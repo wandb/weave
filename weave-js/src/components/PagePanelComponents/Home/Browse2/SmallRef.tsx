@@ -4,7 +4,6 @@ import {
   isWandbArtifactRef,
   isWeaveObjectRef,
   ObjectRef,
-  parseRef,
   refUri,
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
@@ -205,14 +204,6 @@ export const SmallRef: FC<{
       {Item}
     </Link>
   );
-};
-
-export const parseRefMaybe = (s: string): ObjectRef | null => {
-  try {
-    return parseRef(s);
-  } catch (e) {
-    return null;
-  }
 };
 
 export const isObjDeleteError = (e: any): boolean => {

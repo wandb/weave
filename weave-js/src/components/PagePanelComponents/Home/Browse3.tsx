@@ -47,6 +47,7 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
   browse2Context,
@@ -73,7 +74,6 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
-  DEFAULT_COLUMN_VISIBILITY_CALLS,
   DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
@@ -537,6 +537,9 @@ const Browse3ProjectRoot: FC<{
           ]}>
           <PlaygroundPageBinding />
         </Route>
+        <Route path={`${projectRoot}/compare`}>
+          <ComparePageBinding />
+        </Route>
       </Switch>
     </Box>
   );
@@ -736,7 +739,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return DEFAULT_COLUMN_VISIBILITY_CALLS;
+      return {};
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -1038,6 +1041,12 @@ const TablesPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
+};
+
+const ComparePageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return <ComparePage entity={params.entity} project={params.project} />;
 };
 
 const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (

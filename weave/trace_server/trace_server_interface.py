@@ -479,7 +479,7 @@ class ObjDeleteReq(BaseModel):
     include_children: Optional[bool] = Field(
         default=False,
         description="Recursively delete children of this object that are not "
-        "used by other objects"
+        "used by other objects",
     )
 
 

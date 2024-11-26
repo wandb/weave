@@ -8,7 +8,7 @@ import {
   TraceCallSchema,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {ChatCompletion, ChatRequest, Choice} from './types';
+import {Chat, ChatCompletion, ChatRequest, Choice} from './types';
 
 export enum ChatFormat {
   None = 'None',
@@ -59,6 +59,12 @@ export const isToolCall = (toolCall: any): boolean => {
 };
 
 export const isToolCalls = (toolCalls: any): boolean => {
+  if (toolCalls === null) {
+    // Some llms return null for tool calls
+    // before the chat view was hidden for those calls
+    return true;
+  }
+
   if (!_.isArray(toolCalls)) {
     return false;
   }
@@ -361,10 +367,7 @@ export const useCallAsChat = (
   call: TraceCallSchema
 ): {
   loading: boolean;
-  isStructuredOutput: boolean;
-  request: ChatRequest;
-  result: ChatCompletion | null;
-} => {
+} & Chat => {
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();

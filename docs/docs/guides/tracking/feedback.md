@@ -180,3 +180,101 @@ Additionally, you can use call() method to execute the operation and retrieve th
     ```
   </TabItem>
 </Tabs>
+
+## Human annotation
+
+Human annotations are supported in the weave UI after configuration of a Human Annotation scorer, which can be accessed via the `Scorers` page in the navigation sidebar. Once configured, annotations can be used when inspecting individual calls in the main Call or Evaluation table, by selecting the marker icon in the call header (seen below).
+
+![Marker icon in call header](./imgs/marker-icon.png)
+
+### Creating a Human Annotation scorer
+
+To create a scorer, click "create scorer" in the "Scorers" page (accessed via the navigation sidebar). Select the type of scorer, in this case: "Human annotation". Then fill out the subsequent form to configure the scorer, paying special attention to the `Type`, which will be used to determine the type of feedback that will be collected. Here is an example scorer configuration where a human labeler is asked to choose which type of document the llm used:
+
+![Human Annotation scorer form](./imgs/human-annotation-scorer-form.png)
+
+This scorer will automatically show up in the "Feedback" sidebar with the options provided.
+
+![Human Annotation scorer feedback sidebar](./imgs/full-feedback-sidebar.png)
+
+Once labeled, the feedback can also be viewed in the calls table (refreshing the table may be required). The column can be ordered and filtered.
+
+![Human Annotation scorer feedback in calls table](./imgs/feedback-in-the-table.png)
+
+### Through the API
+
+Human annotation scorers can also be configured through the API. Each scorer is its own object, which is created and updated independently. The following example creates two scorers, one for the temperature of the llm call, and one for the tone of the response. Simply import the `AnnotationSpec` class from `weave.flow.annotation_spec` and use the `save` method on the weave client to create the scorer.
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    import weave
+    from weave.flow.annotation_spec import AnnotationSpec
+
+    api = weave.init("feedback-example")
+
+    spec1 = AnnotationSpec(
+      name="Temperature",
+      description="The perceived temperature of the llm call",
+      field_schema={
+        "type": "number",
+        "minimum": -1,
+        "maximum": 1,
+      }
+    )
+    spec2 = AnnotationSpec(
+      name="Tone",
+      description="The tone of the llm response",
+      field_schema={
+        "type": "string",
+        "enum": ["Aggressive", "Neutral", "Polite", "N/A"],
+      },
+    )
+    api.save(spec1, "temperature-scorer")
+    api.save(spec2, "tone-scorer")
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
+### Modifying a Human Annotation scorer
+
+Building on the previous example, the following code creates a new version of the temperature scorer, by using the same object-id when saving.
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    ```python
+    import weave
+    from weave.flow.annotation_spec import AnnotationSpec
+
+    api = weave.init("feedback-example")
+
+    # create a new version of the scorer
+    spec1 = AnnotationSpec(
+      name="Temperature",
+      description="The perceived temperature of the llm call",
+      field_schema={
+        "type": "integer",  # <<- change type to integer
+        "minimum": -1,
+        "maximum": 1,
+      }
+    )
+    api.save(spec1, "temperature-scorer")
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
+The result is an updated object, with a history of all versions. This can be viewed in the scorers tab, under "Human annotations".
+
+![Human Annotation scorer history](./imgs/human-annotation-scorer-history.png)

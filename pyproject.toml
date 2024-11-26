@@ -43,6 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",      # Used by scorers for field validation
 ]
 
 [project.optional-dependencies]
@@ -79,6 +80,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
 test = [
   "nox",
   "pytest>=8.2.0",
@@ -90,7 +92,6 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
-  "jsonschema>=4.23.0",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -222,7 +223,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.20-dev0"
+current_version = "0.51.23-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

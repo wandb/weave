@@ -74,6 +74,10 @@ class TableRef(Ref):
 
         return self._row_digests
 
+    @property
+    def project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):
             refs_internal.validate_no_slashes(self._digest, "digest")
@@ -167,6 +171,18 @@ class ObjectRef(RefWithExtra):
             prompt = EasyPrompt.from_obj(obj)
             # We want to use the ref on the object (and not self) as it will have had
             # version number or latest alias resolved to a specific digest.
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
+        if "StringPrompt" == class_name:
+            from weave.flow.prompt.prompt import StringPrompt
+
+            prompt = StringPrompt.from_obj(obj)
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
+        if "MessagesPrompt" == class_name:
+            from weave.flow.prompt.prompt import MessagesPrompt
+
+            prompt = MessagesPrompt.from_obj(obj)
             prompt.__dict__["ref"] = obj.ref
             return prompt
         return obj

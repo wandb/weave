@@ -45,47 +45,74 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import process_incoming_object
-from weave.trace_server.calls_query_builder import (CallsQuery,
-                                                    HardCodedFilter,
-                                                    OrderField,
-                                                    QueryBuilderDynamicField,
-                                                    QueryBuilderField,
-                                                    combine_conditions)
-from weave.trace_server.clickhouse_schema import (CallDeleteCHInsertable,
-                                                  CallEndCHInsertable,
-                                                  CallStartCHInsertable,
-                                                  CallUpdateCHInsertable,
-                                                  ObjCHInsertable,
-                                                  ObjDeleteCHInsertable,
-                                                  SelectableCHCallSchema,
-                                                  SelectableCHObjSchema)
+from weave.trace_server.base_object_class_util import process_incoming_object_val
+from weave.trace_server.calls_query_builder import (
+    CallsQuery,
+    HardCodedFilter,
+    OrderField,
+    QueryBuilderDynamicField,
+    QueryBuilderField,
+    combine_conditions,
+)
+from weave.trace_server.clickhouse_schema import (
+    CallDeleteCHInsertable,
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+    CallUpdateCHInsertable,
+    ObjCHInsertable,
+    ObjDeleteCHInsertable,
+    SelectableCHCallSchema,
+    SelectableCHObjSchema,
+)
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import (InsertTooLarge, InvalidRequest,
-                                       MissingLLMApiKeyError, NotFoundError,
-                                       ObjectDeletedError, RequestTooLarge)
-from weave.trace_server.feedback import (TABLE_FEEDBACK,
-                                         validate_feedback_create_req,
-                                         validate_feedback_purge_req)
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidRequest,
+    MissingLLMApiKeyError,
+    NotFoundError,
+    ObjectDeletedError,
+    RequestTooLarge,
+)
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
-from weave.trace_server.model_providers.model_providers import \
-    read_model_to_provider_info_map
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
-    ROW_ORDER_COLUMN_NAME, TABLE_ROWS_ALIAS, VAL_DUMP_COLUMN_NAME,
-    make_natural_sort_table_query, make_standard_table_query)
-from weave.trace_server.token_costs import (LLM_TOKEN_PRICES_TABLE,
-                                            validate_cost_purge_req)
+    ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS_ALIAS,
+    VAL_DUMP_COLUMN_NAME,
+    make_natural_sort_table_query,
+    make_standard_table_query,
+)
+from weave.trace_server.token_costs import (
+    LLM_TOKEN_PRICES_TABLE,
+    validate_cost_purge_req,
+)
 from weave.trace_server.trace_server_common import (
-    LRUCache, digest_is_version_like, empty_str_to_none, get_nested_key,
-    hydrate_calls_with_feedback, make_derived_summary_fields,
-    make_feedback_query_req, set_nested_key)
+    LRUCache,
+    digest_is_version_like,
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
+)
 from weave.trace_server.trace_server_interface_util import (
-    assert_non_null_wb_user_id, bytes_digest, extract_refs_from_values,
-    str_digest)
+    assert_non_null_wb_user_id,
+    bytes_digest,
+    extract_refs_from_values,
+    str_digest,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -550,7 +577,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        val, base_object_class = process_incoming_object(
+        val, base_object_class = process_incoming_object_val(
             req.obj.val, req.obj.set_base_object_class
         )
 
@@ -695,9 +722,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for obj_ref in db_obj.refs:
                 child_obj_ref = ri.parse_internal_uri(obj_ref)
                 if isinstance(child_obj_ref, ri.InternalTableRef):
-                    raise TypeError(
-                        "Table ref deletion not yet supported, coming soon"
-                    )
+                    raise TypeError("Table ref deletion not yet supported, coming soon")
 
         delete_insertables.append(
             ObjDeleteCHInsertable(
@@ -1389,7 +1414,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}

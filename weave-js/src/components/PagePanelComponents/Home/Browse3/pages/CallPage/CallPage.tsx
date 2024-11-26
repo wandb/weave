@@ -1,5 +1,7 @@
 import Box from '@mui/material/Box';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
+import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -10,11 +12,14 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../Browse3';
 import {
+  FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
+import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -31,9 +36,11 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
+import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
+
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -56,10 +63,24 @@ export const CallPage: FC<{
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
+export const useShowRunnableUI = () => {
+  const viewerInfo = useViewerInfo();
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+};
+
 const useCallTabs = (call: CallSchema) => {
+  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const handleOpenInPlayground = () => {
+    window.open(
+      urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
+      '_blank'
+    );
+  };
+
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -86,11 +107,20 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <ScrollableTabContent>
-                <Tailwind>
-                  <CallChat call={call.traceCall!} />
-                </Tailwind>
-              </ScrollableTabContent>
+              <>
+                <Button
+                  variant="secondary"
+                  startIcon="sandbox-playground"
+                  className="m-16 mb-8"
+                  onClick={handleOpenInPlayground}>
+                  Open chat in playground
+                </Button>
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <CallChat call={call.traceCall!} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
             ),
           },
         ]
@@ -128,6 +158,21 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
+    // For now, we are only showing this tab for W&B admins since the
+    // feature is in active development. We want to be able to get
+    // feedback without enabling for all users.
+    ...(showScores
+      ? [
+          {
+            label: 'Scores (W&B Admin Preview)',
+            content: (
+              <Tailwind>
+                <CallScoresViewer call={call} />
+              </Tailwind>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Use',
       content: (
@@ -156,6 +201,10 @@ const CallPageInnerVertical: FC<{
     TRACETREE_PARAM in query
       ? query[TRACETREE_PARAM] === '1'
       : !isEvaluateOp(call.spanName);
+  const showFeedbackExpand =
+    FEEDBACK_EXPAND_PARAM in query
+      ? query[FEEDBACK_EXPAND_PARAM] === '1'
+      : false;
 
   const onToggleTraceTree = useCallback(() => {
     history.replace(
@@ -165,7 +214,8 @@ const CallPageInnerVertical: FC<{
         call.traceId,
         call.callId,
         path,
-        !showTraceTree
+        !showTraceTree,
+        showFeedbackExpand
       )
     );
   }, [
@@ -177,7 +227,25 @@ const CallPageInnerVertical: FC<{
     history,
     path,
     showTraceTree,
+    showFeedbackExpand,
   ]);
+  const onToggleFeedbackExpand = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
+    call.entity,
+    call.project
+  );
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
@@ -233,12 +301,34 @@ const CallPageInnerVertical: FC<{
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
             />
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
-      isSidebarOpen={showTraceTree}
+      isRightSidebarOpen={showFeedbackExpand}
+      rightSidebarContent={
+        <Tailwind style={{display: 'contents'}}>
+          <div className="flex h-full flex-col">
+            <FeedbackSidebar
+              humanAnnotationSpecs={humanAnnotationSpecs}
+              specsLoading={specsLoading}
+              callID={currentCall.callId}
+              entity={currentCall.entity}
+              project={currentCall.project}
+            />
+          </div>
+        </Tailwind>
+      }
       headerContent={<CallOverview call={currentCall} />}
-      leftSidebar={
+      isLeftSidebarOpen={showTraceTree}
+      leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
             {loading ? (
