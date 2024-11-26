@@ -1,21 +1,21 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import { Button } from '@wandb/weave/components/Button';
-import { useObjectViewEvent } from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, { useMemo, useState } from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
+import React, {useMemo, useState} from 'react';
 
-import { maybePluralizeWord } from '../../../../../core/util/string';
-import { Icon, IconName } from '../../../../Icon';
-import { LoadingDots } from '../../../../LoadingDots';
-import { Tailwind } from '../../../../Tailwind';
-import { Tooltip } from '../../../../Tooltip';
-import { useClosePeek } from '../context';
-import { NotFoundPanel } from '../NotFoundPanel';
-import { CustomWeaveTypeProjectContext } from '../typeViews/CustomWeaveTypeDispatcher';
-import { WeaveCHTableSourceRefContext } from './CallPage/DataTableView';
-import { ObjectViewerSection } from './CallPage/ObjectViewerSection';
-import { WFHighLevelCallFilter } from './CallsPage/callsTableFilter';
-import { DeleteModal } from './common/DeleteModal';
+import {maybePluralizeWord} from '../../../../../core/util/string';
+import {Icon, IconName} from '../../../../Icon';
+import {LoadingDots} from '../../../../LoadingDots';
+import {Tailwind} from '../../../../Tailwind';
+import {Tooltip} from '../../../../Tooltip';
+import {useClosePeek} from '../context';
+import {NotFoundPanel} from '../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
+import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
+import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -23,20 +23,20 @@ import {
   objectVersionText,
   OpVersionLink,
 } from './common/Links';
-import { CenteredAnimatedLoader } from './common/Loader';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import { EvaluationLeaderboardTab } from './LeaderboardTab';
-import { TabPrompt } from './TabPrompt';
-import { TabUseDataset } from './TabUseDataset';
-import { TabUseModel } from './TabUseModel';
-import { TabUseObject } from './TabUseObject';
-import { TabUsePrompt } from './TabUsePrompt';
-import { KNOWN_BASE_OBJECT_CLASSES } from './wfReactInterface/constants';
-import { useWFHooks } from './wfReactInterface/context';
+import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabPrompt} from './TabPrompt';
+import {TabUseDataset} from './TabUseDataset';
+import {TabUseModel} from './TabUseModel';
+import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
+import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
@@ -281,7 +281,7 @@ const ObjectVersionPageInner: React.FC<{
             open={deleteModalOpen}
             onClose={() => setDeleteModalOpen(false)}
             deleteTargetStr={`${objectVersion.objectId}:v${objectVersion.versionIndex}`}
-            onDelete={objectDelete(objectVersion)}
+            onDelete={() => objectDelete(objectVersion)}
             onSuccess={closePeek}
           />
         </Stack>

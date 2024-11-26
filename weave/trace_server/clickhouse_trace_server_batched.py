@@ -604,10 +604,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     @staticmethod
     def _make_conds_from_digest(
         digest: str,
-    ) -> tuple[list[str], Dict[str, Union[str, int]]]:
+    ) -> tuple[list[str], dict[str, Union[str, int]]]:
         (is_version, version_index) = digest_is_version_like(digest)
         conds: list[str] = []
-        parameters: Dict[str, Union[str, int]] = {}
+        parameters: dict[str, Union[str, int]] = {}
         if digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -630,7 +630,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> SelectableCHObjSchema:
         (is_version, version_index) = digest_is_version_like(digest)
         conds: list[str] = []
-        parameters: Dict[str, Union[str, int]] = {"object_id": object_id}
+        parameters: dict[str, Union[str, int]] = {"object_id": object_id}
         if digest == "latest":
             conds.append("is_latest = 1")
         else:

@@ -4,10 +4,9 @@ import {
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
-import { Switch } from '@wandb/weave/components';
-import { Button } from '@wandb/weave/components/Button';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
-import React, { useState } from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import React, {useState} from 'react';
 import styled from 'styled-components';
 
 interface DeleteModalProps {
@@ -27,7 +26,6 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
 }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [includeChildren, setIncludeChildren] = useState(false);
 
   const handleDelete = () => {
     setDeleteLoading(true);
@@ -54,48 +52,34 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
       maxWidth="xs"
       fullWidth>
       <Tailwind>
-      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
-      <DialogContent style={{overflow: 'hidden'}}>
-        <div className="mb-16">
-          {error != null ? (
-            <p style={{color: 'red'}}>{error}</p>
-          ) : (
-            <p>Are you sure you want to delete?</p>
-          )}
-        </div>
-        <span className="text-md font-semibold mt-10">
-          {deleteTargetStr}
-        </span>
-      </DialogContent>
-      <DialogActions $align="left">
-        <Button
-          variant="destructive"
-          disabled={error != null || deleteLoading}
-          onClick={handleDelete}>
-          {`Delete ${deleteTargetStr}`}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={deleteLoading}
-          onClick={() => {
-            onClose();
-            setError(null);
-          }}>
-          Cancel
-        </Button>
-        <div className="flex items-center">
-        <label htmlFor="include-children" className="mr-8">
-          Recurse
-        </label>
-        <Switch.Root
-          id="include-children"
-          size="small"
-          checked={includeChildren}
-          onCheckedChange={setIncludeChildren}>
-          <Switch.Thumb size="small" checked={includeChildren} />
-        </Switch.Root>
-      </div>
-      </DialogActions>
+        <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
+        <DialogContent style={{overflow: 'hidden'}}>
+          <div className="mb-16">
+            {error != null ? (
+              <p style={{color: 'red'}}>{error}</p>
+            ) : (
+              <p>Are you sure you want to delete?</p>
+            )}
+          </div>
+          <span className="text-md mt-10 font-semibold">{deleteTargetStr}</span>
+        </DialogContent>
+        <DialogActions $align="left">
+          <Button
+            variant="destructive"
+            disabled={error != null || deleteLoading}
+            onClick={handleDelete}>
+            {`Delete ${deleteTargetStr}`}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={deleteLoading}
+            onClick={() => {
+              onClose();
+              setError(null);
+            }}>
+            Cancel
+          </Button>
+        </DialogActions>
       </Tailwind>
     </Dialog>
   );
