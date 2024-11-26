@@ -33,6 +33,8 @@ type CodeViewProps = {
   maxLines?: number;
 };
 
+const DEFAULT_MAX_LINES = 20;
+
 export const CodeView = ({uri, maxLines}: CodeViewProps) => {
   const {
     derived: {useCodeForOpRef},
@@ -68,7 +70,7 @@ export const CodeView = ({uri, maxLines}: CodeViewProps) => {
   );
 
   const totalLines = sanitized.split('\n').length ?? 0;
-  const showLines = Math.min(totalLines, maxLines ?? 20);
+  const showLines = Math.min(totalLines, maxLines ?? DEFAULT_MAX_LINES);
   const lineHeight = 18;
   const padding = 20;
   const height = showLines * lineHeight + padding + 'px';

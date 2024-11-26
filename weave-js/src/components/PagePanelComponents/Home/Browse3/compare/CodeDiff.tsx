@@ -17,6 +17,8 @@ type CodeDiffProps = {
   maxLines?: number;
 };
 
+const DEFAULT_MAX_LINES = 20;
+
 export const CodeDiff = ({
   oldValueRef,
   newValueRef,
@@ -81,7 +83,7 @@ export const CodeDiff = ({
     );
 
   const totalLines = sanitizedNew.split('\n').length ?? 0;
-  const showLines = Math.min(totalLines, maxLines ?? 20);
+  const showLines = Math.min(totalLines, maxLines ?? DEFAULT_MAX_LINES);
   const lineHeight = 18;
   const padding = 20;
   const height = showLines * lineHeight + padding + 'px';
