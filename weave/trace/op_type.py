@@ -574,9 +574,6 @@ def load_instance(
         version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
     )
 
-    with open(module_path) as file:
-        print(file.read())
-
     sys.path.insert(0, os.path.abspath(module_dir))
     try:
         mod = __import__(import_name, fromlist=[module_dir])
