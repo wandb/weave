@@ -3,7 +3,14 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -249,14 +256,31 @@ const CallPageInnerVertical: FC<{
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
-  const callComplete = useCall(
-    {
-      entity: selectedCall.entity,
-      project: selectedCall.project,
-      callId: selectedCall.callId,
-    },
-    {includeCosts: true}
-  );
+  const callComplete = useCall({
+    entity: selectedCall.entity,
+    project: selectedCall.project,
+    callId: selectedCall.callId,
+  });
+  const callCompleteWithCosts = useMemo(() => {
+    if (callComplete.result?.traceCall == null) {
+      return callComplete.result;
+    }
+    return {
+      ...callComplete.result,
+      traceCall: {
+        ...callComplete.result?.traceCall,
+        summary: {
+          ...callComplete.result?.traceCall?.summary,
+          weave: {
+            ...callComplete.result?.traceCall?.summary?.weave,
+            // Only selectedCall has costs, injected when creating
+            // the trace tree
+            costs: selectedCall.traceCall?.summary?.weave?.costs,
+          },
+        },
+      },
+    };
+  }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -268,29 +292,14 @@ const CallPageInnerVertical: FC<{
   }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
-    if (!callComplete.loading && callComplete.result) {
-      setCurrentCall(callComplete.result);
+    if (callCompleteWithCosts != null) {
+      setCurrentCall(callCompleteWithCosts);
     }
   }, [callComplete]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationContols = isPeeking && rowIdsConfigured;
-
-  console.log(
-    'callComplete',
-    callComplete.result?.callId,
-    callComplete.result?.traceCall?.summary?.weave?.costs,
-    'selectedCall',
-    selectedCall.callId,
-    selectedCall.traceCall?.summary?.weave?.costs,
-    'call',
-    call.callId,
-    call.traceCall?.summary?.weave?.costs,
-    'currentCall',
-    currentCall.callId,
-    currentCall.traceCall?.summary?.weave?.costs
-  );
 
   const callTabs = useCallTabs(currentCall);
 
