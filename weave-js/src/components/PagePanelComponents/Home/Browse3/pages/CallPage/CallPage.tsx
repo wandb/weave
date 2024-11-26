@@ -79,7 +79,7 @@ const useCallTabs = (call: CallSchema) => {
 
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showTryInPlayground =
-    !isPeeking || !window.location.pathname.includes('/weave/playground');
+    !isPeeking || !window.location.toString().includes('/weave/playground');
 
   const handleOpenInPlayground = () => {
     window.open(
