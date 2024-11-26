@@ -103,7 +103,7 @@ export const useCallsForQuery = (
     costFilter,
     effectiveLimit,
     undefined,
-    sortBy,
+    undefined,
     undefined,
     costCols,
     expandedColumns,
