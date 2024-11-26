@@ -10,9 +10,11 @@ Test that the scorer unification works as expected. Specifically, that the same 
 import os
 from contextlib import contextmanager
 
+import pytest
+
 import weave
 from weave.scorers.test_scorer import TestScorer
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.trace.weave_client import CallRef, WeaveClient, get_ref
 from weave.trace_server.trace_server_interface import CallsQueryReq
 
 
@@ -29,43 +31,65 @@ def temp_env(key: str, value: str):
             os.environ[key] = old_value
 
 
-def execute_test_call():
+def make_dataset():
+    return [{"a": 1, "b": "hello"}]
+
+
+def make_model():
     @weave.op
-    def action(a: int, b: str) -> str:
+    def model(a: int, b: str) -> str:
         return str(a) + ":" + b
 
-    res, call = action.call(1, "hello")
+    return model
+
+
+def execute_test_call():
+    model = make_model()
+    rows = make_dataset()
+    res, call = model.call(*rows[0].values())
     assert call.inputs == {"a": 1, "b": "hello"}
 
     return res, call
 
 
-def assert_valid_results(client, score, scorer, score_call):
+def assert_valid_results(client, scorer):
     exp_score = {
         "input_a": 1,
         "input_b_length": 5,
         "output_length": 7,
-        "scorer_property": 42 * 1,
+        "scorer_property": 42,
         "test_api_key_length": 5,
     }
-    assert score == exp_score
-
     calls = client.server.calls_query(
         CallsQueryReq(project_id=client._project_id(), include_feedback=True)
     ).calls
-    assert len(calls) == 2
-    feedback_entry = calls[0].summary["weave"]["feedback"][0]
+    assert len(calls) >= 2
+    model_call = [c for c in calls if "model" in c.op_name][0]
+    score_call = [c for c in calls if "TestScorer" in c.op_name][0]
+    feedback_entry = model_call.summary["weave"]["feedback"][0]
     feedback_entry["feedback_type"] = "wandb.runnable.TestScorer"
     feedback_entry["payload"] = {"output": exp_score}
     feedback_entry["runnable_ref"] = scorer.ref.uri()
-    feedback_entry["call_ref"] = score_call.ref.uri()
+    project_id = client._project_id()
+    entity, project = project_id.split("/")
+    feedback_entry["call_ref"] = CallRef(
+        entity=entity,
+        project=project,
+        id=score_call.id,
+    ).uri()
+
+    assert score_call.output == exp_score
+
+
+def create_local_test_scorer():
+    return TestScorer(scorer_property=42)
 
 
 def test_manual_scoring_local_construction(client: WeaveClient):
     res, call = execute_test_call()
 
-    # 1. Manual Construction
-    scorer = TestScorer(scorer_property=42)
+    # 1. Local Construction
+    scorer = create_local_test_scorer()
 
     # 2. Manual Scoring
     with temp_env("TEST_API_KEY", "12345"):
@@ -79,25 +103,33 @@ def test_manual_scoring_local_construction(client: WeaveClient):
     )
 
     # Verify Correct Results
-    assert_valid_results(client, score, scorer, score_call)
+    assert_valid_results(client, scorer)
 
 
 def test_client_scoring_local_construction(client: WeaveClient):
     res, call = execute_test_call()
 
-    # 1. Manual Construction
-    scorer = TestScorer(scorer_property=42)
+    # 1. Local Construction
+    scorer = create_local_test_scorer()
 
     # 2. Client Scoring
     with temp_env("TEST_API_KEY", "12345"):
         score, score_call = call._apply_scorer(scorer)
 
     # Verify Correct Results
-    assert_valid_results(client, score, scorer, score_call)
+    assert_valid_results(client, scorer)
 
 
-def test_evaluation_scoring_local_construction(client: WeaveClient):
-    raise NotImplementedError("Not implemented")
+@pytest.mark.asyncio
+async def test_evaluation_scoring_local_construction(client: WeaveClient):
+    model = make_model()
+    scorer = create_local_test_scorer()
+    rows = make_dataset()
+    eval = weave.Evaluation(dataset=rows, scorers=[scorer])
+    with temp_env("TEST_API_KEY", "12345"):
+        await eval.evaluate(model)
+
+    assert_valid_results(client, scorer)
 
 
 def test_remote_scoring_local_construction(client: WeaveClient):

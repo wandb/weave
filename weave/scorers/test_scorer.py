@@ -14,9 +14,9 @@ class TestScorer(Scorer):
     def score(self, a: int, b: str, output: str) -> dict:
         test_api_key = getenv("TEST_API_KEY")
         return {
-            "input_a": a,
-            "input_b_length": len(b),
-            "output_length": len(output),
-            "scorer_property": self.scorer_property,
+            "input_a": a + 0,
+            "input_b_length": len(b + ""),
+            "output_length": len(output + ""),
+            "scorer_property": self.scorer_property * 1,
             "test_api_key_length": len(test_api_key) if test_api_key else None,
         }
