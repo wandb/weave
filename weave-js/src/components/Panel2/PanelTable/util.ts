@@ -64,7 +64,7 @@ export const stripTag = (type: Type): Type => {
 
 // Very simple type shape comparison util used to determine if tableState
 // needs to be reset or not.
-export const typeShapesMatch = (type: Type, toType: Type): boolean => {
+export const typesAreConcattable = (type: Type, toType: Type): boolean => {
   function propertyTypesAreCompatible(
     incomingTypedDict: TypedDictType,
     toTypedDict: TypedDictType
@@ -72,7 +72,7 @@ export const typeShapesMatch = (type: Type, toType: Type): boolean => {
     for (const key of Object.keys(toTypedDict.propertyTypes)) {
       const keyType = incomingTypedDict.propertyTypes[key];
       const toKeyType = toTypedDict.propertyTypes[key];
-      if (keyType === undefined || !typeShapesMatch(keyType, toKeyType!)) {
+      if (keyType === undefined || !typesAreConcattable(keyType, toKeyType!)) {
         return false;
       }
     }
@@ -87,7 +87,7 @@ export const typeShapesMatch = (type: Type, toType: Type): boolean => {
     return (
       isList(type) &&
       isList(toType) &&
-      typeShapesMatch(listObjectType(type), listObjectType(toType))
+      typesAreConcattable(listObjectType(type), listObjectType(toType))
     );
   }
   // TypedDict type handling

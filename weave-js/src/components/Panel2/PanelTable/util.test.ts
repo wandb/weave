@@ -1,7 +1,7 @@
 import {list, typedDict, union} from '../../../core/model/helpers';
-import {typeShapesMatch} from './util';
+import {typesAreConcattable} from './util';
 
-describe('typeShapesMatch', () => {
+describe('typesAreConcattable', () => {
   it('Matches union types', () => {
     const colsRunOne = {
       id: union(['none', 'string']),
@@ -18,7 +18,7 @@ describe('typeShapesMatch', () => {
         typedDict(colsRunOne),
       ])
     );
-    expect(typeShapesMatch(type, toType)).toBe(true);
+    expect(typesAreConcattable(type, toType)).toBe(true);
   });
 
   it('Matches union types that contain typedDict', () => {
@@ -30,7 +30,7 @@ describe('typeShapesMatch', () => {
     const colsRunTwo = {...colsRunOne, prediction: union(['none', 'number'])};
     const toType = list(typedDict(colsRunOne));
     const type = list(union([typedDict(colsRunTwo), typedDict(colsRunOne)]));
-    expect(typeShapesMatch(type, toType)).toBe(true);
+    expect(typesAreConcattable(type, toType)).toBe(true);
   });
 
   it('Fails when union member of type do not contain all keys of toType', () => {
@@ -51,25 +51,25 @@ describe('typeShapesMatch', () => {
         }),
       ])
     );
-    expect(typeShapesMatch(type, toType)).toBe(false);
+    expect(typesAreConcattable(type, toType)).toBe(false);
   });
 
   it('matches simple typed dicts', () => {
     const type1 = typedDict({a: 'number', b: 'string'});
     const type2 = typedDict({a: 'number', b: 'string'});
-    expect(typeShapesMatch(type1, type2)).toBe(true);
+    expect(typesAreConcattable(type1, type2)).toBe(true);
   });
 
   it('fails when typed dict is missing properties', () => {
     const type1 = typedDict({a: 'number'});
     const type2 = typedDict({a: 'number', b: 'string'});
-    expect(typeShapesMatch(type2, type1)).toBe(true); // type1 can be assigned to type2
-    expect(typeShapesMatch(type1, type2)).toBe(false); // type2 cannot be assigned to type1
+    expect(typesAreConcattable(type2, type1)).toBe(true); // type1 can be assigned to type2
+    expect(typesAreConcattable(type1, type2)).toBe(false); // type2 cannot be assigned to type1
   });
 
   it('fails when union contains non-typed dict', () => {
     const baseType = typedDict({a: 'number'});
     const unionType = union(['string', typedDict({a: 'number'})]);
-    expect(typeShapesMatch(unionType, baseType)).toBe(false);
+    expect(typesAreConcattable(unionType, baseType)).toBe(false);
   });
 });
