@@ -506,10 +506,31 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
+    import_code = []
+    code = []
+    warnings = []
+
+    # Get reducers from the lifecycle handler
+    if hasattr(obj.lifecycle_handler, "callbacks"):
+        print(f"Found callbacks: {obj.lifecycle_handler.callbacks}")
+        for callback in obj.lifecycle_handler.callbacks:
+            # ReducerCallback wraps the actual reducer function
+            if hasattr(callback, "reducer"):
+                reducer = callback.reducer
+                print(f"Found reducer: {reducer}")
+                try:
+                    reducer_source = get_source_notebook_safe(reducer)
+                    code.append(reducer_source)
+                except Exception as e:
+                    print(f"Error getting reducer source: {e}")
+                    warnings.append(f"Could not capture reducer source: {e}")
+
+    # Get the main function and its dependencies
     result = get_code_deps_safe(obj.resolve_fn, artifact)
-    import_code = result["import_code"]
-    code = result["code"]
-    warnings = result["warnings"]
+    import_code.extend(result["import_code"])
+    code.extend(result["code"])
+    warnings.extend(result["warnings"])
+
     if warnings:
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
         for warning in warnings:
@@ -554,6 +575,9 @@ def load_instance(
     import_name = (
         version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
     )
+
+    with open(module_path) as file:
+        print(file.read())
 
     sys.path.insert(0, os.path.abspath(module_dir))
     try:

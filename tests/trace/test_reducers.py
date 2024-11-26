@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import textwrap
 from dataclasses import dataclass
 
 import weave
@@ -22,7 +24,43 @@ def test_basic_reducer(client):
     calls = client.get_calls()
     call = calls[0]
 
+    # The output is accumulated
     assert call.output == "the quick brown fox"
+
+    # The reducer is also captured in the op code
+    ref = weave.publish(generator)
+    op = ref.get()
+
+    reducer_src = textwrap.dedent(inspect.getsource(concat))
+    op_code = op.art.path_contents["obj.py"].decode()
+
+    assert reducer_src in op_code
+
+
+def test_lambda_reducer(client):
+    @weave.op(reducers=[lambda val, acc="": acc + val])
+    def generator():
+        yield "the "
+        yield "quick "
+        yield "brown "
+        yield "fox"
+
+    for _ in generator():
+        pass
+
+    calls = client.get_calls()
+    call = calls[0]
+
+    # The output is accumulated
+    assert call.output == "the quick brown fox"
+
+    # The reducer is also captured in the op code
+    ref = weave.publish(generator)
+    op = ref.get()
+
+    reducer_src = """lambda val, acc="": acc + val"""
+    op_code = op.art.path_contents["obj.py"].decode()
+    assert reducer_src in op_code
 
 
 def test_complex_reducer(client):
@@ -54,7 +92,16 @@ def test_complex_reducer(client):
     calls = client.get_calls()
     call = calls[0]
 
+    # The output is accumulated
     assert call.output == Completion(text="the quick brown fox")
+
+    # The reducer is also captured in the op code
+    ref = weave.publish(generator)
+    op = ref.get()
+
+    reducer_src = textwrap.dedent(inspect.getsource(reducer))
+    op_code = op.art.path_contents["obj.py"].decode()
+    assert reducer_src in op_code
 
 
 def test_generator_as_default_reducer(client):
@@ -71,4 +118,7 @@ def test_generator_as_default_reducer(client):
     calls = client.get_calls()
     call = calls[0]
 
+    # The output is accumulated
     assert call.output == ["the", "quick", "brown", "fox"]
+
+    # We don't need to check for the reducer because it's the default
