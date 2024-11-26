@@ -49,6 +49,7 @@ dependencies = [
 [project.optional-dependencies]
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
 anthropic = ["anthropic>=0.18.0"]
+bedrock = ["boto3==1.34.34"] # Pinned to what litellm is pinned to
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]

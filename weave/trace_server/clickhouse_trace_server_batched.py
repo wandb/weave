@@ -1462,14 +1462,57 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        if not api_key:
+        isBedrock = model_info.get("litellm_provider") == "bedrock"
+        if not api_key and not isBedrock:
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
 
+        aws_access_key_id = None
+        aws_secret_access_key = None
+        aws_region_name = None
+
+        if isBedrock:
+            aws_access_key_id = (
+                secret_fetcher.fetch("AWS_ACCESS_KEY_ID")
+                .get("secrets", {})
+                .get("AWS_ACCESS_KEY_ID")
+            )
+            aws_secret_access_key = (
+                secret_fetcher.fetch("AWS_SECRET_ACCESS_KEY")
+                .get("secrets", {})
+                .get("AWS_SECRET_ACCESS_KEY")
+            )
+            aws_region_name = (
+                secret_fetcher.fetch("AWS_REGION_NAME")
+                .get("secrets", {})
+                .get("AWS_REGION_NAME")
+            )
+            if not aws_region_name:
+                raise MissingLLMApiKeyError(
+                    f"No AWS region name found for model {model_name}",
+                    api_key_name="AWS_REGION_NAME",
+                )
+            elif not aws_access_key_id:
+                raise MissingLLMApiKeyError(
+                    f"No AWS access key ID found for model {model_name}",
+                    api_key_name="AWS_ACCESS_KEY_ID",
+                )
+            elif not aws_secret_access_key:
+                raise MissingLLMApiKeyError(
+                    f"No AWS secret access key found for model {model_name}",
+                    api_key_name="AWS_SECRET_ACCESS_KEY",
+                )
+
         start_time = datetime.datetime.now()
-        res = lite_llm_completion(api_key, req.inputs)
+        res = lite_llm_completion(
+            api_key,
+            req.inputs,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_region_name=aws_region_name,
+        )
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:

@@ -2,7 +2,11 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 def lite_llm_completion(
-    api_key: str, inputs: tsi.CompletionsCreateRequestInputs
+    api_key: str,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    aws_access_key_id: str = None,
+    aws_secret_access_key: str = None,
+    aws_region_name: str = None,
 ) -> tsi.CompletionsCreateRes:
     import litellm
 
@@ -10,7 +14,11 @@ def lite_llm_completion(
     litellm.drop_params = True
     try:
         res = litellm.completion(
-            **inputs.model_dump(exclude_none=True), api_key=api_key
+            **inputs.model_dump(exclude_none=True),
+            api_key=api_key,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_region_name=aws_region_name,
         )
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
