@@ -1,6 +1,11 @@
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {LLMMaxTokensKey} from './llmMaxTokens';
+import {
+  findMostSimilarLLMName,
+  LLM_MAX_TOKENS_KEYS,
+  LLMMaxTokensKey,
+} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -34,7 +39,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   presencePenalty: 0,
   //   nTimes: 1,
   maxTokensLimit: 16384,
-  model: 'gpt-4o-mini' as LLMMaxTokensKey,
+  model: 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey,
 };
 
 export const usePlaygroundState = () => {
@@ -105,6 +110,20 @@ export const usePlaygroundState = () => {
         }
         if (inputs.presence_penalty) {
           newState.presencePenalty = parseFloat(inputs.presence_penalty);
+        }
+        if (inputs.model) {
+          if (LLM_MAX_TOKENS_KEYS.includes(inputs.model as LLMMaxTokensKey)) {
+            newState.model = inputs.model as LLMMaxTokensKey;
+          } else {
+            const closestModel = findMostSimilarLLMName(
+              inputs.model,
+              LLM_MAX_TOKENS_KEYS
+            );
+            toast(
+              `We currently don't support ${inputs.model}, in the playground. We will default to ${closestModel}`
+            );
+            newState.model = closestModel as LLMMaxTokensKey;
+          }
         }
         return [newState];
       });
