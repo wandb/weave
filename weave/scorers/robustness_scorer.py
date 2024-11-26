@@ -18,21 +18,21 @@ class RobustnessScorer(Scorer):
     The scorer measures how much the model's outputs change when the inputs are slightly altered.
     It quantifies this change using statistical effect size measures:
 
-    - **Cohen's h** for binary (exact match) comparisons.
+    - **Cohen's h** for use_exact_match (exact match) comparisons.
     - **Cohen's d** for continuous (semantic similarity) comparisons.
 
-    The scorer supports both exact match (binary) and semantic similarity evaluations. Both metrics are statistical measures and should be interpreted accordingly.
+    The scorer supports both exact match (use_exact_match) and semantic similarity evaluations. Both metrics are statistical measures and should be interpreted accordingly.
 
     Attributes:
-        binary (bool): If True, uses exact match for binary scoring and computes Cohen's h.
-                       If False, uses semantic similarity and computes Cohen's d.
+        use_exact_match (bool): If True, uses exact match scoring and computes Cohen's h.
+                       If False, uses semantic similarity scoring and computes Cohen's d.
         embedding_model_name (str): Name of the embedding model to use for computing semantic similarity.
         similarity_metric (str): The similarity metric to use. Currently, only 'cosine' is supported.
         embedding_model (Optional[SentenceTransformer]): The loaded embedding model used for computing embeddings.
 
     Usage Example:
         # Initialize the scorer
-        scorer = RobustnessScorer(binary=False)
+        scorer = RobustnessScorer(use_exact_match=False)
 
         # Outputs from the model
         outputs = [
@@ -48,7 +48,7 @@ class RobustnessScorer(Scorer):
         print(result)
     """
 
-    binary: bool = True
+    use_exact_match: bool = True
     embedding_model_name: str = "all-MiniLM-L6-v2"
     similarity_metric: str = "cosine"
     embedding_model: Optional[SentenceTransformer] = None
@@ -61,7 +61,7 @@ class RobustnessScorer(Scorer):
             __context (Any): Contextual information (not used in this implementation).
         """
         # Load an embedding model for semantic similarity scoring
-        if not self.binary:
+        if not self.use_exact_match:
             self.embedding_model = SentenceTransformer(self.embedding_model_name)
 
     @weave.op
@@ -69,6 +69,7 @@ class RobustnessScorer(Scorer):
         self,
         output: list[Union[str, bool]],
         ground_truths: Optional[list[Union[str, bool]]] = None,
+        return_interpretation: bool = False,
     ) -> dict:
         """
         Computes the robustness score of the model's outputs.
@@ -80,9 +81,9 @@ class RobustnessScorer(Scorer):
         Returns:
             dict: A dictionary containing the robustness metrics and scores.
 
-                - For binary scoring:
+                - For use_exact_match scoring:
                     - "cohen_h": The computed Cohen's h value.
-                - For non-binary scoring:
+                - For semantic similarity scoring:
                     - "cohen_d": The computed Cohen's d value.
 
                 Common keys:
@@ -120,8 +121,8 @@ class RobustnessScorer(Scorer):
         perturbed_outputs = output[1:]
 
         # Compute similarity scores
-        if self.binary:
-            # Binary scoring using exact match
+        if self.use_exact_match:
+            # Exact match scoring
             if ground_truths:
                 similarities = [
                     1.0 if output[i] == ground_truths[i] else 0.0
@@ -153,30 +154,37 @@ class RobustnessScorer(Scorer):
                 score_o = 1.0  # Similarity of original output with itself
                 perturbed_similarities = similarities
 
-        if not self.binary:
+        if not self.use_exact_match:
             # Compute Cohen's d for continuous scores
             d = self.compute_cohens_d(score_o, perturbed_similarities)
-            return {
+            result = {
                 "cohen_d": d,
                 "score(original)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
+            if return_interpretation:
+                result["interpretation"] = self.get_cohen_d_interpretation(d)
+            return result
         else:
-            # Compute Cohen's h for binary scores
+            # Compute Cohen's h for use_exact_match scores
             h = self.compute_cohens_h(score_o, perturbed_similarities)
-            return {
+            result = {
                 "cohen_h": h,
                 "score(original)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
+            if return_interpretation:
+                result["interpretation"] = self.get_cohen_h_interpretation(h)
+            return result
 
+    @weave.op()
     def compute_cohens_h(
         self, score_o: float, perturbed_similarities: list[float]
     ) -> float:
         """
-        Computes Cohen's h for binary scores.
+        Computes Cohen's h for use_exact_match scores.
 
-        Cohen's h measures the effect size for proportions, suitable for binary data.
+        Cohen's h measures the effect size for proportions, suitable for use_exact_match data.
         It is calculated using the arcsine transformation of the proportions.
 
         Args:
@@ -211,6 +219,7 @@ class RobustnessScorer(Scorer):
 
         return h
 
+    @weave.op()
     def compute_cohens_d(
         self, score_o: float, perturbed_similarities: list[float]
     ) -> float:
@@ -248,7 +257,7 @@ class RobustnessScorer(Scorer):
             - Interpretation should consider the practical significance and context,
               especially with small sample sizes.
             - If the standard deviation of the differences is zero, the effect size is 0.
-            - If the standard deviation is very close to zero and the mean difference is also close to zero, the effect size will be large which is counter intuitive. Either increase the number of perturbed outputs or use binary scoring in such cases. Alternatively, interpret the results accordingly.
+            - If the standard deviation is very close to zero and the mean difference is also close to zero, the effect size will be large which is counter intuitive. Either increase the number of perturbed outputs or use `use_exact_match` scoring in such cases. Alternatively, interpret the results accordingly.
 
         """
         differences = [score_o - s for s in perturbed_similarities]
@@ -260,6 +269,7 @@ class RobustnessScorer(Scorer):
         else:
             return (mean_diff / std_diff).item()
 
+    @weave.op()
     def compute_similarity(self, text1: str, text2: str) -> float:
         """
         Computes similarity between two texts based on the specified metric.
@@ -278,7 +288,7 @@ class RobustnessScorer(Scorer):
             - **"cosine"**: Cosine similarity between sentence embeddings.
 
         Notes:
-            - Requires the embedding model to be loaded (when `binary=False`).
+            - Requires the embedding model to be loaded (when `use_exact_match=False`).
             - Cosine similarity is computed using sentence embeddings from the specified model.
             - You can use any other embedding model by setting the `embedding_model_name` attribute which is compatible with `SentenceTransformer`. This flexibility will allow you to use the right embedding representation for your use case.
 
@@ -294,6 +304,39 @@ class RobustnessScorer(Scorer):
             return sim.item()
         else:
             raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
+        
+    def get_cohen_h_interpretation(self, h: float) -> str:
+        if h < 0.0032:
+            return "Essentially no effect"
+        elif h < 0.0637:
+            return "Very small effect"
+        elif h < 0.1592:
+            return "Small effect"
+        elif h < 0.2546:
+            return "Medium effect"
+        elif h < 0.3820:
+            return "Large effect"
+        elif h < 0.6366:
+            return "Very large effect"
+        else:
+            return "Huge effect"
+
+
+    def get_cohen_d_interpretation(self, d: float) -> str:
+        if d < 0.01:
+            return "Negligible effect"
+        elif d < 0.19:
+            return "Very small effect"
+        elif d < 0.49:
+            return "Small effect"
+        elif d < 0.79:
+            return "Medium effect"
+        elif d < 1.19:
+            return "Large effect"
+        elif d < 1.99:
+            return "Very large effect"
+        else:
+            return "Huge effect"
 
 
 def get_keyboard_adjacent(char: str) -> list[str]:
@@ -414,6 +457,7 @@ def emphasize_words(text: str) -> str:
     return " ".join(words)
 
 
+# TODO: add support for paraphrasing of inputs
 def create_perturbed_dataset(
     dataset: list[str], num_perturbations: int = 7
 ) -> list[dict]:

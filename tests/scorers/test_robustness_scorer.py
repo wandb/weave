@@ -135,7 +135,7 @@ def test_robustness_scorer_non_binary():
     ]
 
     # Instantiate the scorer with binary=False
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
 
     # Run the scorer's `score` method
     result = robustness_scorer.score(output=output)
@@ -165,7 +165,7 @@ def test_robustness_scorer_non_binary_with_ground_truths():
     ground_truths = ["Paris", "Paris", "Paris", "Paris"]
 
     # Instantiate the scorer with binary=False
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
 
     # Run the scorer's `score` method
     result = robustness_scorer.score(output=output, ground_truths=ground_truths)
@@ -185,7 +185,7 @@ def test_robustness_scorer_non_binary_with_ground_truths():
 def test_robustness_scorer_invalid_similarity_metric():
     output = ["Text A", "Text B"]
     robustness_scorer = RobustnessScorer(
-        binary=False, similarity_metric="invalid_metric"
+        use_exact_match=False, similarity_metric="invalid_metric"
     )
 
     with pytest.raises(
@@ -202,7 +202,7 @@ def test_robustness_scorer_zero_variance():
         "The quick brown fox jumps over the lazy dog.",
     ]
 
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
     result = robustness_scorer.score(output=output)
 
     # Since all outputs are identical, differences are zero, and std_dev is zero
@@ -221,7 +221,7 @@ def test_robustness_scorer_long_texts():
         "who kept a spear in his rack, an old shield, a thin horse, and a hunting greyhound.",
     ]
 
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer returns a valid effect size
@@ -237,7 +237,7 @@ def test_robustness_scorer_unicode_texts():
         "C'est la vie",  # Perturbed output without emoji
     ]
 
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer computes a valid effect size
@@ -253,7 +253,7 @@ def test_robustness_scorer_unicode_texts():
         "C'est la vie",  # Perturbed output without emoji
     ]
 
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
     result = robustness_scorer.score(output=output)
 
     # Assert that the scorer computes a valid effect size
@@ -263,7 +263,7 @@ def test_robustness_scorer_unicode_texts():
 
 def test_robustness_scorer_compute_similarity_exception():
     output = ["Text A", "Text B"]
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
 
     # Mock the embedding model to raise an exception
     def mock_encode(*args, **kwargs):
@@ -296,11 +296,19 @@ def test_robustness_scorer_multilingual_texts():
         "こんにちは、お元気ですか？",  # Japanese
     ]
 
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
     result = robustness_scorer.score(output=output)
 
     # Since texts are in different languages, expect low similarities
     assert result["score(perturbed)"] < 0.5
+
+
+def test_interpretation_strings():
+    scorer = RobustnessScorer(use_exact_match=True)
+    outputs = ["The capital of France is Paris.", "Paris is the capital of France."]
+    result = scorer.score(output=outputs, return_interpretation=True)
+    assert "interpretation" in result
+    assert isinstance(result["interpretation"], str)
 
 
 @pytest.mark.asyncio
@@ -426,7 +434,7 @@ async def test_robustness_scorer_non_binary_evaluation():
         return outputs
 
     # Instantiate the RobustnessScorer with binary=False
-    robustness_scorer = RobustnessScorer(binary=False)
+    robustness_scorer = RobustnessScorer(use_exact_match=False)
 
     # Perform evaluation using Weave's Evaluation framework
     evaluation = weave.Evaluation(
