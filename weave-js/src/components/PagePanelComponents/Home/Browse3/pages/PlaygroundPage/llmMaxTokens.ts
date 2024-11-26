@@ -1,3 +1,5 @@
+import levenshtein from 'js-levenshtein';
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
@@ -126,32 +128,6 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-// Helper function to calculate string similarity using Levenshtein distance
-const getLevenshteinDistance = (str1: string, str2: string): number => {
-  const track = Array(str2.length + 1)
-    .fill(null)
-    .map(() => Array(str1.length + 1).fill(null));
-
-  for (let i = 0; i <= str1.length; i++) {
-    track[0][i] = i;
-  }
-  for (let j = 0; j <= str2.length; j++) {
-    track[j][0] = j;
-  }
-
-  for (let j = 1; j <= str2.length; j++) {
-    for (let i = 1; i <= str1.length; i++) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      track[j][i] = Math.min(
-        track[j][i - 1] + 1, // deletion
-        track[j - 1][i] + 1, // insertion
-        track[j - 1][i - 1] + indicator // substitution
-      );
-    }
-  }
-  return track[str2.length][str1.length];
-};
-
 // Main function to find most similar LLM name
 export const findMostSimilarLLMName = (
   input: string,
@@ -168,10 +144,7 @@ export const findMostSimilarLLMName = (
   let smallestDistance = Infinity;
 
   llmList.forEach(llmName => {
-    const distance = getLevenshteinDistance(
-      normalizedInput,
-      llmName.toLowerCase()
-    );
+    const distance = levenshtein(normalizedInput, llmName.toLowerCase());
 
     if (distance < smallestDistance) {
       smallestDistance = distance;
