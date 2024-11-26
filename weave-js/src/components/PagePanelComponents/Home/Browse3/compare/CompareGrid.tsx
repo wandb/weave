@@ -221,18 +221,33 @@ export const CompareGrid = ({
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
-  const getGroupIds = useCallback(() => {
+  const getAutoexpandedGroupIds = useCallback(() => {
     const rowIds = apiRef.current.getAllRowIds();
-    return rowIds.filter(rowId => {
+    const filtered = rowIds.filter(rowId => {
+      // Only consider group nodes
       const rowNode = apiRef.current.getRowNode(rowId);
-      return rowNode && rowNode.type === 'group';
+      const isGroup = rowNode && rowNode.type === 'group';
+      if (!isGroup) {
+        return false;
+      }
+
+      // To help mitigate page freezes with large objects, limit
+      // the depth we are willing to autoexpand.
+      if (rowNode.depth >= 3) {
+        return false;
+      }
+
+      // Don't autoexpand rows with no differences
+      const rowData = apiRef.current.getRow(rowId);
+      return rowData.changeType !== UNCHANGED;
     });
+    return filtered;
   }, [apiRef]);
 
-  // On first render expand groups
+  // On first render autoexpand some groups
   useEffect(() => {
-    setExpandedIds(getGroupIds());
-  }, [setExpandedIds, getGroupIds]);
+    setExpandedIds(getAutoexpandedGroupIds());
+  }, [setExpandedIds, getAutoexpandedGroupIds]);
 
   return (
     <StyledDataGrid

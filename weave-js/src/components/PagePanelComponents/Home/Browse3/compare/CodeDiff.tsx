@@ -9,31 +9,21 @@ import React from 'react';
 import {sanitizeString} from '../../../../../util/sanitizeSecrets';
 import {Loading} from '../../../../Loading';
 import {useWFHooks} from '../pages/wfReactInterface/context';
-
-// Simple language detection based on file extension or content
-// TODO: Unify this utility method with Browse2OpDefCode.tsx
-const detectLanguage = (uri: string, code: string) => {
-  if (uri.endsWith('.py')) {
-    return 'python';
-  }
-  if (uri.endsWith('.js') || uri.endsWith('.ts')) {
-    return 'javascript';
-  }
-  if (code.includes('def ') || code.includes('import ')) {
-    return 'python';
-  }
-  if (code.includes('function ') || code.includes('const ')) {
-    return 'javascript';
-  }
-  return 'plaintext';
-};
+import {detectLanguage} from './CodeView';
 
 type CodeDiffProps = {
   oldValueRef: string;
   newValueRef: string;
+  maxLines?: number;
 };
 
-export const CodeDiff = ({oldValueRef, newValueRef}: CodeDiffProps) => {
+const DEFAULT_MAX_LINES = 20;
+
+export const CodeDiff = ({
+  oldValueRef,
+  newValueRef,
+  maxLines,
+}: CodeDiffProps) => {
   const {
     derived: {useCodeForOpRef},
   } = useWFHooks();
@@ -65,6 +55,10 @@ export const CodeDiff = ({oldValueRef, newValueRef}: CodeDiffProps) => {
           readOnly: true,
           minimap: {enabled: false},
           scrollBeyondLastLine: false,
+          scrollbar: {
+            handleMouseWheel: true, // Make horizontal scrolling with wheel work
+            alwaysConsumeMouseWheel: false, // Don't capture page scroll
+          },
           padding: {top: 10, bottom: 10},
           renderSideBySide: false,
         }}
@@ -79,14 +73,17 @@ export const CodeDiff = ({oldValueRef, newValueRef}: CodeDiffProps) => {
           readOnly: true,
           minimap: {enabled: false},
           scrollBeyondLastLine: false,
+          scrollbar: {
+            handleMouseWheel: true, // Make horizontal scrolling with wheel work
+            alwaysConsumeMouseWheel: false, // Don't capture page scroll
+          },
           padding: {top: 10, bottom: 10},
         }}
       />
     );
 
-  const maxRowsInView = 20;
   const totalLines = sanitizedNew.split('\n').length ?? 0;
-  const showLines = Math.min(totalLines, maxRowsInView);
+  const showLines = Math.min(totalLines, maxLines ?? DEFAULT_MAX_LINES);
   const lineHeight = 18;
   const padding = 20;
   const height = showLines * lineHeight + padding + 'px';

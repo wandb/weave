@@ -11,7 +11,6 @@ import {ObjectPath} from '../pages/CallPage/traverse';
 import {CodeDiff} from './CodeDiff';
 import {CompareGridCellValue} from './CompareGridCellValue';
 import {CompareGridPill} from './CompareGridPill';
-import {RESOLVED_REF_KEY} from './refUtil';
 
 const ARROW = '→';
 
@@ -34,21 +33,11 @@ export const CompareGridCell = ({
   compareValueType,
   rowChangeType,
 }: CompareGridCellProps) => {
-  if (valueType === 'array') {
-    return null;
-  }
-
   // If all of the row values are the same we can just display the value
   if (rowChangeType === 'UNCHANGED' && _.isEqual(value, compareValue)) {
     return (
       <CompareGridCellValue path={path} value={value} valueType={valueType} />
     );
-  }
-
-  if (valueType === 'object' && compareValueType === 'object') {
-    if (!(RESOLVED_REF_KEY in value) || !(RESOLVED_REF_KEY in compareValue)) {
-      return null;
-    }
   }
 
   if (valueType === 'code' && compareValueType === 'code') {

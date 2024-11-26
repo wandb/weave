@@ -41,9 +41,6 @@ import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 
-// Remove this to "release" annotations
-const SHOW_ANNOTATIONS = false;
-
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -304,20 +301,18 @@ const CallPageInnerVertical: FC<{
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
             />
-            {SHOW_ANNOTATIONS && (
-              <Button
-                icon="marker"
-                tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
-                variant="ghost"
-                active={showFeedbackExpand ?? false}
-                onClick={onToggleFeedbackExpand}
-                className="ml-4"
-              />
-            )}
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
-      isRightSidebarOpen={showFeedbackExpand && SHOW_ANNOTATIONS}
+      isRightSidebarOpen={showFeedbackExpand}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
