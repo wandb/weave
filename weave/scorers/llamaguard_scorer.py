@@ -45,16 +45,18 @@ class LlamaGuard(Scorer):
         "S13": "Elections",
         "S14": "Code Interpreter Abuse",
     }
-    _generate_config: PrivateAttr[dict[str, Any]] = {
-        "max_new_tokens": 20,
-        "output_scores": True,
-        "return_dict_in_generate": True,
-        "pad_token_id": 0,
-        "top_p": None,
-        "do_sample": False,  # greedy decoding
-        "temperature": None,
-        "output_logits": True,
-    }
+    _generate_config: dict[str, Any] = PrivateAttr(
+        default={
+            "max_new_tokens": 20,
+            "output_scores": True,
+            "return_dict_in_generate": True,
+            "pad_token_id": 0,
+            "top_p": None,
+            "do_sample": False,  # greedy decoding
+            "temperature": None,
+            "output_logits": True,
+        }
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """

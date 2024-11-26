@@ -220,13 +220,15 @@ class ToxicityScorer(RollingWindowScorer):
     device: str = "cpu"
     max_tokens: int = 512
     overlap: int = 50
-    _categories: PrivateAttr[list[str]] = [
-        "Race/Origin",
-        "Gender/Sex",
-        "Religion",
-        "Ability",
-        "Violence",
-    ]
+    _categories: list[str] = PrivateAttr(
+        default=[
+            "Race/Origin",
+            "Gender/Sex",
+            "Religion",
+            "Ability",
+            "Violence",
+        ]
+    )
 
     def model_post_init(self, __context: Any) -> None:
         try:
@@ -284,7 +286,12 @@ class BiasScorer(ToxicityScorer):
     device: str = "cpu"
     max_tokens: int = 512
     overlap: int = 50
-    _categories: PrivateAttr[list[str]] = ["racial_bias", "gender_bias"]
+    _categories: list[str] = PrivateAttr(
+        default=[
+            "racial_bias",
+            "gender_bias",
+        ]
+    )
 
     def predict(self, prompt: str) -> list[float]:
         """
@@ -372,10 +379,12 @@ class CustomBiasScorer(PipelineScorer):
     task: str = "text-classification"
     device: str = "cpu"
     threshold: float = 0.5
-    _categories: PrivateAttr[list[str]] = [
-        "gender_bias",
-        "racial_bias",
-    ]
+    _categories: list[str] = PrivateAttr(
+        default=[
+            "gender_bias",
+            "racial_bias",
+        ]
+    )
     pipeline_kwargs: dict[str, Any] = {"top_k": 2}
 
     @weave.op
