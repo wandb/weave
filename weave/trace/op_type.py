@@ -507,13 +507,13 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
     import_code = []
-    code_blocks = []
+    code = []
     warnings = []
 
     # Get main function dependencies first
     result = get_code_deps_safe(obj.resolve_fn, artifact)
     import_code.extend(result["import_code"])
-    code_blocks.extend(result["code"])
+    code.extend(result["code"])
     warnings.extend(result["warnings"])
 
     # Then get reducers and their dependencies
@@ -521,11 +521,11 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         if reducer := getattr(callback, "reducer", None):
             reducer_deps = get_code_deps_safe(reducer, artifact)
             import_code.extend(reducer_deps["import_code"])
-            code_blocks.extend(reducer_deps["code"])
+            code.extend(reducer_deps["code"])
             warnings.extend(reducer_deps["warnings"])
 
             # Add reducer source
-            code_blocks.append(get_source_notebook_safe(reducer))
+            code.append(get_source_notebook_safe(reducer))
 
     if warnings:
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
@@ -540,7 +540,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
             "@weave.op()", op_function_code
         )
-    code_blocks.append(op_function_code)
+    code.append(op_function_code)
 
     # Write the file
     with artifact.new_file(f"{name}.py") as f:
@@ -551,7 +551,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
 
-        code_block = "\n".join(dedupe_list(code_blocks))
+        code_block = "\n".join(dedupe_list(code))
         f.write(f"{import_block}\n\n{code_block}")
 
 
