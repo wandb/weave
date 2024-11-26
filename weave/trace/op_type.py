@@ -507,28 +507,48 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
     import_code = []
-    code = []
+    code_blocks = []
     warnings = []
 
-    # Get reducers from the lifecycle handler
-    if hasattr(obj.lifecycle_handler, "callbacks"):
-        print(f"Found callbacks: {obj.lifecycle_handler.callbacks}")
-        for callback in obj.lifecycle_handler.callbacks:
-            # ReducerCallback wraps the actual reducer function
-            if hasattr(callback, "reducer"):
-                reducer = callback.reducer
-                print(f"Found reducer: {reducer}")
-                try:
-                    reducer_source = get_source_notebook_safe(reducer)
-                    code.append(reducer_source)
-                except Exception as e:
-                    print(f"Error getting reducer source: {e}")
-                    warnings.append(f"Could not capture reducer source: {e}")
+    # Get reducers and their dependencies
+    for callback in obj.lifecycle_handler.callbacks:
+        if (reducer := getattr(callback, "reducer", None)):
+            # Get reducer dependencies first
+            reducer_deps = get_code_deps_safe(reducer, artifact)
+            import_code.extend(reducer_deps["import_code"])
 
-    # Get the main function and its dependencies
+            # Store the class definitions separately
+            class_definitions = []
+            other_code = []
+            for code_block in reducer_deps["code"]:
+                if code_block.strip().startswith("@dataclass"):
+                    class_definitions.append(code_block)
+                else:
+                    other_code.append(code_block)
+
+            # Add class definitions first
+            code_blocks.extend(class_definitions)
+            code_blocks.extend(other_code)
+            warnings.extend(reducer_deps["warnings"])
+
+            # Add reducer source
+            code_blocks.append(get_source_notebook_safe(reducer))
+
+    # Get main function dependencies
     result = get_code_deps_safe(obj.resolve_fn, artifact)
     import_code.extend(result["import_code"])
-    code.extend(result["code"])
+
+    # Again, separate class definitions
+    class_definitions = []
+    other_code = []
+    for code_block in result["code"]:
+        if code_block.strip().startswith("@dataclass"):
+            class_definitions.append(code_block)
+        else:
+            other_code.append(code_block)
+
+    # Move any remaining class definitions to the top
+    code_blocks = class_definitions + code_blocks + other_code
     warnings.extend(result["warnings"])
 
     if warnings:
@@ -536,24 +556,26 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         for warning in warnings:
             message += "\n  " + warning
 
+    # Add the main op
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
-
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
     else:
         op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
             "@weave.op()", op_function_code
         )
-    code.append(op_function_code)
+    code_blocks.append(op_function_code)
 
+    # Write the file
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
-        import_block = "\n".join(import_code)
+        import_block = "\n".join(dedupe_list(import_code))
         import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
-        code_block = "\n".join(code)
+
+        code_block = "\n".join(dedupe_list(code_blocks))
         f.write(f"{import_block}\n\n{code_block}")
 
 
