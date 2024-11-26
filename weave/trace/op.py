@@ -928,36 +928,6 @@ def _call_context(op: Op, call: Call, should_raise: bool):
         call_context.pop_call(call.id)
 
 
-def _wrap_generator(
-    op: Op, args: Any, kwargs: Any, *, call: Call, should_raise: bool
-) -> Callable:
-    func = op.resolve_fn
-
-    @wraps(func)
-    def _wrapped_sync_generator() -> Any:
-        with _call_context(op, call, should_raise):
-            for val in func(*args, **kwargs):
-                op.lifecycle_handler.before_yield(call, val)
-                yield val
-
-    return _wrapped_sync_generator()
-
-
-async def _wrap_async_generator(
-    op: Op, args: Any, kwargs: Any, *, call: Call, should_raise: bool
-) -> Callable:
-    func = op.resolve_fn
-
-    @wraps(func)
-    async def _wrapped_async_generator() -> Any:
-        with _call_context(op, call, should_raise):
-            async for val in await func(*args, **kwargs):
-                op.lifecycle_handler.before_yield(call, val)
-                yield val
-
-    return _wrapped_async_generator()
-
-
 async def _exc_op_async(
     op: Op,
     args: Any,
@@ -1001,9 +971,15 @@ async def _exc_op_async(
         if custom_iterator_wrapper:
             res = await custom_iterator_wrapper(op, args, kwargs, call, should_raise)
         else:
-            res = await _wrap_async_generator(
-                op, args, kwargs, call=call, should_raise=should_raise
-            )
+
+            @wraps(func)
+            async def _wrapped_async_generator() -> Any:
+                with _call_context(op, call, should_raise):
+                    async for val in await func(*args, **kwargs):
+                        op.lifecycle_handler.before_yield(call, val)
+                        yield val
+
+            res = await _wrapped_async_generator()
     else:
         # regular async func
         with _call_context(op, call, should_raise):
@@ -1057,9 +1033,15 @@ def _exc_op(
         if custom_iterator_wrapper:
             res = custom_iterator_wrapper(op, args, kwargs, call, should_raise)
         else:
-            res = _wrap_generator(
-                op, args, kwargs, call=call, should_raise=should_raise
-            )
+
+            @wraps(func)
+            def _wrapped_sync_generator() -> Any:
+                with _call_context(op, call, should_raise):
+                    for val in func(*args, **kwargs):
+                        op.lifecycle_handler.before_yield(call, val)
+                        yield val
+
+            res = _wrapped_sync_generator()
     else:
         # regular sync func
         with _call_context(op, call, should_raise):
