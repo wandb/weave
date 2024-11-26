@@ -4,13 +4,14 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 
 import {StyledTextArea} from '../StyledTextarea';
+import {PlaygroundMessageRole} from '../types';
 
 type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: 'assistant' | 'user') => void;
-  onAdd: (role: 'assistant' | 'user', text: string) => void;
+  onSend: (role: PlaygroundMessageRole) => void;
+  onAdd: (role: PlaygroundMessageRole, text: string) => void;
   settingsTab: number | null;
 };
 
@@ -32,9 +33,8 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   onAdd,
   settingsTab,
 }) => {
-  const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
-    'user'
-  );
+  const [addMessageRole, setAddMessageRole] =
+    useState<PlaygroundMessageRole>('user');
   const [shouldReset, setShouldReset] = useState(false);
 
   const handleReset = () => {
@@ -42,12 +42,12 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
     setTimeout(() => setShouldReset(false), 0);
   };
 
-  const handleSend = (role: 'assistant' | 'user') => {
+  const handleSend = (role: PlaygroundMessageRole) => {
     onSend(role);
     handleReset();
   };
 
-  const handleAdd = (role: 'assistant' | 'user', text: string) => {
+  const handleAdd = (role: PlaygroundMessageRole, text: string) => {
     onAdd(role, text);
     handleReset();
   };
@@ -113,6 +113,14 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               Add as
               <Button
                 className="ml-4 rounded-r-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'system'}
+                onClick={() => setAddMessageRole('system')}>
+                System
+              </Button>
+              <Button
+                className="rounded-none"
                 variant="secondary"
                 size="medium"
                 active={addMessageRole === 'assistant'}
