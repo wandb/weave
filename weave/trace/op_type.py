@@ -550,7 +550,6 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
-
         code_block = "\n".join(dedupe_list(code))
         f.write(f"{import_block}\n\n{code_block}")
 
