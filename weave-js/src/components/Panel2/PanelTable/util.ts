@@ -116,6 +116,13 @@ export const typeShapesMatch = (type: Type, toType: Type): boolean => {
   // This util's original behavior never properly handled comparing two union types together;
   // it just returned true. To minimize the risk of shipping a regression, I am leaving this
   // legacy behavior alone for now.
+
+  // This returns true when comparing:
+  //   Two compatible TypedDicts
+  //   One TypedDict to a compatible Union<TypedDict[]>
+  //   Two Unions of any type
+  //
+  //   Two Lists that contain any of the types mentioned above
   return true;
 };
 
