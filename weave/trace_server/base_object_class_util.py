@@ -29,7 +29,7 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
-def process_incoming_object(
+def process_incoming_object_val(
     val: Any, req_base_object_class: Optional[str] = None
 ) -> tuple[dict, Optional[str]]:
     """

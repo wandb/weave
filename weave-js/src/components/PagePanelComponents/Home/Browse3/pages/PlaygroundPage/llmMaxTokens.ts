@@ -1,7 +1,6 @@
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
-// Others were removed because we want users to use models with the dates
 export const LLM_MAX_TOKENS = {
   'gpt-4o-mini': {
     provider: 'openai',
@@ -350,6 +349,7 @@ export const LLM_PROVIDERS = [
   'groq',
   'bedrock',
 ];
+
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
   string

@@ -92,7 +92,7 @@ export const FeedbackSidebar = ({
   ]);
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full w-full flex-col bg-white">
       <div className="justify-left flex w-full border-b border-moon-300 p-12">
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
@@ -126,7 +126,7 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mt-12 w-full items-center justify-center">
+        <div className="mr-10 mt-12 items-center justify-center">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
