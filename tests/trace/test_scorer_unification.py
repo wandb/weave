@@ -41,13 +41,14 @@ def execute_test_call():
 
 
 def assert_valid_results(client, score, scorer, score_call):
-    assert score == {
+    exp_score = {
         "input_a": 1,
         "input_b_length": 5,
         "output_length": 7,
         "scorer_property": 42 * 1,
         "test_api_key_length": 5,
     }
+    assert score == exp_score
 
     calls = client.server.calls_query(
         CallsQueryReq(project_id=client._project_id(), include_feedback=True)
@@ -55,20 +56,12 @@ def assert_valid_results(client, score, scorer, score_call):
     assert len(calls) == 2
     feedback_entry = calls[0].summary["weave"]["feedback"][0]
     feedback_entry["feedback_type"] = "wandb.runnable.TestScorer"
-    feedback_entry["payload"] = {
-        "output": {
-            "input_a": 1,
-            "input_b_length": 5,
-            "output_length": 7,
-            "scorer_property": 42,
-            "test_api_key_length": 5,
-        }
-    }
+    feedback_entry["payload"] = {"output": exp_score}
     feedback_entry["runnable_ref"] = scorer.ref.uri()
     feedback_entry["call_ref"] = score_call.ref.uri()
 
 
-def test_manual_scoring(client):
+def test_manual_scoring_local_construction(client: WeaveClient):
     res, call = execute_test_call()
 
     # 1. Manual Construction
@@ -89,7 +82,7 @@ def test_manual_scoring(client):
     assert_valid_results(client, score, scorer, score_call)
 
 
-def test_client_scoring(client: WeaveClient):
+def test_client_scoring_local_construction(client: WeaveClient):
     res, call = execute_test_call()
 
     # 1. Manual Construction
@@ -101,3 +94,47 @@ def test_client_scoring(client: WeaveClient):
 
     # Verify Correct Results
     assert_valid_results(client, score, scorer, score_call)
+
+
+def test_evaluation_scoring_local_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_remote_scoring_local_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_manual_scoring_remote_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_client_scoring_remote_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_evaluation_scoring_remote_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_remote_scoring_remote_construction(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_local_remote_construction_identity(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_support_for_field_mapping(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_support_for_generic_parameters(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_support_for_labelled_examples(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
+
+
+def test_support_for_context_fields(client: WeaveClient):
+    raise NotImplementedError("Not implemented")
