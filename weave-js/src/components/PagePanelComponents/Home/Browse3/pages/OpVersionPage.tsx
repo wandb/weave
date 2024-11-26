@@ -76,7 +76,7 @@ const OpVersionPageInner: React.FC<{
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col auto-cols-max gap-[16px] text-[14px]">
+          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name:</p>
               <div className="flex items-center">
