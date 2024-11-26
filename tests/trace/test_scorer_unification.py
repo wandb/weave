@@ -7,6 +7,7 @@ Test that the scorer unification works as expected. Specifically, that the same 
 5. Be fetched from remote and ran locally
 """
 
+import datetime
 import os
 from contextlib import contextmanager
 
@@ -15,7 +16,11 @@ import pytest
 import weave
 from weave.scorers.test_scorer import TestScorer
 from weave.trace.weave_client import CallRef, WeaveClient, get_ref
-from weave.trace_server.trace_server_interface import CallsQueryReq
+from weave.trace_server.trace_server_interface import (
+    CallsQueryReq,
+    ObjCreateReq,
+    ObjReadReq,
+)
 
 
 @contextmanager
@@ -153,7 +158,67 @@ def test_remote_scoring_remote_construction(client: WeaveClient):
 
 
 def test_local_remote_construction_identity(client: WeaveClient):
-    raise NotImplementedError("Not implemented")
+    obj_create = client.server.obj_create(
+        ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client._project_id(),
+                    "object_id": "TestScorer",
+                    "val": {"scorer_property": 42},
+                    "set_builtin_object_class": "TestScorer",
+                }
+            }
+        )
+    )
+    obj_create_digest = obj_create.digest
+    obj_read = client.server.obj_read(
+        ObjReadReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "object_id": "TestScorer",
+                "digest": obj_create_digest,
+            }
+        )
+    )
+
+    exp_obj = {
+        "project_id": client._project_id(),
+        "object_id": "TestScorer",
+        "created_at": AnyDatetime(),
+        "deleted_at": None,
+        "digest": "6deBkn3uPXQdQYTpy8gXCLvO6Xw49vkX9w7cOQK9174",
+        "version_index": 0,
+        "is_latest": 1,
+        "kind": "object",
+        "base_object_class": "Scorer",
+        "val": {
+            "_type": "TestScorer",
+            "name": None,
+            "description": None,
+            "column_map": None,
+            "scorer_property": 42,
+            "builtin_scorer_id": "test_scorer",
+            "_class_name": "TestScorer",
+            "_bases": ["Scorer", "Object", "BaseModel"],
+        },
+    }
+
+    assert obj_read.obj.model_dump() == exp_obj
+
+    scorer = create_local_test_scorer()
+    publish_ref = weave.publish(scorer)
+    # assert publish_ref.digest == obj_create_digest
+    obj_read = client.server.obj_read(
+        ObjReadReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "object_id": "TestScorer",
+                "digest": publish_ref.digest,
+            }
+        )
+    )
+    assert obj_read.obj.model_dump() == exp_obj
+    # {'digest': 'YSYEZwqn9ZG4hGk4Qa0E7xrOPPNGU2YLkjH4fRi7ZFI', 'kind': 'object', 'base_object_class': 'TestScorer', 'val': {'_type': 'TestScorer', 'name': None, 'description': None, 'column_map': None, 'scorer_property': 42, 'builtin_scorer_id': 'test_scorer', 'score': 'weave:///shawn/test-project/op/TestScorer.score:DvH4mmpSt2hyqijBqVbP5Q3MCYeQpuTCGnprWgqVPvM', 'summarize': 'weave:///shawn/test-project/op/Scorer.summarize:HxOZbNXYtY4AxB62O524B7AtmhDGwQ7XgrRaSBCuIzw', '_class_name': 'TestScorer', '_bases': ['Scorer', 'Object', 'BaseModel']}}
 
 
 def test_support_for_field_mapping(client: WeaveClient):
@@ -170,3 +235,8 @@ def test_support_for_labelled_examples(client: WeaveClient):
 
 def test_support_for_context_fields(client: WeaveClient):
     raise NotImplementedError("Not implemented")
+
+
+class AnyDatetime:
+    def __eq__(self, other):
+        return isinstance(other, datetime.datetime)

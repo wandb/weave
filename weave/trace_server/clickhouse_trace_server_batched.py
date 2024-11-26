@@ -45,7 +45,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import process_incoming_object
+from weave.trace_server.builtin_object_class_util import process_incoming_object
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -579,7 +579,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         val, base_object_class = process_incoming_object(
-            req.obj.val, req.obj.set_base_object_class
+            req.obj.val, req.obj.set_builtin_object_class
         )
 
         json_val = json.dumps(val)

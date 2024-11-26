@@ -116,7 +116,7 @@ curl -X POST 'https://trace.wandb.ai/obj/create' \
       "project_id": "user/project",
       "object_id": "my_config",
       "val": {...},
-      "set_base_object_class": "MyConfig"
+      "set_builtin_object_class": "MyConfig"
     }
   }'
 
@@ -155,14 +155,14 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 ### Architecture Flow
 
 1. Define your schema in a python file in the `weave/trace_server/interface/base_object_classes/test_only_example.py` directory. See `weave/trace_server/interface/base_object_classes/test_only_example.py` as an example.
-2. Make sure to register your schemas in `weave/trace_server/interface/base_object_classes/base_object_registry.py` by calling `register_base_object`.
+2. Make sure to register your schemas in `weave/trace_server/interface/base_object_classes/builtin_object_registry.py` by calling `register_builtin_object`.
 3. Run `make synchronize-base-object-schemas` to generate the frontend types.
     * The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/trace_server/interface/base_object_classes/generated/generated_base_object_class_schemas.json`.
     * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts`.
 4. Now, each use case uses different parts:
     1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
     2. `Python Reading`. Users can `weave.ref().get()` and the weave python SDK will return the instance with the correct type. Note: we do some special handling such that the returned object is not a WeaveObject, but literally the exact pydantic class.
-    3. `HTTP Writing`. In cases where the client/user does not want to add the special type information, users can publish base objects by setting the `set_base_object_class` setting on `POST obj/create` to the name of the class. The weave server will validate the object against the schema, update the metadata fields, and store the object.
+    3. `HTTP Writing`. In cases where the client/user does not want to add the special type information, users can publish base objects by setting the `set_builtin_object_class` setting on `POST obj/create` to the name of the class. The weave server will validate the object against the schema, update the metadata fields, and store the object.
     4. `HTTP Reading`. When querying for objects, the server will return the object with the correct type if the `base_object_class` metadata field is set.
     5. `Frontend`. The frontend will read the zod schema from `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBaseObjectInstance`.
 * Note: it is critical that all techniques produce the same digest for the same data - which is tested in the tests. This way versions are not thrashed by different clients/users.
@@ -171,7 +171,7 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 graph TD
     subgraph Schema Definition
         F["weave/trace_server/interface/<br>base_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
-        P --> |register_base_object| R["base_object_registry.py"]
+        P --> |register_builtin_object| R["builtin_object_registry.py"]
     end
 
     subgraph Schema Generation
@@ -185,7 +185,7 @@ graph TD
 
     subgraph "Trace Server"
         subgraph "HTTP API"
-            R --> |validates using| HW["POST obj/create<br>set_base_object_class"]
+            R --> |validates using| HW["POST obj/create<br>set_builtin_object_class"]
             HW --> DB[(Weave Object Store)]
             HR["POST objs/query<br>base_object_classes"] --> |Filters base_object_class| DB
         end
@@ -203,7 +203,7 @@ graph TD
         Z --> |import| UBI["useBaseObjectInstances"]
         Z --> |import| UCI["useCreateBaseObjectInstance"]
         UBI --> |Filters base_object_class| HR
-        UCI --> |set_base_object_class| HW
+        UCI --> |set_builtin_object_class| HW
         UI[React UI] --> UBI
         UI --> UCI
     end

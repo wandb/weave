@@ -14,7 +14,7 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import process_incoming_object
+from weave.trace_server.builtin_object_class_util import process_incoming_object
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -612,7 +612,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
 
         val, base_object_class = process_incoming_object(
-            req.obj.val, req.obj.set_base_object_class
+            req.obj.val, req.obj.set_builtin_object_class
         )
         json_val = json.dumps(val)
         digest = str_digest(json_val)

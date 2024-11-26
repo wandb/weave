@@ -113,11 +113,11 @@ export const createBaseObjectInstance = async <
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
-    req.obj.set_base_object_class != null &&
-    req.obj.set_base_object_class !== baseObjectClassName
+    req.obj.set_builtin_object_class != null &&
+    req.obj.set_builtin_object_class !== baseObjectClassName
   ) {
     throw new Error(
-      `set_base_object_class must match baseObjectClassName: ${baseObjectClassName}`
+      `set_builtin_object_class must match baseObjectClassName: ${baseObjectClassName}`
     );
   }
 
@@ -138,7 +138,7 @@ export const createBaseObjectInstance = async <
     ...req,
     obj: {
       ...req.obj,
-      set_base_object_class: baseObjectClassName,
+      set_builtin_object_class: baseObjectClassName,
     },
   };
 
