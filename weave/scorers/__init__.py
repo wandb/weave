@@ -22,11 +22,11 @@ from weave.scorers.llm_utils import (
     embed,
 )
 from weave.scorers.moderation_scorer import (
-    CustomGenderRaceBiasScorer,
-    GenderRaceBiasScorer,
+    BiasScorer,
+    CustomBiasScorer,
     OpenAIModerationScorer,
     RollingWindowScorer,
-    ToxicScorer,
+    ToxicityScorer,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
@@ -63,8 +63,8 @@ __all__ = [
     "OpenAIModerationScorer",
     "RobustnessScorer",
     "RollingWindowScorer",
-    "ToxicScorer",
-    "GenderRaceBiasScorer",
+    "ToxicityScorer",
+    "BiasScorer",
     "PydanticScorer",
     "Scorer",
     "StringMatchScorer",
@@ -75,5 +75,5 @@ __all__ = [
     "create_perturbed_dataset",
     "LlamaGuard",
     "CoherenceScorer",
-    "CustomGenderRaceBiasScorer",
+    "CustomBiasScorer",
 ]
