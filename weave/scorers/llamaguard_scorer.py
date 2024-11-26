@@ -29,7 +29,7 @@ class LlamaGuard(Scorer):
     automodel_kwargs: dict[str, Any] = {}
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
-    _categories: PrivateAttr[dict[str, str]] = {
+    _categories: dict[str, str] = {
         "S1": "Violent Crimes",
         "S2": "Non-Violent Crimes",
         "S3": "Sex Crimes",
