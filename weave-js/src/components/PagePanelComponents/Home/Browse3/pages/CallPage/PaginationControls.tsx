@@ -28,7 +28,7 @@ export const PaginationControls: FC<{
   const showFeedbackExpand =
     FEEDBACK_EXPAND_PARAM in query
       ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : false;
+      : undefined;
 
   const onNextCall = useCallback(() => {
     const nextCallId = getNextRowId?.(call.callId);

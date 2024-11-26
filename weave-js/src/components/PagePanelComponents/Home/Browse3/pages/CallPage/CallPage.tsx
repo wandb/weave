@@ -215,7 +215,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         !showTraceTree,
-        showFeedbackExpand
+        showFeedbackExpand ? true : undefined
       )
     );
   }, [
@@ -238,7 +238,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         showTraceTree,
-        !showFeedbackExpand
+        !showFeedbackExpand ? true : undefined
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
