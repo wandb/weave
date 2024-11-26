@@ -72,7 +72,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
           settingsTab !== null
             ? 'calc(100% - 58px - 320px)'
             : 'calc(100% - 58px)',
-        zIndex: 100,
+        zIndex: 1,
       }}>
       <Box
         sx={{
