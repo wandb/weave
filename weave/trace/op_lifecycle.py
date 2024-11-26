@@ -100,7 +100,6 @@ class LifecycleHandler:
 
     def run_event(self, event: str, *args: Any, **kwargs: Any) -> None:
         for callback in self.callbacks:
-            print(f">>> LifecycleHandler.run_event {event=} {callback=}")
             if func := getattr(callback, event, None):
                 try:
                     func(*args, **kwargs)
