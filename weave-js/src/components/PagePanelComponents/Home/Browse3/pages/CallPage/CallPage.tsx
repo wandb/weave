@@ -223,7 +223,7 @@ const CallPageInnerVertical: FC<{
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
-  const humanAnnotationSpecs = useHumanAnnotationSpecs(
+  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
   );
@@ -276,21 +276,19 @@ const CallPageInnerVertical: FC<{
           )}
           <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
             <Button
-              icon="marker"
-              tooltip={`${
-                showFeedbackExpand ? 'Hide' : 'Show'
-              } feedback sidebar`}
-              variant="ghost"
-              active={showFeedbackExpand ?? false}
-              onClick={onToggleFeedbackExpand}
-              className="mr-4"
-            />
-            <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
+            />
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
             />
           </Box>
         </Box>
@@ -301,6 +299,7 @@ const CallPageInnerVertical: FC<{
           <div className="flex h-full flex-col">
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
+              specsLoading={specsLoading}
               callID={currentCall.callId}
               entity={currentCall.entity}
               project={currentCall.project}

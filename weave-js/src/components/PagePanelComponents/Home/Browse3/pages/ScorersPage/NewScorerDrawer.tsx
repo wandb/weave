@@ -119,6 +119,7 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
         getClient()
       );
       onClose();
+      setFormData(null);
     } catch (error) {
       console.error('Failed to create scorer:', error);
       // Handle error appropriately

@@ -366,6 +366,9 @@ function buildCallsTableColumns(
             return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            if (typeof params.value === 'boolean') {
+              return <div>{params.value ? 'true' : 'false'}</div>;
+            }
             return <div>{params.value}</div>;
           },
         };
