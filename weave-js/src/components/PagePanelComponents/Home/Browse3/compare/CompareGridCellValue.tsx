@@ -66,5 +66,9 @@ export const CompareGridCellValue = ({
     return <ValueViewNumber value={value} />;
   }
 
+  if (valueType === 'boolean') {
+    return <ValueViewPrimitive>{value.toString()}</ValueViewPrimitive>;
+  }
+
   return <div>{value}</div>;
 };

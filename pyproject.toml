@@ -34,7 +34,7 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-  "pydantic>=2.0.0,<2.10.0", # Pinning to resolve issues caused in 2.10.0 release
+  "pydantic>=2.0.0",
   "wandb>=0.17.1",
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
@@ -85,6 +85,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
 test = [
   "nox",
   "pytest>=8.2.0",

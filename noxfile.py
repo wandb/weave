@@ -47,6 +47,7 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "vertexai",
         "scorers_tests",
         "pandas-test",
     ],

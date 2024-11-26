@@ -19,13 +19,26 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
   return (
     <Box
       sx={{
-        width: '150px',
+        width: 'max-content',
+        maxWidth: '100%',
+        '& .MuiOutlinedInput-root': {
+          width: 'max-content',
+          maxWidth: '200px',
+        },
+        '& > div': {
+          width: 'max-content',
+          maxWidth: '200px',
+        },
+        '& .MuiAutocomplete-popper, & [class*="-menu"]': {
+          width: '300px !important',
+        },
         '& #react-select-2-listbox': {
           width: '300px',
           maxHeight: '500px',
         },
         '& #react-select-2-listbox > div': {
           maxHeight: '500px',
+          width: '300px',
         },
       }}>
       <Select

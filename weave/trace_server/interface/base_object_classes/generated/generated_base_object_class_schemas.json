@@ -77,31 +77,36 @@
           "default": null,
           "title": "Description"
         },
-        "json_schema": {
+        "field_schema": {
           "default": {},
-          "description": "Expected to be valid JSON Schema",
+          "description": "Expected to be valid JSON Schema. Can be provided as a dict or a Pydantic model class",
           "examples": [
             {
               "max_length": 100,
               "type": "string"
             },
             {
-              "max": 100,
-              "min": 0,
+              "maximum": 100,
+              "minimum": 0,
               "type": "number"
+            },
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
             },
             {
               "type": "boolean"
             },
             {
-              "options": [
+              "enum": [
                 "option1",
                 "option2"
               ],
-              "type": "categorical"
+              "type": "string"
             }
           ],
-          "title": "Json Schema",
+          "title": "Field Schema",
           "type": "object"
         },
         "unique_among_creators": {

@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
+import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -40,9 +41,6 @@ import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 
-// Remove this to "release" annotations
-const SHOW_ANNOTATIONS = false;
-
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -75,6 +73,14 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const handleOpenInPlayground = () => {
+    window.open(
+      urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
+      '_blank'
+    );
+  };
+
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -101,11 +107,20 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <ScrollableTabContent>
-                <Tailwind>
-                  <CallChat call={call.traceCall!} />
-                </Tailwind>
-              </ScrollableTabContent>
+              <>
+                <Button
+                  variant="secondary"
+                  startIcon="sandbox-playground"
+                  className="m-16 mb-8"
+                  onClick={handleOpenInPlayground}>
+                  Open chat in playground
+                </Button>
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <CallChat call={call.traceCall!} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
             ),
           },
         ]
@@ -286,20 +301,18 @@ const CallPageInnerVertical: FC<{
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
             />
-            {SHOW_ANNOTATIONS && (
-              <Button
-                icon="marker"
-                tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
-                variant="ghost"
-                active={showFeedbackExpand ?? false}
-                onClick={onToggleFeedbackExpand}
-                className="ml-4"
-              />
-            )}
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
-      isRightSidebarOpen={showFeedbackExpand && SHOW_ANNOTATIONS}
+      isRightSidebarOpen={showFeedbackExpand}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
