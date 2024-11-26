@@ -361,8 +361,8 @@ export const browse3ContextGen = (
       if (tracetree !== undefined) {
         params.set(TRACETREE_PARAM, tracetree ? '1' : '0');
       }
-      if (feedbackExpand !== undefined && feedbackExpand) {
-        params.set(FEEDBACK_EXPAND_PARAM, '1');
+      if (feedbackExpand !== undefined) {
+        params.set(FEEDBACK_EXPAND_PARAM, feedbackExpand ? '1' : '0');
       }
       if (params.toString()) {
         url += '?' + params.toString();
