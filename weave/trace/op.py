@@ -689,6 +689,9 @@ def op(
             nonlocal reducers
             nonlocal callbacks
             reducers = reducers or []
+            if inspect.isgeneratorfunction(func) and not reducers:
+                reducers.append(_default_list_reducer)
+
             callbacks = callbacks or []
             callbacks += [ReducerCallback(reducer) for reducer in reducers]
             wrapper.lifecycle_handler = LifecycleHandler(callbacks)
@@ -1073,6 +1076,13 @@ def _is_async_iterable(obj: Any) -> bool:
     the async iterator protocol.
     """
     return hasattr(obj, "__aiter__") and hasattr(obj, "__anext__")
+
+
+def _default_list_reducer(val: Any, acc: list[Any] | None = None) -> list[Any]:
+    if acc is None:
+        acc = []
+
+    return acc + [val]
 
 
 __docspec__ = [call, calls]
