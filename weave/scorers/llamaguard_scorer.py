@@ -44,14 +44,14 @@ class LlamaGuard(Scorer):
         "S14": "Code Interpreter Abuse",
     }
     _generate_config: dict[str, Any] = dict(
-            max_new_tokens=20,
-            output_scores=True,
-            return_dict_in_generate=True,
-            pad_token_id=0,
-            top_p=None,
-            do_sample=False,  # greedy decoding
-            temperature=None,
-            output_logits=True,
+        max_new_tokens=20,
+        output_scores=True,
+        return_dict_in_generate=True,
+        pad_token_id=0,
+        top_p=None,
+        do_sample=False,  # greedy decoding
+        temperature=None,
+        output_logits=True,
     )
 
     def model_post_init(self, __context: Any) -> None:
@@ -123,7 +123,7 @@ class LlamaGuard(Scorer):
                 "role": "user",
                 "content": [
                     {
-                        "type": "text", 
+                        "type": "text",
                         "text": prompt,
                     },
                 ],
@@ -153,7 +153,7 @@ class LlamaGuard(Scorer):
         return {
             "safe": safe,
             "categories": categories if not safe else {},
-            "unsafe_score": unsafe_score
+            "unsafe_score": unsafe_score,
         }
 
     @weave.op

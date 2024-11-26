@@ -49,7 +49,9 @@ class RobustnessScorer(Scorer):
     use_exact_match: bool = True
     embedding_model_name: str = "all-MiniLM-L6-v2"
     similarity_metric: str = "cosine"
-    embedding_model: Optional[Any] = None # Delay type hinting to avoid dependency on SentenceTransformer
+    embedding_model: Optional[Any] = (
+        None  # Delay type hinting to avoid dependency on SentenceTransformer
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """
@@ -318,7 +320,7 @@ class RobustnessScorer(Scorer):
             return sim.item()
         else:
             raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
-        
+
     def get_cohen_h_interpretation(self, h: float) -> str:
         if h < 0.0032:
             return "Essentially no effect"
@@ -334,7 +336,6 @@ class RobustnessScorer(Scorer):
             return "Very large effect"
         else:
             return "Huge effect"
-
 
     def get_cohen_d_interpretation(self, d: float) -> str:
         if d < 0.01:
