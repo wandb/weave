@@ -66,6 +66,7 @@ export const PlaygroundChat = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        overflow: 'hidden', // Rely on inner overflows, not outer page
       }}>
       <Box
         sx={{
@@ -116,9 +117,9 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  width: 'calc(100% - 16px)',
-                  left: '8px',
-                  right: '8px',
+                  width: 'calc(100% - 32px)',
+                  left: '16px',
+                  right: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -139,6 +140,7 @@ export const PlaygroundChat = ({
                   overflow: 'scroll',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
+                  flexGrow: 1,
                 }}>
                 <Tailwind>
                   <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
@@ -169,6 +171,8 @@ export const PlaygroundChat = ({
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  {/* Spacer used for leaving room for the input */}
+                  <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
               <Box
@@ -196,6 +200,7 @@ export const PlaygroundChat = ({
         isLoading={isLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
+        settingsTab={settingsTab}
       />
     </Box>
   );
