@@ -170,7 +170,8 @@ class RobustnessScorer(Scorer):
             # Compute Cohen's d for continuous scores
             d = self.compute_cohens_d(score_o, perturbed_similarities)
             result = {
-                "cohen_d": d,
+                "cohen_d": abs(d),
+                "cohen_d_sign": "positive" if d > 0 else "negative",
                 "score(original)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
@@ -206,14 +207,10 @@ class RobustnessScorer(Scorer):
         Returns:
             float: The absolute value of Cohen's h normalized by π.
 
-        Interpretation:
-            - **0.0 ≤ h < 0.0032**: Essentially no effect
-            - **0.0032 ≤ h < 0.0637**: Very small effect
-            - **0.0637 ≤ h < 0.1592**: Small effect
-            - **0.1592 ≤ h < 0.2546**: Medium effect
-            - **0.2546 ≤ h < 0.3820**: Large effect
-            - **0.3820 ≤ h < 0.6366**: Very large effect
-            - **0.6366 ≤ h < 1**: Huge effect
+        To make it easier to interpret, we use the following thresholds:
+            - **d ≤ 0.1592**: Small effect
+            - **0.1592 < d ≤ 0.3820**: Medium effect
+            - **0.3820 < d**: Large effect
 
         Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case.
 
@@ -249,14 +246,10 @@ class RobustnessScorer(Scorer):
         Returns:
             float: The computed Cohen's d value.
 
-        Interpretation:
-            - **0.0 ≤ d < 0.01**: Negligible effect
-            - **0.01 ≤ d < 0.19**: Very small effect
-            - **0.19 ≤ d < 0.49**: Small effect
-            - **0.49 ≤ d < 0.79**: Medium effect
-            - **0.79 ≤ d < 1.19**: Large effect
-            - **1.19 ≤ d < 1.99**: Very large effect
-            - **1.99 ≤ d**: Huge effect
+        To make it easier to interpret, we use the following thresholds:
+            - **d ≤ 0.2**: Small effect
+            - **0.2 < d ≤ 0.8**: Medium effect
+            - **0.8 < d**: Large effect
 
         Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case. Refer to the notes below for more details.
 
@@ -326,36 +319,23 @@ class RobustnessScorer(Scorer):
             raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
 
     def get_cohen_h_interpretation(self, h: float) -> str:
-        if h < 0.0032:
-            return "Essentially no effect"
-        elif h < 0.0637:
-            return "Very small effect"
-        elif h < 0.1592:
+        if h == 0.0:
+            return "No effect"
+
+        if h <= 0.1592:
             return "Small effect"
-        elif h < 0.2546:
+        elif h <= 0.3820:
             return "Medium effect"
-        elif h < 0.3820:
-            return "Large effect"
-        elif h < 0.6366:
-            return "Very large effect"
         else:
-            return "Huge effect"
+            return "Large effect"
 
     def get_cohen_d_interpretation(self, d: float) -> str:
-        if d < 0.01:
-            return "Negligible effect"
-        elif d < 0.19:
-            return "Very small effect"
-        elif d < 0.49:
+        if d <= 0.2:
             return "Small effect"
-        elif d < 0.79:
+        elif d <= 0.8:
             return "Medium effect"
-        elif d < 1.19:
-            return "Large effect"
-        elif d < 1.99:
-            return "Very large effect"
         else:
-            return "Huge effect"
+            return "Large effect"
 
 
 def get_keyboard_adjacent(char: str) -> list[str]:
