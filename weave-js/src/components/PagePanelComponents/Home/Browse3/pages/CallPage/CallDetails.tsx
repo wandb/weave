@@ -132,7 +132,8 @@ export const CallDetails: FC<{
         }}>
         <Box
           sx={{
-            flex: '0 0 auto',
+            flex: '1 1 100px',
+            overflow: 'hidden',
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
@@ -142,7 +143,8 @@ export const CallDetails: FC<{
         </Box>
         <Box
           sx={{
-            flex: '0 0 auto',
+            flex: '1 1 100px',
+            overflow: 'hidden',
             p: 2,
           }}>
           {'traceback' in excInfo ? (
@@ -199,9 +201,8 @@ export const CallDetails: FC<{
             <Box
               key={opVersionRef}
               sx={{
-                flex: '0 0 auto',
-                height: '500px',
-                maxHeight: '95%',
+                flex: '1 1 100px',
+                overflow: 'hidden',
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -232,7 +233,7 @@ export const CallDetails: FC<{
               </Box>
               <Box
                 sx={{
-                  flex: '1 1 auto',
+                  flex: '1 1 100px',
                   overflow: 'hidden',
                 }}>
                 {callsTable}
@@ -245,7 +246,8 @@ export const CallDetails: FC<{
         {false && singularChildCalls.length > 0 && (
           <Box
             sx={{
-              flex: '0 0 auto',
+              flex: '1 1 100px',
+              overflow: 'hidden',
             }}>
             {multipleChildCallOpRefs.length === 0 ? (
               <Typography pl={1}>Child calls</Typography>

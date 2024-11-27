@@ -473,7 +473,8 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        autoHeight
+        // autoHeight
+        // height={450}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
@@ -520,7 +521,7 @@ export const ObjectViewer = ({
   }, [apiRef, rows, columns, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden'}}>{inner}</div>;
+  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
 };
 
 // Helper function to build the base ref for a given path. This function is used
