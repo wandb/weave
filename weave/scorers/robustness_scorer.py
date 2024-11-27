@@ -47,6 +47,8 @@ class RobustnessScorer(Scorer):
     """
 
     use_exact_match: bool = True
+    use_ground_truths: bool = False
+    return_interpretation: bool = False
     embedding_model_name: str = "all-MiniLM-L6-v2"
     similarity_metric: str = "cosine"
     embedding_model: Optional[Any] = (
@@ -77,7 +79,6 @@ class RobustnessScorer(Scorer):
         self,
         output: list[Union[str, bool]],
         ground_truths: Optional[list[Union[str, bool]]] = None,
-        return_interpretation: bool = False,
     ) -> dict:
         """
         Computes the robustness score of the model's outputs.
@@ -106,7 +107,10 @@ class RobustnessScorer(Scorer):
             len(output) > 1
         ), "There must be output of at least one perturbed question."
 
-        if ground_truths:
+        if self.use_ground_truths:
+            assert (
+                ground_truths
+            ), "`ground_truths` must be provided when use_ground_truths is True."
             assert len(ground_truths) == len(output), (
                 "Length of ground_truths must match the length of output. "
                 f"Got {len(ground_truths)} ground_truths and {len(output)} outputs."
@@ -114,12 +118,12 @@ class RobustnessScorer(Scorer):
 
         # Normalize `output` and `ground_truths` to strings
         output = [str(o) for o in output]
-        if ground_truths:
+        if self.use_ground_truths and ground_truths:
             ground_truths = [str(gt) for gt in ground_truths]
 
         # Ensure all elements are strings
         assert all(isinstance(o, str) for o in output), "All outputs must be strings."
-        if ground_truths:
+        if self.use_ground_truths and ground_truths:
             assert all(
                 isinstance(gt, str) for gt in ground_truths
             ), "All ground_truths must be strings."
@@ -131,7 +135,7 @@ class RobustnessScorer(Scorer):
         # Compute similarity scores
         if self.use_exact_match:
             # Exact match scoring
-            if ground_truths:
+            if self.use_ground_truths and ground_truths:
                 similarities = [
                     1.0 if output[i] == ground_truths[i] else 0.0
                     for i in range(len(output))
@@ -147,7 +151,7 @@ class RobustnessScorer(Scorer):
                 perturbed_similarities = similarities
         else:
             # Semantic similarity scoring
-            if ground_truths:
+            if self.use_ground_truths and ground_truths:
                 similarities = [
                     self.compute_similarity(output[i], ground_truths[i])  # type: ignore
                     for i in range(len(output))
@@ -170,7 +174,7 @@ class RobustnessScorer(Scorer):
                 "score(original)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
-            if return_interpretation:
+            if self.return_interpretation:
                 result["interpretation"] = self.get_cohen_d_interpretation(d)
             return result
         else:
@@ -181,7 +185,7 @@ class RobustnessScorer(Scorer):
                 "score(original)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
-            if return_interpretation:
+            if self.return_interpretation:
                 result["interpretation"] = self.get_cohen_h_interpretation(h)
             return result
 

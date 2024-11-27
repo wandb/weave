@@ -79,7 +79,7 @@ def test_robustness_scorer_with_boolean_output():
 def test_robustness_scorer_with_boolean_output_and_ground_truths():
     output = [True, True, False, True]  # Boolean outputs from the system
     ground_truths = [True, True, True, True]  # Boolean ground truths
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
     result = robustness_scorer.score(output=output, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.39182
 
@@ -87,7 +87,7 @@ def test_robustness_scorer_with_boolean_output_and_ground_truths():
 def test_robustness_scorer_with_ground_truths_as_strings():
     output = ["apple", "aple", "orange", "apple"]
     ground_truths = ["apple", "apple", "apple", "apple"]
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
     result = robustness_scorer.score(output=output, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.60817
 
@@ -100,7 +100,7 @@ def test_robustness_scorer_with_ground_truths_as_booleans():
         False,
         False,
     ]  # Booleans will be converted to strings
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
     result = robustness_scorer.score(output=output, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.39182
 
@@ -108,7 +108,7 @@ def test_robustness_scorer_with_ground_truths_as_booleans():
 def test_robustness_scorer_ground_truths_length_mismatch():
     output = ["True", "False", "True"]
     ground_truths = ["True", "True"]  # Mismatched length
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
     with pytest.raises(
         AssertionError, match="Length of ground_truths must match the length of output."
     ):
@@ -118,7 +118,7 @@ def test_robustness_scorer_ground_truths_length_mismatch():
 def test_robustness_scorer_ground_truths_edge_case():
     output = ["True"]
     ground_truths = ["True"]
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
     with pytest.raises(
         AssertionError, match="There must be output of at least one perturbed question."
     ):
@@ -304,9 +304,9 @@ def test_robustness_scorer_multilingual_texts():
 
 
 def test_interpretation_strings():
-    scorer = RobustnessScorer(use_exact_match=True)
+    scorer = RobustnessScorer(use_exact_match=True, return_interpretation=True)
     outputs = ["The capital of France is Paris.", "Paris is the capital of France."]
-    result = scorer.score(output=outputs, return_interpretation=True)
+    result = scorer.score(output=outputs)
     assert "interpretation" in result
     assert isinstance(result["interpretation"], str)
 
@@ -382,7 +382,7 @@ async def test_robustness_scorer_eval_with_ground_truths():
         return outputs
 
     # Instantiate the RobustnessScorer
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = RobustnessScorer(use_ground_truths=True)
 
     # Perform evaluation using Weave's Evaluation framework
     evaluation = weave.Evaluation(
