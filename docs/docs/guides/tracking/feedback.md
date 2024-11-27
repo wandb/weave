@@ -26,8 +26,8 @@ In the Weave UI, you can add and view feedback [from the call details page](#fro
 3. Open the call details page.
 4. Select the **Feedback** column for the call.
 5. Add, view, or delete feedback:
-   - [Add and view feedback using the icons](#use-the-icons) located  in the upper right corner of the call details feedback view.
-   - View and delete feedback from the call details feedback table. Feedback can be deleted by clicking the trash icon in the rightmost column of the appropriate feedback row.
+   - *[Add and view feedback using the icons](#use-the-icons)* located in the upper right corner of the call details feedback view.
+   - *View and delete feedback from the call details feedback table.* Delete feedback by clicking the trashcan icon in the rightmost column of the appropriate feedback row.
 
 ![Screenshot of Feedback tab in call details](imgs/feedback_tab.png)
 
@@ -42,14 +42,16 @@ To add a reaction:
   1. Click the emoji icon. 
   2. Add a thumbs up, thumbs down, or click the **+** icon for more emojis.
 
+To remove a reaction:
+  1. Hover over the emoji reaction you want to remove.
+  2. Click the reaction to remove it.
+
+> You can also delete feedback from the [**Feedback** column on the call details page.](#from-the-call-details-page).
+
 To add a comment:
   1. Click the comment bubble icon. 
   2. In the text box, add your note. 
   3. To save the note, press the **Enter** key. You can add additional notes.
-
-To remove a reaction:
-  1. Hover over the emoji reaction you want to remove.
-  2. Click the reaction to remove it.
 
 ![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
 
