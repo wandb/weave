@@ -3,7 +3,14 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -254,6 +261,26 @@ const CallPageInnerVertical: FC<{
     project: selectedCall.project,
     callId: selectedCall.callId,
   });
+  const callCompleteWithCosts = useMemo(() => {
+    if (callComplete.result?.traceCall == null) {
+      return callComplete.result;
+    }
+    return {
+      ...callComplete.result,
+      traceCall: {
+        ...callComplete.result?.traceCall,
+        summary: {
+          ...callComplete.result?.traceCall?.summary,
+          weave: {
+            ...callComplete.result?.traceCall?.summary?.weave,
+            // Only selectedCall has costs, injected when creating
+            // the trace tree
+            costs: selectedCall.traceCall?.summary?.weave?.costs,
+          },
+        },
+      },
+    };
+  }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -265,10 +292,10 @@ const CallPageInnerVertical: FC<{
   }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
-    if (!callComplete.loading && callComplete.result) {
-      setCurrentCall(callComplete.result);
+    if (callCompleteWithCosts != null) {
+      setCurrentCall(callCompleteWithCosts);
     }
-  }, [callComplete]);
+  }, [callCompleteWithCosts]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
