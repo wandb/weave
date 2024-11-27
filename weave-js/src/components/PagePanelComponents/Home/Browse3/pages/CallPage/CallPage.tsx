@@ -81,6 +81,10 @@ const useCallTabs = (call: CallSchema) => {
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
 
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showTryInPlayground =
+    !isPeeking || !window.location.toString().includes('/weave/playground');
+
   const handleOpenInPlayground = () => {
     window.open(
       urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
@@ -115,13 +119,22 @@ const useCallTabs = (call: CallSchema) => {
             label: 'Chat',
             content: (
               <>
-                <Button
-                  variant="secondary"
-                  startIcon="sandbox-playground"
-                  className="m-16 mb-8"
-                  onClick={handleOpenInPlayground}>
-                  Open chat in playground
-                </Button>
+                {showTryInPlayground && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      width: '100%',
+                      padding: '8px 16px',
+                    }}>
+                    <Button
+                      variant="ghost"
+                      startIcon="robot-service-member"
+                      onClick={handleOpenInPlayground}>
+                      Try in playground
+                    </Button>
+                  </Box>
+                )}
                 <ScrollableTabContent>
                   <Tailwind>
                     <CallChat call={call.traceCall!} />
