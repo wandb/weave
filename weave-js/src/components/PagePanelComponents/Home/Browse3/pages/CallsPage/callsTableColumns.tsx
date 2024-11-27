@@ -29,6 +29,7 @@ import {
   getCostsFromCellParams,
   getTokensFromCellParams,
 } from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -47,7 +48,6 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
-import {isEvaluateOp} from '../common/heuristics';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
