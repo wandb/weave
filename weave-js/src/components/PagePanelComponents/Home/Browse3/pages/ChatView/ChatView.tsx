@@ -34,9 +34,9 @@ export const ChatView = ({chat}: ChatViewProps) => {
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
       />
-      {chatResult && chatResult.choices && (
+      {chatResult?.choices && chatResult.choices.length > 0 && (
         <>
-          <span className="mt-16 text-sm font-semibold text-moon-800">
+          <span className="-mb-16 mt-24 text-sm font-semibold text-moon-800">
             Response
           </span>
           <div ref={outputRef}>

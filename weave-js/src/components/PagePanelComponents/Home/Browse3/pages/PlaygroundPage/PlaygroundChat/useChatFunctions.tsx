@@ -1,9 +1,9 @@
 import {cloneDeep} from 'lodash';
 import {SetStateAction} from 'react';
 
-import {Choice, Message} from '../../ChatView/types';
+import {Message} from '../../ChatView/types';
 import {OptionalTraceCallSchema, PlaygroundState} from '../types';
-import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
+
 type TraceCallOutput = {
   choices?: any[];
 };
@@ -33,11 +33,6 @@ export const useChatFunctions = (
           (_: any, index: number) =>
             index !== messageIndex && !responseIndexes?.includes(index)
         );
-
-        // If there are no messages left, add a system message
-        if (newTraceCall.inputs.messages.length === 0) {
-          newTraceCall.inputs.messages = [DEFAULT_SYSTEM_MESSAGE];
-        }
       }
       return newTraceCall;
     });
@@ -109,7 +104,7 @@ export const useChatFunctions = (
   const editChoice = (
     callIndex: number,
     choiceIndex: number,
-    newChoice: Choice
+    newChoice: Message
   ) => {
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
@@ -128,10 +123,7 @@ export const useChatFunctions = (
         // Add the new choice as a message
         newTraceCall.inputs = newTraceCall.inputs ?? {};
         newTraceCall.inputs.messages = newTraceCall.inputs.messages ?? [];
-        newTraceCall.inputs.messages.push({
-          role: 'assistant',
-          content: newChoice.message?.content,
-        });
+        newTraceCall.inputs.messages.push(newChoice);
       }
       return newTraceCall;
     });

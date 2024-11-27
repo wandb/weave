@@ -173,6 +173,18 @@ class ObjectRef(RefWithExtra):
             # version number or latest alias resolved to a specific digest.
             prompt.__dict__["ref"] = obj.ref
             return prompt
+        if "StringPrompt" == class_name:
+            from weave.flow.prompt.prompt import StringPrompt
+
+            prompt = StringPrompt.from_obj(obj)
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
+        if "MessagesPrompt" == class_name:
+            from weave.flow.prompt.prompt import MessagesPrompt
+
+            prompt = MessagesPrompt.from_obj(obj)
+            prompt.__dict__["ref"] = obj.ref
+            return prompt
         return obj
 
     def get(self) -> Any:

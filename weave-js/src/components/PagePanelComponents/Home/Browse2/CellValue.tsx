@@ -19,7 +19,6 @@ import {SmallRef} from './SmallRef';
 
 type CellValueProps = {
   value: any;
-  isExpanded?: boolean;
 };
 
 const Collapsed = styled.div<{hasScrolling: boolean}>`
@@ -32,7 +31,7 @@ const Collapsed = styled.div<{hasScrolling: boolean}>`
 `;
 Collapsed.displayName = 'S.Collapsed';
 
-export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
+export const CellValue = ({value}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -40,7 +39,7 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isWeaveRef(value)) {
-    return <SmallRef objRef={parseRef(value)} iconOnly={isExpanded} />;
+    return <SmallRef objRef={parseRef(value)} />;
   }
   if (typeof value === 'boolean') {
     return (
