@@ -12,6 +12,7 @@ export const Root = ({
     className={twMerge(
       'flex items-center rounded-[12px] p-[1px] transition-colors duration-100 ease-out',
       'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+      'flex-shrink-0',
       props.checked ? ' bg-teal-500' : 'bg-moon-350',
       size === 'small' ? 'h-[16px] w-[28px]' : 'h-[24px] w-[44px]',
       className
