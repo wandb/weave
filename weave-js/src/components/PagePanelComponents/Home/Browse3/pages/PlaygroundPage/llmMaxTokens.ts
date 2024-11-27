@@ -211,6 +211,10 @@ export const LLM_MAX_TOKENS = {
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
+export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
+  LLM_MAX_TOKENS
+) as LLMMaxTokensKey[];
+
 export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'groq'];
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],

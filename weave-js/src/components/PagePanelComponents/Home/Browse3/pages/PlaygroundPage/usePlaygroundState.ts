@@ -1,6 +1,6 @@
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {LLMMaxTokensKey} from './llmMaxTokens';
+import {LLM_MAX_TOKENS_KEYS, LLMMaxTokensKey} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -15,6 +15,8 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   role: 'system',
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
+
+const DEFAULT_MODEL = 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey;
 
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
@@ -34,7 +36,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   presencePenalty: 0,
   //   nTimes: 1,
   maxTokensLimit: 16384,
-  model: 'gpt-4o-mini' as LLMMaxTokensKey,
+  model: DEFAULT_MODEL,
 };
 
 export const usePlaygroundState = () => {
@@ -105,6 +107,13 @@ export const usePlaygroundState = () => {
         }
         if (inputs.presence_penalty) {
           newState.presencePenalty = parseFloat(inputs.presence_penalty);
+        }
+        if (inputs.model) {
+          if (LLM_MAX_TOKENS_KEYS.includes(inputs.model as LLMMaxTokensKey)) {
+            newState.model = inputs.model as LLMMaxTokensKey;
+          } else {
+            newState.model = DEFAULT_MODEL;
+          }
         }
         return [newState];
       });
