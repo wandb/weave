@@ -47,6 +47,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
+import {isEvaluateOp} from '../common/heuristics';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
@@ -228,6 +229,7 @@ function buildCallsTableColumns(
           rowParams.row.display_name ??
           opVersionRefOpName(rowParams.row.op_name) ??
           rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
@@ -237,6 +239,7 @@ function buildCallsTableColumns(
             fullWidth={true}
             preservePath={preservePath}
             color={TEAL_600}
+            isEval={isEval}
           />
         );
       },
