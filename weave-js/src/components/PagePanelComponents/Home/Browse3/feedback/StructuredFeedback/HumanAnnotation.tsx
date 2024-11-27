@@ -129,8 +129,8 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
   const {rawValues, mostRecentVal, viewerFeedbackVal} = extractedValues;
 
   const type = useMemo(
-    () => inferTypeFromJsonSchema(props.hfSpec.json_schema ?? {}),
-    [props.hfSpec.json_schema]
+    () => inferTypeFromJsonSchema(props.hfSpec.field_schema ?? {}),
+    [props.hfSpec.field_schema]
   );
 
   if (query?.loading) {
@@ -151,7 +151,7 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
     <div className="w-full py-4">
       <FeedbackComponentSelector
         type={type}
-        jsonSchema={props.hfSpec.json_schema ?? {}}
+        jsonSchema={props.hfSpec.field_schema ?? {}}
         focused={props.focused ?? false}
         onAddFeedback={onAddFeedback}
         foundValue={foundValue}
@@ -222,6 +222,7 @@ const FeedbackComponentSelector: React.FC<{
             onAddFeedback={wrappedOnAddFeedback}
             defaultValue={foundValue as string | null}
             focused={focused}
+            maxLength={jsonSchema.maxLength ?? undefined}
           />
         );
       case 'enum':

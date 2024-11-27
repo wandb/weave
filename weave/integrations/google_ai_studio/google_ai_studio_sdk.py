@@ -26,7 +26,35 @@ def gemini_accumulator(
 
     for i, value_candidate in enumerate(value.candidates):
         for j, value_part in enumerate(value_candidate.content.parts):
-            acc.candidates[i].content.parts[j].text += value_part.text
+            if len(value_part.text) > 0:
+                acc.candidates[i].content.parts[j].text += value_part.text
+            elif len(value_part.executable_code.code) > 0:
+                if len(acc.candidates[i].content.parts[j].executable_code.code) == 0:
+                    acc.candidates[i].content.parts.append(value_part)
+                else:
+                    acc.candidates[i].content.parts[
+                        j
+                    ].executable_code.code += value_part.executable_code.code
+                    acc.candidates[i].content.parts[
+                        j
+                    ].executable_code.language = value_part.executable_code.language
+            elif len(value_part.code_execution_result.output) > 0:
+                if (
+                    len(acc.candidates[i].content.parts[j].code_execution_result.output)
+                    == 0
+                ):
+                    acc.candidates[i].content.parts.append(value_part)
+                else:
+                    acc.candidates[i].content.parts[
+                        j
+                    ].code_execution_result.output += (
+                        value_part.code_execution_result.output
+                    )
+                    acc.candidates[i].content.parts[
+                        j
+                    ].code_execution_result.status = (
+                        value_part.code_execution_result.status
+                    )
 
     acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
     acc.usage_metadata.candidates_token_count += (
@@ -39,7 +67,12 @@ def gemini_accumulator(
 def gemini_on_finish(
     call: Call, output: Any, exception: Optional[BaseException]
 ) -> None:
-    original_model_name = call.inputs["self"]["model_name"]
+    if "model_name" in call.inputs["self"]:
+        original_model_name = call.inputs["self"]["model_name"]
+    elif "model" in call.inputs["self"]:
+        original_model_name = call.inputs["self"]["model"]["model_name"]
+    else:
+        raise ValueError("Unknown model type")
     model_name = original_model_name.split("/")[-1]
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
@@ -108,6 +141,18 @@ google_genai_patcher = MultiPatcher(
             "GenerativeModel.generate_content_async",
             gemini_wrapper_async(
                 name="google.generativeai.GenerativeModel.generate_content_async"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("google.generativeai.generative_models"),
+            "ChatSession.send_message",
+            gemini_wrapper_sync(name="google.generativeai.ChatSession.send_message"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("google.generativeai.generative_models"),
+            "ChatSession.send_message_async",
+            gemini_wrapper_async(
+                name="google.generativeai.ChatSession.send_message_async"
             ),
         ),
     ]

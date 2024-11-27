@@ -3,7 +3,14 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -40,9 +47,6 @@ import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
-
-// Remove this to "release" annotations
-const SHOW_ANNOTATIONS = false;
 
 export const CallPage: FC<{
   entity: string;
@@ -257,6 +261,26 @@ const CallPageInnerVertical: FC<{
     project: selectedCall.project,
     callId: selectedCall.callId,
   });
+  const callCompleteWithCosts = useMemo(() => {
+    if (callComplete.result?.traceCall == null) {
+      return callComplete.result;
+    }
+    return {
+      ...callComplete.result,
+      traceCall: {
+        ...callComplete.result?.traceCall,
+        summary: {
+          ...callComplete.result?.traceCall?.summary,
+          weave: {
+            ...callComplete.result?.traceCall?.summary?.weave,
+            // Only selectedCall has costs, injected when creating
+            // the trace tree
+            costs: selectedCall.traceCall?.summary?.weave?.costs,
+          },
+        },
+      },
+    };
+  }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -268,10 +292,10 @@ const CallPageInnerVertical: FC<{
   }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
-    if (!callComplete.loading && callComplete.result) {
-      setCurrentCall(callComplete.result);
+    if (callCompleteWithCosts != null) {
+      setCurrentCall(callCompleteWithCosts);
     }
-  }, [callComplete]);
+  }, [callCompleteWithCosts]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -304,20 +328,18 @@ const CallPageInnerVertical: FC<{
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
             />
-            {SHOW_ANNOTATIONS && (
-              <Button
-                icon="marker"
-                tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
-                variant="ghost"
-                active={showFeedbackExpand ?? false}
-                onClick={onToggleFeedbackExpand}
-                className="ml-4"
-              />
-            )}
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
-      isRightSidebarOpen={showFeedbackExpand && SHOW_ANNOTATIONS}
+      isRightSidebarOpen={showFeedbackExpand}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">

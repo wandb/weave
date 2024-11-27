@@ -22,6 +22,7 @@ def autopatch() -> None:
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
@@ -37,6 +38,7 @@ def autopatch() -> None:
     google_genai_patcher.attempt_patch()
     huggingface_patcher.attempt_patch()
     notdiamond_patcher.attempt_patch()
+    vertexai_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -56,6 +58,7 @@ def reset_autopatch() -> None:
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
     openai_patcher.undo_patch()
     mistral_patcher.undo_patch()
@@ -71,3 +74,4 @@ def reset_autopatch() -> None:
     google_genai_patcher.undo_patch()
     huggingface_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
+    vertexai_patcher.undo_patch()

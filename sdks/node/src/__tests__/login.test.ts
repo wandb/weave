@@ -43,7 +43,7 @@ describe('login', () => {
     });
     expect(mockSave).toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith(
-      'Successfully logged in.  Credentials saved for api.wandb.ai'
+      'Successfully logged in. Credentials saved for api.wandb.ai'
     );
   });
 
