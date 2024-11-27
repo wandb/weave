@@ -83,7 +83,7 @@ You can also get additional information for each feedback object in `client.get_
     all_feedback = client.get_feedback()
 
     # Fetch a specific feedback object by id.
-    # The API returns a collection, which is expected to contain zero or one items.
+    # The API returns a collection, which is expected to contain at most one item.
     one_feedback = client.get_feedback("<feedback_uuid>")[0]
 
     # Find all feedback objects with a specific reaction. You can specify offset and limit.
@@ -107,7 +107,7 @@ You can also get additional information for each feedback object in `client.get_
 
 ### Add feedback to a call
 
-You can add feedback to a call using the UUID. To use the UUID to get a particular call, [retrieve it during or after call execution](#retrieve-the-call-uuid). The SDK supports the following operations for adding feedback to a call:
+You can add feedback to a call using the call's UUID. To use the UUID to get a particular call, [retrieve it during or after call execution](#retrieve-the-call-uuid). The SDK supports the following operations for adding feedback to a call:
 
 - `call.feedback.add_reaction("<reaction_type>")`: Add one of the supported `<reaction_types>` (emojis), such as 👍.
 - `call.feedback.add_note("<note>")`: Add a note.
