@@ -100,11 +100,13 @@ export const FeedbackSidebar = ({
       {humanAnnotationSpecs.length > 0 ? (
         <>
           <div className="mx-6 h-full flex-grow overflow-auto">
-            <HumanAnnotationSection
+            <HumanAnnotationInputs
               entity={entity}
               project={project}
               callID={callID}
-              humanAnnotationSpecs={humanAnnotationSpecs}
+              humanAnnotationSpecs={humanAnnotationSpecs.sort((a, b) =>
+                (a.name ?? '').localeCompare(b.name ?? '')
+              )}
               setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
             />
           </div>
@@ -139,87 +141,6 @@ export const FeedbackSidebar = ({
         </div>
       )}
     </div>
-  );
-};
-
-type HumanAnnotationSectionProps = {
-  entity: string;
-  project: string;
-  callID: string;
-  humanAnnotationSpecs: tsHumanAnnotationSpec[];
-  setUnsavedFeedbackChanges: React.Dispatch<
-    React.SetStateAction<Record<string, () => Promise<boolean>>>
-  >;
-};
-
-const HumanAnnotationSection = ({
-  entity,
-  project,
-  callID,
-  humanAnnotationSpecs,
-  setUnsavedFeedbackChanges,
-}: HumanAnnotationSectionProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const sortedVisibleColumns = humanAnnotationSpecs.sort((a, b) =>
-    (a.name ?? '').localeCompare(b.name ?? '')
-  );
-
-  return (
-    <div>
-      <HumanAnnotationHeader
-        numHumanAnnotationSpecsVisible={sortedVisibleColumns.length}
-        numHumanAnnotationSpecsHidden={
-          humanAnnotationSpecs.length - sortedVisibleColumns.length
-        }
-        isExpanded={isExpanded}
-        setIsExpanded={setIsExpanded}
-      />
-      {isExpanded && (
-        <HumanAnnotationInputs
-          entity={entity}
-          project={project}
-          callID={callID}
-          humanAnnotationSpecs={sortedVisibleColumns}
-          setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
-        />
-      )}
-    </div>
-  );
-};
-
-type HumanAnnotationHeaderProps = {
-  numHumanAnnotationSpecsVisible: number;
-  numHumanAnnotationSpecsHidden: number;
-  isExpanded: boolean;
-  setIsExpanded: (isExpanded: boolean) => void;
-};
-
-const HumanAnnotationHeader = ({
-  numHumanAnnotationSpecsVisible,
-  numHumanAnnotationSpecsHidden,
-  isExpanded,
-  setIsExpanded,
-}: HumanAnnotationHeaderProps) => {
-  return (
-    <button
-      className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
-      onClick={() => setIsExpanded(!isExpanded)}>
-      <div className="mb-8 flex w-full items-center">
-        <div className="text-lg">Human annotations</div>
-        <div className="ml-6 mt-1">
-          <DisplayNumericCounter count={numHumanAnnotationSpecsVisible} />
-        </div>
-        <div className="flex-grow" />
-        {numHumanAnnotationSpecsHidden > 0 && (
-          <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
-            {numHumanAnnotationSpecsHidden} hidden
-          </div>
-        )}
-      </div>
-      <div className="mb-6 flex items-center">
-        <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
-      </div>
-    </button>
   );
 };
 
