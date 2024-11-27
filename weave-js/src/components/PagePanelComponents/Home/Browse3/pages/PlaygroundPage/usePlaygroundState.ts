@@ -1,4 +1,3 @@
-import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {SetStateAction, useCallback, useState} from 'react';
 
 import {LLM_MAX_TOKENS_KEYS, LLMMaxTokensKey} from './llmMaxTokens';

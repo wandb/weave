@@ -1,5 +1,3 @@
-import levenshtein from 'js-levenshtein';
-
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
