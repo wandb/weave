@@ -6,7 +6,7 @@ import React, {useState} from 'react';
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {PlaygroundState} from '../types';
+import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -51,7 +51,7 @@ export const PlaygroundChat = ({
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
-  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
+  const handleAddMessage = (role: PlaygroundMessageRole, text: string) => {
     for (let i = 0; i < playgroundStates.length; i++) {
       addMessage(i, {role, content: text});
     }
@@ -160,7 +160,7 @@ export const PlaygroundChat = ({
                           retry: (messageIndex: number, isChoice?: boolean) =>
                             handleRetry(idx, messageIndex, isChoice),
                           sendMessage: (
-                            role: 'assistant' | 'user' | 'tool',
+                            role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
