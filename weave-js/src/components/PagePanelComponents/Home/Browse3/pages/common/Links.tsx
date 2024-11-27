@@ -20,7 +20,6 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {Id} from './Id';
-import {isEvaluateOp} from './heuristics';
 
 type LinkVariant = 'primary' | 'secondary';
 
