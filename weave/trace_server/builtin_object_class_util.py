@@ -24,6 +24,7 @@ def get_base_object_class_name(val: Any) -> Optional[str]:
                                 return val["_class_name"]
     return None
 
+
 def get_object_class_name(val: Any) -> Optional[str]:
     if isinstance(val, dict):
         return val.get("_class_name")
@@ -37,6 +38,20 @@ def get_object_class_name(val: Any) -> Optional[str]:
         #                     elif "_class_name" in val:
         #                         return val["_class_name"]
     return None
+
+
+def deserialize_obj(val: Any) -> Any:
+    from weave.trace_server.interface.base_object_classes.builtin_object_registry import (
+        BUILTIN_OBJECT_CLASS_REGISTRY,
+    )
+
+    if isinstance(val, dict):
+        if "_class_name" in val:
+            class_name = val["_class_name"]
+            object_class = BUILTIN_OBJECT_CLASS_REGISTRY.get(class_name)
+            if object_class is not None:
+                return object_class.model_validate(val["val"])
+    return val
 
 
 def process_incoming_object(
@@ -90,13 +105,21 @@ def process_incoming_object(
         # In this case, we simply validate if the match is found
         if builtin_object_class := BUILTIN_OBJECT_CLASS_REGISTRY.get(val_class_name):
             keys = builtin_object_class.model_fields.keys()
-            builtin_object_class.model_validate({k: v for k, v in dict_val.items() if k in keys})
+            builtin_object_class.model_validate(
+                {k: v for k, v in dict_val.items() if k in keys}
+            )
     elif req_builtin_object_class is not None:
         # In this case, we require that the base object class is registered
-        if builtin_object_class := BUILTIN_OBJECT_CLASS_REGISTRY.get(req_builtin_object_class):
-            dict_val = dump_object_with_correct_hierarchy(builtin_object_class.model_validate(dict_val))
+        if builtin_object_class := BUILTIN_OBJECT_CLASS_REGISTRY.get(
+            req_builtin_object_class
+        ):
+            dict_val = dump_object_with_correct_hierarchy(
+                builtin_object_class.model_validate(dict_val)
+            )
         else:
-            raise ValueError(f"Unknown builtin object class: {req_builtin_object_class}")
+            raise ValueError(
+                f"Unknown builtin object class: {req_builtin_object_class}"
+            )
 
     return dict_val, get_base_object_class_name(dict_val)
 

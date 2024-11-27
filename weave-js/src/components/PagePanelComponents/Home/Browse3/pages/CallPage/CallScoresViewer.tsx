@@ -343,7 +343,7 @@ const RunButton: React.FC<{
       await getClient().actionsExecuteBatch({
         project_id: projectIdFromParts({entity, project}),
         call_ids: [callId],
-        action_ref: actionRef,
+        runnable_ref: actionRef,
       });
       refetchFeedback();
     } catch (err) {

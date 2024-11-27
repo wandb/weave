@@ -81,7 +81,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    runnable_ref_uri = published_ref.uri()
 
     @weave.op
     def example_op(input: str) -> str:
@@ -99,7 +99,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
                 ActionsExecuteBatchReq.model_validate(
                     {
                         "project_id": client._project_id(),
-                        "action_ref": action_ref_uri,
+                        "runnable_ref": runnable_ref_uri,
                         "call_ids": [call.id],
                     }
                 )
@@ -109,7 +109,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
     assert feedback.feedback_type == "wandb.runnable." + action_name
-    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.runnable_ref == runnable_ref_uri
     assert feedback.payload == {"output": True}
 
 
@@ -172,7 +172,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    runnable_ref_uri = published_ref.uri()
 
     @weave.op
     def example_op(input: str) -> str:
@@ -190,7 +190,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
                 ActionsExecuteBatchReq.model_validate(
                     {
                         "project_id": client._project_id(),
-                        "action_ref": action_ref_uri,
+                        "runnable_ref": runnable_ref_uri,
                         "call_ids": [call.id],
                     }
                 )
@@ -200,7 +200,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
     assert feedback.feedback_type == "wandb.runnable." + action_name
-    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.runnable_ref == runnable_ref_uri
     assert feedback.payload == {
         "output": {
             "is_mindful": True,

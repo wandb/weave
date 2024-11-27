@@ -217,8 +217,12 @@ def test_local_remote_construction_identity(client: WeaveClient):
             }
         )
     )
+
+    # TOOD: Fix serialization
+    # KNown drawbacks:
+    # 1. we don't have the same resulting digst
+    # 2. no deep tracking of ops
     assert obj_read.obj.model_dump() == exp_obj
-    # {'digest': 'YSYEZwqn9ZG4hGk4Qa0E7xrOPPNGU2YLkjH4fRi7ZFI', 'kind': 'object', 'base_object_class': 'TestScorer', 'val': {'_type': 'TestScorer', 'name': None, 'description': None, 'column_map': None, 'scorer_property': 42, 'builtin_scorer_id': 'test_scorer', 'score': 'weave:///shawn/test-project/op/TestScorer.score:DvH4mmpSt2hyqijBqVbP5Q3MCYeQpuTCGnprWgqVPvM', 'summarize': 'weave:///shawn/test-project/op/Scorer.summarize:HxOZbNXYtY4AxB62O524B7AtmhDGwQ7XgrRaSBCuIzw', '_class_name': 'TestScorer', '_bases': ['Scorer', 'Object', 'BaseModel']}}
 
 
 def test_support_for_field_mapping(client: WeaveClient):

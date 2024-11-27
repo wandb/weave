@@ -342,7 +342,7 @@ export const fileExtensions = {
 
 export type ActionsExecuteBatchReq = {
   project_id: string;
-  action_ref: string;
+  runnable_ref: string;
   call_ids: string[];
 };
 

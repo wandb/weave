@@ -858,7 +858,7 @@ class CostPurgeRes(BaseModel):
 
 class ActionsExecuteBatchReq(BaseModel):
     project_id: str
-    action_ref: str
+    runnable_ref: str
     call_ids: list[str]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 

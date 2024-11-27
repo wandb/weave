@@ -32,7 +32,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    runnable_ref_uri = published_ref.uri()
 
     # Part 2: Demonstrate manual feedback (this is not user-facing)
     # This could be it's own test, but it's convenient to have it here.
@@ -48,7 +48,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
                 "project_id": client._project_id(),
                 "weave_ref": call1.ref.uri(),
                 "feedback_type": "wandb.runnable." + action_name,
-                "runnable_ref": action_ref_uri,
+                "runnable_ref": runnable_ref_uri,
                 "payload": {
                     "output": False,
                 },
@@ -60,7 +60,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
     assert feedback.feedback_type == "wandb.runnable." + action_name
-    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.runnable_ref == runnable_ref_uri
     assert feedback.payload == {"output": False}
 
     # Step 3: test that we can in-place execute one action at a time.
@@ -71,7 +71,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
         ActionsExecuteBatchReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "action_ref": action_ref_uri,
+                "runnable_ref": runnable_ref_uri,
                 "call_ids": [call2.id],
             }
         )
@@ -81,7 +81,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
     assert feedback.feedback_type == "wandb.runnable." + action_name
-    assert feedback.runnable_ref == action_ref_uri
+    assert feedback.runnable_ref == runnable_ref_uri
     assert feedback.payload == {"output": True}
 
 
