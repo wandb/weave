@@ -113,7 +113,6 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
         }
 
         const baseLinkProps = {
-          key: item.name,
           onClick: () => {
             item.onClick?.();
           },

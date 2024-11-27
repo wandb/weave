@@ -41,7 +41,8 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
           tooltipText="Click to copy unabridged string"
         />
       </Box>
-      {isParentObject && (
+      {/* Temporarily commenting this out until the serve and deploy features are fixed */}
+      {/* {isParentObject && (
         <>
           <Box mt={2}>
             To <DocLink path="guides/tools/serve" text="serve this model" />{' '}
@@ -64,7 +65,7 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
             />
           </Box>
         </>
-      )}
+      )} */}
     </Box>
   );
 };

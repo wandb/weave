@@ -158,13 +158,13 @@ export const useProjectSidebar = (
             iconName: IconNames.BenchmarkSquare,
           },
           // Hiding until we want to release
-          // {
-          //   type: 'button' as const,
-          //   name: 'Scorers',
-          //   slug: 'weave/scorers',
-          //   isShown: isWeaveOnly,
-          //   iconName: IconNames.TypeNumberAlt,
-          // },
+          {
+            type: 'button' as const,
+            name: 'Scorers',
+            slug: 'weave/scorers',
+            isShown: isWeaveOnly,
+            iconName: IconNames.TypeNumberAlt,
+          },
           {
             type: 'divider' as const,
             key: 'dividerWithinWeave-2',
@@ -228,7 +228,7 @@ export const useProjectSidebar = (
             // iconName: IconNames.OverflowHorizontal,
             menu: [
               'weave/leaderboards',
-              // 'weave/scorers', // Hiding until we want to release
+              'weave/scorers',
               'weave/operations',
               'weave/objects',
               'weave/playground',
