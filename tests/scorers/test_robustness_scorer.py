@@ -1,7 +1,7 @@
 import math
 import string
 
-import pytest
+import pytest  # type: ignore
 
 import weave
 from weave.scorers import RobustnessScorer

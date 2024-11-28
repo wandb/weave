@@ -5,6 +5,7 @@ from weave.scorers.base_scorer import (
     auto_summarize,
     get_scorer_attributes,
 )
+from weave.scorers.bleu_scorer import BLEUScorer
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
@@ -44,7 +45,6 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
-from weave.scorers.bleu_scorer import BLEUScorer
 
 __all__ = [
     "auto_summarize",

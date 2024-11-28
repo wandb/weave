@@ -1,13 +1,14 @@
-from typing import Optional, Any, Sequence
-import weave
+from typing import Any, Optional, Union
+
 from pydantic import Field
+
+import weave
 from weave.scorers.base_scorer import Scorer
 
 
 class BLEUScorer(Scorer):
-    """
-    A Scorer that computes the BLEU score using SacreBLEU.
-    """
+    """A Scorer that computes the BLEU score using SacreBLEU."""
+
     # Optional configuration parameters
     lowercase: bool = Field(
         default=False, description="If True, use case-insensitive matching."
@@ -19,7 +20,7 @@ class BLEUScorer(Scorer):
         ),
     )
     smooth_method: str = Field(
-        default='exp',
+        default="exp",
         description="Smoothing method to use: 'none', 'floor', 'add-k', or 'exp'.",
     )
     smooth_value: Optional[float] = Field(
@@ -30,7 +31,7 @@ class BLEUScorer(Scorer):
         default=4, description="Maximum n-gram order for BLEU calculation."
     )
     effective_order: bool = Field(
-        default=True, # because we are doing sentence-level BLEU in the `score` method
+        default=True,  # because we are doing sentence-level BLEU in the `score` method
         description="If True, use effective order for sentence-level BLEU.",
     )
     bleu: Any = Field(default=None, exclude=True)
@@ -39,6 +40,7 @@ class BLEUScorer(Scorer):
         super().model_post_init(__context)
         try:
             from sacrebleu.metrics import BLEU
+
             self.bleu = BLEU(
                 lowercase=self.lowercase,
                 tokenize=self.tokenize,
@@ -54,15 +56,17 @@ class BLEUScorer(Scorer):
             )
 
     @weave.op()
-    def score(self, ground_truths: list[str], output: str, **kwargs) -> float:
-        """
-        Computes the BLEU score for a single hypothesis and reference(s).
-        """
+    def score(
+        self, ground_truths: list[str], output: str
+    ) -> dict[str, Union[str, float, list[str]]]:
+        """Computes the BLEU score for a single hypothesis and reference(s)."""
         # Ensure that the reference is a list of strings
         if isinstance(ground_truths, str):
             ground_truths = [ground_truths]
 
-        assert isinstance(ground_truths, list), "`ground_truths` must be a list of strings."
+        assert isinstance(
+            ground_truths, list
+        ), "`ground_truths` must be a list of strings."
 
         # Compute the individual/sentence-level BLEU score
         score = self.bleu.sentence_score(output, ground_truths)
@@ -75,11 +79,13 @@ class BLEUScorer(Scorer):
         }
 
     @weave.op()
-    def summarize(self, score_rows: list[dict]) -> Optional[dict]:
+    def summarize(self, score_rows: list[dict]) -> dict:
         if not score_rows:
             return {}
 
-        assert all(isinstance(x, dict) for x in score_rows), "All score rows must be dictionaries"
+        assert all(
+            isinstance(x, dict) for x in score_rows
+        ), "All score rows must be dictionaries"
 
         # Compute average sentence-level BLEU score
         sentence_bleu = sum(x["sentence_bleu"] for x in score_rows) / len(score_rows)
@@ -91,6 +97,9 @@ class BLEUScorer(Scorer):
         corpus_bleu = self.bleu.corpus_score(sys_list, refs_list)
 
         return {
-            "corpus_level": {"bleu": corpus_bleu.score, "brevity_penalty": corpus_bleu.bp},
+            "corpus_level": {
+                "bleu": corpus_bleu.score,
+                "brevity_penalty": corpus_bleu.bp,
+            },
             "sentence_level": {"bleu": sentence_bleu},
         }
