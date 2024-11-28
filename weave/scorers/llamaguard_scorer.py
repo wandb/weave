@@ -16,16 +16,44 @@ class LlamaGuard(Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
-    Defaults to the `meta-llama/Llama-Guard-3-1B` model but you can specify a different model size.
+    LlamaGuard comes in three flavors:
+
+    - **Llama Guard 3 1B**: Text-only model optimized for on-device and cloud safety evaluations.
+    - **Llama Guard 3 8B**: Text-only model that supports the S14 category (Code Interpreter Abuse).
+    - **Llama Guard 3 11B-Vision**: Multimodal model supporting both text and image inputs.
+
+    The models are multilingual for text-only prompts and follow the categories defined by the ML Commons consortium. You can customize the prompt format and the categories used for evaluation.
+
+    **Note**: When evaluating images, use the multimodal model (11B-Vision) and include the `<|image|>` token in your prompt. For text-only classification, use the 1B or 8B models and omit the `<|image|>` token.
 
     Args:
-        model_name: The name of the LlamaGuard model to use. Defaults to `meta-llama/Llama-Guard-3-1B`.
-        device: The device to use for inference. Defaults to `cpu`.
-        automodel_kwargs: Additional keyword arguments to pass to `AutoModelForCausalLM.from_pretrained`.
+        model_name_or_path (str): The name of the LlamaGuard model to use. Defaults to `"meta-llama/Llama-Guard-3-1B"`.
+        device (str): The device to use for inference. Defaults to `"cpu"`.
+        automodel_kwargs (dict[str, Any]): Additional keyword arguments to pass to `AutoModelForCausalLM.from_pretrained`.
+
+    Returns:
+        dict[str, Any]: A dictionary containing:
+            - `safe` (bool): Indicates whether the content is safe.
+            - `categories` (dict[str, bool]): The categories that were violated if the content is unsafe.
+            - `unsafe_score` (float): The probability score for the "unsafe" token.
+
+    Example:
+        >>> from weave.scorers.llamaguard_scorer import LlamaGuard
+        >>> scorer = LlamaGuard()
+        >>> result = scorer.score("Your input text here.")
+        >>> print(result)
+        {
+            'safe': False,
+            'categories': {
+                'Violent Crimes': True,
+                'Hate': True
+            },
+            'unsafe_score': 0.9876
+        }
     """
 
     device: str = "cpu"
-    model_name: str = "meta-llama/Llama-Guard-3-1B"
+    model_name_or_path: str = "meta-llama/Llama-Guard-3-1B"
     automodel_kwargs: dict[str, Any] = {}
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
@@ -76,11 +104,11 @@ class LlamaGuard(Scorer):
             raise ValueError("CUDA is not available")
 
         self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
+            self.model_name_or_path,
             device_map=self.device,
             **self.automodel_kwargs,
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
 
     @weave.op
     def tokenize(
