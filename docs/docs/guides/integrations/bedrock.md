@@ -115,7 +115,7 @@ print(response["output"])
 
 Before you can get started with Weave on Amazon Bedrock, complete the general prerequisites:
 
-1. [Set up Weave and a W&B account](/docs/docs/quickstart#1-install-weave-and-create-an-api-key).
+1. [Sign up for a W&B account or log in](https://app.wandb.ai/login?signup=true&_gl=1*bm01gz*_ga*ODEyMjQ4MjkyLjE3MzE0MzU1NjU.*_ga_JH1SJHJQXJ*MTczMjc1Mjk4Ny40NS4xLjE3MzI3NTMzODAuNTYuMC4w*_ga_GMYDGNGKDT*MTczMjc1Mjk4Ny4zNi4xLjE3MzI3NTMzNzYuMC4wLjA.*_gcl_au*OTI3ODM1OTcyLjE3MzE0MzU1NjUuMTI0Mzg5MDMyMy4xNzMxODk0OTk5LjE3MzE4OTQ5OTg.).
 2. Complete the [Bedrock prerequisites](https://docs.aws.amazon.com/bedrock/latest/userguide/getting-started.html).
 3. Python 3.8 or later
 
