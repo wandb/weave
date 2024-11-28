@@ -397,12 +397,6 @@ async def test_robustness_scorer_eval_with_ground_truths():
     assert cohen_h_mean == 0.24999, f"Unexpected Cohen's h mean: {cohen_h_mean}"
 
 
-import pytest
-
-import weave
-from weave.scorers.robustness_scorer import RobustnessScorer
-
-
 @pytest.mark.asyncio
 async def test_robustness_scorer_non_binary_evaluation():
     # Simulated dataset with questions (original and perturbed)

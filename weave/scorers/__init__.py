@@ -44,6 +44,7 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
+from weave.scorers.bleu_scorer import BLEUScorer
 
 __all__ = [
     "auto_summarize",
@@ -76,4 +77,5 @@ __all__ = [
     "LlamaGuard",
     "CoherenceScorer",
     "CustomBiasScorer",
+    "BLEUScorer",
 ]
