@@ -141,9 +141,7 @@ vertexai_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("vertexai.generative_models"),
             "ChatSession.send_message_async",
-            vertexai_wrapper_async(
-                name="vertexai.ChatSession.send_message_async"
-            ),
+            vertexai_wrapper_async(name="vertexai.ChatSession.send_message_async"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("vertexai.preview.vision_models"),
