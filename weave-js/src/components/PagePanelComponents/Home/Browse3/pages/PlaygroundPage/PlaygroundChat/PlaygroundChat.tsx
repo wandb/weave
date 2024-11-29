@@ -6,7 +6,7 @@ import React, {useState} from 'react';
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {PlaygroundState} from '../types';
+import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -51,7 +51,7 @@ export const PlaygroundChat = ({
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
-  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
+  const handleAddMessage = (role: PlaygroundMessageRole, text: string) => {
     for (let i = 0; i < playgroundStates.length; i++) {
       addMessage(i, {role, content: text});
     }
@@ -66,6 +66,7 @@ export const PlaygroundChat = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        overflow: 'hidden', // Rely on inner overflows, not outer page
       }}>
       <Box
         sx={{
@@ -116,9 +117,9 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  width: 'calc(100% - 16px)',
-                  left: '8px',
-                  right: '8px',
+                  width: 'calc(100% - 32px)',
+                  left: '16px',
+                  right: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -139,6 +140,7 @@ export const PlaygroundChat = ({
                   overflow: 'scroll',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
+                  flexGrow: 1,
                 }}>
                 <Tailwind>
                   <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
@@ -158,7 +160,7 @@ export const PlaygroundChat = ({
                           retry: (messageIndex: number, isChoice?: boolean) =>
                             handleRetry(idx, messageIndex, isChoice),
                           sendMessage: (
-                            role: 'assistant' | 'user' | 'tool',
+                            role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
@@ -169,6 +171,8 @@ export const PlaygroundChat = ({
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  {/* Spacer used for leaving room for the input */}
+                  <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
               <Box
@@ -196,6 +200,7 @@ export const PlaygroundChat = ({
         isLoading={isLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
+        settingsTab={settingsTab}
       />
     </Box>
   );
