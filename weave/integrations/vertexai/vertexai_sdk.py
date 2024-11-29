@@ -14,7 +14,11 @@ if TYPE_CHECKING:
 
 def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     if "self" in inputs:
-        model_name = inputs["self"]._model_name
+        model_name = (
+            inputs["self"]._model_name
+            if hasattr(inputs["self"], "_model_name")
+            else inputs["self"]._model._model_name
+        )
         inputs["self"] = dictify(inputs["self"])
         inputs["model_name"] = model_name
     return inputs
@@ -127,6 +131,18 @@ vertexai_patcher = MultiPatcher(
             "GenerativeModel.generate_content_async",
             vertexai_wrapper_async(
                 name="vertexai.GenerativeModel.generate_content_async"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("vertexai.generative_models"),
+            "ChatSession.send_message",
+            vertexai_wrapper_sync(name="vertexai.ChatSession.send_message"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("vertexai.generative_models"),
+            "ChatSession.send_message_async",
+            vertexai_wrapper_async(
+                name="vertexai.ChatSession.send_message_async"
             ),
         ),
         SymbolPatcher(
