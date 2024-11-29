@@ -84,6 +84,7 @@ scorers_tests = [
   "accelerate>=1.0.0",
   "torch>=2.2.0",
   "sacrebleu>=2.4.2",
+  "rouge>=1.0.1",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
