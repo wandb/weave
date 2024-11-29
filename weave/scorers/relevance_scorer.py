@@ -15,39 +15,7 @@ except ImportError:
         "The `transformers` package is required to use the RelevanceScorer, please run `pip install transformers`"
     )
 
-
-class RelevanceScorer(Scorer):
-    """
-    Use wandb/relevance_scorer to check if the model output is relevant.
-
-    Args:
-        model_name: The name of the relevance scorer model to use. Defaults to `wandb/relevance_scorer`.
-        device: The device to use for inference. Defaults to `cpu`.
-    """
-
-    device: str = "cpu"
-    model_name: str = "wandb/relevance_scorer"
-    _classifier: Any = PrivateAttr()
-    _tokenizer: Any = PrivateAttr()
-    _id2label: dict[int, str] = PrivateAttr()
-    _system_prompt: str = PrivateAttr()
-
-    def model_post_init(self, __context: Any) -> None:
-        if not torch.cuda.is_available() and "cuda" in self.device:
-            raise ValueError("CUDA is not available")
-        self._classifier = pipeline(
-            task="text-generation", model=self.model_name, device=self.device
-        )
-        self._tokenizer = self._classifier.tokenizer
-        self._id2label = {
-            0: "Unknown",
-            1: "Completely Irrelevant",
-            2: "Mostly Irrelevant",
-            3: "A Little Irrelevant",
-            4: "Mostly Relevant",
-            5: "Perfectly Relevant",
-        }
-        self._system_prompt = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context. 
+RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context. 
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
 Relevance measures how effectively a generated output addresses its input context across three core dimensions:
 
@@ -98,7 +66,41 @@ Provide evaluation results in the following JSON format:
   "relevant": [true/false]
 }
 ```
-""".strip()
+"""
+
+
+class RelevanceScorer(Scorer):
+    """
+    Use wandb/relevance_scorer to check if the model output is relevant.
+
+    Args:
+        model_name: The name of the relevance scorer model to use. Defaults to `wandb/relevance_scorer`.
+        device: The device to use for inference. Defaults to `cpu`.
+    """
+
+    device: str = "cpu"
+    model_name: str = "wandb/relevance_scorer"
+    _classifier: Any = PrivateAttr()
+    _tokenizer: Any = PrivateAttr()
+    _id2label: dict[int, str] = PrivateAttr()
+    _system_prompt: str = PrivateAttr()
+
+    def model_post_init(self, __context: Any) -> None:
+        if not torch.cuda.is_available() and "cuda" in self.device:
+            raise ValueError("CUDA is not available")
+        self._classifier = pipeline(
+            task="text-generation", model=self.model_name, device=self.device
+        )
+        self._tokenizer = self._classifier.tokenizer
+        self._id2label = {
+            0: "Unknown",
+            1: "Completely Irrelevant",
+            2: "Mostly Irrelevant",
+            3: "A Little Irrelevant",
+            4: "Mostly Relevant",
+            5: "Perfectly Relevant",
+        }
+        self._system_prompt = RELEVANCE_INSTRUCTIONS.strip()
 
     @weave.op
     def score_messages(self, messages: str) -> dict[str, Any]:
