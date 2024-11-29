@@ -388,7 +388,6 @@ class BiasScorer(ToxicityScorer):
         }
 
 
-
 class PipelineScorer(Scorer):
     """
     Base class for using Hugging Face pipelines for moderation scoring.
