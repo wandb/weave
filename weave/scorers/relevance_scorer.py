@@ -128,7 +128,7 @@ class RelevanceScorer(Scorer):
         if relevance > 3:
             relevant = True
         return {
-            "relevant": relevant,
+            "is_relevant": relevant,
             "score": relevance,
             "relevance": self._id2label.get(relevance, "Unknown"),
         }
