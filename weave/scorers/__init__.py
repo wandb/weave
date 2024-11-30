@@ -34,6 +34,7 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
+from weave.scorers.relevance_scorer import RelevanceScorer
 from weave.scorers.robustness_scorer import (
     RobustnessScorer,
     create_perturbed_dataset,
@@ -63,6 +64,7 @@ __all__ = [
     "LLMScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
+    "RelevanceScorer",
     "RobustnessScorer",
     "RollingWindowScorer",
     "ToxicityScorer",
