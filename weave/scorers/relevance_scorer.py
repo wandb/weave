@@ -170,7 +170,7 @@ class RelevanceScorer(Scorer):
         ]
 
     @weave.op
-    async def score(
+    def score(
         self,
         input: str,
         output: str,
