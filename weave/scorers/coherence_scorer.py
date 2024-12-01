@@ -71,7 +71,7 @@ class CoherenceScorer(Scorer):
         return formatted_chat_history
 
     @weave.op
-    async def score(
+    def score(
         self,
         input: str,
         output: str,
