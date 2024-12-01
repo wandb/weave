@@ -10,6 +10,10 @@ declare global {
       DD_ENV: string;
       ENV_IS_CI: boolean;
     };
+    // Backend host wasn't getting wired up in QA, this deserves a refactor
+    CONFIG?: {
+      BACKEND_HOST?: string;
+    };
   }
 }
 // These get populated via /__frontend/env.js and are defined in weave_server.py
@@ -21,7 +25,7 @@ if (!window.WEAVE_CONFIG) {
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
     TRACE_BACKEND_BASE_URL: '',
-    WANDB_BASE_URL: 'https://api.wandb.ai',
+    WANDB_BASE_URL: window.CONFIG?.BACKEND_HOST ?? 'https://api.wandb.ai',
     DD_ENV: '',
     ENV_IS_CI: false,
   };
