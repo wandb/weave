@@ -24,7 +24,6 @@ from weave.scorers.llm_utils import (
 )
 from weave.scorers.moderation_scorer import (
     BiasScorer,
-    CustomBiasScorer,
     OpenAIModerationScorer,
     RollingWindowScorer,
     ToxicityScorer,
@@ -79,7 +78,6 @@ __all__ = [
     "create_perturbed_dataset",
     "LlamaGuard",
     "CoherenceScorer",
-    "CustomBiasScorer",
     "BLEUScorer",
     "RougeScorer",
 ]

@@ -109,23 +109,10 @@ class RollingWindowScorer(Scorer):
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
+
     def predict_chunk(self, input_ids: "Tensor") -> list[int]:
-        """
-        Predict toxicity scores for a chunk of tokenized input.
-
-        Args:
-            input_ids: Tokenized input IDs for the chunk.
-
-        Returns:
-            A list of prediction scores for each category.
-        """
-        attention_mask = (input_ids != 0).long()
-        outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
-        predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
-        if isinstance(predictions, int):
-            return [predictions]
-        return predictions
-
+        raise NotImplementedError("Subclasses must implement predict_chunk method.")
+    
     def aggregate_predictions(
         self, all_predictions: list[list[Union[int, float]]]
     ) -> list[float]:
@@ -176,10 +163,11 @@ class RollingWindowScorer(Scorer):
         stride: int = self.max_tokens - self.overlap
 
         for i in range(0, total_tokens, stride):
+            print("Running window", i)
             chunk_input_ids = input_ids[:, i : i + self.max_tokens]
             chunk_predictions = self.predict_chunk(chunk_input_ids)
             all_predictions.append(chunk_predictions)
-
+        print("All predictions", all_predictions)
         # Aggregate predictions using the specified aggregation method
         final_predictions: list[float] = self.aggregate_predictions(all_predictions)
 
@@ -234,7 +222,7 @@ class ToxicityScorer(RollingWindowScorer):
         dict[str, Any]: A dictionary containing the `categories` with their respective scores and a `flagged` boolean.
 
     Example:
-        >>> from weave.scorers.moderation_scorer import ToxicityScorer
+        >>> from weave.scorers import ToxicityScorer
         >>> scorer = ToxicityScorer()
         >>> result = scorer.score("This is a hateful message.")
         >>> print(result)
@@ -284,6 +272,23 @@ class ToxicityScorer(RollingWindowScorer):
         print(f"Model and tokenizer loaded on {self.device}")
         self._model.eval()
 
+    def predict_chunk(self, input_ids: "Tensor") -> list[int]:
+        """
+        Predict toxicity scores for a chunk of tokenized input.
+
+        Args:
+            input_ids: Tokenized input IDs for the chunk.
+
+        Returns:
+            A list of prediction scores for each category.
+        """
+        attention_mask = (input_ids != 0).long()
+        outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
+        predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
+        if isinstance(predictions, int):
+            return [predictions]
+        return predictions
+    
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
         flagged: bool = False
@@ -298,95 +303,6 @@ class ToxicityScorer(RollingWindowScorer):
             "categories": dict(zip(self._categories, predictions)),
             "flagged": flagged,
         }
-
-
-class BiasScorer(ToxicityScorer):
-    """
-    Moderation scorer that assesses gender and race/origin bias by focusing on specific categories.
-
-    Inherits from `ToxicityScorer` and retains the "Race/Origin" and "Gender/Sex" categories separately.
-    Flags the input if **any** of these categories meet or exceed their respective thresholds.
-
-    Args:
-        model_name_or_path (str): The name of the model to use. Defaults to `"wandb/celadon"`.
-        total_threshold (int): The total threshold to flag the input based on combined scores. Defaults to `5`.
-        category_threshold (int): The threshold for individual category scores to flag the input. Defaults to `2`.
-        device (str): The device to use for inference. Defaults to `"cpu"`.
-        max_tokens (int): Maximum number of tokens per window. Defaults to `512`.
-        overlap (int): Number of overlapping tokens between windows. Defaults to `50`.
-
-    Returns:
-        dict[str, Any]: A dictionary containing the bias scores and a `flagged` boolean.
-
-    Example:
-        >>> from weave.scorers.moderation_scorer import BiasScorer
-        >>> scorer = BiasScorer()
-        >>> result = scorer.score("An offensive statement about gender.")
-        >>> print(result)
-        {
-            'racial_bias': 0,
-            'gender_bias': 3,
-            'flagged': True
-        }
-    """
-
-    model_name_or_path: str = "wandb/celadon"
-    total_threshold: int = 1
-    category_threshold: int = 2
-    device: str = "cpu"
-    max_tokens: int = 512
-    overlap: int = 50
-    _categories: list[str] = PrivateAttr(
-        default=[
-            "racial_bias",
-            "gender_bias",
-        ]
-    )
-
-    def predict(self, prompt: str) -> list[float]:
-        """
-        Extract predictions for Race/Origin and Gender/Sex categories.
-
-        Args:
-            prompt: The input text to evaluate.
-
-        Returns:
-            A list containing the scores for Race/Origin and Gender/Sex.
-        """
-        input_ids: Tensor = self.tokenize_input(prompt)
-        predictions = self.predict_long(input_ids)
-        if len(predictions) < 2:
-            raise ValueError("Insufficient predictions for Race/Origin and Gender/Sex.")
-        return [predictions[0], predictions[1]]  # Extract scores for the two categories
-
-    @weave.op
-    def score(self, output: str) -> dict[str, Any]:
-        """
-        Score the input text for gender and race/origin bias.
-
-        Args:
-            output: The input text to evaluate.
-
-        Returns:
-            A dictionary containing individual category scores and a flagged boolean.
-        """
-        flagged: bool = False
-        predictions: list[float] = self.predict(output)
-        filtered_predictions: list[float] = [predictions[0], predictions[1]]
-
-        # Check if any individual category meets or exceeds its threshold
-        if (
-            any(o >= self.category_threshold for o in filtered_predictions)
-            or sum(filtered_predictions) >= self.total_threshold
-        ):
-            flagged = True
-
-        return {
-            self._categories[0]: predictions[0],
-            self._categories[1]: predictions[1],
-            "flagged": flagged,
-        }
-
 
 class PipelineScorer(Scorer):
     """
@@ -442,7 +358,7 @@ class PipelineScorer(Scorer):
         return self.pipe(output)
 
 
-class CustomBiasScorer(PipelineScorer):
+class BiasScorer(RollingWindowScorer):
     """
     Moderation scorer that assesses gender and race/origin bias using a custom-trained model.
 
@@ -471,22 +387,48 @@ class CustomBiasScorer(PipelineScorer):
         }
     """
 
-    model_name_or_path: str = "wandb/bias"
-    task: str = "text-classification"
+    model_name_or_path: str = "wandb/bias-scorer"
     device: str = "cpu"
-    threshold: float = 0.45
-    pipeline_kwargs: dict[str, Any] = {"top_k": 2}
+    threshold: float = 0.5
     _categories: list[str] = PrivateAttr(
         default=[
             "gender_bias",
             "racial_bias",
         ]
     )
+    def model_post_init(self, __context: Any) -> None:
+        try:
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except ImportError:
+            print(
+                "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
+            )
+        """Initialize the toxicity model and tokenizer."""
+        if not torch.cuda.is_available() and self.device == "cuda":
+            raise ValueError("CUDA is not available")
+        self._model = AutoModelForSequenceClassification.from_pretrained(
+            self.model_name_or_path, device_map=self.device, trust_remote_code=True
+        )
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
+        print(f"Model and tokenizer loaded on {self.device}")
+        self._model.eval()
+    
+    def predict_chunk(self, input_ids: "Tensor") -> list[float]:
+        attention_mask = (input_ids != 0).long()
+        outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
+        predictions = outputs.logits.sigmoid().tolist()[0]
+        return predictions
 
     @weave.op
-    def score(self, output: str) -> dict[str, Any]:
-        output = self.pipe(output)
-        output = {
-            cat: o["score"] > self.threshold for cat, o in zip(self._categories, output)
+    def score(self, output: str, return_all_scores: bool = False) -> dict[str, Any]:
+        predictions = self.predict(output)
+        scores = [o >= self.threshold for o in predictions]
+        if return_all_scores:
+            categories = dict(zip(self._categories, predictions))
+        else:
+            categories = dict(zip(self._categories, scores))
+        return {
+            "categories": categories,
+            "flagged": any(scores),
         }
-        return output
