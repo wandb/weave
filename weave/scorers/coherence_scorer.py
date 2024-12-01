@@ -54,7 +54,7 @@ class CoherenceScorer(Scorer):
             coherent = False
 
         return {
-            "coherent": coherent,
+            "is_coherent": coherent,
             "coherence": coherence_output["label"],
             "coherence_score": self._label2id[coherence_output["label"]],
             "confidence": coherence_output["score"],
