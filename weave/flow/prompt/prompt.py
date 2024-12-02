@@ -419,13 +419,13 @@ class EasyPrompt(UserList, Prompt):
             "messages": list(self),
         }
 
-    @staticmethod
-    def from_obj(obj: Any) -> "EasyPrompt":
+    @classmethod
+    def from_obj(cls, obj: Any) -> "EasyPrompt":
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
         requirements = dict(obj.requirements)
-        return EasyPrompt(
+        return cls(
             name=obj.name,
             description=obj.description,
             messages=messages,
