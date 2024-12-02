@@ -71,7 +71,7 @@ export const CallPage: FC<{
 
 export const useShowRunnableUI = () => {
   return false;
-  // import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+  // Uncomment to re-enable.
   // const viewerInfo = useViewerInfo();
   // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
