@@ -304,7 +304,8 @@ class HallucinationScorer(Scorer):
             name=model_name_or_path,
         )
         local_model_path = f"models/{model_name}"
-        return art.download(local_model_path)
+        art.download(local_model_path)
+        return local_model_path
 
     def _score_via_api(self, messages: list) -> dict[str, Any]:
         import requests
