@@ -251,9 +251,9 @@ class HallucinationScorer(Scorer):
         base_url: Optional URL for external API scoring instead of local model
         debug: Enable debug logging, defaults to False
     """
-    device: str = "cuda"
     model_name_or_path: str = "c-metrics/hallucination/SmolLM2-135M-Instruct-sft:v18"
     base_url: Optional[str] = None
+    device: str = "cuda"
     debug: bool = False
     llm_model: Any = None
     tokenizer: Any = None
@@ -275,7 +275,7 @@ class HallucinationScorer(Scorer):
             raise ValueError("CUDA is not available")
         
         if self.llm_model is None:
-            self.local_model_path = self.download_model(self.model_name_or_path)
+            self.local_model_path = self._download_model(self.model_name_or_path)
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 self.local_model_path, 
                 torch_dtype="bfloat16"
