@@ -276,9 +276,9 @@ class HallucinationScorer(Scorer):
             raise ValueError("CUDA is not available")
         
         if self.llm_model is None:
-            self.local_model_path = self._download_model(self.model_name_or_path)
+            self._local_model_path = self._download_model(self.model_name_or_path)
             self.llm_model = AutoModelForCausalLM.from_pretrained(
-                self.local_model_path, 
+                self._local_model_path, 
                 torch_dtype="bfloat16"
             ).to(self.device)
 
