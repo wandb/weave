@@ -25,7 +25,7 @@ class CoherenceScorer(Scorer):
     """
 
     device: str = "cpu"
-    model_name: str = "wandb/coherence_scorer"
+    model_name_or_path: str = "wandb/coherence_scorer"
     _classifier: Any = PrivateAttr()
     _label2id: dict[str, int] = PrivateAttr()
 
@@ -33,7 +33,7 @@ class CoherenceScorer(Scorer):
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         self._classifier = pipeline(
-            task="sentiment-analysis", model=self.model_name, device=self.device
+            task="sentiment-analysis", model=self.model_name_or_path, device=self.device
         )
         self._label2id = {
             "Completely Incoherent": 0,
