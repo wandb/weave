@@ -1,19 +1,19 @@
-from typing import Union, Any
+from typing import Union
+
 import numpy as np
+import torch
+import torch.nn.functional as F
+from openai.types.chat import ChatCompletion
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from openai.types.chat import ChatCompletion
 
-
-import torch
-import torch.nn.functional as F
-    
 
 class OpenAIPerplexityScorer(Scorer):
     """A scorer that computes perplexity for OpenAI outputs using log probabilities.
     Reference: https://cookbook.openai.com/examples/using_logprobs#5-calculating-perplexity
     """
+
     @weave.op()
     def score(self, output: Union[ChatCompletion, list]) -> dict:
         """
@@ -28,17 +28,23 @@ class OpenAIPerplexityScorer(Scorer):
             dict: A dictionary containing the calculated perplexity.
         """
         if isinstance(output, ChatCompletion):
-            assert output.choices[0].logprobs is not None, "Logprobs must be present in the output!"
-            logprobs = [logprob.logprob for logprob in output.choices[0].logprobs.content]
+            assert (
+                output.choices[0].logprobs is not None
+            ), "Logprobs must be present in the output!"
+            logprobs = [
+                logprob.logprob for logprob in output.choices[0].logprobs.content
+            ]
         elif isinstance(output, list):
             assert isinstance(output[0], float), "Logprobs must be a list of floats!"
             logprobs = output
         else:
-            raise ValueError("Invalid input type!")
-        
+            raise TypeError("Invalid input type!")
+
         assert len(logprobs) > 0, "Logprobs must be a non-empty list!"
-        assert all(isinstance(logprob, float) for logprob in logprobs), "Logprobs must be a list of floats!"
-        
+        assert all(
+            isinstance(logprob, float) for logprob in logprobs
+        ), "Logprobs must be a list of floats!"
+
         # Correct perplexity calculation
         nll = -np.mean(logprobs)
         perplexity = np.exp(nll).item()
@@ -47,6 +53,7 @@ class OpenAIPerplexityScorer(Scorer):
 
 class HuggingFacePerplexityScorer(Scorer):
     """A scorer that computes perplexity for Hugging Face outputs using log probabilities."""
+
     @weave.op()
     def score(self, output: dict) -> dict:
         """
@@ -64,8 +71,12 @@ class HuggingFacePerplexityScorer(Scorer):
         input_ids = output["input_ids"]
 
         # Shift logits and labels for causal language modeling
-        shift_logits = logits[:, :-1, :]  # Ignore the last logit (no next token to predict)
-        shift_labels = input_ids[:, 1:]  # Ignore the first input token (no previous context)
+        shift_logits = logits[
+            :, :-1, :
+        ]  # Ignore the last logit (no next token to predict)
+        shift_labels = input_ids[
+            :, 1:
+        ]  # Ignore the first input token (no previous context)
 
         # Compute log probabilities
         log_probs = F.log_softmax(shift_logits, dim=-1)

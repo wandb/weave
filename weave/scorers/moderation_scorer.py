@@ -109,10 +109,9 @@ class RollingWindowScorer(Scorer):
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
-
     def predict_chunk(self, input_ids: "Tensor") -> list[int]:
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
-    
+
     def aggregate_predictions(
         self, all_predictions: list[list[Union[int, float]]]
     ) -> list[float]:
@@ -288,7 +287,7 @@ class ToxicityScorer(RollingWindowScorer):
         if isinstance(predictions, int):
             return [predictions]
         return predictions
-    
+
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
         flagged: bool = False
@@ -303,6 +302,7 @@ class ToxicityScorer(RollingWindowScorer):
             "categories": dict(zip(self._categories, predictions)),
             "flagged": flagged,
         }
+
 
 class PipelineScorer(Scorer):
     """
@@ -396,6 +396,7 @@ class BiasScorer(RollingWindowScorer):
             "racial_bias",
         ]
     )
+
     def model_post_init(self, __context: Any) -> None:
         try:
             import torch
@@ -413,7 +414,7 @@ class BiasScorer(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
         print(f"Model and tokenizer loaded on {self.device}")
         self._model.eval()
-    
+
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         attention_mask = (input_ids != 0).long()
         outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)

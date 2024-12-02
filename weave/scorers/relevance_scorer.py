@@ -1,10 +1,10 @@
+import json
 from typing import Any, Optional
 
 from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-import json
 
 try:
     import torch
@@ -105,7 +105,6 @@ class RelevanceScorer(Scorer):
     @weave.op
     def score_messages(self, messages: str) -> dict[str, Any]:
         """Score a prompt response pair."""
-
         generated_output = self._classifier(
             messages,
             max_new_tokens=20,
@@ -141,7 +140,6 @@ class RelevanceScorer(Scorer):
         chat_history: Optional[list[dict[str, str]]],
     ) -> list[dict[str, str]]:
         """Format the prompt for the model."""
-
         chat_history = chat_history if isinstance(chat_history, list) else []
         context = context if isinstance(context, list) else []
         if context:

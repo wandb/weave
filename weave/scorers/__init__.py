@@ -28,6 +28,10 @@ from weave.scorers.moderation_scorer import (
     RollingWindowScorer,
     ToxicityScorer,
 )
+from weave.scorers.perplexity_scorer import (
+    HuggingFacePerplexityScorer,
+    OpenAIPerplexityScorer,
+)
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
@@ -46,7 +50,6 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
-from weave.scorers.perplexity_scorer import OpenAIPerplexityScorer, HuggingFacePerplexityScorer
 
 __all__ = [
     "auto_summarize",
