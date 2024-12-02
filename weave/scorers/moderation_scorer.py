@@ -405,6 +405,7 @@ class BiasScorer(RollingWindowScorer):
     """
 
     model_name_or_path: str = "wandb/bias-scorer"
+    base_url: Optional[str] = None
     device: str = "cpu"
     threshold: float = 0.5
     _categories: list[str] = PrivateAttr(
@@ -415,6 +416,9 @@ class BiasScorer(RollingWindowScorer):
     )
 
     def model_post_init(self, __context: Any) -> None:
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
         try:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -438,8 +442,19 @@ class BiasScorer(RollingWindowScorer):
         predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
+    def _score_via_api(self, output: str, return_all_scores: bool = False) -> dict[str, Any]:
+        import requests
+        response = requests.post(
+            self.base_url,
+            json={"output": output, "return_all_scores": return_all_scores}
+        )
+        response.raise_for_status()
+        return response.json()
+
     @weave.op
     def score(self, output: str, return_all_scores: bool = False) -> dict[str, Any]:
+        if self.base_url:
+            return self._score_via_api(output, return_all_scores)
         predictions = self.predict(output)
         scores = [o >= self.threshold for o in predictions]
         if return_all_scores:
