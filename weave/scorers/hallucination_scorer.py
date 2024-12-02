@@ -265,6 +265,7 @@ class HallucinationScorer(Scorer):
     top_k: int = 20
     top_p: int = 0.7
     use_torch_compile: bool = False
+    _local_model_path: str = None
     
     def model_post_init(self, __context) -> None:
         if self.base_url:
