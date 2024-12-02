@@ -3,7 +3,6 @@ import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
