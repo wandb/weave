@@ -292,6 +292,7 @@ class HallucinationScorer(Scorer):
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
+            self.temperature = None
 
     def _download_model(self, model_name_or_path: str) -> str:
         from wandb import Api
