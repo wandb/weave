@@ -239,16 +239,33 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 class HallucinationScorer(weave.Scorer):
     """
-    Nice docstring
+    A scorer that detects hallucinations in model outputs by comparing them against provided context.
+    
+    This scorer uses a local LLM to analyze whether model outputs contain information not supported
+    by the given context. It loads models using the transformers library and can optionally use
+    torch.compile for faster inference.
+
+    Args:
+        device: Device to run model on, defaults to "cuda"
+        model_name_or_path: Path or name of model to load, defaults to "wandb/coherence_scorer"
+        base_url: Optional URL for external API scoring instead of local model
+        max_new_tokens: Max tokens to generate, defaults to 2
+        model_max_length: Max sequence length, defaults to 8192
+        do_sample: Whether to use sampling in generation, defaults to False
+        temperature: Sampling temperature when do_sample=True, defaults to 0.0
+        num_beams: Number of beams for beam search, defaults to 1
+        top_k: Top-k sampling parameter, defaults to 20
+        top_p: Top-p sampling parameter, defaults to 0.7
+        use_torch_compile: Whether to compile model with torch.compile(), defaults to False
+        debug: Enable debug logging, defaults to False
     """
-    device: str = "cpu"
-    model_name_or_path: str = "wandb/coherence_scorer"
+    device: str = "cuda"
+    model_name_or_path: str = "wandb/hallucination_scorer"
     base_url: Optional[str] = None
     llm_model: Any = None
     tokenizer: Any = None
     max_new_tokens: int = 2
     model_max_length:int = 8192
-    device: str = "cuda"
     do_sample: bool = False
     temperature: float = 0.0
     num_beams: int = 1
@@ -288,7 +305,6 @@ class HallucinationScorer(weave.Scorer):
             query=query,
             context=context,
             output=output,
-            do_training=False
         )
 
         inp_template = self.tokenizer.apply_chat_template(
@@ -340,103 +356,3 @@ class HallucinationScorer(weave.Scorer):
             })
         
         return result
-
-
-
-
-
-
-
-
-
-class CoherenceScorer(Scorer):
-    """
-    Use wandb/coherence_scorer to check if the model output is coherent.
-
-    Args:
-        model_name: The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
-        device: The device to use for inference. Defaults to `cpu`.
-    """
-
-    device: str = "cpu"
-    model_name_or_path: str = "wandb/coherence_scorer"
-    base_url: Optional[str] = None
-    _classifier: Any = PrivateAttr()
-    _label2id: dict[str, int] = PrivateAttr()
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
-        if not torch.cuda.is_available() and "cuda" in self.device:
-            raise ValueError("CUDA is not available")
-        self._classifier = pipeline(
-            task="sentiment-analysis", model=self.model_name_or_path, device=self.device
-        )
-        self._label2id = {
-            "Completely Incoherent": 0,
-            "Mostly Incoherent": 1,
-            "A Little Incoherent": 2,
-            "Mostly Coherent": 3,
-            "Perfectly Coherent": 4,
-        }
-
-    @weave.op
-    def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
-        """Score a prompt response pair."""
-        coherence_output = self._classifier(
-            inputs={"text": prompt, "text_pair": output}
-        )
-        coherent = True
-        if "incoherent" in coherence_output["label"].lower():
-            coherent = False
-
-        return {
-            "is_coherent": coherent,
-            "coherence": coherence_output["label"],
-            "coherence_score": self._label2id[coherence_output["label"]],
-            "confidence": coherence_output["score"],
-        }
-
-    def _format_chat_history(self, chat_history: list[dict[str, str]]) -> str:
-        """Format the chat history for the prompt."""
-        formatted_chat_history = ""
-        for turn in chat_history:
-            if turn["role"] == "user":
-                formatted_chat_history += f"{turn['text']}\n<extra_id_1>Assistant\n"
-            else:
-                formatted_chat_history += f"{turn['text']}\n<extra_id_1>User\n"
-        return formatted_chat_history
-    
-    def _score_via_api(
-            self, 
-            input: str, 
-            output: str, 
-            chat_history: Optional[list[dict[str, str]]] = None, 
-            context: Optional[str] = None
-    ) -> dict[str, Any]:
-        import requests
-        response = requests.post(
-            self.base_url,
-            json={"input": input, "output": output, "chat_history": chat_history, "context": context}
-        )
-        response.raise_for_status()
-        return response.json()
-    
-    @weave.op
-    def score(
-        self,
-        input: str,
-        output: str,
-        chat_history: Optional[list[dict[str, str]]] = None,
-        context: Optional[str] = None,
-    ) -> dict[str, Any]:
-        if self.base_url:
-            return self._score_via_api(input, output, chat_history, context)
-        prompt = input
-        if chat_history is not None:
-            history = self._format_chat_history(chat_history)
-            prompt = f"{history}{input}"
-        if context is not None:
-            prompt = f"{input}\n\n{context}"
-        return self.score_messages(prompt, output)
