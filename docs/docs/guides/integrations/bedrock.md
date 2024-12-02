@@ -267,3 +267,43 @@ Once you complete the prerequisites, start logging to Weave.
     response = call_claude_bis("How do I say: This is really handy, in French?", model_id)
     mprint(response)
     ```
+
+## Use Bedrock with the LLM Playground
+
+You can test and experiment with Amazon Bedrock models using Playground. To use Bedrock models in Playground, complete the following steps:
+
+1. In W&B settings, add your AWS credentials and region name to team secrets:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION_NAME` 
+
+2. In the sidebar, select **Playground** to open a new Playground window.
+
+3. From the LLM dropdown, select one of the available Amazon Bedrock models.
+
+    - ai21.j2-mid-v1
+    - ai21.j2-ultra-v1
+    - amazon.titan-text-lite-v1
+    - amazon.titan-text-express-v1
+    - mistral.mistral-7b-instruct-v0:2
+    - mistral.mixtral-8x7b-instruct-v0:1
+    - mistral.mistral-large-2402-v1:0
+    - mistral.mistral-large-2407-v1:0
+    - anthropic.claude-3-sonnet-20240229-v1:0
+    - anthropic.claude-3-5-sonnet-20240620-v1:0
+    - anthropic.claude-3-haiku-20240307-v1:0
+    - anthropic.claude-3-opus-20240229-v1:0
+    - anthropic.claude-v2
+    - anthropic.claude-v2:1
+    - anthropic.claude-instant-v1
+    - cohere.command-text-v14
+    - cohere.command-light-text-v14
+    - cohere.command-r-plus-v1:0
+    - cohere.command-r-v1:0
+    - meta.llama2-13b-chat-v1
+    - meta.llama2-70b-chat-v1
+    - meta.llama3-8b-instruct-v1:0
+    - meta.llama3-70b-instruct-v1:0
+    - meta.llama3-1-8b-instruct-v1:0
+    - meta.llama3-1-70b-instruct-v1:0
+    - meta.llama3-1-405b-instruct-v1:0
