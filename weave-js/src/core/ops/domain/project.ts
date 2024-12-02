@@ -1,5 +1,5 @@
 import * as Urls from '../../_external/util/urls';
-import {hash, list} from '../../model';
+import {hash, list, typedDict} from '../../model';
 import {docType} from '../../util/docs';
 import * as OpKinds from '../opKinds';
 import {connectionToNodes} from './util';
@@ -296,4 +296,46 @@ export const opProjectRunQueues = makeProjectOp({
   })} for a ${docType('project')}`,
   returnType: inputTypes => list('runQueue'),
   resolver: ({project}) => project.runQueues,
+});
+
+export const opProjectTracesType = makeProjectOp({
+  name: 'project-tracesType',
+  argTypes: projectArgTypes,
+  description: `Returns the ${docType('list', {
+    plural: true,
+  })} for a ${docType('project')}`,
+  argDescriptions: {project: projectArgDescription},
+  returnValueDescription: `The ${docType('list', {
+    plural: true,
+  })} for a ${docType('project')}`,
+  returnType: inputTypes => 'type',
+  resolver: ({project}) => project.traces,
+  hidden: true,
+});
+
+export const opProjectTraces = makeProjectOp({
+  name: 'project-traces',
+  argTypes: projectArgTypes,
+  description: `Returns the ${docType('list', {
+    plural: true,
+  })} for a ${docType('project')}`,
+  argDescriptions: {project: projectArgDescription},
+  returnValueDescription: `The ${docType('list', {
+    plural: true,
+  })} for a ${docType('project')}`,
+  returnType: inputTypes => list(typedDict({})),
+  resolver: ({project}) => project.traces,
+  // resolveOutputType: async (
+  //   inputTypes,
+  //   node,
+  //   executableNode,
+  //   client,
+  //   stack
+  // ) => {
+  //   console.log(executableNode);
+  //   const res = await client.query(
+  //     opProjectTracesType(executableNode.fromOp.inputs as any)
+  //   );
+  //   return res;
+  // },
 });
