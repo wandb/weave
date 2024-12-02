@@ -21,6 +21,8 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
 
+const DEFAULT_MODEL = 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey;
+
 const DEFAULT_PLAYGROUND_STATE = {
   pendingToolResponseIds: [],
   traceCall: {
@@ -40,7 +42,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   presencePenalty: 0,
   //   nTimes: 1,
   maxTokensLimit: 16384,
-  model: 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey,
+  model: DEFAULT_MODEL,
 };
 
 export const usePlaygroundState = () => {

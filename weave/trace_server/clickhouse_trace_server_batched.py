@@ -45,7 +45,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import process_incoming_object
+from weave.trace_server.base_object_class_util import process_incoming_object_val
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -578,7 +578,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        val, base_object_class = process_incoming_object(
+        val, base_object_class = process_incoming_object_val(
             req.obj.val, req.obj.set_base_object_class
         )
 
@@ -1330,7 +1330,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
@@ -1462,14 +1462,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        if not api_key:
+        isBedrock = model_info.get("litellm_provider") == "bedrock"
+        if not api_key and not isBedrock:
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
 
         start_time = datetime.datetime.now()
-        res = lite_llm_completion(api_key, req.inputs)
+        res = lite_llm_completion(
+            api_key,
+            req.inputs,
+            isBedrock,
+        )
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:

@@ -1,7 +1,7 @@
 import {Box, CircularProgress, Divider} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useRef, useState} from 'react';
+import React, {useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
@@ -64,13 +64,6 @@ export const PlaygroundChat = ({
     setChatText('');
   };
 
-  // Used to shift top bar over for scrollbar
-  const chatRef = useRef<HTMLDivElement>(null);
-  const isChatOverflowing =
-    chatRef?.current?.scrollHeight &&
-    chatRef.current.clientHeight &&
-    chatRef.current.scrollHeight > chatRef.current.clientHeight;
-
   return (
     <Box
       sx={{
@@ -79,6 +72,7 @@ export const PlaygroundChat = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        overflow: 'hidden', // Rely on inner overflows, not outer page
       }}>
       <Box
         sx={{
@@ -129,8 +123,9 @@ export const PlaygroundChat = ({
                 sx={{
                   position: 'absolute',
                   top: '8px',
-                  left: '8px',
-                  right: isChatOverflowing ? '16px' : '8px',
+                  width: 'calc(100% - 32px)',
+                  left: '16px',
+                  right: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -152,8 +147,8 @@ export const PlaygroundChat = ({
                   overflowY: 'auto',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
-                }}
-                ref={chatRef}>
+                  flexGrow: 1,
+                }}>
                 <Tailwind>
                   <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
@@ -190,6 +185,8 @@ export const PlaygroundChat = ({
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  {/* Spacer used for leaving room for the input */}
+                  <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
               <Box
@@ -220,6 +217,7 @@ export const PlaygroundChat = ({
         isLoading={isLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
+        settingsTab={settingsTab}
       />
     </Box>
   );
