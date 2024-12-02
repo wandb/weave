@@ -1,6 +1,6 @@
 # Comparison
 
-The Weave Comparison feature allows you to visually compare and diff code, traces, prompts, models, model configs, evaluation metrics, and evaluation predictions.  Whether you're comparing two objects side-by-side or analyzing a larger set of objects, the Comparison feature makes it easier to identify differences, patterns, and trends.
+The Weave Comparison feature allows you to visually compare and diff code, traces, prompts, models, model configs, evaluation metrics, and evaluation predictions.  You can compare two objects side-by-side or analyze a larger set of objects to identify differences, patterns, and trends.
 
 This guide covers the steps to start a comparison and the available actions to tailor your comparison view, including baseline comparisons, numeric diff formatting, and more. 
 
@@ -8,7 +8,7 @@ This guide covers the steps to start a comparison and the available actions to t
 
 ## Access the Comparison view
 
-1. In the sidebar, select tyoe of object you'd like to compare (e.g. **Traces**, **Models**, etc.).
+1. In the sidebar, select the type of object you'd like to compare (e.g. **Traces**, **Models**, etc.).
 2. Select the checkbox for each object that you want to compare.
 3. Click **Compare**. The Comparison view displays. Now, you can refine your view using the [available actions](#available-actions).
 
@@ -73,15 +73,12 @@ For numeric values such as `completion_tokens` and `total_tokens`, you can view 
 2. Click the diff value. The format automatically updates to either an integer or a percentage.
     ![A numeric value updated to a percentage.](imgs/comparison-2objs-numericdiffformat-updated.png)
 
-
-![Comparing 7 objects at once.](imgs/comparsion-7objs-diffonly-allobjs.png)
-
 ### Compare with baseline or previous
 
 > This option is only available when comparing 3 or more objects.
 > You can also [set](#set-a-baseline) or [remove an existing baseline by clicking the 3 dots to the right of the ID](#remove-a-baseline).
 
-To perform a baseline comparision with 3 or more objects, do the following:
+To perform a baseline comparison with 3 or more objects, do the following:
 
 1. In the right hand corner of the Comparison view, click the dropdown. Depending on your current view configuration, the dropdown is either titled **Compare with previous** or **Compare with baseline**.
 2. Depending on your current view configuration, select either **Compare with previous** or **Compare with baseline**.
@@ -108,7 +105,7 @@ To remove an object from comparison, do the following:
 
 1. In the Comparison view topbar, find the object that you want to remove from comparison.
 2. Click the three dots to the right of the ID.
-3. In the dropdown, select **Remove object from comparison**. The UI refreshes with an updated that no longer included the removed object.
+3. In the dropdown, select **Remove object from comparison**. The UI refreshes with an updated that no longer includes the removed object.
 
 ## Usage notes
 
