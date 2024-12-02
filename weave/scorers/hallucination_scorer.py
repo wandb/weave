@@ -252,7 +252,7 @@ class HallucinationScorer(Scorer):
         debug: Enable debug logging, defaults to False
     """
     device: str = "cuda"
-    model_name_or_path: str = "wandb/hallucination_scorer"
+    model_name_or_path: str = "c-metrics/hallucination/SmolLM2-135M-Instruct-sft:v18"
     base_url: Optional[str] = None
     debug: bool = False
     llm_model: Any = None
@@ -266,7 +266,6 @@ class HallucinationScorer(Scorer):
     top_p: int = 0.7
     use_torch_compile: bool = False
     
-    
     def model_post_init(self, __context) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
@@ -276,8 +275,9 @@ class HallucinationScorer(Scorer):
             raise ValueError("CUDA is not available")
         
         if self.llm_model is None:
+            self.local_model_path = self.download_model(self.model_name_or_path)
             self.llm_model = AutoModelForCausalLM.from_pretrained(
-                self.model_name_or_path, 
+                self.local_model_path, 
                 torch_dtype="bfloat16"
             ).to(self.device)
 
@@ -291,6 +291,19 @@ class HallucinationScorer(Scorer):
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
+
+    def _download_model(self, model_name_or_path: str) -> str:
+        from wandb import Api
+
+        api = Api()
+        # model_artifact_path = f"c-metrics/hallucination/SmolLM2-135M-Instruct-sft:v18"
+        model_name = model_name_or_path.split("/")[-1].replace(":", "_")
+        art = api.artifact(
+            type="model",
+            name=model_name_or_path,
+        )
+        local_model_path = f"models/{model_name}"
+        return art.download(local_model_path)
 
     def _score_via_api(self, messages: list) -> dict[str, Any]:
         import requests
