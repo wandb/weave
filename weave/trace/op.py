@@ -309,13 +309,13 @@ def _execute_op(
         # Ensure that res is fully loaded if possible
         if res is not None:
             try:
-              # Specifically check if res is a PIL Image subclass by class name and module
-              if (
-                  hasattr(res, '__class__') and
-                  'Image' in res.__class__.__name__ and
-                  res.__class__.__module__.startswith('PIL.')
-              ):
-                  res.load()
+                # Specifically check if res is a PIL Image subclass by class name and module
+                if (
+                    hasattr(res, "__class__")
+                    and "Image" in res.__class__.__name__
+                    and res.__class__.__module__.startswith("PIL.")
+                ):
+                    res.load()
             except Exception as e:
                 logger.warning(f"Could not load PIL Image object: {e}")
         try:
