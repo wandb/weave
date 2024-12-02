@@ -413,11 +413,11 @@ export const TextFeedbackColumn = ({
         value={value}
         onChange={onValueChange}
         maxLength={maxLength}
-        placeholder="..."
+        placeholder=""
       />
       {maxLength && (
         <div className="mb-1 text-xs text-moon-500">
-          {`character max: ${maxLength}`}
+          {`Maximum characters: ${maxLength}`}
         </div>
       )}
     </div>
@@ -477,6 +477,7 @@ export const EnumFeedbackColumn = ({
         onChange={onValueChange}
         value={value}
         openOnFocus
+        placeholder="Select"
         autoFocus={focused}
         renderInput={params => (
           <MuiTextField
@@ -556,6 +557,7 @@ export const BinaryFeedbackColumn = ({
           onClick={() => handleClick(false)}>
           False
         </Button>
+        <div className="flex-grow" />
       </div>
     </Tailwind>
   );
@@ -652,9 +654,10 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
       />
       {(min != null || max != null) && (
         <div className="mb-1 text-xs text-moon-500">
-          {min != null && `min: ${min}`}
+          {isInteger ? 'Integer required. ' : ''}
+          {min != null && `Min: ${min}`}
           {min != null && max != null && ', '}
-          {max != null && `max: ${max}`}
+          {max != null && `Max: ${max}`}
         </div>
       )}
     </div>

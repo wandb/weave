@@ -93,13 +93,14 @@ export const FeedbackSidebar = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="justify-left flex w-full border-b border-moon-300 p-12">
+      <div className="justify-left flex w-full p-12">
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
       </div>
+      <div className="min-h-1 h-1 flex-grow overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
         <>
-          <div className="mx-6 h-full flex-grow overflow-auto">
+          <div className="ml-6 h-full flex-grow overflow-auto">
             <HumanAnnotationInputs
               entity={entity}
               project={project}
@@ -110,7 +111,7 @@ export const FeedbackSidebar = ({
               setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
             />
           </div>
-          <div className="flex w-full border-t border-moon-300 p-12 pr-18">
+          <div className="flex w-full border-t border-moon-300 p-12">
             <Button
               onClick={save}
               variant="primary"
@@ -175,7 +176,7 @@ const HumanAnnotationInputs = ({
         <div key={field.ref} className="px-16">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
-            <div className="bg-gray-50 font-italic mt-4 text-sm text-moon-700 ">
+            <div className="bg-gray-50 font-italic text-sm text-moon-700 ">
               {field.description}
             </div>
           )}
@@ -193,14 +194,6 @@ const HumanAnnotationInputs = ({
           </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-const DisplayNumericCounter = ({count}: {count: number}) => {
-  return (
-    <div className="rounded-sm bg-moon-150 px-2 text-xs font-medium text-moon-500">
-      {count}
     </div>
   );
 };

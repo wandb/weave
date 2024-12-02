@@ -695,6 +695,7 @@ const NumberField: React.FC<{
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
   const fieldDescription = getFieldDescription(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
     <Box display="flex" alignContent="center" justifyContent="space-between">
@@ -703,6 +704,7 @@ const NumberField: React.FC<{
         type="number"
         value={(value ?? '').toString()}
         style={{width: '100%'}}
+        isOptional={isOptional}
         onChange={newValue => {
           const finalValue = newValue === '' ? undefined : Number(newValue);
           if (
