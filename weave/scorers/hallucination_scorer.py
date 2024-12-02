@@ -287,7 +287,7 @@ class HallucinationScorer(Scorer):
                 self.llm_model = torch.compile(self.llm_model, backend="inductor", fullgraph=True)
         
         if self.tokenizer is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, 
+            self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path, 
                                                            model_max_length=self.model_max_length)
         if not self.do_sample:
             self.top_k = None
