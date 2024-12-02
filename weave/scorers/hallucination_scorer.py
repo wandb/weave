@@ -5,6 +5,7 @@ import weave
 from weave.scorers.llm_scorer import InstructorLLMScorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 from weave.scorers.utils import stringify
+from weave.scorers.base_scorer import Scorer
 
 try:
     import torch
@@ -237,31 +238,23 @@ class HallucinationFreeScorer(InstructorLLMScorer):
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-class HallucinationScorer(weave.Scorer):
+class HallucinationScorer(Scorer):
     """
-    A scorer that detects hallucinations in model outputs by comparing them against provided context.
+    A scorer that detects hallucinations in the output, given an query and context.
     
-    This scorer uses a local LLM to analyze whether model outputs contain information not supported
-    by the given context. It loads models using the transformers library and can optionally use
-    torch.compile for faster inference.
+    This scorer uses a fine-tuned LLM to analyze whether model outputs contain information not supported
+    by the given context.
 
     Args:
         device: Device to run model on, defaults to "cuda"
-        model_name_or_path: Path or name of model to load, defaults to "wandb/coherence_scorer"
+        model_name_or_path: Path or name of model weights to load
         base_url: Optional URL for external API scoring instead of local model
-        max_new_tokens: Max tokens to generate, defaults to 2
-        model_max_length: Max sequence length, defaults to 8192
-        do_sample: Whether to use sampling in generation, defaults to False
-        temperature: Sampling temperature when do_sample=True, defaults to 0.0
-        num_beams: Number of beams for beam search, defaults to 1
-        top_k: Top-k sampling parameter, defaults to 20
-        top_p: Top-p sampling parameter, defaults to 0.7
-        use_torch_compile: Whether to compile model with torch.compile(), defaults to False
         debug: Enable debug logging, defaults to False
     """
     device: str = "cuda"
     model_name_or_path: str = "wandb/hallucination_scorer"
     base_url: Optional[str] = None
+    debug: bool = False
     llm_model: Any = None
     tokenizer: Any = None
     max_new_tokens: int = 2
@@ -272,7 +265,7 @@ class HallucinationScorer(weave.Scorer):
     top_k: int = 20
     top_p: int = 0.7
     use_torch_compile: bool = False
-    debug: bool = False
+    
     
     def model_post_init(self, __context) -> None:
         if self.base_url:
@@ -298,39 +291,54 @@ class HallucinationScorer(weave.Scorer):
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
-        
+
+    def _score_via_api(self, messages: list) -> dict[str, Any]:
+        import requests
+        response = requests.post(
+            self.base_url,
+            json={"messages": messages}
+        )
+        response.raise_for_status()
+        return response.json()
+
     @weave.op
-    def predict(self, query:str, context:str, output:str):
+    def score(self, query:str, context:str, output:str) -> dict:
+
         messages = get_chat_template_messages(
             query=query,
             context=context,
             output=output,
         )
 
-        inp_template = self.tokenizer.apply_chat_template(
-            messages,
-            return_tensors="pt",
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(self.device)
-        
-        pad_token_id = self.tokenizer.eos_token_id
+        if self.base_url:
+            output = self._score_via_api(messages)
+            output = output["data"]
 
-        with torch.no_grad():            
-            self.llm_model.eval()
-            
-            output = self.llm_model.generate(
-                inp_tokenized["input_ids"],
-                max_new_tokens=self.max_new_tokens,
-                attention_mask=inp_tokenized["attention_mask"],
-                pad_token_id=pad_token_id,
-                temperature=self.temperature,
-                do_sample=self.do_sample,
-                num_beams=self.num_beams,
-                top_k=self.top_k,
-                top_p=self.top_p
+        else:
+            inp_template = self.tokenizer.apply_chat_template(
+                messages,
+                return_tensors="pt",
+                tokenize=False,
+                add_generation_prompt=True
             )
+            inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(self.device)
+            
+            pad_token_id = self.tokenizer.eos_token_id
+
+            with torch.no_grad():            
+                self.llm_model.eval()
+                
+                output = self.llm_model.generate(
+                    inp_tokenized["input_ids"],
+                    max_new_tokens=self.max_new_tokens,
+                    attention_mask=inp_tokenized["attention_mask"],
+                    pad_token_id=pad_token_id,
+                    temperature=self.temperature,
+                    do_sample=self.do_sample,
+                    num_beams=self.num_beams,
+                    top_k=self.top_k,
+                    top_p=self.top_p
+                )
 
         true_token = 2787
         false_token = 4245
