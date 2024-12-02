@@ -106,12 +106,12 @@ export type ObjectVersionKey =
   | WandbArtifactObjectVersionKey
   | WeaveObjectVersionKey;
 
-export type ObjectVersionSchema = ObjectVersionKey & {
+export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   baseObjectClass: string | null;
   createdAtMs: number;
-  val: any;
+  val: T;
 };
 
 export type ObjectVersionFilter = {
@@ -162,7 +162,10 @@ export type Refetchable = {
 };
 
 export type WFDataModelHooksInterface = {
-  useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
+  useCall: (
+    key: CallKey | null,
+    opts?: {includeCosts?: boolean}
+  ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
     project: string,
@@ -173,7 +176,12 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefColumns?: Set<string>,
-    opts?: {skip?: boolean; refetchOnDelete?: boolean}
+    opts?: {
+      skip?: boolean;
+      refetchOnDelete?: boolean;
+      includeCosts?: boolean;
+      includeFeedback?: boolean;
+    }
   ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
@@ -240,7 +248,7 @@ export type WFDataModelHooksInterface = {
     filter: ObjectVersionFilter,
     limit?: number,
     metadataOnly?: boolean,
-    opts?: {skip?: boolean}
+    opts?: {skip?: boolean; noAutoRefresh?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;

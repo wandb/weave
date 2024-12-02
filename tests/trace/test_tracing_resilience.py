@@ -13,8 +13,8 @@ import pytest
 
 import weave
 from tests.trace.util import DummyTestException
-from weave.trace import call_context
-from weave.trace.context import raise_on_captured_errors
+from weave.trace.context import call_context
+from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
@@ -64,7 +64,7 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     assert_no_current_call()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior
     assert ag_res == {

@@ -1,14 +1,15 @@
 from collections import Counter
+from collections.abc import Generator
 from contextlib import contextmanager
 from threading import Lock
-from typing import Any, Generator
+from typing import Any
 
 import PIL
 import pytest
 
 import weave
 from tests.trace.util import DummyTestException
-from weave.trace.context import raise_on_captured_errors
+from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -91,8 +92,8 @@ def build_evaluation():
         return "I don't know"
 
     @weave.op()
-    def score(question: str, expected: str, model_output: str):
-        return model_output == expected
+    def score(question: str, expected: str, output: str):
+        return output == expected
 
     evaluation = weave.Evaluation(
         name="My Evaluation",
@@ -133,6 +134,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "file_create": 10,  # 4 images, 6 ops
             "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
             "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "feedback_create": 4,  # 4 predict feedbacks
         }
     )
 
@@ -160,7 +162,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server._flush()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     assert len(ag_res) == 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
@@ -173,7 +175,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server._flush()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior.
     # For some reason with high parallelism, some logs are not captured,

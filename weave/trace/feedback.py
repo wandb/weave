@@ -1,12 +1,15 @@
 """Classes for working with feedback on a project or ref level."""
 
+from __future__ import annotations
+
 import json
-from typing import Any, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Any
 
 from rich.table import Table
 
 from weave.trace import util
-from weave.trace.client_context import weave_client as weave_client_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.refs import parse_uri
 from weave.trace.rich import pydantic_util
 from weave.trace.rich.container import AbstractRichContainer
@@ -21,7 +24,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
     show_refs: bool
 
     def __init__(
-        self, show_refs: bool, feedbacks: Optional[Iterable[tsi.Feedback]] = None
+        self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None
     ) -> None:
         super().__init__("Feedback", feedbacks)
         self.show_refs = show_refs
@@ -86,18 +89,18 @@ class FeedbackQuery:
 
     show_refs: bool
     _query: tsi.Query
-    offset: Optional[int]
-    limit: Optional[int]
+    offset: int | None
+    limit: int | None
 
-    feedbacks: Optional[Feedbacks]
+    feedbacks: Feedbacks | None
 
     def __init__(
         self,
         entity: str,
         project: str,
         query: Query,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int | None = None,
+        limit: int | None = None,
         show_refs: bool = False,
     ):
         self.client = weave_client_context.require_weave_client()
@@ -185,7 +188,7 @@ class RefFeedbackQuery(FeedbackQuery):
         self.weave_ref = ref
 
     def _add(
-        self, feedback_type: str, payload: dict[str, Any], creator: Optional[str]
+        self, feedback_type: str, payload: dict[str, Any], creator: str | None
     ) -> str:
         freq = tsi.FeedbackCreateReq(
             project_id=f"{self.entity}/{self.project}",
@@ -201,8 +204,8 @@ class RefFeedbackQuery(FeedbackQuery):
     def add(
         self,
         feedback_type: str,
-        payload: Optional[dict[str, Any]] = None,
-        creator: Optional[str] = None,
+        payload: dict[str, Any] | None = None,
+        creator: str | None = None,
         **kwargs: dict[str, Any],
     ) -> str:
         """Add feedback to the ref.
@@ -217,7 +220,7 @@ class RefFeedbackQuery(FeedbackQuery):
         feedback.update(kwargs)
         return self._add(feedback_type, feedback, creator)
 
-    def add_reaction(self, emoji: str, creator: Optional[str] = None) -> str:
+    def add_reaction(self, emoji: str, creator: str | None = None) -> str:
         return self._add(
             "wandb.reaction.1",
             {
@@ -226,7 +229,7 @@ class RefFeedbackQuery(FeedbackQuery):
             creator=creator,
         )
 
-    def add_note(self, note: str, creator: Optional[str] = None) -> str:
+    def add_note(self, note: str, creator: str | None = None) -> str:
         return self._add(
             "wandb.note.1",
             {

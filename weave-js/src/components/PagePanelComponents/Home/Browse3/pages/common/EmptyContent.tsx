@@ -43,6 +43,57 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
+  icon: 'benchmark-square' as const,
+  heading: 'No leaderboard submissions found.',
+  description: 'Create leaderboard submissions by running evaluations.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="https://wandb.me/weave_evals">
+        evaluation basics
+      </TargetBlank>{' '}
+      or follow our tutorial to{' '}
+      <TargetBlank href="http://wandb.me/weave_eval_tut">
+        set up an evaluation pipeline
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_LEADERBOARDS: EmptyProps = {
+  icon: 'benchmark-square' as const,
+  heading: 'No leaderboards yet',
+  description:
+    'Use leaderboards to summarize and compare the performance of your models.',
+  moreInformation: (
+    <>
+      Follow the{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart">
+        leaderboard quickstart
+      </TargetBlank>{' '}
+      to create leaderboards for your evaluations.
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_PROMPTS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No prompts yet',
+  description:
+    'You can use prompts to try different instructions for your LLM, tracking edits and their impact on performance.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_prompts">
+        prompt basics
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
 export const EMPTY_PROPS_MODEL: EmptyProps = {
   icon: 'model' as const,
   heading: 'No models yet',
@@ -129,6 +180,45 @@ export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
       Learn about{' '}
       <TargetBlank href="https://wandb.me/weave">Weave features</TargetBlank> or
       return to <Link to="..">your project homepage</Link>.
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
+  icon: 'type-number-alt' as const,
+  heading: 'No programmatic scorers yet',
+  description: 'Create programmatic scorers in Python.',
+  moreInformation: (
+    <>
+      Learn more about{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+        creating and using scorers
+      </TargetBlank>{' '}
+      in evaluations.
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
+  icon: 'automation-robot-arm' as const,
+  heading: 'No Actions yet',
+  description:
+    'Use Actions to define workloads to be executed by Weave servers (for example: LLM Judges) ',
+  moreInformation: <></>,
+};
+
+export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
+  icon: 'forum-chat-bubble' as const,
+  heading: 'No annotations yet',
+  description: 'Create annotations in the UI or python.',
+  moreInformation: (
+    <>
+      More information about creating and using annotation specifications for
+      human labeling can be found in the{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
+        documentation
+      </TargetBlank>
+      .
     </>
   ),
 };

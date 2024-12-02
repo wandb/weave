@@ -13,7 +13,6 @@ title: Introduction Notebook
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{intro-colab} -->
 
 # 🏃‍♀️ Quickstart

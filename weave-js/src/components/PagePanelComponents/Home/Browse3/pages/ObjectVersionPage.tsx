@@ -25,9 +25,13 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
+import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
@@ -43,8 +47,14 @@ type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
 };
 const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
+  Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
+  ActionSpec: 'rocket-launch',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -115,15 +125,14 @@ const ObjectVersionPageInner: React.FC<{
   );
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
-    if (objectVersion.baseObjectClass === 'Dataset') {
-      return 'Dataset';
-    }
-    if (objectVersion.baseObjectClass === 'Model') {
-      return 'Model';
-    }
-    return null;
+    const s = objectVersion.baseObjectClass;
+    return KNOWN_BASE_OBJECT_CLASSES.includes(s as KnownBaseObjectClassType)
+      ? (s as KnownBaseObjectClassType)
+      : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
 
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
@@ -181,6 +190,13 @@ const ObjectVersionPageInner: React.FC<{
   }, [viewerData]);
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
+  const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
+  const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
+  const evalHasCallsLoading = consumingCalls.loading;
+
+  if (isEvaluation && evalHasCallsLoading) {
+    return <CenteredAnimatedLoader />;
+  }
 
   return (
     <SimplePageLayoutWithHeader
@@ -264,6 +280,41 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabPrompt
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
+        ...(isEvaluation && evalHasCalls
+          ? [
+              {
+                label: 'Leaderboard',
+                content: (
+                  <EvaluationLeaderboardTab
+                    entity={entityName}
+                    project={projectName}
+                    evaluationObjectName={objectName}
+                    evaluationObjectVersion={objectVersion.versionHash}
+                  />
+                ),
+              },
+            ]
+          : []),
         {
           label: isDataset ? 'Rows' : 'Values',
           content: (
@@ -295,23 +346,33 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content: (
-            <Tailwind>
-              {baseObjectClass === 'Dataset' ? (
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              ) : baseObjectClass === 'Model' ? (
-                <TabUseModel
-                  name={objectName}
-                  uri={refUri}
-                  projectName={projectName}
-                />
-              ) : (
-                <TabUseObject name={objectName} uri={refUri} />
-              )}
-            </Tailwind>
+            <ScrollableTabContent>
+              <Tailwind>
+                {baseObjectClass === 'Prompt' ? (
+                  <TabUsePrompt
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
+                  />
+                ) : baseObjectClass === 'Dataset' ? (
+                  <TabUseDataset
+                    name={objectName}
+                    uri={refUri}
+                    versionIndex={objectVersionIndex}
+                  />
+                ) : baseObjectClass === 'Model' ? (
+                  <TabUseModel
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                  />
+                ) : (
+                  <TabUseObject name={objectName} uri={refUri} />
+                )}
+              </Tailwind>
+            </ScrollableTabContent>
           ),
         },
 

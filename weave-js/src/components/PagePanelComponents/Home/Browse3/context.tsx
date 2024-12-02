@@ -188,7 +188,34 @@ export const browse2Context = {
   compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    evaluationCallIds: string[]
+    evaluationCallIds: string[],
+    metrics: Record<string, boolean> | null
+  ) => {
+    throw new Error('Not implemented');
+  },
+
+  scorersUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
+  ) => {
+    throw new Error('Not implemented');
+  },
+  compareCallsUri: (
+    entityName: string,
+    projectName: string,
+    callIds: string[]
+  ) => {
+    throw new Error('Not implemented');
+  },
+  compareObjectsUri: (
+    entityName: string,
+    projectName: string,
+    objectSpecifiers: string[]
   ) => {
     throw new Error('Not implemented');
   },
@@ -323,7 +350,8 @@ export const browse3ContextGen = (
       traceId: string,
       callId: string,
       path?: string | null,
-      tracetree?: boolean
+      tracetree?: boolean,
+      feedbackExpand?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
       const params = new URLSearchParams();
@@ -332,6 +360,9 @@ export const browse3ContextGen = (
       }
       if (tracetree !== undefined) {
         params.set(TRACETREE_PARAM, tracetree ? '1' : '0');
+      }
+      if (feedbackExpand !== undefined) {
+        params.set(FEEDBACK_EXPAND_PARAM, feedbackExpand ? '1' : '0');
       }
       if (params.toString()) {
         url += '?' + params.toString();
@@ -408,14 +439,53 @@ export const browse3ContextGen = (
     compareEvaluationsUri: (
       entityName: string,
       projectName: string,
-      evaluationCallIds: string[]
+      evaluationCallIds: string[],
+      metrics: Record<string, boolean> | null
     ) => {
+      const metricsPart = metrics
+        ? `&metrics=${encodeURIComponent(JSON.stringify(metrics))}`
+        : '';
       return `${projectRoot(
         entityName,
         projectName
       )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
         JSON.stringify(evaluationCallIds)
-      )}`;
+      )}${metricsPart}`;
+    },
+
+    scorersUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/scorers`;
+    },
+
+    leaderboardsUIUrl: (
+      entityName: string,
+      projectName: string,
+      leaderboardName?: string,
+      edit?: boolean
+    ) => {
+      return `${projectRoot(entityName, projectName)}/leaderboards${
+        leaderboardName ? `/${leaderboardName}` : ''
+      }${edit ? '?edit=true' : ''}`;
+    },
+    compareCallsUri: (
+      entityName: string,
+      projectName: string,
+      callIds: string[]
+    ) => {
+      const params = callIds
+        .map(id => 'call=' + encodeURIComponent(id))
+        .join('&');
+      return `${projectRoot(entityName, projectName)}/compare?${params}`;
+    },
+    compareObjectsUri: (
+      entityName: string,
+      projectName: string,
+      objectSpecifiers: string[]
+    ) => {
+      const params = objectSpecifiers
+        .map(id => 'obj=' + encodeURIComponent(id))
+        .join('&');
+      return `${projectRoot(entityName, projectName)}/compare?${params}`;
     },
   };
   return browse3Context;
@@ -465,7 +535,8 @@ type RouteType = {
     traceId: string,
     callId: string,
     path?: string | null,
-    tracetree?: boolean
+    tracetree?: boolean,
+    feedbackExpand?: boolean
   ) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
@@ -498,7 +569,27 @@ type RouteType = {
   compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    evaluationCallIds: string[]
+    evaluationCallIds: string[],
+    metrics: Record<string, boolean> | null
+  ) => string;
+
+  scorersUIUrl: (entityName: string, projectName: string) => string;
+
+  leaderboardsUIUrl: (
+    entityName: string,
+    projectName: string,
+    leaderboardName?: string,
+    edit?: boolean
+  ) => string;
+  compareCallsUri: (
+    entityName: string,
+    projectName: string,
+    callIds: string[]
+  ) => string;
+  compareObjectsUri: (
+    entityName: string,
+    projectName: string,
+    objectSpecifiers: string[]
   ) => string;
 };
 
@@ -522,6 +613,7 @@ const useSetSearchParam = () => {
 
 export const PEEK_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
+export const FEEDBACK_EXPAND_PARAM = 'feedbackExpand';
 export const PATH_PARAM = 'path';
 
 export const baseContext = browse3ContextGen(
@@ -612,6 +704,24 @@ const useMakePeekingRouter = (): RouteType => {
         PEEK_PARAM,
         baseContext.compareEvaluationsUri(...args)
       );
+    },
+    scorersUIUrl: (...args: Parameters<typeof baseContext.scorersUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.scorersUIUrl(...args));
+    },
+    leaderboardsUIUrl: (
+      ...args: Parameters<typeof baseContext.leaderboardsUIUrl>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.leaderboardsUIUrl(...args));
+    },
+    compareCallsUri: (
+      ...args: Parameters<typeof baseContext.compareCallsUri>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.compareCallsUri(...args));
+    },
+    compareObjectsUri: (
+      ...args: Parameters<typeof baseContext.compareObjectsUri>
+    ) => {
+      return setSearchParam(PEEK_PARAM, baseContext.compareObjectsUri(...args));
     },
   };
 };
