@@ -26,10 +26,14 @@ class CoherenceScorer(Scorer):
 
     device: str = "cpu"
     model_name_or_path: str = "wandb/coherence_scorer"
+    base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
     _label2id: dict[str, int] = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         self._classifier = pipeline(
@@ -69,7 +73,22 @@ class CoherenceScorer(Scorer):
             else:
                 formatted_chat_history += f"{turn['text']}\n<extra_id_1>User\n"
         return formatted_chat_history
-
+    
+    def _score_via_api(
+            self, 
+            input: str, 
+            output: str, 
+            chat_history: Optional[list[dict[str, str]]] = None, 
+            context: Optional[str] = None
+    ) -> dict[str, Any]:
+        import requests
+        response = requests.post(
+            self.base_url,
+            json={"input": input, "output": output, "chat_history": chat_history, "context": context}
+        )
+        response.raise_for_status()
+        return response.json()
+    
     @weave.op
     def score(
         self,
@@ -78,6 +97,8 @@ class CoherenceScorer(Scorer):
         chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[str] = None,
     ) -> dict[str, Any]:
+        if self.base_url:
+            return self._score_via_api(input, output, chat_history, context)
         prompt = input
         if chat_history is not None:
             history = self._format_chat_history(chat_history)

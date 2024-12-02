@@ -80,12 +80,16 @@ class RelevanceScorer(Scorer):
 
     device: str = "cpu"
     model_name_or_path: str = "wandb/relevance_scorer"
+    base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
     _id2label: dict[int, str] = PrivateAttr()
     _system_prompt: str = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         self._classifier = pipeline(
@@ -167,6 +171,15 @@ class RelevanceScorer(Scorer):
             {"role": "user", "content": context_and_completion},
         ]
 
+    def _score_via_api(self, input: str, output: str, context: Optional[list[str]] = None, chat_history: Optional[list[dict[str, str]]] = None) -> dict[str, Any]:
+        import requests
+        response = requests.post(
+            self.base_url,
+            json={"input": input, "output": output, "context": context, "chat_history": chat_history}
+        )
+        response.raise_for_status()
+        return response.json()
+
     @weave.op
     def score(
         self,
@@ -175,6 +188,8 @@ class RelevanceScorer(Scorer):
         context: Optional[list[str]] = None,
         chat_history: Optional[list[dict[str, str]]] = None,
     ) -> dict[str, Any]:
+        if self.base_url:
+            return self._score_via_api(input, output, context, chat_history)
         messages = self._format_messages(
             prompt=input, completion=output, context=context, chat_history=chat_history
         )

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import Field, PrivateAttr, field_validator
 
@@ -238,6 +238,7 @@ class ToxicityScorer(RollingWindowScorer):
     """
 
     model_name_or_path: str = "wandb/celadon"
+    base_url: Optional[str] = None
     total_threshold: int = 5
     category_threshold: int = 2
     device: str = "cpu"
@@ -254,6 +255,9 @@ class ToxicityScorer(RollingWindowScorer):
     )
 
     def model_post_init(self, __context: Any) -> None:
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
         try:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -288,11 +292,24 @@ class ToxicityScorer(RollingWindowScorer):
             return [predictions]
         return predictions
 
+    def _score_via_api(self, output: str) -> dict[str, Any]:
+        import requests
+        response = requests.post(
+            self.base_url,
+            json={"output": output}
+        )
+        response.raise_for_status()
+        return response.json()
+
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
+        # remote scoring
+        if self.base_url:
+            return self._score_via_api(output=output)
+        
+        # local scoring
         flagged: bool = False
         predictions: list[float] = self.predict(output)
-
         if (sum(predictions) >= self.total_threshold) or any(
             o >= self.category_threshold for o in predictions
         ):
