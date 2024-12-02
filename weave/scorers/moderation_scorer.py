@@ -384,7 +384,7 @@ class BiasScorer(RollingWindowScorer):
     Reference: https://huggingface.co/wandb/bias-scorer
 
     Args:
-        model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias"`.
+        model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias_scorer"`.
         task (str): The pipeline task type. Defaults to `"text-classification"`.
         device (str): The device to use for inference. Defaults to `"cpu"`.
         threshold (float): The threshold for the bias score to flag the input. Defaults to `0.45`.
@@ -404,7 +404,7 @@ class BiasScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = "wandb/bias-scorer"
+    model_name_or_path: str = "wandb/bias_scorer"
     base_url: Optional[str] = None
     device: str = "cpu"
     threshold: float = 0.5
