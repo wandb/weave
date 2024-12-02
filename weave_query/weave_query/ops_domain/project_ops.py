@@ -1,8 +1,9 @@
 import json
 import typing
-
+import asyncio
 from weave_query import errors
 from weave_query import weave_types as types
+from weave_query import ops_arrow
 from weave_query.api import op
 from weave_query import input_provider
 from weave_query.gql_op_plugin import wb_gql_op_plugin
@@ -17,6 +18,7 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_root_op,
     make_root_op_gql_op_output_type,
 )
+from weave_query.wandb_trace_server_api import get_wandb_api
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -259,3 +261,50 @@ def artifacts(
         for typeEdge in project["artifactTypes_100"]["edges"]
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]
+
+def _get_project_traces(project):
+    api = get_wandb_api()
+    res = asyncio.run(api.query_calls_stream(project.id))
+    print('#############', res)
+    return res
+
+@op(
+    name="project-tracesType",
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            entity {
+                id
+                name
+            }
+        """
+    ),
+    hidden=True
+)
+def traces_type(project: wdt.Project):
+    ttype = types.TypeRegistry.type_of([{"test": 1}, {"test": 2}])
+    print('ttype:', ttype)
+    return ttype
+
+@op(
+    name="project-traces",
+    output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            entity {
+                id
+                name
+            }
+        """
+    ),
+    refine_output_type=traces_type
+)
+def traces(project: wdt.Project):
+    # api = get_wandb_api()
+    res = _get_project_traces(project)
+    print('#############', res)
+    return ops_arrow.to_arrow([{"test": 1}, {"test": 2}])
+    if "calls" in res[0]:
+        return ops_arrow.to_arrow(res[0]["calls"])
+    else:
+        return ops_arrow.to_arrow([])
