@@ -79,7 +79,7 @@ class RelevanceScorer(Scorer):
     """
 
     device: str = "cpu"
-    model_name: str = "wandb/relevance_scorer"
+    model_name_or_path: str = "wandb/relevance_scorer"
     _classifier: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
     _id2label: dict[int, str] = PrivateAttr()
@@ -89,7 +89,7 @@ class RelevanceScorer(Scorer):
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         self._classifier = pipeline(
-            task="text-generation", model=self.model_name, device=self.device
+            task="text-generation", model=self.model_name_or_path, device=self.device
         )
         self._tokenizer = self._classifier.tokenizer
         self._id2label = {
