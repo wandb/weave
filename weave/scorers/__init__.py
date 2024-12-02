@@ -11,7 +11,7 @@ from weave.scorers.classification_scorer import (
     transpose,
 )
 from weave.scorers.coherence_scorer import CoherenceScorer
-from weave.scorers.hallucination_scorer import HallucinationFreeScorer
+from weave.scorers.hallucination_scorer import HallucinationFreeScorer, HallucinationScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuard
 from weave.scorers.llm_scorer import (
@@ -61,6 +61,7 @@ __all__ = [
     "EmbeddingSimilarityScorer",
     "get_scorer_attributes",
     "_has_oldstyle_scorers",
+    "HallucinationScorer",
     "HallucinationFreeScorer",
     "InstructorLLMScorer",
     "ValidJSONScorer",
