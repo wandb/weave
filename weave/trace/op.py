@@ -317,7 +317,7 @@ def _execute_op(
               ):
                   res.load()
             except Exception as e:
-                logger.warning(f"Could not load PIL Image object: {e}")        
+                logger.warning(f"Could not load PIL Image object: {e}")
         try:
             # Here we do a try/catch because we don't want to
             # break the user process if we trip up on processing
