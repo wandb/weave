@@ -111,8 +111,6 @@ class RelevanceScorer(Scorer):
             max_new_tokens=20,
             stop_strings=["}"],
             tokenizer=self._tokenizer,
-            do_sample=True,
-            num_beams=1,
         )
         assistant_output = generated_output[0].get("generated_text", [])[-1]
         classification = assistant_output.get("content", "")
