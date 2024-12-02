@@ -547,13 +547,13 @@ export const BinaryFeedbackColumn = ({
     <Tailwind>
       <div className="flex w-full justify-center gap-10">
         <Button
-          variant={value === true ? 'primary' : 'outline'}
+          variant={value === true ? 'primary' : 'secondary'}
           onClick={() => handleClick(true)}
           autoFocus={focused}>
           True
         </Button>
         <Button
-          variant={value === false ? 'primary' : 'outline'}
+          variant={value === false ? 'primary' : 'secondary'}
           onClick={() => handleClick(false)}>
           False
         </Button>
