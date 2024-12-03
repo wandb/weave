@@ -16,6 +16,7 @@ from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
+from weave.flow.util import make_memorable_name
 from weave.scorers import (
     Scorer,
     _has_oldstyle_scorers,
@@ -115,11 +116,18 @@ class Evaluation(Object):
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
+    # evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     def model_post_init(self, __context: Any) -> None:
+        # if self.evaluation_name:
+        #     base_f = self.evaluate.resolve_fn
+        #     self.__dict__["evaluate"] = weave.op(
+        #         base_f, call_display_name=self.evaluation_name
+        #     )
+
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
@@ -486,7 +494,7 @@ class Evaluation(Object):
             eval_rows.append(eval_row)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
-    @weave.op()
+    @weave.op(call_display_name=make_memorable_name)
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to

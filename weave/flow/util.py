@@ -4,6 +4,8 @@ import multiprocessing
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
+from weave.trace.weave_client import Call
+
 T = TypeVar("T")
 U = TypeVar("U")
 
@@ -81,3 +83,89 @@ def warn_once(logger: logging.Logger, message: str) -> None:
     if message not in _shown_warnings:
         logger.warning(message)
         _shown_warnings.add(message)
+
+
+def make_memorable_name(call: Call) -> str:
+    adjectives = [
+        "jubilant",
+        "eager",
+        "calm",
+        "bright",
+        "clever",
+        "dazzling",
+        "elegant",
+        "fierce",
+        "gentle",
+        "happy",
+        "innocent",
+        "kind",
+        "lively",
+        "merry",
+        "nice",
+        "proud",
+        "quiet",
+        "rich",
+        "sweet",
+        "tender",
+        "unique",
+        "wise",
+        "zealous",
+        "brave",
+        "charming",
+        "daring",
+        "eloquent",
+        "friendly",
+        "graceful",
+        "honest",
+        "imaginative",
+        "joyful",
+        "keen",
+        "loyal",
+        "noble",
+        "optimistic",
+    ]
+
+    nouns = [
+        "sun",
+        "moon",
+        "star",
+        "cloud",
+        "rain",
+        "wind",
+        "tree",
+        "flower",
+        "river",
+        "mountain",
+        "ocean",
+        "forest",
+        "meadow",
+        "bird",
+        "wolf",
+        "bear",
+        "tiger",
+        "lion",
+        "eagle",
+        "fish",
+        "whale",
+        "dolphin",
+        "rose",
+        "daisy",
+        "oak",
+        "pine",
+        "maple",
+        "cedar",
+        "valley",
+        "hill",
+        "lake",
+        "stream",
+        "breeze",
+        "dawn",
+        "dusk",
+        "horizon",
+        "island",
+        "plateau",
+    ]
+
+    adj = random.choice(adjectives)
+    noun = random.choice(nouns)
+    return f"{adj}-{noun}"
