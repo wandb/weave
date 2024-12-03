@@ -7,7 +7,7 @@ from typing import Any
 
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
-from weave.trace.object_initializers import register_object_initializer
+from weave.trace.object_preparers import register_preparer
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +52,11 @@ def register() -> None:
         serializer.register_serializer(Image.Image, save, load)
 
 
-class PILImageInitializer:
-    def should_initialize(self, obj: Any) -> bool:
+class PILImagePreparer:
+    def should_prepare(self, obj: Any) -> bool:
         return isinstance(obj, Image.Image)
 
-    def initialize(self, obj: Image.Image) -> None:
+    def prepare(self, obj: Image.Image) -> None:
         try:
             # This load is necessary to ensure that the image is fully loaded into memory.
             # If we don't do this, it's possible that only part of the data is loaded
@@ -69,4 +69,4 @@ class PILImageInitializer:
 
 
 if dependencies_met:
-    register_object_initializer(PILImageInitializer())
+    register_preparer(PILImagePreparer())
