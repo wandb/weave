@@ -662,6 +662,8 @@ def op(
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            wrapper.get_source = partial(get_source, wrapper)  # type: ignore
+
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
                 if len(params) != 1:
@@ -677,6 +679,15 @@ def op(
     if func is None:
         return op_deco
     return op_deco(func)
+
+
+def get_source(op: Op) -> str:
+    try:
+        return op.art.path_contents["obj.py"].decode()
+    except Exception:
+        raise RuntimeError(
+            "Failed to get source for op (did you get this op back from a ref?)"
+        )
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
