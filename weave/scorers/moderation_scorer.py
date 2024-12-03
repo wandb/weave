@@ -469,10 +469,10 @@ class BiasScorer(RollingWindowScorer):
         return response.json()
 
     @weave.op
-    def score(self, output: str, return_all_scores: bool = False) -> dict[str, Any]:
+    def score(self, text: str, return_all_scores: bool = False) -> dict[str, Any]:
         if self.base_url:
-            return self._score_via_api(output, return_all_scores)
-        predictions = self.predict(output)
+            return self._score_via_api(text, return_all_scores)
+        predictions = self.predict(text)
         scores = [o >= self.threshold for o in predictions]
         if return_all_scores:
             categories = dict(zip(self._categories, predictions))
