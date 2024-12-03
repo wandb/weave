@@ -19,8 +19,11 @@ def register(preparer: ObjectPreparer) -> None:
     _object_preparers.append(preparer)
 
 
-def prepare_obj(obj: Any) -> None:
-    for initializer in _object_preparers:
+def get_preparer_for_obj(obj: Any) -> None:
+      for initializer in _object_preparers:
         if initializer.should_prepare(obj):
-            initializer.prepare(obj)
-            break
+           return initializer
+
+def prepare_obj(obj: Any) -> None:
+    if preparer := get_preparer_for_obj(obj):
+        preparer.prepare(obj)
