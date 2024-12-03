@@ -119,7 +119,7 @@ def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> 
 
 scorer_model_paths = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
-    "hallucination_hhem_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer:v0",
+    "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",  # task: "sentiment-analysis"
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0" , 
