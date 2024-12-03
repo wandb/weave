@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import Field, PrivateAttr, field_validator
@@ -5,7 +6,7 @@ from pydantic import Field, PrivateAttr, field_validator
 import weave
 from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL
+from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL, download_model, set_device, scorer_model_paths
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -213,7 +214,7 @@ class ToxicityScorer(RollingWindowScorer):
         model_name_or_path (str): The name of the model to use. Defaults to `"wandb/celadon"`.
         total_threshold (int): The threshold for the total moderation score to flag the input. Defaults to `5`.
         category_threshold (int): The threshold for individual category scores to flag the input. Defaults to `2`.
-        device (str): The device to use for inference. Defaults to `"cpu"`.
+        device (str): The device to use for inference. Defaults to `"cuda"` if available, otherwise `"cpu"`.
         max_tokens (int): Maximum number of tokens per window. Defaults to `512`.
         overlap (int): Number of overlapping tokens between windows. Defaults to `50`.
 
@@ -241,7 +242,7 @@ class ToxicityScorer(RollingWindowScorer):
     base_url: Optional[str] = None
     total_threshold: int = 5
     category_threshold: int = 2
-    device: str = "cpu"
+    device: str = None  # set to "cpu" or "cuda"
     max_tokens: int = 512
     overlap: int = 50
     _categories: list[str] = PrivateAttr(
@@ -266,14 +267,30 @@ class ToxicityScorer(RollingWindowScorer):
                 "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
             )
         """Initialize the toxicity model and tokenizer."""
-        if not torch.cuda.is_available() and self.device == "cuda":
-            raise ValueError("CUDA is not available")
+        self.device = set_device(self.device)
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        else:
+            self._local_model_path = download_model(scorer_model_paths["toxicity_scorer"])
+
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self.model_name_or_path, device_map=self.device, trust_remote_code=True
+            self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
         self._model.eval()
+
+    def _download_model(self, model_name_or_path: str) -> str:
+        from wandb import Api
+        api = Api()
+        model_name = model_name_or_path.split("/")[-1].replace(":", "_")
+        art = api.artifact(
+            type="model",
+            name=model_name_or_path,
+        )
+        local_model_path = f"models/{model_name}"
+        art.download(local_model_path)
+        return local_model_path
 
     def predict_chunk(self, input_ids: "Tensor") -> list[int]:
         """
@@ -386,7 +403,7 @@ class BiasScorer(RollingWindowScorer):
     Args:
         model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias_scorer"`.
         task (str): The pipeline task type. Defaults to `"text-classification"`.
-        device (str): The device to use for inference. Defaults to `"cpu"`.
+        device (str): The device to use for inference. Defaults to `None`, which will use `cuda` if available.
         threshold (float): The threshold for the bias score to flag the input. Defaults to `0.45`.
         pipeline_kwargs (dict[str, Any]): Additional keyword arguments for the pipeline. Defaults to `{"top_k": 2}`.
 
@@ -406,7 +423,7 @@ class BiasScorer(RollingWindowScorer):
 
     model_name_or_path: str = "wandb/bias_scorer"
     base_url: Optional[str] = None
-    device: str = "cpu"
+    device: str = None
     threshold: float = 0.5
     _categories: list[str] = PrivateAttr(
         default=[
@@ -426,13 +443,18 @@ class BiasScorer(RollingWindowScorer):
             print(
                 "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
             )
-        """Initialize the toxicity model and tokenizer."""
-        if not torch.cuda.is_available() and self.device == "cuda":
-            raise ValueError("CUDA is not available")
+
+        """Initialize the bias model and tokenizer."""
+        self.device = set_device(self.device)
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        else:
+            self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])
+
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self.model_name_or_path, device_map=self.device, trust_remote_code=True
+            self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
         self._model.eval()
 

@@ -1,3 +1,4 @@
+import os
 import json
 from typing import Any, Optional
 
@@ -5,6 +6,7 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
+from weave.scorers.llm_utils import download_model, set_device, scorer_model_paths
 
 try:
     import torch
@@ -75,10 +77,10 @@ class RelevanceScorer(Scorer):
 
     Args:
         model_name: The name of the relevance scorer model to use. Defaults to `wandb/relevance_scorer`.
-        device: The device to use for inference. Defaults to `cpu`.
+        device: The device to use for inference. Defaults to `None`, which will use `cuda` if available.
     """
 
-    device: str = "cpu"
+    device: str = None
     model_name_or_path: str = "wandb/relevance_scorer"
     base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
@@ -90,10 +92,16 @@ class RelevanceScorer(Scorer):
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
-        if not torch.cuda.is_available() and "cuda" in self.device:
-            raise ValueError("CUDA is not available")
+        
+        """Initialize the coherence model and tokenizer."""
+        self.device = set_device(self.device)
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        else:
+            self._local_model_path = download_model(scorer_model_paths["relevance_scorer"])
+        
         self._classifier = pipeline(
-            task="text-generation", model=self.model_name_or_path, device=self.device
+            task="text-generation", model=self._local_model_path, device=self.device
         )
         self._tokenizer = self._classifier.tokenizer
         self._id2label = {

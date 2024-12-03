@@ -1,3 +1,4 @@
+import os
 from typing import Any, Optional
 from pydantic import BaseModel, Field
 
@@ -6,14 +7,15 @@ from weave.scorers.llm_scorer import InstructorLLMScorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 from weave.scorers.utils import stringify
 from weave.scorers.base_scorer import Scorer
+from weave.scorers.llm_utils import download_model, scorer_model_paths
 
 try:
     import torch
-    from transformers import pipeline
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 except ImportError:
     import_failed = True
     print(
-        "The `transformers` package is required to use the CoherenceScorer, please run `pip install transformers`"
+        "The `transformers` package is required to use the HallucinationScorer, please run `pip install transformers`"
     )
 
 DEFAULT_HALLUCINATION_SYSTEM_PROMPT = """
@@ -235,9 +237,6 @@ class HallucinationFreeScorer(InstructorLLMScorer):
         return response.model_dump()  # Morgan wants this to be a dict
     
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-
 class HallucinationScorer(Scorer):
     """
     A scorer that detects hallucinations in the output, given an query and context.
@@ -251,7 +250,7 @@ class HallucinationScorer(Scorer):
         base_url: Optional URL for external API scoring instead of local model
         debug: Enable debug logging, defaults to False
     """
-    model_name_or_path: str = "c-metrics/hallucination/SmolLM2-135M-Instruct-sft:v18"
+    model_name_or_path: str = "c-metrics/hallucination/SmolLM2-135M-Instruct-sft-hallu:v56"
     base_url: Optional[str] = None
     device: str = "cuda"
     debug: bool = False
@@ -272,11 +271,18 @@ class HallucinationScorer(Scorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         
+        # torch.cuda.is_available()
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
         
         if self.llm_model is None:
-            self._local_model_path = self._download_model(self.model_name_or_path)
+            # Check if the model is already downloaded
+            if os.path.isdir(self.model_name_or_path):
+                self._local_model_path = self.model_name_or_path
+            # Else assume it's a wandb model name and download it
+            else:
+                self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])
+
             self.llm_model = AutoModelForCausalLM.from_pretrained(
                 self._local_model_path, 
                 torch_dtype="bfloat16"
@@ -293,20 +299,6 @@ class HallucinationScorer(Scorer):
             self.top_k = None
             self.top_p = None
             self.temperature = None
-
-    def _download_model(self, model_name_or_path: str) -> str:
-        from wandb import Api
-
-        api = Api()
-        # model_artifact_path = f"c-metrics/hallucination/SmolLM2-135M-Instruct-sft:v18"
-        model_name = model_name_or_path.split("/")[-1].replace(":", "_")
-        art = api.artifact(
-            type="model",
-            name=model_name_or_path,
-        )
-        local_model_path = f"models/{model_name}"
-        art.download(local_model_path)
-        return local_model_path
 
     def _score_via_api(self, messages: list) -> dict[str, Any]:
         import requests
