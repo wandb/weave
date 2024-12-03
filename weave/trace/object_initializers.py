@@ -2,6 +2,8 @@ from typing import Any, Protocol
 
 
 class ObjectInitializer(Protocol):
+    """An initializer to 'materialize' WeaveObjects into their original types."""
+
     def should_initialize(self, obj: Any) -> bool: ...
     def initialize(self, obj: Any) -> None: ...
 

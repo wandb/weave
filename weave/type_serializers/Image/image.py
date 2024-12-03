@@ -62,4 +62,5 @@ class PILImageInitializer:
             raise
 
 
-register_object_initializer(PILImageInitializer())
+if dependencies_met:
+    register_object_initializer(PILImageInitializer())
