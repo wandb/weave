@@ -78,7 +78,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   ) => {
     setPlaygroundStateField(index, 'model', model);
     setPlaygroundStateField(index, 'maxTokensLimit', maxTokens);
-    setPlaygroundStateField(index, 'maxTokens', maxTokens / 2);
+    setPlaygroundStateField(index, 'maxTokens', Math.floor(maxTokens / 2));
   };
 
   const ConfirmClearModal: React.FC<{

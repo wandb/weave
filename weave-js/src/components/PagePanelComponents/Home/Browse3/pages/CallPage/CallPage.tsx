@@ -1,9 +1,15 @@
 import Box from '@mui/material/Box';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -64,8 +70,10 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  const viewerInfo = useViewerInfo();
-  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  return false;
+  // Uncomment to re-enable.
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -73,6 +81,10 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showTryInPlayground =
+    !isPeeking || !window.location.toString().includes('/weave/playground');
 
   const handleOpenInPlayground = () => {
     window.open(
@@ -108,13 +120,22 @@ const useCallTabs = (call: CallSchema) => {
             label: 'Chat',
             content: (
               <>
-                <Button
-                  variant="secondary"
-                  startIcon="sandbox-playground"
-                  className="m-16 mb-8"
-                  onClick={handleOpenInPlayground}>
-                  Open chat in playground
-                </Button>
+                {showTryInPlayground && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      width: '100%',
+                      padding: '8px 16px',
+                    }}>
+                    <Button
+                      variant="ghost"
+                      startIcon="robot-service-member"
+                      onClick={handleOpenInPlayground}>
+                      Try in playground
+                    </Button>
+                  </Box>
+                )}
                 <ScrollableTabContent>
                   <Tailwind>
                     <CallChat call={call.traceCall!} />
@@ -215,7 +236,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         !showTraceTree,
-        showFeedbackExpand
+        showFeedbackExpand ? true : undefined
       )
     );
   }, [
@@ -238,7 +259,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         showTraceTree,
-        !showFeedbackExpand
+        !showFeedbackExpand ? true : undefined
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
@@ -254,6 +275,26 @@ const CallPageInnerVertical: FC<{
     project: selectedCall.project,
     callId: selectedCall.callId,
   });
+  const callCompleteWithCosts = useMemo(() => {
+    if (callComplete.result?.traceCall == null) {
+      return callComplete.result;
+    }
+    return {
+      ...callComplete.result,
+      traceCall: {
+        ...callComplete.result?.traceCall,
+        summary: {
+          ...callComplete.result?.traceCall?.summary,
+          weave: {
+            ...callComplete.result?.traceCall?.summary?.weave,
+            // Only selectedCall has costs, injected when creating
+            // the trace tree
+            costs: selectedCall.traceCall?.summary?.weave?.costs,
+          },
+        },
+      },
+    };
+  }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -265,10 +306,10 @@ const CallPageInnerVertical: FC<{
   }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
-    if (!callComplete.loading && callComplete.result) {
-      setCurrentCall(callComplete.result);
+    if (callCompleteWithCosts != null) {
+      setCurrentCall(callCompleteWithCosts);
     }
-  }, [callComplete]);
+  }, [callCompleteWithCosts]);
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
