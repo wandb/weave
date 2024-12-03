@@ -1,8 +1,14 @@
 import * as Urls from '../../_external/util/urls';
-import {hash, list, typedDict} from '../../model';
+import {hash, list, maybe, typedDict, union} from '../../model';
 import {docType} from '../../util/docs';
 import * as OpKinds from '../opKinds';
-import {connectionToNodes} from './util';
+import {
+  connectionToNodes,
+  traceFilterType,
+  traceLimitType,
+  traceOffsetType,
+  traceSortByType,
+} from './util';
 
 const makeProjectOp = OpKinds.makeTaggingStandardOp;
 
@@ -298,13 +304,38 @@ export const opProjectRunQueues = makeProjectOp({
   resolver: ({project}) => project.runQueues,
 });
 
+const projectTracesArgTypes = {
+  ...projectArgTypes,
+  payload: union([
+    'none',
+    typedDict(
+      {
+        filter: traceFilterType,
+        limit: traceLimitType,
+        offset: traceOffsetType,
+        sort_by: traceSortByType,
+      },
+      ['filter', 'limit', 'offset', 'sort_by']
+    ),
+  ]),
+};
+
+const projectTracesArgTypesDescription = {
+  project: projectArgDescription,
+  payload: 'The payload object to the trace api',
+  'payload.filter': `The filter object used when querying traces`,
+  'payload.limit': `A number representing the limit for number of trace calls`,
+  'payload.offset': `A number representing the offset for the number of trace calls`,
+  'payload.sort_by': `An array with a dictionary with keys \`field\`(<string>) and \`direction\` ("asc"|"desc")`,
+};
+
 export const opProjectTracesType = makeProjectOp({
   name: 'project-tracesType',
-  argTypes: projectArgTypes,
+  argTypes: projectTracesArgTypes,
   description: `Returns the ${docType('list', {
     plural: true,
   })} for a ${docType('project')}`,
-  argDescriptions: {project: projectArgDescription},
+  argDescriptions: projectTracesArgTypesDescription,
   returnValueDescription: `The ${docType('list', {
     plural: true,
   })} for a ${docType('project')}`,
@@ -315,27 +346,26 @@ export const opProjectTracesType = makeProjectOp({
 
 export const opProjectTraces = makeProjectOp({
   name: 'project-traces',
-  argTypes: projectArgTypes,
+  argTypes: projectTracesArgTypes,
   description: `Returns the ${docType('list', {
     plural: true,
-  })} for a ${docType('project')}`,
-  argDescriptions: {project: projectArgDescription},
+  })} of traces for a ${docType('project')}`,
+  argDescriptions: projectTracesArgTypesDescription,
   returnValueDescription: `The ${docType('list', {
     plural: true,
   })} for a ${docType('project')}`,
   returnType: inputTypes => list(typedDict({})),
   resolver: ({project}) => project.traces,
-  // resolveOutputType: async (
-  //   inputTypes,
-  //   node,
-  //   executableNode,
-  //   client,
-  //   stack
-  // ) => {
-  //   console.log(executableNode);
-  //   const res = await client.query(
-  //     opProjectTracesType(executableNode.fromOp.inputs as any)
-  //   );
-  //   return res;
-  // },
+  resolveOutputType: async (
+    inputTypes,
+    node,
+    executableNode,
+    client,
+    stack
+  ) => {
+    const res = await client.query(
+      opProjectTracesType(executableNode.fromOp.inputs as any)
+    );
+    return res;
+  },
 });
