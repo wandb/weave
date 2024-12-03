@@ -60,7 +60,8 @@ class PILImageInitializer:
         try:
             # This load is necessary to ensure that the image is fully loaded into memory.
             # If we don't do this, it's possible that only part of the data is loaded
-            # before
+            # before the object is returned.  This can happen when trying to run an evaluation
+            # on a ref-get'd dataset with image columns.
             obj.load()
         except Exception as e:
             logger.exception(f"Failed to load PIL Image: {e}")
