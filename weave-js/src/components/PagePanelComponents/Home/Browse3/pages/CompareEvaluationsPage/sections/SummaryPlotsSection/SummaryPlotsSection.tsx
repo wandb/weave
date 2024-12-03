@@ -237,10 +237,10 @@ const useFilteredData = (
     return data;
   }, [radarData, selectedMetrics]);
 
-function normalizeDataForRadarPlot(radarData: RadarPlotData): RadarPlotData {
-  // First collect all values for each metric across all calls
+function getMetricValuesFromRadarData(radarData: RadarPlotData): {
+  [metric: string]: number[];
+} {
   const metricValues: {[metric: string]: number[]} = {};
-
   // Gather all values for each metric
   Object.values(radarData).forEach(callData => {
     Object.entries(callData.metrics).forEach(([metric, value]) => {
@@ -250,19 +250,24 @@ function normalizeDataForRadarPlot(radarData: RadarPlotData): RadarPlotData {
       metricValues[metric].push(value);
     });
   });
+  return metricValues;
+}
 
-  // Find min/max for each metric
-  const metricRanges: {[metric: string]: {min: number; max: number}} = {};
+function getMetricMinsFromRadarData(radarData: RadarPlotData): {
+  [metric: string]: number;
+} {
+  const metricValues = getMetricValuesFromRadarData(radarData);
+  const metricMins: {[metric: string]: number} = {};
   Object.entries(metricValues).forEach(([metric, values]) => {
-    metricRanges[metric] = {
-      min: Math.min(...values),
-      max: Math.max(...values),
-    };
+    metricMins[metric] = Math.min(...values);
   });
+  return metricMins;
+}
 
-  // Create normalized data structure
+function normalizeDataForRadarPlot(radarData: RadarPlotData): RadarPlotData {
+  const metricMins = getMetricMinsFromRadarData(radarData);
+
   const normalizedData: RadarPlotData = {};
-
   Object.entries(radarData).forEach(([callId, callData]) => {
     normalizedData[callId] = {
       name: callData.name,
@@ -271,13 +276,9 @@ function normalizeDataForRadarPlot(radarData: RadarPlotData): RadarPlotData {
     };
 
     Object.entries(callData.metrics).forEach(([metric, value]) => {
-      const range = metricRanges[metric];
-      // If min and max are the same, set normalized value to 1
-      // Otherwise normalize to 0-1 range
-      const normalizedValue =
-        range.max === range.min
-          ? 1
-          : (value - range.min) / (range.max - range.min);
+      const min = metricMins[metric];
+      // Only shift values if there are negative values
+      const normalizedValue = min < 0 ? value - min : value;
       normalizedData[callId].metrics[metric] = normalizedValue;
     });
   });
@@ -407,14 +408,14 @@ const usePaginatedPlots = (
   return {plotsToShow, totalPlots, startIndex, endIndex, totalPages};
 };
 
-const normalizeValues = (values: Array<number | undefined>): number[] => {
+function normalizeValues(values: Array<number | undefined>): number[] {
   // find the max value
   // find the power of 2 that is greater than the max value
   // divide all values by that power of 2
   const maxVal = Math.max(...(values.filter(v => v !== undefined) as number[]));
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
-};
+}
 
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
