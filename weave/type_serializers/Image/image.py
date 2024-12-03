@@ -49,7 +49,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
 
 def register() -> None:
     if dependencies_met:
-        serializer.register_object_serializer(Image.Image, save, load)
+        serializer.register_serializer(Image.Image, save, load)
 
 
 class PILImageInitializer:
