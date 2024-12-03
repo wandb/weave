@@ -1,7 +1,6 @@
-import {Autocomplete, TextField as MuiTextField} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {MOON_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -445,79 +444,30 @@ export const EnumFeedbackColumn = ({
       label: option,
       value: option,
     }));
-    opts.splice(0, 0, {label: '', value: ''});
     return opts;
   }, [options]);
-
-  const [value, setValue] = useState<Option>(dropdownOptions[0]);
+  const [value, setValue] = useState<Option | undefined>(undefined);
 
   useEffect(() => {
-    setValue(
-      dropdownOptions.find(option => option.value === defaultValue) ??
-        dropdownOptions[0]
-    );
+    const found = dropdownOptions.find(option => option.value === defaultValue);
+    if (found != null) {
+      setValue(found);
+    }
   }, [defaultValue, dropdownOptions]);
 
   const onValueChange = useCallback(
-    (e: any, newValue: Option) => {
-      if (newValue?.value === value?.value) {
+    (newValue: Option | null) => {
+      if (newValue == null || newValue.value === value?.value) {
         return;
       }
       setValue(newValue);
-      onAddFeedback?.(newValue?.value ?? '');
+      onAddFeedback?.(newValue.value);
     },
     [value?.value, onAddFeedback]
   );
 
   return (
-    <div className="flex w-full">
-      <Autocomplete
-        options={dropdownOptions}
-        getOptionLabel={option => option.label}
-        onChange={onValueChange}
-        value={value}
-        openOnFocus
-        placeholder="Select"
-        autoFocus={focused}
-        renderInput={params => (
-          <MuiTextField
-            {...params}
-            sx={{
-              '& .MuiInputBase-root': {
-                height: '38px',
-                minHeight: '38px',
-                borderColor: MOON_300,
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-            }}
-          />
-        )}
-        disableClearable
-        sx={{
-          minWidth: '200px',
-          width: '100%',
-        }}
-        fullWidth
-        ListboxProps={{
-          style: {
-            maxHeight: '200px',
-          },
-        }}
-        renderOption={(props, option) => (
-          <li {...props} style={{minHeight: '30px'}}>
-            {option.label || <span>&nbsp;</span>}
-          </li>
-        )}
-      />
-    </div>
+    <Select options={dropdownOptions} value={value} onChange={onValueChange} />
   );
 };
 
