@@ -1,7 +1,13 @@
 """Defines the custom Image weave type."""
 
+import logging
+from typing import Any
+
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.object_initializers import register_object_initializer
+
+logger = logging.getLogger(__name__)
 
 dependencies_met = False
 
@@ -42,3 +48,18 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
 def register() -> None:
     if dependencies_met:
         serializer.register_serializer(Image.Image, save, load)
+
+
+class PILImageInitializer:
+    def should_initialize(self, obj: Any) -> bool:
+        return isinstance(obj, Image.Image)
+
+    def initialize(self, obj: Image.Image) -> None:
+        try:
+            obj.load()
+        except Exception as e:
+            logger.exception(f"Failed to load PIL Image: {e}")
+            raise
+
+
+register_object_initializer(PILImageInitializer())

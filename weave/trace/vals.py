@@ -14,6 +14,7 @@ from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
+from weave.trace.object_initializers import initialize_object
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -643,7 +644,7 @@ def make_trace_obj(
             )
         )
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
-
+        initialize_object(val)
     if isinstance(val, Table):
         val_ref = val.ref
         if not isinstance(val_ref, TableRef):
@@ -753,6 +754,7 @@ def make_trace_obj(
     else:
         if hasattr(box_val, "ref"):
             setattr(box_val, "ref", new_ref)
+        initialize_object(box_val)
     return box_val
 
 
