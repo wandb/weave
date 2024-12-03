@@ -12,6 +12,7 @@ from weave.scorers.classification_scorer import (
 )
 from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer, HallucinationScorer
+from weave.scorers.faithfulness_scorer import FaithfulnessScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuard
 from weave.scorers.llm_scorer import (
@@ -64,6 +65,7 @@ __all__ = [
     "HallucinationScorer",
     "HallucinationFreeScorer",
     "InstructorLLMScorer",
+    "FaithfulnessScorer",
     "ValidJSONScorer",
     "LevenshteinScorer",
     "LLMScorer",
