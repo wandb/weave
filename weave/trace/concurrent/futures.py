@@ -37,8 +37,8 @@ from contextvars import ContextVar
 from threading import Lock
 from typing import Any, Callable, TypeVar
 
+from weave.trace.concurrent.thread_safety import ensure_thread_safe
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.serializer import prepare_for_thread_boundary
 from weave.trace.util import ContextAwareThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -200,7 +200,7 @@ class FutureExecutor:
             token = self._in_thread_context.set(True)
             try:
                 result = f(*args, **kwargs)
-                return prepare_for_thread_boundary(result)
+                return ensure_thread_safe(result)
             finally:
                 self._in_thread_context.reset(token)
 

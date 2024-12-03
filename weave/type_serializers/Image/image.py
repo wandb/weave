@@ -1,9 +1,7 @@
 """Defines the custom Image weave type."""
 
 from weave.trace import serializer
-from weave.trace.concurrent.thread_safety import (
-    register_thread_safety_handler,
-)
+from weave.trace.concurrent.thread_safety import register_thread_safety_handler
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
 dependencies_met = False
