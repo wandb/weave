@@ -437,7 +437,7 @@ class BiasScorer(RollingWindowScorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])
+            self._local_model_path = download_model(scorer_model_paths["bias_scorer"])
 
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
