@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 import sys
+import textwrap
 import traceback
 from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass
@@ -686,7 +687,15 @@ def get_source(op: Op) -> str:
         return op.art.path_contents["obj.py"].decode()
     except Exception:
         raise RuntimeError(
-            "Failed to get source for op (did you get this op back from a ref?)"
+            textwrap.dedent(
+                """
+                Failed to get source for op (this only works when you get an op back from a ref).  The pattern is:
+
+                ref = weave.publish(func)
+                op = ref.get()
+                source = op.get_source()
+                """
+            )
         )
 
 
