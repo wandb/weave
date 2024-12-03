@@ -15,7 +15,7 @@ class ObjectPreparer(Protocol):
 _object_preparers: list[ObjectPreparer] = []
 
 
-def register_preparer(preparer: ObjectPreparer) -> None:
+def register(preparer: ObjectPreparer) -> None:
     _object_preparers.append(preparer)
 
 
