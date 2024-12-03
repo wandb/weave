@@ -662,7 +662,7 @@ def op(
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            wrapper.get_source = partial(get_source, wrapper)  # type: ignore
+            wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
@@ -681,20 +681,20 @@ def op(
     return op_deco(func)
 
 
-def get_source(op: Op) -> str:
-    """Get the source code of the op.
+def get_captured_code(op: Op) -> str:
+    """Get the captured code of the op.
 
     This only works when you get an op back from a ref.  The pattern is:
 
     ref = weave.publish(func)
     op = ref.get()
-    source = op.get_source()
+    captured_code = op.get_captured_code()
     """
     try:
         return op.art.path_contents["obj.py"].decode()
     except Exception:
         raise RuntimeError(
-            "Failed to get source for op (this only works when you get an op back from a ref)."
+            "Failed to get captured code for op (this only works when you get an op back from a ref)."
         )
 
 
