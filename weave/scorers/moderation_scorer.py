@@ -6,7 +6,13 @@ from pydantic import Field, PrivateAttr, field_validator
 import weave
 from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL, download_model, set_device, scorer_model_paths
+from weave.scorers.llm_utils import (
+    _LLM_CLIENTS,
+    OPENAI_DEFAULT_MODERATION_MODEL,
+    download_model,
+    scorer_model_paths,
+    set_device,
+)
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -260,7 +266,6 @@ class ToxicityScorer(RollingWindowScorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         try:
-            import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError:
             print(
@@ -271,7 +276,9 @@ class ToxicityScorer(RollingWindowScorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(scorer_model_paths["toxicity_scorer"])
+            self._local_model_path = download_model(
+                scorer_model_paths["toxicity_scorer"]
+            )
 
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
@@ -299,10 +306,8 @@ class ToxicityScorer(RollingWindowScorer):
 
     def _score_via_api(self, output: str) -> dict[str, Any]:
         import requests
-        response = requests.post(
-            self.base_url,
-            json={"output": output}
-        )
+
+        response = requests.post(self.base_url, json={"output": output})
         response.raise_for_status()
         return response.json()
 
@@ -311,7 +316,7 @@ class ToxicityScorer(RollingWindowScorer):
         # remote scoring
         if self.base_url:
             return self._score_via_api(output=output)
-        
+
         # local scoring
         flagged: bool = False
         predictions: list[float] = self.predict(output)
@@ -425,7 +430,6 @@ class BiasScorer(RollingWindowScorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         try:
-            import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError:
             print(
@@ -452,11 +456,14 @@ class BiasScorer(RollingWindowScorer):
         predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
-    def _score_via_api(self, output: str, return_all_scores: bool = False) -> dict[str, Any]:
+    def _score_via_api(
+        self, output: str, return_all_scores: bool = False
+    ) -> dict[str, Any]:
         import requests
+
         response = requests.post(
             self.base_url,
-            json={"output": output, "return_all_scores": return_all_scores}
+            json={"output": output, "return_all_scores": return_all_scores},
         )
         response.raise_for_status()
         return response.json()

@@ -1,13 +1,13 @@
-from typing import Any, Optional, List, Literal
+from typing import Any, Literal, Optional
+
 from pydantic import Field
+
 import weave
 from weave.scorers.base_scorer import Scorer
 
 
 class AccuracyScorer(Scorer):
-    """
-    Accuracy scorer supporting binary, multiclass, and multilabel tasks.
-    """
+    """Accuracy scorer supporting binary, multiclass, and multilabel tasks."""
 
     task: Literal["binary", "multiclass", "multilabel"]
     num_classes: Optional[int] = Field(
@@ -41,14 +41,18 @@ class AccuracyScorer(Scorer):
 
         elif self.task == "multiclass":
             if not isinstance(output, int):
-                raise ValueError("For multiclass tasks, predictions must be an integer representing the class.")
+                raise ValueError(
+                    "For multiclass tasks, predictions must be an integer representing the class."
+                )
             result = 1.0 if output == ground_truth else 0.0
 
         elif self.task == "multilabel":
             output = self._apply_threshold(output)
             if isinstance(output, list) and isinstance(ground_truth, list):
                 result = 1.0 if set(output) == set(ground_truth) else 0.0
-            raise ValueError("For multilabel tasks, predictions and ground truth must be lists of labels.")
+            raise ValueError(
+                "For multilabel tasks, predictions and ground truth must be lists of labels."
+            )
         else:
             raise ValueError(f"Unsupported task type: {self.task}")
 
@@ -59,12 +63,12 @@ class AccuracyScorer(Scorer):
         }
 
     @weave.op
-    def summarize(self, score_rows: List[dict]) -> Optional[dict]:
+    def summarize(self, score_rows: list[dict]) -> Optional[dict]:
         """
         Summarize the accuracy scores for a batch of predictions.
 
         Args:
-            score_rows (List[dict]): A list of dictionaries with `score`, `output`, and `ground_truth`.
+            score_rows (list[dict]): A list of dictionaries with `score`, `output`, and `ground_truth`.
 
         Returns:
             Optional[dict]: Summary statistics including accuracy and class-wise details for multiclass and multilabel tasks.
@@ -89,20 +93,24 @@ class AccuracyScorer(Scorer):
 
         return None
 
-    def _summarize_multiclass(self, scores: List[float], outputs: List[Any], ground_truths: List[Any]) -> dict:
+    def _summarize_multiclass(
+        self, scores: list[float], outputs: list[Any], ground_truths: list[Any]
+    ) -> dict:
         """
         Summarize accuracy for multiclass tasks.
 
         Args:
-            scores (List[float]): List of scores.
-            outputs (List[Any]): Predictions from the model.
-            ground_truths (List[Any]): Ground truth labels.
+            scores (list[float]): List of scores.
+            outputs (list[Any]): Predictions from the model.
+            ground_truths (list[Any]): Ground truth labels.
 
         Returns:
             dict: Summary of multiclass accuracy.
         """
         if not self.num_classes:
-            raise ValueError("num_classes must be provided for multiclass summarization.")
+            raise ValueError(
+                "num_classes must be provided for multiclass summarization."
+            )
 
         per_class_correct = [0] * self.num_classes
         per_class_total = [0] * self.num_classes
@@ -123,7 +131,9 @@ class AccuracyScorer(Scorer):
             accuracy = sum(per_class_accuracy) / self.num_classes
         elif self.average == "weighted":
             weights = [total / sum(per_class_total) for total in per_class_total]
-            accuracy = sum(acc * weight for acc, weight in zip(per_class_accuracy, weights))
+            accuracy = sum(
+                acc * weight for acc, weight in zip(per_class_accuracy, weights)
+            )
         elif self.average == "none":
             accuracy = per_class_accuracy
         else:
@@ -131,14 +141,16 @@ class AccuracyScorer(Scorer):
 
         return {"accuracy": accuracy, "per_class_accuracy": per_class_accuracy}
 
-    def _summarize_multilabel(self, scores: List[float], outputs: List[Any], ground_truths: List[Any]) -> dict:
+    def _summarize_multilabel(
+        self, scores: list[float], outputs: list[Any], ground_truths: list[Any]
+    ) -> dict:
         """
         Summarize accuracy for multilabel tasks.
 
         Args:
-            scores (List[float]): List of scores.
-            outputs (List[Any]): Predictions from the model.
-            ground_truths (List[Any]): Ground truth labels.
+            scores (list[float]): List of scores.
+            outputs (list[Any]): Predictions from the model.
+            ground_truths (list[Any]): Ground truth labels.
 
         Returns:
             dict: Summary of multilabel accuracy.
@@ -151,7 +163,8 @@ class AccuracyScorer(Scorer):
 
             for label_idx in range(num_labels):
                 correct = sum(
-                    1 for output, gt in zip(outputs, ground_truths)
+                    1
+                    for output, gt in zip(outputs, ground_truths)
                     if output[label_idx] == gt[label_idx]
                 )
                 per_label_accuracies.append(correct / len(outputs))

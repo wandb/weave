@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -95,8 +95,10 @@ def embed(
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
 
+
 def set_device(device: Optional[str] = None) -> str:
     import torch
+
     assert device in [None, "cpu", "cuda"], "device must be None, 'cpu', or 'cuda'"
     cuda_available = torch.cuda.is_available()
     if not cuda_available and device == "cuda":
@@ -105,8 +107,10 @@ def set_device(device: Optional[str] = None) -> str:
         device = "cuda" if cuda_available else "cpu"
     return device
 
+
 def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:
     from wandb import Api
+
     api = Api()
     art = api.artifact(
         type="model",
@@ -117,12 +121,13 @@ def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> 
     art.download(local_model_path)
     return local_model_path
 
+
 scorer_model_paths = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
     "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",  # task: "sentiment-analysis"
-    "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0" , 
+    "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer:v0",
 }

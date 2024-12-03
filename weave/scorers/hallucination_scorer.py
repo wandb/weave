@@ -1,17 +1,26 @@
 import os
 from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import InstructorLLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
-from weave.scorers.utils import stringify
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, scorer_model_paths
+from weave.scorers.llm_scorer import InstructorLLMScorer
+from weave.scorers.llm_utils import (
+    OPENAI_DEFAULT_MODEL,
+    create,
+    download_model,
+    scorer_model_paths,
+)
+from weave.scorers.utils import stringify
 
 try:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModelForSequenceClassification
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+    )
 except ImportError:
     import_failed = True
     print(
@@ -91,7 +100,7 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 """
 
 
-def get_chat_template_messages(query:str, output:str, context:str=None):
+def get_chat_template_messages(query: str, output: str, context: str = None):
     system_prompt = """The task is to evaluate whether the <output> contains \
 information not supported by the <query> or <context>, or \
 whether the <output> contradicts the information provided in the <query> or <context>.
@@ -131,7 +140,7 @@ For each output, evaluate:
 </evaluation_criteria>
 """
 
-    prompt_template = """Does the following <output> meet the criteria for lack of Faithfulness, \
+    prompt_template = f"""Does the following <output> meet the criteria for lack of Faithfulness, \
 Unsubstantiated Claim or Contradiction?
 
 <query>
@@ -146,15 +155,14 @@ Unsubstantiated Claim or Contradiction?
 {output}
 </output>
 
-Answer only with True or False.""".format(query=query, context=context, output=output)
+Answer only with True or False."""
 
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt_template}
+        {"role": "user", "content": prompt_template},
     ]
-   
-    return messages
 
+    return messages
 
 
 class HallucinationReasoning(BaseModel):
@@ -235,12 +243,12 @@ class HallucinationFreeScorer(InstructorLLMScorer):
             max_tokens=self.max_tokens,
         )
         return response.model_dump()  # Morgan wants this to be a dict
-    
+
 
 class HallucinationScorer(Scorer):
     """
     A scorer that detects hallucinations in the output, given an query and context.
-    
+
     This scorer uses a fine-tuned LLM to analyze whether model outputs contain information not supported
     by the given context.
 
@@ -250,14 +258,17 @@ class HallucinationScorer(Scorer):
         base_url: Optional URL for external API scoring instead of local model
         debug: Enable debug logging, defaults to False
     """
-    model_name_or_path: str = "c-metrics/hallucination/SmolLM2-135M-Instruct-sft-hallu:v56"
+
+    model_name_or_path: str = (
+        "c-metrics/hallucination/SmolLM2-135M-Instruct-sft-hallu:v56"
+    )
     base_url: Optional[str] = None
     device: str = "cuda"
     debug: bool = False
     llm_model: Any = None
     tokenizer: Any = None
     max_new_tokens: int = 2
-    model_max_length:int = 8192
+    model_max_length: int = 8192
     do_sample: bool = False
     temperature: float = 0.0
     num_beams: int = 1
@@ -267,16 +278,16 @@ class HallucinationScorer(Scorer):
     use_hhem: bool = True
     hhem_score_threshold: float = 0.5
     _local_model_path: str = None
-    
+
     def model_post_init(self, __context) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
-        
+
         # torch.cuda.is_available()
         if not torch.cuda.is_available() and "cuda" in self.device:
             raise ValueError("CUDA is not available")
-        
+
         if self.llm_model is None:
             # Check if the model is already downloaded
             if os.path.isdir(self.model_name_or_path):
@@ -284,30 +295,36 @@ class HallucinationScorer(Scorer):
             # Else assume it's a wandb model name and download it
             else:
                 if self.use_hhem:
-                    self._local_model_path = download_model(scorer_model_paths["hallucination_hhem_scorer"])
+                    self._local_model_path = download_model(
+                        scorer_model_paths["hallucination_hhem_scorer"]
+                    )
                 else:
-                    self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])                   
+                    self._local_model_path = download_model(
+                        scorer_model_paths["hallucination_scorer"]
+                    )
 
             if self.use_hhem:
                 self.llm_model = AutoModelForSequenceClassification.from_pretrained(
-                    self._local_model_path, 
+                    self._local_model_path,
                     torch_dtype="bfloat16",
-                    trust_remote_code=True
+                    trust_remote_code=True,
                 ).to(self.device)
                 self.tokenizer = self.llm_model.tokenzier
             else:
                 self.llm_model = AutoModelForCausalLM.from_pretrained(
-                    self._local_model_path, 
-                    torch_dtype="bfloat16"
+                    self._local_model_path, torch_dtype="bfloat16"
                 ).to(self.device)
 
                 if self.use_torch_compile:
                     self.llm_model.generation_config.cache_implementation = "static"
-                    self.llm_model = torch.compile(self.llm_model, backend="inductor", fullgraph=True)
+                    self.llm_model = torch.compile(
+                        self.llm_model, backend="inductor", fullgraph=True
+                    )
 
         if self.tokenizer is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path, 
-                                                           model_max_length=self.model_max_length)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self._local_model_path, model_max_length=self.model_max_length
+            )
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
@@ -315,15 +332,13 @@ class HallucinationScorer(Scorer):
 
     def _score_via_api(self, messages: list) -> dict[str, Any]:
         import requests
-        response = requests.post(
-            self.base_url,
-            json={"messages": messages}
-        )
+
+        response = requests.post(self.base_url, json={"messages": messages})
         response.raise_for_status()
         return response.json()
 
     @weave.op
-    def score(self, query:str, context:str, output:str) -> dict:
+    def score(self, query: str, context: str, output: str) -> dict:
         messages = get_chat_template_messages(
             query=query,
             context=context,
@@ -336,7 +351,7 @@ class HallucinationScorer(Scorer):
         else:
             if self.use_hhem:
                 pairs = [(query + "\n\n" + context, output)]
-                pred = self.llm_model.predict(pairs) 
+                pred = self.llm_model.predict(pairs)
 
                 pred_item = pred.item()
                 return {"flagged": pred_item <= self.hhem_score_threshold}
@@ -345,15 +360,17 @@ class HallucinationScorer(Scorer):
                     messages,
                     return_tensors="pt",
                     tokenize=False,
-                    add_generation_prompt=True
+                    add_generation_prompt=True,
                 )
-                inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(self.device)
-                
+                inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(
+                    self.device
+                )
+
                 pad_token_id = self.tokenizer.eos_token_id
 
-                with torch.no_grad():            
+                with torch.no_grad():
                     self.llm_model.eval()
-                    
+
                     output = self.llm_model.generate(
                         inp_tokenized["input_ids"],
                         max_new_tokens=self.max_new_tokens,
@@ -363,30 +380,37 @@ class HallucinationScorer(Scorer):
                         do_sample=self.do_sample,
                         num_beams=self.num_beams,
                         top_k=self.top_k,
-                        top_p=self.top_p
+                        top_p=self.top_p,
                     )
 
-        true_token = 2787
-        false_token = 4245
+                true_token = 2787
+                false_token = 4245
 
-        input_length = inp_tokenized["input_ids"].shape[1]
-        completion_tokens = output[0][input_length:].tolist()
+                input_length = inp_tokenized["input_ids"].shape[1]
+                completion_tokens = output[0][input_length:].tolist()
 
-        is_hallucination = (true_token in completion_tokens)
-        result = {"flagged": is_hallucination}
-        
-        if self.debug:
-            scorer_worked = (completion_tokens.count(true_token) + completion_tokens.count(false_token)) == 1
-            print(f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n")
-            completion = self.tokenizer.decode(completion_tokens)
-            print(f"COMPLETION:\n{completion}\n----------------------\n")
+                is_hallucination = true_token in completion_tokens
+                result = {"flagged": is_hallucination}
 
-            result.update({
-                "completion": completion,
-                "completion_tokens": completion_tokens,
-                "total_tokens": len(output[0]),
-                "total_completion_tokens": len(completion_tokens),
-                "scorer_worked": scorer_worked
-            })
-        
+                if self.debug:
+                    scorer_worked = (
+                        completion_tokens.count(true_token)
+                        + completion_tokens.count(false_token)
+                    ) == 1
+                    print(
+                        f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n"
+                    )
+                    completion = self.tokenizer.decode(completion_tokens)
+                    print(f"COMPLETION:\n{completion}\n----------------------\n")
+
+                    result.update(
+                        {
+                            "completion": completion,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": len(output[0]),
+                            "total_completion_tokens": len(completion_tokens),
+                            "scorer_worked": scorer_worked,
+                        }
+                    )
+
         return result

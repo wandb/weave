@@ -1,12 +1,12 @@
-import os
 import json
+import os
 from typing import Any, Optional
 
 from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, set_device, scorer_model_paths
+from weave.scorers.llm_utils import download_model, scorer_model_paths, set_device
 
 try:
     import torch
@@ -17,7 +17,7 @@ except ImportError:
         "The `transformers` package is required to use the RelevanceScorer, please run `pip install transformers`"
     )
 
-RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context. 
+RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
 Relevance measures how effectively a generated output addresses its input context across three core dimensions:
 
@@ -92,14 +92,16 @@ class RelevanceScorer(Scorer):
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
-        
+
         """Initialize the coherence model and tokenizer."""
         self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(scorer_model_paths["relevance_scorer"])
-        
+            self._local_model_path = download_model(
+                scorer_model_paths["relevance_scorer"]
+            )
+
         self._classifier = pipeline(
             task="text-generation", model=self._local_model_path, device=self.device
         )
@@ -179,11 +181,23 @@ class RelevanceScorer(Scorer):
             {"role": "user", "content": context_and_completion},
         ]
 
-    def _score_via_api(self, input: str, output: str, context: Optional[list[str]] = None, chat_history: Optional[list[dict[str, str]]] = None) -> dict[str, Any]:
+    def _score_via_api(
+        self,
+        input: str,
+        output: str,
+        context: Optional[list[str]] = None,
+        chat_history: Optional[list[dict[str, str]]] = None,
+    ) -> dict[str, Any]:
         import requests
+
         response = requests.post(
             self.base_url,
-            json={"input": input, "output": output, "context": context, "chat_history": chat_history}
+            json={
+                "input": input,
+                "output": output,
+                "context": context,
+                "chat_history": chat_history,
+            },
         )
         response.raise_for_status()
         return response.json()

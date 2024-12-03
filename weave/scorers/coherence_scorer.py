@@ -5,10 +5,9 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, set_device, scorer_model_paths
+from weave.scorers.llm_utils import download_model, scorer_model_paths, set_device
 
 try:
-    import torch
     from transformers import pipeline
 except ImportError:
     import_failed = True
@@ -36,13 +35,15 @@ class CoherenceScorer(Scorer):
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
-        
+
         """Initialize the coherence model and tokenizer."""
         self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(scorer_model_paths["coherence_scorer"])
+            self._local_model_path = download_model(
+                scorer_model_paths["coherence_scorer"]
+            )
 
         self._classifier = pipeline(
             task="sentiment-analysis", model=self._local_model_path, device=self.device
@@ -81,22 +82,28 @@ class CoherenceScorer(Scorer):
             else:
                 formatted_chat_history += f"{turn['text']}\n<extra_id_1>User\n"
         return formatted_chat_history
-    
+
     def _score_via_api(
-            self, 
-            input: str, 
-            output: str, 
-            chat_history: Optional[list[dict[str, str]]] = None, 
-            context: Optional[str] = None
+        self,
+        input: str,
+        output: str,
+        chat_history: Optional[list[dict[str, str]]] = None,
+        context: Optional[str] = None,
     ) -> dict[str, Any]:
         import requests
+
         response = requests.post(
             self.base_url,
-            json={"input": input, "output": output, "chat_history": chat_history, "context": context}
+            json={
+                "input": input,
+                "output": output,
+                "chat_history": chat_history,
+                "context": context,
+            },
         )
         response.raise_for_status()
         return response.json()
-    
+
     @weave.op
     def score(
         self,
