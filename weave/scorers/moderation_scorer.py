@@ -280,18 +280,6 @@ class ToxicityScorer(RollingWindowScorer):
         print(f"Model and tokenizer loaded on {self.device}")
         self._model.eval()
 
-    def _download_model(self, model_name_or_path: str) -> str:
-        from wandb import Api
-        api = Api()
-        model_name = model_name_or_path.split("/")[-1].replace(":", "_")
-        art = api.artifact(
-            type="model",
-            name=model_name_or_path,
-        )
-        local_model_path = f"models/{model_name}"
-        art.download(local_model_path)
-        return local_model_path
-
     def predict_chunk(self, input_ids: "Tensor") -> list[int]:
         """
         Predict toxicity scores for a chunk of tokenized input.
