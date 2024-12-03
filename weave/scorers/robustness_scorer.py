@@ -27,6 +27,7 @@ class RobustnessScorer(Scorer):
         embedding_model_name (str): Name of the embedding model to use for computing semantic similarity.
         similarity_metric (str): The similarity metric to use. Currently, only 'cosine' is supported.
         embedding_model (Optional[SentenceTransformer]): The loaded embedding model used for computing embeddings.
+        cohen_d_threshold (float): The threshold for Cohen's d interpretation when std_diff is close to 0.
 
     Usage Example:
         # Initialize the scorer
@@ -54,6 +55,7 @@ class RobustnessScorer(Scorer):
     embedding_model: Optional[Any] = (
         None  # Delay type hinting to avoid dependency on SentenceTransformer
     )
+    cohen_d_threshold: float = 1e-2
 
     def model_post_init(self, __context: Any) -> None:
         """
@@ -269,7 +271,7 @@ class RobustnessScorer(Scorer):
         mean_diff = np.mean(differences)
         std_diff = np.std(differences, ddof=1)  # Sample standard deviation
 
-        if std_diff == 0:
+        if std_diff < self.cohen_d_threshold:
             return 0.0  # No variability in differences; negligible effect
         else:
             return (mean_diff / std_diff).item()
