@@ -1,5 +1,7 @@
 """Defines the custom Image weave type."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -19,7 +21,7 @@ except ImportError:
     pass
 
 
-def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
+def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".
     # There is an extensive internal discussion here:
     # https://weightsandbiases.slack.com/archives/C03BSTEBD7F/p1723670081582949
@@ -38,7 +40,7 @@ def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None
         obj.save(f, format="png")  # type: ignore
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
+def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
     # Note: I am purposely ignoring the `name` here and hard-coding the filename. See comment
     # on save.
     path = artifact.path("image.png")
@@ -47,7 +49,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
 
 def register() -> None:
     if dependencies_met:
-        serializer.register_serializer(Image.Image, save, load)
+        serializer.register_object_serializer(Image.Image, save, load)
 
 
 class PILImageInitializer:
