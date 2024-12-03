@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
@@ -71,8 +70,10 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  const viewerInfo = useViewerInfo();
-  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  return false;
+  // Uncomment to re-enable.
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {

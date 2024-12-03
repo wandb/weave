@@ -207,6 +207,137 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 65536,
     supports_function_calling: true,
   },
+
+  'ai21.j2-mid-v1': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'ai21.j2-ultra-v1': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'amazon.titan-text-lite-v1': {
+    provider: 'bedrock',
+    max_tokens: 4000,
+    supports_function_calling: false,
+  },
+  'amazon.titan-text-express-v1': {
+    provider: 'bedrock',
+    max_tokens: 8000,
+    supports_function_calling: false,
+  },
+  'mistral.mistral-7b-instruct-v0:2': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'mistral.mixtral-8x7b-instruct-v0:1': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'mistral.mistral-large-2402-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: true,
+  },
+  'mistral.mistral-large-2407-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: true,
+  },
+  'anthropic.claude-3-sonnet-20240229-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'anthropic.claude-3-5-sonnet-20240620-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'anthropic.claude-3-haiku-20240307-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'anthropic.claude-3-opus-20240229-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'anthropic.claude-v2': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'anthropic.claude-v2:1': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'anthropic.claude-instant-v1': {
+    provider: 'bedrock',
+    max_tokens: 8191,
+    supports_function_calling: false,
+  },
+  'cohere.command-text-v14': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'cohere.command-light-text-v14': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'cohere.command-r-plus-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'cohere.command-r-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'meta.llama2-13b-chat-v1': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'meta.llama2-70b-chat-v1': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'meta.llama3-8b-instruct-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 2048,
+    supports_function_calling: false,
+  },
+  'meta.llama3-70b-instruct-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 2048,
+    supports_function_calling: false,
+  },
+  'meta.llama3-1-8b-instruct-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 2048,
+    supports_function_calling: true,
+  },
+  'meta.llama3-1-70b-instruct-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 2048,
+    supports_function_calling: true,
+  },
+  'meta.llama3-1-405b-instruct-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
@@ -215,7 +346,14 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
   LLM_MAX_TOKENS
 ) as LLMMaxTokensKey[];
 
-export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'groq'];
+export const LLM_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'gemini',
+  'groq',
+  'bedrock',
+];
+
 export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
   string
@@ -224,4 +362,5 @@ export const LLM_PROVIDER_LABELS: Record<
   anthropic: 'Anthropic',
   gemini: 'Gemini',
   groq: 'Groq',
+  bedrock: 'Bedrock',
 };
