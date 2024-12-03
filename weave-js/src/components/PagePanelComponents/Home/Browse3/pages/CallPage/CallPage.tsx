@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
@@ -70,10 +71,8 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  return false;
-  // Uncomment to re-enable.
-  // const viewerInfo = useViewerInfo();
-  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  const viewerInfo = useViewerInfo();
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -185,7 +184,7 @@ const useCallTabs = (call: CallSchema) => {
     ...(showScores
       ? [
           {
-            label: 'Scores (W&B Admin Preview)',
+            label: 'Scores',
             content: (
               <Tailwind>
                 <CallScoresViewer call={call} />
