@@ -23,6 +23,7 @@ from typing import (
 )
 
 from weave.trace import box, settings
+from weave.trace.concurrent.thread_safety import ensure_thread_safe
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -299,6 +300,7 @@ def _execute_op(
             print_call_link(__call)
 
     def on_output(output: Any) -> Any:
+        output = ensure_thread_safe(output)
         if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, __call.inputs)
         finish(output)

@@ -37,7 +37,6 @@ from contextvars import ContextVar
 from threading import Lock
 from typing import Any, Callable, TypeVar
 
-from weave.trace.concurrent.thread_safety import ensure_thread_safe
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
 
@@ -199,8 +198,7 @@ class FutureExecutor:
         def wrapped_f(*args: Any, **kwargs: Any) -> T:
             token = self._in_thread_context.set(True)
             try:
-                result = f(*args, **kwargs)
-                return ensure_thread_safe(result)
+                return f(*args, **kwargs)
             finally:
                 self._in_thread_context.reset(token)
 
