@@ -1029,3 +1029,21 @@ def test_scorers_with_output_and_model_output_raise_error():
 
     with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
+
+
+@pytest.mark.asyncio
+async def test_evaluation_with_custom_name(client):
+    dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
+    evaluation = weave.Evaluation(dataset=dataset, evaluation_name="wow-custom!")
+
+    @weave.op()
+    def model(input: str) -> str:
+        return "hmmm"
+
+    await evaluation.evaluate(model)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.display_name == "wow-custom!"

@@ -5,6 +5,7 @@ import textwrap
 import time
 import traceback
 from collections.abc import Coroutine
+from types import MethodType
 from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
@@ -29,7 +30,7 @@ from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
@@ -116,17 +117,23 @@ class Evaluation(Object):
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
-    # evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
+
+    # Custom evaluation name for display in the UI.  This is the same API as passing a
+    # custom `call_display_name` to `weave.op` (see that for more details).
+    evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     def model_post_init(self, __context: Any) -> None:
-        # if self.evaluation_name:
-        #     base_f = self.evaluate.resolve_fn
-        #     self.__dict__["evaluate"] = weave.op(
-        #         base_f, call_display_name=self.evaluation_name
-        #     )
+        if self.evaluation_name:
+            original_op = self.evaluate
+            new_op = weave.op(
+                original_op.resolve_fn,
+                call_display_name=self.evaluation_name,
+            )
+            bound_method = MethodType(new_op, self)
+            self.__dict__["evaluate"] = bound_method
 
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
