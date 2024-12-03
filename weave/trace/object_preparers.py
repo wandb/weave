@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Protocol
 
 
@@ -19,10 +21,11 @@ def register(preparer: ObjectPreparer) -> None:
     _object_preparers.append(preparer)
 
 
-def get_preparer_for_obj(obj: Any) -> None:
-      for initializer in _object_preparers:
+def get_preparer_for_obj(obj: Any) -> ObjectPreparer | None:
+    for initializer in _object_preparers:
         if initializer.should_prepare(obj):
-           return initializer
+            return initializer
+
 
 def prepare_obj(obj: Any) -> None:
     if preparer := get_preparer_for_obj(obj):
