@@ -32,6 +32,7 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+import traceback
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
@@ -78,6 +79,8 @@ class FutureExecutor:
         self._active_futures_lock = Lock()
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
+        self._logger = logging.getLogger(__name__)
+        self._logger.setLevel(logging.DEBUG)
 
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
@@ -112,18 +115,36 @@ class FutureExecutor:
 
         def callback() -> None:
             try:
+                self._logger.debug("Waiting for futures to complete in then() callback")
                 done, _ = wait(futures)
-                results = [f.result() for f in done]
+                self._logger.debug(f"Getting results for {len(done)} futures")
+                results = []
+                for f in done:
+                    self._logger.debug("Getting result for future")
+                    try:
+                        result = f.result()
+                        self._logger.debug(f"Got result: {result}")
+                        results.append(result)
+                    except Exception as e:
+                        self._logger.exception("Error getting future result")
+                        result_future.set_exception(e)
+                        return
             except Exception as e:
+                self._logger.exception("Error in then() callback")
                 result_future.set_exception(e)
                 return
 
+            self._logger.debug("Submitting callback function")
             g_future = self._safe_submit(g, results)
 
             def on_g_done(f: Future[U]) -> None:
                 try:
-                    result_future.set_result(f.result())
+                    self._logger.debug("Getting result from callback function")
+                    result = f.result()
+                    self._logger.debug(f"Got result from callback: {result}")
+                    result_future.set_result(result)
                 except Exception as e:
+                    self._logger.exception("Error in callback function")
                     result_future.set_exception(e)
 
             self._safe_add_done_callback(g_future, on_g_done)
@@ -159,16 +180,22 @@ class FutureExecutor:
         """
         with self._active_futures_lock:
             if not self._active_futures:
+                self._logger.debug("No active futures to flush")
                 return True
             futures_to_wait = list(self._active_futures)
+            self._logger.debug(f"Flushing {len(futures_to_wait)} active futures")
 
         if self._in_thread_context.get():
+            self._logger.error("Cannot flush from within a thread")
             raise RuntimeError("Cannot flush from within a thread")
 
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
-                future.result()
+                self._logger.debug("Getting result for future during flush")
+                result = future.result()
+                self._logger.debug(f"Got result during flush: {result}")
             except Exception as e:
+                self._logger.exception("Error getting future result during flush")
                 if get_raise_on_captured_errors():
                     raise
         return True
@@ -180,7 +207,9 @@ class FutureExecutor:
                 self._active_futures.remove(future)
                 exception = future.exception()
                 if exception:
-                    logger.error(f"Task failed: {_format_exception(exception)}")
+                    self._logger.error(
+                        f"Task failed: {_format_exception(exception)}\nTraceback:\n{''.join(traceback.format_tb(exception.__traceback__))}"
+                    )
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
