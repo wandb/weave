@@ -37,7 +37,19 @@ registered.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+
+class ThreadBoundarySafe(Protocol[T]):
+    def prepare_for_thread_boundary(self) -> T: ...
+
+
+def prepare_for_thread_boundary(obj: T) -> T:
+    if isinstance(obj, ThreadBoundarySafe):
+        return obj.prepare_for_thread_boundary()
+    return obj
 
 
 @dataclass

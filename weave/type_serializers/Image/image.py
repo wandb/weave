@@ -1,6 +1,9 @@
 """Defines the custom Image weave type."""
 
 from weave.trace import serializer
+from weave.trace.concurrent.thread_boundary_handlers import (
+    register_thread_boundary_handler,
+)
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
 dependencies_met = False
@@ -39,6 +42,11 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
     return Image.open(path)
 
 
+def prepare_for_thread_boundary(obj: "Image.Image") -> "Image.Image":
+    return obj.copy()
+
+
 def register() -> None:
     if dependencies_met:
         serializer.register_serializer(Image.Image, save, load)
+        register_thread_boundary_handler(Image.Image, prepare_for_thread_boundary)
