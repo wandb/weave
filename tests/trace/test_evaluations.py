@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 
 import weave
-from tests.trace.util import AnyIntMatcher
+from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.scorers import Scorer
 from weave.trace.refs import CallRef
@@ -504,8 +504,8 @@ async def test_evaluation_data_topology(client):
             }
         },
         "weave": {
+            "display_name": AnyStrMatcher(),
             "latency_ms": AnyIntMatcher(),
-            "trace_name": "Evaluation.evaluate",
             "status": "success",
         },
     }
