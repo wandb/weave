@@ -1,4 +1,4 @@
-from weave.scorers.hallucination_scorer import HallucinationFreeScorer
+from weave.scorers.hallucination_scorer import HallucinationScorer
 
 
 class FaithfulnessScorer(HallucinationScorer):
