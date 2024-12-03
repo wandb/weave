@@ -81,7 +81,7 @@ class RelevanceScorer(Scorer):
     """
 
     device: str = None
-    model_name_or_path: str = "wandb/relevance_scorer"
+    model_name_or_path: str = None
     base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()

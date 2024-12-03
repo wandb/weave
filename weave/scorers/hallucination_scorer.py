@@ -259,9 +259,7 @@ class HallucinationScorer(Scorer):
         debug: Enable debug logging, defaults to False
     """
 
-    model_name_or_path: str = (
-        "c-metrics/hallucination/SmolLM2-135M-Instruct-sft-hallu:v56"
-    )
+    model_name_or_path: str = None
     base_url: Optional[str] = None
     device: str = "cuda"
     debug: bool = False

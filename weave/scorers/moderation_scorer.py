@@ -244,7 +244,7 @@ class ToxicityScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = "wandb/celadon"
+    model_name_or_path: str = None
     base_url: Optional[str] = None
     total_threshold: int = 5
     category_threshold: int = 2
@@ -414,7 +414,7 @@ class BiasScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = "wandb/bias_scorer"
+    model_name_or_path: str = None
     base_url: Optional[str] = None
     device: str = None
     threshold: float = 0.5
