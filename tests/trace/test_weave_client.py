@@ -1580,14 +1580,14 @@ def test_object_deletion(client):
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
             names=["my-obj"],
-            order_by=[{"created_at": "desc"}],
+            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
         )
     )
     assert len(versions.objs) == 2
 
     # iterate over the versions, confirm the indexes are correct
-    assert versions.objs[0].version_index == 4
-    assert versions.objs[1].version_index == 2
+    assert versions.objs[0].version_index == 3
+    assert versions.objs[1].version_index == 1
 
     weave_obj4.delete()
     weave_obj2.delete()
