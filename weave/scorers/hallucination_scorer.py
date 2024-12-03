@@ -11,7 +11,7 @@ from weave.scorers.llm_utils import download_model, scorer_model_paths
 
 try:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModelForSequenceClassification
 except ImportError:
     import_failed = True
     print(
@@ -264,6 +264,8 @@ class HallucinationScorer(Scorer):
     top_k: int = 20
     top_p: int = 0.7
     use_torch_compile: bool = False
+    use_hhem: bool = True
+    hhem_score_threshold: float = 0.5
     _local_model_path: str = None
     
     def model_post_init(self, __context) -> None:
@@ -281,16 +283,28 @@ class HallucinationScorer(Scorer):
                 self._local_model_path = self.model_name_or_path
             # Else assume it's a wandb model name and download it
             else:
-                self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])
+                if self.use_hhem:
+                    self._local_model_path = download_model(scorer_model_paths["hallucination_hhem_scorer"])
+                else:
+                    self._local_model_path = download_model(scorer_model_paths["hallucination_scorer"])                   
 
-            self.llm_model = AutoModelForCausalLM.from_pretrained(
-                self._local_model_path, 
-                torch_dtype="bfloat16"
-            ).to(self.device)
+            if self.use_hhem:
+                self.llm_model = AutoModelForSequenceClassification.from_pretrained(
+                    self._local_model_path, 
+                    torch_dtype="bfloat16",
+                    trust_remote_code=True
+                ).to(self.device)
+            else:
+                self.llm_model = AutoModelForCausalLM.from_pretrained(
+                    self._local_model_path, 
+                    torch_dtype="bfloat16"
+                ).to(self.device)
 
-            if self.use_torch_compile:
-                self.llm_model.generation_config.cache_implementation = "static"
-                self.llm_model = torch.compile(self.llm_model, backend="inductor", fullgraph=True)
+                if self.use_torch_compile:
+                    self.llm_model.generation_config.cache_implementation = "static"
+                    self.llm_model = torch.compile(self.llm_model, backend="inductor", fullgraph=True)
+
+        self.tokenizer = self.llm_model.tokenzier
         
         if self.tokenizer is None:
             self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path, 
@@ -311,42 +325,47 @@ class HallucinationScorer(Scorer):
 
     @weave.op
     def score(self, query:str, context:str, output:str) -> dict:
-
         messages = get_chat_template_messages(
             query=query,
             context=context,
             output=output,
         )
-
         if self.base_url:
             output = self._score_via_api(messages)
             output = output["data"]
 
         else:
-            inp_template = self.tokenizer.apply_chat_template(
-                messages,
-                return_tensors="pt",
-                tokenize=False,
-                add_generation_prompt=True
-            )
-            inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(self.device)
-            
-            pad_token_id = self.tokenizer.eos_token_id
+            if self.use_hhem:
+                pairs = [(query + "\n\n" + context, output)]
+                pred = self.llm_model.predict(pairs) 
 
-            with torch.no_grad():            
-                self.llm_model.eval()
-                
-                output = self.llm_model.generate(
-                    inp_tokenized["input_ids"],
-                    max_new_tokens=self.max_new_tokens,
-                    attention_mask=inp_tokenized["attention_mask"],
-                    pad_token_id=pad_token_id,
-                    temperature=self.temperature,
-                    do_sample=self.do_sample,
-                    num_beams=self.num_beams,
-                    top_k=self.top_k,
-                    top_p=self.top_p
+                pred_item = pred.item()
+                return {"flagged": pred_item <= self.hhem_score_threshold}
+            else:
+                inp_template = self.tokenizer.apply_chat_template(
+                    messages,
+                    return_tensors="pt",
+                    tokenize=False,
+                    add_generation_prompt=True
                 )
+                inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(self.device)
+                
+                pad_token_id = self.tokenizer.eos_token_id
+
+                with torch.no_grad():            
+                    self.llm_model.eval()
+                    
+                    output = self.llm_model.generate(
+                        inp_tokenized["input_ids"],
+                        max_new_tokens=self.max_new_tokens,
+                        attention_mask=inp_tokenized["attention_mask"],
+                        pad_token_id=pad_token_id,
+                        temperature=self.temperature,
+                        do_sample=self.do_sample,
+                        num_beams=self.num_beams,
+                        top_k=self.top_k,
+                        top_p=self.top_p
+                    )
 
         true_token = 2787
         false_token = 4245
@@ -355,11 +374,11 @@ class HallucinationScorer(Scorer):
         completion_tokens = output[0][input_length:].tolist()
 
         is_hallucination = (true_token in completion_tokens)
-        result = {"is_hallucination": is_hallucination}
+        result = {"flagged": is_hallucination}
         
         if self.debug:
             scorer_worked = (completion_tokens.count(true_token) + completion_tokens.count(false_token)) == 1
-            print(f"COMPLETION TOKENS: {completion_tokens}\n----------------------\n")
+            print(f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n")
             completion = self.tokenizer.decode(completion_tokens)
             print(f"COMPLETION:\n{completion}\n----------------------\n")
 
