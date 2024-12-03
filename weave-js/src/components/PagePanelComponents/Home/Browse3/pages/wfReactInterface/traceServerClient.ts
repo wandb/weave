@@ -35,7 +35,6 @@ export class TraceServerClient extends DirectTraceServerClient {
     super(baseUrl);
     this.readBatchCollectors = [];
     this.scheduleReadBatch();
-
     this.onDeleteListeners = [];
     this.onRenameListeners = [];
     this.onFeedbackListeners = {};
@@ -85,6 +84,7 @@ export class TraceServerClient extends DirectTraceServerClient {
       }
     };
   }
+
   public registerOnObjectListener(callback: () => void): () => void {
     this.onObjectListeners.push(callback);
     return () => {
