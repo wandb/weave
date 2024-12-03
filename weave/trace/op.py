@@ -691,7 +691,7 @@ def get_captured_code(op: Op) -> str:
     captured_code = op.get_captured_code()
     """
     try:
-        return op.art.path_contents["obj.py"].decode()
+        return op.art.path_contents["obj.py"].decode()  # type: ignore
     except Exception:
         raise RuntimeError(
             "Failed to get captured code for op (this only works when you get an op back from a ref)."
