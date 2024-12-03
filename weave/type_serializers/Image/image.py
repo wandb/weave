@@ -58,6 +58,9 @@ class PILImageInitializer:
 
     def initialize(self, obj: Image.Image) -> None:
         try:
+            # This load is necessary to ensure that the image is fully loaded into memory.
+            # If we don't do this, it's possible that only part of the data is loaded
+            # before
             obj.load()
         except Exception as e:
             logger.exception(f"Failed to load PIL Image: {e}")

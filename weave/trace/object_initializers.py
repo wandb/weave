@@ -2,7 +2,11 @@ from typing import Any, Protocol
 
 
 class ObjectInitializer(Protocol):
-    """An initializer to 'materialize' WeaveObjects into their original types."""
+    """An initializer to ensure saved Weave objects are safe to load back to their original types.
+
+    In many cases, this will be some form of deepcopy to ensure all the data is loaded
+    into memory before attempting to return the object.
+    """
 
     def should_initialize(self, obj: Any) -> bool: ...
     def initialize(self, obj: Any) -> None: ...
