@@ -1,14 +1,12 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import {Button} from '@wandb/weave/components/Button';
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
-import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
-import {DeleteModal} from './common/DeleteModal';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -51,13 +49,9 @@ export const OpVersionPage: React.FC<{
 const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
-  const {useOpVersions, useCallsStats, useObjectDeleteFunc} = useWFHooks();
+  const {useOpVersions, useCallsStats} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex} = opVersion;
-
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const closePeek = useClosePeek();
-  const objectDelete = useObjectDeleteFunc();
 
   const opVersions = useOpVersions(
     entity,
@@ -134,21 +128,9 @@ const OpVersionPageInner: React.FC<{
               }}
             />
           </Box>
-
           <Box mr={1}>
-            <Button
-              icon="delete"
-              variant="ghost"
-              onClick={() => setDeleteModalOpen(true)}
-            />
+            <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
           </Box>
-          <DeleteModal
-            open={deleteModalOpen}
-            onClose={() => setDeleteModalOpen(false)}
-            deleteTargetStr={`${opVersion.opId}:v${opVersion.versionIndex}`}
-            onDelete={() => objectDelete(opVersion)}
-            onSuccess={closePeek}
-          />
         </Stack>
       }
       tabs={[

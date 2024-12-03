@@ -22,6 +22,7 @@ import React, {
 import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
@@ -48,7 +49,6 @@ import {
   TraverseContext,
 } from './traverse';
 import {ValueView} from './ValueView';
-import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 
 type Data = Record<string, any> | any[];
 

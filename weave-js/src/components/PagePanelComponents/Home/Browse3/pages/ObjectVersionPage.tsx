@@ -1,21 +1,19 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
-import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
-import {DeleteModal} from './common/DeleteModal';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -114,10 +112,7 @@ const ObjectVersionPageInner: React.FC<{
 }> = ({objectVersion}) => {
   useObjectViewEvent(objectVersion);
 
-  const closePeek = useClosePeek();
-  const {useRootObjectVersions, useCalls, useRefsData, useObjectDeleteFunc} =
-    useWFHooks();
-  const objectDelete = useObjectDeleteFunc();
+  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
@@ -198,7 +193,6 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
@@ -269,21 +263,9 @@ const ObjectVersionPageInner: React.FC<{
               }}
             />
           </Box>
-
           <Box mr={1}>
-            <Button
-              icon="delete"
-              variant="ghost"
-              onClick={() => setDeleteModalOpen(true)}
-            />
+            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
           </Box>
-          <DeleteModal
-            open={deleteModalOpen}
-            onClose={() => setDeleteModalOpen(false)}
-            deleteTargetStr={`${objectVersion.objectId}:v${objectVersion.versionIndex}`}
-            onDelete={() => objectDelete(objectVersion)}
-            onSuccess={closePeek}
-          />
         </Stack>
       }
       // menuItems={[

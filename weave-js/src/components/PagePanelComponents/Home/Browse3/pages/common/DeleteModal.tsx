@@ -9,6 +9,13 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
+import {useClosePeek} from '../../context';
+import {useWFHooks} from '../wfReactInterface/context';
+import {
+  ObjectVersionSchema,
+  OpVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
+
 interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
@@ -107,3 +114,42 @@ const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
   padding: 32px 32px 32px 32px !important;
 `;
 DialogActions.displayName = 'S.DialogActions';
+
+export const DeleteObjectButtonWithModal: React.FC<{
+  objVersionSchema: OpVersionSchema | ObjectVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({objVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const objectDelete = useObjectDeleteFunc();
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const deleteStr =
+    overrideDisplayStr ?? makeDefaultObjectDeleteStr(objVersionSchema);
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTargetStr={deleteStr}
+        onDelete={() => objectDelete(objVersionSchema)}
+        onSuccess={closePeek}
+      />
+    </>
+  );
+};
+
+function makeDefaultObjectDeleteStr(
+  objVersionSchema: OpVersionSchema | ObjectVersionSchema
+) {
+  if ('objectId' in objVersionSchema) {
+    return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+  }
+  return `${objVersionSchema.opId}:v${objVersionSchema.versionIndex}`;
+}
