@@ -1,12 +1,12 @@
 /// <reference types="vitest" />
+import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import * as path from 'path';
-
+import {visualizer} from 'rollup-plugin-visualizer';
 import {defineConfig} from 'vite';
 import svgr from 'vite-plugin-svgr';
-import react from '@vitejs/plugin-react';
+
 import fileUrls from './vite-plugin-file-urls';
-import {visualizer} from 'rollup-plugin-visualizer';
-import fs from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({mode, command}) => {
@@ -171,6 +171,26 @@ export default defineConfig(({mode, command}) => {
       target: 'es2021',
       outDir: './build',
       sourcemap: true,
+      rollupOptions: {
+        onwarn(warning, warn) {
+          // Ignore "use client" warnings
+          if (
+            warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
+            warning.message.includes('"use client"')
+          ) {
+            return;
+          }
+          // Ignore sourcemap resolution warnings
+          if (
+            warning.message.includes(
+              'Error when using sourcemap for reporting an error'
+            )
+          ) {
+            return;
+          }
+          warn(warning);
+        },
+      },
     },
     envPrefix: 'REACT_APP_',
     cacheDir: path.join(__dirname, '.vite_cache'),
