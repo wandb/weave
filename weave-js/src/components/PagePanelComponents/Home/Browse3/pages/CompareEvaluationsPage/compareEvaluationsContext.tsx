@@ -10,7 +10,6 @@ import {ComparisonDimensionsType} from './ecpState';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
-  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
@@ -18,6 +17,7 @@ const CompareEvaluationsContext = React.createContext<{
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
+  setEvaluationCallOrder: (newCallIdOrder: string[]) => void;
 } | null>(null);
 
 export const useCompareEvaluationsState = () => {
@@ -32,8 +32,6 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   initialEvaluationCallIds: string[];
-  selectedCallIdsOrdered: string[];
-  setSelectedCallIdsOrdered: React.Dispatch<React.SetStateAction<string[]>>;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 
@@ -48,8 +46,6 @@ export const CompareEvaluationsProvider: React.FC<{
   entity,
   project,
   initialEvaluationCallIds,
-  setSelectedCallIdsOrdered,
-  selectedCallIdsOrdered,
   selectedMetrics,
   setSelectedMetrics,
   onEvaluationCallIdsUpdate,
@@ -71,7 +67,6 @@ export const CompareEvaluationsProvider: React.FC<{
     entity,
     project,
     evaluationCallIds,
-    selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest,
     selectedMetrics ?? undefined
@@ -83,14 +78,12 @@ export const CompareEvaluationsProvider: React.FC<{
     }
     return {
       state: initialState.result,
-      setSelectedCallIdsOrdered,
       setComparisonDimensions,
       setSelectedInputDigest,
       setSelectedMetrics,
       addEvaluationCall: (newCallId: string) => {
         const newEvaluationCallIds = [...evaluationCallIds, newCallId];
         setEvaluationCallIds(newEvaluationCallIds);
-        setSelectedCallIdsOrdered(newEvaluationCallIds);
         onEvaluationCallIdsUpdate(newEvaluationCallIds);
       },
       removeEvaluationCall: (callId: string) => {
@@ -98,15 +91,17 @@ export const CompareEvaluationsProvider: React.FC<{
           id => id !== callId
         );
         setEvaluationCallIds(newEvaluationCallIds);
-        setSelectedCallIdsOrdered(newEvaluationCallIds);
         onEvaluationCallIdsUpdate(newEvaluationCallIds);
+      },
+      setEvaluationCallOrder: (newCallIdOrder: string[]) => {
+        setEvaluationCallIds(newCallIdOrder);
+        onEvaluationCallIdsUpdate(newCallIdOrder);
       },
     };
   }, [
     initialState.loading,
     initialState.result,
     setEvaluationCallIds,
-    setSelectedCallIdsOrdered,
     evaluationCallIds,
     onEvaluationCallIdsUpdate,
     setComparisonDimensions,

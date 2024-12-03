@@ -32,6 +32,7 @@ import {
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
+  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';

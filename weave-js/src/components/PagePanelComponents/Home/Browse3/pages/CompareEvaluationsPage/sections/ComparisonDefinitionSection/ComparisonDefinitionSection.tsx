@@ -24,7 +24,11 @@ import {
 } from '../../../wfReactInterface/wfDataModelHooksInterface';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
-import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
+import {
+  EvaluationComparisonState,
+  getOrderedCallIds,
+  swapEvaluationCalls,
+} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 import {useDragDropReorder} from './dragUtils';
 import {EvaluationDefinition, VerticalBar} from './EvaluationDefinition';
@@ -32,22 +36,15 @@ import {EvaluationDefinition, VerticalBar} from './EvaluationDefinition';
 export const ComparisonDefinitionSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {setSelectedCallIdsOrdered} = useCompareEvaluationsState();
+  const {setEvaluationCallOrder} = useCompareEvaluationsState();
 
   const reorderItems = useCallback(
     (fromIndex: number, toIndex: number) => {
-      setSelectedCallIdsOrdered(prev => {
-        if (prev == null) {
-          return prev;
-        }
-        const newOrder = [...prev];
-        const from = newOrder[fromIndex];
-        newOrder[fromIndex] = newOrder[toIndex];
-        newOrder[toIndex] = from;
-        return newOrder;
-      });
+      const currentOrder = getOrderedCallIds(props.state);
+      const newOrder = swapEvaluationCalls(currentOrder, fromIndex, toIndex);
+      setEvaluationCallOrder(newOrder);
     },
-    [setSelectedCallIdsOrdered]
+    [setEvaluationCallOrder, props.state]
   );
 
   const {makeDragSourceCallbackRef, onDragOver, onDrop, onDragEnd} =
@@ -56,7 +53,9 @@ export const ComparisonDefinitionSection: React.FC<{
       dropzonePadding: 8,
     });
 
-  const callIds = getOrderedCallIds(props.state);
+  const callIds = useMemo(() => {
+    return getOrderedCallIds(props.state);
+  }, [props.state]);
 
   return (
     <DragDropProvider>
@@ -160,9 +159,9 @@ const AddEvaluationButton: React.FC<{
 
   const evalsNotComparing = useMemo(() => {
     return calls.result.filter(
-      call => !props.state.selectedCallIdsOrdered.includes(call.callId)
+      call => !getOrderedCallIds(props.state).includes(call.callId)
     );
-  }, [calls.result, props.state.selectedCallIdsOrdered]);
+  }, [calls.result, props.state]);
 
   const [menuOptions, setMenuOptions] =
     useState<CallSchema[]>(evalsNotComparing);

@@ -24,8 +24,8 @@ export type EvaluationComparisonState = {
   selectedInputDigest?: string;
   // The selected metrics to display
   selectedMetrics?: Record<string, boolean>;
-  // The order of the evaluation calls, the first call is always the baseline
-  selectedCallIdsOrdered: string[];
+  // Ordered call Ids
+  evaluationCallIdsOrdered: string[];
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -43,12 +43,14 @@ export const useEvaluationComparisonState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  selectedCallIdsOrdered: string[],
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string,
   selectedMetrics?: Record<string, boolean>
 ): Loadable<EvaluationComparisonState> => {
-  const data = useEvaluationComparisonData(entity, project, evaluationCallIds);
+  const orderedCallIds = useMemo(() => {
+    return getCallIdsOrderedForQuery(evaluationCallIds);
+  }, [evaluationCallIds]);
+  const data = useEvaluationComparisonData(entity, project, orderedCallIds);
 
   const value = useMemo(() => {
     if (data.result == null || data.loading) {
@@ -94,34 +96,35 @@ export const useEvaluationComparisonState = (
         data: data.result,
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
-        selectedCallIdsOrdered,
         selectedMetrics,
+        evaluationCallIdsOrdered: evaluationCallIds,
       },
     };
   }, [
     data.result,
     data.loading,
-    selectedCallIdsOrdered,
     comparisonDimensions,
     selectedInputDigest,
     selectedMetrics,
+    evaluationCallIds,
   ]);
 
   return value;
 };
 
-/**
- * Should use this over keys of `state.data.evaluationCalls` because it ensures the baseline
- * evaluation call is first.
- */
 export const getOrderedCallIds = (state: EvaluationComparisonState) => {
-  return state.selectedCallIdsOrdered.filter(
-    callId => state.data.evaluationCalls[callId] != null
-  );
+  return state.evaluationCallIdsOrdered;
 };
 
 export const getBaselineCallId = (state: EvaluationComparisonState) => {
-  return state.selectedCallIdsOrdered[0];
+  return getOrderedCallIds(state)[0];
+};
+
+/**
+ * Sort call IDs to ensure consistent order for memoized query params
+ */
+const getCallIdsOrderedForQuery = (callIds: string[]) => {
+  return Array.from(callIds).sort();
 };
 
 /**
@@ -146,4 +149,30 @@ const moveItemToFront = <T>(arr: T[], item: T): T[] => {
     arr.unshift(item);
   }
   return arr;
+};
+
+export const getOrderedEvalsWithNewBaseline = (
+  evaluationCallIds: string[],
+  newBaselineCallId: string
+) => {
+  return moveItemToFront(evaluationCallIds, newBaselineCallId);
+};
+
+export const swapEvaluationCalls = (
+  evaluationCallIds: string[],
+  ndx1: number,
+  ndx2: number
+): string[] => {
+  return swapArrayItems(evaluationCallIds, ndx1, ndx2);
+};
+
+const swapArrayItems = <T>(arr: T[], ndx1: number, ndx2: number): T[] => {
+  if (ndx1 < 0 || ndx2 < 0 || ndx1 >= arr.length || ndx2 >= arr.length) {
+    throw new Error('Index out of bounds');
+  }
+  const newArr = [...arr];
+  const from = newArr[ndx1];
+  newArr[ndx1] = newArr[ndx2];
+  newArr[ndx2] = from;
+  return newArr;
 };

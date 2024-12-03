@@ -77,9 +77,6 @@ export const CompareEvaluationsPage: React.FC<
 export const CompareEvaluationsPageContent: React.FC<
   CompareEvaluationsPageProps
 > = props => {
-  const [selectedCallIdsOrdered, setSelectedCallIdsOrdered] = React.useState<
-    string[]
-  >([]);
   const [comparisonDimensions, setComparisonDimensions] =
     React.useState<ComparisonDimensionsType | null>(null);
 
@@ -105,10 +102,6 @@ export const CompareEvaluationsPageContent: React.FC<
     [comparisonDimensions]
   );
 
-  React.useEffect(() => {
-    setSelectedCallIdsOrdered(props.evaluationCallIds);
-  }, [props.evaluationCallIds, setSelectedCallIdsOrdered]);
-
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
   }
@@ -120,8 +113,6 @@ export const CompareEvaluationsPageContent: React.FC<
       initialEvaluationCallIds={props.evaluationCallIds}
       selectedMetrics={props.selectedMetrics}
       setSelectedMetrics={props.setSelectedMetrics}
-      selectedCallIdsOrdered={selectedCallIdsOrdered}
-      setSelectedCallIdsOrdered={setSelectedCallIdsOrdered}
       comparisonDimensions={comparisonDimensions ?? undefined}
       onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}

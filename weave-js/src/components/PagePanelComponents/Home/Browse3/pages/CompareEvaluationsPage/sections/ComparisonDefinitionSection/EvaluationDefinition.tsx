@@ -29,7 +29,12 @@ import {
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
 } from '../../ecpConstants';
-import {EvaluationComparisonState, getBaselineCallId} from '../../ecpState';
+import {
+  EvaluationComparisonState,
+  getBaselineCallId,
+  getOrderedCallIds,
+  getOrderedEvalsWithNewBaseline,
+} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 import {DragHandleIcon} from './dragUtils';
 
@@ -39,7 +44,7 @@ export const EvaluationDefinition: React.FC<{
   ndx: number;
   onDragEnd?: (ctx: DragDropState, e: React.DragEvent) => void;
 }> = props => {
-  const {removeEvaluationCall, setSelectedCallIdsOrdered} =
+  const {removeEvaluationCall, setEvaluationCallOrder} =
     useCompareEvaluationsState();
 
   const menuOptions = useMemo(() => {
@@ -48,19 +53,12 @@ export const EvaluationDefinition: React.FC<{
         key: 'add-to-baseline',
         content: 'Set as baseline',
         onClick: () => {
-          setSelectedCallIdsOrdered(prev => {
-            if (prev == null) {
-              return prev;
-            }
-            const index = prev.indexOf(props.callId);
-            if (index === 0) {
-              return prev;
-            }
-            const newOrder = [...prev];
-            newOrder.splice(index, 1);
-            newOrder.unshift(props.callId);
-            return newOrder;
-          });
+          const currentOrder = getOrderedCallIds(props.state);
+          const newOrder = getOrderedEvalsWithNewBaseline(
+            currentOrder,
+            props.callId
+          );
+          setEvaluationCallOrder(newOrder);
         },
         disabled: props.callId === getBaselineCallId(props.state),
       },
@@ -73,12 +71,7 @@ export const EvaluationDefinition: React.FC<{
         disabled: Object.keys(props.state.data.evaluationCalls).length === 1,
       },
     ];
-  }, [
-    props.callId,
-    props.state,
-    removeEvaluationCall,
-    setSelectedCallIdsOrdered,
-  ]);
+  }, [props.callId, props.state, removeEvaluationCall, setEvaluationCallOrder]);
 
   const partRef = useMemo(() => ({id: `${props.ndx}`}), [props.ndx]);
 
