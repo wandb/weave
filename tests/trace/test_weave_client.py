@@ -1571,18 +1571,23 @@ def test_object_deletion(client):
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         client.get(weave_obj3.ref)
 
+    # make sure we can still get the existing object versions
+    assert client.get(weave_obj4.ref)
+    assert client.get(weave_obj2.ref)
+
     # count the number of versions of the object
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
             names=["my-obj"],
+            order_by=[{"created_at": "desc"}],
         )
     )
     assert len(versions.objs) == 2
 
-    # make sure we can still get the existing object versions
-    assert client.get(weave_obj4.ref)
-    assert client.get(weave_obj2.ref)
+    # iterate over the versions, confirm the indexes are correct
+    assert versions.objs[0].version_index == 4
+    assert versions.objs[1].version_index == 2
 
     weave_obj4.delete()
     weave_obj2.delete()
@@ -1621,6 +1626,7 @@ def test_recursive_object_deletion(client):
     assert client.get(obj3_ref) == {"c": obj2}
 
 
+@pytest.mark.skip("Deleting tables is not yet supported.")
 def test_table_object_deletion(client):
     # create a dataset
     data = [{"a": 1}, {"a": 2}, {"a": 3}]

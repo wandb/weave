@@ -129,9 +129,11 @@ class Traceable:
 
     def delete(self) -> None:
         if self.ref is None:
-            raise ValueError("Cannot delete object that is not saved")
+            raise ValueError(
+                "Cannot delete object that is not saved. Call save() first."
+            )
         if not isinstance(self.ref, (ObjectRef, OpRef)):
-            raise ValueError("Cannot delete refs other than objects and ops")
+            raise TypeError("Deleting non-object refs is not yet supported.")
         ref: ObjectRef = typing.cast(ObjectRef, self.ref)
         self.server.obj_delete(
             ObjDeleteReq(
