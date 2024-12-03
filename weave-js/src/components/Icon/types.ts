@@ -7,6 +7,7 @@ export const IconNames = {
   Area: 'area',
   ArtifactTypeAlt: 'artifact-type-alt',
   AudioVolume: 'audio-volume',
+  AutomatedWorkspace: 'automated-workspace',
   AutomationRobotArm: 'automation-robot-arm',
   Back: 'back',
   BaselineAlt: 'baseline-alt',

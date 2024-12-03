@@ -8,16 +8,14 @@ from typing import Any
 from weave.trace import object_preparers, serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
-logger = logging.getLogger(__name__)
-
-dependencies_met = False
-
 try:
     from PIL import Image
-
-    dependencies_met = True
 except ImportError:
-    pass
+    dependencies_met = False
+else:
+    dependencies_met = True
+
+logger = logging.getLogger(__name__)
 
 
 class PILImagePreparer:
