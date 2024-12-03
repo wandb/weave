@@ -16,7 +16,7 @@ Evaluating LLM prompts and responses is challenging. The Weave Playground is des
 Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
 
 - [Prerequisites](#prerequisites)
-   - [Add a provider API key](#add-a-provider-api-key)
+   - [Add provider credentials and information](#add-provider-credentials-and-information)
    - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
 - [Adjust LLM parameters](#adjust-llm-parameters)
@@ -27,17 +27,21 @@ Get started with the Playground to optimize your LLM interactions and streamline
 
 ## Prerequisites
 
-Before you can use Playground, you must [add an API key](#add-a-provider-api-key) for your preferred LLM provider(s), and [open the Playground UI](#access-the-playground). 
+Before you can use Playground, you must [add provider credentials](#add-provider-credentials-and-information), and [open the Playground UI](#access-the-playground). 
 
-### Add a provider API key 
+### Add provider credentials and information 
 
-Playground currently supports OpenAI, Anthropic, Gemini, and Groq models.
-To use one of the available LLMs, your W&B admin must add the appropriate API key to your team secrets in W&B settings.
+Playground currently supports OpenAI, Anthropic, Gemini, Groq, and Amazon Bedrock models.
+To use one of the available models, add the appropriate information to your team secrets in W&B settings.
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
 - Gemini: `GOOGLE_API_KEY`
 - Groq: `GEMMA_API_KEY`
+- Amazon Bedrock:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION_NAME`
 
 ### Access the Playground
 
@@ -105,6 +109,32 @@ You can switch the LLM using the dropdown menu in the top left. Currently, the a
 - o1-mini
 - o1-preview-2024-09-12
 - o1-preview
+- ai21.j2-mid-v1
+- ai21.j2-ultra-v1
+- amazon.titan-text-lite-v1
+- amazon.titan-text-express-v1
+- mistral.mistral-7b-instruct-v0:2
+- mistral.mixtral-8x7b-instruct-v0:1
+- mistral.mistral-large-2402-v1:0
+- mistral.mistral-large-2407-v1:0
+- anthropic.claude-3-sonnet-20240229-v1:0
+- anthropic.claude-3-5-sonnet-20240620-v1:0
+- anthropic.claude-3-haiku-20240307-v1:0
+- anthropic.claude-3-opus-20240229-v1:0
+- anthropic.claude-v2
+- anthropic.claude-v2:1
+- anthropic.claude-instant-v1
+- cohere.command-text-v14
+- cohere.command-light-text-v14
+- cohere.command-r-plus-v1:0
+- cohere.command-r-v1:0
+- meta.llama2-13b-chat-v1
+- meta.llama2-70b-chat-v1
+- meta.llama3-8b-instruct-v1:0
+- meta.llama3-70b-instruct-v1:0
+- meta.llama3-1-8b-instruct-v1:0
+- meta.llama3-1-70b-instruct-v1:0
+- meta.llama3-1-405b-instruct-v1:0
 
 ## Adjust LLM parameters
 

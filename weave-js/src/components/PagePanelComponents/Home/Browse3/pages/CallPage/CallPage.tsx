@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
@@ -71,8 +70,10 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  const viewerInfo = useViewerInfo();
-  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  return false;
+  // Uncomment to re-enable.
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -80,6 +81,10 @@ const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showTryInPlayground =
+    !isPeeking || !window.location.toString().includes('/weave/playground');
 
   const handleOpenInPlayground = () => {
     window.open(
@@ -115,13 +120,22 @@ const useCallTabs = (call: CallSchema) => {
             label: 'Chat',
             content: (
               <>
-                <Button
-                  variant="secondary"
-                  startIcon="sandbox-playground"
-                  className="m-16 mb-8"
-                  onClick={handleOpenInPlayground}>
-                  Open chat in playground
-                </Button>
+                {showTryInPlayground && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      width: '100%',
+                      padding: '8px 16px',
+                    }}>
+                    <Button
+                      variant="ghost"
+                      startIcon="robot-service-member"
+                      onClick={handleOpenInPlayground}>
+                      Try in playground
+                    </Button>
+                  </Box>
+                )}
                 <ScrollableTabContent>
                   <Tailwind>
                     <CallChat call={call.traceCall!} />

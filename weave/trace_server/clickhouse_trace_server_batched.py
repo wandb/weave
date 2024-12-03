@@ -1462,14 +1462,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        if not api_key:
+        isBedrock = model_info.get("litellm_provider") == "bedrock"
+        if not api_key and not isBedrock:
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
 
         start_time = datetime.datetime.now()
-        res = lite_llm_completion(api_key, req.inputs)
+        res = lite_llm_completion(
+            api_key,
+            req.inputs,
+            isBedrock,
+        )
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
