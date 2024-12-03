@@ -8,6 +8,7 @@ import {
   GridColumnGroupingModel,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -17,13 +18,18 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
 import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
-} from '../CallPage/TraceUsageStats';
+  getCostsFromCellParams,
+  getTokensFromCellParams,
+} from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -43,7 +49,11 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
+  'summary.usage',
+  'summary.weave',
+  'feedback',
+];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -55,7 +65,8 @@ export const useCallsTableColumns = (
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -131,7 +142,8 @@ export const useCallsTableColumns = (
         columnIsRefExpanded,
         userDefinedColumnWidths,
         allowedColumnPatterns,
-        onAddFilter
+        onAddFilter,
+        costsLoading
       ),
     [
       entity,
@@ -148,6 +160,7 @@ export const useCallsTableColumns = (
       userDefinedColumnWidths,
       allowedColumnPatterns,
       onAddFilter,
+      costsLoading,
     ]
   );
 
@@ -172,7 +185,8 @@ function buildCallsTableColumns(
   columnIsRefExpanded: (col: string) => boolean,
   userDefinedColumnWidths: Record<string, number>,
   allowedColumnPatterns?: string[],
-  onAddFilter?: OnAddFilter
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -215,6 +229,7 @@ function buildCallsTableColumns(
           rowParams.row.display_name ??
           opVersionRefOpName(rowParams.row.op_name) ??
           rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
@@ -224,6 +239,7 @@ function buildCallsTableColumns(
             fullWidth={true}
             preservePath={preservePath}
             color={TEAL_600}
+            isEval={isEval}
           />
         );
       },
@@ -322,6 +338,47 @@ function buildCallsTableColumns(
   );
   cols.push(...newCols);
 
+  // Create special feedback columns with grouping model
+  const annotationColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith('summary.weave.feedback.wandb.annotation') &&
+      c.endsWith('payload.value')
+  );
+  if (annotationColNames.length > 0) {
+    // Add feedback group to grouping model
+    groupingModel.push({
+      groupId: 'feedback',
+      headerName: 'Annotations',
+      children: annotationColNames.map(col => ({
+        field: convertFeedbackFieldToBackendFilter(col),
+      })),
+    });
+
+    // Add feedback columns
+    const annotationColumns: Array<GridColDef<TraceCallSchema>> =
+      annotationColNames.map(c => {
+        const parsed = parseFeedbackType(c);
+        return {
+          field: convertFeedbackFieldToBackendFilter(c),
+          headerName: parsed ? parsed.displayName : `${c}`,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed ? parsed.userDefinedType : c}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            if (typeof params.value === 'boolean') {
+              return <div>{params.value ? 'true' : 'false'}</div>;
+            }
+            return <div>{params.value}</div>;
+          },
+        };
+      });
+    cols.push(...annotationColumns);
+  }
+
   cols.push({
     field: 'wb_user_id',
     headerName: 'User',
@@ -388,17 +445,18 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: (unused: any, row: any) => {
-      const usage = getUsageFromCellParams(row);
-      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      const {tokensNum} = getTokensFromCellParams(row);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
+      const {tokens, tokenToolTipContent} = getTokensFromCellParams(
+        cellParams.row
+      );
+      return (
+        <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTipContent} />
+      );
     },
   });
-
   cols.push({
     field: 'cost',
     headerName: 'Cost',
@@ -409,14 +467,17 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: (unused: any, row: any) => {
-      const usage = getUsageFromCellParams(row);
-      const {costNum} = getTokensAndCostFromUsage(usage);
+      const {costNum} = getCostsFromCellParams(row);
       return costNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
+      if (costsLoading) {
+        return <LoadingDots />;
+      }
+      const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
+      return (
+        <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
+      );
     },
   });
 

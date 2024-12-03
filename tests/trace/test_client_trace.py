@@ -4,10 +4,10 @@ import json
 import platform
 import sys
 import time
-import typing
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
+from typing import Any, Callable
 
 import pytest
 import wandb
@@ -23,10 +23,15 @@ from tests.trace.util import (
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -35,7 +40,6 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
-from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
 ## Hacky interface compatibility helpers
 
@@ -240,12 +244,12 @@ def test_graph_call_ordering(client):
 
 
 class OpCallSummary(BaseModel):
-    op: typing.Callable
+    op: Callable
     num_calls: int = 0
 
 
 class OpCallSpec(BaseModel):
-    call_summaries: typing.Dict[str, OpCallSummary]
+    call_summaries: dict[str, OpCallSummary]
     total_calls: int
     root_calls: int
     run_calls: int
@@ -283,7 +287,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
-    result: typing.Dict[str, OpCallSummary] = {}
+    result: dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
     result["adder"] = OpCallSummary(op=adder)
     result["subtractor"] = OpCallSummary(op=subtractor)
@@ -330,7 +334,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     run_calls += num_calls * 3
     root_calls += num_calls
 
-    total_calls = sum([op_call.num_calls for op_call in result.values()])
+    total_calls = sum(op_call.num_calls for op_call in result.values())
 
     return OpCallSpec(
         call_summaries=result,
@@ -404,11 +408,11 @@ def test_trace_call_query_filter_op_version_refs(client):
         assert len(res.calls) == exp_count
 
 
-def has_any(list_a: typing.List[str], list_b: typing.List[str]) -> bool:
-    return any([a in list_b for a in list_a])
+def has_any(list_a: list[str], list_b: list[str]) -> bool:
+    return any(a in list_b for a in list_a)
 
 
-def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
+def unique_vals(list_a: list[str]) -> list[str]:
     return list(set(list_a))
 
 
@@ -421,7 +425,7 @@ def get_all_calls_asserting_finished(
         )
     )
     assert len(res.calls) == call_spec.total_calls
-    assert all([call.ended_at for call in res.calls])
+    assert all(call.ended_at for call in res.calls)
     return res
 
 
@@ -1124,10 +1128,10 @@ def test_trace_call_filter(client):
         print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -1137,10 +1141,10 @@ def test_trace_call_filter(client):
             )
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -1439,7 +1443,7 @@ def test_named_reuse(client):
     dataset = weave.ref(d_ref.uri()).get()
 
     @weave.op()
-    async def dummy_score(model_output):
+    async def dummy_score(output):
         return 1
 
     class SimpleModel(weave.Model):
@@ -1473,25 +1477,23 @@ def test_named_reuse(client):
 
 
 def test_unknown_input_and_output_types(client):
-    class MyUnserializableClassA:
+    class MyUnknownClassA:
         a_val: float
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
-    class MyUnserializableClassB:
+    class MyUnknownClassB:
         b_val: float
 
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
     @weave.op()
-    def op_with_unknown_types(
-        a: MyUnserializableClassA, b: float
-    ) -> MyUnserializableClassB:
-        return MyUnserializableClassB(a.a_val + b)
+    def op_with_unknown_types(a: MyUnknownClassA, b: float) -> MyUnknownClassB:
+        return MyUnknownClassB(a.a_val + b)
 
-    a = MyUnserializableClassA(3)
+    a = MyUnknownClassA(3)
     res = op_with_unknown_types(a, 0.14)
 
     assert res.b_val == 3.14
@@ -1511,18 +1513,18 @@ def test_unknown_input_and_output_types(client):
 
 
 def test_unknown_attribute(client):
-    class MyUnserializableClass:
+    class MyUnknownClass:
         val: int
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
     class MySerializableClass(weave.Object):
-        obj: MyUnserializableClass
+        obj: MyUnknownClass
 
-    a_obj = MyUnserializableClass(1)
+    a_obj = MyUnknownClass(1)
     a = MySerializableClass(obj=a_obj)
-    b_obj = MyUnserializableClass(2)
+    b_obj = MyUnknownClass(2)
     b = MySerializableClass(obj=b_obj)
 
     ref_a = weave.publish(a)
@@ -1537,12 +1539,12 @@ def test_unknown_attribute(client):
 
 @contextmanager
 def _no_graph_client():
-    client = weave.trace.client_context.weave_client.get_weave_client()
-    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    client = get_weave_client()
+    set_weave_client_global(None)
     try:
         yield
     finally:
-        weave.trace.client_context.weave_client.set_weave_client_global(client)
+        set_weave_client_global(client)
 
 
 @contextmanager
@@ -2241,7 +2243,7 @@ def test_sort_and_filter_through_refs(client):
         return val
 
     class TestObj(weave.Object):
-        val: typing.Any
+        val: Any
 
     def test_obj(val):
         return weave.publish(TestObj(val=val))
@@ -2329,21 +2331,23 @@ def test_sort_and_filter_through_refs(client):
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    sort_by=[tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")],
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "sort_by": [
+                        tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")
+                    ],
+                    "query": {"$expr": query},
+                }
             )
         )
 
         assert len(inner_res.calls) == count
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
-                dict(
-                    project_id=get_client_project_id(client),
-                    query={"$expr": query},
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
             )
         )
 
@@ -2372,10 +2376,10 @@ def test_in_operation(client):
 
     res = get_client_trace_server(client).calls_query_stats(
         tsi.CallsQueryStatsReq.model_validate(
-            dict(
-                project_id=get_client_project_id(client),
-                query={"$expr": query},
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
     )
     assert res.count == 2
@@ -2388,10 +2392,10 @@ def test_in_operation(client):
     }
     res = get_client_trace_server(client).calls_query_stream(
         tsi.CallsQueryReq.model_validate(
-            dict(
-                project_id=get_client_project_id(client),
-                query={"$expr": query},
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
     )
     res = list(res)
@@ -2659,18 +2663,16 @@ def test_object_with_disallowed_keys(client):
     assert obj.ref.name == "thing-with-disallowed-keys"
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
-
-    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
-        with pytest.raises(Exception):
-            client.server.obj_create(create_req)
+    with pytest.raises(InvalidFieldError):
+        client.server.obj_create(create_req)
 
 
 CHAR_LIMIT = 128
@@ -2686,13 +2688,13 @@ def test_object_with_char_limit(client):
     assert obj.ref.name == name
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
     client.server.obj_create(create_req)
 
@@ -2707,13 +2709,13 @@ def test_object_with_char_over_limit(client):
     assert obj.ref.name == name[:-1]
 
     create_req = tsi.ObjCreateReq.model_validate(
-        dict(
-            obj=dict(
-                project_id=client._project_id(),
-                object_id=name,
-                val={"1": 1},
-            )
-        )
+        {
+            "obj": {
+                "project_id": client._project_id(),
+                "object_id": name,
+                "val": {"1": 1},
+            }
+        }
     )
     with pytest.raises(Exception):
         client.server.obj_create(create_req)
@@ -2980,7 +2982,7 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    weave.trace.client_context.weave_client.set_weave_client_global(None)
+    set_weave_client_global(None)
     weave.trace.weave_init._current_inited_client = (
         weave.trace.weave_init.InitializedClient(client)
     )

@@ -7,7 +7,8 @@
 import contextlib
 import contextvars
 import dataclasses
-import typing
+from collections.abc import Generator
+from typing import Any, Optional
 
 import aiohttp
 import gql
@@ -26,29 +27,29 @@ from weave.trace import env
 # for this symbol.
 @dataclasses.dataclass
 class WandbApiContext:
-    user_id: typing.Optional[str] = None  # TODO: delete
-    api_key: typing.Optional[str] = None
-    headers: typing.Optional[dict[str, str]] = None  # TODO: delete
-    cookies: typing.Optional[dict[str, str]] = None  # TODO: delete
+    user_id: Optional[str] = None  # TODO: delete
+    api_key: Optional[str] = None
+    headers: Optional[dict[str, str]] = None  # TODO: delete
+    cookies: Optional[dict[str, str]] = None  # TODO: delete
 
     @classmethod
-    def from_json(cls, json: typing.Any) -> "WandbApiContext":
+    def from_json(cls, json: Any) -> "WandbApiContext":
         return cls(**json)
 
-    def to_json(self) -> typing.Any:
+    def to_json(self) -> Any:
         return dataclasses.asdict(self)
 
 
 ## wandb_api.py context
-_wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = (
+_wandb_api_context: contextvars.ContextVar[Optional[WandbApiContext]] = (
     contextvars.ContextVar("wandb_api_context", default=None)
 )
 
 
 def set_wandb_thread_local_api_settings(
-    api_key: typing.Optional[str],
-    cookies: typing.Optional[typing.Dict],
-    headers: typing.Optional[typing.Dict],
+    api_key: Optional[str],
+    cookies: Optional[dict],
+    headers: Optional[dict],
 ) -> None:
     _thread_local_api_settings.api_key = api_key
     _thread_local_api_settings.cookies = cookies
@@ -62,11 +63,11 @@ def reset_wandb_thread_local_api_settings() -> None:
 
 
 def set_wandb_api_context(
-    user_id: typing.Optional[str],
-    api_key: typing.Optional[str],
-    headers: typing.Optional[dict],
-    cookies: typing.Optional[dict],
-) -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
+    user_id: Optional[str],
+    api_key: Optional[str],
+    headers: Optional[dict],
+    cookies: Optional[dict],
+) -> Optional[contextvars.Token[Optional[WandbApiContext]]]:
     cur_ctx = get_wandb_api_context()
     if cur_ctx:
         # WANDB API context is only allowed to be set once per thread, since we
@@ -78,7 +79,7 @@ def set_wandb_api_context(
 
 
 def reset_wandb_api_context(
-    token: typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]],
+    token: Optional[contextvars.Token[Optional[WandbApiContext]]],
 ) -> None:
     if token is None:
         return
@@ -89,8 +90,8 @@ def reset_wandb_api_context(
 # api.py
 @contextlib.contextmanager
 def wandb_api_context(
-    ctx: typing.Optional[WandbApiContext],
-) -> typing.Generator[None, None, None]:
+    ctx: Optional[WandbApiContext],
+) -> Generator[None, None, None]:
     if ctx:
         token = set_wandb_api_context(
             ctx.user_id, ctx.api_key, ctx.headers, ctx.cookies
@@ -103,11 +104,11 @@ def wandb_api_context(
 
 
 # api.py, weave_init.py
-def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
+def get_wandb_api_context() -> Optional[WandbApiContext]:
     return _wandb_api_context.get()
 
 
-def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]]]:
+def init() -> Optional[contextvars.Token[Optional[WandbApiContext]]]:
     api_key = env.weave_wandb_api_key()
     if api_key:
         return set_wandb_api_context("admin", api_key, None, None)
@@ -115,7 +116,7 @@ def init() -> typing.Optional[contextvars.Token[typing.Optional[WandbApiContext]
 
 
 @contextlib.contextmanager
-def from_environment() -> typing.Generator[None, None, None]:
+def from_environment() -> Generator[None, None, None]:
     token = init()
     try:
         yield
@@ -128,9 +129,7 @@ class WandbApiAsync:
     def __init__(self) -> None:
         self.connector = aiohttp.TCPConnector(limit=50)
 
-    async def query(
-        self, query: graphql.DocumentNode, **kwargs: typing.Any
-    ) -> typing.Any:
+    async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         wandb_context = get_wandb_api_context()
         headers = None
         cookies = None
@@ -178,7 +177,7 @@ class WandbApiAsync:
         """
     )
 
-    async def server_info(self) -> typing.Any:
+    async def server_info(self) -> Any:
         return await self.query(self.SERVER_INFO_QUERY)
 
     ARTIFACT_MANIFEST_QUERY = gql.gql(
@@ -204,7 +203,7 @@ class WandbApiAsync:
 
     async def artifact_manifest_url(
         self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    ) -> Optional[str]:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -245,7 +244,7 @@ class WandbApiAsync:
         """
     )
 
-    async def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
+    async def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
@@ -275,7 +274,7 @@ class WandbApiAsync:
         """
     )
 
-    async def default_entity_name(self) -> typing.Optional[str]:
+    async def default_entity_name(self) -> Optional[str]:
         try:
             result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -294,9 +293,7 @@ class WandbApiAsync:
         """
     )
 
-    async def can_access_entity(
-        self, entity: str, api_key: typing.Optional[str]
-    ) -> bool:
+    async def can_access_entity(self, entity: str, api_key: Optional[str]) -> bool:
         try:
             result = await self.query(
                 self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
@@ -310,7 +307,7 @@ class WandbApiAsync:
 
 
 class WandbApi:
-    def query(self, query: graphql.DocumentNode, **kwargs: typing.Any) -> typing.Any:
+    def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         wandb_context = get_wandb_api_context()
         headers = None
         cookies = None
@@ -344,7 +341,7 @@ class WandbApi:
         """
     )
 
-    def server_info(self) -> typing.Any:
+    def server_info(self) -> Any:
         return self.query(self.SERVER_INFO_QUERY)
 
     ARTIFACT_MANIFEST_QUERY = gql.gql(
@@ -370,7 +367,7 @@ class WandbApi:
 
     def artifact_manifest_url(
         self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    ) -> Optional[str]:
         try:
             result = self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -411,7 +408,7 @@ class WandbApi:
         """
     )
 
-    def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
+    def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
         try:
             result = self.query(self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -440,7 +437,7 @@ class WandbApi:
         """
     )
 
-    def default_entity_name(self) -> typing.Optional[str]:
+    def default_entity_name(self) -> Optional[str]:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -450,7 +447,7 @@ class WandbApi:
         except AttributeError:
             return None
 
-    def username(self) -> typing.Optional[str]:
+    def username(self) -> Optional[str]:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:

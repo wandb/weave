@@ -12,7 +12,7 @@ This document outlines how to publish a new Weave release to our public [PyPI pa
    - Both of these commits will be pushed to master
    - Note: if you need to make a new minor or major release, you can do these steps manually with 2 PRs modifying the files in `weave/version.py` and `weave/pyproject.toml`
 
-4. Go to the [publish-pypi-release](https://github.com/wandb/weave/actions/workflows/release.yaml) GitHub action and trigger a new release from the `x.y.z` branch (NOT MASTER). For riskier releases, make sure `Use Test PyPI` is checked so we first publish a test package.
+4. Go to the [publish-pypi-release](https://github.com/wandb/weave/actions/workflows/release.yaml) GitHub action and trigger a new release from the `x.y.z` tag (NOT MASTER). For riskier releases, make sure `Use Test PyPI` is checked so we first publish a test package to [test.pypi.org](https://test.pypi.org/project/weave/#history).
 
 5. Verify the new version of Weave exists in [PyPI](https://pypi.org/project/weave/) once it is complete.
 

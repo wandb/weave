@@ -152,8 +152,8 @@ const AddEvaluationButton: React.FC<{
     props.state.data.project,
     evaluationsFilter,
     DEFAULT_FILTER_CALLS,
-    DEFAULT_SORT_CALLS,
     page,
+    DEFAULT_SORT_CALLS,
     expandedRefCols,
     columns
   );

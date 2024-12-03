@@ -18,9 +18,9 @@ import React, {
   useState,
 } from 'react';
 
+import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
@@ -73,7 +73,7 @@ type RefValues = Record<string, any>; // ref URI to value
 
 type TruncatedStore = {[key: string]: {values: any; index: number}};
 
-const RESOVLED_REF_KEY = '_ref';
+const RESOLVED_REF_KEY = '_ref';
 
 export const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
@@ -100,9 +100,11 @@ export const ObjectViewer = ({
   const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
 
   // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
-  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
-  // are the paths at which the refs were expanded.
-  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+  // this might contain nested refs not in the `dataRefs` set. The keys are object paths at which the refs were expanded
+  // and the values are the corresponding ref string.
+  const [expandedRefs, setExpandedRefs] = useState<{[path: string]: string}>(
+    {}
+  );
 
   // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
   const addExpandedRef = useCallback((path: string, ref: string) => {
@@ -163,13 +165,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         }
       }
@@ -182,7 +184,7 @@ export const ObjectViewer = ({
         isWeaveRef(context.value) &&
         refValues[context.value] != null &&
         // Don't expand _ref keys
-        context.path.tail() !== RESOVLED_REF_KEY
+        context.path.tail() !== RESOLVED_REF_KEY
       ) {
         dirty = true;
         return refValues[context.value];
@@ -647,7 +649,7 @@ const ShowMoreButtons = ({
       sx={{
         display: 'flex',
         width: '100%',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
         gap: 1,
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (

@@ -13,7 +13,11 @@ import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallFilter,
+  CallSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
+import {addCostsToCallResults} from './cost';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
@@ -29,7 +33,8 @@ export const CallTraceView: FC<{
   rows: Row[];
   forcedExpandKeys: Set<string>;
   path?: string;
-}> = ({call, selectedCall, rows, forcedExpandKeys, path}) => {
+  costLoading: boolean;
+}> = ({call, selectedCall, rows, forcedExpandKeys, path, costLoading}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -55,6 +60,7 @@ export const CallTraceView: FC<{
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
           {...params}
+          costLoading={costLoading}
           onClick={event => {
             setExpandKeys(curr => {
               if (curr.has(params.row.id)) {
@@ -69,7 +75,7 @@ export const CallTraceView: FC<{
         />
       ),
     }),
-    []
+    [costLoading]
   );
 
   const [suppressScroll, setSuppressScroll] = useState(false);
@@ -381,10 +387,44 @@ export const useCallFlattenedTraceTree = (
     () => traceCalls.result ?? [],
     [traceCalls.result]
   );
-  const traceCallMap = useMemo(
-    () => _.keyBy(traceCallsResult, 'callId'),
-    [traceCallsResult]
+
+  const costFilter: CallFilter = useMemo(
+    () => ({
+      callIds:
+        traceCallsResult && traceCallsResult.length < 1000
+          ? traceCallsResult.map(c => c.traceCall?.id || '')
+          : undefined,
+      traceId: call.traceId,
+    }),
+    [traceCallsResult, call.traceId]
   );
+
+  const costCols = useMemo(() => ['id'], []);
+  const costs = useCalls(
+    call.entity,
+    call.project,
+    costFilter,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    costCols,
+    undefined,
+    {
+      skip: traceCalls.loading,
+      includeCosts: true,
+    }
+  );
+
+  const costResult = useMemo(() => {
+    return addCostsToCallResults(traceCallsResult, costs.result ?? []);
+  }, [costs.result, traceCallsResult]);
+
+  const traceCallMap = useMemo(() => {
+    const result = costResult.length > 0 ? costResult : traceCallsResult;
+    return _.keyBy(result, 'callId');
+  }, [costResult, traceCallsResult]);
+
   const childCallLookup = useMemo(() => {
     const lookup: Record<string, string[]> = {};
     for (const c of traceCallsResult) {
@@ -397,14 +437,26 @@ export const useCallFlattenedTraceTree = (
     }
     return lookup;
   }, [traceCallsResult]);
+
+  // Update the main call to the one with costs
+  const mainCall = useMemo(() => {
+    let mainCallTemp: CallSchema = call;
+    for (const c of costResult) {
+      if (c.callId === mainCallTemp.callId) {
+        mainCallTemp = c;
+      }
+    }
+    return mainCallTemp;
+  }, [costResult, call]);
+
   return useMemo(() => {
     let selectedCall = null;
     let selectedCallSimilarity = Number.POSITIVE_INFINITY;
 
     const rows: Row[] = [];
     // Ascend to the root
-    let currentCall: CallSchema | null = call;
-    let lastCall: CallSchema = call;
+    let currentCall: CallSchema | null = mainCall;
+    let lastCall: CallSchema = mainCall;
 
     let pathPrefix = '';
     while (currentCall != null) {
@@ -415,13 +467,22 @@ export const useCallFlattenedTraceTree = (
         childCallLookup
       );
       pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
-      currentCall = currentCall.parentId
-        ? traceCallMap[currentCall.parentId]
-        : null;
+      if (currentCall.parentId) {
+        if (!traceCallMap[currentCall.parentId]) {
+          // Cant find parent, assume it doesn't exist
+          currentCall.parentId = null;
+        } else {
+          currentCall = traceCallMap[currentCall.parentId];
+        }
+      } else {
+        currentCall = null;
+      }
     }
 
     // Add a parent row
-    const parentCall = call.parentId ? traceCallMap[call.parentId] : null;
+    const parentCall = mainCall.parentId
+      ? traceCallMap[mainCall.parentId]
+      : null;
     if (parentCall) {
       rows.push({
         id: parentCall.callId,
@@ -441,8 +502,8 @@ export const useCallFlattenedTraceTree = (
       path: string;
     }> = [
       {
-        targetCall: call,
-        parentHierarchy: call.parentId ? [call.parentId] : [],
+        targetCall: mainCall,
+        parentHierarchy: mainCall.parentId ? [mainCall.parentId] : [],
         path: pathPrefix,
       },
     ];
@@ -489,7 +550,7 @@ export const useCallFlattenedTraceTree = (
         rows.push({
           id: 'HIDDEN_SIBLING_COUNT',
           count: siblingCount,
-          hierarchy: [call.parentId!, 'HIDDEN_SIBLING_COUNT'],
+          hierarchy: [mainCall.parentId!, 'HIDDEN_SIBLING_COUNT'],
         });
       }
     }
@@ -523,7 +584,7 @@ export const useCallFlattenedTraceTree = (
     }
 
     if (!selectedCall) {
-      selectedCall = call;
+      selectedCall = mainCall;
     }
 
     // Epand the path to the selected call.
@@ -535,14 +596,20 @@ export const useCallFlattenedTraceTree = (
         ? traceCallMap[callToExpand.parentId]
         : null;
     }
-
-    return {rows, selectedCall, expandKeys, loading: traceCalls.loading};
+    return {
+      rows,
+      selectedCall,
+      expandKeys,
+      loading: traceCalls.loading,
+      costLoading: costs.loading,
+    };
   }, [
-    call,
+    mainCall,
     childCallLookup,
     traceCallMap,
     traceCallsResult,
     selectedPath,
     traceCalls.loading,
+    costs.loading,
   ]);
 };

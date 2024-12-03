@@ -8,19 +8,17 @@ and that we don't interfere with the user's own Sentry SDK setup.
 This file is a trimmed down version of the original WandB Sentry module.
 """
 
+from __future__ import annotations
+
 __all__ = ("Sentry",)
+
 
 import atexit
 import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
-
-if sys.version_info >= (3, 8):
-    from typing import Literal
-else:
-    from typing_extensions import Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
@@ -38,7 +36,7 @@ def _safe_noop(func: Callable) -> Callable:
     """Decorator to ensure that Sentry methods do nothing if disabled and don't raise."""
 
     @functools.wraps(func)
-    def wrapper(self: Type["Sentry"], *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: type[Sentry], *args: Any, **kwargs: Any) -> Any:
         if self._disabled:
             return None
         try:
@@ -60,7 +58,7 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: Optional[sentry_sdk.hub.Hub] = None
+        self.hub: sentry_sdk.hub.Hub | None = None
 
         self._disabled = False
 
@@ -103,14 +101,9 @@ class Sentry:
     @_safe_noop
     def exception(
         self,
-        exc: Union[
-            str,
-            BaseException,
-            "ExcInfo",
-            None,
-        ],
+        exc: str | BaseException | ExcInfo | None,
         handled: bool = False,
-        status: Optional["SessionStatus"] = None,
+        status: SessionStatus | None = None,
     ) -> None:
         """Log an exception to Sentry."""
         error = Exception(exc) if isinstance(exc, str) else exc
@@ -166,7 +159,7 @@ class Sentry:
             client.flush()
 
     @_safe_noop
-    def mark_session(self, status: Optional["SessionStatus"] = None) -> None:
+    def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
         assert self.hub is not None
         _, scope = self.hub._stack[-1]
@@ -178,7 +171,7 @@ class Sentry:
     @_safe_noop
     def configure_scope(
         self,
-        tags: Optional[Dict[str, Any]] = None,
+        tags: dict[str, Any] | None = None,
     ) -> None:
         """Configure the Sentry scope for the current thread.
 

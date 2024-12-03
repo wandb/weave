@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "es2018",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "paths": {
+      "weave": ["./src/index.ts"]
+    },
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "examples",
+    "dist",
+    "node_modules",
+    "src/integrations/checkOpenai.ts"
+  ]
+  // "references": [
+  //   {
+  //     "path": "./src/tsconfig.src.json"
+  //   },
+  //   {
+  //     "path": "./examples/tsconfig.examples.json"
+  //   }
+  // ]
+}
