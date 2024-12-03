@@ -25,6 +25,7 @@ def get_preparer_for_obj(obj: Any) -> ObjectPreparer | None:
     for initializer in _object_preparers:
         if initializer.should_prepare(obj):
             return initializer
+    return None
 
 
 def prepare_obj(obj: Any) -> None:
