@@ -380,6 +380,7 @@ const ArrayField: React.FC<{
       ))}
       <Button
         variant="secondary"
+        style={{padding: '4px', width: '100%'}}
         onClick={() =>
           addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
