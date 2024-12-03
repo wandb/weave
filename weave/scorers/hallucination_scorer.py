@@ -294,6 +294,7 @@ class HallucinationScorer(Scorer):
                     torch_dtype="bfloat16",
                     trust_remote_code=True
                 ).to(self.device)
+                self.tokenizer = self.llm_model.tokenzier
             else:
                 self.llm_model = AutoModelForCausalLM.from_pretrained(
                     self._local_model_path, 
@@ -304,8 +305,6 @@ class HallucinationScorer(Scorer):
                     self.llm_model.generation_config.cache_implementation = "static"
                     self.llm_model = torch.compile(self.llm_model, backend="inductor", fullgraph=True)
 
-        self.tokenizer = self.llm_model.tokenzier
-        
         if self.tokenizer is None:
             self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path, 
                                                            model_max_length=self.model_max_length)
