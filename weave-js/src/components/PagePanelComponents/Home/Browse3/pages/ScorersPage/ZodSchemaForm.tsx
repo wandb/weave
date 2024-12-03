@@ -153,7 +153,16 @@ const NestedForm: React.FC<{
   setConfig: (config: Record<string, any>) => void;
   path: string[];
   hideLabel?: boolean;
-}> = ({keyName, fieldSchema, config, setConfig, path, hideLabel}) => {
+  autoFocus?: boolean;
+}> = ({
+  keyName,
+  fieldSchema,
+  config,
+  setConfig,
+  path,
+  hideLabel,
+  autoFocus,
+}) => {
   const currentPath = [...path, keyName];
   const currentValue = getNestedValue(config, currentPath);
 
@@ -287,6 +296,7 @@ const NestedForm: React.FC<{
       type={fieldType}
       value={currentValue ?? ''}
       onChange={value => updateConfig(currentPath, value, config, setConfig)}
+      autoFocus={autoFocus}
     />
   );
 };
@@ -361,6 +371,7 @@ const ArrayField: React.FC<{
                 }}
                 path={[]}
                 hideLabel
+                autoFocus={index === arrayValue.length - 1}
               />
             </Box>
             <Box mb={2} ml={1}>
