@@ -754,7 +754,6 @@ def make_trace_obj(
     else:
         if hasattr(box_val, "ref"):
             setattr(box_val, "ref", new_ref)
-        prepare_obj(box_val)
     return box_val
 
 
