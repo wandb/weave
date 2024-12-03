@@ -3,14 +3,12 @@
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
-dependencies_met = False
-
 try:
     from PIL import Image
-
-    dependencies_met = True
 except ImportError:
-    pass
+    dependencies_met = False
+else:
+    dependencies_met = True
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
