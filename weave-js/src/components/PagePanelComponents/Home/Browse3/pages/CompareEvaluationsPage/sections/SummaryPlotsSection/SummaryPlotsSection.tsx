@@ -42,6 +42,7 @@ export const SummaryPlots: React.FC<{
   }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
 
   const filteredData = useFilteredData(radarData, selectedMetrics);
+  const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
   const barPlotData = useBarPlotData(filteredData);
 
   const {
@@ -53,7 +54,12 @@ export const SummaryPlots: React.FC<{
   } = useContainerDimensions();
 
   const {plotsToShow, totalPlots, startIndex, endIndex, totalPages} =
-    usePaginatedPlots(filteredData, barPlotData, plotsPerPage, currentPage);
+    usePaginatedPlots(
+      normalizedRadarData,
+      barPlotData,
+      plotsPerPage,
+      currentPage
+    );
 
   // Render placeholder during initial render
   if (isInitialRender) {
@@ -230,6 +236,54 @@ const useFilteredData = (
     }
     return data;
   }, [radarData, selectedMetrics]);
+
+function normalizeDataForRadarPlot(radarData: RadarPlotData): RadarPlotData {
+  // First collect all values for each metric across all calls
+  const metricValues: {[metric: string]: number[]} = {};
+
+  // Gather all values for each metric
+  Object.values(radarData).forEach(callData => {
+    Object.entries(callData.metrics).forEach(([metric, value]) => {
+      if (!metricValues[metric]) {
+        metricValues[metric] = [];
+      }
+      metricValues[metric].push(value);
+    });
+  });
+
+  // Find min/max for each metric
+  const metricRanges: {[metric: string]: {min: number; max: number}} = {};
+  Object.entries(metricValues).forEach(([metric, values]) => {
+    metricRanges[metric] = {
+      min: Math.min(...values),
+      max: Math.max(...values),
+    };
+  });
+
+  // Create normalized data structure
+  const normalizedData: RadarPlotData = {};
+
+  Object.entries(radarData).forEach(([callId, callData]) => {
+    normalizedData[callId] = {
+      name: callData.name,
+      color: callData.color,
+      metrics: {},
+    };
+
+    Object.entries(callData.metrics).forEach(([metric, value]) => {
+      const range = metricRanges[metric];
+      // If min and max are the same, set normalized value to 1
+      // Otherwise normalize to 0-1 range
+      const normalizedValue =
+        range.max === range.min
+          ? 1
+          : (value - range.min) / (range.max - range.min);
+      normalizedData[callId].metrics[metric] = normalizedValue;
+    });
+  });
+
+  return normalizedData;
+}
 
 const useBarPlotData = (filteredData: RadarPlotData) =>
   useMemo(() => {
