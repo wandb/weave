@@ -13,7 +13,6 @@ from weave.trace.weave_client import Call
 
 
 def autopatch(settings: AutopatchSettings | None = None) -> None:
-    from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
@@ -35,13 +34,13 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
 
     print(f"Autopatch with {settings=}")
 
-    openai_patcher = get_openai_patcher(settings.openai)
-    openai_patcher.attempt_patch()
+    if settings.openai.enabled:
+        get_openai_patcher(settings.openai).attempt_patch()
+
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
-    anthropic_patcher.attempt_patch()
     groq_patcher.attempt_patch()
     instructor_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
