@@ -149,7 +149,7 @@ export const CallsCharts = ({
         data.errors.push({started_at, isError: false});
       }
 
-      if (ended_at !== undefined) {
+      if (ended_at != null) {
         const startTime = new Date(started_at).getTime();
         const endTime = new Date(ended_at).getTime();
         const latency = endTime - startTime;

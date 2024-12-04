@@ -184,7 +184,7 @@ const useCallTabs = (call: CallSchema) => {
     ...(showScores
       ? [
           {
-            label: 'Scores (W&B Admin Preview)',
+            label: 'Scores',
             content: (
               <Tailwind>
                 <CallScoresViewer call={call} />

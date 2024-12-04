@@ -1,19 +1,40 @@
 """Defines the custom Image weave type."""
 
-from weave.trace import serializer
-from weave.trace.custom_objs import MemTraceFilesArtifact
+from __future__ import annotations
 
-dependencies_met = False
+import logging
+from typing import Any
+
+from weave.trace import object_preparers, serializer
+from weave.trace.custom_objs import MemTraceFilesArtifact
 
 try:
     from PIL import Image
-
-    dependencies_met = True
 except ImportError:
-    pass
+    dependencies_met = False
+else:
+    dependencies_met = True
+
+logger = logging.getLogger(__name__)
 
 
-def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
+class PILImagePreparer:
+    def should_prepare(self, obj: Any) -> bool:
+        return isinstance(obj, Image.Image)
+
+    def prepare(self, obj: Image.Image) -> None:
+        try:
+            # This load is necessary to ensure that the image is fully loaded into memory.
+            # If we don't do this, it's possible that only part of the data is loaded
+            # before the object is returned.  This can happen when trying to run an evaluation
+            # on a ref-get'd dataset with image columns.
+            obj.load()
+        except Exception as e:
+            logger.exception(f"Failed to load PIL Image: {e}")
+            raise
+
+
+def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".
     # There is an extensive internal discussion here:
     # https://weightsandbiases.slack.com/archives/C03BSTEBD7F/p1723670081582949
@@ -32,7 +53,7 @@ def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None
         obj.save(f, format="png")  # type: ignore
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
+def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
     # Note: I am purposely ignoring the `name` here and hard-coding the filename. See comment
     # on save.
     path = artifact.path("image.png")
@@ -42,3 +63,4 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
 def register() -> None:
     if dependencies_met:
         serializer.register_serializer(Image.Image, save, load)
+        object_preparers.register(PILImagePreparer())

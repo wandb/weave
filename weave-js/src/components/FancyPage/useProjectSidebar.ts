@@ -43,6 +43,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Overview',
+            slug: 'overview',
+            isShown: isModelsOnly,
+            iconName: IconNames.Info,
+          },
+          {
+            type: 'button' as const,
             name: 'Workspace',
             slug: 'workspace',
             isShown: !isWeaveOnly,
@@ -97,13 +104,6 @@ export const useProjectSidebar = (
             isShown: isModelsOnly,
             iconName: IconNames.VersionsLayers,
             isDisabled: viewingRestricted,
-          },
-          {
-            type: 'button' as const,
-            name: 'Overview',
-            slug: 'overview',
-            isShown: isModelsOnly,
-            iconName: IconNames.Info,
           },
           {
             type: 'menuPlaceholder' as const,
