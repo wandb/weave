@@ -46,5 +46,5 @@ CREATE TABLE feedback (
     */
     payload_dump String,
 
-) ENGINE = ReplacingMergeTree()
+) ENGINE = ReplicatedReplacingMergeTree()
 ORDER BY (project_id, weave_ref, wb_user_id, id);

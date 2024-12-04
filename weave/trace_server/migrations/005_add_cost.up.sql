@@ -59,5 +59,5 @@ CREATE TABLE llm_token_prices (
     */
     created_at DateTime64(3) DEFAULT now64(3),
 
-) ENGINE = MergeTree()
+) ENGINE = ReplicatedMergeTree()
 ORDER BY (pricing_level, pricing_level_id, provider_id, llm_id, effective_date);
