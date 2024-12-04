@@ -257,5 +257,6 @@ export const useProjectSidebar = (
     viewingRestricted,
     isModelsOnly,
     showWeaveSidebarItems,
+    isLaunchActive,
   ]);
 };
