@@ -11,7 +11,7 @@ export const useProjectSidebar = (
   hasWeaveData: boolean,
   hasTraceBackend: boolean = true,
   hasModelsAccess: boolean = true,
-  isLaunchActive: boolean = false,
+  isLaunchActive: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
