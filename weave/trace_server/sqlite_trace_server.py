@@ -653,8 +653,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     deleted_at = excluded.deleted_at
                 """,
                 (
-                    req.obj.project_id,
-                    req.obj.object_id,
+                    project_id,
+                    object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(val),
                     base_object_class,
