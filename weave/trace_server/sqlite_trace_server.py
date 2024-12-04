@@ -616,25 +616,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         json_val = json.dumps(val)
         digest = str_digest(json_val)
+        project_id, object_id = req.obj.project_id, req.obj.object_id
 
         # Validate
-        object_id_validator(req.obj.object_id)
+        object_id_validator(object_id)
 
-        # TODO: version index isn't right here, what if we delete stuff?
+        if self._obj_exists(cursor, project_id, object_id, digest):
+            return tsi.ObjCreateRes(digest=digest)
+
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            # Mark all existing objects with such id as not latest
-            cursor.execute(
-                """UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req.obj.object_id),
-            )
-            # first get version count
-            cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req.obj.object_id),
-            )
-            version_index = cursor.fetchone()[0]
-
+            self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
+            version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
                 """INSERT INTO objects (
                     project_id,
@@ -675,6 +668,42 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
         return tsi.ObjCreateRes(digest=digest)
+
+    def _obj_exists(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
+    ) -> bool:
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL",
+            (project_id, object_id, digest),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return False
+        return return_row[0] > 0
+
+    def _mark_existing_objects_as_not_latest(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> None:
+        """Mark all existing objects with such id as not latest.
+        We are creating a new object with the same id, all existing ones are no longer latest.
+        """
+        cursor.execute(
+            "UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+
+    def _get_obj_version_index(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> int:
+        """Get the version index for a new object with such id."""
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return 0
+        return return_row[0]
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [f"object_id = '{req.object_id}'"]
