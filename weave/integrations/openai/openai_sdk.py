@@ -379,7 +379,10 @@ def create_wrapper_async(
     return wrapper
 
 
-def get_openai_patcher(settings: IntegrationSettings) -> MultiPatcher:
+def get_openai_patcher(settings: IntegrationSettings | None = None) -> MultiPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
     symbol_patchers = [
         # Patch the Completions.create method
         SymbolPatcher(
