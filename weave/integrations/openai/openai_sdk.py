@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import importlib
 from dataclasses import asdict
 from functools import wraps
@@ -382,22 +383,24 @@ def get_openai_patcher(settings: IntegrationSettings | None = None) -> MultiPatc
     if settings is None:
         settings = IntegrationSettings()
 
-    completions_create_settings = settings.op_settings
-    if completions_create_settings.call_display_name is None:
-        completions_create_settings.call_display_name = "openai.chat.completions.create"
+    base = settings.op_settings
 
-    completions_parse_settings = settings.op_settings
-    if completions_parse_settings.call_display_name is None:
-        completions_parse_settings.call_display_name = (
-            "openai.beta.chat.completions.parse"
-        )
+    completions_create_settings = dataclasses.replace(
+        base,
+        call_display_name=base.call_display_name or "openai.chat.completions.create",
+    )
+    completions_parse_settings = dataclasses.replace(
+        base,
+        call_display_name=base.call_display_name
+        or "openai.beta.chat.completions.parse",
+    )
 
     symbol_patchers = [
         # Patch the Completions.create method
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.chat.completions"),
             "Completions.create",
-            create_wrapper_sync(settings=settings),
+            create_wrapper_sync(settings=completions_create_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.chat.completions"),
@@ -407,7 +410,7 @@ def get_openai_patcher(settings: IntegrationSettings | None = None) -> MultiPatc
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.beta.chat.completions"),
             "Completions.parse",
-            create_wrapper_sync(settings=settings),
+            create_wrapper_sync(settings=completions_parse_settings),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.beta.chat.completions"),
