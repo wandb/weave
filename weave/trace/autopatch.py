@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from anthropic import BaseModel
-
 from weave.trace.weave_client import Call
 
 
@@ -100,7 +98,7 @@ class IntegrationOpSettings:
 
 
 @dataclass
-class AutopatchSettings(BaseModel):
+class AutopatchSettings:
     """Settings for auto-patching integrations."""
 
     openai: IntegrationOpSettings = field(default_factory=IntegrationOpSettings)
