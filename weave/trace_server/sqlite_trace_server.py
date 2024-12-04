@@ -621,15 +621,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Validate
         object_id_validator(object_id)
 
-        if self._obj_exists(cursor, project_id, object_id, digest):
-            return tsi.ObjCreateRes(digest=digest)
-
         with self.lock:
+            if self._obj_exists(cursor, project_id, object_id, digest):
+                return tsi.ObjCreateRes(digest=digest)
+
             cursor.execute("BEGIN TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
-                """INSERT INTO objects (
+                """INSERT OR IGNORE INTO objects (
                     project_id,
                     object_id,
                     created_at,
