@@ -3,7 +3,7 @@ title: Leaderboard Quickstart
 ---
 
 
-:::tip[This is a notebook]
+:::tip[You can run this tutorial as a Jupyter Notebook]
 
 <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/leaderboard_quickstart.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
@@ -17,16 +17,28 @@ title: Leaderboard Quickstart
 
 # Leaderboard Quickstart
 
-In this notebook we will learn to use Weave's Leaderboard to compare model performance across different datasets and scoring functions. Specifically, we will:
+In this tutorial, you will learn how to use the Weave Leaderboard to compare model performance across different datasets and scoring functions. Specifically, you will:
 
-1. Generate a dataset of fake zip code data
-2. Author some scoring functions and evaluate a baseline model.
-3. Use these techniques to evaluate a matrix of models vs evaluations.
-4. Review the leaderboard in the Weave UI.
+1. Use an OpenAI model to generate a dataset of fake zip code data
+2. Create [Scorers](../../guides/evaluation/scorers.md) to score the model output.
+3. Use the dataset and Scorers to run [Evaluations](../../guides/core-types/evaluations.md) using a baseline model and 2 additional models for comparison.
+4. Create a Leaderboard in the Weave UI to view the results.
+
+Before you begin, ensure that you've completed the [prerequisites](#prerequisites).
+
+## Prerequisites
+
+- [A Weights & Biases account](https://app.wandb.ai/login?signup=true&_gl=1*1f6iyeh*_gcl_au*OTI3ODM1OTcyLjE3MzE0MzU1NjUuMTYxOTQ4Mzk1LjE3MzMyNTYwMTYuMTczMzI1NjAxNQ..*_ga*ODEyMjQ4MjkyLjE3MzE0MzU1NjU.*_ga_JH1SJHJQXJ*MTczMzM0Nzc5Ny42NC4xLjE3MzMzNTI1ODAuNjAuMC4w*_ga_GMYDGNGKDT*MTczMzM0Nzc5Ny41MC4xLjE3MzMzNTA1MjQuMC4wLjA.)
+- Python 3.7 or higher
+- The following Python libraries:
+  - `weave`
+  - `pydantic`
+  - `openai`
+- An OpenAI account and API key 
 
 ## Step 1: Generate a dataset of fake zip code data
 
-First we will create a function `generate_dataset_rows` that generates a list of fake zip code data.
+First, create a function `generate_dataset_rows` that uses OpenAI's `gpt-4o-mini` to generate a list of fake zip code data, where each data row is defined by the `Row` class.
 
 
 ```python
@@ -76,6 +88,7 @@ def generate_dataset_rows(
     return json.loads(completion.choices[0].message.content)["rows"]
 ```
 
+Then, create a new Weave project to start logging your model output to. 
 
 ```python
 import weave
@@ -85,13 +98,11 @@ weave.init("leaderboard-demo")
 
 ## Step 2: Author scoring functions
 
-Next we will author 3 scoring functions:
+Next, create 3 scoring functions to measure different aspects of model performance:
 
-1. `check_concrete_fields`: Checks if the model output matches the expected city and state.
-2. `check_value_fields`: Checks if the model output is within 10% of the expected population and median income.
-3. `check_subjective_fields`: Uses a LLM to check if the model output matches the expected "known for" field.
-
-
+- `check_concrete_fields`: Checks if the model output matches the expected `city` and `state`.
+- `check_value_fields`: Checks if the model output is within 10% of the expected `population` and `median_income`.
+- `check_subjective_fields`: Uses `gpt-4o-mini` to check if the model output matches the expected `known for` field.
 
 ```python
 @weave.op
@@ -144,9 +155,7 @@ def check_subjective_fields(zip_code: str, known_for: str, output: dict):
 
 ## Step 3: Create a simple Evaluation
 
-Next we define a simple evaliation using our fake data and scoring functions.
-
-
+Next, define an Evaluation using the fake zip code data and the 3 scoring functions.
 
 ```python
 rows = generate_dataset_rows()
@@ -161,11 +170,9 @@ evaluation = weave.Evaluation(
 )
 ```
 
-## Step 4: Evaluate a baseline model
+## Step 4: Define a baseline Model
 
-Now we will evaluate a baseline model which returns a static response.
-
-
+Now, define a baseline Model for the Evaluation that returns a static response.
 
 ```python
 @weave.op
@@ -183,10 +190,9 @@ def baseline_model(zip_code: str):
 await evaluation.evaluate(baseline_model)
 ```
 
-## Step 5: Create more Models
+## Step 5: Create Models for comparison
 
-Now we will create 2 more models to compare against the baseline.
-
+Next, create 2 additional Models, `gpt_4o_mini_no_context` and `gpt_4o_mini_with_context` to compare to the `baseline_model`.
 
 ```python
 @weave.op
@@ -210,7 +216,6 @@ def gpt_4o_mini_no_context(zip_code: str):
 
 await evaluation.evaluate(gpt_4o_mini_no_context)
 ```
-
 
 ```python
 @weave.op
@@ -247,11 +252,9 @@ def gpt_4o_mini_with_context(zip_code: str):
 await evaluation.evaluate(gpt_4o_mini_with_context)
 ```
 
-## Step 6: Create more Evaluations
+## Step 6: Create a matrix of models and Evaluations
 
-Now we will evaluate a matrix of models vs evaluations.
-
-
+Next, create a matrix that shows the result of different `evaluations` for the `baseline_ model`, `gpt_4o_mini_no_context`, and `gpt_4o_mini_with_context.` Each `evaluation` either varies the `location` or the `year` of the fake zip code data.
 
 ```python
 scorers = [
@@ -297,12 +300,18 @@ for evaluation in evaluations:
         )
 ```
 
-## Step 7: Review the Leaderboard
+## Step 7: Create a Leaderboard to view the results
 
-You can create a new leaderboard by navigating to the leaderboard tab in the UI and clicking "Create Leaderboard".
+To view your results, create a new Leaderboard. You can create a Leaderboard in the UI or using the SDK:
 
-We can also generate a leaderboard directly from Python:
+### Create a Leaderboard in the UI
 
+1. In the Weave UI, navigate to the **Leaderboard tab** 
+2. Click **Create Leaderboard**.
+
+### Create a Leaderboard using the SDK
+
+The following code creates a Leaderboard using the SDK.
 
 ```python
 from weave.flow import leaderboard
