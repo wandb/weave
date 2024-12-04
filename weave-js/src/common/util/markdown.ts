@@ -57,7 +57,6 @@ export function buildSanitizationSchema(rules?: SanitizationRules) {
 }
 
 export function generateHTML(markdown: string, rules?: SanitizationRules) {
-  console.log('generateHTML', markdown);
   const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
   const vfile = (
@@ -80,13 +79,9 @@ export function generateHTML(markdown: string, rules?: SanitizationRules) {
     .processSync(markdown);
 
   if (typeof vfile.value === 'string') {
-    console.log('generateHTML before blankifyLinks', vfile.value);
     vfile.value = blankifyLinks(vfile.value);
-    console.log('generateHTML after blankifyLinks', vfile.value);
     vfile.value = shiftHeadings(vfile.value);
-    console.log('generateHTML after shiftHeadings', vfile.value);
   }
-  console.log('generateHTML', vfile.value);
   return vfile;
 }
 
