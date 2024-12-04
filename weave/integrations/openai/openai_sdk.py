@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 from dataclasses import asdict
 from functools import wraps
@@ -46,7 +48,7 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
 
 def openai_on_finish_post_processor(
-    value: Optional["ChatCompletionChunk"],
+    value: Optional[ChatCompletionChunk],
 ) -> Optional[dict]:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
@@ -125,10 +127,10 @@ def openai_on_finish_post_processor(
 
 
 def openai_accumulator(
-    acc: Optional["ChatCompletionChunk"],
-    value: "ChatCompletionChunk",
+    acc: Optional[ChatCompletionChunk],
+    value: ChatCompletionChunk,
     skip_last: bool = False,
-) -> "ChatCompletionChunk":
+) -> ChatCompletionChunk:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -383,7 +385,10 @@ def get_openai_patcher(settings: IntegrationOpSettings) -> MultiPatcher:
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.chat.completions"),
             "Completions.create",
-            create_wrapper_sync(name="openai.chat.completions.create"),
+            create_wrapper_sync(
+                name="openai.chat.completions.create",
+                autopatch_settings=settings,
+            ),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("openai.resources.chat.completions"),
