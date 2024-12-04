@@ -85,24 +85,28 @@ def reset_autopatch() -> None:
 
 
 @dataclass
-class IntegrationOpSettings:
+class OpSettings:
     """Op settings for a specific integration.
 
     These currently subset the `op` decorator args to provide a consistent interface
     when working with auto-patched functions.  See the `op` decorator for more details."""
 
-    # Whether to enable the integration.
-    enabled: bool = True
-
-    # Op-level configuration
     call_display_name: str | Callable[[Call], str] | None = None
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     postprocess_output: Callable[[Any], Any] | None = None
 
 
 @dataclass
+class IntegrationSettings:
+    """Configuration for a specific integration."""
+
+    enabled: bool = True
+    op_settings: OpSettings = field(default_factory=OpSettings)
+
+
+@dataclass
 class AutopatchSettings:
     """Settings for auto-patching integrations."""
 
-    openai: IntegrationOpSettings = field(default_factory=IntegrationOpSettings)
-    anthropic: IntegrationOpSettings = field(default_factory=IntegrationOpSettings)
+    openai: IntegrationSettings = field(default_factory=IntegrationSettings)
+    anthropic: IntegrationSettings = field(default_factory=IntegrationSettings)
