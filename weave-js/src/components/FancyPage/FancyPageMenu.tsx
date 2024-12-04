@@ -44,7 +44,9 @@ export const FancyPageMenu = ({
             <ItemIcon color={colorIconBg}>
               <IconOverflowHorizontal />
             </ItemIcon>
-            <ItemLabel color={colorText}>More</ItemLabel>
+            <ItemLabel className="night-aware" color={colorText}>
+              More
+            </ItemLabel>
           </MenuButton>
         </div>
       </DropdownMenu.Trigger>

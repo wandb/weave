@@ -12,8 +12,7 @@ import {
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
-import {Radio} from '@wandb/weave/components';
-import {Switch} from '@wandb/weave/components';
+import {Radio, Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {
@@ -424,6 +423,29 @@ export const CompareEvaluationsTableButton: FC<{
   </Box>
 );
 
+export const CompareTracesTableButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  tooltipText?: string;
+}> = ({onClick, disabled, tooltipText}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-4"
+      size="medium"
+      variant="primary"
+      disabled={disabled}
+      onClick={onClick}
+      tooltip={tooltipText}>
+      Compare
+    </Button>
+  </Box>
+);
+
 export const BulkDeleteButton: FC<{
   disabled?: boolean;
   onClick: () => void;
@@ -462,7 +484,7 @@ export const RefreshButton: FC<{
         size="medium"
         onClick={onClick}
         tooltip="Refresh"
-        icon="randomize-reset-reload"
+        icon="reload-refresh"
       />
     </Box>
   );

@@ -73,17 +73,52 @@ def color_content(content: str, values: dict) -> str:
 
 class Prompt(Object):
     def format(self, **kwargs: Any) -> Any:
-        raise NotImplemented
-
-
-class MessagesPrompt(Prompt):
-    def format(self, **kwargs: Any) -> list:
-        raise NotImplemented
+        raise NotImplementedError("Subclasses must implement format()")
 
 
 class StringPrompt(Prompt):
+    content: str = ""
+
+    def __init__(self, content: str):
+        super().__init__()
+        self.content = content
+
     def format(self, **kwargs: Any) -> str:
-        raise NotImplemented
+        return self.content.format(**kwargs)
+
+    @classmethod
+    def from_obj(cls, obj: Any) -> "StringPrompt":
+        prompt = cls(content=obj.content)
+        prompt.name = obj.name
+        prompt.description = obj.description
+        return prompt
+
+
+class MessagesPrompt(Prompt):
+    messages: list[dict] = Field(default_factory=list)
+
+    def __init__(self, messages: list[dict]):
+        super().__init__()
+        self.messages = messages
+
+    def format_message(self, message: dict, **kwargs: Any) -> dict:
+        m = {}
+        for k, v in message.items():
+            if isinstance(v, str):
+                m[k] = v.format(**kwargs)
+            else:
+                m[k] = v
+        return m
+
+    def format(self, **kwargs: Any) -> list:
+        return [self.format_message(m, **kwargs) for m in self.messages]
+
+    @classmethod
+    def from_obj(cls, obj: Any) -> "MessagesPrompt":
+        prompt = cls(messages=obj.messages)
+        prompt.name = obj.name
+        prompt.description = obj.description
+        return prompt
 
 
 class EasyPrompt(UserList, Prompt):
@@ -384,13 +419,13 @@ class EasyPrompt(UserList, Prompt):
             "messages": list(self),
         }
 
-    @staticmethod
-    def from_obj(obj: Any) -> "EasyPrompt":
+    @classmethod
+    def from_obj(cls, obj: Any) -> "EasyPrompt":
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
         requirements = dict(obj.requirements)
-        return EasyPrompt(
+        return cls(
             name=obj.name,
             description=obj.description,
             messages=messages,

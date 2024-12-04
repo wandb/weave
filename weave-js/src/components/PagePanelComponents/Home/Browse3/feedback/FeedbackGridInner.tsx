@@ -40,7 +40,16 @@ export const FeedbackGridInner = ({
           return <CellValueString value={params.row.payload.note} />;
         }
         if (params.row.feedback_type === 'wandb.reaction.1') {
-          return params.row.payload.emoji;
+          return (
+            <span className="night-aware">{params.row.payload.emoji}</span>
+          );
+        }
+        if (params.row.feedback_type.startsWith('wandb.annotation.')) {
+          return (
+            <CellValueString
+              value={JSON.stringify(params.row.payload.value ?? null)}
+            />
+          );
         }
         return <CellValueString value={JSON.stringify(params.row.payload)} />;
       },

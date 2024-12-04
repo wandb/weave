@@ -32,12 +32,15 @@ export type ToolCall = {
     // Validate the arguments in your code before calling your function.
     arguments: string;
   };
+  response?: Message;
 };
 
 export type Message = {
   role: string;
   content?: string | MessagePart[];
   tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  original_index?: number;
 };
 
 export type Messages = Message[];
@@ -105,7 +108,9 @@ export type ChatCompletion = {
 export type Chat = {
   // TODO: Maybe optional information linking back to Call?
   isStructuredOutput: boolean;
-  request: ChatRequest;
+  // When the chat is created from a call, this will be the request.
+  // When the chat is created from an empty playground, this will be null.
+  request: ChatRequest | null;
   result: ChatCompletion | null;
 };
 
