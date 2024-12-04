@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {PopupProps} from 'semantic-ui-react';
 
 import {Tooltip} from '../Tooltip';
