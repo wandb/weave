@@ -10,7 +10,9 @@ import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {
+  FEEDBACK_EXPAND_PARAM,
   PATH_PARAM,
+  TRACETREE_PARAM,
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
@@ -280,6 +282,7 @@ export const CallLink: React.FC<{
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
+  isEval?: boolean;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -295,13 +298,24 @@ export const CallLink: React.FC<{
   const existingPath = peekParams.get(PATH_PARAM) ?? '';
   // Preserve the path only when showing trace tree
   const path = props.preservePath ? existingPath : null;
-
+  // default to true if not specified and not an eval
+  const traceTreeParam = peekParams.get(TRACETREE_PARAM);
+  const showTraceTree =
+    traceTreeParam === '1'
+      ? true
+      : traceTreeParam === '0'
+      ? false
+      : !props.isEval;
+  // default to false if not specified
+  const showFeedbackExpand = peekParams.get(FEEDBACK_EXPAND_PARAM) === '1';
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
     '',
     props.callId,
-    path
+    path,
+    showTraceTree,
+    showFeedbackExpand
   );
   const onClick = () => {
     history.push(to);

@@ -43,6 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",      # Used by scorers for field validation
 ]
 
 [project.optional-dependencies]
@@ -52,8 +53,11 @@ cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
-groq = ["groq>=0.9.0"]
-instructor = ["instructor>=1.4.3"]
+groq = ["groq>=0.13.0"]
+instructor = [
+  "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
+  "instructor>=1.4.3; python_version > '3.9'",
+]
 langchain = [
   "langchain-core>=0.2.1",
   "langchain-openai>=0.1.7",
@@ -79,6 +83,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
 test = [
   "nox",
   "pytest>=8.2.0",
@@ -90,7 +95,6 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
-  "jsonschema>=4.23.0",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -222,7 +226,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.20-dev0"
+current_version = "0.51.24-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

@@ -2,6 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
+import {useShowRunnableUI} from '../CallPage/CallPage';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {AnnotationsTab} from './AnnotationsTab';
 import {ProgrammaticScorersTab} from './CoreScorersTab';
@@ -22,6 +23,8 @@ export const ScorersPage: React.FC<{
     scorerTypeRecord.ANNOTATION.value
   );
 
+  const showRunnableUI = useShowRunnableUI();
+
   return (
     <>
       <SimplePageLayoutWithHeader
@@ -32,11 +35,15 @@ export const ScorersPage: React.FC<{
             icon: scorerTypeRecord.ANNOTATION.icon,
             content: <AnnotationsTab entity={entity} project={project} />,
           },
-          {
-            label: scorerTypeRecord.LLM_JUDGE.label + 's',
-            icon: scorerTypeRecord.LLM_JUDGE.icon,
-            content: <LLMJudgesTab entity={entity} project={project} />,
-          },
+          ...(showRunnableUI
+            ? [
+                {
+                  label: scorerTypeRecord.LLM_JUDGE.label + 's',
+                  icon: scorerTypeRecord.LLM_JUDGE.icon,
+                  content: <LLMJudgesTab entity={entity} project={project} />,
+                },
+              ]
+            : []),
           {
             label: scorerTypeRecord.PROGRAMMATIC.label + 's',
             icon: scorerTypeRecord.PROGRAMMATIC.icon,

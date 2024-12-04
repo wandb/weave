@@ -3,11 +3,8 @@ import {
   Checkbox,
   FormControl,
   FormControlLabel,
-  IconButton,
   InputLabel,
-  Tooltip,
 } from '@material-ui/core';
-import {Delete, Help} from '@mui/icons-material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
@@ -131,7 +128,6 @@ const DiscriminatedUnionField: React.FC<{
           label: currentType,
         }}
         onChange={v => {
-          console.log(v);
           handleTypeChange(v.value as string);
         }}
       />
@@ -156,7 +152,17 @@ const NestedForm: React.FC<{
   config: Record<string, any>;
   setConfig: (config: Record<string, any>) => void;
   path: string[];
-}> = ({keyName, fieldSchema, config, setConfig, path}) => {
+  hideLabel?: boolean;
+  autoFocus?: boolean;
+}> = ({
+  keyName,
+  fieldSchema,
+  config,
+  setConfig,
+  path,
+  hideLabel,
+  autoFocus,
+}) => {
   const currentPath = [...path, keyName];
   const currentValue = getNestedValue(config, currentPath);
 
@@ -180,7 +186,7 @@ const NestedForm: React.FC<{
       <FormControl
         fullWidth
         style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-        <Label label={keyName} />
+        {!hideLabel && <Label label={keyName} />}
         <Box ml={2}>
           <ZSForm
             configSchema={unwrappedSchema as z.ZodObject<any>}
@@ -286,10 +292,11 @@ const NestedForm: React.FC<{
 
   return (
     <TextFieldWithLabel
-      label={keyName}
+      label={!hideLabel ? keyName : undefined}
       type={fieldType}
       value={currentValue ?? ''}
       onChange={value => updateConfig(currentPath, value, config, setConfig)}
+      autoFocus={autoFocus}
     />
   );
 };
@@ -317,6 +324,7 @@ const ArrayField: React.FC<{
   );
   const minItems = unwrappedSchema._def.minLength?.value ?? 0;
   const elementSchema = unwrappedSchema.element;
+  const fieldDescription = getFieldDescription(fieldSchema);
 
   // Ensure the minimum number of items is always present
   React.useEffect(() => {
@@ -331,47 +339,63 @@ const ArrayField: React.FC<{
 
   return (
     <FormControl fullWidth style={{marginBottom: GAP_BETWEEN_ITEMS_PX + 'px'}}>
-      <Label label={keyName} />
+      <Box display="flex" alignItems="center" justifyContent="space-between">
+        <Label label={keyName} />
+        {fieldDescription && (
+          <DescriptionTooltip description={fieldDescription} />
+        )}
+      </Box>
       {arrayValue.map((item, index) => (
         <Box
           key={index}
           display="flex"
           flexDirection="column"
           alignItems="flex-start"
-          mb={2}
-          sx={{
-            borderBottom: '1px solid',
-            p: 2,
+          style={{
+            width: '100%',
+            gap: 4,
+            alignItems: 'center',
+            height: '35px',
+            marginBottom: '4px',
           }}>
-          <Box flexGrow={1} width="100%">
-            <NestedForm
-              keyName={`${index}`}
-              fieldSchema={elementSchema}
-              config={{[`${index}`]: item}}
-              setConfig={newItemConfig => {
-                const newArray = [...arrayValue];
-                newArray[index] = newItemConfig[`${index}`];
-                updateConfig(targetPath, newArray, config, setConfig);
-              }}
-              path={[]}
-            />
-          </Box>
-          <Box mt={1}>
-            <IconButton
-              onClick={() =>
-                removeArrayItem(targetPath, index, config, setConfig)
-              }
-              disabled={arrayValue.length <= minItems}>
-              <Delete />
-            </IconButton>
+          <Box flexGrow={1} width="100%" display="flex" alignItems="center">
+            <Box flexGrow={1}>
+              <NestedForm
+                keyName={`${index}`}
+                fieldSchema={elementSchema}
+                config={{[`${index}`]: item}}
+                setConfig={newItemConfig => {
+                  const newArray = [...arrayValue];
+                  newArray[index] = newItemConfig[`${index}`];
+                  updateConfig(targetPath, newArray, config, setConfig);
+                }}
+                path={[]}
+                hideLabel
+                autoFocus={index === arrayValue.length - 1}
+              />
+            </Box>
+            <Box mb={2} ml={1}>
+              <Button
+                size="small"
+                variant="ghost"
+                icon="delete"
+                tooltip="Remove this entry"
+                disabled={arrayValue.length <= minItems}
+                onClick={() =>
+                  removeArrayItem(targetPath, index, config, setConfig)
+                }
+              />
+            </Box>
           </Box>
         </Box>
       ))}
       <Button
+        variant="secondary"
+        style={{padding: '4px', width: '100%'}}
         onClick={() =>
           addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
-        Add Item
+        Add item
       </Button>
     </FormControl>
   );
@@ -619,23 +643,7 @@ const updateConfig = (
     }
     current = current[targetPath[i]];
   }
-
-  // Convert OrderedRecord to plain object if necessary
-  if (
-    value &&
-    typeof value === 'object' &&
-    'keys' in value &&
-    'values' in value
-  ) {
-    const plainObject: Record<string, any> = {};
-    value.keys.forEach((key: string) => {
-      plainObject[key] = value.values[key];
-    });
-    current[targetPath[targetPath.length - 1]] = plainObject;
-  } else {
-    current[targetPath[targetPath.length - 1]] = value;
-  }
-
+  current[targetPath[targetPath.length - 1]] = value;
   setConfig(newConfig);
 };
 
@@ -698,23 +706,37 @@ const NumberField: React.FC<{
   const max =
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
+  const fieldDescription = getFieldDescription(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
-    <TextFieldWithLabel
-      label={keyName}
-      type="number"
-      value={(value ?? '').toString()}
-      onChange={newValue => {
-        const finalValue = newValue === '' ? undefined : Number(newValue);
-        if (
-          finalValue !== undefined &&
-          (finalValue < min || finalValue > max)
-        ) {
-          return;
-        }
-        updateConfig(targetPath, finalValue, config, setConfig);
-      }}
-    />
+    <Box display="flex" alignContent="center" justifyContent="space-between">
+      <TextFieldWithLabel
+        label={keyName}
+        type="number"
+        value={(value ?? '').toString()}
+        style={{width: '100%'}}
+        isOptional={isOptional}
+        onChange={newValue => {
+          const finalValue = newValue === '' ? undefined : Number(newValue);
+          if (
+            finalValue !== undefined &&
+            (finalValue < min || finalValue > max)
+          ) {
+            return;
+          }
+          updateConfig(targetPath, finalValue, config, setConfig);
+        }}
+      />
+      {fieldDescription && (
+        <Box
+          display="flex"
+          alignItems="center"
+          sx={{marginTop: '14px', marginLeft: '2px'}}>
+          <DescriptionTooltip description={fieldDescription} />
+        </Box>
+      )}
+    </Box>
   );
 };
 
@@ -809,11 +831,12 @@ const DescriptionTooltip: React.FC<{description?: string}> = ({
     return null;
   }
   return (
-    <Tooltip title={description}>
-      <IconButton size="small">
-        <Help fontSize="small" />
-      </IconButton>
-    </Tooltip>
+    <Button
+      size="small"
+      variant="ghost"
+      icon="help-alt"
+      tooltip={description}
+    />
   );
 };
 
