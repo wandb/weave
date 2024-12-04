@@ -33,6 +33,8 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     if settings is None:
         settings = AutopatchSettings()
 
+    print(f"Autopatch with {settings=}")
+
     openai_patcher = get_openai_patcher(settings.openai)
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()

@@ -326,17 +326,19 @@ def create_wrapper_sync(
             return False
 
         op_kwargs = asdict(integration_settings.op_settings)
+        print(f"{op_kwargs=}")
         op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op.name = name  # type: ignore
-        op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
-        )
+        # op.name = name  # type: ignore
+        # op._set_on_input_handler(openai_on_input_handler)
+        return op
+        # return add_accumulator(
+        #     op,  # type: ignore
+        #     make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
+        #         acc, value, skip_last=not _openai_stream_options_is_set(inputs)
+        #     ),
+        #     should_accumulate=should_use_accumulator,
+        #     on_finish_post_processor=openai_on_finish_post_processor,
+        # )
 
     return wrapper
 

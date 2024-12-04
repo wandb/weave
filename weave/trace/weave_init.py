@@ -122,6 +122,8 @@ def init_weave(
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
+    print(f"Passing {autopatch_settings=}")
+
     autopatch.autopatch(autopatch_settings)
 
     username = get_username()
