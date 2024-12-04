@@ -20,7 +20,12 @@ import {blankifyLinks, shiftHeadings} from './html';
 
 // exported only for tests
 export const DEFAULT_SANITIZATION_SCHEMA = _.merge(gh, {
-  attributes: {'*': ['className', 'style']},
+  attributes: {
+    '*': ['className', 'style'],
+  },
+  protocols: {
+    src: ['http', 'https', 'data'],
+  },
 });
 
 const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
@@ -52,6 +57,7 @@ export function buildSanitizationSchema(rules?: SanitizationRules) {
 }
 
 export function generateHTML(markdown: string, rules?: SanitizationRules) {
+  console.log('generateHTML', markdown);
   const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
   const vfile = (
@@ -74,9 +80,13 @@ export function generateHTML(markdown: string, rules?: SanitizationRules) {
     .processSync(markdown);
 
   if (typeof vfile.value === 'string') {
+    console.log('generateHTML before blankifyLinks', vfile.value);
     vfile.value = blankifyLinks(vfile.value);
+    console.log('generateHTML after blankifyLinks', vfile.value);
     vfile.value = shiftHeadings(vfile.value);
+    console.log('generateHTML after shiftHeadings', vfile.value);
   }
+  console.log('generateHTML', vfile.value);
   return vfile;
 }
 
