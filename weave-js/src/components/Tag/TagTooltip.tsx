@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {PopupProps} from 'semantic-ui-react';
 
 import {Tooltip} from '../Tooltip';
@@ -15,6 +15,7 @@ export const TagTooltip = React.forwardRef<HTMLElement, TagTooltipProps>(
       <Tooltip
         ref={ref}
         position="top center"
+        open={passThroughProps.disabled ? false : undefined}
         content={
           <span
             style={{
