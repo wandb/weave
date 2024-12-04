@@ -50,7 +50,7 @@ export const scorerTypeRecord: Record<ScorerType, ScorerTypeConfig<any>> = {
     onSave: AnnotationScorerForm.onAnnotationScorerSave,
   },
   LLM_JUDGE: {
-    label: LLM_JUDGE_LABEL + ' (W&B Admin Preview)',
+    label: LLM_JUDGE_LABEL,
     value: LLM_JUDGE_VALUE,
     icon: IconNames.RobotServiceMember,
     Component: LLMJudgeScorerForm.LLMJudgeScorerForm,

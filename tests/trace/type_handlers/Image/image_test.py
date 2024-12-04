@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 
 import pytest
@@ -130,3 +131,41 @@ def test_image_as_file(client: WeaveClient) -> None:
         assert res == "Image size: 100x100"
     finally:
         file_path.unlink()
+
+
+@pytest.fixture
+def dataset_ref(client):
+    # This fixture represents a saved dataset containing images
+    IMAGE_SIZE = (1024, 1024)
+    N_ROWS = 50
+
+    def make_random_image():
+        random_colour = (
+            random.randint(0, 255),
+            random.randint(0, 255),
+            random.randint(0, 255),
+        )
+        return Image.new("RGB", IMAGE_SIZE, random_colour)
+
+    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    dataset = weave.Dataset(rows=rows)
+    ref = weave.publish(dataset)
+
+    return ref
+
+
+@pytest.mark.asyncio
+async def test_images_in_dataset_for_evaluation(client, dataset_ref):
+    dataset = dataset_ref.get()
+    evaluation = weave.Evaluation(dataset=dataset)
+
+    @weave.op
+    def model(img: Image) -> dict[str, str]:
+        return {"result": "hello"}
+
+    # Expect that evaluation works for a ref-get'd dataset containing images
+    res = await evaluation.evaluate(model)
+
+    assert isinstance(res, dict)
+    assert "model_latency" in res and "mean" in res["model_latency"]
+    assert isinstance(res["model_latency"]["mean"], (int, float))

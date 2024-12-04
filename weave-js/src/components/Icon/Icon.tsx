@@ -8,6 +8,7 @@ import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-a
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
 import {ReactComponent as ImportArtifactTypeAlt} from '../../assets/icons/icon-artifact-type-alt.svg';
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
+import {ReactComponent as ImportAutomatedWorkspace} from '../../assets/icons/icon-automated-workspace.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
 import {ReactComponent as ImportBaselineAlt} from '../../assets/icons/icon-baseline-alt.svg';
@@ -297,6 +298,9 @@ export const IconArtifactTypeAlt = (props: SVGIconProps) => (
 );
 export const IconAudioVolume = (props: SVGIconProps) => (
   <ImportAudioVolume {...updateIconProps(props)} />
+);
+export const IconAutomatedWorkspace = (props: SVGIconProps) => (
+  <ImportAutomatedWorkspace {...updateIconProps(props)} />
 );
 export const IconAutomationRobotArm = (props: SVGIconProps) => (
   <ImportAutomationRobotArm {...updateIconProps(props)} />
@@ -1064,6 +1068,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   area: IconArea,
   'artifact-type-alt': IconArtifactTypeAlt,
   'audio-volume': IconAudioVolume,
+  'automated-workspace': IconAutomatedWorkspace,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
   'baseline-alt': IconBaselineAlt,
