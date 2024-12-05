@@ -316,11 +316,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
-                return fn(
-                    *args, **kwargs
-                )  # This is where the final execution of fn is happening.
+                return fn(*args, **kwargs)
 
             return _wrapper
 
@@ -354,7 +352,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             async def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
                 return await fn(*args, **kwargs)
 
