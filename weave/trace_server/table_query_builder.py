@@ -1,6 +1,6 @@
 from typing import Optional
 
-from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.orm import Column, ParamBuilder, Table
 
 # Constants for table and column names
 TABLE_ROWS_ALIAS = "tr"
@@ -111,3 +111,39 @@ def make_standard_table_query(
     {sql_safe_offset}
     """
     return query
+
+
+TABLE_ROWS = Table(
+    "table_rows",
+    [
+        Column("project_id", "string"),
+        Column("digest", "string"),
+        Column("val_dump", "string"),
+    ],
+)
+
+
+def validate_table_rows_delete_req(project_id: str, row_digests: list[str]) -> None:
+    if not project_id:
+        raise TypeError("project_id is required")
+    if not row_digests:
+        raise TypeError("row_digests is required")
+    if len(row_digests) > 10_000:
+        raise ValueError("Cannot delete more than 10000 rows at a time")
+
+
+TABLE_TABLE = Table(
+    "tables",
+    [
+        Column("project_id", "string"),
+        Column("digest", "string"),
+        Column("row_digests", "array(string)"),
+    ],
+)
+
+
+def validate_table_delete_req(project_id: str, digest: str) -> None:
+    if not project_id:
+        raise TypeError("project_id is required")
+    if not digest:
+        raise TypeError("digest is required")

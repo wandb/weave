@@ -88,10 +88,14 @@ from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS,
     TABLE_ROWS_ALIAS,
+    TABLE_TABLE,
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    validate_table_delete_req,
+    validate_table_rows_delete_req,
 )
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -709,6 +713,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         db_obj = self._obj_read(
             req.project_id, req.object_id, req.digest, metadata_only=False
         )
+
         if db_obj.refs:
             for obj_ref in db_obj.refs:
                 child_obj_ref = ri.parse_internal_uri(obj_ref)
@@ -968,6 +973,76 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         count = query_result.result_rows[0][0] if query_result.result_rows else 0
 
         return tsi.TableQueryStatsRes(count=count)
+
+    def _table_query(self, project_id: str, digest: str) -> list[dict[str, Any]]:
+        parameters: dict[str, str] = {"project_id": project_id, "digest": digest}
+        query = """
+        SELECT row_digests
+        FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+        raw_res = self._query(query, parameters=parameters)
+        row_digests = raw_res.result_rows[0][0] if raw_res.result_rows else []
+        return row_digests
+
+    def _purge_table_rows(self, project_id: str, row_digests: list[str]) -> None:
+        validate_table_rows_delete_req(project_id, row_digests)
+        query = TABLE_ROWS.purge()
+        query = query.project_id(project_id)
+        row_digests_condition = tsi.Query(
+            **{
+                "$expr": {
+                    "$in": [
+                        {"$getField": "digest"},
+                        [{"$literal": digest} for digest in row_digests],
+                    ],
+                }
+            }
+        )
+        query = query.where(row_digests_condition)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+
+    def _purge_table(self, project_id: str, digest: str) -> None:
+        validate_table_delete_req(project_id, digest)
+        query = TABLE_TABLE.purge()
+        query = query.project_id(project_id)
+        digest_condition = tsi.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "digest"},
+                        {"$literal": digest},
+                    ],
+                }
+            }
+        )
+        query = query.where(digest_condition)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+
+    def table_delete_permanently(
+        self, req: tsi.TableDeletePermanentlyReq
+    ) -> tsi.TableDeletePermanentlyRes:
+        table_row_digests = self._table_query(req.project_id, req.digest)
+
+        print("ROW DIGESTS", table_row_digests)
+
+        # delete 10_000 rows at a time
+        batch_size = 10_000
+        batches = [
+            table_row_digests[i : i + batch_size]
+            for i in range(0, len(table_row_digests), batch_size)
+        ]
+        for batch in batches:
+            print("BATCH", batch)
+            self._purge_table_rows(req.project_id, batch)
+
+        # after all the rows are deleted, delete the table
+        self._purge_table(req.project_id, req.digest)
+
+        rows_deleted = len(table_row_digests)
+        return tsi.TableDeletePermanentlyRes(rows_deleted=rows_deleted)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches

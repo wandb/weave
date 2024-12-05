@@ -679,6 +679,15 @@ class TableQueryStatsRes(BaseModel):
     count: int
 
 
+class TableDeletePermanentlyReq(BaseModel):
+    project_id: str
+    digest: str
+
+
+class TableDeletePermanentlyRes(BaseModel):
+    rows_deleted: int
+
+
 class RefsReadBatchReq(BaseModel):
     refs: list[str]
 
@@ -919,6 +928,9 @@ class TraceServerInterface(Protocol):
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
+    def table_delete_permanently(
+        self, req: TableDeletePermanentlyReq
+    ) -> TableDeletePermanentlyRes: ...
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...

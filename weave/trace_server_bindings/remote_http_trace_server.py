@@ -454,6 +454,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
         )
 
+    def table_delete_permanently(
+        self, req: Union[tsi.TableDeleteReq, dict[str, Any]]
+    ) -> tsi.TableDeleteRes:
+        return self._generic_request(
+            "/table/delete_permanently", req, tsi.TableDeleteReq, tsi.TableDeleteRes
+        )
+
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
