@@ -17,7 +17,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
