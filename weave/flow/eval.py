@@ -7,7 +7,7 @@ import traceback
 from collections.abc import Coroutine
 from typing import Any, Callable, Literal, Optional, Union, cast
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
 
@@ -124,10 +124,13 @@ class Evaluation(Object):
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
-    def model_post_init(self, __context: Any) -> None:
+    @model_validator(mode="after")
+    def _udpate_display_name(self) -> "Evaluation":
         if self.evaluation_name:
             self.evaluate.call_display_name = self.evaluation_name
+        return self
 
+    def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
