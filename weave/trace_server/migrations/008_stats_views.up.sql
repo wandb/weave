@@ -8,7 +8,7 @@ CREATE TABLE files_stats
     size_bytes SimpleAggregateFunction(any, UInt64),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
     updated_at SimpleAggregateFunction(max, DateTime64(3))
-) ENGINE = ReplicatedAggregatingMergeTree()
+) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
 
 CREATE MATERIALIZED VIEW files_stats_view
@@ -36,7 +36,7 @@ CREATE TABLE table_rows_stats
     size_bytes SimpleAggregateFunction(any, UInt64),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
     updated_at SimpleAggregateFunction(max, DateTime64(3))
-) ENGINE = ReplicatedAggregatingMergeTree()
+) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, digest);
 
 CREATE MATERIALIZED VIEW table_rows_stats_view
@@ -64,7 +64,7 @@ CREATE TABLE object_versions_stats
     size_bytes SimpleAggregateFunction(any, UInt64),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
     updated_at SimpleAggregateFunction(max, DateTime64(3))
-) ENGINE = ReplicatedAggregatingMergeTree()
+) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, kind, object_id, digest);
 
 CREATE MATERIALIZED VIEW object_versions_stats_view
@@ -97,7 +97,7 @@ CREATE TABLE feedback_stats
     updated_at SimpleAggregateFunction(max, DateTime64(3)),
     feedback_type SimpleAggregateFunction(any, String),
     payload_size_bytes SimpleAggregateFunction(any, UInt64),
-) ENGINE = ReplicatedAggregatingMergeTree()
+) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, weave_ref, wb_user_id, id);
 
 CREATE MATERIALIZED VIEW feedback_stats_view
@@ -139,7 +139,7 @@ CREATE TABLE calls_merged_stats
     updated_at SimpleAggregateFunction(max, DateTime64(3)),
     deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
     display_name AggregateFunction(argMax, Nullable(String), DateTime64(3))
-) ENGINE = ReplicatedAggregatingMergeTree()
+) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
 
 -- NOTE: This needs to be generally kept in sync with calls_merged.

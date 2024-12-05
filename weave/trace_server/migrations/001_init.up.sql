@@ -100,7 +100,7 @@ CREATE TABLE call_parts (
     `created_at`: The time that the row was inserted into the database.
     */
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplicatedMergeTree
+) ENGINE = MergeTree
 ORDER BY (project_id, id);
 
 CREATE TABLE calls_merged (
@@ -124,7 +124,7 @@ CREATE TABLE calls_merged (
     output_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
     wb_user_id SimpleAggregateFunction(any, Nullable(String)),
     wb_run_id SimpleAggregateFunction(any, Nullable(String))
-) ENGINE = ReplicatedAggregatingMergeTree
+) ENGINE = AggregatingMergeTree
 ORDER BY (project_id, id);
 
 CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
@@ -157,7 +157,7 @@ CREATE TABLE object_versions (
     val_dump String,
     digest String,
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplicatedReplacingMergeTree()
+) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, kind, object_id, digest);
 
 CREATE VIEW object_versions_deduped AS
@@ -207,7 +207,7 @@ CREATE TABLE table_rows (
     refs Array(String),
     val_dump String,
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplicatedReplacingMergeTree()
+) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW table_rows_deduped AS
 SELECT project_id, digest, val_dump
@@ -225,7 +225,7 @@ CREATE TABLE tables (
     digest String,
     row_digests Array(String),
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplicatedReplacingMergeTree()
+) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW tables_deduped AS
 SELECT *
@@ -246,7 +246,7 @@ CREATE TABLE files (
     name String,
     val_bytes String,
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplicatedReplacingMergeTree()
+) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
 
 CREATE VIEW files_deduped AS
