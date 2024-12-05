@@ -5,7 +5,6 @@ import textwrap
 import time
 import traceback
 from collections.abc import Coroutine
-from types import MethodType
 from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
@@ -127,13 +126,7 @@ class Evaluation(Object):
 
     def model_post_init(self, __context: Any) -> None:
         if self.evaluation_name:
-            original_op = self.evaluate
-            new_op = weave.op(
-                original_op.resolve_fn,
-                call_display_name=self.evaluation_name,
-            )
-            bound_method = MethodType(new_op, self)
-            self.__dict__["evaluate"] = bound_method
+            self.evaluate.call_display_name = self.evaluation_name
 
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
