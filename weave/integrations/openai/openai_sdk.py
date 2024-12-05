@@ -388,7 +388,7 @@ def create_wrapper_async(
 def get_openai_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
     global _openai_patcher
 
-    if _openai_patcher is None:
+    if _openai_patcher is not None:
         return _openai_patcher
 
     if settings is None:
