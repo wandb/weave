@@ -9,9 +9,9 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
-# TODO: type_serializers is imported here to trigger registration of the image serializer.
+# TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from weave import type_serializers  # noqa: F401
+from weave import type_handlers  # noqa: F401
 from weave.trace import urls, util, weave_client, weave_init
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
