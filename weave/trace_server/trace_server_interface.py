@@ -795,6 +795,15 @@ class FileContentReadRes(BaseModel):
     content: bytes
 
 
+class FileDeletePermanentlyReq(BaseModel):
+    project_id: str
+    digest: str
+
+
+class FileDeletePermanentlyRes(BaseModel):
+    pass
+
+
 class EnsureProjectExistsRes(BaseModel):
     project_name: str
 

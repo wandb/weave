@@ -716,11 +716,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project_id, req.object_id, req.digest, metadata_only=False
         )
 
+        permanently_delete = False
+
         if db_obj.refs:
             for obj_ref in db_obj.refs:
                 child_obj_ref = ri.parse_internal_uri(obj_ref)
-                if isinstance(child_obj_ref, ri.InternalTableRef):
-                    raise TypeError("Table ref deletion not yet supported.")
+                if (
+                    isinstance(child_obj_ref, ri.InternalTableRef)
+                    and permanently_delete
+                ):
+                    self._table_delete_permanently(req.project_id, child_obj_ref.digest)
+                else:
+                    # TODO: Delete children?
+                    pass
+
+        files = json.loads(db_obj.val_dump).get("files", [])
+        print("obj_delete FILES", files)
+        if files and permanently_delete:
+            # TODO: Delete the files?
+            pass
 
         delete_insertable = ObjDeleteCHInsertable(
             project_id=req.project_id,
@@ -1021,13 +1035,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = query.prepare(database_type="clickhouse")
         self.ch_client.query(prepared.sql, prepared.parameters)
 
-    def table_delete_permanently(
-        self, req: tsi.TableDeletePermanentlyReq
-    ) -> tsi.TableDeletePermanentlyRes:
-        project_id, digest = req.project_id, req.digest
+    def _table_delete_permanently(self, project_id: str, digest: str) -> int:
         table_row_digests = self._table_query_available_rows(project_id, digest)
 
-        print("ROW DIGESTS", table_row_digests)
+        print("ROW DIGESTS len", len(table_row_digests))
 
         # TODO: we could just delete them all at once in one query, with the select rows
         # as a subquery
@@ -1045,6 +1056,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._purge_table(project_id, digest)
 
         rows_deleted = len(table_row_digests)
+        return rows_deleted
+
+    def table_delete_permanently(
+        self, req: tsi.TableDeletePermanentlyReq
+    ) -> tsi.TableDeletePermanentlyRes:
+        project_id, digest = req.project_id, req.digest
+        rows_deleted = self._table_delete_permanently(project_id, digest)
         return tsi.TableDeletePermanentlyRes(rows_deleted=rows_deleted)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
