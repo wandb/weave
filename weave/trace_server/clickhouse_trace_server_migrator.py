@@ -25,6 +25,9 @@ class ClickHouseTraceServerMigrator:
         self.ch_client = ch_client
         self._initialize_migration_db()
 
+    def _format_sql(self, sql_query: str, create_db: bool=False) -> str:
+        return sql_query
+
     def apply_migrations(
         self, target_db: str, target_version: Optional[int] = None
     ) -> None:
@@ -46,19 +49,21 @@ class ClickHouseTraceServerMigrator:
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
-            self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
+            create_db_sql = f"CREATE DATABASE IF NOT EXISTS {target_db}"
+            self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        self.ch_client.command(
+        create_db_sql = (
             """
             CREATE DATABASE IF NOT EXISTS db_management
         """
         )
-        self.ch_client.command(
+        self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
+        create_table_sql = (
             """
             CREATE TABLE IF NOT EXISTS db_management.migrations
             (
@@ -70,6 +75,7 @@ class ClickHouseTraceServerMigrator:
             ORDER BY (db_name)
         """
         )
+        self.ch_client.command(self._format_sql(create_table_sql))
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -204,7 +210,7 @@ class ClickHouseTraceServerMigrator:
                 continue
             curr_db = self.ch_client.database
             self.ch_client.database = target_db
-            self.ch_client.command(command)
+            self.ch_client.command(self._format_sql(command))
             self.ch_client.database = curr_db
         self.ch_client.command(
             f"""
