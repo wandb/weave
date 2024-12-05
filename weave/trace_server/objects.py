@@ -1,7 +1,9 @@
-from typing import Any, Iterator
-from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
-from weave.trace_server.orm import Column, Table, combine_conditions
+from collections.abc import Iterator
+from typing import Any
+
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+from weave.trace_server.orm import combine_conditions
 
 VALID_OBJECT_SORT_FIELDS = {"created_at", "object_id"}
 VALID_SORT_DIRECTIONS = {"asc", "desc"}
@@ -118,7 +120,8 @@ def _make_select_object_metadata_query(
                         ORDER BY created_at ASC
                     ) AS rn
                 FROM object_versions
-                WHERE project_id = {{project_id: String}} {object_id_conditions_part}
+                WHERE project_id = {{project_id: String}}
+                {object_id_conditions_part}
             )
             WHERE rn = 1
         )
@@ -153,7 +156,7 @@ def select_object_metadata_clickhouse_query(
 
 
 def format_objects_from_query_result(
-    query_result: Iterator[tuple[Any, ...]]
+    query_result: Iterator[tuple[Any, ...]],
 ) -> list[SelectableCHObjSchema]:
     result = []
     for row in query_result:
