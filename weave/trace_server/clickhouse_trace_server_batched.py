@@ -95,6 +95,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    DynamicBatchProcessor,
     LRUCache,
     digest_is_version_like,
     empty_str_to_none,
@@ -343,48 +344,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
 
-        if not req.expand_columns and not req.include_feedback:
+        if not expand_columns and not include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
                 )
 
-        else:
-            expand_columns = req.expand_columns or []
-            ref_cache = LRUCache(max_size=1000)
+        ref_cache = LRUCache(max_size=1000)
+        batch_processor = DynamicBatchProcessor(
+            initial_size=100,
+            max_size=MAX_CALLS_STREAM_BATCH_SIZE,
+            growth_factor=10,
+        )
 
-            batch_size = 10
-            batch = []
-            for row in raw_res:
-                call_dict = _ch_call_dict_to_call_schema_dict(
-                    dict(zip(select_columns, row))
-                )
-                batch.append(call_dict)
-
-                if len(batch) >= batch_size:
-                    hydrated_batch = self._hydrate_calls(
-                        req.project_id,
-                        batch,
-                        expand_columns,
-                        req.include_feedback or False,
-                        ref_cache,
-                    )
-                    for call in hydrated_batch:
-                        yield tsi.CallSchema.model_validate(call)
-
-                    # *** Dynamic increase from 10 to 500 ***
-                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
-                    batch = []
-
-            hydrated_batch = self._hydrate_calls(
-                req.project_id,
-                batch,
-                expand_columns,
-                req.include_feedback or False,
-                ref_cache,
+        for batch in batch_processor.process(raw_res):
+            call_dicts = [
+                _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+                for row in batch
+            ]
+            hydrated_calls = self._hydrate_calls(
+                req.project_id, call_dicts, expand_columns, include_feedback, ref_cache
             )
-            for call in hydrated_batch:
+            for call in hydrated_calls:
                 yield tsi.CallSchema.model_validate(call)
 
     def _hydrate_calls(
@@ -398,13 +382,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(calls) == 0:
             return calls
 
-        self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        if expand_columns:
+            self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+
         if include_feedback:
-            feedback_query_req = make_feedback_query_req(project_id, calls)
-            feedback = self.feedback_query(feedback_query_req)
-            hydrate_calls_with_feedback(calls, feedback)
+            self._hydrate_calls_with_feedback(project_id, calls)
 
         return calls
+
+    def _hydrate_calls_with_feedback(
+        self, project_id: str, calls: list[dict[str, Any]]
+    ) -> None:
+        feedback_query_req = make_feedback_query_req(project_id, calls)
+        feedback = self.feedback_query(feedback_query_req)
+        hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
@@ -1099,7 +1090,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
                     needed_extra_results.append((i, extra_result))
-
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
                 for i, extra_result in needed_extra_results:
