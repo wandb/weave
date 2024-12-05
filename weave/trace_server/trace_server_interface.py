@@ -476,12 +476,6 @@ class ObjDeleteReq(BaseModel):
     object_id: str
     digest: str
 
-    include_children: Optional[bool] = Field(
-        default=False,
-        description="Recursively delete children of this object that are not "
-        "used by other objects",
-    )
-
 
 class ObjDeleteRes(BaseModel):
     pass
