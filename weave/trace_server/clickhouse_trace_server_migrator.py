@@ -25,7 +25,7 @@ class ClickHouseTraceServerMigrator:
         self.ch_client = ch_client
         self._initialize_migration_db()
 
-    def _format_sql(self, sql_query: str, create_db: bool=False) -> str:
+    def _format_sql(self, sql_query: str, create_db: bool = False) -> str:
         return sql_query
 
     def apply_migrations(
@@ -57,14 +57,11 @@ class ClickHouseTraceServerMigrator:
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        create_db_sql = (
-            """
+        create_db_sql = """
             CREATE DATABASE IF NOT EXISTS db_management
         """
-        )
         self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
-        create_table_sql = (
-            """
+        create_table_sql = """
             CREATE TABLE IF NOT EXISTS db_management.migrations
             (
                 db_name String,
@@ -74,7 +71,6 @@ class ClickHouseTraceServerMigrator:
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
-        )
         self.ch_client.command(self._format_sql(create_table_sql))
 
     def _get_migration_status(self, db_name: str) -> dict:
