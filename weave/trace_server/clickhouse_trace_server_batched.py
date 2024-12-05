@@ -706,42 +706,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        # 1. Read the entire object from the db based on id and digest
-        # 2. For all in delete list:
-        #    - Set deleted_at to the current time
-        #    - Insert this object into object_versions
-        #      - This object should be IDENTICAL to the original, including
-        #        the created_at time, this will become the only copy of the
-        #        object when the db deduplicates on primary key
         db_obj = self._obj_read(
             req.project_id, req.object_id, req.digest, metadata_only=False
         )
-        delete_insertables: list[ObjDeleteCHInsertable] = []
-
         if db_obj.refs:
             for obj_ref in db_obj.refs:
                 child_obj_ref = ri.parse_internal_uri(obj_ref)
                 if isinstance(child_obj_ref, ri.InternalTableRef):
-                    raise TypeError("Table ref deletion not yet supported, coming soon")
+                    raise TypeError("Table ref deletion not yet supported.")
 
-        delete_insertables.append(
-            ObjDeleteCHInsertable(
-                project_id=req.project_id,
-                object_id=req.object_id,
-                digest=req.digest,
-                kind=db_obj.kind,
-                val_dump=db_obj.val_dump,
-                refs=db_obj.refs,
-                base_object_class=db_obj.base_object_class,
-                deleted_at=datetime.datetime.now(datetime.timezone.utc),
-                # ! Use the original created_at time !
-                created_at=_ensure_datetimes_have_tz_strict(db_obj.created_at),
-            )
+        delete_insertable = ObjDeleteCHInsertable(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+            kind=db_obj.kind,
+            val_dump=db_obj.val_dump,
+            refs=db_obj.refs,
+            base_object_class=db_obj.base_object_class,
+            deleted_at=datetime.datetime.now(datetime.timezone.utc),
+            # ! Use the original created_at time !
+            created_at=_ensure_datetimes_have_tz_strict(db_obj.created_at),
         )
         self._insert(
             "object_versions",
-            data=[list(ch_obj.model_dump().values()) for ch_obj in delete_insertables],
-            column_names=list(delete_insertables[0].model_fields.keys()),
+            data=[list(delete_insertable.model_dump().values())],
+            column_names=list(delete_insertable.model_fields.keys()),
         )
         return tsi.ObjDeleteRes()
 
