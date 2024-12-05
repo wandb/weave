@@ -8,6 +8,7 @@ from weave.integrations.bedrock import patch_client
 
 model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
+
 system_message = "You are an expert software engineer that knows a lot of programming. You prefer short answers."
 messages = [
     {
@@ -45,8 +46,6 @@ def _remove_body_from_response(response):
     allowed_hosts=[
         "api.wandb.ai",
         "localhost",
-        "portal.sso.us-east-2.amazonaws.com",
-        "bedrock-runtime.us-east-1.amazonaws.com",
     ],
 )
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
@@ -105,3 +104,44 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     # Verify the response structure
     assert invoke_output is not None
     assert "content" in invoke_output
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "content-type",
+        "user-agent",
+        "x-amz-date",
+        "x-amz-security-token",
+        "x-amz-sso_bearer_token",
+        "amz-sdk-invocation-id",
+    ],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+    ],
+)
+def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -> None:
+    bedrock_client = boto3.client("bedrock-runtime")
+    patch_client(bedrock_client)
+
+    response = bedrock_client.converse_stream(
+        modelId=model_id,
+        system=[{"text": system_message}],
+        messages=messages,
+        inferenceConfig={"maxTokens": 30},
+    )
+    # Access the stream from the response
+    stream = response.get('stream')
+    assert stream is not None, "Stream not found in response"
+
+    # Accumulate the streamed response
+    final_response = None
+    for event in stream:
+        # Process each event (the accumulator handles this internally)
+        final_response = event  # The final event after accumulation
+
+    assert final_response is not None
+    # assert "content" in final_response
+    # assert len(final_response["content"]) > 0
