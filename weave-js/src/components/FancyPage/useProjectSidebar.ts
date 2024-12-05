@@ -10,7 +10,8 @@ export const useProjectSidebar = (
   hasModelsData: boolean,
   hasWeaveData: boolean,
   hasTraceBackend: boolean = true,
-  hasModelsAccess: boolean = true
+  hasModelsAccess: boolean = true,
+  isLaunchActive: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
@@ -68,7 +69,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Jobs',
             slug: 'jobs',
-            isShown: isModelsOnly,
+            isShown: isModelsOnly && isLaunchActive,
             isDisabled: viewingRestricted,
             iconName: IconNames.FlashBolt,
           },
@@ -250,5 +251,6 @@ export const useProjectSidebar = (
     viewingRestricted,
     isModelsOnly,
     showWeaveSidebarItems,
+    isLaunchActive,
   ]);
 };
