@@ -32,7 +32,7 @@ messages = [
 )
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime")
-    patch_client(bedrock_client)
+    patch_client(bedrock_client )
     
     response = bedrock_client.converse(
         modelId=model_id,
