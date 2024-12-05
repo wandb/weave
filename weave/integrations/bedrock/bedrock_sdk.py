@@ -45,14 +45,14 @@ def bedrock_on_finish_invoke(
             "total_tokens": total_tokens,
         }
         usage[model_name].update(tokens_metrics)
-
+    if call.summary is not None:
+        call.summary.update(summary_update)
 
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs.get("kwargs", {})
 
 
 def _patch_converse(bedrock_client: "BaseClient") -> None:
-    print("patching converse API")
     op = weave.op(
         bedrock_client.converse,
         name="BedrockRuntime.converse",
@@ -63,7 +63,6 @@ def _patch_converse(bedrock_client: "BaseClient") -> None:
 
 
 def _patch_invoke(bedrock_client: "BaseClient") -> None:
-    print("patching invoke API")
     op = weave.op(
         bedrock_client.invoke_model,
         name="BedrockRuntime.invoke",
@@ -78,7 +77,6 @@ def bedrock_stream_accumulator(
     value: dict,
 ) -> dict:
     """Accumulates streaming events into a final response dictionary."""
-    print(f"Accumulator called with acc: {acc}, value: {value}")
     if acc is None:
         acc = {
             'role': None,
@@ -114,7 +112,6 @@ def bedrock_stream_accumulator(
         if 'metrics' in metadata:
             acc['latency_ms'] = metadata['metrics'].get('latencyMs', 0)
     
-    print("Accumulator updated:", acc)
     return acc
 
         
