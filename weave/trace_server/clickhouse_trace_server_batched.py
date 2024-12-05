@@ -1090,6 +1090,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
                     needed_extra_results.append((i, extra_result))
+
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
                 for i, extra_result in needed_extra_results:
