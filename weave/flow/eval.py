@@ -125,7 +125,8 @@ class Evaluation(Object):
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     @model_validator(mode="after")
-    def _udpate_display_name(self) -> "Evaluation":
+    def _update_display_name(self) -> "Evaluation":
+        # Keep the evaluate op's `call_display_name` in sync with `evaluation_name`
         if self.evaluation_name:
             self.evaluate.call_display_name = self.evaluation_name
         return self
