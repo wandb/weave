@@ -1,11 +1,11 @@
 import asyncio
-import datetime
 import inspect
 import logging
 import textwrap
 import time
 import traceback
 from collections.abc import Coroutine
+from datetime import datetime
 from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr, model_validator
@@ -133,9 +133,9 @@ class Evaluation(Object):
 
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":
-        # Keep the evaluate op's `call_display_name` in sync with `evaluation_name`
         if self.evaluation_name:
-            eval_op = cast(Op, self.evaluate)
+            # Treat user-specified `evaluation_name` as the name for `Evaluation.evaluate`
+            eval_op = as_op(self.evaluate)
             eval_op.call_display_name = self.evaluation_name
         return self
 

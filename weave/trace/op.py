@@ -34,8 +34,6 @@ from weave.trace.util import log_once
 
 logger = logging.getLogger(__name__)
 
-WEAVE_KWARGS_KEY = "__weave"
-
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
 
@@ -53,17 +51,6 @@ try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
-
-try:
-    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
-    from mistralai.types.basemodel import UNSET  # type: ignore
-
-    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
-except ImportError:
-    MISTRAL_NOT_GIVEN = None
-
-MISTRAL_NOT_GIVEN = None
-
 
 try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
@@ -105,14 +92,13 @@ OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
 def _value_is_sentinel(param: Any) -> bool:
-    return (
-        param.default is None
-        or param.default is OPENAI_NOT_GIVEN
-        or param.default is COHERE_NOT_GIVEN
-        or param.default is ANTHROPIC_NOT_GIVEN
-        or param.default is MISTRAL_NOT_GIVEN
-        or param.default is CEREBRAS_NOT_GIVEN
-        or param.default is Ellipsis
+    return param.default in (
+        None,
+        Ellipsis,
+        OPENAI_NOT_GIVEN,
+        COHERE_NOT_GIVEN,
+        ANTHROPIC_NOT_GIVEN,
+        CEREBRAS_NOT_GIVEN,
     )
 
 
@@ -121,16 +107,15 @@ def _apply_fn_defaults_to_inputs(
 ) -> dict[str, Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
-    for param_name, param in sig.parameters.items():
-        if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not _value_is_sentinel(
-                param
-            ):
-                inputs[param_name] = param.default
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                inputs[param_name] = ()
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                inputs[param_name] = {}
+    for name, param in sig.parameters.items():
+        if name in inputs:
+            continue
+        if param.default != inspect.Parameter.empty and not _value_is_sentinel(param):
+            inputs[name] = param.default
+        if param.kind == inspect.Parameter.VAR_POSITIONAL:
+            inputs[name] = ()
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
+            inputs[name] = {}
     return inputs
 
 
@@ -230,6 +215,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
+
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
     return ProcessedInputs(
         original_args=args,
@@ -750,7 +736,9 @@ def as_op(fn: Callable) -> Op:
     if not is_op(fn):
         raise ValueError("fn must be a weave.op() decorated function")
 
-    return cast(Op, fn)
+    # The unbinding is necessary for methods because `MethodType` is applied after the
+    # func is decorated into an Op.
+    return maybe_unbind_method(cast(Op, fn))
 
 
 __docspec__ = [call, calls]
