@@ -81,6 +81,10 @@ from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
+from weave.trace_server.objects import (
+    format_objects_from_query_result,
+    select_object_metadata_clickhouse_query,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -1581,124 +1585,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
         """
-        if not conditions:
-            conditions = ["1 = 1"]
-        if not object_id_conditions:
-            object_id_conditions = ["1 = 1"]
-
-        conditions_part = combine_conditions(conditions, "AND")
-        object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
-
-        limit_part = ""
-        offset_part = ""
-        if limit is not None:
-            limit_part = f"LIMIT {int(limit)}"
-        if offset is not None:
-            offset_part = f" OFFSET {int(offset)}"
-
-        sort_part = ""
-        if sort_by:
-            valid_sort_fields = {"object_id", "created_at"}
-            sort_clauses = []
-            for sort in sort_by:
-                if sort.field in valid_sort_fields and sort.direction in {
-                    "asc",
-                    "desc",
-                }:
-                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
-            if sort_clauses:
-                sort_part = f"ORDER BY {', '.join(sort_clauses)}"
-
-        if parameters is None:
-            parameters = {}
-
-        select_without_val_dump_query = f"""
-            SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                digest,
-                is_op,
-                version_index,
-                version_count,
-                is_latest
-            FROM (
-                SELECT project_id,
-                    object_id,
-                    created_at,
-                    kind,
-                    base_object_class,
-                    refs,
-                    digest,
-                    is_op,
-                    row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
-                        ORDER BY created_at ASC
-                    ) - 1 AS version_index,
-                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(version_index + 1 = version_count, 1, 0) AS is_latest
-                FROM (
-                    SELECT project_id,
-                        object_id,
-                        created_at,
-                        kind,
-                        base_object_class,
-                        refs,
-                        digest,
-                        if (kind = 'op', 1, 0) AS is_op,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {{project_id: String}} AND
-                        {object_id_conditions_part}
-                )
-                WHERE rn = 1
-            )
-            WHERE {conditions_part}
-            {sort_part}
-            {limit_part}
-            {offset_part}
-        """
+        obj_metadata_query = select_object_metadata_clickhouse_query(
+            conditions,
+            object_id_conditions,
+            limit,
+            offset,
+            sort_by,
+        )
+        parameters = parameters or {}
         query_result = self._query_stream(
-            select_without_val_dump_query,
+            obj_metadata_query,
             {"project_id": project_id, **parameters},
         )
-        result: list[SelectableCHObjSchema] = []
-        for row in query_result:
-            result.append(
-                SelectableCHObjSchema.model_validate(
-                    dict(
-                        zip(
-                            [
-                                "project_id",
-                                "object_id",
-                                "created_at",
-                                "kind",
-                                "base_object_class",
-                                "refs",
-                                "digest",
-                                "is_op",
-                                "version_index",
-                                "version_count",
-                                "is_latest",
-                                "val_dump",
-                            ],
-                            # Add an empty val_dump to the end of the row
-                            list(row) + ["{}"],
-                        )
-                    )
-                )
-            )
+        result: list[SelectableCHObjSchema] = format_objects_from_query_result(
+            query_result
+        )
 
         # -- Don't make second query for object values if metadata_only --
         if metadata_only:
