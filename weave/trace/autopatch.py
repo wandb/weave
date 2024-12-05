@@ -20,10 +20,10 @@ def autopatch() -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
-    openai_patcher.attempt_patch()
+    get_openai_patcher().attempt_patch()
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
@@ -54,10 +54,10 @@ def reset_autopatch() -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import openai_patcher
+    from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
-    openai_patcher.undo_patch()
+    get_openai_patcher().undo_patch()
     mistral_patcher.undo_patch()
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()

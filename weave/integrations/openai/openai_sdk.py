@@ -10,6 +10,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
 
+_openai_patcher: Optional[MultiPatcher] = None
+
 
 def maybe_unwrap_api_response(value: Any) -> Any:
     """If the caller requests a raw response, we unwrap the APIResponse object.
@@ -380,28 +382,38 @@ def create_wrapper_async(
     return wrapper
 
 
-symbol_patchers = [
-    # Patch the Completions.create method
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "Completions.create",
-        create_wrapper_sync(name="openai.chat.completions.create"),
-    ),
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "AsyncCompletions.create",
-        create_wrapper_async(name="openai.chat.completions.create"),
-    ),
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.beta.chat.completions"),
-        "Completions.parse",
-        create_wrapper_sync(name="openai.beta.chat.completions.parse"),
-    ),
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.beta.chat.completions"),
-        "AsyncCompletions.parse",
-        create_wrapper_async(name="openai.beta.chat.completions.parse"),
-    ),
-]
+def get_openai_patcher() -> MultiPatcher:
+    global _openai_patcher
 
-openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
+    if _openai_patcher is None:
+        symbol_patchers = [
+            # Patch the Completions.create method
+            # Patch the Completions.create method
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "Completions.create",
+                create_wrapper_sync(name="openai.chat.completions.create"),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "AsyncCompletions.create",
+                create_wrapper_async(name="openai.chat.completions.create"),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.beta.chat.completions"
+                ),
+                "Completions.parse",
+                create_wrapper_sync(name="openai.beta.chat.completions.parse"),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.beta.chat.completions"
+                ),
+                "AsyncCompletions.parse",
+                create_wrapper_async(name="openai.beta.chat.completions.parse"),
+            ),
+        ]
+        _openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
+
+    return _openai_patcher
