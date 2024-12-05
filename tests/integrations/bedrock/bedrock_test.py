@@ -25,10 +25,24 @@ messages = [
     }
 ]
 
+def _remove_body_from_response(response):
+    if 'body' in response:
+        response['body'] = None  # Remove the body content
+    return response
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=[
+        "authorization",
+        "content-type", 
+        "user-agent",
+        "x-amz-date",
+        "x-amz-security-token",
+        "x-amz-sso_bearer_token",
+        "amz-sdk-invocation-id"
+    ],
+    before_record_response=_remove_body_from_response,
+    allowed_hosts=["api.wandb.ai", "localhost", "portal.sso.us-east-2.amazonaws.com", "bedrock-runtime.us-east-1.amazonaws.com"],
 )
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime")
@@ -51,7 +65,16 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=[
+        "authorization",
+        "content-type",
+        "user-agent",
+        "x-amz-date",
+        "x-amz-security-token",
+        "x-amz-sso_bearer_token",
+        "amz-sdk-invocation-id"
+    ], 
+    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime")
