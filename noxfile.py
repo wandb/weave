@@ -52,7 +52,7 @@ def lint(session):
         "pandas-test",
     ],
 )
-def tests(session, shard):
+def tests(session: nox.Session, shard: str):
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
@@ -103,6 +103,7 @@ def tests(session, shard):
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
+        "-s",
         *session.posargs,
         *test_dirs,
         env=env,
