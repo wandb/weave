@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import inspect
 import logging
 import textwrap
@@ -40,6 +41,12 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+
+def default_evaluation_display_name(call: Call) -> str:
+    date = datetime.now().strftime("%Y-%m-%d")
+    unique_name = make_memorable_name()
+    return f"eval-{date}-{unique_name}"
 
 
 def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
@@ -499,7 +506,7 @@ class Evaluation(Object):
             eval_rows.append(eval_row)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
-    @weave.op(call_display_name=make_memorable_name)
+    @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to

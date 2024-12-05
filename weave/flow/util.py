@@ -5,8 +5,6 @@ import random
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
-from weave.trace.weave_client import Call
-
 T = TypeVar("T")
 U = TypeVar("U")
 
@@ -86,7 +84,7 @@ def warn_once(logger: logging.Logger, message: str) -> None:
         _shown_warnings.add(message)
 
 
-def make_memorable_name(call: Call) -> str:
+def make_memorable_name() -> str:
     adjectives = [
         "jubilant",
         "eager",
