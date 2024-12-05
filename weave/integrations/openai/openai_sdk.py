@@ -327,7 +327,7 @@ def create_wrapper_sync(
                 return True
             return False
 
-        op = weave.op()(_add_stream_options(fn))
+        op = weave.op(call_display_name="hmmmm")(_add_stream_options(fn))
         op.name = name  # type: ignore
         op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
