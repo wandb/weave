@@ -113,6 +113,26 @@ def make_standard_table_query(
     return query
 
 
+def make_available_table_rows_query(
+    project_id: str, digest: str
+) -> tuple[str, dict[str, str]]:
+    parameters: dict[str, str] = {"project_id": project_id, "digest": digest}
+    query = """
+        SELECT t1.row_digests
+        FROM tables t1
+        LEFT JOIN (
+            SELECT DISTINCT arrayJoin(row_digests) as row_digest
+            FROM tables
+            WHERE project_id = {project_id:String}
+            AND digest != {digest:String}
+        ) t2 ON has(t1.row_digests, t2.row_digest)
+        WHERE t1.project_id = {project_id:String}
+        AND t1.digest = {digest:String}
+        AND t2.row_digest IS NULL
+        """
+    return query, parameters
+
+
 TABLE_ROWS = Table(
     "table_rows",
     [

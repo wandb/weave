@@ -92,6 +92,8 @@ from weave.trace_server.table_query_builder import (
     TABLE_ROWS_ALIAS,
     TABLE_TABLE,
     VAL_DUMP_COLUMN_NAME,
+    make_available_rows_query,
+    make_available_table_rows_query,
     make_natural_sort_table_query,
     make_standard_table_query,
     validate_table_delete_req,
@@ -974,13 +976,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableQueryStatsRes(count=count)
 
-    def _table_query(self, project_id: str, digest: str) -> list[dict[str, Any]]:
-        parameters: dict[str, str] = {"project_id": project_id, "digest": digest}
-        query = """
-        SELECT row_digests
-        FROM tables
-        WHERE project_id = {project_id:String} AND digest = {digest:String}
-        """
+    def _table_query_available_rows(
+        self, project_id: str, digest: str
+    ) -> list[dict[str, Any]]:
+        """Query table by digest and return the row_digests that aren't used by any other table"""
+        query, parameters = make_available_table_rows_query(project_id, digest)
         raw_res = self._query(query, parameters=parameters)
         row_digests = raw_res.result_rows[0][0] if raw_res.result_rows else []
         return row_digests
@@ -1024,11 +1024,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def table_delete_permanently(
         self, req: tsi.TableDeletePermanentlyReq
     ) -> tsi.TableDeletePermanentlyRes:
-        table_row_digests = self._table_query(req.project_id, req.digest)
+        project_id, digest = req.project_id, req.digest
+        table_row_digests = self._table_query_available_rows(project_id, digest)
 
         print("ROW DIGESTS", table_row_digests)
 
-        # delete 10_000 rows at a time
+        # TODO: we could just delete them all at once in one query, with the select rows
+        # as a subquery
+        # delete 10_000 rows at a time (?)
         batch_size = 10_000
         batches = [
             table_row_digests[i : i + batch_size]
@@ -1036,10 +1039,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
         for batch in batches:
             print("BATCH", batch)
-            self._purge_table_rows(req.project_id, batch)
+            self._purge_table_rows(project_id, batch)
 
         # after all the rows are deleted, delete the table
-        self._purge_table(req.project_id, req.digest)
+        self._purge_table(project_id, digest)
 
         rows_deleted = len(table_row_digests)
         return tsi.TableDeletePermanentlyRes(rows_deleted=rows_deleted)
