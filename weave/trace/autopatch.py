@@ -89,6 +89,7 @@ class OpSettings:
     These currently subset the `op` decorator args to provide a consistent interface
     when working with auto-patched functions.  See the `op` decorator for more details."""
 
+    name: str | None = None
     call_display_name: str | Callable[[Call], str] | None = None
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     postprocess_output: Callable[[Any], Any] | None = None
