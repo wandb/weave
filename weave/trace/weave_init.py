@@ -65,7 +65,7 @@ Args:
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
-    autopatch_settings: AutopatchSettings | None = None,
+    autopatch_settings: autopatch.AutopatchSettings | None = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
