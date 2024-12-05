@@ -8,38 +8,6 @@ interactions:
         YXBwbGljYXRpb24vanNvbg==
       Content-Length:
       - '158'
-      Content-Type:
-      - !!binary |
-        YXBwbGljYXRpb24vanNvbg==
-      User-Agent:
-      - !!binary |
-        Qm90bzMvMS4zNC4xNTYgbWQvQm90b2NvcmUjMS4zNC4xNTYgdWEvMi4wIG9zL21hY29zIzIzLjQu
-        MCBtZC9hcmNoI2FybTY0IGxhbmcvcHl0aG9uIzMuMTEuOSBtZC9weWltcGwjQ1B5dGhvbiBjZmcv
-        cmV0cnktbW9kZSNsZWdhY3kgQm90b2NvcmUvMS4zNC4xNTY=
-      X-Amz-Date:
-      - !!binary |
-        MjAyNDEyMDRUMTAyMTA1Wg==
-      X-Amz-Security-Token:
-      - !!binary |
-        SVFvSmIzSnBaMmx1WDJWakVFSWFDWFZ6TFdWaGMzUXRNaUpITUVVQ0lRREJsMEZsT0g3WmdDWFd3
-        c1NtTkdsTXVETnUvVWJCN0JYNzJBVndYbFhzdHdJZ0tqYldqaGFPZmQzTjBOT0swTDBWZnpUUzNi
-        bmZGUldWRVhneWhtV2EzOUFxbGdNSTYvLy8vLy8vLy8vL0FSQUFHZ3d6TnpJeE1EZzNNelU0TXpr
-        aURBREtTem5Ec1VNdEkzZFNXeXJxQWtXTHliN1V4dEw5SVhjZlBXd3lrOHRUWCsvZFp0cDdJUTVZ
-        bmJNRXRZU0c2dnU1Yk5iZjUrWlYrT1hXOEJnTlVPOTBMZnZEUXdKTm1wSndaVG9yTCs0STFseTJR
-        eThrSWpVb1dhRlhuTW1QbmJDWlUxc0wzUmVuWkxzMGVzbzdUTDY1dEw5dk9zbHFkZStKNkZIVVJl
-        TUkvd0sycFprMUlYblNQV0l4d2IvVDRZVS9vMkZxL3hlM3cyNTZiUldmRG5IY3VhekhITmxncGFH
-        eUowNnlmWHZZc1BaeFk2dEN4REt6S0R0dVpFMFl3aGtYQmwvMTdVN202WFZQRXFnMndGWFpXN2Y5
-        b1FsZWQ4RSsvQ091YktWNXB1b2p1QVlBSkM2b0Q3SnUweEZiZ0k2YkJxWDVkeDY5R1lzQ1lsT1ho
-        aHlEU0JVT0JkdGZpSFltMVFGUVI2aHo4c0d5dkFsR2pRcXQ5TzFLUVhCWDZ5Y0RrYThZTklQTUdi
-        bVJya0ptcmNVakUwSUNDbHRkcGZHa3JOMjNUZy9kWlR2OEY5U05kVWZBUVp6NkQxUVZXcG9WYlh0
-        VitkSTFLVTRaMTlYZU1OdldHVnJpOS80ZWQ5ZVNJeVJWb0R4OTNVT1NoaWtiMUxCb01KRGF3TG9H
-        T3FZQkhNWEJCYkN4dmNuMS82Z3llNHlLYjUzcXFHM3VSV2FKZzRJekpwMUdVWmt3dCthM2VFdWtm
-        aWQvNXU3RGtaVWVxQllMSUdhYTVEd2I4YXFNZnNiS0Z5TU5CaWUvS05ybHFlYytUMmVMdHJhSGx0
-        UW5iY1Y0alVMbmErSE9yMGlLRmxubzBxNVQwV0NzZi9BY2JiaFptRzNSbXFzbzUvUEk3cFR1UDlC
-        dFk2ZEQxV2YvTkNVVzJTa3B5UFhNWHhpeVRScCtWTUo0Y0Zaa3J4UzhOd2Y1NENGaUF5ZU42dz09
-      amz-sdk-invocation-id:
-      - !!binary |
-        NDA4ODliMzMtZDZiNS00MDQxLThhMjItMGEwYzY4ODRjZmZh
       amz-sdk-request:
       - !!binary |
         YXR0ZW1wdD0x
@@ -47,7 +15,7 @@ interactions:
     uri: https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-3-5-sonnet-20240620-v1%3A0/invoke
   response:
     body:
-      string: '{"id":"msg_bdrk_012e3kYbWdGLHPvTX7mgZEL5","type":"message","role":"assistant","model":"claude-3-5-sonnet-20240620","content":[{"type":"text","text":"The
+      string: '{"id":"msg_bdrk_01BgG5ZL1hCouMqNyv7ZmLHn","type":"message","role":"assistant","model":"claude-3-5-sonnet-20240620","content":[{"type":"text","text":"The
         capital of France is Paris."}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":14,"output_tokens":10}}'
     headers:
       Connection:
@@ -57,15 +25,15 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 04 Dec 2024 10:21:06 GMT
+      - Thu, 05 Dec 2024 09:53:45 GMT
       X-Amzn-Bedrock-Input-Token-Count:
       - '14'
       X-Amzn-Bedrock-Invocation-Latency:
-      - '532'
+      - '373'
       X-Amzn-Bedrock-Output-Token-Count:
       - '10'
       x-amzn-RequestId:
-      - ceb0979e-b0f2-4049-87a0-9cf0aea542b3
+      - 8264bbb0-26d8-4c90-bc4d-db3de3de6d80
     status:
       code: 200
       message: OK
