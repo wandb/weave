@@ -1,7 +1,9 @@
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Callable
 
 import weave
 from weave.trace.weave_client import Call
+from weave.trace.op_extensions.accumulator import add_accumulator, _IteratorWrapper
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
@@ -10,7 +12,6 @@ if TYPE_CHECKING:
 def bedrock_on_finish_converse(
     call: Call, output: Any, exception: Optional[BaseException]
 ) -> None:
-    print(call, type(call))
     model_name = call.inputs["modelId"]
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
@@ -72,6 +73,79 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
     bedrock_client.invoke_model = op
 
 
+def bedrock_stream_accumulator(
+    acc: Optional[dict],
+    value: dict,
+) -> dict:
+    """Accumulates streaming events into a final response dictionary."""
+    print(f"Accumulator called with acc: {acc}, value: {value}")
+    if acc is None:
+        acc = {
+            'role': None,
+            'content': '',
+            'stop_reason': None,
+            'usage': {
+                'inputTokens': 0,
+                'outputTokens': 0,
+                'totalTokens': 0,
+            },
+            'latency_ms': None,
+        }
+    
+    # Handle 'messageStart' event
+    if 'messageStart' in value:
+        acc['role'] = value['messageStart']['role']
+    
+    # Handle 'contentBlockDelta' event
+    if 'contentBlockDelta' in value:
+        acc['content'] += value['contentBlockDelta']['delta']['text']
+    
+    # Handle 'messageStop' event
+    if 'messageStop' in value:
+        acc['stop_reason'] = value['messageStop']['stopReason']
+    
+    # Handle 'metadata' event
+    if 'metadata' in value:
+        metadata = value['metadata']
+        if 'usage' in metadata:
+            acc['usage']['inputTokens'] = metadata['usage'].get('inputTokens', 0)
+            acc['usage']['outputTokens'] = metadata['usage'].get('outputTokens', 0)
+            acc['usage']['totalTokens'] = metadata['usage'].get('totalTokens', 0)
+        if 'metrics' in metadata:
+            acc['latency_ms'] = metadata['metrics'].get('latencyMs', 0)
+    
+    print("Accumulator updated:", acc)
+    return acc
+
+        
+def create_stream_wrapper(
+    name: str,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op = weave.op(postprocess_inputs=postprocess_inputs)(fn)
+        op.name = name  # type: ignore
+        op._set_on_finish_handler(bedrock_on_finish_converse)
+        class BedrockIteratorWrapper(_IteratorWrapper):
+            def get(self, key: str, default: Any = None) -> Any:
+                """Delegate 'get' method to the response object."""
+                if key == 'stream':
+                    self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.get('stream')
+                    return self
+
+        return add_accumulator(
+            op,
+            make_accumulator=lambda _: bedrock_stream_accumulator,
+            should_accumulate=lambda _: True,
+            iterator_wrapper=BedrockIteratorWrapper,
+        )
+    return wrapper
+
+def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
+    """Patches the converse_stream method to handle streaming."""
+    op = create_stream_wrapper("BedrockRuntime.converse_stream")(bedrock_client.converse_stream)
+    bedrock_client.converse_stream = op
+
 def patch_client(bedrock_client: "BaseClient") -> None:
     _patch_converse(bedrock_client)
     _patch_invoke(bedrock_client)
+    _patch_converse_stream(bedrock_client)
