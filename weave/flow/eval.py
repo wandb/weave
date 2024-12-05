@@ -128,7 +128,8 @@ class Evaluation(Object):
     def _update_display_name(self) -> "Evaluation":
         # Keep the evaluate op's `call_display_name` in sync with `evaluation_name`
         if self.evaluation_name:
-            self.evaluate.call_display_name = self.evaluation_name
+            eval_op = cast(Op, self.evaluate)
+            eval_op.call_display_name = self.evaluation_name
         return self
 
     def model_post_init(self, __context: Any) -> None:
