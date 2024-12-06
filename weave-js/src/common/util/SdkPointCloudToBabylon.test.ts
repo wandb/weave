@@ -178,15 +178,13 @@ describe('getFilteringOptionsForPointCloud', () => {
 describe('loadPointCloud', () => {
   it('appropriate defaults set when loading point cloud from file', () => {
     const fileContents = JSON.stringify({
-      "boxes": [],
-      "points": [
-        []
-      ],
-      "type": "lidar/beta",
-      "vectors": []
-    })
+      boxes: [],
+      points: [[]],
+      type: 'lidar/beta',
+      vectors: [],
+    });
     const babylonPointCloud = loadPointCloud(fileContents);
     expect(babylonPointCloud.points).toHaveLength(1);
-    expect(babylonPointCloud.points[0].position).toEqual([0, 0, 0])
+    expect(babylonPointCloud.points[0].position).toEqual([0, 0, 0]);
   });
 });
