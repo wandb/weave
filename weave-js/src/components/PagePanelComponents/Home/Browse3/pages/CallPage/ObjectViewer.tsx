@@ -23,7 +23,10 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {
+  CustomWeaveTypePayload,
+  isCustomWeaveTypePayload,
+} from '../../typeViews/customWeaveType.types';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -475,9 +478,6 @@ export const ObjectViewer = ({
         }}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
-          const isNonRefString =
-            params.model.valueType === 'string' &&
-            !isWeaveRef(params.model.value);
           const isArray = params.model.valueType === 'array';
           const isTableRef =
             isWeaveRef(params.model.value) &&
@@ -486,16 +486,27 @@ export const ObjectViewer = ({
           const isCustomWeaveType = isCustomWeaveTypePayload(
             params.model.value
           );
-          if (
-            isNonRefString ||
-            (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef ||
-            isCode ||
-            isCustomWeaveType
-          ) {
-            return 'auto';
+          if (!params.model.isLeaf) {
+            return 38;
+          } else if (isCustomWeaveType) {
+            const type = (params.model.value as CustomWeaveTypePayload)
+              .weave_type.type;
+            if (type === 'wave.Wave_read') {
+              return 38;
+            }
+            return 350;
+          } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
+            // Perfectly enough space for 1 page of data rows
+            return 450;
+          } else if (isCode) {
+            // Probably will get negative feedback here since code that is < 20 lines
+            // will have some whitespace below the code. However, we absolutely need
+            // to have static height for all cells else the MUI data grid will jump around
+            // when cleaning up virtual rows.
+            return 375;
+          } else {
+            return 38;
           }
-          return 38;
         }}
         hideFooter
         rowSelection={false}

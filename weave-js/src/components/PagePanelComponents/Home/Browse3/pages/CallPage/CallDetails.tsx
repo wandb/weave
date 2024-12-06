@@ -1,4 +1,3 @@
-import {Typography} from '@mui/material';
 import Box from '@mui/material/Box';
 import _ from 'lodash';
 import React, {FC, useContext, useMemo} from 'react';
@@ -10,9 +9,7 @@ import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
-import {KeyValueTable} from '../common/KeyValueTable';
-import {CallLink, opNiceName} from '../common/Links';
-import {CenteredAnimatedLoader} from '../common/Loader';
+import {CallLink} from '../common/Links';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
@@ -104,7 +101,7 @@ export const CallDetails: FC<{
     columns
   );
 
-  const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
+  const {multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
   );
@@ -132,8 +129,10 @@ export const CallDetails: FC<{
         }}>
         <Box
           sx={{
-            flex: '1 1 100px',
-            overflow: 'hidden',
+            // flex: '1 1 100px',
+            // minHeight: '300px',
+            maxHeight: 'calc(100% - 70px)',
+            // overflow: 'hidden',
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
@@ -143,8 +142,13 @@ export const CallDetails: FC<{
         </Box>
         <Box
           sx={{
-            flex: '1 1 100px',
-            overflow: 'hidden',
+            // minHeight: '300px',
+            // flex: '1 1 100px',
+            // maxHeight: '100%',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? 70 : 0
+            }px)`,
+            // overflow: 'hidden',
             p: 2,
           }}>
           {'traceback' in excInfo ? (
@@ -201,7 +205,9 @@ export const CallDetails: FC<{
             <Box
               key={opVersionRef}
               sx={{
-                flex: '1 1 100px',
+                flex: '0 0 auto',
+                height: '500px',
+                maxHeight: 'calc(100% - 70px)',
                 overflow: 'hidden',
                 p: 2,
                 display: 'flex',
@@ -233,7 +239,9 @@ export const CallDetails: FC<{
               </Box>
               <Box
                 sx={{
-                  flex: '1 1 100px',
+                  flex: '1 1 auto',
+                  maxHeight: 'calc(100% - 70px)',
+                  // maxHeight: '100%',
                   overflow: 'hidden',
                 }}>
                 {callsTable}
@@ -241,34 +249,6 @@ export const CallDetails: FC<{
             </Box>
           );
         })}
-        {childCalls.loading && <CenteredAnimatedLoader />}
-        {/* Disabling display of singular children while we decide if we want them here. */}
-        {false && singularChildCalls.length > 0 && (
-          <Box
-            sx={{
-              flex: '1 1 100px',
-              overflow: 'hidden',
-            }}>
-            {multipleChildCallOpRefs.length === 0 ? (
-              <Typography pl={1}>Child calls</Typography>
-            ) : (
-              <Typography pl={1}>Singular child calls</Typography>
-            )}
-            {singularChildCalls.map(c => (
-              <Box
-                key={c.callId}
-                sx={{
-                  flex: '0 0 auto',
-                  p: 2,
-                }}>
-                <KeyValueTable
-                  headerTitle={opNiceName(c.spanName)}
-                  data={getDisplayInputsAndOutput(c)}
-                />
-              </Box>
-            ))}
-          </Box>
-        )}
       </Box>
     </Box>
   );
