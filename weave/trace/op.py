@@ -662,6 +662,8 @@ def op(
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
                 if len(params) != 1:
@@ -677,6 +679,23 @@ def op(
     if func is None:
         return op_deco
     return op_deco(func)
+
+
+def get_captured_code(op: Op) -> str:
+    """Get the captured code of the op.
+
+    This only works when you get an op back from a ref.  The pattern is:
+
+    ref = weave.publish(func)
+    op = ref.get()
+    captured_code = op.get_captured_code()
+    """
+    try:
+        return op.art.path_contents["obj.py"].decode()  # type: ignore
+    except Exception:
+        raise RuntimeError(
+            "Failed to get captured code for op (this only works when you get an op back from a ref)."
+        )
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:

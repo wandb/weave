@@ -14,34 +14,31 @@ const AnnotationScorerFormSchema = z.object({
   Description: z.string().optional(),
   Type: z.discriminatedUnion('type', [
     z.object({
-      type: z.literal('boolean'),
+      type: z.literal('Boolean'),
     }),
     z.object({
-      type: z.literal('integer'),
-      minimum: z.number().optional().describe('Optional minimum value'),
-      maximum: z.number().optional().describe('Optional maximum value'),
+      type: z.literal('Integer'),
+      Minimum: z.number().optional(),
+      Maximum: z.number().optional(),
     }),
     z.object({
-      type: z.literal('number'),
-      minimum: z.number().optional().describe('Optional minimum value'),
-      maximum: z.number().optional().describe('Optional maximum value'),
+      type: z.literal('Number'),
+      Minimum: z.number().optional(),
+      Maximum: z.number().optional(),
     }),
     z.object({
-      type: z.literal('string'),
-      maxLength: z
-        .number()
-        .optional()
-        .describe('Optional maximum length of the string'),
+      type: z.literal('String'),
+      'Max length': z.number().optional(),
     }),
     z.object({
-      type: z.literal('options'),
-      enum: z.array(z.string()).describe('List of options to choose from'),
+      type: z.literal('Select'),
+      'Select options': z.array(z.string()).min(1),
     }),
   ]),
 });
 
 const DEFAULT_STATE = {
-  Type: {type: 'boolean'},
+  Type: {type: 'Boolean'},
 } as z.infer<typeof AnnotationScorerFormSchema>;
 
 export const AnnotationScorerForm: FC<
@@ -84,10 +81,8 @@ export const onAnnotationScorerSave = async (
   data: z.infer<typeof AnnotationScorerFormSchema>,
   client: TraceServerClient
 ) => {
-  let type = data.Type.type;
-  if (type === 'options') {
-    type = 'string';
-  }
+  const jsonSchemaType = convertTypeToJsonSchemaType(data.Type.type);
+  const typeExtras = convertTypeExtrasToJsonSchema(data);
   return createBaseObjectInstance(client, 'AnnotationSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
@@ -96,10 +91,34 @@ export const onAnnotationScorerSave = async (
         name: data.Name,
         description: data.Description,
         field_schema: {
-          ...data.Type,
-          type,
+          ...typeExtras,
+          type: jsonSchemaType,
         },
       },
     },
   });
 };
+
+function convertTypeToJsonSchemaType(type: string) {
+  // Special case for Options, which is a string with an enum
+  if (type === 'Select') {
+    return 'string';
+  }
+  return type.toLowerCase();
+}
+
+function convertTypeExtrasToJsonSchema(
+  obj: z.infer<typeof AnnotationScorerFormSchema>
+) {
+  const typeSchema = obj.Type;
+  const typeExtras: Record<string, any> = {};
+  if (typeSchema.type === 'String') {
+    typeExtras.maxLength = typeSchema['Max length'];
+  } else if (typeSchema.type === 'Integer' || typeSchema.type === 'Number') {
+    typeExtras.minimum = typeSchema.Minimum;
+    typeExtras.maximum = typeSchema.Maximum;
+  } else if (typeSchema.type === 'Select') {
+    typeExtras.enum = typeSchema['Select options'];
+  }
+  return typeExtras;
+}

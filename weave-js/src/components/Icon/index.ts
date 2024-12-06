@@ -8,6 +8,7 @@ export {
   IconArea,
   IconArtifactTypeAlt,
   IconAudioVolume,
+  IconAutomatedWorkspace,
   IconAutomationRobotArm,
   IconBack,
   IconBaselineAlt,
