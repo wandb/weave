@@ -117,12 +117,13 @@ export const PlaygroundChat = ({
                 sx={{
                   backgroundColor: 'white',
                   borderBottom: `1px solid ${MOON_200}`,
-                  display: 'flex',
-                  alignItems: 'center',
                   position: 'absolute',
                   top: '0',
                   width: '100%',
-                  padding: '0 16px 0 16px 0',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
