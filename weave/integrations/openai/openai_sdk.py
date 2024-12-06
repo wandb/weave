@@ -94,8 +94,9 @@ def openai_on_finish_post_processor(
                 )
         return _tool_calls
 
+    dump = None
     if isinstance(value, ChatCompletionChunk):
-        final_value = ChatCompletion(
+        dump = ChatCompletion(
             id=value.id,
             choices=[
                 {
@@ -116,10 +117,14 @@ def openai_on_finish_post_processor(
             object="chat.completion",
             system_fingerprint=value.system_fingerprint,
             usage=value.usage if hasattr(value, "usage") else None,
-        )
-        return final_value.model_dump(exclude_unset=True, exclude_none=True)
-    else:
+        ).model_dump(exclude_unset=True, exclude_none=True)
+    elif not hasattr(value, "model_dump"):
         return value
+    else:
+        dump = value.model_dump(exclude_unset=True, exclude_none=True)
+    if hasattr(value, "_request_id"):
+        dump["request_id"] = value._request_id
+    return dump
 
 
 def openai_accumulator(

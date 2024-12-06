@@ -1,5 +1,6 @@
 import _ from 'lodash';
 
+import {CachingTraceServerClient} from './traceServerCachingClient';
 import {
   CompletionsCreateReq,
   CompletionsCreateRes,
@@ -14,12 +15,11 @@ import {
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
-import {DirectTraceServerClient} from './traceServerDirectClient';
 
 const DEFAULT_BATCH_INTERVAL = 150;
 const MAX_REFS_PER_BATCH = 1000;
 
-export class TraceServerClient extends DirectTraceServerClient {
+export class TraceServerClient extends CachingTraceServerClient {
   private readBatchCollectors: Array<{
     req: TraceRefsReadBatchReq;
     resolvePromise: (res: TraceRefsReadBatchRes) => void;

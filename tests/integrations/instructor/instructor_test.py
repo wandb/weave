@@ -64,7 +64,7 @@ def test_instructor_openai(
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
     output_arguments = json.loads(
-        output.choices[0].message.tool_calls[0].function.arguments
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
     )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
@@ -112,7 +112,7 @@ def test_instructor_openai_async(
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
     output_arguments = json.loads(
-        output.choices[0].message.tool_calls[0].function.arguments
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
     )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
@@ -166,7 +166,7 @@ def test_instructor_iterable(
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
-    output_arguments = json.loads(output.choices[0].message.content)
+    output_arguments = json.loads(output["choices"][0]["message"]["content"])
     assert "tasks" in output_arguments
     assert "person_name" in output_arguments["tasks"][0]
     assert "age" in output_arguments["tasks"][0]
