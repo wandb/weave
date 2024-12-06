@@ -13,7 +13,7 @@ import {
 import {DirectTraceServerClient} from './traceServerDirectClient';
 
 interface CacheConfig {
-  maxSize: number;
+  max: number;
   getCacheKey: (req: any) => string;
 }
 
@@ -29,29 +29,29 @@ export class CachingTraceServerClient extends DirectTraceServerClient {
 
     // Configure caches for specific methods
     this.addCache('fileContent', {
-      maxSize: 1000,
+      max: 1000,
       getCacheKey: (req: TraceFileContentReadReq) => JSON.stringify(req),
     });
 
     this.addCache('objRead', {
-      maxSize: 1000,
+      max: 1000,
       getCacheKey: (req: TraceObjReadReq) => JSON.stringify(req),
     });
 
     this.addCache('tableQuery', {
-      maxSize: 1000,
+      max: 1000,
       getCacheKey: (req: TraceTableQueryReq) => JSON.stringify(req),
     });
 
     this.addCache('tableQueryStats', {
-      maxSize: 1000,
+      max: 1000,
       getCacheKey: (req: TraceTableQueryStatsReq) => JSON.stringify(req),
     });
   }
 
   protected addCache(methodName: string, config: CacheConfig) {
     this.caches.set(methodName, {
-      cache: new LRUCache({max: config.maxSize}),
+      cache: new LRUCache({max: config.max}),
       config,
     });
   }
