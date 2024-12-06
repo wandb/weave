@@ -10,7 +10,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     Scorers are passed to a `weave.Evaluation` object during evaluation. There are three types of Scorers available for Python:
 
     1. [Predefined scorer](../evaluation/predefined-scorers.md): Pre-built scorers designed for common use cases.
-    2. [Function-based Scorers](../evaluation/custom-scorers.md#function-based-scorers): Simple Python functions decorated with `@weave.op`.
+    2. [Function-based Scorers](../evaluation/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
     3. [Class-based Scorers](../evaluation/custom-scorers.md#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
 
     Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as text returned from a LLM-evaluator about its reasoning. See the [Custom scorers page](../evaluation/custom-scorers.md) for more information.
@@ -19,7 +19,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
   <TabItem value="typescript" label="TypeScript">
     Scorers are special ops passed to a `weave.Evaluation` object during evaluation.
 
-    Only [function-based scorers](](../evaluation/custom-scorers.md#function-based-scorers)) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you must use Python.
+    Only [function-based scorers](../evaluation/custom-scorers.md#function-based-scorers) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you must use Python.
   </TabItem>
 </Tabs>
 

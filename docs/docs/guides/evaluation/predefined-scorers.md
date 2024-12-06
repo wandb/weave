@@ -405,7 +405,7 @@ model_id="your-model-id"
 
 #### Example
 
-See the [`ContextRelevancyScorer` example](#example-6).
+See the [`ContextRelevancyScorer` example](#example-5).
 
 ---
 
@@ -415,7 +415,7 @@ See the [`ContextRelevancyScorer` example](#example-6).
 The `ContextRelevancyScorer` is based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library
 :::
 
-The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It helps tp determine if the context used is appropriate for generating the output. The works by using an LLM to rate the relevancy of the context to the output. The rating scale is from `0` to `1`, with `0` being least relevant and `1` being most relevant. `ContextRelevancyScorer` then returns a dictionary with the `relevancy_score`. For further usage information, see [Usage notes](#usage-notes-5) and the [example](#example-5).
+The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It helps tp determine if the context used is appropriate for generating the output. The works by using an LLM to rate the relevancy of the context to the output. The rating scale is from `0` to `1`, with `0` being least relevant and `1` being most relevant. `ContextRelevancyScorer` then returns a dictionary with the `relevancy_score`. For further usage information, see [Usage notes](#usage-notes-5) and the [example](#example-4).
 
 
 ```python

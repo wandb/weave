@@ -6,7 +6,7 @@ import TabItem from '@theme/TabItem';
 In Weave, you can create your own custom scorers. The Scorers can either be class-based or function-based. 
 
 :::tip
-If you're using Python, there are various  predefined scorers available for common use cases. For more information, see [Select a predefined scorer](../evaluation/predefined-scorers.md#which-predefined-scorer-should-i-use) on the [Predefined scorers page](../evaluation/predefined-scorers.md).
+If you're using Python, there are various  predefined scorers available for common use cases. For more information, see [Select a predefined scorer](../evaluation/predefined-scorers.md#select-a-predefined-scorer) on the [Predefined scorers page](../evaluation/predefined-scorers.md).
 :::
 
 ## Select the right type of custom scorer
@@ -79,6 +79,7 @@ Function-based scorers are available in both Python and Typescript.
 
   </TabItem>
 </Tabs>
+
 
 ## Class-based Scorers
 

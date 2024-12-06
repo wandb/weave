@@ -43,8 +43,8 @@ The options available depend on whether you are using Typescript or Python:
   There are three types of scorers available for Python:
 
     1. [Predefined scorer](../evaluation/predefined-scorers.md): Pre-built scorers designed for common use cases.
-    2. [Function-based scorers](../evaluation/custom-scorers.md#function-based-scorers): Simple Python functions decorated with `@weave.op`.
-    3. [Class-based scorers](../evaluation/custom-scorers.md#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
+    2. [Function-based scorers](../evaluation/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
+    3. [Class-based scorers](../evaluation/custom-scorers#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
 
     In the following example, the function-based scorer `match_score1()` will take `expected` from the dictionary for scoring.
 
@@ -67,7 +67,7 @@ The options available depend on whether you are using Typescript or Python:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-     Only [function-based scorers](](../evaluation/custom-scorers.md#function-based-scorers)) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you must use Python.
+     Only [function-based scorers](../evaluation/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you must use Python.
   </TabItem>
 </Tabs>
 
