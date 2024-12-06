@@ -365,37 +365,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             growth_factor=10,
         )
 
-        # Process in batches to avoid memory issues
-        for batch in batch_processor.process(raw_res):
+        for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            hydrated_calls = self._hydrate_calls(
-                req.project_id, call_dicts, expand_columns, include_feedback, ref_cache
-            )
-            for call in hydrated_calls:
+
+            if expand_columns:
+                self._expand_call_refs(
+                    req.project_id, call_dicts, expand_columns, ref_cache
+                )
+
+            if include_feedback:
+                self._add_feedback_to_calls(req.project_id, call_dicts)
+
+            for call in call_dicts:
                 yield tsi.CallSchema.model_validate(call)
 
-    def _hydrate_calls(
-        self,
-        project_id: str,
-        calls: list[dict[str, Any]],
-        expand_columns: list[str],
-        include_feedback: bool,
-        ref_cache: LRUCache,
-    ) -> list[dict[str, Any]]:
-        if len(calls) == 0:
-            return calls
-
-        if expand_columns:
-            self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
-
-        if include_feedback:
-            self._hydrate_calls_with_feedback(project_id, calls)
-
-        return calls
-
-    def _hydrate_calls_with_feedback(
+    def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
     ) -> None:
+        if len(calls) == 0:
+            return
+
         feedback_query_req = make_feedback_query_req(project_id, calls)
         with self.use_secondary_client():
             feedback = self.feedback_query(feedback_query_req)
@@ -431,6 +420,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         expand_columns: list[str],
         ref_cache: LRUCache,
     ) -> None:
+        if len(calls) == 0:
+            return
+
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)
         for col in expand_columns:
@@ -1532,8 +1524,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def use_secondary_client(self) -> Iterator[None]:
         """Context manager to temporarily use the secondary client for all operations
 
-        Primary and secondary client connections have separate session IDs, so we can
-        safely use them concurrently.
+        Primary and secondary client connections have separate clickhouse session IDs,
+        we can safely use them concurrently.
 
         Usage:
         ```
@@ -1547,15 +1539,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._use_secondary_client = False
 
+    @staticmethod
+    def _client_is_initialized(thread_local: threading.local) -> bool:
+        return hasattr(thread_local, "ch_client")
+
     @property
     def ch_client(self) -> CHClient:
-        """Returns either the primary or secondary client based on context"""
+        """Returns and creates (if necessary) the clickhouse client based on context"""
         if self._use_secondary_client:
-            if not hasattr(self._secondary_thread_local, "ch_client"):
+            if not self._client_is_initialized(self._secondary_thread_local):
                 self._secondary_thread_local.ch_client = self._mint_client()
             return self._secondary_thread_local.ch_client
 
-        if not hasattr(self._thread_local, "ch_client"):
+        if not self._client_is_initialized(self._thread_local):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 

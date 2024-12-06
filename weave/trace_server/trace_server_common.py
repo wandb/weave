@@ -179,8 +179,7 @@ class DynamicBatchProcessor:
         self.max_size = max_size
         self.growth_factor = growth_factor
 
-    def process(self, iterator: Iterator[Any]) -> Iterator[list[Any]]:
-        """Process an iterator into dynamically sized batches."""
+    def make_batches(self, iterator: Iterator[Any]) -> Iterator[list[Any]]:
         batch = []
 
         for item in iterator:
@@ -188,13 +187,15 @@ class DynamicBatchProcessor:
 
             if len(batch) >= self.batch_size:
                 yield batch
+
                 batch = []
-                self.batch_size = min(
-                    self.max_size, self.batch_size * self.growth_factor
-                )
+                self.batch_size = self._compute_batch_size()
 
         if batch:
             yield batch
+
+    def _compute_batch_size(self) -> int:
+        return min(self.max_size, self.batch_size * self.growth_factor)
 
 
 def digest_is_version_like(digest: str) -> tuple[bool, int]:

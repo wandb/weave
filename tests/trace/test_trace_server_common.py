@@ -66,7 +66,7 @@ def test_dynamic_batch_processor():
 
     test_data = range(15)
 
-    batches = list(processor.process(iter(test_data)))
+    batches = list(processor.make_batches(iter(test_data)))
 
     # Expected batch sizes: 2, 4, 8, 1
     assert batches[0] == [0, 1]
