@@ -27,6 +27,7 @@ import {
   CustomWeaveTypePayload,
   isCustomWeaveTypePayload,
 } from '../../typeViews/customWeaveType.types';
+import {getCustomWeaveTypePreferredRowHeight} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -50,6 +51,10 @@ import {
   TraverseContext,
 } from './traverse';
 import {ValueView} from './ValueView';
+
+const DEFAULT_ROW_HEIGHT = 38;
+const CODE_ROW_HEIGHT = 350;
+const TABLE_ROW_HEIGHT = 450;
 
 type Data = Record<string, any> | any[];
 
@@ -487,25 +492,28 @@ export const ObjectViewer = ({
             params.model.value
           );
           if (!params.model.isLeaf) {
-            return 38;
+            // This is a group header, so we want to use the default height
+            return DEFAULT_ROW_HEIGHT;
           } else if (isCustomWeaveType) {
             const type = (params.model.value as CustomWeaveTypePayload)
               .weave_type.type;
-            if (type === 'wave.Wave_read') {
-              return 38;
+            const preferredRowHeight =
+              getCustomWeaveTypePreferredRowHeight(type);
+            if (preferredRowHeight) {
+              return preferredRowHeight;
             }
-            return 350;
+            return DEFAULT_ROW_HEIGHT;
           } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
             // Perfectly enough space for 1 page of data rows
-            return 450;
+            return TABLE_ROW_HEIGHT;
           } else if (isCode) {
             // Probably will get negative feedback here since code that is < 20 lines
             // will have some whitespace below the code. However, we absolutely need
             // to have static height for all cells else the MUI data grid will jump around
             // when cleaning up virtual rows.
-            return 375;
+            return CODE_ROW_HEIGHT;
           } else {
-            return 38;
+            return DEFAULT_ROW_HEIGHT;
           }
         }}
         hideFooter

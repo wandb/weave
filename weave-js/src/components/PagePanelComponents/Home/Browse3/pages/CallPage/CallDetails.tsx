@@ -129,10 +129,8 @@ export const CallDetails: FC<{
         }}>
         <Box
           sx={{
-            // flex: '1 1 100px',
-            // minHeight: '300px',
+            flex: '0 0 auto',
             maxHeight: 'calc(100% - 70px)',
-            // overflow: 'hidden',
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
@@ -142,13 +140,10 @@ export const CallDetails: FC<{
         </Box>
         <Box
           sx={{
-            // minHeight: '300px',
-            // flex: '1 1 100px',
-            // maxHeight: '100%',
+            flex: '0 0 auto',
             maxHeight: `calc(100% - ${
               multipleChildCallOpRefs.length > 0 ? 70 : 0
             }px)`,
-            // overflow: 'hidden',
             p: 2,
           }}>
           {'traceback' in excInfo ? (
@@ -207,8 +202,6 @@ export const CallDetails: FC<{
               sx={{
                 flex: '0 0 auto',
                 height: '500px',
-                maxHeight: 'calc(100% - 70px)',
-                overflow: 'hidden',
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -240,8 +233,6 @@ export const CallDetails: FC<{
               <Box
                 sx={{
                   flex: '1 1 auto',
-                  maxHeight: 'calc(100% - 70px)',
-                  // maxHeight: '100%',
                   overflow: 'hidden',
                 }}>
                 {callsTable}
