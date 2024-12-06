@@ -382,7 +382,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return
 
         feedback_query_req = make_feedback_query_req(project_id, calls)
-        feedback = self.feedback_query(feedback_query_req)
+        with self.with_new_client():
+            feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
@@ -430,9 +431,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            vals = self._refs_read_batch_within_project(
-                project_id, list(refs_to_resolve.values()), ref_cache
-            )
+            with self.with_new_client():
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(refs_to_resolve.values()), ref_cache
+                )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
@@ -1503,6 +1505,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the clickhouse client"""
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
@@ -1519,6 +1522,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
+
+    @contextmanager
+    def with_new_client(self) -> Iterator[None]:
+        """Context manager to use a new client for operations.
+        Each call gets a fresh client with its own clickhouse session ID.
+
+        Usage:
+        ```
+        with self.with_new_client():
+            self.feedback_query(req)
+        ```
+        """
+        client = self._mint_client()
+        original_client = self.ch_client
+        self._thread_local.ch_client = client
+        try:
+            yield
+        finally:
+            self._thread_local.ch_client = original_client
+            client.close()
 
     # def __del__(self) -> None:
     #     self.ch_client.close()
