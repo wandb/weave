@@ -125,7 +125,7 @@ The following example shows an evaluation that uses `dataset` and two scorers, `
 from weave import Evaluation, Model
 import weave
 import asyncio
-weave.init('intro-example')
+
 examples = [
     {"question": "What is the capital of France?", "expected": "Paris"},
     {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
