@@ -29,7 +29,13 @@ import {
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Switch} from '@wandb/weave/components';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
-import {Icon} from '@wandb/weave/components/Icon';
+import {
+  Icon,
+  IconNotVisible,
+  IconPinToRight,
+  IconSortAscending,
+  IconSortDescending,
+} from '@wandb/weave/components/Icon';
 import React, {
   FC,
   useCallback,
@@ -45,7 +51,7 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -1069,6 +1075,13 @@ export const CallsTable: FC<{
           },
           columnMenu: CallsCustomColumnMenu,
           pagination: PaginationButtons,
+          columnMenuSortDescendingIcon: IconSortDescending,
+          columnMenuSortAscendingIcon: IconSortAscending,
+          columnMenuHideIcon: IconNotVisible,
+          columnMenuPinLeftIcon: () => (
+            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+          ),
+          columnMenuPinRightIcon: IconPinToRight,
         }}
       />
     </FilterLayoutTemplate>
