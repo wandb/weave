@@ -185,6 +185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
+        self._secondary_thread_local = threading.local()  # Separate connection for secondary queries
         self._host = host
         self._port = port
         self._user = user
@@ -382,11 +383,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(calls) == 0:
             return calls
 
-        if expand_columns:
-            self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        with self.secondary_client.query_context():
+            if expand_columns:
+                self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
 
-        if include_feedback:
-            self._hydrate_calls_with_feedback(project_id, calls)
+            if include_feedback:
+                self._hydrate_calls_with_feedback(project_id, calls)
 
         return calls
 
@@ -1515,6 +1517,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
+
+    @property
+    def secondary_client(self) -> CHClient:
+        """Separate client instance for secondary queries to avoid stream conflicts"""
+        if not hasattr(self._secondary_thread_local, "ch_client"):
+            self._secondary_thread_local.ch_client = self._mint_client()
+        return self._secondary_thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
