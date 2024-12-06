@@ -185,7 +185,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
-        self._secondary_thread_local = threading.local()  # Separate connection for secondary queries
+        self._secondary_thread_local = (
+            threading.local()
+        )  # Separate connection for secondary queries
         self._host = host
         self._port = port
         self._user = user
@@ -383,20 +385,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(calls) == 0:
             return calls
 
-        with self.secondary_client.query_context():
-            if expand_columns:
-                self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        client = self.secondary_client
+        if expand_columns:
+            self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
 
-            if include_feedback:
-                self._hydrate_calls_with_feedback(project_id, calls)
+        if include_feedback:
+            self._hydrate_calls_with_feedback(client, project_id, calls)
 
         return calls
 
     def _hydrate_calls_with_feedback(
-        self, project_id: str, calls: list[dict[str, Any]]
+        self, client: CHClient, project_id: str, calls: list[dict[str, Any]]
     ) -> None:
         feedback_query_req = make_feedback_query_req(project_id, calls)
-        feedback = self.feedback_query(feedback_query_req)
+        req_raw = feedback_query_req.model_dump()
+        feedback = self._feedback_query(client, **req_raw)
         hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
@@ -1369,17 +1372,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             payload=res_payload,
         )
 
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+    def _feedback_query(
+        self,
+        client: CHClient,
+        project_id: str,
+        fields: list[str] | None,
+        req_query: tsi.Query | None,
+        sort_by: list[tsi.SortBy] | None,
+        limit: int | None,
+        offset: int | None,
+    ) -> list[Row]:
         query = TABLE_FEEDBACK.select()
-        query = query.project_id(req.project_id)
-        query = query.fields(req.fields)
-        query = query.where(req.query)
-        query = query.order_by(req.sort_by)
-        query = query.limit(req.limit).offset(req.offset)
+        query = query.project_id(project_id)
+        query = query.fields(fields)
+        query = query.where(req_query)
+        query = query.order_by(sort_by)
+        query = query.limit(limit).offset(offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
+        )
+        return result
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        client = self.secondary_client
+        result = self._feedback_query(
+            client,
+            req.project_id,
+            req.fields,
+            req.query,
+            req.sort_by,
+            req.limit,
+            req.offset,
         )
         return tsi.FeedbackQueryRes(result=result)
 

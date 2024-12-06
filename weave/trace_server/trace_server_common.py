@@ -49,12 +49,12 @@ def make_feedback_query_req(
 
 
 def hydrate_calls_with_feedback(
-    calls: list[dict[str, Any]], feedback: tsi.FeedbackQueryRes
+    calls: list[dict[str, Any]], feedback: list[dict[str, Any]]
 ) -> None:
     """Hydrate calls with feedback inplace."""
     feedback_map = defaultdict(list)
     # map feedback to calls
-    for feedback_item in feedback.result:
+    for feedback_item in feedback:
         uri = ri.parse_internal_uri(feedback_item["weave_ref"])
         if isinstance(uri, ri.InternalCallRef):
             feedback_map[uri.id].append(feedback_item)
