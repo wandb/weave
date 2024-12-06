@@ -74,6 +74,7 @@ export {
   IconExportShareUpload,
   IconFacebookSocial,
   IconFailed,
+  IconFilledCircle,
   IconFilterAlt,
   IconFlashBolt,
   IconFolderAlt,

@@ -74,6 +74,7 @@ import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-
 import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
+import {ReactComponent as ImportFilledCircle} from '../../assets/icons/icon-filled-circle.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
@@ -498,6 +499,9 @@ export const IconFacebookSocial = (props: SVGIconProps) => (
 );
 export const IconFailed = (props: SVGIconProps) => (
   <ImportFailed {...updateIconProps(props)} />
+);
+export const IconFilledCircle = (props: SVGIconProps) => (
+  <ImportFilledCircle {...updateIconProps(props)} />
 );
 export const IconFilterAlt = (props: SVGIconProps) => (
   <ImportFilterAlt {...updateIconProps(props)} />
@@ -1142,6 +1146,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'export-share-upload': IconExportShareUpload,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
+  'filled-circle': IconFilledCircle,
   'filter-alt': IconFilterAlt,
   'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
