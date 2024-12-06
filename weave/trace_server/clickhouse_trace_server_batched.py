@@ -95,6 +95,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    DynamicBatchProcessor,
     LRUCache,
     digest_is_version_like,
     empty_str_to_none,
@@ -184,6 +185,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
+        self._secondary_thread_local = threading.local()
+        self._use_secondary_client = False
+
         self._host = host
         self._port = port
         self._user = user
@@ -343,68 +347,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
 
-        if not req.expand_columns and not req.include_feedback:
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+
+        if not expand_columns and not include_feedback:
             for row in raw_res:
-                yield tsi.CallSchema.model_validate(
-                    _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            return
+
+        ref_cache = LRUCache(max_size=1000)
+        batch_processor = DynamicBatchProcessor(
+            initial_size=100,
+            max_size=MAX_CALLS_STREAM_BATCH_SIZE,
+            growth_factor=10,
+        )
+
+        for batch in batch_processor.make_batches(raw_res):
+            call_dicts = [row_to_call_schema_dict(row) for row in batch]
+
+            if expand_columns:
+                self._expand_call_refs(
+                    req.project_id, call_dicts, expand_columns, ref_cache
                 )
 
-        else:
-            expand_columns = req.expand_columns or []
-            ref_cache = LRUCache(max_size=1000)
+            if include_feedback:
+                self._add_feedback_to_calls(req.project_id, call_dicts)
 
-            batch_size = 10
-            batch = []
-            for row in raw_res:
-                call_dict = _ch_call_dict_to_call_schema_dict(
-                    dict(zip(select_columns, row))
-                )
-                batch.append(call_dict)
-
-                if len(batch) >= batch_size:
-                    hydrated_batch = self._hydrate_calls(
-                        req.project_id,
-                        batch,
-                        expand_columns,
-                        req.include_feedback or False,
-                        ref_cache,
-                    )
-                    for call in hydrated_batch:
-                        yield tsi.CallSchema.model_validate(call)
-
-                    # *** Dynamic increase from 10 to 500 ***
-                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
-                    batch = []
-
-            hydrated_batch = self._hydrate_calls(
-                req.project_id,
-                batch,
-                expand_columns,
-                req.include_feedback or False,
-                ref_cache,
-            )
-            for call in hydrated_batch:
+            for call in call_dicts:
                 yield tsi.CallSchema.model_validate(call)
 
-    def _hydrate_calls(
-        self,
-        project_id: str,
-        calls: list[dict[str, Any]],
-        expand_columns: list[str],
-        include_feedback: bool,
-        ref_cache: LRUCache,
-    ) -> list[dict[str, Any]]:
+    def _add_feedback_to_calls(
+        self, project_id: str, calls: list[dict[str, Any]]
+    ) -> None:
         if len(calls) == 0:
-            return calls
+            return
 
-        self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
-        if include_feedback:
-            feedback_query_req = make_feedback_query_req(project_id, calls)
+        feedback_query_req = make_feedback_query_req(project_id, calls)
+        with self.use_secondary_client():
             feedback = self.feedback_query(feedback_query_req)
-            hydrate_calls_with_feedback(calls, feedback)
-
-        return calls
+        hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
@@ -436,6 +420,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         expand_columns: list[str],
         ref_cache: LRUCache,
     ) -> None:
+        if len(calls) == 0:
+            return
+
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)
         for col in expand_columns:
@@ -448,9 +435,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            vals = self._refs_read_batch_within_project(
-                project_id, list(refs_to_resolve.values()), ref_cache
-            )
+            with self.use_secondary_client():
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(refs_to_resolve.values()), ref_cache
+                )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
@@ -1519,12 +1507,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     # Private Methods
-    @property
-    def ch_client(self) -> CHClient:
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
-
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
@@ -1537,6 +1519,41 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
+
+    @contextmanager
+    def use_secondary_client(self) -> Iterator[None]:
+        """Context manager to temporarily use the secondary client for all operations
+
+        Primary and secondary client connections have separate clickhouse session IDs,
+        we can safely use them concurrently.
+
+        Usage:
+        ```
+        with self.use_secondary_client():
+            self.feedback_query(req)
+        ```
+        """
+        self._use_secondary_client = True
+        try:
+            yield
+        finally:
+            self._use_secondary_client = False
+
+    @staticmethod
+    def _client_is_initialized(thread_local: threading.local) -> bool:
+        return hasattr(thread_local, "ch_client")
+
+    @property
+    def ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the clickhouse client based on context"""
+        if self._use_secondary_client:
+            if not self._client_is_initialized(self._secondary_thread_local):
+                self._secondary_thread_local.ch_client = self._mint_client()
+            return self._secondary_thread_local.ch_client
+
+        if not self._client_is_initialized(self._thread_local):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
 
     # def __del__(self) -> None:
     #     self.ch_client.close()
