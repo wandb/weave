@@ -121,7 +121,8 @@ class MessagesPrompt(Prompt):
         return prompt
 
 
-class EasyPrompt(UserList, Prompt):
+# TODO: error: Definition of "copy" in base class "UserList" is incompatible with definition in base class "BaseModel"
+class EasyPrompt(UserList, Prompt):  # type: ignore
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
     requirements: dict = Field(default_factory=dict)
@@ -153,9 +154,11 @@ class EasyPrompt(UserList, Prompt):
             for item in content:
                 self.append(item, role=role, dedent=dedent)
 
-    def __add__(self, other: Any) -> "Prompt":
+    # TODO: error: Return type "Prompt" of "__add__" incompatible with return type "EasyPrompt" in supertype "UserList"
+    def __add__(self, other: Any) -> "Prompt":  # type: ignore
         new_prompt = self.copy()
-        new_prompt += other
+        # TODO: error: Result type of + incompatible in assignment
+        new_prompt += other  # type: ignore
         return new_prompt
 
     def append(
@@ -180,7 +183,8 @@ class EasyPrompt(UserList, Prompt):
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
-    def __iadd__(self, item: Any) -> "Prompt":
+    # TODO: error: Return type "Prompt" of "__iadd__" incompatible with return type "EasyPrompt" in supertype "UserList"
+    def __iadd__(self, item: Any) -> "Prompt":  # type: ignore
         self.append(item)
         return self
 
@@ -197,7 +201,8 @@ class EasyPrompt(UserList, Prompt):
     @property
     def system_prompt(self) -> "Prompt":
         """Join all messages into a system prompt object."""
-        return Prompt(self.as_str, role="system")
+        # TODO: error: Unexpected keyword argument "role" for "Prompt"
+        return Prompt(self.as_str, role="system")  # type: ignore
 
     @property
     def messages(self) -> list[Message]:
@@ -266,7 +271,8 @@ class EasyPrompt(UserList, Prompt):
         if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], dict):
             kwargs = args[0]
         prompt = self.bind(kwargs)
-        return list(prompt)
+        # TODO: error: Argument 1 to "list" has incompatible type "Prompt"; expected "Iterable[Message]"
+        return list(prompt)  # type: ignore
 
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
@@ -305,10 +311,14 @@ class EasyPrompt(UserList, Prompt):
             new_prompt = Prompt()
             new_prompt.name = self.name
             new_prompt.description = self.description
-            new_prompt.data = self.data[key]
-            new_prompt.config = self.config.copy()
-            new_prompt.requirements = self.requirements.copy()
-            new_prompt._values = self._values.copy()
+            # TODO: error: "Prompt" has no attribute "data"
+            new_prompt.data = self.data[key]  # type: ignore
+            # TODO: error: "Prompt" has no attribute "config"
+            new_prompt.config = self.config.copy()  # type: ignore
+            # TODO: error: "Prompt" has no attribute "requirements"
+            new_prompt.requirements = self.requirements.copy()  # type: ignore
+            # TODO: error: "Prompt" has no attribute "_values"
+            new_prompt._values = self._values.copy()  # type: ignore
             return new_prompt
         elif isinstance(key, str):
             if key == "ref":
@@ -319,7 +329,8 @@ class EasyPrompt(UserList, Prompt):
         else:
             raise TypeError(f"Invalid argument type: {type(key)}")
 
-    def __deepcopy__(self, memo: dict) -> "Prompt":
+    # TODO: error: Signature of "__deepcopy__" incompatible with supertype "BaseModel"
+    def __deepcopy__(self, memo: dict) -> "Prompt":  # type: ignore
         # I'm sure this isn't right, but hacking in to avoid
         # TypeError: cannot pickle '_thread.lock' object.
         # Basically, as part of logging our message objects are
@@ -327,12 +338,15 @@ class EasyPrompt(UserList, Prompt):
         # in turn can't be copied
         c = copy.deepcopy(dict(self.config), memo)
         r = copy.deepcopy(dict(self.requirements), memo)
+        # TODO: Unexpected keyword argument "config" for "Prompt"
         p = Prompt(
             name=self.name, description=self.description, config=c, requirements=r
-        )
-        p._values = dict(self._values)
+        )  # type: ignore
+        # TODO: error: "Prompt" has no attribute "_values"
+        p._values = dict(self._values)  # type: ignore
         for value in self.data:
-            p.data.append(dict(value))
+            # TODO: error: "Prompt" has no attribute "data"
+            p.data.append(dict(value))  # type: ignore
         return p
 
     def require(self, param_name: str, **kwargs: Any) -> "Prompt":
@@ -398,7 +412,8 @@ class EasyPrompt(UserList, Prompt):
         tables = [pydantic_util.table_to_str(t) for t in tables]
         return "\n".join(tables)
 
-    def __str__(self) -> str:
+    # TODO: error: Signature of "__str__" incompatible with supertype "Object"
+    def __str__(self) -> str:  # type: ignore
         """Return a single prompt string when str() is called on the object."""
         return self.as_str
 

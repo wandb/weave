@@ -53,8 +53,10 @@ def evaluate_router(
     router_dataset: dict[str, pd.DataFrame] = {}
 
     for model, dataset in model_datasets.items():
-        score_column, model_df = _build_dataframe(model, dataset)
-        router_dataset[model] = model_df[[prompt_column, response_column, score_column]]
+        # TODO: error: Argument 1 to "_build_dataframe" has incompatible type "Union[Model, str]"; expected "str"
+        score_column, model_df = _build_dataframe(model, dataset)  # type: ignore
+        # TODO: error: Invalid index type "Union[Model, str]" for "dict[str, Any]"; expected type "str"
+        router_dataset[model] = model_df[[prompt_column, response_column, score_column]]  # type: ignore
 
     custom_router = CustomRouter(api_key=api_key)
     eval_results, eval_stats = custom_router.eval(

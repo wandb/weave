@@ -36,9 +36,11 @@ from weave.trace_server.trace_server_interface import (
 ActionFnType = Callable[[str, ActionSpec, CallSchema, TraceServerInterface], Any]
 
 
+# TODO: error: Dict entry 0 has incompatible type "type[LlmJudgeActionConfig]": "Callable[[str, LlmJudgeActionConfig, CallSchema, TraceServerInterface], Any]"; expected "Union[type[LlmJudgeActionConfig], type[ContainsWordsActionConfig]]": "Callable[[str, ActionSpec, CallSchema, TraceServerInterface], Any]"
+# TODO: error: Dict entry 1 has incompatible type "type[ContainsWordsActionConfig]": "Callable[[str, ContainsWordsActionConfig, CallSchema, TraceServerInterface], Any]"; expected "Union[type[LlmJudgeActionConfig], type[ContainsWordsActionConfig]]": "Callable[[str, ActionSpec, CallSchema, TraceServerInterface], Any]"
 dispatch_map: dict[type[ActionConfigType], ActionFnType] = {
-    LlmJudgeActionConfig: do_llm_judge_action,
-    ContainsWordsActionConfig: do_contains_words_action,
+    LlmJudgeActionConfig: do_llm_judge_action,  # type: ignore
+    ContainsWordsActionConfig: do_contains_words_action,  # type: ignore
 }
 
 
@@ -105,7 +107,8 @@ def dispatch_action(
 ) -> ActionResult:
     action_type = type(action_def.config)
     action_fn = dispatch_map[action_type]
-    result = action_fn(project_id, action_def.config, target_call, trace_server)
+    # TODO: error: Argument 2 has incompatible type "Union[LlmJudgeActionConfig, ContainsWordsActionConfig]"; expected "ActionSpec"
+    result = action_fn(project_id, action_def.config, target_call, trace_server)  # type: ignore
     feedback_res = publish_results_as_feedback(
         target_call, action_ref, result, wb_user_id, trace_server
     )

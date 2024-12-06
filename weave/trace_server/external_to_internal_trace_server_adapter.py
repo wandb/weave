@@ -354,12 +354,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         # Extend this to account for ORG ID when org level costs are implemented
         for cost in res.results:
             # TODO: error: Unsupported operand types for in ("str" and "CostQueryOutput")
-            if "pricing_level_id" in cost:
+            if "pricing_level_id" in cost:  # type: ignore
                 # TODO: error: Value of type "CostQueryOutput" is not indexable
-                if cost["pricing_level_id"] != req.project_id:
+                if cost["pricing_level_id"] != req.project_id:  # type: ignore
                     raise ValueError("Internal Error - Project Mismatch")
                 # TODO: error: Unsupported target for indexed assignment ("CostQueryOutput")
-                cost["pricing_level_id"] = original_project_id
+                cost["pricing_level_id"] = original_project_id  # type: ignore
         return res
 
     def actions_execute_batch(

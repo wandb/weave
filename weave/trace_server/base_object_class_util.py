@@ -102,7 +102,8 @@ def dump_base_object(val: BaseModel) -> dict:
         dump[k] = _general_dump(getattr(val, k))
     # yes, this is done twice, to match the client
     dump["_class_name"] = cls_name
-    dump["_bases"] = bases
+    # TODO: error: Incompatible types in assignment (expression has type "list[str]", target has type "str")
+    dump["_bases"] = bases  # type: ignore
     return dump
 
 

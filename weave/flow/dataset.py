@@ -67,5 +67,6 @@ class Dataset(Object):
                 )
         return rows
 
-    def __iter__(self) -> Iterator[dict]:
+    # TODO: error: Signature of "__iter__" incompatible with supertype "Object"
+    def __iter__(self) -> Iterator[dict]:  # type: ignore
         return iter(self.rows)

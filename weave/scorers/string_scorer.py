@@ -17,7 +17,7 @@ class StringMatchScorer(Scorer):
 
 class LevenshteinScorer(Scorer):
     distance: Callable[[str, str], int] = Field(
-        default=None, description="The Levenshtein distance function"
+        ..., description="The Levenshtein distance function"
     )
 
     @model_validator(mode="after")

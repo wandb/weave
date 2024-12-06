@@ -26,8 +26,9 @@ def generate_schemas() -> None:
     # Dynamically create a parent model with all registered objects as properties
     CompositeModel = create_model(
         "CompositeBaseObject",
+        # TODO: error: No overload variant of "create_model" matches argument types "str", "dict[str, tuple[type[BaseObject], ellipsis]]"
         **{name: (cls, ...) for name, cls in BASE_OBJECT_REGISTRY.items()},
-    )
+    )  # type: ignore
 
     # Generate the schema using the composite model
     top_level_schema = CompositeModel.model_json_schema(mode="validation")
