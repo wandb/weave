@@ -19,6 +19,7 @@ PY313_INCOMPATIBLE_SHARDS = [
 def lint(session):
     session.install("pre-commit", "jupyter")
     session.run("python", "--version")
+    session.run("pre-commit", "--version")
     session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
