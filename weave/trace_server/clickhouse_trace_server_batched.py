@@ -353,6 +353,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not expand_columns and not include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            return
 
         ref_cache = LRUCache(max_size=1000)
         batch_processor = DynamicBatchProcessor(
@@ -361,10 +362,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             growth_factor=10,
         )
 
+        # Process in batches to avoid memory issues
         for batch in batch_processor.process(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
             hydrated_calls = self._hydrate_calls(
-                req.project_id, call_dicts, expand_columns, include_feedback, ref_cache
+                req.project_id,
+                call_dicts,
+                expand_columns,
+                include_feedback,
+                ref_cache
             )
             for call in hydrated_calls:
                 yield tsi.CallSchema.model_validate(call)
@@ -379,6 +385,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> list[dict[str, Any]]:
         if len(calls) == 0:
             return calls
+
+        # Collect calls into memory before making additional queries
+        calls = list(calls)
 
         if expand_columns:
             self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
