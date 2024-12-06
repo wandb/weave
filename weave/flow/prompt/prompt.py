@@ -154,11 +154,9 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
             for item in content:
                 self.append(item, role=role, dedent=dedent)
 
-    # TODO: error: Return type "Prompt" of "__add__" incompatible with return type "EasyPrompt" in supertype "UserList"
-    def __add__(self, other: Any) -> "Prompt":  # type: ignore
+    def __add__(self, other: Any) -> "EasyPrompt":
         new_prompt = self.copy()
-        # TODO: error: Result type of + incompatible in assignment
-        new_prompt += other  # type: ignore
+        new_prompt += other
         return new_prompt
 
     def append(
@@ -183,8 +181,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
-    # TODO: error: Return type "Prompt" of "__iadd__" incompatible with return type "EasyPrompt" in supertype "UserList"
-    def __iadd__(self, item: Any) -> "Prompt":  # type: ignore
+    def __iadd__(self, item: Any) -> "EasyPrompt":
         self.append(item)
         return self
 
@@ -199,10 +196,9 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         return {"role": "system", "content": self.as_str}
 
     @property
-    def system_prompt(self) -> "Prompt":
+    def system_prompt(self) -> "EasyPrompt":
         """Join all messages into a system prompt object."""
-        # TODO: error: Unexpected keyword argument "role" for "Prompt"
-        return Prompt(self.as_str, role="system")  # type: ignore
+        return EasyPrompt(self.as_str, role="system")
 
     @property
     def messages(self) -> list[Message]:
