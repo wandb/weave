@@ -222,37 +222,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._call_batch = []
             self._flush_immediately = True
 
-    @contextmanager
-    def use_secondary_client(self) -> Iterator[None]:
-        """Context manager to temporarily use the secondary client for all operations
-
-        Primary and secondary client connections have separate session IDs, so we can
-        safely use them concurrently.
-
-        Usage:
-        ```
-        with self.use_secondary_client():
-            self.feedback_query(req)
-        ```
-        """
-        self._use_secondary_client = True
-        try:
-            yield
-        finally:
-            self._use_secondary_client = False
-
-    @property
-    def ch_client(self) -> CHClient:
-        """Returns either the primary or secondary client based on context"""
-        if self._use_secondary_client:
-            if not hasattr(self._secondary_thread_local, "ch_client"):
-                self._secondary_thread_local.ch_client = self._mint_client()
-            return self._secondary_thread_local.ch_client
-
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
-
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         # Converts the user-provided call details into a clickhouse schema.
@@ -1558,6 +1527,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
+
+    @contextmanager
+    def use_secondary_client(self) -> Iterator[None]:
+        """Context manager to temporarily use the secondary client for all operations
+
+        Primary and secondary client connections have separate session IDs, so we can
+        safely use them concurrently.
+
+        Usage:
+        ```
+        with self.use_secondary_client():
+            self.feedback_query(req)
+        ```
+        """
+        self._use_secondary_client = True
+        try:
+            yield
+        finally:
+            self._use_secondary_client = False
+
+    @property
+    def ch_client(self) -> CHClient:
+        """Returns either the primary or secondary client based on context"""
+        if self._use_secondary_client:
+            if not hasattr(self._secondary_thread_local, "ch_client"):
+                self._secondary_thread_local.ch_client = self._mint_client()
+            return self._secondary_thread_local.ch_client
+
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
 
     # def __del__(self) -> None:
     #     self.ch_client.close()
