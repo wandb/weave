@@ -121,6 +121,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
@@ -357,7 +358,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         ref_cache = LRUCache(max_size=1000)
         batch_processor = DynamicBatchProcessor(
-            initial_size=10,
+            initial_size=INITIAL_CALLS_STREAM_BATCH_SIZE,
             max_size=MAX_CALLS_STREAM_BATCH_SIZE,
             growth_factor=10,
         )
