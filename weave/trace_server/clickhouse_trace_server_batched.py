@@ -366,11 +366,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for batch in batch_processor.process(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
             hydrated_calls = self._hydrate_calls(
-                req.project_id,
-                call_dicts,
-                expand_columns,
-                include_feedback,
-                ref_cache
+                req.project_id, call_dicts, expand_columns, include_feedback, ref_cache
             )
             for call in hydrated_calls:
                 yield tsi.CallSchema.model_validate(call)
@@ -385,9 +381,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> list[dict[str, Any]]:
         if len(calls) == 0:
             return calls
-
-        # Collect calls into memory before making additional queries
-        calls = list(calls)
 
         if expand_columns:
             self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
