@@ -1071,18 +1071,6 @@ const OpSelector = ({
     },
     [filter, setFilter]
   );
-  const getOptionLabel = useCallback(
-    (option: string) => {
-      return opVersionOptions[option]?.title ?? 'loading...';
-    },
-    [opVersionOptions]
-  );
-  const groupBy = useCallback(
-    (option: string) => {
-      return opVersionOptions[option]?.group;
-    },
-    [opVersionOptions]
-  );
 
   return (
     <div className="flex-none">
@@ -1114,11 +1102,11 @@ const OpSelector = ({
             renderInput={renderParams => (
               <StyledTextField {...renderParams} sx={{maxWidth: '350px'}} />
             )}
-            getOptionLabel={getOptionLabel}
+            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
             disableClearable={
               selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
             }
-            groupBy={groupBy}
+            groupBy={option => opVersionOptions[option]?.group}
             options={Object.keys(opVersionOptions)}
             popupIcon={<Icon name="chevron-down" />}
             clearIcon={<Icon name="close" />}
