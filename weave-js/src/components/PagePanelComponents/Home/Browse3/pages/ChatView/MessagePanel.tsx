@@ -166,8 +166,8 @@ export const MessagePanel = ({
           {isPlayground && isHovering && !editorHeight && (
             <div
               className={classNames(
-                'absolute -bottom-[24px] right-[4px] flex w-full items-center justify-start',
-                isNested ? 'bottom-0' : 'bottom-[-32px]'
+                'absolute right-[4px] flex w-full items-center justify-start',
+                isNested ? 'bottom-0' : 'bottom-[-8px]'
               )}>
               <PlaygroundMessagePanelButtons
                 index={message.original_index ?? index}
