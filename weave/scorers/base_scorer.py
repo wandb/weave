@@ -48,9 +48,9 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
         raise ValueError(
             textwrap.dedent(
                 """
-                Both `output` and `model_output` cannot be in the scorer signature at the same time.
+                The scorer signature cannot include both `output` and `model_output` at the same time.
 
-                To resolve, rename one of the arguments to avoid conflict.  Prefer using `output` as the model's output.
+                To resolve, rename one of the arguments to avoid conflict. Prefer using `output` as the model's output.
                 """
             )
         )
