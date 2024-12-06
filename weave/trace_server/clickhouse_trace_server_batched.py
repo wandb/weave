@@ -185,9 +185,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
-        self._secondary_thread_local = (
-            threading.local()
-        )  # Separate connection for secondary queries
+        self._secondary_thread_local = threading.local()
+        self._use_secondary_client = False
+
         self._host = host
         self._port = port
         self._user = user
@@ -221,6 +221,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._call_batch = []
             self._flush_immediately = True
+
+    @contextmanager
+    def use_secondary_client(self) -> Iterator[None]:
+        """Context manager to temporarily use the secondary client for all operations
+
+        Primary and secondary client connections have separate session IDs, so we can
+        safely use them concurrently.
+
+        Usage:
+        ```
+        with self.use_secondary_client():
+            self.feedback_query(req)
+        ```
+        """
+        self._use_secondary_client = True
+        try:
+            yield
+        finally:
+            self._use_secondary_client = False
+
+    @property
+    def ch_client(self) -> CHClient:
+        """Returns either the primary or secondary client based on context"""
+        if self._use_secondary_client:
+            if not hasattr(self._secondary_thread_local, "ch_client"):
+                self._secondary_thread_local.ch_client = self._mint_client()
+            return self._secondary_thread_local.ch_client
+
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -385,21 +416,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(calls) == 0:
             return calls
 
-        client = self.secondary_client
         if expand_columns:
             self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
 
         if include_feedback:
-            self._hydrate_calls_with_feedback(client, project_id, calls)
+            self._hydrate_calls_with_feedback(project_id, calls)
 
         return calls
 
     def _hydrate_calls_with_feedback(
-        self, client: CHClient, project_id: str, calls: list[dict[str, Any]]
+        self, project_id: str, calls: list[dict[str, Any]]
     ) -> None:
         feedback_query_req = make_feedback_query_req(project_id, calls)
-        req_raw = feedback_query_req.model_dump()
-        feedback = self._feedback_query(client, **req_raw)
+        with self.use_secondary_client():
+            feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
@@ -444,9 +474,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            vals = self._refs_read_batch_within_project(
-                project_id, list(refs_to_resolve.values()), ref_cache
-            )
+            with self.use_secondary_client():
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(refs_to_resolve.values()), ref_cache
+                )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
@@ -1372,39 +1403,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             payload=res_payload,
         )
 
-    def _feedback_query(
-        self,
-        client: CHClient,
-        project_id: str,
-        fields: list[str] | None,
-        req_query: tsi.Query | None,
-        sort_by: list[tsi.SortBy] | None,
-        limit: int | None,
-        offset: int | None,
-    ) -> list[Row]:
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         query = TABLE_FEEDBACK.select()
-        query = query.project_id(project_id)
-        query = query.fields(fields)
-        query = query.where(req_query)
-        query = query.order_by(sort_by)
-        query = query.limit(limit).offset(offset)
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = client.query(prepared.sql, prepared.parameters)
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
-        )
-        return result
-
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        client = self.secondary_client
-        result = self._feedback_query(
-            client,
-            req.project_id,
-            req.fields,
-            req.query,
-            req.sort_by,
-            req.limit,
-            req.offset,
         )
         return tsi.FeedbackQueryRes(result=result)
 
@@ -1537,19 +1546,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     # Private Methods
-    @property
-    def ch_client(self) -> CHClient:
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
-
-    @property
-    def secondary_client(self) -> CHClient:
-        """Separate client instance for secondary queries to avoid stream conflicts"""
-        if not hasattr(self._secondary_thread_local, "ch_client"):
-            self._secondary_thread_local.ch_client = self._mint_client()
-        return self._secondary_thread_local.ch_client
-
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
