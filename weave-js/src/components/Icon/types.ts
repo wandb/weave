@@ -73,6 +73,7 @@ export const IconNames = {
   ExportShareUpload: 'export-share-upload',
   FacebookSocial: 'facebook-social',
   Failed: 'failed',
+  FilledCircle: 'filled-circle',
   FilterAlt: 'filter-alt',
   FlashBolt: 'flash-bolt',
   FolderAlt: 'folder-alt',
