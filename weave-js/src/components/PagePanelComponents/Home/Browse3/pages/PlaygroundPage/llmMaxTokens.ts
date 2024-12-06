@@ -162,6 +162,11 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 4096,
     supports_function_calling: true,
   },
+  'gpt-4o-2024-11-20': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
   'groq/gemma-7b-it': {
     provider: 'groq',
     max_tokens: 8192,
@@ -205,6 +210,16 @@ export const LLM_MAX_TOKENS = {
   'o1-mini': {
     provider: 'openai',
     max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'o1-preview-2024-09-12': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'o1-preview': {
+    provider: 'openai',
+    max_tokens: 32768,
     supports_function_calling: true,
   },
 
