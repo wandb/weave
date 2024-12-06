@@ -250,7 +250,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
             problems += self.validate_requirement(key, value)
         return problems
 
-    def bind(self, *args: Any, **kwargs: Any) -> "Prompt":
+    def bind(self, *args: Any, **kwargs: Any) -> "EasyPrompt":
         is_dict = len(args) == 1 and isinstance(args[0], dict)
         problems = []
         if is_dict:
@@ -267,8 +267,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], dict):
             kwargs = args[0]
         prompt = self.bind(kwargs)
-        # TODO: error: Argument 1 to "list" has incompatible type "Prompt"; expected "Iterable[Message]"
-        return list(prompt)  # type: ignore
+        return list(prompt)
 
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
@@ -285,7 +284,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
 
     def __getitem__(self, key: Union[SupportsIndex, slice]) -> Any:
-        """Override getitem to return a Message, Prompt object, or config value."""
+        """Override getitem to return a Message, EasyPrompt object, or config value."""
         if isinstance(key, SupportsIndex):
             int_index = key.__index__()
             message = self.data[int_index].copy()
@@ -304,17 +303,13 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
             message["content"] = message["content"].format(**values)
             return message
         elif isinstance(key, slice):
-            new_prompt = Prompt()
+            new_prompt = EasyPrompt()
             new_prompt.name = self.name
             new_prompt.description = self.description
-            # TODO: error: "Prompt" has no attribute "data"
-            new_prompt.data = self.data[key]  # type: ignore
-            # TODO: error: "Prompt" has no attribute "config"
-            new_prompt.config = self.config.copy()  # type: ignore
-            # TODO: error: "Prompt" has no attribute "requirements"
-            new_prompt.requirements = self.requirements.copy()  # type: ignore
-            # TODO: error: "Prompt" has no attribute "_values"
-            new_prompt._values = self._values.copy()  # type: ignore
+            new_prompt.data = self.data[key]
+            new_prompt.config = self.config.copy()
+            new_prompt.requirements = self.requirements.copy()
+            new_prompt._values = self._values.copy()
             return new_prompt
         elif isinstance(key, str):
             if key == "ref":
@@ -325,8 +320,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         else:
             raise TypeError(f"Invalid argument type: {type(key)}")
 
-    # TODO: error: Signature of "__deepcopy__" incompatible with supertype "BaseModel"
-    def __deepcopy__(self, memo: dict) -> "Prompt":  # type: ignore
+    def __deepcopy__(self, memo: dict) -> "EasyPrompt":  # type: ignore[override]
         # I'm sure this isn't right, but hacking in to avoid
         # TypeError: cannot pickle '_thread.lock' object.
         # Basically, as part of logging our message objects are
@@ -335,14 +329,12 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         c = copy.deepcopy(dict(self.config), memo)
         r = copy.deepcopy(dict(self.requirements), memo)
         # TODO: Unexpected keyword argument "config" for "Prompt"
-        p = Prompt(
+        p = EasyPrompt(
             name=self.name, description=self.description, config=c, requirements=r
-        )  # type: ignore
-        # TODO: error: "Prompt" has no attribute "_values"
-        p._values = dict(self._values)  # type: ignore
+        )
+        p._values = dict(self._values)
         for value in self.data:
-            # TODO: error: "Prompt" has no attribute "data"
-            p.data.append(dict(value))  # type: ignore
+            p.data.append(dict(value))
         return p
 
     def require(self, param_name: str, **kwargs: Any) -> "Prompt":
@@ -408,8 +400,7 @@ class EasyPrompt(UserList, Prompt):  # type: ignore
         tables = [pydantic_util.table_to_str(t) for t in tables]
         return "\n".join(tables)
 
-    # TODO: error: Signature of "__str__" incompatible with supertype "Object"
-    def __str__(self) -> str:  # type: ignore
+    def __str__(self) -> str:  # type: ignore[override]
         """Return a single prompt string when str() is called on the object."""
         return self.as_str
 
