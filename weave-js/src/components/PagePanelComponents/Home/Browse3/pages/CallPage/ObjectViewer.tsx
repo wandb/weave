@@ -450,51 +450,44 @@ export const ObjectViewer = ({
 
   // Per https://mui.com/x/react-data-grid/row-height/#dynamic-row-height, always
   // memoize the getRowHeight function.
-  const getRowHeight = useCallback(
-    (params: GridRowHeightParams) => {
-      const isNonRefString =	
-      params.model.valueType === 'string' &&	
-      !isWeaveRef(params.model.value);
-      const isArray = params.model.valueType === 'array';
-      const isTableRef =
-        isWeaveRef(params.model.value) &&
-        (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-      const {isCode} = params.model;
-      const isCustomWeaveType = isCustomWeaveTypePayload(
-        params.model.value
-      );
-      if (!params.model.isLeaf) {
-        // This is a group header, so we want to use the default height
-        return DEFAULT_ROW_HEIGHT;
-      } else if (isNonRefString) {
-        // This is the only special case where we will allow for dynamic height.
-        // Since strings have special renders that take up different amounts of
-        // space, we will allow for dynamic height.
-        return 'auto';
-      } else if (isCustomWeaveType) {
-        const type = (params.model.value as CustomWeaveTypePayload)
-          .weave_type.type;
-        const preferredRowHeight =
-          getCustomWeaveTypePreferredRowHeight(type);
-        if (preferredRowHeight) {
-          return preferredRowHeight;
-        }
-        return DEFAULT_ROW_HEIGHT;
-      } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
-        // Perfectly enough space for 1 page of data rows
-        return TABLE_ROW_HEIGHT;
-      } else if (isCode) {
-        // Probably will get negative feedback here since code that is < 20 lines
-        // will have some whitespace below the code. However, we absolutely need
-        // to have static height for all cells else the MUI data grid will jump around
-        // when cleaning up virtual rows.
-        return CODE_ROW_HEIGHT;
-      } else {
-        return DEFAULT_ROW_HEIGHT;
+  const getRowHeight = useCallback((params: GridRowHeightParams) => {
+    const isNonRefString =
+      params.model.valueType === 'string' && !isWeaveRef(params.model.value);
+    const isArray = params.model.valueType === 'array';
+    const isTableRef =
+      isWeaveRef(params.model.value) &&
+      (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+    const {isCode} = params.model;
+    const isCustomWeaveType = isCustomWeaveTypePayload(params.model.value);
+    if (!params.model.isLeaf) {
+      // This is a group header, so we want to use the default height
+      return DEFAULT_ROW_HEIGHT;
+    } else if (isNonRefString) {
+      // This is the only special case where we will allow for dynamic height.
+      // Since strings have special renders that take up different amounts of
+      // space, we will allow for dynamic height.
+      return 'auto';
+    } else if (isCustomWeaveType) {
+      const type = (params.model.value as CustomWeaveTypePayload).weave_type
+        .type;
+      const preferredRowHeight = getCustomWeaveTypePreferredRowHeight(type);
+      if (preferredRowHeight) {
+        return preferredRowHeight;
       }
-    },
-    []
-  );
+      return DEFAULT_ROW_HEIGHT;
+    } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
+      // Perfectly enough space for 1 page of data rows
+      return TABLE_ROW_HEIGHT;
+    } else if (isCode) {
+      // Probably will get negative feedback here since code that is < 20 lines
+      // will have some whitespace below the code. However, we absolutely need
+      // to have static height for all cells else the MUI data grid will jump around
+      // when cleaning up virtual rows.
+      return CODE_ROW_HEIGHT;
+    } else {
+      return DEFAULT_ROW_HEIGHT;
+    }
+  }, []);
 
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
