@@ -1097,8 +1097,7 @@ class WeaveClient:
                 ],
             }
         elif isinstance(query, Query):
-            # TODO: error: Incompatible types in assignment (expression has type "Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]", variable has type "dict[str, Any]")
-            expr = query.expr_  # type: ignore
+            expr = query.expr_.model_dump()
 
         if llm_ids:
             expr = {
