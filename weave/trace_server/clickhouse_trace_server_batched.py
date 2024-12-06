@@ -185,8 +185,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
-        self._secondary_thread_local = threading.local()
-        self._use_secondary_client = False
         self._host = host
         self._port = port
         self._user = user
@@ -384,7 +382,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return
 
         feedback_query_req = make_feedback_query_req(project_id, calls)
-        with self.use_secondary_client():
+        with self.with_new_client():
             feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
 
@@ -433,7 +431,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            with self.use_secondary_client():
+            with self.with_new_client():
                 vals = self._refs_read_batch_within_project(
                     project_id, list(refs_to_resolve.values()), ref_cache
                 )
@@ -1505,6 +1503,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     # Private Methods
+    @property
+    def ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the clickhouse client"""
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
+
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
@@ -1519,37 +1524,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return client
 
     @contextmanager
-    def use_secondary_client(self) -> Iterator[None]:
-        """Context manager to temporarily use the secondary client for all operations
-        Primary and secondary client connections have separate clickhouse session IDs,
-        we can safely use them concurrently.
+    def with_new_client(self) -> Iterator[None]:
+        """Context manager to use a new client for operations.
+        Each call gets a fresh client with its own clickhouse session ID.
+
         Usage:
         ```
-        with self.use_secondary_client():
+        with self.with_new_client():
             self.feedback_query(req)
         ```
         """
-        self._use_secondary_client = True
+        client = self._mint_client()
+        original_client = self.ch_client
+        self._thread_local.ch_client = client
         try:
             yield
         finally:
-            self._use_secondary_client = False
-
-    @staticmethod
-    def _client_is_initialized(thread_local: threading.local) -> bool:
-        return hasattr(thread_local, "ch_client")
-
-    @property
-    def ch_client(self) -> CHClient:
-        """Returns and creates (if necessary) the clickhouse client based on context"""
-        if self._use_secondary_client:
-            if not self._client_is_initialized(self._secondary_thread_local):
-                self._secondary_thread_local.ch_client = self._mint_client()
-            return self._secondary_thread_local.ch_client
-
-        if not self._client_is_initialized(self._thread_local):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
+            self._thread_local.ch_client = original_client
+            client.close()
 
     # def __del__(self) -> None:
     #     self.ch_client.close()
