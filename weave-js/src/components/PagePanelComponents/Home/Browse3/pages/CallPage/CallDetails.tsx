@@ -17,6 +17,8 @@ import {ExceptionDetails, getExceptionInfo} from './Exceptions';
 import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
 
+const HEADER_HEIGHT_BUFFER = 60;
+
 const Heading = styled.div`
   color: ${MOON_800};
   font-weight: 600;
@@ -130,7 +132,7 @@ export const CallDetails: FC<{
         <Box
           sx={{
             flex: '0 0 auto',
-            maxHeight: 'calc(100% - 70px)',
+            maxHeight: `calc(100% - ${HEADER_HEIGHT_BUFFER}px)`,
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
@@ -142,7 +144,7 @@ export const CallDetails: FC<{
           sx={{
             flex: '0 0 auto',
             maxHeight: `calc(100% - ${
-              multipleChildCallOpRefs.length > 0 ? 70 : 0
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
             }px)`,
             p: 2,
           }}>
