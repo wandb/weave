@@ -353,9 +353,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         res = self._ref_apply(self._internal_trace_server.cost_query, req)
         # Extend this to account for ORG ID when org level costs are implemented
         for cost in res.results:
+            # TODO: error: Unsupported operand types for in ("str" and "CostQueryOutput")
             if "pricing_level_id" in cost:
+                # TODO: error: Value of type "CostQueryOutput" is not indexable
                 if cost["pricing_level_id"] != req.project_id:
                     raise ValueError("Internal Error - Project Mismatch")
+                # TODO: error: Unsupported target for indexed assignment ("CostQueryOutput")
                 cost["pricing_level_id"] = original_project_id
         return res
 

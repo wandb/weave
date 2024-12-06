@@ -161,8 +161,8 @@ def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Res
 
 def post(
     url: str,
-    data: Optional[Union[dict[str, Any], str]] = None,
-    json: Optional[dict[str, Any]] = None,
+    data: Optional[Union[dict[str, Any], str, bytes]] = None,
+    json: Optional[Any] = None,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""

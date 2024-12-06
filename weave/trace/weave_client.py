@@ -1097,7 +1097,7 @@ class WeaveClient:
                 ],
             }
         elif isinstance(query, Query):
-            expr = query.expr_
+            expr = query.expr_.model_dump()
 
         if llm_ids:
             expr = {

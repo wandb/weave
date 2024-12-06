@@ -44,9 +44,9 @@ PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
 
 def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
     if isinstance(obj, pydantic.BaseModel):
-        return obj.model_fields
+        return list(obj.model_fields.keys())
     elif isinstance(obj, pydantic.v1.BaseModel):
-        return obj.__fields__
+        return list(obj.__fields__.keys())
     else:
         raise TypeError(f"{obj} is not a pydantic model")
 
