@@ -62,7 +62,7 @@ export const MessagePanel = ({
     : undefined;
 
   return (
-    <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
+    <div className={classNames('flex gap-[16px]', {'mt-24': !isTool})}>
       {!isNested && !isSystemPrompt && (
         <div className="w-32 flex-shrink-0">
           {!isUser && !isTool && (
@@ -70,7 +70,7 @@ export const MessagePanel = ({
               size="x-small"
               icon="robot-service-member"
               color="moon"
-              className="h-32 w-32"
+              className="h-32 w-32 mt-[12px] bg-moon-100"
             />
           )}
         </div>
