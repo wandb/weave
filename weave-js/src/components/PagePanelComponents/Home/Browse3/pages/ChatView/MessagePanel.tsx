@@ -84,9 +84,9 @@ export const MessagePanel = ({
           'bg-cactus-300/[0.24]': isUser,
           'max-w-full': !isUser,
           'max-w-[768px]': isUser,
-          'ml-auto py-8': isUser,
-          'mr-auto pb-8 pt-4': !isUser,
-          'py-8': hasContent,
+          'ml-auto': isUser,
+          'mr-auto': !isUser,
+          'pt-[16px] pb-[32px]': hasContent,
         })}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}>
