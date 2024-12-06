@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 from pydantic import Field, model_validator
 
@@ -16,9 +16,8 @@ class StringMatchScorer(Scorer):
 
 
 class LevenshteinScorer(Scorer):
-    distance: Callable[[str, str], int] = Field(
-        # TODO: error: Incompatible types in assignment (expression has type "None", variable has type "Callable[[str, str], int]")
-        default=None,  # type: ignore
+    distance: Optional[Callable[[str, str], int]] = Field(
+        default=None,
         description="The Levenshtein distance function",
     )
 
