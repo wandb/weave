@@ -12,6 +12,7 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: PlaygroundMessageRole) => void;
   onAdd: (role: PlaygroundMessageRole, text: string) => void;
+  hasPendingToolResponses: boolean;
   settingsTab: number | null;
 };
 
@@ -31,6 +32,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
+  hasPendingToolResponses,
   settingsTab,
 }) => {
   const [addMessageRole, setAddMessageRole] =

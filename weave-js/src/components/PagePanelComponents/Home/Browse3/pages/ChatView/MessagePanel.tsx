@@ -34,12 +34,15 @@ export const MessagePanel = ({
   const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [hasPendingToolResponse, setHasPendingToolResponse] = useState(false);
   const [editorHeight, setEditorHeight] = useState<number | null>(
     pendingToolResponseId ? 100 : null
   );
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const {isPlayground} = usePlaygroundContext();
+  const {isPlayground, setPendingToolResponseIds, pendingToolResponseIds} =
+    usePlaygroundContext();
+
   useEffect(() => {
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
@@ -60,6 +63,41 @@ export const MessagePanel = ({
         )
         .filter((idx): idx is number => idx !== undefined)
     : undefined;
+
+  if (
+    pendingToolResponseId &&
+    !pendingToolResponseIds.includes(pendingToolResponseId)
+  ) {
+    // Add the pending tool response id to the list of pending tool response ids
+    // This disables sending a message to the LLM until the tool call response is saved
+    setPendingToolResponseIds([
+      ...pendingToolResponseIds,
+      pendingToolResponseId,
+    ]);
+  } else if (
+    !pendingToolResponseId &&
+    message.tool_call_id &&
+    pendingToolResponseIds.includes(message.tool_call_id)
+  ) {
+    // Remove the pending tool response id from the list of pending tool response ids
+    // This re-enables sending a message to the LLM
+    setPendingToolResponseIds(
+      pendingToolResponseIds.filter(id => id !== message.tool_call_id)
+    );
+  }
+
+  if (pendingToolResponseIds.length > 0) {
+    message.tool_calls?.forEach(toolCall => {
+      if (pendingToolResponseIds.includes(toolCall.id)) {
+        // This is to disable this messages retry and edit until the tool call response is saved
+        setHasPendingToolResponse(true);
+        // If the message is overflowing and the editor is not already showing, show it
+        if (!isShowingMore && isOverflowing) {
+          setIsShowingMore(true);
+        }
+      }
+    });
+  }
 
   return (
     <div className={classNames('flex gap-8', {'mt-24': !isTool})}>
@@ -127,9 +165,11 @@ export const MessagePanel = ({
               <>
                 {hasContent && (
                   <div
-                    className={classNames(hasToolCalls ? 'pb-8' : '', {
-                      'px-16': isSystemPrompt || isUser,
-                    })}>
+                    className={classNames(
+                      hasToolCalls ? 'pb-8' : '',
+                      ' text-sm',
+                      {'px-16': isSystemPrompt || isUser || hasToolCalls}
+                    )}>
                     {_.isString(message.content) ? (
                       <MessagePanelPart
                         value={message.content}
@@ -177,6 +217,7 @@ export const MessagePanel = ({
                 contentRef={contentRef}
                 setEditorHeight={setEditorHeight}
                 responseIndexes={responseIndexes}
+                hasPendingToolResponse={hasPendingToolResponse}
               />
             </div>
           )}

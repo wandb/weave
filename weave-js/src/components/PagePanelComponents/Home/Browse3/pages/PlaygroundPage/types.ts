@@ -9,6 +9,7 @@ export enum PlaygroundResponseFormats {
 }
 
 export type PlaygroundState = {
+  pendingToolResponseIds: string[];
   traceCall: OptionalTraceCallSchema;
   trackLLMCall: boolean;
   loading: boolean;
