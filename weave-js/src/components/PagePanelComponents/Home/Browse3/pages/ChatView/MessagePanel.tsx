@@ -68,8 +68,7 @@ export const MessagePanel = ({
         'mb-[0]': isNested,
       })}
       onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-    >
+      onMouseLeave={() => setIsHovering(false)}>
       <div className="flex gap-[16px]">
         {!isNested && !isSystemPrompt && (
           <div className="w-32 flex-shrink-0">
@@ -95,7 +94,7 @@ export const MessagePanel = ({
             'ml-auto': isUser,
             'mr-auto': !isUser,
             'py-[16px]': hasContent,
-            'pt-[8px] pb-[4px]': !isUser && !isTool && !isSystemPrompt,
+            'pb-[4px] pt-[8px]': !isUser && !isTool && !isSystemPrompt,
           })}>
           <div>
             {isSystemPrompt && (
