@@ -25,6 +25,9 @@ class ClickHouseTraceServerMigrator:
         self.ch_client = ch_client
         self._initialize_migration_db()
 
+    def _format_sql(self, sql_query: str, create_db: bool = False) -> str:
+        return sql_query
+
     def apply_migrations(
         self, target_db: str, target_version: Optional[int] = None
     ) -> None:
@@ -46,20 +49,19 @@ class ClickHouseTraceServerMigrator:
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
-            self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
+            create_db_sql = f"CREATE DATABASE IF NOT EXISTS {target_db}"
+            self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        self.ch_client.command(
-            """
+        create_db_sql = """
             CREATE DATABASE IF NOT EXISTS db_management
         """
-        )
-        self.ch_client.command(
-            """
+        self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
+        create_table_sql = """
             CREATE TABLE IF NOT EXISTS db_management.migrations
             (
                 db_name String,
@@ -69,7 +71,7 @@ class ClickHouseTraceServerMigrator:
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
-        )
+        self.ch_client.command(self._format_sql(create_table_sql))
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -184,31 +186,46 @@ class ClickHouseTraceServerMigrator:
 
         return []
 
+    def _execute_migration_command(self, target_db: str, command: str) -> None:
+        """Execute a single migration command in the context of the target database."""
+        command = command.strip()
+        if len(command) == 0:
+            return
+        curr_db = self.ch_client.database
+        self.ch_client.database = target_db
+        self.ch_client.command(self._format_sql(command))
+        self.ch_client.database = curr_db
+
+    def _update_migration_status(self, target_db: str, target_version: int, is_start: bool = True) -> None:
+        """Update the migration status in db_management.migrations table."""
+        if is_start:
+            self.ch_client.command(
+                f"ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
+            )
+        else:
+            self.ch_client.command(
+                f"ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
+            )
+
     def _apply_migration(
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
+
         with open(migration_file_path) as f:
             migration_sql = f.read()
-        self.ch_client.command(
-            f"""
-            ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'
-        """
-        )
+
+        # Mark migration as partially applied
+        self._update_migration_status(target_db, target_version, is_start=True)
+
+        # Execute each command in the migration
         migration_sub_commands = migration_sql.split(";")
         for command in migration_sub_commands:
-            command = command.strip()
-            if len(command) == 0:
-                continue
-            curr_db = self.ch_client.database
-            self.ch_client.database = target_db
-            self.ch_client.command(command)
-            self.ch_client.database = curr_db
-        self.ch_client.command(
-            f"""
-            ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'
-        """
-        )
+            self._execute_migration_command(target_db, command)
+
+        # Mark migration as fully applied
+        self._update_migration_status(target_db, target_version, is_start=False)
+
         logger.info(f"Migration {migration_file} applied to `{target_db}`")
