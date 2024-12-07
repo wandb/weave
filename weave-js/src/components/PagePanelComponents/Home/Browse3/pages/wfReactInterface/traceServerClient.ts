@@ -12,6 +12,7 @@ import {
   TraceCallUpdateReq,
   TraceObjCreateReq,
   TraceObjCreateRes,
+  TraceObjDeleteReq,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
@@ -132,6 +133,13 @@ export class TraceServerClient extends CachingTraceServerClient {
         listeners.forEach(listener => listener());
       }
       return purgeRes;
+    });
+    return res;
+  }
+
+  public objectDelete(req: TraceObjDeleteReq): Promise<void> {
+    const res = super.objectDelete(req).then(() => {
+      this.onObjectListeners.forEach(listener => listener());
     });
     return res;
   }

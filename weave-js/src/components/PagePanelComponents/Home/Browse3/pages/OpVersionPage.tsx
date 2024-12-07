@@ -1,9 +1,12 @@
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import React, {useMemo} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -75,49 +78,60 @@ const OpVersionPageInner: React.FC<{
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            Name: (
-              <>
-                {opId}{' '}
-                {opVersions.loading ? (
-                  <LoadingDots />
-                ) : (
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          width="100%">
+          <Box flexGrow={1}>
+            <SimpleKeyValueTable
+              data={{
+                Name: (
                   <>
-                    [
-                    <OpVersionsLink
+                    {opId}{' '}
+                    {opVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <>
+                        [
+                        <OpVersionsLink
+                          entity={entity}
+                          project={project}
+                          filter={{
+                            opName: opId,
+                          }}
+                          versionCount={opVersionCount}
+                          neverPeek
+                          variant="secondary"
+                        />
+                        ]
+                      </>
+                    )}
+                  </>
+                ),
+                Version: <>{versionIndex}</>,
+                Calls:
+                  !callsStats.loading || opVersionCallCount > 0 ? (
+                    <CallsLink
                       entity={entity}
                       project={project}
+                      callCount={opVersionCallCount}
                       filter={{
-                        opName: opId,
+                        opVersionRefs: [uri],
                       }}
-                      versionCount={opVersionCount}
                       neverPeek
                       variant="secondary"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{versionIndex}</>,
-            Calls:
-              !callsStats.loading || opVersionCallCount > 0 ? (
-                <CallsLink
-                  entity={entity}
-                  project={project}
-                  callCount={opVersionCallCount}
-                  filter={{
-                    opVersionRefs: [uri],
-                  }}
-                  neverPeek
-                  variant="secondary"
-                />
-              ) : (
-                <></>
-              ),
-          }}
-        />
+                  ) : (
+                    <></>
+                  ),
+              }}
+            />
+          </Box>
+          <Box mr={1}>
+            <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
+          </Box>
+        </Stack>
       }
       tabs={[
         {

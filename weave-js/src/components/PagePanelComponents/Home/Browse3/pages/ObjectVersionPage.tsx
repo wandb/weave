@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
@@ -12,6 +13,7 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -94,7 +96,9 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (objectVersion.error) {
+    return <NotFoundPanel title={objectVersion.error.message} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
@@ -211,47 +215,58 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          width="100%">
+          <Box flexGrow={1}>
+            <SimpleKeyValueTable
+              data={{
+                [refExtra ? 'Parent Object' : 'Name']: (
                   <>
-                    [
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{
-                        objectName,
-                      }}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
-                    />
-                    ]
+                    {objectName}{' '}
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <>
+                        [
+                        <ObjectVersionsLink
+                          entity={entityName}
+                          project={projectName}
+                          filter={{
+                            objectName,
+                          }}
+                          versionCount={objectVersionCount}
+                          neverPeek
+                          variant="secondary"
+                        />
+                        ]
+                      </>
+                    )}
                   </>
-                )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+                ),
+                Version: <>{objectVersionIndex}</>,
+                ...(refExtra
+                  ? {
+                      Subpath: refExtra,
+                    }
+                  : {}),
+                // 'Type Version': (
+                //   <TypeVersionLink
+                //     entityName={entityName}
+                //     projectName={projectName}
+                //     typeName={typeName}
+                //     version={typeVersionHash}
+                //   />
+                // ),
+              }}
+            />
+          </Box>
+          <Box mr={1}>
+            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+          </Box>
+        </Stack>
       }
       // menuItems={[
       //   {
