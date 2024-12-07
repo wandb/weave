@@ -26,7 +26,6 @@ export const FilterPanel = (props: FilterPanelProps) => {
         <AutoSizer
           className="ml-2 flex items-center"
           style={{
-            width: '100%',
             height: '100%',
           }}>
           {({width, height}) => (
