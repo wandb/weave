@@ -21,6 +21,33 @@ type CompareGridPillProps = {
 
 export const CompareGridPill = (props: CompareGridPillProps) => {
   const {value, valueType, compareValue, compareValueType} = props;
+
+  if (valueType === 'object' && compareValueType === 'object') {
+    const keyCount = Object.keys(value).length;
+    const keyCountCompare = Object.keys(compareValue).length;
+    return (
+      <CompareGridPill
+        value={keyCount}
+        compareValue={keyCountCompare}
+        valueType="number"
+        compareValueType="number"
+      />
+    );
+  }
+
+  if (valueType === 'array' && compareValueType === 'array') {
+    const itemCount = value.length;
+    const itemCountCompare = compareValue.length;
+    return (
+      <CompareGridPill
+        value={itemCount}
+        compareValue={itemCountCompare}
+        valueType="number"
+        compareValueType="number"
+      />
+    );
+  }
+
   if (valueType !== 'number' || compareValueType !== 'number') {
     return null;
   }

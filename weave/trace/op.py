@@ -34,8 +34,6 @@ from weave.trace.util import log_once
 
 logger = logging.getLogger(__name__)
 
-WEAVE_KWARGS_KEY = "__weave"
-
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
 
@@ -53,17 +51,6 @@ try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
-
-try:
-    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
-    from mistralai.types.basemodel import UNSET  # type: ignore
-
-    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
-except ImportError:
-    MISTRAL_NOT_GIVEN = None
-
-MISTRAL_NOT_GIVEN = None
-
 
 try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
@@ -105,14 +92,13 @@ OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
 
 def _value_is_sentinel(param: Any) -> bool:
-    return (
-        param.default is None
-        or param.default is OPENAI_NOT_GIVEN
-        or param.default is COHERE_NOT_GIVEN
-        or param.default is ANTHROPIC_NOT_GIVEN
-        or param.default is MISTRAL_NOT_GIVEN
-        or param.default is CEREBRAS_NOT_GIVEN
-        or param.default is Ellipsis
+    return param.default in (
+        None,
+        Ellipsis,
+        OPENAI_NOT_GIVEN,
+        COHERE_NOT_GIVEN,
+        ANTHROPIC_NOT_GIVEN,
+        CEREBRAS_NOT_GIVEN,
     )
 
 
@@ -662,6 +648,8 @@ def op(
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
                 if len(params) != 1:
@@ -677,6 +665,23 @@ def op(
     if func is None:
         return op_deco
     return op_deco(func)
+
+
+def get_captured_code(op: Op) -> str:
+    """Get the captured code of the op.
+
+    This only works when you get an op back from a ref.  The pattern is:
+
+    ref = weave.publish(func)
+    op = ref.get()
+    captured_code = op.get_captured_code()
+    """
+    try:
+        return op.art.path_contents["obj.py"].decode()  # type: ignore
+    except Exception:
+        raise RuntimeError(
+            "Failed to get captured code for op (this only works when you get an op back from a ref)."
+        )
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:

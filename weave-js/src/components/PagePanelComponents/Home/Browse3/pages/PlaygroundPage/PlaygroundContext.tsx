@@ -1,6 +1,7 @@
 import {createContext, useContext} from 'react';
 
 import {Message} from '../ChatView/types';
+import {PlaygroundMessageRole} from './types';
 
 export type PlaygroundContextType = {
   isPlayground: boolean;
@@ -13,7 +14,7 @@ export type PlaygroundContextType = {
 
   retry: (messageIndex: number, isChoice?: boolean) => void;
   sendMessage: (
-    role: 'assistant' | 'user' | 'tool',
+    role: PlaygroundMessageRole,
     content: string,
     toolCallId?: string
   ) => void;
