@@ -215,6 +215,7 @@ warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
 exclude = [".*pyi$", "weave_query", "tests", "examples"]
 ignore_missing_imports = true
+plugins = ['pydantic.mypy']
 
 [[tool.mypy.overrides]]
 module = "weave.*"

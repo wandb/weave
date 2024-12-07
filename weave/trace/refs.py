@@ -168,23 +168,23 @@ class ObjectRef(RefWithExtra):
         if "EasyPrompt" == class_name:
             from weave.flow.prompt.prompt import EasyPrompt
 
-            prompt = EasyPrompt.from_obj(obj)
+            easy_prompt = EasyPrompt.from_obj(obj)
             # We want to use the ref on the object (and not self) as it will have had
             # version number or latest alias resolved to a specific digest.
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
+            easy_prompt.__dict__["ref"] = obj.ref
+            return easy_prompt
         if "StringPrompt" == class_name:
             from weave.flow.prompt.prompt import StringPrompt
 
-            prompt = StringPrompt.from_obj(obj)
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
+            string_prompt = StringPrompt.from_obj(obj)
+            string_prompt.__dict__["ref"] = obj.ref
+            return string_prompt
         if "MessagesPrompt" == class_name:
             from weave.flow.prompt.prompt import MessagesPrompt
 
-            prompt = MessagesPrompt.from_obj(obj)
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
+            messages_prompt = MessagesPrompt.from_obj(obj)
+            messages_prompt.__dict__["ref"] = obj.ref
+            return messages_prompt
         return obj
 
     def get(self) -> Any:
