@@ -8,6 +8,13 @@ def client_is_sqlite(client):
     return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 
 
+class AnyStrMatcher:
+    """Matches any string."""
+
+    def __eq__(self, other):
+        return isinstance(other, str)
+
+
 class AnyIntMatcher:
     """Matches any integer."""
 
