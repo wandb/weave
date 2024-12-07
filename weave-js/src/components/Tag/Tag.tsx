@@ -57,6 +57,7 @@ export type TagProps = {
   // and there is a need to position the Tag as a direct child for something like flexbox
   Wrapper?: React.ComponentType<any> | null;
   isInteractive?: boolean;
+  icon?: React.ReactNode;
 };
 
 export const Tag: FC<TagProps> = ({
@@ -98,6 +99,7 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   showIcon = false,
   iconName,
   Wrapper = Tailwind,
+  icon,
 }) => {
   const labelRef = useRef<HTMLParagraphElement>(null);
   const isTooltipEnabled = isTagLabelTruncated(labelRef);
@@ -108,12 +110,13 @@ export const RemovableTag: FC<RemovableTagProps> = ({
       <div
         key={`tag-${label}`}
         className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
-        {showIcon && (
+        {showIcon && iconName && (
           <Icon
             className="mr-4 h-14 w-14"
             name={iconName ?? DEFAULT_TAG_ICON}
           />
         )}
+        {icon}
         <p
           className={twMerge(
             'max-w-[172px]', // 172px =  MAX_TAG_LABEL_WIDTH_PX + 14 (account for remove action button)
