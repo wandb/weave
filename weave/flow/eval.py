@@ -5,6 +5,7 @@ import textwrap
 import time
 import traceback
 from collections.abc import Coroutine
+from inspect import isfunction
 from typing import Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr
@@ -165,9 +166,12 @@ class Evaluation(Object):
 
         model_self = None
         model_predict: Union[Callable, Model]
-        if callable(model):
+        if callable(model) and isfunction(model):
             model_predict = model
         else:
+            if not isinstance(model, Model):
+                raise ValueError(INVALID_MODEL_ERROR)
+
             model_self = model
             model_predict = get_infer_method(model)
 

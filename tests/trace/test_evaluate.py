@@ -107,6 +107,23 @@ def test_evaluate_other_model_method_names():
     assert result == expected_eval_result
 
 
+def test_evaluate_model_with__call__(client):
+    class EvalModel(Model):
+        @weave.op()
+        async def infer(self, input) -> str:
+            return eval(input)
+
+        def __call__(self, *args, **kwargs):
+            return self.infer(*args, **kwargs)
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    result = asyncio.run(evaluation.evaluate(EvalModel()))
+    assert result == expected_eval_result
+
+
 def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
