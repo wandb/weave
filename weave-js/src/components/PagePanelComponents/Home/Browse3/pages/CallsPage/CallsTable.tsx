@@ -85,7 +85,10 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  OpVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
@@ -743,71 +746,13 @@ export const CallsTable: FC<{
         <TailwindContents>
           <RefreshButton onClick={() => calls.refetch()} />
           {!hideOpSelector && (
-            <div className="flex-none">
-              <ListItem
-                sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
-                <FormControl fullWidth sx={{borderColor: MOON_200}}>
-                  <Autocomplete
-                    PaperComponent={paperProps => (
-                      <StyledPaper {...paperProps} />
-                    )}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        height: '32px',
-                        '& fieldset': {
-                          borderColor: MOON_200,
-                        },
-                        '&:hover fieldset': {
-                          borderColor: `rgba(${TEAL_300}, 0.48)`,
-                        },
-                      },
-                      '& .MuiOutlinedInput-input': {
-                        height: '32px',
-                        padding: '0 14px',
-                        boxSizing: 'border-box',
-                      },
-                    }}
-                    size="small"
-                    // Temp disable multiple for simplicity - may want to re-enable
-                    // multiple
-                    limitTags={1}
-                    disabled={Object.keys(frozenFilter ?? {}).includes(
-                      'opVersions'
-                    )}
-                    value={selectedOpVersionOption}
-                    onChange={(event, newValue) => {
-                      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                        setFilter({
-                          ...filter,
-                          opVersionRefs: [],
-                        });
-                      } else {
-                        setFilter({
-                          ...filter,
-                          opVersionRefs: newValue ? [newValue] : [],
-                        });
-                      }
-                    }}
-                    renderInput={renderParams => (
-                      <StyledTextField
-                        {...renderParams}
-                        sx={{maxWidth: '350px'}}
-                      />
-                    )}
-                    getOptionLabel={option => {
-                      return opVersionOptions[option]?.title ?? 'loading...';
-                    }}
-                    disableClearable={
-                      selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-                    }
-                    groupBy={option => opVersionOptions[option]?.group}
-                    options={Object.keys(opVersionOptions)}
-                    popupIcon={<Icon name="chevron-down" />}
-                    clearIcon={<Icon name="close" />}
-                  />
-                </FormControl>
-              </ListItem>
-            </div>
+            <OpSelector
+              frozenFilter={frozenFilter}
+              filter={filter}
+              setFilter={setFilter}
+              selectedOpVersionOption={selectedOpVersionOption}
+              opVersionOptions={opVersionOptions}
+            />
           )}
           {filterModel && setFilterModel && (
             <FilterPanel
@@ -1085,6 +1030,90 @@ export const CallsTable: FC<{
         }}
       />
     </FilterLayoutTemplate>
+  );
+};
+
+const OpSelector = ({
+  frozenFilter,
+  filter,
+  setFilter,
+  selectedOpVersionOption,
+  opVersionOptions,
+}: {
+  frozenFilter: WFHighLevelCallFilter | undefined;
+  filter: WFHighLevelCallFilter;
+  setFilter: (state: WFHighLevelCallFilter) => void;
+  selectedOpVersionOption: string;
+  opVersionOptions: Record<
+    string,
+    {
+      title: string;
+      ref: string;
+      group: string;
+      objectVersion?: OpVersionSchema;
+    }
+  >;
+}) => {
+  const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
+  const handleChange = useCallback(
+    (event: any, newValue: string | null) => {
+      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+        setFilter({
+          ...filter,
+          opVersionRefs: [],
+        });
+      } else {
+        setFilter({
+          ...filter,
+          opVersionRefs: newValue ? [newValue] : [],
+        });
+      }
+    },
+    [filter, setFilter]
+  );
+
+  return (
+    <div className="flex-none">
+      <ListItem sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
+        <FormControl fullWidth sx={{borderColor: MOON_200}}>
+          <Autocomplete
+            PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                height: '32px',
+                '& fieldset': {
+                  borderColor: MOON_200,
+                },
+                '&:hover fieldset': {
+                  borderColor: `rgba(${TEAL_300}, 0.48)`,
+                },
+              },
+              '& .MuiOutlinedInput-input': {
+                height: '32px',
+                padding: '0 14px',
+                boxSizing: 'border-box',
+              },
+            }}
+            size="small"
+            limitTags={1}
+            disabled={frozenOpFilter}
+            value={selectedOpVersionOption}
+            onChange={handleChange}
+            renderInput={renderParams => (
+              <StyledTextField {...renderParams} sx={{maxWidth: '350px'}} />
+            )}
+            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
+            disableClearable={
+              selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+            }
+            groupBy={option => opVersionOptions[option]?.group}
+            options={Object.keys(opVersionOptions)}
+            popupIcon={<Icon name="chevron-down" />}
+            clearIcon={<Icon name="close" />}
+          />
+        </FormControl>
+      </ListItem>
+    </div>
   );
 };
 
