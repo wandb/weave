@@ -62,126 +62,132 @@ export const MessagePanel = ({
     : undefined;
 
   return (
-    <div className={classNames('flex gap-[16px]', {'mt-24': !isTool})}>
-      {!isNested && !isSystemPrompt && (
-        <div className="w-32 flex-shrink-0">
-          {!isUser && !isTool && (
-            <Callout
-              size="x-small"
-              icon="robot-service-member"
-              color="moon"
-              className="mt-[12px] h-32 w-32 bg-moon-100"
-            />
-          )}
-        </div>
-      )}
-
-      <div
-        className={classNames('relative w-full overflow-visible', {
-          'rounded-lg': !isNested,
-          'border-t border-moon-250': isTool,
-          'bg-moon-100': isSystemPrompt || hasToolCalls,
-          'bg-cactus-300/[0.24]': isUser,
-          'max-w-full': !isUser,
-          'max-w-[768px]': isUser,
-          'ml-auto': isUser,
-          'mr-auto': !isUser,
-          'pb-[32px] pt-[16px]': hasContent,
-        })}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}>
-        <div>
-          {isSystemPrompt && (
-            <div className="flex justify-between px-16">
-              <div className="text-moon-500">
-                {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
-              </div>
-            </div>
-          )}
-
-          {isTool && (
-            <div className={classNames('pb-8')}>
-              <div className="text-[14px] font-semibold text-moon-500">
-                Response
-              </div>
-            </div>
-          )}
-
-          <div
-            ref={contentRef}
-            className={classNames('w-full overflow-y-hidden', {
-              'max-h-[400px]': !isShowingMore,
-              'max-h-full': isShowingMore,
-            })}>
-            {isPlayground && editorHeight ? (
-              <PlaygroundMessagePanelEditor
-                message={message}
-                index={index}
-                isChoice={isChoice ?? false}
-                editorHeight={editorHeight}
-                isNested={isNested ?? false}
-                pendingToolResponseId={pendingToolResponseId}
-                setEditorHeight={setEditorHeight}
+    <div
+      className={classNames({
+        'mb-[24px]': !isNested,
+        'mb-[0]': isNested,
+      })}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      <div className="flex gap-[16px]">
+        {!isNested && !isSystemPrompt && (
+          <div className="w-32 flex-shrink-0">
+            {!isUser && !isTool && (
+              <Callout
+                size="x-small"
+                icon="robot-service-member"
+                color="moon"
+                className="mt-[4px] h-32 w-32 bg-moon-100"
               />
-            ) : (
-              <>
-                {hasContent && (
-                  <div
-                    className={classNames(hasToolCalls ? 'pb-8' : '', {
-                      'px-16': isSystemPrompt || isUser,
-                    })}>
-                    {_.isString(message.content) ? (
-                      <MessagePanelPart
-                        value={message.content}
-                        isStructuredOutput={isStructuredOutput}
-                      />
-                    ) : (
-                      message.content!.map((p, i) => (
-                        <MessagePanelPart key={i} value={p} />
-                      ))
-                    )}
-                  </div>
-                )}
-                {hasToolCalls && (
-                  <div
-                    className={classNames({
-                      'border-t border-moon-250 pt-8': hasContent,
-                    })}>
-                    <ToolCalls toolCalls={message.tool_calls!} />
-                  </div>
-                )}
-              </>
             )}
           </div>
+        )}
 
-          {isOverflowing && !editorHeight && (
-            <ShowMoreButton
-              isUser={isUser}
-              isShowingMore={isShowingMore}
-              setIsShowingMore={setIsShowingMore}
-            />
-          )}
+        <div
+          className={classNames('relative w-full overflow-visible', {
+            'rounded-lg': !isNested,
+            'border-t border-moon-250': isTool,
+            'bg-moon-100': isSystemPrompt || hasToolCalls,
+            'bg-cactus-300/[0.24]': isUser,
+            'max-w-full': !isUser,
+            'max-w-[768px]': isUser,
+            'ml-auto': isUser,
+            'mr-auto': !isUser,
+            'py-[16px]': hasContent,
+            'pt-[8px] pb-[4px]': !isUser && !isTool && !isSystemPrompt,
+          })}>
+          <div>
+            {isSystemPrompt && (
+              <div className="flex justify-between px-[16px]">
+                <div className="text-sm text-moon-500">
+                  {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
+                </div>
+              </div>
+            )}
 
-          {/* Playground buttons (retry, edit, delete) */}
-          {isPlayground && isHovering && !editorHeight && (
+            {isTool && (
+              <div className={classNames('pb-8')}>
+                <div className="text-[14px] font-semibold text-moon-500">
+                  Response
+                </div>
+              </div>
+            )}
+
             <div
-              className={classNames(
-                'pointer-events-none absolute right-[8px] flex w-full items-center justify-start',
-                isNested ? 'bottom-0' : 'bottom-[-8px]'
-              )}>
-              <PlaygroundMessagePanelButtons
-                index={message.original_index ?? index}
-                isChoice={isChoice ?? false}
-                isTool={isTool}
-                hasContent={hasContent}
-                contentRef={contentRef}
-                setEditorHeight={setEditorHeight}
-                responseIndexes={responseIndexes}
-              />
+              ref={contentRef}
+              className={classNames('w-full overflow-y-hidden', {
+                'max-h-[400px]': !isShowingMore,
+                'max-h-full': isShowingMore,
+              })}>
+              {isPlayground && editorHeight ? (
+                <PlaygroundMessagePanelEditor
+                  message={message}
+                  index={index}
+                  isChoice={isChoice ?? false}
+                  editorHeight={editorHeight}
+                  isNested={isNested ?? false}
+                  pendingToolResponseId={pendingToolResponseId}
+                  setEditorHeight={setEditorHeight}
+                />
+              ) : (
+                <>
+                  {hasContent && (
+                    <div
+                      className={classNames(hasToolCalls ? 'pb-8' : '', {
+                        'px-16': isSystemPrompt || isUser,
+                      })}>
+                      {_.isString(message.content) ? (
+                        <MessagePanelPart
+                          value={message.content}
+                          isStructuredOutput={isStructuredOutput}
+                        />
+                      ) : (
+                        message.content!.map((p, i) => (
+                          <MessagePanelPart key={i} value={p} />
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {hasToolCalls && (
+                    <div
+                      className={classNames({
+                        'border-t border-moon-250 pt-8': hasContent,
+                      })}>
+                      <ToolCalls toolCalls={message.tool_calls!} />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-          )}
+
+            {isOverflowing && !editorHeight && (
+              <ShowMoreButton
+                isUser={isUser}
+                isShowingMore={isShowingMore}
+                setIsShowingMore={setIsShowingMore}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Playground buttons (retry, edit, delete) */}
+      {isPlayground && isHovering && !editorHeight ? (
+        <div className="flex w-full items-center justify-start">
+          <PlaygroundMessagePanelButtons
+            index={message.original_index ?? index}
+            isChoice={isChoice ?? false}
+            isTool={isTool}
+            hasContent={hasContent}
+            contentRef={contentRef}
+            setEditorHeight={setEditorHeight}
+            responseIndexes={responseIndexes}
+          />
+        </div>
+      ) : isPlayground && !editorHeight ? (
+        <div className="h-[32px]" />
+      ) : null}
     </div>
   );
 };
