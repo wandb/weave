@@ -65,8 +65,7 @@ export const MessagePanel = ({
       className={classNames('group', {
         'mb-[24px]': !isNested,
         'mb-[0]': isNested,
-      })}
-    >
+      })}>
       <div className="flex gap-[16px]">
         {!isNested && !isSystemPrompt && (
           <div className="w-32 flex-shrink-0">
