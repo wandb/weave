@@ -1,8 +1,12 @@
 import {Popover} from '@mui/material';
 import Input from '@wandb/weave/common/components/Input';
+import {
+  DragDropProvider,
+  DropTarget,
+} from '@wandb/weave/common/containers/DragDropContainer';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../../../../Button';
 import {
@@ -12,6 +16,7 @@ import {
 import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
+import {opNiceName} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,
@@ -19,37 +24,72 @@ import {
 } from '../../../wfReactInterface/wfDataModelHooksInterface';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {
+  EvaluationComparisonState,
+  getOrderedCallIds,
+  swapEvaluationCalls,
+} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+import {useDragDropReorder} from './dragUtils';
 import {EvaluationDefinition, VerticalBar} from './EvaluationDefinition';
 
 export const ComparisonDefinitionSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const evalCallIds = useMemo(
-    () => getOrderedCallIds(props.state),
-    [props.state]
+  const {setEvaluationCallOrder} = useCompareEvaluationsState();
+
+  const reorderItems = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const currentOrder = getOrderedCallIds(props.state);
+      const newOrder = swapEvaluationCalls(currentOrder, fromIndex, toIndex);
+      setEvaluationCallOrder(newOrder);
+    },
+    [setEvaluationCallOrder, props.state]
   );
 
+  const {makeDragSourceCallbackRef, onDragOver, onDrop, onDragEnd} =
+    useDragDropReorder({
+      reorder: reorderItems,
+      dropzonePadding: 8,
+    });
+
+  const callIds = useMemo(() => {
+    return getOrderedCallIds(props.state);
+  }, [props.state]);
+
   return (
-    <HorizontalBox
-      sx={{
-        alignItems: 'center',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-        width: '100%',
-        overflow: 'auto',
-      }}>
-      {evalCallIds.map((key, ndx) => {
-        return (
-          <React.Fragment key={key}>
-            <EvaluationDefinition state={props.state} callId={key} />
-          </React.Fragment>
-        );
-      })}
-      <AddEvaluationButton state={props.state} />
-    </HorizontalBox>
+    <DragDropProvider>
+      <DropTarget
+        style={{width: '100%', overflow: 'auto'}}
+        partRef={{id: `target`}}
+        onDragOver={onDragOver}
+        onDrop={onDrop}>
+        <HorizontalBox
+          sx={{
+            alignItems: 'center',
+            paddingLeft: STANDARD_PADDING,
+            paddingRight: STANDARD_PADDING,
+            width: '100%',
+            overflow: 'auto',
+          }}>
+          {callIds.map((key, ndx) => {
+            return (
+              <div key={key} ref={makeDragSourceCallbackRef(ndx)}>
+                <EvaluationDefinition
+                  state={props.state}
+                  callId={key}
+                  ndx={ndx}
+                  onDragEnd={onDragEnd}
+                />
+              </div>
+            );
+          })}
+          <HorizontalBox>
+            <AddEvaluationButton state={props.state} />
+          </HorizontalBox>
+        </HorizontalBox>
+      </DropTarget>
+    </DragDropProvider>
   );
 };
 
@@ -81,7 +121,7 @@ const ModelRefLabel: React.FC<{modelRef: string}> = props => {
   const objectVersion = useObjectVersion(objVersionKey);
   return (
     <span className="ml-2">
-      {objectVersion.result?.objectId}:{objectVersion.result?.versionIndex}
+      {objectVersion.result?.objectId}:v{objectVersion.result?.versionIndex}
     </span>
   );
 };
@@ -105,7 +145,7 @@ const AddEvaluationButton: React.FC<{
   );
   const expandedRefCols = useMemo(() => new Set<string>(), []);
   // Don't query for output here, re-queried in tsDataModelHooksEvaluationComparison.ts
-  const columns = useMemo(() => ['inputs'], []);
+  const columns = useMemo(() => ['inputs', 'display_name'], []);
   const calls = useCallsForQuery(
     props.state.data.entity,
     props.state.data.project,
@@ -119,10 +159,9 @@ const AddEvaluationButton: React.FC<{
 
   const evalsNotComparing = useMemo(() => {
     return calls.result.filter(
-      call =>
-        !Object.keys(props.state.data.evaluationCalls).includes(call.callId)
+      call => !getOrderedCallIds(props.state).includes(call.callId)
     );
-  }, [calls.result, props.state.data.evaluationCalls]);
+  }, [calls.result, props.state]);
 
   const [menuOptions, setMenuOptions] =
     useState<CallSchema[]>(evalsNotComparing);
@@ -222,12 +261,26 @@ const AddEvaluationButton: React.FC<{
                     variant="ghost"
                     size="small"
                     className="pb-8 pt-8 font-['Source_Sans_Pro'] text-base font-normal text-moon-800"
-                    onClick={() => {
-                      addEvaluationCall(call.callId);
-                    }}>
+                    onClick={() => addEvaluationCall(call.callId)}>
                     <>
-                      <span>{call.displayName ?? call.spanName}</span>
-                      <Id id={call.callId} type="Call" className="ml-0 mr-4" />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flexGrow: 1,
+                          flexShrink: 1,
+                          maxWidth: '250px',
+                        }}>
+                        {call.displayName ?? opNiceName(call.spanName)}
+                      </span>
+                      <span style={{flexShrink: 0}}>
+                        <Id
+                          id={call.callId}
+                          type="Call"
+                          className="ml-0 mr-4"
+                        />
+                      </span>
                       <VerticalBar />
                       <ModelRefLabel modelRef={call.traceCall?.inputs.model} />
                     </>
