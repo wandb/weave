@@ -897,10 +897,14 @@ export function isObjectTypeLike(t: any): t is ObjectType | Union {
   );
 }
 
-export function typedDict(propertyTypes: {[key: string]: Type}): TypedDictType {
+export function typedDict(
+  propertyTypes: {[key: string]: Type},
+  notRequiredKeys?: string[]
+): TypedDictType {
   return {
     type: 'typedDict',
     propertyTypes,
+    notRequiredKeys,
   };
 }
 
