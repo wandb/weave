@@ -70,7 +70,7 @@ export const MessagePanel = ({
               size="x-small"
               icon="robot-service-member"
               color="moon"
-              className="h-32 w-32 mt-[12px] bg-moon-100"
+              className="mt-[12px] h-32 w-32 bg-moon-100"
             />
           )}
         </div>
@@ -86,7 +86,7 @@ export const MessagePanel = ({
           'max-w-[768px]': isUser,
           'ml-auto': isUser,
           'mr-auto': !isUser,
-          'pt-[16px] pb-[32px]': hasContent,
+          'pb-[32px] pt-[16px]': hasContent,
         })}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}>
@@ -166,7 +166,7 @@ export const MessagePanel = ({
           {isPlayground && isHovering && !editorHeight && (
             <div
               className={classNames(
-                'absolute right-[8px] flex w-full items-center justify-start pointer-events-none',
+                'pointer-events-none absolute right-[8px] flex w-full items-center justify-start',
                 isNested ? 'bottom-0' : 'bottom-[-8px]'
               )}>
               <PlaygroundMessagePanelButtons

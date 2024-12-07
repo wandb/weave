@@ -109,7 +109,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
       sx={{
         width: '100%',
         display: 'flex',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
       }}>
       <Box
         sx={{

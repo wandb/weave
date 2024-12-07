@@ -147,7 +147,7 @@ export const PlaygroundChat = ({
                   flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] mt-[32px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
