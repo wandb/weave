@@ -65,7 +65,8 @@ test_params = [
 
 
 @pytest.mark.parametrize("provider,model", test_params, ids=lambda p: f"{p[0]}:{p[1]}")
-def test_summarization_scorer_evaluate_summary(provider, model):
+@pytest.mark.asyncio
+async def test_summarization_scorer_evaluate_summary(provider, model):
     client, model_id = get_client_and_model(provider, model)
 
     summarization_scorer = SummarizationScorer(
@@ -76,7 +77,7 @@ def test_summarization_scorer_evaluate_summary(provider, model):
     )
     input_text = "This is the original text."
     summary_text = "This is the summary."
-    result = summarization_scorer.evaluate_summary(
+    result = await summarization_scorer.evaluate_summary(
         input=input_text, summary=summary_text
     )
     assert isinstance(result, SummarizationEvaluationResponse)

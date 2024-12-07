@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+import inspect
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -66,31 +67,57 @@ def instructor_client(client: _LLM_CLIENTS) -> instructor.client:
         raise ValueError(f"Unsupported client type: {client_type}")
 
 
-def create(
+def is_async(func: Callable[..., Any]) -> bool:
+    """Returns true if the callable is async, accounting for wrapped callables"""
+    is_coroutine = inspect.iscoroutinefunction(func)
+    while hasattr(func, "__wrapped__"):
+        func = func.__wrapped__  # type: ignore
+        is_coroutine = is_coroutine or inspect.iscoroutinefunction(func)
+    return is_coroutine
+
+
+def is_sync_client(client: _LLM_CLIENTS) -> bool:
+    return not is_async(client.chat.completions.create)
+
+
+async def create(
     client: instructor.client, *args: Any, **kwargs: Any
 ) -> InstructorChatCompletionCreate:
-    # gemini has slightly different argument namings...
-    # max_tokens -> max_output_tokens
+    # Handle asynchronous client
     if "generativemodel" in type(client.client).__name__.lower():
         max_output_tokens = kwargs.pop("max_tokens")
         temperature = kwargs.pop("temperature", None)
-        _ = kwargs.pop("model")  # model is baked in the client
+        _ = kwargs.pop("model")  # Model is baked into the client
         kwargs["generation_config"] = {
             "max_output_tokens": max_output_tokens,
             "temperature": temperature,
         }
-    return client.chat.completions.create(*args, **kwargs)
+    instructor_create = client.chat.completions.create
+    if is_async(instructor_create):
+        return await instructor_create(*args, **kwargs)
+    else:
+        return instructor_create(*args, **kwargs)
 
 
-def embed(
+async def embed(
     client: _LLM_CLIENTS, model_id: str, texts: str | list[str], **kwargs: Any
 ) -> list[list[float]]:
     client_type = type(client).__name__.lower()
+    # Handle asynchronous client
     if "openai" in client_type:
-        response = client.embeddings.create(model=model_id, input=texts, **kwargs)
+        if is_sync_client(client):
+            response = client.embeddings.create(model=model_id, input=texts, **kwargs)
+        else:
+            response = await client.embeddings.create(
+                model=model_id, input=texts, **kwargs
+            )
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
-        response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
+        if is_sync_client(client):
+            response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
+        else:
+            response = await client.embeddings.create(
+                model=model_id, inputs=texts, **kwargs
+            )
         return [embedding.embedding for embedding in response.data]
-    else:
-        raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
+    raise ValueError(f"Unsupported client type: {client_type}")
