@@ -53,25 +53,30 @@ export const ToggleButtonGroup = React.forwardRef<
           <ToggleGroup.Item
             key={optionValue}
             value={optionValue}
-            disabled={isDisabled || value === optionValue}>
+            disabled={isDisabled || value === optionValue}
+            className={twMerge(
+              size === 'small' && 'first:rounded-l-[4px] last:rounded-r-[4px]',
+              size === 'medium' && 'first:rounded-l-[5px] last:rounded-r-[5px]',
+              size === 'large' && 'first:rounded-l-[5px] last:rounded-r-[5px]',
+              'overflow-hidden'
+            )}>
             <Button
               icon={icon}
               size={size}
               className={twMerge(
                 size === 'small' &&
-                  (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
+                  (icon ? 'gap-4 pl-4 pr-8 py-3 text-sm' : 'px-8 py-3 text-sm'),
                 size === 'medium' &&
-                  (icon ? 'gap-5 px-7 py-4 text-base' : 'px-10 py-4 text-base'),
+                  (icon ? 'gap-5 pl-7 pr-10 py-4 text-base' : 'px-10 py-4 text-base'),
                 size === 'large' &&
                   (icon
-                    ? 'gap-6 px-10 py-8 text-base'
+                    ? 'gap-6 pl-10 pr-12 py-8 text-base'
                     : 'px-12 py-8 text-base'),
                 isDisabled && 'pointer-events-none opacity-35',
                 value === optionValue
                   ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
                   : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
-                'first:rounded-l-sm', // First button rounded left
-                'last:rounded-r-sm' // Last button rounded right
+                'rounded-none'
               )}>
               {optionValue}
             </Button>
