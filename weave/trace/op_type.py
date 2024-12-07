@@ -506,17 +506,33 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
+    import_code = []
+    code = []
+    warnings = []
+
+    # Get main function dependencies first
     result = get_code_deps_safe(obj.resolve_fn, artifact)
-    import_code = result["import_code"]
-    code = result["code"]
-    warnings = result["warnings"]
+    import_code.extend(result["import_code"])
+    code.extend(result["code"])
+    warnings.extend(result["warnings"])
+
+    # Then get reducers and their dependencies
+    for callback in obj.lifecycle_handler.callbacks:
+        if reducer := getattr(callback, "reducer", None):
+            reducer_deps = get_code_deps_safe(reducer, artifact)
+            import_code.extend(reducer_deps["import_code"])
+            code.extend(reducer_deps["code"])
+            warnings.extend(reducer_deps["warnings"])
+
+            code.append(get_source_notebook_safe(reducer))
+
     if warnings:
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
         for warning in warnings:
             message += "\n  " + warning
 
+    # Add the main op
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
-
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
     else:
@@ -525,14 +541,15 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
         )
     code.append(op_function_code)
 
+    # Write the file
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
-        import_block = "\n".join(import_code)
+        import_block = "\n".join(dedupe_list(import_code))
         import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
-        code_block = "\n".join(code)
+        code_block = "\n".join(dedupe_list(code))
         f.write(f"{import_block}\n\n{code_block}")
 
 
