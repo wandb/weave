@@ -394,6 +394,15 @@ const pointCloudScene = (
   // Apply vertexData to custom mesh
   vertexData.applyToMesh(pcMesh);
 
+  // A file without any points defined still includes a single, empty "point".
+  // In order to play nice with Babylon, we position this empty point at 0,0,0.
+  // Hence, a pointCloud with a single point at 0,0,0 is likely empty.
+  const isEmpty =
+    pointCloud.points.length === 1 &&
+    pointCloud.points[0].position[0] === 0 &&
+    pointCloud.points[0].position[1] === 0 &&
+    pointCloud.points[0].position[2] === 0;
+
   camera.parent = pcMesh;
 
   const pcMaterial = new Babylon.StandardMaterial('mat', scene);
@@ -472,8 +481,8 @@ const pointCloudScene = (
         new Vector3(edges.length * 2, edges.length * 2, edges.length * 2)
       );
 
-    // If we are iterating over camera, target a box
-    if (index === meta?.cameraIndex) {
+    // If we are iterating over camera or the cloud is empty, target a box
+    if (index === meta?.cameraIndex || (index === 0 && isEmpty)) {
       camera.position = center.add(new Vector3(0, 0, 1000));
       camera.target = center;
       camera.zoomOn([lines]);
