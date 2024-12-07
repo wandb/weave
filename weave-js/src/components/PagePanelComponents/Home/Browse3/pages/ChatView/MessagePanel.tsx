@@ -33,7 +33,6 @@ export const MessagePanel = ({
 }: MessagePanelProps) => {
   const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const [editorHeight, setEditorHeight] = useState<number | null>(
     pendingToolResponseId ? 100 : null
   );
@@ -63,12 +62,11 @@ export const MessagePanel = ({
 
   return (
     <div
-      className={classNames({
+      className={classNames('group', {
         'mb-[24px]': !isNested,
         'mb-[0]': isNested,
       })}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}>
+    >
       <div className="flex gap-[16px]">
         {!isNested && !isSystemPrompt && (
           <div className="w-32 flex-shrink-0">
@@ -171,9 +169,9 @@ export const MessagePanel = ({
         </div>
       </div>
 
-      {/* Playground buttons (retry, edit, delete) */}
-      {isPlayground && isHovering && !editorHeight ? (
-        <div className="flex w-full items-center justify-start">
+      {/* Playground buttons (retry, edit, delete) - using group and group-hover to control opacity. */}
+      {isPlayground && !editorHeight ? (
+        <div className="flex w-full items-center justify-start opacity-0 group-hover:opacity-100">
           <PlaygroundMessagePanelButtons
             index={message.original_index ?? index}
             isChoice={isChoice ?? false}
@@ -184,8 +182,6 @@ export const MessagePanel = ({
             responseIndexes={responseIndexes}
           />
         </div>
-      ) : isPlayground && !editorHeight ? (
-        <div className="h-[32px]" />
       ) : null}
     </div>
   );
