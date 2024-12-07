@@ -1126,6 +1126,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
         return tsi.CompletionsCreateRes()
 
+    def permanently_delete_project(
+        self, req: tsi.PermanentlyDeleteProjectReq
+    ) -> tsi.PermanentlyDeleteProjectRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            tables_to_purge = [
+                "call_parts",
+                "object_versions",
+                "tables",
+                "table_rows",
+                "files",
+                "feedback",
+                "cost",
+            ]
+            conn.execute("BEGIN TRANSACTION")
+            for table in tables_to_purge:
+                cursor.execute(
+                    f"DELETE FROM {table} WHERE project_id = ?", (req.project_id,)
+                )
+            conn.commit()
+        return tsi.PermanentlyDeleteProjectRes()
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
