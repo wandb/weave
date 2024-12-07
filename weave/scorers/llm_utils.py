@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from weave.trace.autopatch import autopatch
 
@@ -8,7 +8,7 @@ autopatch()  # ensure both weave patching and instructor patching are applied
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-OPENAI_DEFAULT_MODERATION_MODEL = "text-moderation-latest"
+OPENAI_DEFAULT_MODERATION_MODEL = "omni-moderation-latest"
 
 ANTHROPIC_DEFAULT_MODEL = "claude-3-5-sonnet"
 
@@ -94,3 +94,40 @@ def embed(
         return [embedding.embedding for embedding in response.data]
     else:
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
+
+
+def set_device(device: Optional[str] = None) -> str:
+    import torch
+
+    assert device in [None, "cpu", "cuda"], "device must be None, 'cpu', or 'cuda'"
+    cuda_available = torch.cuda.is_available()
+    if not cuda_available and device == "cuda":
+        raise ValueError("CUDA is not available")
+    if device is None:
+        device = "cuda" if cuda_available else "cpu"
+    return device
+
+
+def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:
+    from wandb import Api
+
+    api = Api()
+    art = api.artifact(
+        type="model",
+        name=model_name_or_path,
+    )
+    model_name = model_name_or_path.split("/")[-1].replace(":", "_")
+    local_model_path = f"{local_dir}/{model_name}"
+    art.download(local_model_path)
+    return local_model_path
+
+
+scorer_model_paths = {
+    "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
+    "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
+    "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
+    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",  # task: "sentiment-analysis"
+    "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
+    "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
+    "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer:v0",
+}
