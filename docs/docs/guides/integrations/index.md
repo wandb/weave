@@ -31,6 +31,7 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[LangChain](/guides/integrations/langchain)**
 - **[LlamaIndex](/guides/integrations/llamaindex)**
 - **[DSPy](/guides/integrations/dspy)**
+- **[Not Diamond](/guides/integrations/notdiamond)**
 
 
 
