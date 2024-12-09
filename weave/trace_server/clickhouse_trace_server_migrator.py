@@ -16,13 +16,16 @@ class MigrationError(RuntimeError):
 
 class ClickHouseTraceServerMigrator:
     ch_client: CHClient
+    cluster_name: Optional[str]
 
     def __init__(
         self,
         ch_client: CHClient,
+        cluster_name: Optional[str] = None,
     ):
         super().__init__()
         self.ch_client = ch_client
+        self.cluster_name = cluster_name
         self._initialize_migration_db()
 
     def _format_sql(self, sql_query: str, create_db: bool = False) -> str:
