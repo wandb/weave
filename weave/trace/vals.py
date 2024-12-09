@@ -31,8 +31,8 @@ from weave.trace.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
+    ObjDeleteReq,
     ObjReadReq,
-    ObjVersionDeleteReq,
     TableQueryReq,
     TableRowFilter,
     TraceServerInterface,
@@ -136,8 +136,8 @@ class Traceable:
         if not isinstance(self.ref, (ObjectRef, OpRef)):
             raise TypeError("Deleting non-object refs is not yet supported.")
         ref: ObjectRef = typing.cast(ObjectRef, self.ref)
-        self.server.obj_version_delete(
-            ObjVersionDeleteReq(
+        self.server.obj_delete(
+            ObjDeleteReq(
                 project_id=f"{ref.entity}/{ref.project}",
                 object_id=ref.name,
                 digests=[ref.digest],
