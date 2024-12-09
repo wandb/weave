@@ -760,7 +760,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjQueryRes(objs=objs)
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    def obj_version_delete(self, req: tsi.ObjVersionDeleteReq) -> tsi.ObjVersionDeleteRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
@@ -769,12 +769,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
                 WHERE project_id = ? AND
                     object_id = ? AND
-                    digest = ?
+                    digest IN ({})
                 """,
-                (req.project_id, req.object_id, req.digest),
+                (req.project_id, req.object_id, ",".join(req.digests)),
             )
             conn.commit()
-        return tsi.ObjDeleteRes()
+        return tsi.ObjVersionDeleteRes()
+
+    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute(
+                """
+                UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND
+                    object_id IN ({})
+                """,
+                (req.project_id, ",".join(req.object_ids)),
+            )
+            conn.commit()
+        return tsi.ObjsDeleteRes()
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

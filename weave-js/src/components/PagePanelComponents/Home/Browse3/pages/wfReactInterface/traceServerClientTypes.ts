@@ -251,11 +251,20 @@ export type TraceObjCreateRes = {
   digest: string;
 };
 
-export type TraceObjDeleteReq = {
+export type TraceObjVersionDeleteReq = {
   project_id: string;
   object_id: string;
-  digest: string;
+  digests: string[];
 };
+
+export type TraceObjVersionDeleteRes = {};
+
+export type TraceObjsDeleteReq = {
+  project_id: string;
+  object_ids: string[];
+};
+
+export type TraceObjsDeleteRes = {};
 
 export type TraceRefsReadBatchReq = {
   refs: string[];

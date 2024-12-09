@@ -69,7 +69,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
-    ObjDeleteReq,
+    ObjVersionDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -903,21 +903,21 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_object(self, object: ObjectRef) -> None:
-        self.server.obj_delete(
-            ObjDeleteReq(
+        self.server.obj_version_delete(
+            ObjVersionDeleteReq(
                 project_id=self._project_id(),
                 object_id=object.name,
-                digest=object.digest,
+                digests=[object.digest],
             )
         )
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op(self, op: OpRef) -> None:
-        self.server.obj_delete(
-            ObjDeleteReq(
+        self.server.obj_version_delete(
+            ObjVersionDeleteReq(
                 project_id=self._project_id(),
                 object_id=op.name,
-                digest=op.digest,
+                digests=[op.digest],
             )
         )
 
