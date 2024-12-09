@@ -10,7 +10,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Generic, Protocol, TypeVar, cast
+from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
 
 import pydantic
 from requests import HTTPError
@@ -90,24 +90,23 @@ ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 R = TypeVar("R", covariant=True)
 
 
-class FetchFunc(Protocol):
+class FetchFunc(Protocol[T]):
     def __call__(self, offset: int, limit: int) -> list[T]: ...
 
 
-class TransformFunc(Protocol):
-    def __call__(self, item: T) -> R: ...
+TransformFunc = Callable[[T], R]
 
 
-class PaginatedIterator(Generic[T]):
+class PaginatedIterator(Generic[T, R]):
     def __init__(
         self,
-        fetch_func: FetchFunc,
+        fetch_func: FetchFunc[T],
         page_size: int = 1000,
-        transform_func: TransformFunc | None = None,
+        transform_func: TransformFunc[T, R] | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
@@ -118,7 +117,11 @@ class PaginatedIterator(Generic[T]):
     def _fetch_page(self, index: int) -> list[T]:
         return self.fetch_func(index * self.page_size, self.page_size)
 
-    def _get_one(self, index: int) -> T:
+    @overload
+    def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
+    @overload
+    def _get_one(self: PaginatedIterator[T, R], index: int) -> R: ...
+    def _get_one(self, index: int) -> T | R:
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
@@ -131,10 +134,14 @@ class PaginatedIterator(Generic[T]):
 
         res = page[page_offset]
         if transform := self.transform_func:
-            res = transform(res)
+            return transform(res)
         return res
 
-    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+    @overload
+    def _get_slice(self: PaginatedIterator[T, T], key: slice) -> Iterator[T]: ...
+    @overload
+    def _get_slice(self: PaginatedIterator[T, R], key: slice) -> Iterator[R]: ...
+    def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R]:
         if (start := key.start or 0) < 0:
             raise ValueError("Negative start not supported")
         if (stop := key.stop) is not None and stop < 0:
@@ -150,12 +157,24 @@ class PaginatedIterator(Generic[T]):
                 break
             i += step
 
-    def __getitem__(self, key: slice | int) -> T | list[T]:
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: int) -> T: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: int) -> R: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: slice) -> list[T]: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: slice) -> list[R]: ...
+    def __getitem__(self, key: slice | int) -> T | R | list[T] | list[R]:
         if isinstance(key, slice):
             return list(self._get_slice(key))
         return self._get_one(key)
 
-    def __iter__(self) -> Iterator[T]:
+    @overload
+    def __iter__(self: PaginatedIterator[T, T]) -> Iterator[T]: ...
+    @overload
+    def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
+    def __iter__(self) -> Iterator[T] | Iterator[R]:
         return self._get_slice(slice(0, None, 1))
 
 
@@ -164,7 +183,7 @@ def _make_calls_iterator(
     project_id: str,
     filter: CallsFilter,
     include_costs: bool = False,
-) -> PaginatedIterator[Call]:
+) -> PaginatedIterator[CallSchema, Call]:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
             CallsQueryReq(
@@ -363,7 +382,7 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> PaginatedIterator[Call]:
+    def children(self) -> PaginatedIterator[CallSchema, Call]:
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
@@ -449,7 +468,7 @@ class Call:
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
+) -> Call:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
@@ -468,8 +487,9 @@ def make_client_call(
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
-    ref = CallRef(entity, project, call_id)
-    return WeaveObject(call, ref, server, None)
+    return call
+    # ref = CallRef(entity, project, call_id)
+    # return WeaveObject(call, ref, server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -649,7 +669,7 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> PaginatedIterator[Call]:
+    ) -> PaginatedIterator[CallSchema, Call]:
         if filter is None:
             filter = CallsFilter()
 
@@ -665,7 +685,7 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> PaginatedIterator[Call]:
+    ) -> PaginatedIterator[CallSchema, Call]:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -673,7 +693,7 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
-    ) -> WeaveObject:
+    ) -> Call:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -691,7 +711,7 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
-    ) -> WeaveObject:
+    ) -> Call:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1488,7 +1508,7 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> PaginatedIterator[Call]:
+    def _op_calls(self, op: Op) -> PaginatedIterator[CallSchema, Call]:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
