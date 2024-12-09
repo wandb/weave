@@ -1552,7 +1552,7 @@ def test_object_deletion(client):
     weave_obj = client.save(obj, "my-obj")
     assert client.get(weave_obj.ref) == obj
 
-    client.delete_object(weave_obj.ref)
+    client.delete_object_version(weave_obj.ref)
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         client.get(weave_obj.ref)
 
@@ -1626,6 +1626,30 @@ def test_recursive_object_deletion(client):
     assert client.get(obj3_ref) == {"c": obj2}
 
 
+def test_delete_all_versions(client):
+    obj = {"a": 5}
+    weave_obj = client.save(obj, "my-obj")
+    assert client.get(weave_obj.ref) == obj
+
+    client.delete_object_all_versions(weave_obj.ref)
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj.ref)
+
+    # create 10 versions of the object
+    for i in range(10):
+        obj["a"] = i
+        weave_obj = client.save(obj, "my-obj-2")
+
+    client.delete_object_all_versions(weave_obj.ref)
+    objs = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj-2"],
+        )
+    ).objs
+    assert len(objs) == 0
+
+
 @pytest.mark.skip("Deleting tables is not yet supported.")
 def test_table_object_deletion(client):
     # create a dataset
@@ -1637,7 +1661,7 @@ def test_table_object_deletion(client):
     assert client.get(dataset_ref) == dataset
 
     # delete the dataset
-    client.delete_object(dataset_ref)
+    client.delete_object_version(dataset_ref)
 
     # make sure we can't get the dataset
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
@@ -1659,7 +1683,7 @@ def test_table_object_deletion(client):
     assert read_res.obj.version_index == 1
 
     # delete the dataset again
-    client.delete_object(dataset_ref)
+    client.delete_object_version(dataset_ref)
 
     # make sure we can't get the dataset
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
