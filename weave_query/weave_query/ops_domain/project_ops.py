@@ -3,6 +3,7 @@ import typing
 
 from weave_query import errors
 from weave_query import weave_types as types
+from weave_query import ops_arrow
 from weave_query.api import op
 from weave_query import input_provider
 from weave_query.gql_op_plugin import wb_gql_op_plugin
@@ -17,6 +18,7 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_root_op,
     make_root_op_gql_op_output_type,
 )
+from weave_query.wandb_trace_server_api import get_wandb_trace_api_sync
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")
@@ -259,3 +261,82 @@ def artifacts(
         for typeEdge in project["artifactTypes_100"]["edges"]
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]
+
+def _get_project_traces(project, payload):
+    api = get_wandb_trace_api_sync()
+    project_id = f'{project["entity"]["name"]}/{project["name"]}'
+    filter = None
+    limit = None 
+    offset = None
+    sort_by = None
+    if payload is not None:
+        filter = payload.get("filter")
+        limit = payload.get("limit") 
+        offset = payload.get("offset")
+        sort_by = payload.get("sort_by")
+    res = []
+    for call in api.query_calls_stream(project_id, filter=filter, limit=limit, offset=offset, sort_by=sort_by):
+        res.append(call)
+    return res
+
+traces_filter_property_types = {
+    "op_names": types.optional(types.List(types.String())),
+    "input_refs": types.optional(types.List(types.String())),
+    "output_refs": types.optional(types.List(types.String())),
+    "parent_ids": types.optional(types.List(types.String())),
+    "trace_ids": types.optional(types.List(types.String())),
+    "call_ids": types.optional(types.List(types.String())),
+    "trace_roots_only": types.optional(types.Boolean()),
+    "wb_user_ids": types.optional(types.List(types.String())),
+    "wb_run_ids": types.optional(types.List(types.String())),
+}
+
+traces_input_types = {
+    "project": wdt.ProjectType,
+    "payload": types.optional(types.TypedDict(property_types={
+        "filter": types.optional(types.TypedDict(property_types=traces_filter_property_types, not_required_keys=set(traces_filter_property_types.keys()))),
+        "limit": types.optional(types.Number()),
+        "offset": types.optional(types.Number()),
+        "sort_by": types.optional(types.List(types.TypedDict(property_types={"field": types.String(), "direction": types.String()})))
+    }, not_required_keys=set(['filter', 'limit', 'offset', 'sort_by'])))
+}
+
+@op(
+    name="project-tracesType",
+    input_type=traces_input_types,
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            entity {
+                id
+                name
+            }
+        """
+    ),
+    hidden=True
+)
+def traces_type(project, payload):
+    res = _get_project_traces(project, payload)
+    ttype = types.TypeRegistry.type_of(res)
+    return ttype
+
+@op(
+    name="project-traces",
+    input_type=traces_input_types,
+    output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            entity {
+                id
+                name
+            }
+        """
+    ),
+    refine_output_type=traces_type
+)
+def traces(project, payload):
+    res = _get_project_traces(project, payload)
+    if res:
+        return ops_arrow.to_arrow(res)
+    else:
+        return ops_arrow.to_arrow([])
