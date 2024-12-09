@@ -40,7 +40,7 @@ import {
   TraceFileContentReadRes,
   TraceObjCreateReq,
   TraceObjCreateRes,
-  TraceObjVersionDeleteReq,
+  TraceObjDeleteReq,
   TraceObjQueryReq,
   TraceObjQueryRes,
   TraceObjReadReq,
@@ -51,8 +51,6 @@ import {
   TraceTableQueryRes,
   TraceTableQueryStatsReq,
   TraceTableQueryStatsRes,
-  TraceObjsDeleteReq,
-  TraceObjDeleteReq,
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
