@@ -78,7 +78,7 @@ const OpVersionPageInner: React.FC<{
         <Tailwind>
           <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
             <div className="block">
-              <p className="text-moon-500">Name:</p>
+              <p className="text-moon-500">Name</p>
               <div className="flex items-center">
                 <OpVersionsLink
                   entity={entity}
@@ -110,7 +110,7 @@ const OpVersionPageInner: React.FC<{
               </div>
             </div>
             <div className="block">
-              <p className="text-moon-500">Version:</p>
+              <p className="text-moon-500">Version</p>
               <p>{versionIndex}</p>
             </div>
             <div className="block">

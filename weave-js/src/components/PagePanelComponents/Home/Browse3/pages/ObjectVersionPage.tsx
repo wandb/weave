@@ -214,7 +214,7 @@ const ObjectVersionPageInner: React.FC<{
         <Tailwind>
           <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
             <div className="block">
-              <p className="text-moon-500">Name:</p>
+              <p className="text-moon-500">Name</p>
               <div className="flex items-center">
                 <ObjectVersionsLink
                   entity={entityName}
@@ -244,12 +244,12 @@ const ObjectVersionPageInner: React.FC<{
               </div>
             </div>
             <div className="block">
-              <p className="text-moon-500">Version:</p>
+              <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
             {refExtra && (
               <div className="block">
-                <p className="text-moon-500">Subpath:</p>
+                <p className="text-moon-500">Subpath</p>
                 <p>{refExtra}</p>
               </div>
             )}
