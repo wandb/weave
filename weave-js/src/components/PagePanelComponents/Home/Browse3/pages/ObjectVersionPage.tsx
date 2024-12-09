@@ -211,47 +211,50 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <>
-                    [
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{
-                        objectName,
-                      }}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
+        <Tailwind>
+          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="block">
+              <p className="text-moon-500">Name</p>
+              <div className="flex items-center">
+                <ObjectVersionsLink
+                  entity={entityName}
+                  project={projectName}
+                  filter={{objectName}}
+                  versionCount={objectVersionCount}
+                  neverPeek
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
+                    <span>{objectName}</span>
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <span className="ml-[4px]">
+                        ({objectVersionCount} version
+                        {objectVersionCount !== 1 ? 's' : ''})
+                      </span>
+                    )}
+                    <Icon
+                      name="forward-next"
+                      width={16}
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+                  </div>
+                </ObjectVersionsLink>
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version</p>
+              <p>{objectVersionIndex}</p>
+            </div>
+            {refExtra && (
+              <div className="block">
+                <p className="text-moon-500">Subpath</p>
+                <p>{refExtra}</p>
+              </div>
+            )}
+          </div>
+        </Tailwind>
       }
       // menuItems={[
       //   {

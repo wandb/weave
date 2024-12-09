@@ -471,7 +471,8 @@ export const BulkDeleteButton: FC<{
 
 export const RefreshButton: FC<{
   onClick: () => void;
-}> = ({onClick}) => {
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
   return (
     <Box
       sx={{
@@ -483,6 +484,7 @@ export const RefreshButton: FC<{
         variant="outline"
         size="medium"
         onClick={onClick}
+        disabled={disabled}
         tooltip="Refresh"
         icon="reload-refresh"
       />
