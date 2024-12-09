@@ -257,15 +257,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             obj.project_id = original_project_id
         return res
 
-    def obj_version_delete(
-        self, req: tsi.ObjVersionDeleteReq
-    ) -> tsi.ObjVersionDeleteRes:
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.obj_version_delete, req)
-
-    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.objs_delete, req)
+        return self._ref_apply(self._internal_trace_server.obj_delete, req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)

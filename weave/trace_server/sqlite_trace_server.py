@@ -760,36 +760,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjQueryRes(objs=objs)
 
-    def obj_version_delete(self, req: tsi.ObjVersionDeleteReq) -> tsi.ObjVersionDeleteRes:
-        conn, cursor = get_conn_cursor(self.db_path)
-        with self.lock:
-            cursor.execute("BEGIN TRANSACTION")
-            cursor.execute(
-                """
-                UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
-                WHERE project_id = ? AND
-                    object_id = ? AND
-                    digest IN ({})
-                """,
-                (req.project_id, req.object_id, ",".join(req.digests)),
-            )
-            conn.commit()
-        return tsi.ObjVersionDeleteRes()
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        delete_query = """
+            UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+            WHERE project_id = ? AND
+                object_id = ?
+        """
+        parameters = [req.project_id, req.object_id]
 
-    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
+        if req.digests:
+            num_digests = len(req.digests)
+            delete_query += "AND digest IN ({})".format(", ".join("?" * num_digests))
+            parameters.extend(req.digests)
+
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            cursor.execute(
-                """
-                UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
-                WHERE project_id = ? AND
-                    object_id IN ({})
-                """,
-                (req.project_id, ",".join(req.object_ids)),
-            )
+            cursor.execute(delete_query, parameters)
+            # get the number of objects deleted
+            cursor.execute("SELECT changes()")
+            num_deleted = cursor.fetchone()[0]
             conn.commit()
-        return tsi.ObjsDeleteRes()
+        return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

@@ -52,6 +52,7 @@ import {
   TraceTableQueryStatsReq,
   TraceTableQueryStatsRes,
   TraceObjsDeleteReq,
+  TraceObjDeleteReq,
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
@@ -232,15 +233,8 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
-  public objectDelete(req: TraceObjVersionDeleteReq): Promise<void> {
-    return this.makeRequest<TraceObjVersionDeleteReq, void>(
-      '/obj/version_delete',
-      req
-    );
-  }
-
-  public objectsDelete(req: TraceObjsDeleteReq): Promise<void> {
-    return this.makeRequest<TraceObjsDeleteReq, void>('/objs/delete', req);
+  public objectDelete(req: TraceObjDeleteReq): Promise<void> {
+    return this.makeRequest<TraceObjDeleteReq, void>('/obj/delete', req);
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {

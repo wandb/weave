@@ -471,24 +471,14 @@ class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
 
-# class ObjVersionDeleteReq(BaseModel):
-#     project_id: str
-#     object_id: str
-#     digests: list[str]
-
-
-# class ObjVersionDeleteRes(BaseModel):
-#     pass
-
-
 class ObjDeleteReq(BaseModel):
     project_id: str
     object_id: str
     digests: list[str]
 
 
-class ObjsDeleteRes(BaseModel):
-    pass
+class ObjDeleteRes(BaseModel):
+    num_deleted: int
 
 
 class TableCreateReq(BaseModel):
@@ -916,8 +906,7 @@ class TraceServerInterface(Protocol):
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
-    def obj_version_delete(self, req: ObjVersionDeleteReq) -> ObjVersionDeleteRes: ...
-    def objs_delete(self, req: ObjsDeleteReq) -> ObjsDeleteRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...

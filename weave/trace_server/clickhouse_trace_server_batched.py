@@ -710,9 +710,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs: list[SelectableCHObjSchema],
     ) -> list[ObjDeleteCHInsertable]:
         delete_insertables = []
+        now = datetime.datetime.now(datetime.timezone.utc)
         for obj in objs:
             original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
-            now = datetime.datetime.now(datetime.timezone.utc)
             delete_insertables.append(
                 ObjDeleteCHInsertable(
                     project_id=obj.project_id,
@@ -741,76 +741,72 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for obj in objs:
             refs = [ri.parse_internal_uri(r) for r in obj.refs]
             if any(isinstance(r, ri.InternalTableRef) for r in refs):
+                # TODO: Raise?
                 continue
             filtered_objs.append(obj)
         return filtered_objs
 
-    # def obj_versions_delete(
-    #     self, req: tsi.ObjVersionDeleteReq
-    # ) -> tsi.ObjVersionDeleteRes:
-    #     """
-    #     Delete object versions by digest, belonging to given object_id.
-
-    #     All deletion in this method is "soft". Deletion occurs by inserting
-    #     a new row into the object_versions table with the deleted_at field set.
-    #     Inserted rows share identical primary keys (order by) with original rows,
-    #     and will be combined by the ReplacingMergeTree engine at database merge
-    #     time.
-    #     """
-    #     object_versions = self._select_objs_query(
-    #         req.project_id,
-    #         object_id_conditions=["object_id = {object_id: String}"],
-    #         conditions=["digest IN {digests: Array(String)}"],
-    #         parameters={"object_id": req.object_id, "digests": req.digests},
-    #         metadata_only=False,
-    #     )
-    #     filtered_object_versions = self._filter_deletable_objects(object_versions)
-    #     insertables = self._make_soft_delete_insertables(filtered_object_versions)
-    #     data = [list(obj.model_dump().values()) for obj in insertables]
-    #     column_names = list(insertables[0].model_fields.keys())
-    #     self._insert("object_versions", data=data, column_names=column_names)
-    #     return tsi.ObjVersionDeleteRes()
-
-    def objs_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjsDeleteRes:
-        # Query for the val_dump of the latest version of each object.
-        # Soft delete the latest version, retaining the val_dump
-        # Overwrite val_dump for all other versions (hard delete ish)
-
-        if req.digests:
-            # we are deleting specific versions
-            pass
-        else:
-            # we are deleting all versions of an object
-            pass
-
-        latest_obj_version = self._select_objs_query(
-            req.project_id,
-            conditions=["is_latest = 1"],
-            object_id_conditions=["object_id = {object_id: String}"],
-            parameters={"object_id": req.object_id},
-            metadata_only=False,
-        )
-        filtered_latest_obj_versions = self._filter_deletable_objects(
-            latest_obj_versions
-        )
-        insertables = self._make_soft_delete_insertables(filtered_latest_obj_versions)
-
+    def _make_obj_delete_insertables(
+        self, project_id: str, object_id: str
+    ) -> list[ObjDeleteCHInsertable]:
+        latest_obj_version = self._obj_read(project_id, object_id, "latest")
         other_obj_versions = self._select_objs_query(
-            req.project_id,
+            project_id,
             conditions=["is_latest = 0"],
-            object_id_conditions=["object_id IN {object_ids: Array(String)}"],
-            parameters={"object_ids": req.object_ids},
+            object_id_conditions=["object_id = {object_id: String}"],
+            parameters={"object_id": object_id},
             # only get metadata, we are going to hard delete
             metadata_only=True,
         )
-        filtered_other_obj_versions = self._filter_deletable_objects(other_obj_versions)
-        insertables += self._make_soft_delete_insertables(filtered_other_obj_versions)
+        all_versions = [latest_obj_version] + other_obj_versions
+        filtered_obj_versions = self._filter_deletable_objects(all_versions)
+        insertables = self._make_soft_delete_insertables(filtered_obj_versions)
+        return insertables
+
+    def _make_obj_versions_delete_insertables(
+        self, project_id: str, object_id: str, digests: list[str]
+    ) -> list[ObjDeleteCHInsertable]:
+        object_versions = self._select_objs_query(
+            project_id,
+            object_id_conditions=["object_id = {object_id: String}"],
+            conditions=["digest IN {digests: Array(String)}"],
+            parameters={"object_id": object_id, "digests": digests},
+            metadata_only=False,
+        )
+        filtered_object_versions = self._filter_deletable_objects(object_versions)
+        insertables = self._make_soft_delete_insertables(filtered_object_versions)
+        return insertables
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjsDeleteRes:
+        """
+        Delete object versions by digest, belonging to given object_id.
+
+        All deletion in this method is "soft". Deletion occurs by inserting
+        a new row into the object_versions table with the deleted_at field set.
+        Inserted rows share identical primary keys (order by) with original rows,
+        and will be combined by the ReplacingMergeTree engine at database merge
+        time.
+
+        If no digests are provided, we only retain the value from the latest version
+        of the object, all other versions will have their data overwritten with an
+        empty val_dump.
+
+        Otherwise, all specified versions are soft deleted.
+        """
+        if req.digests:
+            insertables = self._make_obj_versions_delete_insertables(
+                req.project_id, req.object_id, req.digests
+            )
+        else:
+            insertables = self._make_obj_delete_insertables(
+                req.project_id, req.object_id
+            )
 
         data = [list(obj.model_dump().values()) for obj in insertables]
         column_names = list(insertables[0].model_fields.keys())
         self._insert("object_versions", data=data, column_names=column_names)
 
-        return tsi.ObjsDeleteRes()
+        return tsi.ObjDeleteRes(num_deleted=len(insertables))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []

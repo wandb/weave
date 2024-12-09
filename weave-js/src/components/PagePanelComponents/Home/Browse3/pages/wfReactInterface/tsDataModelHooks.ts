@@ -1094,27 +1094,48 @@ const useRootObjectVersions = (
 const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
-  const objectDelete = useCallback(
+  const _getObjectId = (key: ObjectVersionKey | OpVersionKey) => {
+    // Get object id from op or object version key
+    let objectId = '';
+    if ('objectId' in key) {
+      objectId = key.objectId;
+    } else {
+      objectId = key.opId;
+    }
+    return objectId;
+  };
+
+  const objectVersionDelete = useCallback(
     (key: ObjectVersionKey | OpVersionKey) => {
-      let objectId = '';
-      if ('objectId' in key) {
-        objectId = key.objectId;
-      } else {
-        objectId = key.opId;
-      }
+      const objectId = _getObjectId(key);
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
         }),
         object_id: objectId,
-        digest: key.versionHash,
+        digests: [key.versionHash],
       });
     },
     [getTsClient]
   );
 
-  return objectDelete;
+  const objectDeleteAllVersions = useCallback(
+    (key: ObjectVersionKey | OpVersionKey) => {
+      const objectId = _getObjectId(key);
+      return getTsClient().objectDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: objectId,
+        digests: [],
+      });
+    },
+    [getTsClient]
+  );
+
+  return {objectVersionDelete, objectDeleteAllVersions};
 };
 
 const useRefsReadBatch = makeTraceServerEndpointHook<

@@ -121,7 +121,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
 }> = ({objVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
-  const objectDelete = useObjectDeleteFunc();
+  const {objectVersionDelete} = useObjectDeleteFunc();
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const deleteStr =
@@ -138,7 +138,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         deleteTargetStr={deleteStr}
-        onDelete={() => objectDelete(objVersionSchema)}
+        onDelete={() => objectVersionDelete(objVersionSchema)}
         onSuccess={closePeek}
       />
     </>

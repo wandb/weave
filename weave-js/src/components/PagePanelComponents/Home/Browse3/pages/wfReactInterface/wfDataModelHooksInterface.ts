@@ -252,9 +252,14 @@ export type WFDataModelHooksInterface = {
     metadataOnly?: boolean,
     opts?: {skip?: boolean; noAutoRefresh?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
-  useObjectDeleteFunc: () => (
-    key: ObjectVersionKey | OpVersionKey
-  ) => Promise<void>;
+  useObjectDeleteFunc: () => {
+    objectVersionDelete: (
+      key: ObjectVersionKey | OpVersionKey
+    ) => Promise<void>;
+    objectDeleteAllVersions: (
+      key: ObjectVersionKey | OpVersionKey
+    ) => Promise<void>;
+  };
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB

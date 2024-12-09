@@ -69,12 +69,13 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
-    ObjVersionDeleteReq,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ObjVersionDeleteReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -902,9 +903,9 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_object(self, object: ObjectRef) -> None:
-        self.server.obj_version_delete(
-            ObjVersionDeleteReq(
+    def delete_object_version(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=object.name,
                 digests=[object.digest],
@@ -912,12 +913,31 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_op(self, op: OpRef) -> None:
-        self.server.obj_version_delete(
-            ObjVersionDeleteReq(
+    def delete_object_all_versions(self, object_id: str) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_id,
+                digests=[],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op_version(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=op.name,
                 digests=[op.digest],
+            )
+        )
+
+    def delete_op_all_versions(self, op_id: str) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op_id,
+                digests=[],
             )
         )
 

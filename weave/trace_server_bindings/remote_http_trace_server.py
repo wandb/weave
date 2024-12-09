@@ -352,19 +352,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
         )
 
-    def obj_version_delete(
-        self, req: tsi.ObjVersionDeleteReq
-    ) -> tsi.ObjVersionDeleteRes:
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjsDeleteRes:
         return self._generic_request(
-            "/obj/version_delete",
-            req,
-            tsi.ObjVersionDeleteReq,
-            tsi.ObjVersionDeleteRes,
-        )
-
-    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
-        return self._generic_request(
-            "/objs/delete", req, tsi.ObjsDeleteReq, tsi.ObjsDeleteRes
+            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjsDeleteRes
         )
 
     def table_create(
