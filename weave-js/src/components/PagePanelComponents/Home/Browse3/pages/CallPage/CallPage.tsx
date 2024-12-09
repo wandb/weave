@@ -312,7 +312,7 @@ const CallPageInnerVertical: FC<{
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const showPaginationContols = isPeeking && rowIdsConfigured;
+  const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
 
@@ -330,10 +330,10 @@ const CallPageInnerVertical: FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationContols && (
+          {showPaginationControls && (
             <PaginationControls call={call} path={path} />
           )}
-          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+          <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}

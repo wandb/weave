@@ -139,6 +139,7 @@ import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-mini
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
 import {ReactComponent as ImportMolecule} from '../../assets/icons/icon-molecule.svg';
+import {ReactComponent as ImportMoon} from '../../assets/icons/icon-moon.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-new-section-above.svg';
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
@@ -216,6 +217,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
 import {ReactComponent as ImportSweepGrid} from '../../assets/icons/icon-sweep-grid.svg';
@@ -695,6 +697,9 @@ export const IconModelOnDark = (props: SVGIconProps) => (
 export const IconMolecule = (props: SVGIconProps) => (
   <ImportMolecule {...updateIconProps(props)} />
 );
+export const IconMoon = (props: SVGIconProps) => (
+  <ImportMoon {...updateIconProps(props)} />
+);
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
@@ -925,6 +930,9 @@ export const IconStop = (props: SVGIconProps) => (
 );
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
+);
+export const IconSun = (props: SVGIconProps) => (
+  <ImportSun {...updateIconProps(props)} />
 );
 export const IconSwap = (props: SVGIconProps) => (
   <ImportSwap {...updateIconProps(props)} />
@@ -1211,6 +1219,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   model: IconModel,
   'model-on-dark': IconModelOnDark,
   molecule: IconMolecule,
+  moon: IconMoon,
   'music-audio': IconMusicAudio,
   'new-section-above': IconNewSectionAbove,
   'new-section-below': IconNewSectionBelow,
@@ -1288,6 +1297,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
   'sweep-grid': IconSweepGrid,
