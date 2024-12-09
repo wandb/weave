@@ -107,16 +107,15 @@ def _apply_fn_defaults_to_inputs(
 ) -> dict[str, Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
-    for param_name, param in sig.parameters.items():
-        if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not _value_is_sentinel(
-                param
-            ):
-                inputs[param_name] = param.default
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                inputs[param_name] = ()
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                inputs[param_name] = {}
+    for name, param in sig.parameters.items():
+        if name in inputs:
+            continue
+        if param.default != inspect.Parameter.empty and not _value_is_sentinel(param):
+            inputs[name] = param.default
+        if param.kind == inspect.Parameter.VAR_POSITIONAL:
+            inputs[name] = ()
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
+            inputs[name] = {}
     return inputs
 
 
@@ -216,6 +215,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
+
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
     return ProcessedInputs(
         original_args=args,
@@ -736,7 +736,9 @@ def as_op(fn: Callable) -> Op:
     if not is_op(fn):
         raise ValueError("fn must be a weave.op() decorated function")
 
-    return cast(Op, fn)
+    # The unbinding is necessary for methods because `MethodType` is applied after the
+    # func is decorated into an Op.
+    return maybe_unbind_method(cast(Op, fn))
 
 
 __docspec__ = [call, calls]
