@@ -12,6 +12,7 @@ LLM providers are the vendors that offer access to large language models for gen
 
 - **[OpenAI](/guides/integrations/openai)**
 - **[Anthropic](/guides/integrations/anthropic)**
+- **[Amazon Bedrock](/guides/integrations/bedrock)**
 - **[Cerebras](/guides/integrations/cerebras)**
 - **[Cohere](/guides/integrations/cohere)**
 - **[MistralAI](/guides/integrations/mistral)**
