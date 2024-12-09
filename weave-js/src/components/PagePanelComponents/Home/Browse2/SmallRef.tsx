@@ -125,6 +125,11 @@ export const SmallRef: FC<{
   }
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
+
+  const isDeleted =
+    isObjDeleteError(objectVersion?.error) ||
+    isObjDeleteError(opVersion?.error);
+
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
@@ -140,7 +145,6 @@ export const SmallRef: FC<{
     rootType = {type: 'OpDef'};
   }
   const {label} = objectRefDisplayName(objRef, versionIndex);
-
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
   if (rootTypeName === 'Dataset') {
@@ -177,13 +181,14 @@ export const SmallRef: FC<{
             overflow: 'hidden',
             whiteSpace: 'nowrap',
             textOverflow: 'ellipsis',
+            textDecoration: isDeleted ? 'line-through' : 'none',
           }}>
           {label}
         </Box>
       )}
     </Box>
   );
-  if (refTypeQuery.loading) {
+  if (refTypeQuery.loading || isDeleted) {
     return Item;
   }
   if (!isArtifactRef && !isWeaveObjRef) {
@@ -199,4 +204,13 @@ export const SmallRef: FC<{
       {Item}
     </Link>
   );
+};
+
+export const isObjDeleteError = (e: any): boolean => {
+  if (e == null) {
+    return false;
+  }
+  const errorStr = String(e);
+  const regex = /Obj .* was deleted at .*/;
+  return regex.test(errorStr);
 };

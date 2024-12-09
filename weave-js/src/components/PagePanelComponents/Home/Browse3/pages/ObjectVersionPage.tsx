@@ -12,6 +12,7 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -94,7 +95,9 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (objectVersion.error) {
+    return <NotFoundPanel title={objectVersion.error.message} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
@@ -253,6 +256,10 @@ const ObjectVersionPageInner: React.FC<{
                 <p>{refExtra}</p>
               </div>
             )}
+          </div>
+          <div className="flex-grow" />
+          <div className="ml-1 flex">
+            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
           </div>
         </Tailwind>
       }

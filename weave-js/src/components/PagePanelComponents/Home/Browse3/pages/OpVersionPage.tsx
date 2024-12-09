@@ -5,6 +5,7 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -137,6 +138,10 @@ const OpVersionPageInner: React.FC<{
               ) : (
                 <p>-</p>
               )}
+            </div>
+            <div className="flex-grow" />
+            <div className="ml-1 flex">
+              <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
             </div>
           </div>
         </Tailwind>

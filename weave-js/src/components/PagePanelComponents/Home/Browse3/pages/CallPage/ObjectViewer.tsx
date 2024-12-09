@@ -7,6 +7,7 @@ import {
   GridRowId,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   Dispatch,
@@ -21,6 +22,7 @@ import React, {
 import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
@@ -161,8 +163,15 @@ export const ObjectViewer = ({
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
+      if (!r) {
         // Shouldn't be possible
+        continue;
+      }
+      if (!v) {
+        // Value for ref not found, probably deleted
+        refValues[r] = {
+          _weave_is_deleted_ref: objectRefDisplayName(parseRef(r)).label,
+        };
         continue;
       }
       let val = r;
