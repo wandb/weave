@@ -10,7 +10,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Generic, TypeVar, cast
+from typing import Any, Callable, Generic, Protocol, TypeVar, cast
 
 import pydantic
 from requests import HTTPError
@@ -90,10 +90,16 @@ ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-R = TypeVar("R")
-FetchFunc = Callable[[int, int], list[T]]  # inputs: offset, limit
-TransformFunc = Callable[[T], R]
+T = TypeVar("T", covariant=True)
+R = TypeVar("R", covariant=True)
+
+
+class FetchFunc(Protocol):
+    def __call__(self, offset: int, limit: int) -> list[T]: ...
+
+
+class TransformFunc(Protocol):
+    def __call__(self, item: T) -> R: ...
 
 
 class PaginatedIterator(Generic[T]):
@@ -153,7 +159,7 @@ class PaginatedIterator(Generic[T]):
         return self._get_slice(slice(0, None, 1))
 
 
-def make_calls_iterator(
+def _make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
     filter: CallsFilter,
@@ -363,7 +369,7 @@ class Call:
             raise ValueError("Can't get children of call without ID")
 
         client = weave_client_context.require_weave_client()
-        return make_calls_iterator(
+        return _make_calls_iterator(
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
@@ -647,7 +653,7 @@ class WeaveClient:
         if filter is None:
             filter = CallsFilter()
 
-        return make_calls_iterator(
+        return _make_calls_iterator(
             self.server,
             self._project_id(),
             filter,
@@ -1489,7 +1495,7 @@ class WeaveClient:
         return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def get_objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
         if not filter:
             filter = ObjectVersionFilter()
         else:
