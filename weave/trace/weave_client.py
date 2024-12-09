@@ -10,7 +10,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, Protocol, TypeVar, overload
 
 import pydantic
 from requests import HTTPError
@@ -82,6 +82,9 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+if TYPE_CHECKING:
+    from weave.flow.obj import Object
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -199,6 +202,26 @@ def _make_calls_iterator(
     def transform_func(call: CallSchema) -> Call:
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(fetch_func, transform_func=transform_func)
+
+
+def _make_objects_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    filter: ObjectVersionFilter,
+) -> PaginatedIterator[ObjSchema, WeaveObject]:
+    def fetch_func(offset: int, limit: int) -> list[ObjSchema]:
+        response = server.objs_query(
+            ObjQueryReq(
+                project_id=project_id,
+                filter=filter,
+            )
+        )
+        return response.objs
+
+    def transform_func(obj: ObjSchema) -> WeaveObject:
+        return WeaveObject(obj, None, server, None, None)
 
     return PaginatedIterator(fetch_func, transform_func=transform_func)
 
@@ -1515,21 +1538,16 @@ class WeaveClient:
         return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def get_objects(
+        self, filter: ObjectVersionFilter | None = None
+    ) -> PaginatedIterator[ObjSchema, Object]:
         if not filter:
             filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
-        response = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self._project_id(),
-                filter=filter,
-            )
-        )
-        return response.objs
+        return _make_objects_iterator(self.server, self._project_id(), filter)
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
