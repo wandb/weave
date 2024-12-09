@@ -10,7 +10,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, cast
+from typing import Any, Callable, Generic, TypeVar, cast
 
 import pydantic
 from requests import HTTPError
@@ -89,6 +89,93 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+R = TypeVar("R")
+FetchFunc = Callable[[int, int], list[T]]  # inputs: offset, limit
+TransformFunc = Callable[[T], R]
+
+
+class PaginatedIterator(Generic[T]):
+    def __init__(
+        self,
+        fetch_func: FetchFunc,
+        page_size: int = 1000,
+        transform_func: TransformFunc | None = None,
+    ) -> None:
+        self.fetch_func = fetch_func
+        self.page_size = page_size
+        self.transform_func = transform_func
+        self.index = 0
+
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[T]:
+        return self.fetch_func(index * self.page_size, self.page_size)
+
+    def _get_one(self, index: int) -> T:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
+
+        page_index = index // self.page_size
+        page_offset = index % self.page_size
+
+        page = self._fetch_page(page_index)
+        if page_offset >= len(page):
+            raise IndexError(f"Index {index} out of range")
+
+        res = page[page_offset]
+        if transform := self.transform_func:
+            res = transform(res)
+        return res
+
+    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) is not None and stop < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        i = start
+        while stop is None or i < stop:
+            try:
+                yield self._get_one(i)
+            except IndexError:
+                break
+            i += step
+
+    def __getitem__(self, key: slice | int) -> T | list[T]:
+        if isinstance(key, slice):
+            return list(self._get_slice(key))
+        return self._get_one(key)
+
+    def __iter__(self) -> Iterator[T]:
+        return self._get_slice(slice(0, None, 1))
+
+
+def make_calls_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    filter: CallsFilter,
+    include_costs: bool = False,
+) -> PaginatedIterator[Call]:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        response = server.calls_query(
+            CallsQueryReq(
+                project_id=project_id,
+                filter=filter,
+                offset=offset,
+                limit=limit,
+                include_costs=include_costs,
+            )
+        )
+        return response.calls
+
+    def transform_func(call: CallSchema) -> Call:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(fetch_func, transform_func=transform_func)
 
 
 class OpNameError(ValueError):
@@ -270,13 +357,13 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> CallsIter:
+    def children(self) -> PaginatedIterator[Call]:
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
 
         client = weave_client_context.require_weave_client()
-        return CallsIter(
+        return make_calls_iterator(
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
@@ -352,80 +439,6 @@ class Call:
             call_ref_uri=score_call_ref.uri(),
             runnable_ref_uri=scorer_op_ref.uri(),
         )
-
-
-class CallsIter:
-    server: TraceServerInterface
-    filter: CallsFilter
-    include_costs: bool
-
-    def __init__(
-        self,
-        server: TraceServerInterface,
-        project_id: str,
-        filter: CallsFilter,
-        include_costs: bool = False,
-    ) -> None:
-        self.server = server
-        self.project_id = project_id
-        self.filter = filter
-        self._page_size = 1000
-        self.include_costs = include_costs
-
-    # seems like this caching should be on the server, but it's here for now...
-    @lru_cache
-    def _fetch_page(self, index: int) -> list[CallSchema]:
-        # caching in here means that any other CallsIter objects would also
-        # benefit from the cache
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self.project_id,
-                filter=self.filter,
-                offset=index * self._page_size,
-                limit=self._page_size,
-                include_costs=self.include_costs,
-            )
-        )
-        return response.calls
-
-    def _get_one(self, index: int) -> WeaveObject:
-        if index < 0:
-            raise IndexError("Negative indexing not supported")
-
-        page_index = index // self._page_size
-        page_offset = index % self._page_size
-
-        calls = self._fetch_page(page_index)
-        if page_offset >= len(calls):
-            raise IndexError(f"Index {index} out of range")
-
-        call = calls[page_offset]
-        entity, project = self.project_id.split("/")
-        return make_client_call(entity, project, call, self.server)
-
-    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
-        if (start := key.start or 0) < 0:
-            raise ValueError("Negative start not supported")
-        if (stop := key.stop) is not None and stop < 0:
-            raise ValueError("Negative stop not supported")
-        if (step := key.step or 1) < 0:
-            raise ValueError("Negative step not supported")
-
-        i = start
-        while stop is None or i < stop:
-            try:
-                yield self._get_one(i)
-            except IndexError:
-                break
-            i += step
-
-    def __getitem__(self, key: slice | int) -> WeaveObject | list[WeaveObject]:
-        if isinstance(key, slice):
-            return list(self._get_slice(key))
-        return self._get_one(key)
-
-    def __iter__(self) -> Iterator[WeaveObject]:
-        return self._get_slice(slice(0, None, 1))
 
 
 def make_client_call(
@@ -630,12 +643,15 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> CallsIter:
+    ) -> PaginatedIterator[Call]:
         if filter is None:
             filter = CallsFilter()
 
-        return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
+        return make_calls_iterator(
+            self.server,
+            self._project_id(),
+            filter,
+            include_costs,
         )
 
     @deprecated(new_name="get_calls")
@@ -643,7 +659,7 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> CallsIter:
+    ) -> PaginatedIterator[Call]:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1466,14 +1482,14 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
+    def _op_calls(self, op: Op) -> PaginatedIterator[Call]:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
         return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def get_objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
         if not filter:
             filter = ObjectVersionFilter()
         else:
@@ -1632,4 +1648,4 @@ def elide_display_name(name: str) -> str:
     return name
 
 
-__docspec__ = [WeaveClient, Call, CallsIter]
+__docspec__ = [WeaveClient, Call, PaginatedIterator]
