@@ -1,6 +1,9 @@
+import levenshtein from 'js-levenshtein';
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
+// Others were removed because we want users to use models with the dates
 export const LLM_MAX_TOKENS = {
   'gpt-4o-mini': {
     provider: 'openai',
@@ -32,6 +35,7 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 4096,
     supports_function_calling: true,
   },
+
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
     max_tokens: 8192,
@@ -378,4 +382,36 @@ export const LLM_PROVIDER_LABELS: Record<
   gemini: 'Gemini',
   groq: 'Groq',
   bedrock: 'Bedrock',
+};
+
+// Main function to find most similar LLM name
+export const findMostSimilarLLMName = (
+  input: string,
+  llmList: LLMMaxTokensKey[]
+): string => {
+  const normalizedInput = input.toLowerCase().trim();
+
+  // If exact match exists, return it
+  if (llmList.includes(normalizedInput as LLMMaxTokensKey)) {
+    return normalizedInput;
+  }
+
+  let closestMatch = llmList[0];
+  let smallestDistance = Infinity;
+
+  llmList.forEach(llmName => {
+    const distance = levenshtein(normalizedInput, llmName.toLowerCase());
+
+    if (distance < smallestDistance) {
+      smallestDistance = distance;
+      closestMatch = llmName;
+    }
+
+    if (llmName.includes(normalizedInput)) {
+      closestMatch = llmName;
+      smallestDistance = 0;
+    }
+  });
+
+  return closestMatch;
 };

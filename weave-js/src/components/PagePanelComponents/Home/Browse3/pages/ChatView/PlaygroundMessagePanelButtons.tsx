@@ -11,6 +11,7 @@ type PlaygroundMessagePanelButtonsProps = {
   contentRef: React.RefObject<HTMLDivElement>;
   setEditorHeight: (height: number | null) => void;
   responseIndexes?: number[];
+  hasPendingToolResponse: boolean;
 };
 
 export const PlaygroundMessagePanelButtons: React.FC<
@@ -23,6 +24,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
   contentRef,
   setEditorHeight,
   responseIndexes,
+  hasPendingToolResponse,
 }) => {
   const {deleteMessage, deleteChoice, retry} = usePlaygroundContext();
 
@@ -34,11 +36,13 @@ export const PlaygroundMessagePanelButtons: React.FC<
         startIcon="randomize-reset-reload"
         onClick={() => retry?.(index, isChoice)}
         tooltip={
-          !hasContent
+          hasPendingToolResponse
+            ? 'Waiting for tool call response(s)'
+            : !hasContent
             ? 'We currently do not support retrying functions'
             : 'Retry'
         }
-        disabled={!hasContent}>
+        disabled={!hasContent || hasPendingToolResponse}>
         Retry
       </Button>
       <Button
@@ -54,9 +58,13 @@ export const PlaygroundMessagePanelButtons: React.FC<
           );
         }}
         tooltip={
-          !hasContent ? 'We currently do not support editing functions' : 'Edit'
+          hasPendingToolResponse
+            ? 'Waiting for tool call response(s)'
+            : !hasContent
+            ? 'We currently do not support editing functions'
+            : 'Edit'
         }
-        disabled={!hasContent}>
+        disabled={!hasContent || hasPendingToolResponse}>
         Edit
       </Button>
       <Button

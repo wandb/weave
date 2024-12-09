@@ -5,6 +5,9 @@ import {PlaygroundMessageRole} from './types';
 
 export type PlaygroundContextType = {
   isPlayground: boolean;
+  setPendingToolResponseIds: (toolCallIds: string[]) => void;
+  pendingToolResponseIds: string[];
+
   addMessage: (newMessage: Message) => void;
   editMessage: (messageIndex: number, newMessage: Message) => void;
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
@@ -22,6 +25,9 @@ export type PlaygroundContextType = {
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
   isPlayground: false,
+  setPendingToolResponseIds: () => {},
+  pendingToolResponseIds: [],
+
   addMessage: () => {},
   editMessage: () => {},
   deleteMessage: () => {},
