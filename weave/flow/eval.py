@@ -5,9 +5,10 @@ import textwrap
 import time
 import traceback
 from collections.abc import Coroutine
+from datetime import datetime
 from typing import Any, Callable, Literal, Optional, Union, cast
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
 
@@ -16,6 +17,7 @@ from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
+from weave.flow.util import make_memorable_name
 from weave.scorers import (
     Scorer,
     _has_oldstyle_scorers,
@@ -28,7 +30,7 @@ from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
 
@@ -39,6 +41,12 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+
+def default_evaluation_display_name(call: Call) -> str:
+    date = datetime.now().strftime("%Y-%m-%d")
+    unique_name = make_memorable_name()
+    return f"eval-{date}-{unique_name}"
 
 
 def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
@@ -116,8 +124,20 @@ class Evaluation(Object):
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
+    # Custom evaluation name for display in the UI.  This is the same API as passing a
+    # custom `call_display_name` to `weave.op` (see that for more details).
+    evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
+
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
+    @model_validator(mode="after")
+    def _update_display_name(self) -> "Evaluation":
+        if self.evaluation_name:
+            # Treat user-specified `evaluation_name` as the name for `Evaluation.evaluate`
+            eval_op = as_op(self.evaluate)
+            eval_op.call_display_name = self.evaluation_name
+        return self
 
     def model_post_init(self, __context: Any) -> None:
         scorers: list[Union[Callable, Scorer, Op]] = []
@@ -486,7 +506,7 @@ class Evaluation(Object):
             eval_rows.append(eval_row)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
-    @weave.op()
+    @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to

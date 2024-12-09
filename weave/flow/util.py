@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import multiprocessing
+import random
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
@@ -81,3 +82,89 @@ def warn_once(logger: logging.Logger, message: str) -> None:
     if message not in _shown_warnings:
         logger.warning(message)
         _shown_warnings.add(message)
+
+
+def make_memorable_name() -> str:
+    adjectives = [
+        "brave",
+        "bright",
+        "calm",
+        "charming",
+        "clever",
+        "daring",
+        "dazzling",
+        "eager",
+        "elegant",
+        "eloquent",
+        "fierce",
+        "friendly",
+        "gentle",
+        "graceful",
+        "happy",
+        "honest",
+        "imaginative",
+        "innocent",
+        "joyful",
+        "jubilant",
+        "keen",
+        "kind",
+        "lively",
+        "loyal",
+        "merry",
+        "nice",
+        "noble",
+        "optimistic",
+        "proud",
+        "quiet",
+        "rich",
+        "sweet",
+        "tender",
+        "unique",
+        "wise",
+        "zealous",
+    ]
+
+    nouns = [
+        "bear",
+        "bird",
+        "breeze",
+        "cedar",
+        "cloud",
+        "daisy",
+        "dawn",
+        "dolphin",
+        "dusk",
+        "eagle",
+        "fish",
+        "flower",
+        "forest",
+        "hill",
+        "horizon",
+        "island",
+        "lake",
+        "lion",
+        "maple",
+        "meadow",
+        "moon",
+        "mountain",
+        "oak",
+        "ocean",
+        "pine",
+        "plateau",
+        "rain",
+        "river",
+        "rose",
+        "star",
+        "stream",
+        "sun",
+        "tiger",
+        "tree",
+        "valley",
+        "whale",
+        "wind",
+        "wolf",
+    ]
+
+    adj = random.choice(adjectives)
+    noun = random.choice(nouns)
+    return f"{adj}-{noun}"

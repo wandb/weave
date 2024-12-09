@@ -9,6 +9,7 @@ import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {
   FEEDBACK_EXPAND_PARAM,
   PATH_PARAM,
@@ -414,7 +415,8 @@ export const CallsLink: React.FC<{
       $variant={props.variant}
       to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount}
-      {props.countIsLimited ? '+' : ''} calls
+      {props.countIsLimited ? '+' : ''}{' '}
+      {maybePluralizeWord(props.callCount, 'call')}
     </Link>
   );
 };

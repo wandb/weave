@@ -1,6 +1,7 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterator
 from typing import Any, Optional, cast
 
 from weave.trace_server import refs_internal as ri
@@ -168,6 +169,33 @@ class LRUCache(OrderedDict):
         if key not in self and len(self) >= self.max_size:
             self.popitem(last=False)
         super().__setitem__(key, value)
+
+
+class DynamicBatchProcessor:
+    """Helper class to handle dynamic batch processing with growing batch sizes."""
+
+    def __init__(self, initial_size: int, max_size: int, growth_factor: int):
+        self.batch_size = initial_size
+        self.max_size = max_size
+        self.growth_factor = growth_factor
+
+    def make_batches(self, iterator: Iterator[Any]) -> Iterator[list[Any]]:
+        batch = []
+
+        for item in iterator:
+            batch.append(item)
+
+            if len(batch) >= self.batch_size:
+                yield batch
+
+                batch = []
+                self.batch_size = self._compute_batch_size()
+
+        if batch:
+            yield batch
+
+    def _compute_batch_size(self) -> int:
+        return min(self.max_size, self.batch_size * self.growth_factor)
 
 
 def digest_is_version_like(digest: str) -> tuple[bool, int]:
