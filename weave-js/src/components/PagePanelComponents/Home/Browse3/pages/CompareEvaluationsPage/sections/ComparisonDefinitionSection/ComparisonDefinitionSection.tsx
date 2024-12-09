@@ -176,7 +176,7 @@ const AddEvaluationButton: React.FC<{
       return;
     }
 
-    const filteredOptions = calls.result.filter(call => {
+    const filteredOptions = evalsNotComparing.filter(call => {
       if (
         (call.displayName ?? call.spanName)
           .toLowerCase()

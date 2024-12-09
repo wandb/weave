@@ -2,7 +2,7 @@ import {quantile} from 'd3-array';
 import _ from 'lodash';
 import moment from 'moment';
 import * as Plotly from 'plotly.js';
-import React, {useEffect, useMemo, useRef} from 'react';
+import React, {useMemo, useRef} from 'react';
 
 import {
   BLUE_500,
@@ -63,6 +63,8 @@ const Y_AXIS_STYLE: Partial<Plotly.LayoutAxis> = {
   tickfont: {color: MOON_500},
   zeroline: false,
 };
+
+const PLOT_DEBOUNCE_MS = 200;
 
 export const calculateBinSize = (
   data: ChartDataLatency[] | ChartDataErrors[] | ChartDataRequests[],
@@ -147,28 +149,28 @@ export const LatencyPlotlyChart: React.FC<{
     ];
   }, [chartData, binSize]);
 
-  useEffect(() => {
-    const plotlyLayout: Partial<Plotly.Layout> = {
-      height,
-      margin: CHART_MARGIN_STYLE,
-      xaxis: X_AXIS_STYLE_WITH_SPIKES,
-      yaxis: Y_AXIS_STYLE,
-      hovermode: 'x unified',
-      showlegend: false,
-      hoverlabel: {
-        bordercolor: MOON_200,
-      },
-    };
+  const plotlyLayout: Partial<Plotly.Layout> = {
+    height,
+    margin: CHART_MARGIN_STYLE,
+    xaxis: X_AXIS_STYLE_WITH_SPIKES,
+    yaxis: Y_AXIS_STYLE,
+    hovermode: 'x unified',
+    showlegend: false,
+    hoverlabel: {
+      bordercolor: MOON_200,
+    },
+  };
 
-    const plotlyConfig: Partial<Plotly.Config> = {
-      displayModeBar: false,
-      responsive: true,
-    };
+  const plotlyConfig: Partial<Plotly.Config> = {
+    displayModeBar: false,
+    responsive: true,
+  };
 
-    if (divRef.current) {
-      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
-    }
-  }, [plotlyData, height]);
+  if (divRef.current) {
+    _.debounce(() => {
+      Plotly.newPlot(divRef.current!, plotlyData, plotlyLayout, plotlyConfig);
+    }, PLOT_DEBOUNCE_MS)();
+  }
 
   return <div ref={divRef}></div>;
 };
@@ -206,29 +208,29 @@ export const ErrorPlotlyChart: React.FC<{
     ];
   }, [chartData, binSize]);
 
-  useEffect(() => {
-    const plotlyLayout: Partial<Plotly.Layout> = {
-      height,
-      margin: CHART_MARGIN_STYLE,
-      bargap: 0.2,
-      xaxis: X_AXIS_STYLE,
-      yaxis: Y_AXIS_STYLE,
-      hovermode: 'x unified',
-      hoverlabel: {
-        bordercolor: MOON_200,
-      },
-      dragmode: 'zoom',
-    };
+  const plotlyLayout: Partial<Plotly.Layout> = {
+    height,
+    margin: CHART_MARGIN_STYLE,
+    bargap: 0.2,
+    xaxis: X_AXIS_STYLE,
+    yaxis: Y_AXIS_STYLE,
+    hovermode: 'x unified',
+    hoverlabel: {
+      bordercolor: MOON_200,
+    },
+    dragmode: 'zoom',
+  };
 
-    const plotlyConfig: Partial<Plotly.Config> = {
-      displayModeBar: false,
-      responsive: true,
-    };
+  const plotlyConfig: Partial<Plotly.Config> = {
+    displayModeBar: false,
+    responsive: true,
+  };
 
-    if (divRef.current) {
-      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
-    }
-  }, [plotlyData, height]);
+  if (divRef.current) {
+    _.debounce(() => {
+      Plotly.newPlot(divRef.current!, plotlyData, plotlyLayout, plotlyConfig);
+    }, PLOT_DEBOUNCE_MS)();
+  }
 
   return <div ref={divRef}></div>;
 };
@@ -266,28 +268,28 @@ export const RequestsPlotlyChart: React.FC<{
     ];
   }, [chartData, binSize]);
 
-  useEffect(() => {
-    const plotlyLayout: Partial<Plotly.Layout> = {
-      height,
-      margin: CHART_MARGIN_STYLE,
-      xaxis: X_AXIS_STYLE,
-      yaxis: Y_AXIS_STYLE,
-      bargap: 0.2,
-      hovermode: 'x unified',
-      hoverlabel: {
-        bordercolor: MOON_200,
-      },
-    };
+  const plotlyLayout: Partial<Plotly.Layout> = {
+    height,
+    margin: CHART_MARGIN_STYLE,
+    xaxis: X_AXIS_STYLE,
+    yaxis: Y_AXIS_STYLE,
+    bargap: 0.2,
+    hovermode: 'x unified',
+    hoverlabel: {
+      bordercolor: MOON_200,
+    },
+  };
 
-    const plotlyConfig: Partial<Plotly.Config> = {
-      displayModeBar: false,
-      responsive: true,
-    };
+  const plotlyConfig: Partial<Plotly.Config> = {
+    displayModeBar: false,
+    responsive: true,
+  };
 
-    if (divRef.current) {
-      Plotly.newPlot(divRef.current, plotlyData, plotlyLayout, plotlyConfig);
-    }
-  }, [plotlyData, height]);
+  if (divRef.current) {
+    _.debounce(() => {
+      Plotly.newPlot(divRef.current!, plotlyData, plotlyLayout, plotlyConfig);
+    }, PLOT_DEBOUNCE_MS)();
+  }
 
   return <div ref={divRef}></div>;
 };
