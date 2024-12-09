@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import React, {useMemo} from 'react';
 
+import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
@@ -16,7 +17,6 @@ import {
 import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
-  SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TabUseOp} from './TabUseOp';
@@ -78,60 +78,75 @@ const OpVersionPageInner: React.FC<{
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          width="100%">
-          <Box flexGrow={1}>
-            <SimpleKeyValueTable
-              data={{
-                Name: (
-                  <>
-                    {opId}{' '}
+        <Tailwind>
+          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="block">
+              <p className="text-moon-500">Name</p>
+              <div className="flex items-center">
+                <OpVersionsLink
+                  entity={entity}
+                  project={project}
+                  filter={{
+                    opName: opId,
+                  }}
+                  versionCount={opVersionCount}
+                  neverPeek
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
+                    <span>{opId}</span>
                     {opVersions.loading ? (
                       <LoadingDots />
                     ) : (
-                      <>
-                        [
-                        <OpVersionsLink
-                          entity={entity}
-                          project={project}
-                          filter={{
-                            opName: opId,
-                          }}
-                          versionCount={opVersionCount}
-                          neverPeek
-                          variant="secondary"
-                        />
-                        ]
-                      </>
+                      <span className="ml-[4px]">
+                        ({opVersionCount} version
+                        {opVersionCount !== 1 ? 's' : ''})
+                      </span>
                     )}
-                  </>
-                ),
-                Version: <>{versionIndex}</>,
-                Calls:
-                  !callsStats.loading || opVersionCallCount > 0 ? (
-                    <CallsLink
-                      entity={entity}
-                      project={project}
-                      callCount={opVersionCallCount}
-                      filter={{
-                        opVersionRefs: [uri],
-                      }}
-                      neverPeek
-                      variant="secondary"
+                    <Icon
+                      name="forward-next"
+                      width={16}
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                  ) : (
-                    <></>
-                  ),
-              }}
-            />
-          </Box>
-          <Box mr={1}>
-            <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
-          </Box>
-        </Stack>
+                  </div>
+                </OpVersionsLink>
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version</p>
+              <p>{versionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Calls:</p>
+              {!callsStats.loading || opVersionCallCount > 0 ? (
+                <div className="group flex w-max items-center">
+                  <CallsLink
+                    entity={entity}
+                    project={project}
+                    callCount={opVersionCallCount}
+                    filter={{
+                      opVersionRefs: [uri],
+                    }}
+                    neverPeek
+                    variant="secondary"
+                  />
+                  <Icon
+                    name="forward-next"
+                    width={16}
+                    height={16}
+                    className="ml-[2px] text-teal-500 opacity-0 hover:hidden group-hover:opacity-100"
+                  />
+                </div>
+              ) : (
+                <p>-</p>
+              )}
+            </div>
+            <div className="flex-grow" />
+            <div className="ml-1 flex">
+              <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
+            </div>
+          </div>
+        </Tailwind>
       }
       tabs={[
         {
