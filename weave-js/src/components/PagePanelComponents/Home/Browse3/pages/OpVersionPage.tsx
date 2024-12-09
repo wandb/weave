@@ -1,5 +1,3 @@
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import React, {useMemo} from 'react';
 
 import {Icon} from '../../../../Icon';

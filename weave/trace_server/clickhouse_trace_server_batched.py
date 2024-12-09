@@ -762,7 +762,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         insertables = self._make_soft_delete_insertables(filtered_object_versions)
         return insertables
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjsDeleteRes:
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         """
         Delete object versions by digest, belonging to given object_id.
 
