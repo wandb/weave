@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
@@ -16,7 +17,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -70,10 +71,8 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  return false;
-  // Uncomment to re-enable.
-  // const viewerInfo = useViewerInfo();
-  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  const viewerInfo = useViewerInfo();
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -185,7 +184,7 @@ const useCallTabs = (call: CallSchema) => {
     ...(showScores
       ? [
           {
-            label: 'Scores (W&B Admin Preview)',
+            label: 'Scores',
             content: (
               <Tailwind>
                 <CallScoresViewer call={call} />
@@ -313,7 +312,7 @@ const CallPageInnerVertical: FC<{
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const showPaginationContols = isPeeking && rowIdsConfigured;
+  const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
 
@@ -331,10 +330,10 @@ const CallPageInnerVertical: FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationContols && (
+          {showPaginationControls && (
             <PaginationControls call={call} path={path} />
           )}
-          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+          <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
