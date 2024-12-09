@@ -2,7 +2,7 @@ import io
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeVar, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -14,6 +14,10 @@ from weave.trace_server.async_batch_processor import AsyncBatchProcessor
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
+
+
+RequestT = TypeVar("RequestT", bound=BaseModel)
+ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
 
 class StartBatchItem(BaseModel):
@@ -211,10 +215,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _generic_request(
         self,
         url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> BaseModel:
+        req: Union[RequestT, dict[str, Any]],
+        req_model: type[RequestT],
+        res_model: type[ResponseT],
+    ) -> ResponseT:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req)
@@ -223,10 +227,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _generic_stream_request(
         self,
         url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> Iterator[BaseModel]:
+        req: Union[RequestT, dict[str, Any]],
+        req_model: type[RequestT],
+        res_model: type[ResponseT],
+    ) -> Iterator[ResponseT]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req, stream=True)
@@ -265,7 +269,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 )
             self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
             return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
+                id=str(req_as_obj.start.id),
+                trace_id=str(req_as_obj.start.trace_id),
             )
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes

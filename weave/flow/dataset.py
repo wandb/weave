@@ -67,5 +67,5 @@ class Dataset(Object):
                 )
         return rows
 
-    def __iter__(self) -> Iterator[dict]:
+    def __iter__(self) -> Iterator[dict]:  # type: ignore[override]
         return iter(self.rows)

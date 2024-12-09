@@ -459,7 +459,9 @@ class CallsQuery(BaseModel):
         )
 
         has_heavy_order = any(
-            order_field.field.is_heavy() for order_field in self.order_fields
+            # TODO: error: "QueryBuilderField" has no attribute "is_heavy"
+            order_field.field.is_heavy()  # type: ignore
+            for order_field in self.order_fields
         )
 
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
