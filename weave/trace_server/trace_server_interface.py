@@ -474,7 +474,10 @@ class ObjQueryRes(BaseModel):
 class ObjDeleteReq(BaseModel):
     project_id: str
     object_id: str
-    digests: list[str]
+    digests: list[str] = Field(
+        default=[],
+        description="List of digests to delete. If empty, delete all versions.",
+    )
 
 
 class ObjDeleteRes(BaseModel):

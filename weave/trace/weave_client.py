@@ -75,7 +75,6 @@ from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
-    ObjVersionDeleteReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
