@@ -13,7 +13,7 @@ from weave.trace.weave_client import Call
 
 
 def autopatch(settings: AutopatchSettings | None = None) -> None:
-    from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
@@ -38,7 +38,7 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
-    anthropic_patcher.attempt_patch()
+    get_anthropic_patcher(settings.anthropic).attempt_patch()
     groq_patcher.attempt_patch()
     instructor_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
@@ -50,7 +50,7 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
 
 
 def reset_autopatch() -> None:
-    from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
@@ -72,7 +72,7 @@ def reset_autopatch() -> None:
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
-    anthropic_patcher.undo_patch()
+    get_anthropic_patcher().undo_patch()
     groq_patcher.undo_patch()
     instructor_patcher.undo_patch()
     dspy_patcher.undo_patch()
