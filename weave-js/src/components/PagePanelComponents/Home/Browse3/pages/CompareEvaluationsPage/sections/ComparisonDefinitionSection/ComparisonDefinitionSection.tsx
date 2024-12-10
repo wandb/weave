@@ -257,18 +257,10 @@ const AddEvaluationButton: React.FC<{
                     className="pb-8 pt-8 font-['Source_Sans_Pro'] text-base font-normal text-moon-800"
                     onClick={() => addEvaluationCall(call.callId)}>
                     <>
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flexGrow: 1,
-                          flexShrink: 1,
-                          maxWidth: '250px',
-                        }}>
+                      <span className="max-w-[250px] flex-shrink flex-grow overflow-hidden text-ellipsis whitespace-nowrap">
                         {call.displayName ?? opNiceName(call.spanName)}
                       </span>
-                      <span style={{flexShrink: 0}}>
+                      <span className="flex-shrink-0">
                         <Id
                           id={call.callId}
                           type="Call"
