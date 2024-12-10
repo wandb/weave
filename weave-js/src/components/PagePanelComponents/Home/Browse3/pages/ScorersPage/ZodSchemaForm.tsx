@@ -347,58 +347,63 @@ const ArrayField: React.FC<{
           <DescriptionTooltip description={fieldDescription} />
         )}
       </Box>
-      {arrayValue.map((item, index) => (
-        <Box
-          key={index}
-          display="flex"
-          flexDirection="column"
-          alignItems="flex-start"
-          style={{
-            width: '100%',
-            gap: 4,
-            alignItems: 'center',
-            height: '35px',
-            marginBottom: '4px',
-          }}>
-          <Box flexGrow={1} width="100%" display="flex" alignItems="center">
-            <Box flexGrow={1}>
-              <NestedForm
-                keyName={`${index}`}
-                fieldSchema={elementSchema}
-                config={{[`${index}`]: item}}
-                setConfig={newItemConfig => {
-                  const newArray = [...arrayValue];
-                  newArray[index] = newItemConfig[`${index}`];
-                  updateConfig(targetPath, newArray, config, setConfig);
-                }}
-                path={[]}
-                hideLabel
-                autoFocus={index === arrayValue.length - 1}
-              />
-            </Box>
-            <Box mb={2} ml={1}>
-              <Button
-                size="small"
-                variant="ghost"
-                icon="delete"
-                tooltip="Remove this entry"
-                disabled={arrayValue.length <= minItems}
-                onClick={() =>
-                  removeArrayItem(targetPath, index, config, setConfig)
-                }
-              />
+      <Box border="1px solid #e0e0e0" borderRadius="4px" p={2}>
+        {arrayValue.map((item, index) => (
+          <Box
+            key={index}
+            display="flex"
+            flexDirection="column"
+            alignItems="flex-start"
+            style={{
+              width: '100%',
+              gap: 4,
+              alignItems: 'center',
+              height: '35px',
+              marginBottom: '4px',
+            }}>
+            <Box flexGrow={1} width="100%" display="flex" alignItems="center">
+              <Box flexGrow={1}>
+                <NestedForm
+                  keyName={`${index}`}
+                  fieldSchema={elementSchema}
+                  config={{[`${index}`]: item}}
+                  setConfig={newItemConfig => {
+                    const newArray = [...arrayValue];
+                    newArray[index] = newItemConfig[`${index}`];
+                    updateConfig(targetPath, newArray, config, setConfig);
+                  }}
+                  path={[]}
+                  hideLabel
+                  autoFocus={index === arrayValue.length - 1}
+                />
+              </Box>
+              <Box mb={4} ml={4}>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="delete"
+                  tooltip="Remove this entry"
+                  disabled={arrayValue.length <= minItems}
+                  onClick={() =>
+                    removeArrayItem(targetPath, index, config, setConfig)
+                  }
+                />
+              </Box>
             </Box>
           </Box>
+        ))}
+        <Box mt={2} width="100%">
+          <Button
+            variant="secondary"
+            icon="add-new"
+            style={{padding: '4px', width: '100%'}}
+            onClick={() =>
+              addArrayItem(targetPath, elementSchema, config, setConfig)
+            }>
+            Add item
+          </Button>
         </Box>
-      ))}
-      <Button
-        variant="secondary"
-        style={{padding: '4px', width: '100%'}}
-        onClick={() =>
-          addArrayItem(targetPath, elementSchema, config, setConfig)
-        }>
-        Add item
-      </Button>
+      </Box>
     </FormControl>
   );
 };
