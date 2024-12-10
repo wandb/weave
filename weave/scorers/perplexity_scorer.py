@@ -1,8 +1,6 @@
 from typing import Union
 
 import numpy as np
-import torch
-import torch.nn.functional as F
 from openai.types.chat import ChatCompletion
 
 import weave
@@ -53,6 +51,20 @@ class OpenAIPerplexityScorer(Scorer):
 
 class HuggingFacePerplexityScorer(Scorer):
     """A scorer that computes perplexity for Hugging Face outputs using log probabilities."""
+    def model_post_init(self, __context: Any) -> None:
+        """
+        Initialize the model and tokenizer. Imports are performed here to ensure they're only
+        loaded when an instance of LlamaGuard is created.
+        """
+        try:
+            import torch
+        except ImportError as e:
+            raise ImportError(
+                "The `transformers` and `torch` packages are required to use LlamaGuard. "
+                "Please install them by running `pip install transformers torch`."
+            ) from e
+
+
 
     @weave.op()
     def score(self, output: dict) -> dict:
@@ -67,6 +79,9 @@ class HuggingFacePerplexityScorer(Scorer):
         Returns:
             dict: A dictionary containing the calculated perplexity.
         """
+        import torch
+        import torch.nn.functional as F
+
         logits = output["logits"]
         input_ids = output["input_ids"]
 
