@@ -152,7 +152,7 @@ class Op(Protocol):
     postprocess_output: Callable[..., Any] | None
 
     call: Callable[..., Any]
-    calls: Callable[..., PaginatedIterator[CallSchema, Call]]
+    calls: Callable[..., PaginatedIterator[CallSchema, WeaveObject]]
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -487,7 +487,7 @@ async def _do_call_async(
     return res, call
 
 
-def calls(op: Op) -> PaginatedIterator[CallSchema, Call]:
+def calls(op: Op) -> PaginatedIterator[CallSchema, WeaveObject]:
     """
     Get an iterator over all calls to this op.
 

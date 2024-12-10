@@ -73,7 +73,7 @@ def _hash_str(s: str, hash_len: int) -> str:
 
 
 def flatten_calls(
-    calls: Union[Iterable[Call], PaginatedIterator[CallSchema, Call]],
+    calls: Union[Iterable[Call], PaginatedIterator[CallSchema, WeaveObject]],
     *,
     depth: int = 0,
 ) -> list:
