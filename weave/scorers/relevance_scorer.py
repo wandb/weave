@@ -331,6 +331,7 @@ class RelevanceScorer(Scorer):
     @weave.op
     def score(
         self, 
+        output: str,
         query: str, 
         documents: list[str],
         return_all_scores: bool = False
