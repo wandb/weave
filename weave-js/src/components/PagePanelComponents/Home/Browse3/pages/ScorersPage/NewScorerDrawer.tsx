@@ -221,12 +221,14 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
             lineHeight: '40px',
           }}>
           <Box sx={{flexGrow: 1}}>{title}</Box>
-          <Button
-            size="medium"
-            variant="quiet"
-            icon="close"
-            onClick={onClose}
-          />
+          <Box>
+            <Button
+              size="large"
+              variant="quiet"
+              icon="close"
+              onClick={onClose}
+            />
+          </Box>
         </Box>
 
         <Box

@@ -336,7 +336,6 @@ const SimpleTabView: FC<{
             style={{
               overflowX: 'scroll',
               scrollbarWidth: 'none',
-              borderBottom: 'none',
             }}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
