@@ -1,5 +1,8 @@
+import dataclasses
 import importlib
 from typing import TYPE_CHECKING, Callable, Optional
+
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
@@ -7,6 +10,8 @@ if TYPE_CHECKING:
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
+_groq_patcher: Optional[MultiPatcher] = None
 
 
 def groq_accumulator(
@@ -83,11 +88,10 @@ def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def groq_wrapper(name: str) -> Callable[[Callable], Callable]:
+def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
-        op.name = name  # type: ignore
-        # return op
+        op_kwargs = dataclasses.asdict(settings)
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: groq_accumulator,
@@ -97,17 +101,39 @@ def groq_wrapper(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-groq_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("groq.resources.chat.completions"),
-            "Completions.create",
-            groq_wrapper(name="groq.chat.completions.create"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("groq.resources.chat.completions"),
-            "AsyncCompletions.create",
-            groq_wrapper(name="groq.async.chat.completions.create"),
-        ),
-    ]
-)
+def get_groq_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
+    global _groq_patcher
+
+    if _groq_patcher is not None:
+        return _groq_patcher
+
+    if settings is None:
+        settings = IntegrationSettings()
+
+    base = settings.op_settings
+
+    completions_create_settings = dataclasses.replace(
+        base,
+        name=base.name or "groq.chat.completions.create",
+    )
+    async_completions_create_settings = dataclasses.replace(
+        base,
+        name=base.name or "groq.async.chat.completions.create",
+    )
+
+    _groq_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("groq.resources.chat.completions"),
+                "Completions.create",
+                groq_wrapper(completions_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("groq.resources.chat.completions"),
+                "AsyncCompletions.create",
+                groq_wrapper(async_completions_create_settings),
+            ),
+        ]
+    )
+
+    return _groq_patcher

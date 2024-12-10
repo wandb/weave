@@ -20,7 +20,7 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         google_genai_patcher,
     )
-    from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.groq.groq_sdk import get_groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import get_litellm_patcher
@@ -39,7 +39,7 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
     get_anthropic_patcher(settings.anthropic).attempt_patch()
-    groq_patcher.attempt_patch()
+    get_groq_patcher(settings.groq).attempt_patch()
     instructor_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
     cerebras_patcher.attempt_patch()
@@ -57,7 +57,7 @@ def reset_autopatch() -> None:
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         google_genai_patcher,
     )
-    from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.groq.groq_sdk import get_groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import get_litellm_patcher
@@ -73,7 +73,7 @@ def reset_autopatch() -> None:
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
     get_anthropic_patcher().undo_patch()
-    groq_patcher.undo_patch()
+    get_groq_patcher().undo_patch()
     instructor_patcher.undo_patch()
     dspy_patcher.undo_patch()
     cerebras_patcher.undo_patch()
