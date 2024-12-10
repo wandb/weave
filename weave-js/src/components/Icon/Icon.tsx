@@ -74,6 +74,7 @@ import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-
 import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
+import {ReactComponent as ImportFilledCircle} from '../../assets/icons/icon-filled-circle.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
@@ -138,9 +139,11 @@ import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-mini
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
 import {ReactComponent as ImportMolecule} from '../../assets/icons/icon-molecule.svg';
+import {ReactComponent as ImportMoon} from '../../assets/icons/icon-moon.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-new-section-above.svg';
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
+import {ReactComponent as ImportNotVisible} from '../../assets/icons/icon-not-visible.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
@@ -160,6 +163,7 @@ import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
+import {ReactComponent as ImportPinToRight} from '../../assets/icons/icon-pin-to-right.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
 import {ReactComponent as ImportPlotly} from '../../assets/icons/icon-plotly.svg';
 import {ReactComponent as ImportPriorityCritical} from '../../assets/icons/icon-priority-critical.svg';
@@ -213,6 +217,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
 import {ReactComponent as ImportSweepGrid} from '../../assets/icons/icon-sweep-grid.svg';
@@ -497,6 +502,9 @@ export const IconFacebookSocial = (props: SVGIconProps) => (
 export const IconFailed = (props: SVGIconProps) => (
   <ImportFailed {...updateIconProps(props)} />
 );
+export const IconFilledCircle = (props: SVGIconProps) => (
+  <ImportFilledCircle {...updateIconProps(props)} />
+);
 export const IconFilterAlt = (props: SVGIconProps) => (
   <ImportFilterAlt {...updateIconProps(props)} />
 );
@@ -689,6 +697,9 @@ export const IconModelOnDark = (props: SVGIconProps) => (
 export const IconMolecule = (props: SVGIconProps) => (
   <ImportMolecule {...updateIconProps(props)} />
 );
+export const IconMoon = (props: SVGIconProps) => (
+  <ImportMoon {...updateIconProps(props)} />
+);
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
@@ -697,6 +708,9 @@ export const IconNewSectionAbove = (props: SVGIconProps) => (
 );
 export const IconNewSectionBelow = (props: SVGIconProps) => (
   <ImportNewSectionBelow {...updateIconProps(props)} />
+);
+export const IconNotVisible = (props: SVGIconProps) => (
+  <ImportNotVisible {...updateIconProps(props)} />
 );
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
@@ -754,6 +768,9 @@ export const IconPhoto = (props: SVGIconProps) => (
 );
 export const IconPin = (props: SVGIconProps) => (
   <ImportPin {...updateIconProps(props)} />
+);
+export const IconPinToRight = (props: SVGIconProps) => (
+  <ImportPinToRight {...updateIconProps(props)} />
 );
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
@@ -913,6 +930,9 @@ export const IconStop = (props: SVGIconProps) => (
 );
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
+);
+export const IconSun = (props: SVGIconProps) => (
+  <ImportSun {...updateIconProps(props)} />
 );
 export const IconSwap = (props: SVGIconProps) => (
   <ImportSwap {...updateIconProps(props)} />
@@ -1134,6 +1154,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'export-share-upload': IconExportShareUpload,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
+  'filled-circle': IconFilledCircle,
   'filter-alt': IconFilterAlt,
   'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
@@ -1198,9 +1219,11 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   model: IconModel,
   'model-on-dark': IconModelOnDark,
   molecule: IconMolecule,
+  moon: IconMoon,
   'music-audio': IconMusicAudio,
   'new-section-above': IconNewSectionAbove,
   'new-section-below': IconNewSectionBelow,
+  'not-visible': IconNotVisible,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
   'openai-logo': IconOpenaiLogo,
@@ -1220,6 +1243,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
   pin: IconPin,
+  'pin-to-right': IconPinToRight,
   play: IconPlay,
   plotly: IconPlotly,
   'priority-critical': IconPriorityCritical,
@@ -1273,6 +1297,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
   'sweep-grid': IconSweepGrid,
