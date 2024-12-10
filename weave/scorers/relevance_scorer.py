@@ -273,10 +273,16 @@ class RelevanceScorer(Scorer):
                 "The `transformers` and `torch` packages are required to use the RelevanceScorer, please run `pip install transformers torch`"
             )
         """Initialize the model, tokenizer and device after pydantic initialization."""
-        self._model = AutoModelForTokenClassification.from_pretrained(
-            self.model_name_or_path, device_map=self.device
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        else:
+            self._local_model_path = download_model(
+                scorer_model_paths["relevance_scorer"]
             )
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
+        self._model = AutoModelForTokenClassification.from_pretrained(
+            self._local_model_path, device_map=self.device
+            )
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         self._model.eval()
         self.device = set_device(self.device)
 
