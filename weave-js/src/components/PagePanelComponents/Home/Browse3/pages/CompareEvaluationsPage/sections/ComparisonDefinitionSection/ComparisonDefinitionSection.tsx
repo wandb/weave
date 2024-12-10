@@ -13,8 +13,6 @@ import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
 import {opNiceName} from '../../../common/Links';
-import {SortableItems} from '../../../common/shoppingCart/ShoppingCart';
-import {ShoppingCartItemDefs} from '../../../common/shoppingCart/types';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,
@@ -28,6 +26,8 @@ import {
   swapEvaluationCalls,
 } from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+import {ItemDef} from '../DraggableSection/DraggableItem';
+import {DraggableSection} from '../DraggableSection/DraggableSection';
 import {VerticalBar} from './EvaluationDefinition';
 
 export const ComparisonDefinitionSection: React.FC<{
@@ -40,7 +40,7 @@ export const ComparisonDefinitionSection: React.FC<{
     return getOrderedCallIds(props.state);
   }, [props.state]);
 
-  const shoppingCartItems: ShoppingCartItemDefs = useMemo(() => {
+  const items: ItemDef[] = useMemo(() => {
     return callIds.map(callId => ({
       key: 'evaluations',
       value: callId,
@@ -55,11 +55,7 @@ export const ComparisonDefinitionSection: React.FC<{
     const newSortOrder = getOrderedEvalsWithNewBaseline(callIds, value);
     setEvaluationCallOrder(newSortOrder);
   };
-
-  const onRemoveShoppingCartItem = (value: string) => {
-    removeEvaluationCall(value);
-  };
-
+  const onRemoveItem = (value: string) => removeEvaluationCall(value);
   const onSortEnd = ({
     oldIndex,
     newIndex,
@@ -74,15 +70,13 @@ export const ComparisonDefinitionSection: React.FC<{
   return (
     <Tailwind>
       <div className="flex w-full items-center gap-4 px-16 pt-12">
-        <SortableItems
+        <DraggableSection
           useDragHandle
           axis="xy"
-          items={shoppingCartItems}
-          baselineEnabled={true}
-          selected={null}
-          onClickShoppingCartItem={() => {}}
+          state={props.state}
+          items={items}
           onSetBaseline={onSetBaseline}
-          onRemoveShoppingCartItem={onRemoveShoppingCartItem}
+          onRemoveItem={onRemoveItem}
           onSortEnd={onSortEnd}
         />
         <HorizontalBox>
