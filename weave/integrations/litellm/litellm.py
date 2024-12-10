@@ -10,6 +10,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
 
+_litellm_patcher: Optional[MultiPatcher] = None
+
 
 # This accumulator is nearly identical to the mistral accumulator, just with different types.
 def litellm_accumulator(
