@@ -87,11 +87,7 @@ export default defineConfig(({mode, command}) => {
 
   // enable the react plugin in dev only, for fast refresh
 
-  // we're not using it in prod builds right now because it requires Babel,
-  // which is slow. To make sure the behavior is the same in both envs, we're
-  // NOT using the new JSX runtime in dev (so it should be equivalent to prod,
-  // where JSX transpilation is handled by esbuild, which doesn't support the
-  // new runtime yet)
+  // Using esbuild for JSX transpilation in both dev and prod
   if (mode !== 'production') {
     plugins.unshift(
       react({
