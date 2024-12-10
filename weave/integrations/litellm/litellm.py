@@ -89,7 +89,7 @@ def should_use_accumulator(inputs: dict) -> bool:
 def make_wrapper(settings: OpSettings) -> Callable:
     def litellm_wrapper(fn: Callable) -> Callable:
         op_kwargs = dataclasses.asdict(settings)
-        op = weave.op()(fn, **op_kwargs)
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: litellm_accumulator,
