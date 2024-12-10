@@ -107,5 +107,17 @@ class IntegrationSettings:
 class AutopatchSettings:
     """Settings for auto-patching integrations."""
 
-    openai: IntegrationSettings = field(default_factory=IntegrationSettings)
     anthropic: IntegrationSettings = field(default_factory=IntegrationSettings)
+    cerebras: IntegrationSettings = field(default_factory=IntegrationSettings)
+    cohere: IntegrationSettings = field(default_factory=IntegrationSettings)
+    dspy: IntegrationSettings = field(default_factory=IntegrationSettings)
+    google_ai_studio: IntegrationSettings = field(default_factory=IntegrationSettings)
+    groq: IntegrationSettings = field(default_factory=IntegrationSettings)
+    instructor: IntegrationSettings = field(default_factory=IntegrationSettings)
+    langchain: IntegrationSettings = field(default_factory=IntegrationSettings)
+    litellm: IntegrationSettings = field(default_factory=IntegrationSettings)
+    llamaindex: IntegrationSettings = field(default_factory=IntegrationSettings)
+    mistral: IntegrationSettings = field(default_factory=IntegrationSettings)
+    notdiamond: IntegrationSettings = field(default_factory=IntegrationSettings)
+    openai: IntegrationSettings = field(default_factory=IntegrationSettings)
+    vertexai: IntegrationSettings = field(default_factory=IntegrationSettings)
