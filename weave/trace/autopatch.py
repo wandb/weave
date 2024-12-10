@@ -23,9 +23,9 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.litellm.litellm import litellm_patcher
+    from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
@@ -34,8 +34,8 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
         settings = AutopatchSettings()
 
     get_openai_patcher(settings.openai).attempt_patch()
-    mistral_patcher.attempt_patch()
-    litellm_patcher.attempt_patch()
+    get_mistral_patcher(settings.mistral).attempt_patch()
+    get_litellm_patcher(settings.litellm).attempt_patch()
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
     get_anthropic_patcher(settings.anthropic).attempt_patch()
@@ -60,16 +60,16 @@ def reset_autopatch() -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.litellm.litellm import litellm_patcher
+    from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
     get_openai_patcher().undo_patch()
-    mistral_patcher.undo_patch()
-    litellm_patcher.undo_patch()
+    get_mistral_patcher().undo_patch()
+    get_litellm_patcher().undo_patch()
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
     get_anthropic_patcher().undo_patch()
