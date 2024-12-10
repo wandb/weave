@@ -3048,6 +3048,53 @@ def test_op_sampling(client):
     assert 40 < num_traces < 60  # But only traced ~50% of the time
 
 
+def test_op_sampling_async(client):
+    never_traced_calls = 0
+    always_traced_calls = 0
+    sometimes_traced_calls = 0
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def never_traced(x: int) -> int:
+        nonlocal never_traced_calls
+        never_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)
+    async def always_traced(x: int) -> int:
+        nonlocal always_traced_calls
+        always_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.5)
+    async def sometimes_traced(x: int) -> int:
+        nonlocal sometimes_traced_calls
+        sometimes_traced_calls += 1
+        return x + 1
+
+    import asyncio
+
+    # Never traced should execute but not be traced
+    for i in range(10):
+        asyncio.run(never_traced(i))
+    assert never_traced_calls == 10  # Function was called
+    assert "call_start" not in client.server.attribute_access_log
+
+    # Always traced should execute and be traced
+    for i in range(10):
+        asyncio.run(always_traced(i))
+    assert always_traced_calls == 10  # Function was called
+    assert len(list(always_traced.calls())) == 10  # And traced
+    assert "call_start" in client.server.attribute_access_log
+
+    # Sometimes traced should execute always but only be traced sometimes
+    num_runs = 100
+    for i in range(num_runs):
+        asyncio.run(sometimes_traced(i))
+    assert sometimes_traced_calls == num_runs  # Function was called every time
+    num_traces = len(list(sometimes_traced.calls()))
+    assert 40 < num_traces < 60  # But only traced ~50% of the time
+
+
 def test_op_sampling_inheritance(client):
     parent_calls = 0
     child_calls = 0
@@ -3070,9 +3117,7 @@ def test_op_sampling_inheritance(client):
 
     assert parent_calls == 10  # Parent function executed
     assert child_calls == 10  # Child function executed
-    assert (
-        "call_start" not in client.server.attribute_access_log
-    )  # But neither was traced
+    assert "call_start" not in client.server.attribute_access_log
 
     # Reset counters
     child_calls = 0
@@ -3080,6 +3125,44 @@ def test_op_sampling_inheritance(client):
     # Direct calls to child should execute and be traced
     for i in range(10):
         child_op(i)
+
+    assert child_calls == 10  # Child function executed
+    assert len(list(child_op.calls())) == 10  # And was traced
+    assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+
+
+def test_op_sampling_inheritance_async(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op()
+    async def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def parent_op(x: int) -> int:
+        nonlocal parent_calls
+        parent_calls += 1
+        return await child_op(x)
+
+    import asyncio
+
+    # When parent is sampled out, child should still execute but not be traced
+    for i in range(10):
+        asyncio.run(parent_op(i))
+
+    assert parent_calls == 10  # Parent function executed
+    assert child_calls == 10  # Child function executed
+    assert "call_start" not in client.server.attribute_access_log
+
+    # Reset counters
+    child_calls = 0
+
+    # Direct calls to child should execute and be traced
+    for i in range(10):
+        asyncio.run(child_op(i))
 
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced

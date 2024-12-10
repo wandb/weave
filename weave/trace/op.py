@@ -468,26 +468,30 @@ async def _do_call_async(
     func = op.resolve_fn
     call = _placeholder_call()
 
-    if (
+    pargs = (
+        op._on_input_handler(op, args, kwargs)
+        if op._on_input_handler
+        else _default_on_input_handler(op, args, kwargs)
+    )
+
+    skip_tracing = (
         settings.should_disable_weave()
         or weave_client_context.get_weave_client() is None
         or not op._tracing_enabled
-    ):
-        res = await func(*args, **kwargs)
+        or not get_tracing_enabled()
+    )
+
+    if skip_tracing:
+        res = await func(*pargs.args, **pargs.kwargs)
     else:
         current_call = call_context.get_current_call()
-        tracing_enabled = get_tracing_enabled()
         if current_call is None:
             # Root call: decide whether to trace based on sample rate
             if random.random() > op.tracing_sample_rate:
                 # Disable tracing for this call and all descendants
                 with tracing_disabled():
-                    res = await func(*args, **kwargs)
-                return res, call
-        elif not tracing_enabled:
-            # Tracing is disabled in the context
-            res = await func(*args, **kwargs)
-            return res, call
+                    res = await func(*pargs.args, **pargs.kwargs)
+                    return res, call
 
         # Proceed with tracing
         try:
@@ -501,10 +505,10 @@ async def _do_call_async(
                 logger.error,
                 ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
             )
-            res = await func(*args, **kwargs)
+            res = await func(*pargs.args, **pargs.kwargs)
         else:
             execute_result = _execute_op(
-                op, call, *args, __should_raise=__should_raise, **kwargs
+                op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
             )
             if not inspect.iscoroutine(execute_result):
                 raise TypeError(
