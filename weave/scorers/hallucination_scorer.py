@@ -343,14 +343,12 @@ class HallucinationScorer(Scorer):
             output=output,
         )
         if self.base_url:
-            output = self._score_via_api(messages)
-            output = output["data"]
-
+            res = self._score_via_api(messages)
+            res = res["data"]
         else:
             if self.use_hhem:
                 pairs = [(query + "\n\n" + context, output)]
                 pred = self.llm_model.predict(pairs)
-
                 score = pred.item()
                 return {
                     "flagged": score <= self.hhem_score_threshold,
@@ -372,7 +370,7 @@ class HallucinationScorer(Scorer):
                 with torch.no_grad():
                     self.llm_model.eval()
 
-                    output = self.llm_model.generate(
+                    res = self.llm_model.generate(
                         inp_tokenized["input_ids"],
                         max_new_tokens=self.max_new_tokens,
                         attention_mask=inp_tokenized["attention_mask"],
@@ -388,7 +386,7 @@ class HallucinationScorer(Scorer):
                 false_token = 4245
 
                 input_length = inp_tokenized["input_ids"].shape[1]
-                completion_tokens = output[0][input_length:].tolist()
+                completion_tokens = res[0][input_length:].tolist()
 
                 is_hallucination = true_token in completion_tokens
                 result = {
@@ -411,7 +409,7 @@ class HallucinationScorer(Scorer):
                         {
                             "completion": completion,
                             "completion_tokens": completion_tokens,
-                            "total_tokens": len(output[0]),
+                            "total_tokens": len(res[0]),
                             "total_completion_tokens": len(completion_tokens),
                             "scorer_worked": scorer_worked,
                         }
