@@ -27,7 +27,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
   const {deleteMessage, deleteChoice, retry} = usePlaygroundContext();
 
   return (
-    <div className="z-10 ml-auto flex gap-4 rounded-lg border border-moon-250 bg-white p-4">
+    <div className="ml-auto flex gap-4 rounded-lg pt-[8px]">
       <Button
         variant="quiet"
         size="small"
