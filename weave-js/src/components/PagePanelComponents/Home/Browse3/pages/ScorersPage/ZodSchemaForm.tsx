@@ -153,7 +153,16 @@ const NestedForm: React.FC<{
   setConfig: (config: Record<string, any>) => void;
   path: string[];
   hideLabel?: boolean;
-}> = ({keyName, fieldSchema, config, setConfig, path, hideLabel}) => {
+  autoFocus?: boolean;
+}> = ({
+  keyName,
+  fieldSchema,
+  config,
+  setConfig,
+  path,
+  hideLabel,
+  autoFocus,
+}) => {
   const currentPath = [...path, keyName];
   const currentValue = getNestedValue(config, currentPath);
 
@@ -287,6 +296,7 @@ const NestedForm: React.FC<{
       type={fieldType}
       value={currentValue ?? ''}
       onChange={value => updateConfig(currentPath, value, config, setConfig)}
+      autoFocus={autoFocus}
     />
   );
 };
@@ -361,6 +371,7 @@ const ArrayField: React.FC<{
                 }}
                 path={[]}
                 hideLabel
+                autoFocus={index === arrayValue.length - 1}
               />
             </Box>
             <Box mb={2} ml={1}>
@@ -380,6 +391,7 @@ const ArrayField: React.FC<{
       ))}
       <Button
         variant="secondary"
+        style={{padding: '4px', width: '100%'}}
         onClick={() =>
           addArrayItem(targetPath, elementSchema, config, setConfig)
         }>
@@ -695,6 +707,7 @@ const NumberField: React.FC<{
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
   const fieldDescription = getFieldDescription(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
     <Box display="flex" alignContent="center" justifyContent="space-between">
@@ -703,6 +716,7 @@ const NumberField: React.FC<{
         type="number"
         value={(value ?? '').toString()}
         style={{width: '100%'}}
+        isOptional={isOptional}
         onChange={newValue => {
           const finalValue = newValue === '' ? undefined : Number(newValue);
           if (

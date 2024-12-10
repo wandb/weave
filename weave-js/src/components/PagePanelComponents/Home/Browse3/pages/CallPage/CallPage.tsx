@@ -17,7 +17,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -184,7 +184,7 @@ const useCallTabs = (call: CallSchema) => {
     ...(showScores
       ? [
           {
-            label: 'Scores (W&B Admin Preview)',
+            label: 'Scores',
             content: (
               <Tailwind>
                 <CallScoresViewer call={call} />
@@ -312,7 +312,7 @@ const CallPageInnerVertical: FC<{
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const showPaginationContols = isPeeking && rowIdsConfigured;
+  const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
 
@@ -330,10 +330,10 @@ const CallPageInnerVertical: FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationContols && (
+          {showPaginationControls && (
             <PaginationControls call={call} path={path} />
           )}
-          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+          <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}

@@ -1,7 +1,6 @@
-import {Autocomplete, TextField as MuiTextField} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {MOON_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -413,11 +412,11 @@ export const TextFeedbackColumn = ({
         value={value}
         onChange={onValueChange}
         maxLength={maxLength}
-        placeholder="..."
+        placeholder=""
       />
       {maxLength && (
         <div className="mb-1 text-xs text-moon-500">
-          {`character max: ${maxLength}`}
+          {`Maximum characters: ${maxLength}`}
         </div>
       )}
     </div>
@@ -445,78 +444,30 @@ export const EnumFeedbackColumn = ({
       label: option,
       value: option,
     }));
-    opts.splice(0, 0, {label: '', value: ''});
     return opts;
   }, [options]);
-
-  const [value, setValue] = useState<Option>(dropdownOptions[0]);
+  const [value, setValue] = useState<Option | undefined>(undefined);
 
   useEffect(() => {
-    setValue(
-      dropdownOptions.find(option => option.value === defaultValue) ??
-        dropdownOptions[0]
-    );
+    const found = dropdownOptions.find(option => option.value === defaultValue);
+    if (found != null) {
+      setValue(found);
+    }
   }, [defaultValue, dropdownOptions]);
 
   const onValueChange = useCallback(
-    (e: any, newValue: Option) => {
-      if (newValue?.value === value?.value) {
+    (newValue: Option | null) => {
+      if (newValue == null || newValue.value === value?.value) {
         return;
       }
       setValue(newValue);
-      onAddFeedback?.(newValue?.value ?? '');
+      onAddFeedback?.(newValue.value);
     },
     [value?.value, onAddFeedback]
   );
 
   return (
-    <div className="flex w-full">
-      <Autocomplete
-        options={dropdownOptions}
-        getOptionLabel={option => option.label}
-        onChange={onValueChange}
-        value={value}
-        openOnFocus
-        autoFocus={focused}
-        renderInput={params => (
-          <MuiTextField
-            {...params}
-            sx={{
-              '& .MuiInputBase-root': {
-                height: '38px',
-                minHeight: '38px',
-                borderColor: MOON_300,
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: MOON_300,
-              },
-            }}
-          />
-        )}
-        disableClearable
-        sx={{
-          minWidth: '200px',
-          width: '100%',
-        }}
-        fullWidth
-        ListboxProps={{
-          style: {
-            maxHeight: '200px',
-          },
-        }}
-        renderOption={(props, option) => (
-          <li {...props} style={{minHeight: '30px'}}>
-            {option.label || <span>&nbsp;</span>}
-          </li>
-        )}
-      />
-    </div>
+    <Select options={dropdownOptions} value={value} onChange={onValueChange} />
   );
 };
 
@@ -546,16 +497,17 @@ export const BinaryFeedbackColumn = ({
     <Tailwind>
       <div className="flex w-full justify-center gap-10">
         <Button
-          variant={value === true ? 'primary' : 'outline'}
+          variant={value === true ? 'primary' : 'secondary'}
           onClick={() => handleClick(true)}
           autoFocus={focused}>
           True
         </Button>
         <Button
-          variant={value === false ? 'primary' : 'outline'}
+          variant={value === false ? 'primary' : 'secondary'}
           onClick={() => handleClick(false)}>
           False
         </Button>
+        <div className="flex-grow" />
       </div>
     </Tailwind>
   );
@@ -652,9 +604,10 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
       />
       {(min != null || max != null) && (
         <div className="mb-1 text-xs text-moon-500">
-          {min != null && `min: ${min}`}
+          {isInteger ? 'Integer required. ' : ''}
+          {min != null && `Min: ${min}`}
           {min != null && max != null && ', '}
-          {max != null && `max: ${max}`}
+          {max != null && `Max: ${max}`}
         </div>
       )}
     </div>
