@@ -567,6 +567,7 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
       // If val is null but v isn't empty, there's a format error
       if (val === null) {
         setError(true);
+        onChange(null);
         return;
       }
 
