@@ -3,7 +3,7 @@ import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Button, ButtonSize} from './Button';
-import {Icon, IconName} from './Icon';
+import {IconName} from './Icon';
 import {Tailwind} from './Tailwind';
 
 export type ToggleOption = {
