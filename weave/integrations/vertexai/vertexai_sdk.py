@@ -1,8 +1,10 @@
+import dataclasses
 import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
@@ -10,6 +12,8 @@ from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse
+
+_vertexai_patcher: Optional[MultiPatcher] = None
 
 
 def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -81,10 +85,13 @@ def vertexai_on_finish(
         call.summary.update(summary_update)
 
 
-def vertexai_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
+def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=vertexai_postprocess_inputs)(fn)
-        op.name = name  # type: ignore
+        op_kwargs = dataclasses.asdict(settings)
+        if not settings.postprocess_inputs:
+            op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
+
+        op = weave.op(fn, **op_kwargs)
         op._set_on_finish_handler(vertexai_on_finish)
         return add_accumulator(
             op,  # type: ignore
@@ -96,7 +103,7 @@ def vertexai_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def vertexai_wrapper_async(name: str) -> Callable[[Callable], Callable]:
+def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -105,9 +112,11 @@ def vertexai_wrapper_async(name: str) -> Callable[[Callable], Callable]:
 
             return _async_wrapper
 
-        "We need to do this so we can check if `stream` is used"
-        op = weave.op(postprocess_inputs=vertexai_postprocess_inputs)(_fn_wrapper(fn))
-        op.name = name  # type: ignore
+        op_kwargs = dataclasses.asdict(settings)
+        if not settings.postprocess_inputs:
+            op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
+
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
         op._set_on_finish_handler(vertexai_on_finish)
         return add_accumulator(
             op,  # type: ignore
@@ -119,34 +128,70 @@ def vertexai_wrapper_async(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-vertexai_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("vertexai.generative_models"),
-            "GenerativeModel.generate_content",
-            vertexai_wrapper_sync(name="vertexai.GenerativeModel.generate_content"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("vertexai.generative_models"),
-            "GenerativeModel.generate_content_async",
-            vertexai_wrapper_async(
-                name="vertexai.GenerativeModel.generate_content_async"
+def get_vertexai_patcher(
+    settings: Optional[IntegrationSettings] = None,
+) -> MultiPatcher:
+    global _vertexai_patcher
+
+    if _vertexai_patcher is not None:
+        return _vertexai_patcher
+
+    if settings is None:
+        settings = IntegrationSettings()
+
+    base = settings.op_settings
+
+    generative_model_generate_content_settings = dataclasses.replace(
+        base,
+        name=base.name or "vertexai.GenerativeModel.generate_content",
+    )
+    generative_model_generate_content_async_settings = dataclasses.replace(
+        base,
+        name=base.name or "vertexai.GenerativeModel.generate_content_async",
+    )
+    chat_session_send_message_settings = dataclasses.replace(
+        base,
+        name=base.name or "vertexai.ChatSession.send_message",
+    )
+    chat_session_send_message_async_settings = dataclasses.replace(
+        base,
+        name=base.name or "vertexai.ChatSession.send_message_async",
+    )
+    image_generation_model_generate_images_settings = dataclasses.replace(
+        base,
+        name=base.name or "vertexai.ImageGenerationModel.generate_images",
+    )
+
+    _vertexai_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("vertexai.generative_models"),
+                "GenerativeModel.generate_content",
+                vertexai_wrapper_sync(generative_model_generate_content_settings),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("vertexai.generative_models"),
-            "ChatSession.send_message",
-            vertexai_wrapper_sync(name="vertexai.ChatSession.send_message"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("vertexai.generative_models"),
-            "ChatSession.send_message_async",
-            vertexai_wrapper_async(name="vertexai.ChatSession.send_message_async"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("vertexai.preview.vision_models"),
-            "ImageGenerationModel.generate_images",
-            vertexai_wrapper_sync(name="vertexai.ImageGenerationModel.generate_images"),
-        ),
-    ]
-)
+            SymbolPatcher(
+                lambda: importlib.import_module("vertexai.generative_models"),
+                "GenerativeModel.generate_content_async",
+                vertexai_wrapper_async(
+                    generative_model_generate_content_async_settings
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("vertexai.generative_models"),
+                "ChatSession.send_message",
+                vertexai_wrapper_sync(chat_session_send_message_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("vertexai.generative_models"),
+                "ChatSession.send_message_async",
+                vertexai_wrapper_async(chat_session_send_message_async_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("vertexai.preview.vision_models"),
+                "ImageGenerationModel.generate_images",
+                vertexai_wrapper_sync(image_generation_model_generate_images_settings),
+            ),
+        ]
+    )
+
+    return _vertexai_patcher
