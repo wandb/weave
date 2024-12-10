@@ -354,7 +354,7 @@ class HallucinationScorer(Scorer):
                 score = pred.item()
                 return {
                     "flagged": score <= self.hhem_score_threshold,
-                    "score": score,
+                    "extras": {"score": score},
                 }
             else:
                 inp_template = self.tokenizer.apply_chat_template(
