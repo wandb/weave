@@ -1683,4 +1683,4 @@ def elide_display_name(name: str) -> str:
     return name
 
 
-__docspec__ = [WeaveClient, Call, PaginatedIterator]
+__docspec__ = [WeaveClient, Call, CallsIter]

@@ -71,11 +71,7 @@ def _hash_str(s: str, hash_len: int) -> str:
     return hashlib.md5(s.encode()).hexdigest()[:hash_len]
 
 
-def flatten_calls(
-    calls: Union[Iterable[Call], CallsIter],
-    *,
-    depth: int = 0,
-) -> list:
+def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) -> list:
     lst = []
     for call in calls:
         lst.append((call, depth))
