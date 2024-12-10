@@ -119,7 +119,6 @@ def set_device(device: Optional[str] = None) -> str:
 
 def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:
     from wandb import Api
-
     api = Api()
     art = api.artifact(
         type="model",

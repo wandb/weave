@@ -279,6 +279,7 @@ class RelevanceScorer(Scorer):
             self._local_model_path = download_model(
                 scorer_model_paths["relevance_scorer"]
             )
+        assert self._local_model_path, "Model path not found"
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
             )
