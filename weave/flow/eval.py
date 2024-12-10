@@ -508,7 +508,7 @@ class Evaluation(Object):
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def evaluate(self, model: Union[Callable, Model], verbose: bool = True) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
         # summarize. Under the hood, Weave should choose the appropriate storage
@@ -519,7 +519,7 @@ class Evaluation(Object):
         # also bad. In the near-term, this will at least solve the problem of
         # breaking summarization with big datasets, but this is not the correct
         # long-term solution.
-        eval_results = await self.get_eval_results(model)
+        eval_results = await self.get_eval_results(model, verbose)
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
