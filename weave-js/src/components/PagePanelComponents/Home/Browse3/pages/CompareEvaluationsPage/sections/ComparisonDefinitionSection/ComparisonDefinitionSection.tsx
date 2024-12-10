@@ -105,7 +105,7 @@ const AddEvaluationButton: React.FC<{
   );
   const expandedRefCols = useMemo(() => new Set<string>(), []);
   // Don't query for output here, re-queried in tsDataModelHooksEvaluationComparison.ts
-  const columns = useMemo(() => ['inputs'], []);
+  const columns = useMemo(() => ['inputs', 'display_name'], []);
   const calls = useCallsForQuery(
     props.state.data.entity,
     props.state.data.project,
@@ -137,7 +137,7 @@ const AddEvaluationButton: React.FC<{
       return;
     }
 
-    const filteredOptions = calls.result.filter(call => {
+    const filteredOptions = evalsNotComparing.filter(call => {
       if (
         (call.displayName ?? call.spanName)
           .toLowerCase()
