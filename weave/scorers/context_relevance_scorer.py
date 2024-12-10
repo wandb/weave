@@ -340,7 +340,7 @@ class ContextRelevanceScorer(Scorer):
         self, 
         output: str,
         query: str, 
-        documents: list[str],
+        context: str | list[str],
         return_all_scores: bool = False
         ) -> tuple[list[dict[str, Any]], float]:
         """Score multiple documents and compute weighted average relevance."""
@@ -348,7 +348,9 @@ class ContextRelevanceScorer(Scorer):
         total_weighted_score = 0.0
         total_length = 0
 
-        for doc in documents:
+        if isinstance(context, str):
+            context = [context]
+        for doc in context:
             spans, relevant_tokens, total_tokens = self._score_document(query, doc, self.threshold)
             
             all_spans.extend(spans)
