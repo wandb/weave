@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import React, {FC, useCallback, useState} from 'react';
+import React, {FC, useCallback, useEffect, useState} from 'react';
 import {z} from 'zod';
 
 import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
@@ -45,6 +45,9 @@ export const AnnotationScorerForm: FC<
   ScorerFormProps<z.infer<typeof AnnotationScorerFormSchema>>
 > = ({data, onDataChange}) => {
   const [config, setConfig] = useState(data ?? DEFAULT_STATE);
+  useEffect(() => {
+    setConfig(data ?? DEFAULT_STATE);
+  }, [data]);
   const [isValid, setIsValid] = useState(false);
 
   const handleConfigChange = useCallback(
