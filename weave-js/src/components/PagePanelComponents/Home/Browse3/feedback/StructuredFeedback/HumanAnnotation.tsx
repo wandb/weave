@@ -415,7 +415,7 @@ export const TextFeedbackColumn = ({
         placeholder=""
       />
       {maxLength && (
-        <div className="mb-1 text-xs text-moon-500">
+        <div className="mb-1 mt-4 text-xs text-moon-500">
           {`Maximum characters: ${maxLength}`}
         </div>
       )}
@@ -603,7 +603,7 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
         errorState={error}
       />
       {(min != null || max != null) && (
-        <div className="mb-1 text-xs text-moon-500">
+        <div className="mb-1 mt-4 text-xs text-moon-500">
           {isInteger ? 'Integer required. ' : ''}
           {min != null && `Min: ${min}`}
           {min != null && max != null && ', '}
