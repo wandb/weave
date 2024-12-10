@@ -204,6 +204,10 @@ def get_anthropic_patcher(
         base,
         name=base.name or "anthropic.Messages.stream",
     )
+    async_stream_settings = dataclasses.replace(
+        base,
+        name=base.name or "anthropic.AsyncMessages.stream",
+    )
 
     _anthropic_patcher = MultiPatcher(
         [
@@ -226,7 +230,7 @@ def get_anthropic_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("anthropic.resources.messages"),
                 "AsyncMessages.stream",
-                create_stream_wrapper(stream_settings),
+                create_stream_wrapper(async_stream_settings),
             ),
         ]
     )
