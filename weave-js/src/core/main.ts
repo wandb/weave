@@ -22,6 +22,10 @@ import {
   LOG_DEBUG_MESSAGES,
 } from './util/constants';
 
+if (LOG_DEBUG_MESSAGES) {
+  console.debug("hello, world! i'm devin");
+}
+
 // Useful for console debugging
 export function bindClientToGlobalThis(client: Client) {
   if (typeof globalThis !== 'undefined' && DEBUG_ATTACH_TO_GLOBAL_THIS) {
