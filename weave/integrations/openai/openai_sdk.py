@@ -395,7 +395,7 @@ def get_openai_patcher(settings: Optional[IntegrationSettings] = None) -> MultiP
     )
     async_completions_create_settings = dataclasses.replace(
         base,
-        name=base.name or "openai.async_chat.completions.create",
+        name=base.name or "openai.chat.completions.create",
     )
     completions_parse_settings = dataclasses.replace(
         base,
@@ -403,7 +403,7 @@ def get_openai_patcher(settings: Optional[IntegrationSettings] = None) -> MultiP
     )
     async_completions_parse_settings = dataclasses.replace(
         base,
-        name=base.name or "openai.async_beta.chat.completions.parse",
+        name=base.name or "openai.beta.chat.completions.parse",
     )
 
     symbol_patchers = [
