@@ -102,6 +102,9 @@ TransformFunc = Callable[[T], R]
 
 
 class PaginatedIterator(Generic[T, R]):
+    """An iterator that fetches pages of items from a server and optionally transforms them
+    into a more user-friendly type."""
+
     def __init__(
         self,
         fetch_func: FetchFunc[T],
@@ -111,7 +114,9 @@ class PaginatedIterator(Generic[T, R]):
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
-        self.index = 0
+
+        if page_size <= 0:
+            raise ValueError("page_size must be greater than 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
