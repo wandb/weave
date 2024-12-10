@@ -138,5 +138,5 @@ scorer_model_paths = {
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",  # task: "sentiment-analysis"
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
-    "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer:v0",
+    "relevance_scorer": "c-metrics/context-relevance-scorer/relevance_scorer:v0",
 }
