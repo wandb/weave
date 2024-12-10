@@ -5,7 +5,6 @@ import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../../../../Button';
-import {ShoppingCartItemDefs} from '../../../../compare/types';
 import {
   DEFAULT_FILTER_CALLS,
   DEFAULT_SORT_CALLS,
@@ -15,6 +14,7 @@ import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
 import {opNiceName} from '../../../common/Links';
 import {SortableItems} from '../../../common/shoppingCart/ShoppingCart';
+import {ShoppingCartItemDefs} from '../../../common/shoppingCart/types';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,

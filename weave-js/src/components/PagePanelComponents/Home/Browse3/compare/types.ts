@@ -1,11 +1,3 @@
-export type ShoppingCartItemDef = {
-  key: string;
-  value: string;
-  label?: string;
-};
-
-export type ShoppingCartItemDefs = ShoppingCartItemDef[];
-
 export type ComparableObject = Record<string, any>;
 export type ComparableObjects = ComparableObject[];
 

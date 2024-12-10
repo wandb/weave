@@ -12,7 +12,7 @@ import {Icon} from '../../../../../../Icon';
 import {Pill} from '../../../../../../Tag';
 import {Tailwind} from '../../../../../../Tailwind';
 import {Tooltip} from '../../../../../../Tooltip';
-import {ShoppingCartItemDef} from '../../../compare/types';
+import {ShoppingCartItemDef} from './types';
 
 // TODO: Change cursor to grabbing when dragging
 const DragHandle = SortableHandle(() => (
