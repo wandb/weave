@@ -69,16 +69,19 @@ export const ComparisonDefinitionSection: React.FC<{
 
   return (
     <Tailwind>
-      <div className="flex w-full items-center gap-4 px-16 pt-12">
-        <DraggableSection
-          useDragHandle
-          axis="xy"
-          state={props.state}
-          items={items}
-          onSetBaseline={onSetBaseline}
-          onRemoveItem={onRemoveItem}
-          onSortEnd={onSortEnd}
-        />
+      <div className="flex w-full items-center gap-4 overflow-x-auto px-16">
+        <HorizontalBox>
+          <DraggableSection
+            useDragHandle
+            axis="x"
+            state={props.state}
+            items={items}
+            onSetBaseline={onSetBaseline}
+            onRemoveItem={onRemoveItem}
+            onSortEnd={onSortEnd}
+            useWindowAsScrollContainer
+          />
+        </HorizontalBox>
         <HorizontalBox>
           <AddEvaluationButton state={props.state} />
         </HorizontalBox>

@@ -15,7 +15,7 @@ type DraggableSectionProps = {
 export const DraggableSection = SortableContainer(
   ({state, items, onSetBaseline, onRemoveItem}: DraggableSectionProps) => {
     return (
-      <div className="flex flex-wrap items-center gap-8">
+      <div className="flex flex-wrap items-center gap-16">
         {items.map((item, index) => (
           <DraggableItem
             key={`item-${item.value}`}
