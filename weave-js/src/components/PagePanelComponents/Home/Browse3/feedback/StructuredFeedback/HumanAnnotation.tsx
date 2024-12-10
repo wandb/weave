@@ -57,7 +57,7 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
       props.callRef,
       query.refetch
     );
-  }, [props.callRef, query.refetch]);
+  }, [props.callRef, query.refetch, getTsClient]);
 
   useEffect(() => {
     if (foundFeedbackCallRef && props.callRef !== foundFeedbackCallRef) {
@@ -180,7 +180,8 @@ const FeedbackComponentSelector: React.FC<{
         if (value == null || value === foundValue || value === '') {
           // Remove from unsaved changes if value is invalid
           setUnsavedFeedbackChanges(curr => {
-            const {[feedbackSpecRef]: _, ...rest} = curr;
+            const rest = {...curr};
+            delete rest[feedbackSpecRef];
             return rest;
           });
           return true;
@@ -191,7 +192,7 @@ const FeedbackComponentSelector: React.FC<{
         }));
         return true;
       },
-      [onAddFeedback, setUnsavedFeedbackChanges, feedbackSpecRef]
+      [onAddFeedback, setUnsavedFeedbackChanges, feedbackSpecRef, foundValue]
     );
 
     switch (type) {
