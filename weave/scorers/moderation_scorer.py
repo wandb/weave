@@ -173,7 +173,6 @@ class RollingWindowScorer(Scorer):
             chunk_input_ids = input_ids[:, i : i + self.max_tokens]
             chunk_predictions = self.predict_chunk(chunk_input_ids)
             all_predictions.append(chunk_predictions)
-        print("All predictions", all_predictions)
         # Aggregate predictions using the specified aggregation method
         final_predictions: list[float] = self.aggregate_predictions(all_predictions)
 
