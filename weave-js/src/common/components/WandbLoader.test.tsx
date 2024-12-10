@@ -2,7 +2,11 @@ import {render} from '@testing-library/react';
 import React from 'react';
 import {vi} from 'vitest';
 
-import {fireOnRandom, TrackedWaveLoader} from './WandbLoader';
+import {
+  fireOnRandom,
+  TrackedWandbLoader,
+  TrackedWaveLoader,
+} from './WandbLoader';
 
 describe('fireOnRandom', () => {
   test('should fire the callback', () => {
@@ -54,7 +58,7 @@ describe('<TrackedWaveLoader />', () => {
     );
     unmount();
 
-    expect(track).toHaveBeenCalledOnce();
+    expect(track).toHaveBeenCalledTimes(1);
     const [trackName, {componentId, duration, start, stop}] =
       track.mock.lastCall;
     expect(trackName).toBe('wandb-loader-onscreen');
@@ -73,14 +77,54 @@ describe('<TrackedWaveLoader />', () => {
         onStart={onStart}
         onComplete={onComplete}
         size="huge"
-        samplingRate={1}
       />
     );
 
-    expect(onStart).toHaveBeenCalledOnce();
+    expect(onStart).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
     unmount();
-    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
-describe('<TrackedWandbLoader />', () => {});
+
+describe('<TrackedWandbLoader />', () => {
+  it('tracks component lifecycle using track prop', () => {
+    const track = vi.fn();
+    const {unmount} = render(
+      <TrackedWandbLoader
+        name="my-wandb-loader"
+        track={track}
+        size="huge"
+        samplingRate={1}
+      />
+    );
+    unmount();
+
+    expect(track).toHaveBeenCalledTimes(1);
+    const [trackName, {componentId, duration, start, stop}] =
+      track.mock.lastCall;
+    expect(trackName).toBe('wandb-loader-onscreen');
+    expect(componentId).toBe('my-wandb-loader');
+    expect(typeof duration).toBe('number');
+    expect(typeof start).toBe('number');
+    expect(typeof stop).toBe('number');
+  });
+  it('tracks component lifecycle using onStart and onComplete', () => {
+    const onStart = vi.fn();
+    const onComplete = vi.fn();
+    const {unmount} = render(
+      <TrackedWaveLoader
+        name="my-wandb-loader"
+        track={vi.fn()}
+        onStart={onStart}
+        onComplete={onComplete}
+        size="huge"
+      />
+    );
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
+    unmount();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+});
