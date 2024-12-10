@@ -308,7 +308,13 @@ class ContextRelevanceScorer(Scorer):
             
             special_tokens_mask = model_inputs.pop("special_tokens_mask")
             combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
-
+            # we should mask the query up to the sep token, 
+            # on the combined mask we have to search for the first False
+            # TODO: Check that this is now wrong
+            false_indices = np.where(~combined_mask)[0]
+            start = false_indices[0]
+            end = false_indices[1]
+            combined_mask[start:end] = False
             results = self._model(**model_inputs)
 
             logits = results.logits[0].detach()
