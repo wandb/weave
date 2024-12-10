@@ -55,7 +55,7 @@ export const ComputeGraphContextProviderFromClient: React.FC<{client: Client}> =
         data-test-num-shadow-server-requests-counter={
           GlobalCGEventTracker.shadowServerRequests
         }
-        className={isLoading ? 'loading cg-executing test-fast-refresh' : ''}
+        className={isLoading ? 'loading cg-executing' : ''}
         style={{height: '100%'}}>
         <ClientContext.Provider value={context}>
           {children}
