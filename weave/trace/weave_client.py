@@ -200,7 +200,8 @@ def _make_calls_iterator(
         )
         return response.calls
 
-    def transform_func(call: CallSchema) -> Call:
+    # TODO: Should be Call, not WeaveObject
+    def transform_func(call: CallSchema) -> WeaveObject:
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
@@ -472,7 +473,7 @@ class Call:
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> Call:
+) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
@@ -696,7 +697,7 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
-    ) -> Call:
+    ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -714,7 +715,7 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
-    ) -> Call:
+    ) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()

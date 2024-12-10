@@ -31,6 +31,7 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
+from weave.trace.weave_client import CallsIterator
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +152,7 @@ class Op(Protocol):
     postprocess_output: Callable[..., Any] | None
 
     call: Callable[..., Any]
-    calls: Callable[..., CallIterator]
+    calls: Callable[..., CallsIterator]
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -486,7 +487,7 @@ async def _do_call_async(
     return res, call
 
 
-def calls(op: Op) -> CallIterator:
+def calls(op: Op) -> CallsIterator:
     """
     Get an iterator over all calls to this op.
 
