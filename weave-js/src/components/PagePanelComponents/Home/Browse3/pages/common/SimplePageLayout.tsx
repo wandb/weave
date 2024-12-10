@@ -332,11 +332,7 @@ const SimpleTabView: FC<{
           style={{margin: '12px 16px 0 16px'}}
           value={props.tabs[props.tabValue].label}
           onValueChange={props.handleTabChange}>
-          <Tabs.List
-            style={{
-              overflowX: 'scroll',
-              scrollbarWidth: 'none',
-            }}>
+          <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none'}}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
                 key={tab.label}
