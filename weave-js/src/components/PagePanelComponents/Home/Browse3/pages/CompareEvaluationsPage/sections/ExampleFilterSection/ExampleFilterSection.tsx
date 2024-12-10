@@ -13,7 +13,7 @@ import {
 } from '../../compositeMetricsUtil';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getBaselineCallId} from '../../ecpState';
 import {metricDefinitionId} from '../../ecpUtil';
 import {
   flattenedDimensionPath,
@@ -103,7 +103,7 @@ const SingleDimensionFilter: React.FC<{
   }, [props.state.data]);
 
   const {setComparisonDimensions} = useCompareEvaluationsState();
-  const baselineCallId = props.state.baselineEvaluationCallId;
+  const baselineCallId = getBaselineCallId(props.state);
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
     callId => callId !== baselineCallId
   )!;

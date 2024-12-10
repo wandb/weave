@@ -14,6 +14,7 @@ import {Icon} from '../../../../Icon';
 import {TailwindContents} from '../../../../Tailwind';
 import {isWeaveRef} from '../filters/common';
 import {mapObject, TraverseContext} from '../pages/CallPage/traverse';
+import {ShoppingCart} from '../pages/common/shoppingCart/ShoppingCart';
 import {SimplePageLayout} from '../pages/common/SimplePageLayout';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {
@@ -26,7 +27,6 @@ import {computeDiff, mergeObjects} from './compare';
 import {CompareGrid, MAX_OBJECT_COLS} from './CompareGrid';
 import {isSequentialVersions, parseSpecifier} from './hooks';
 import {getExpandableRefs, RefValues, RESOLVED_REF_KEY} from './refUtil';
-import {ShoppingCart} from './ShoppingCart';
 import {ComparableObject, Mode} from './types';
 
 type ComparePageObjectsLoadedProps = {
