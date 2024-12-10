@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
-from weave.trace.weave_client import Call
+from weave.trace.weave_client import Call, CallsIterator
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
 
@@ -72,7 +72,7 @@ def _hash_str(s: str, hash_len: int) -> str:
 
 
 def flatten_calls(
-    calls: Union[Iterable[Call], CallIterator],
+    calls: Union[Iterable[Call], CallsIterator],
     *,
     depth: int = 0,
 ) -> list:
