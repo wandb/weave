@@ -34,7 +34,7 @@ export const DraggableItem = SortableElement(
     onRemoveItem,
     onSetBaseline,
   }: DraggableItemProps) => {
-    const isDeletable = numItems > 2;
+    const isDeletable = numItems > 1;
     const isBaseline = idx === 0;
     const [isOpen, setIsOpen] = useState(false);
 
@@ -72,20 +72,12 @@ export const DraggableItem = SortableElement(
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content align="start">
-                {isBaseline ? (
-                  <DropdownMenu.Item
-                    onClick={() => {
-                      onSetBaseline(null);
-                    }}>
-                    <Icon name="baseline-alt" />
-                    Remove baseline
-                  </DropdownMenu.Item>
-                ) : (
-                  <DropdownMenu.Item onClick={onMakeBaselinePropagated}>
-                    <Icon name="baseline-alt" />
-                    Make baseline
-                  </DropdownMenu.Item>
-                )}
+                <DropdownMenu.Item
+                  onClick={onMakeBaselinePropagated}
+                  disabled={isBaseline}>
+                  <Icon name="baseline-alt" />
+                  Make baseline
+                </DropdownMenu.Item>
                 {isDeletable && (
                   <>
                     <DropdownMenu.Separator />
