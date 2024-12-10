@@ -360,8 +360,8 @@ class ContextRelevanceScorer(Scorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        output = {"flagged": final_score > self.threshold}
-        output['extras'] = {'score': final_score}
+        res = {"flagged": final_score > self.threshold}
+        res['extras'] = {'score': final_score}
         if return_all_scores:
-            output['extras']['all_spans'] = all_spans
-        return output
+            res['extras']['all_spans'] = all_spans
+        return res
