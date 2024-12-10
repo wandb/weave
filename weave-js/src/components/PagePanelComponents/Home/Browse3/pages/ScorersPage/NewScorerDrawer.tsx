@@ -138,11 +138,16 @@ export const NewScorerDrawer: FC<NewScorerDrawerProps> = ({
     );
   }, [showRunnableUI]);
 
+  const handleClose = () => {
+    setFormData(null);
+    onClose();
+  };
+
   return (
     <SaveableDrawer
       open={open}
       title="Create scorer"
-      onClose={onClose}
+      onClose={handleClose}
       onSave={onSave}
       saveDisabled={!isFormValid}>
       <AutocompleteWithLabel
@@ -208,12 +213,20 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
           sx={{
             flex: '0 0 auto',
             borderBottom: '1px solid #e0e0e0',
-            p: '10px',
+            px: '24px',
+            py: '20px',
             display: 'flex',
             fontWeight: 600,
+            fontSize: '24px',
+            lineHeight: '40px',
           }}>
           <Box sx={{flexGrow: 1}}>{title}</Box>
-          <Button size="small" variant="quiet" icon="close" onClick={onClose} />
+          <Button
+            size="medium"
+            variant="quiet"
+            icon="close"
+            onClick={onClose}
+          />
         </Box>
 
         <Box
@@ -230,11 +243,13 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
             display: 'flex',
             flex: '0 0 auto',
             borderTop: '1px solid #e0e0e0',
-            p: '10px',
+            px: '24px',
+            py: '20px',
           }}>
           <Button
             onClick={onSave}
             color="primary"
+            size="large"
             disabled={saveDisabled}
             className="w-full">
             Create scorer

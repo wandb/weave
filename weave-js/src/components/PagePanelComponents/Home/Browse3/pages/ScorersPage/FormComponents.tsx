@@ -3,7 +3,7 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import React from 'react';
 
-export const GAP_BETWEEN_ITEMS_PX = 10;
+export const GAP_BETWEEN_ITEMS_PX = 16;
 export const GAP_BETWEEN_LABEL_AND_FIELD_PX = 10;
 
 type AutocompleteWithLabelType<Option = any> = (

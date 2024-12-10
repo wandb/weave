@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import React, {FC, useCallback, useState} from 'react';
+import React, {FC, useCallback, useEffect, useState} from 'react';
 import {z} from 'zod';
 
 import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
@@ -28,7 +28,7 @@ const AnnotationScorerFormSchema = z.object({
     }),
     z.object({
       type: z.literal('String'),
-      'Max length': z.number().optional(),
+      'Maximum length': z.number().optional(),
     }),
     z.object({
       type: z.literal('Select'),
@@ -45,6 +45,9 @@ export const AnnotationScorerForm: FC<
   ScorerFormProps<z.infer<typeof AnnotationScorerFormSchema>>
 > = ({data, onDataChange}) => {
   const [config, setConfig] = useState(data ?? DEFAULT_STATE);
+  useEffect(() => {
+    setConfig(data ?? DEFAULT_STATE);
+  }, [data]);
   const [isValid, setIsValid] = useState(false);
 
   const handleConfigChange = useCallback(
@@ -113,7 +116,7 @@ function convertTypeExtrasToJsonSchema(
   const typeSchema = obj.Type;
   const typeExtras: Record<string, any> = {};
   if (typeSchema.type === 'String') {
-    typeExtras.maxLength = typeSchema['Max length'];
+    typeExtras.maxLength = typeSchema['Maximum length'];
   } else if (typeSchema.type === 'Integer' || typeSchema.type === 'Number') {
     typeExtras.minimum = typeSchema.Minimum;
     typeExtras.maximum = typeSchema.Maximum;

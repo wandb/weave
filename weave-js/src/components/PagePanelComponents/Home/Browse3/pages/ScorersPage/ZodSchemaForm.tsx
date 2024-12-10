@@ -289,9 +289,11 @@ const NestedForm: React.FC<{
   } else if (isZodType(fieldSchema, s => s instanceof z.ZodBoolean)) {
     fieldType = 'checkbox';
   }
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
     <TextFieldWithLabel
+      isOptional={isOptional}
       label={!hideLabel ? keyName : undefined}
       type={fieldType}
       value={currentValue ?? ''}
@@ -758,6 +760,7 @@ const LiteralField: React.FC<{
   setConfig,
 }) => {
   const literalValue = unwrappedSchema.value;
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   useEffect(() => {
     if (value !== literalValue) {
@@ -765,7 +768,14 @@ const LiteralField: React.FC<{
     }
   }, [value, literalValue, targetPath, config, setConfig]);
 
-  return <TextFieldWithLabel label={keyName} disabled value={literalValue} />;
+  return (
+    <TextFieldWithLabel
+      isOptional={isOptional}
+      label={keyName}
+      disabled
+      value={literalValue}
+    />
+  );
 };
 
 const BooleanField: React.FC<{
