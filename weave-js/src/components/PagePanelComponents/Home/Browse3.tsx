@@ -1,15 +1,5 @@
 import {ApolloProvider} from '@apollo/client';
-import {Home} from '@mui/icons-material';
-import {
-  AppBar,
-  Box,
-  Breadcrumbs,
-  Drawer,
-  IconButton,
-  Link as MaterialLink,
-  Toolbar,
-  Typography,
-} from '@mui/material';
+import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
@@ -21,9 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import _ from 'lodash';
 import React, {
-  ComponentProps,
   FC,
   useCallback,
   useEffect,
@@ -33,7 +21,6 @@ import React, {
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
-  Link as RouterLink,
   Redirect,
   Route,
   Switch,
@@ -199,7 +186,6 @@ export const Browse3: FC<{
               `/${URL_BROWSE3}`,
             ]}>
             <Browse3Mounted
-              hideHeader={props.hideHeader}
               headerOffset={props.headerOffset}
               navigateAwayFromProject={props.navigateAwayFromProject}
             />
@@ -211,7 +197,6 @@ export const Browse3: FC<{
 };
 
 const Browse3Mounted: FC<{
-  hideHeader?: boolean;
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
@@ -225,37 +210,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {!props.hideHeader && (
-        <AppBar
-          sx={{
-            zIndex: theme => theme.zIndex.drawer + 1,
-            height: '60px',
-            flex: '0 0 auto',
-            position: 'static',
-          }}>
-          <Toolbar
-            sx={{
-              backgroundColor: '#1976d2',
-              minHeight: '30px',
-            }}>
-            <IconButton
-              component={RouterLink}
-              to={`/`}
-              sx={{
-                color: theme =>
-                  theme.palette.getContrastText(theme.palette.primary.main),
-                '&:hover': {
-                  color: theme =>
-                    theme.palette.getContrastText(theme.palette.primary.dark),
-                },
-                marginRight: theme => theme.spacing(2),
-              }}>
-              <Home />
-            </IconButton>
-            <Browse3Breadcrumbs />
-          </Toolbar>
-        </AppBar>
-      )}
       <Switch>
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
@@ -1050,20 +1004,6 @@ const ComparePageBinding = () => {
   return <ComparePage entity={params.entity} project={params.project} />;
 };
 
-const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
-  <MaterialLink
-    sx={{
-      color: theme => theme.palette.getContrastText(theme.palette.primary.main),
-      '&:hover': {
-        color: theme =>
-          theme.palette.getContrastText(theme.palette.primary.dark),
-      },
-    }}
-    {...props}
-    component={RouterLink}
-  />
-);
-
 const PlaygroundPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   return (
@@ -1072,81 +1012,5 @@ const PlaygroundPageBinding = () => {
       project={params.project}
       callId={params.itemName}
     />
-  );
-};
-
-const Browse3Breadcrumbs: FC = props => {
-  const params = useParamsDecoded<Browse3Params>();
-  const query = useURLSearchParamsDict();
-  const filePathParts = query.path?.split('/') ?? [];
-  const refFields = query.extra?.split('/') ?? [];
-
-  return (
-    <Breadcrumbs>
-      {params.entity && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}`}>
-          {params.entity}
-        </AppBarLink>
-      )}
-      {params.project && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}/${params.project}`}>
-          {params.project}
-        </AppBarLink>
-      )}
-      {params.tab && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}`}>
-          {params.tab}
-        </AppBarLink>
-      )}
-      {params.itemName && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
-          {params.itemName}
-        </AppBarLink>
-      )}
-      {params.version && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
-          {params.version}
-        </AppBarLink>
-      )}
-      {filePathParts.map((part, idx) => (
-        <AppBarLink
-          key={idx}
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-            params.tab
-          }/${params.itemName}/versions/${
-            params.version
-          }?path=${encodeURIComponent(
-            filePathParts.slice(0, idx + 1).join('/')
-          )}`}>
-          {part}
-        </AppBarLink>
-      ))}
-      {_.range(0, refFields.length, 2).map(idx => (
-        <React.Fragment key={idx}>
-          <Typography
-            sx={{
-              color: theme =>
-                theme.palette.getContrastText(theme.palette.primary.main),
-            }}>
-            {refFields[idx]}
-          </Typography>
-          <AppBarLink
-            to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-              params.tab
-            }/${params.itemName}/versions/${
-              params.version
-            }?path=${encodeURIComponent(
-              filePathParts.join('/')
-            )}&extra=${encodeURIComponent(
-              refFields.slice(0, idx + 2).join('/')
-            )}`}>
-            {refFields[idx + 1]}
-          </AppBarLink>
-        </React.Fragment>
-      ))}
-    </Breadcrumbs>
   );
 };
