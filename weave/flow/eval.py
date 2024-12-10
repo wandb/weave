@@ -493,6 +493,13 @@ class Evaluation(Object):
             n_complete += 1
             if verbose:
                 print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            else:
+                # Print progress at 25%, 50%, 75% and 100%
+                total_rows = len(trial_rows)
+                progress_milestones = [total_rows // 4, total_rows // 2, 3 * total_rows // 4, total_rows]
+                if n_complete in progress_milestones:
+                    percent_complete = int((n_complete / total_rows) * 100)
+                    print(f"Evaluated {percent_complete}% of examples")
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
