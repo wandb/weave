@@ -31,12 +31,11 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
-from weave.trace.weave_client import CallsIterator
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call
+    from weave.trace.weave_client import Call, CallsIterator
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
