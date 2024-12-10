@@ -32,6 +32,7 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
 
     if settings is None:
         settings = AutopatchSettings()
+
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
     get_litellm_patcher(settings.litellm).attempt_patch()
