@@ -11,7 +11,7 @@ import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
 import {LlmJudgeActionSpecSchema} from '../wfReactInterface/baseObjectClasses.zod';
-import {createBaseObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+import {createLeafObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
 import {ActionSpecSchema} from '../wfReactInterface/generatedBaseObjectClasses.zod';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
@@ -185,7 +185,7 @@ export const onLLMJudgeScorerSave = async (
     config: judgeAction,
   });
 
-  return createBaseObjectInstance(client, 'ActionSpec', {
+  return createLeafObjectInstance(client, 'ActionSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
       object_id: objectId,

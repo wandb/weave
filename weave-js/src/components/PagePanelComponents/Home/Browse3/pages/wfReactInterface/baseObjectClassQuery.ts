@@ -13,22 +13,22 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-type BaseObjectClassRegistry = typeof baseObjectClassRegistry;
-type BaseObjectClassRegistryKeys = keyof BaseObjectClassRegistry;
-type BaseObjectClassType<C extends BaseObjectClassRegistryKeys> = z.infer<
-  BaseObjectClassRegistry[C]
+type ObjectClassRegistry = typeof baseObjectClassRegistry;  // TODO: Add more here - not just bases!
+type ObjectClassRegistryKeys = keyof ObjectClassRegistry;
+type ObjectClassType<C extends ObjectClassRegistryKeys> = z.infer<
+  ObjectClassRegistry[C]
 >;
 
-export type TraceObjSchemaForBaseObjectClass<
-  C extends BaseObjectClassRegistryKeys
-> = TraceObjSchema<BaseObjectClassType<C>, C>;
+export type TraceObjSchemaForObjectClass<
+  C extends ObjectClassRegistryKeys
+> = TraceObjSchema<ObjectClassType<C>, C>;
 
-export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
+export const useBaseObjectInstances = <C extends ObjectClassRegistryKeys>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
+): Loadable<Array<TraceObjSchemaForObjectClass<C>>> => {
   const [objects, setObjects] = useState<
-    Array<TraceObjSchemaForBaseObjectClass<C>>
+    Array<TraceObjSchemaForObjectClass<C>>
   >([]);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
@@ -56,11 +56,11 @@ export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
   return {result: objects, loading};
 };
 
-const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
+const getBaseObjectInstances = async <C extends ObjectClassRegistryKeys>(
   client: TraceServerClient,
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
+): Promise<Array<TraceObjSchema<ObjectClassType<C>, C>>> => {
   const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
@@ -86,47 +86,47 @@ const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
     .map(
       ({obj, parsed}) =>
         ({...obj, val: parsed.data} as TraceObjSchema<
-          BaseObjectClassType<C>,
+          ObjectClassType<C>,
           C
         >)
     );
 };
 
-export const useCreateBaseObjectInstance = <
-  C extends BaseObjectClassRegistryKeys,
-  T = BaseObjectClassType<C>
+export const useCreateLeafObjectInstance = <
+  C extends ObjectClassRegistryKeys,
+  T = ObjectClassType<C>
 >(
-  baseObjectClassName: C
+  leafObjectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createBaseObjectInstance(client, baseObjectClassName, req);
+    createLeafObjectInstance(client, leafObjectClassName, req);
 };
 
-export const createBaseObjectInstance = async <
-  C extends BaseObjectClassRegistryKeys,
-  T = BaseObjectClassType<C>
+export const createLeafObjectInstance = async <
+  C extends ObjectClassRegistryKeys, 
+  T = ObjectClassType<C>
 >(
   client: TraceServerClient,
-  baseObjectClassName: C,
+  leafObjectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
-    req.obj.set_base_object_class != null &&
-    req.obj.set_base_object_class !== baseObjectClassName
+    req.obj.set_leaf_object_class != null &&
+    req.obj.set_leaf_object_class !== leafObjectClassName
   ) {
     throw new Error(
-      `set_base_object_class must match baseObjectClassName: ${baseObjectClassName}`
+      `set_leaf_object_class must match leafObjectClassName: ${leafObjectClassName}`
     );
   }
 
-  const knownBaseObjectClass = baseObjectClassRegistry[baseObjectClassName];
-  if (!knownBaseObjectClass) {
-    throw new Error(`Unknown object class: ${baseObjectClassName}`);
+  const knownObjectClass = baseObjectClassRegistry[leafObjectClassName];
+  if (!knownObjectClass) {
+    throw new Error(`Unknown object class: ${leafObjectClassName}`);
   }
 
-  const verifiedObject = knownBaseObjectClass.safeParse(req.obj.val);
+  const verifiedObject = knownObjectClass.safeParse(req.obj.val);
 
   if (!verifiedObject.success) {
     throw new Error(
@@ -134,13 +134,13 @@ export const createBaseObjectInstance = async <
     );
   }
 
-  const reqWithBaseObjectClass: TraceObjCreateReq = {
+  const reqWithLeafObjectClass: TraceObjCreateReq = {
     ...req,
     obj: {
       ...req.obj,
-      set_base_object_class: baseObjectClassName,
+      set_leaf_object_class: leafObjectClassName,
     },
   };
 
-  return client.objCreate(reqWithBaseObjectClass);
+  return client.objCreate(reqWithLeafObjectClass);
 };

@@ -29,65 +29,76 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
+def get_leaf_object_class(val: Any) -> Optional[str]:
+    if isinstance(val, dict):
+        if "_bases" in val:
+            if isinstance(val["_bases"], list):
+                if len(val["_bases"]) >= 2:
+                    if val["_bases"][-1] == "BaseModel":
+                        if val["_bases"][-2] in base_object_class_names:
+                            if "_class_name" in val:
+                                return val["_class_name"]
+    return None
+
+
 def process_incoming_object_val(
-    val: Any, req_base_object_class: Optional[str] = None
+    val: Any, req_leaf_object_class: Optional[str] = None
 ) -> tuple[dict, Optional[str]]:
     """
     This method is responsible for accepting an incoming object from the user, validating it
-    against the base object class, and returning the object with the base object class
+    against the leaf object class, and returning the object with the base object class
     set. It does not mutate the original object, but returns a new object with values set if needed.
 
     Specifically,:
 
     1. If the object is not a dict, it is returned as is, and the base object class is set to None.
-    2. There are 2 ways to specify the base object class:
-        a. The `req_base_object_class` argument.
+    2. There are 2 ways to specify the leaf object class:
+        a. The `req_leaf_object_class` argument.
             * used by non-pythonic writers of weave objects
         b. The `_bases` & `_class_name` attributes of the object, which is a list of base class names.
             * used by pythonic weave object writers (legacy)
-    3. If the object has a base object class that does not match the requested base object class,
+    3. If the object has a leaf object class that does not match the requested leaf object class,
         an error is thrown.
-    4. if the object contains a base object class inside the payload, then we simply validate
-        the object against the base object class (if a match is found in BASE_OBJECT_REGISTRY)
-    5. If the object does not have a base object class and a requested base object class is
+    4. if the object contains a leaf object class inside the payload, then we simply validate
+        the object against the leaf object class (if a match is found in BASE_OBJECT_REGISTRY)
+    5. If the object does not have a leaf object class and a requested leaf object class is
         provided, we require a match in BASE_OBJECT_REGISTRY and validate the object against
-        the requested base object class. Finally, we set the correct feilds.
+        the requested leaf object class. Finally, we set the correct fields.
     """
     if not isinstance(val, dict):
-        if req_base_object_class is not None:
+        if req_leaf_object_class is not None:
             raise ValueError(
-                "set_base_object_class cannot be provided for non-dict objects"
+                "set_leaf_object_class cannot be provided for non-dict objects"
             )
         return val, None
 
     dict_val = val.copy()
-    val_base_object_class = get_base_object_class(dict_val)
+    val_leaf_object_class = get_leaf_object_class(dict_val)
 
     if (
-        val_base_object_class != None
-        and req_base_object_class != None
-        and val_base_object_class != req_base_object_class
+        val_leaf_object_class != None
+        and req_leaf_object_class != None
+        and val_leaf_object_class != req_leaf_object_class
     ):
         raise ValueError(
-            f"set_base_object_class must match base_object_class: {val_base_object_class} != {req_base_object_class}"
+            f"set_leaf_object_class must match found leaf class: {req_leaf_object_class} != {val_leaf_object_class}"
         )
 
-    if val_base_object_class is not None:
+    if val_leaf_object_class is not None:
         # In this case, we simply validate if the match is found
-        if base_object_class_type := BASE_OBJECT_REGISTRY.get(val_base_object_class):
-            base_object_class_type.model_validate(dict_val)
-    elif req_base_object_class is not None:
+        if object_class_type := BASE_OBJECT_REGISTRY.get(val_leaf_object_class):
+            object_class_type.model_validate(dict_val)
+    elif req_leaf_object_class is not None:
         # In this case, we require that the base object class is registered
-        if base_object_class_type := BASE_OBJECT_REGISTRY.get(req_base_object_class):
-            dict_val = dump_base_object(base_object_class_type.model_validate(dict_val))
+        if object_class_type := BASE_OBJECT_REGISTRY.get(req_leaf_object_class):
+            dict_val = dump_base_object(object_class_type.model_validate(dict_val))
         else:
-            raise ValueError(f"Unknown base object class: {req_base_object_class}")
+            raise ValueError(f"Unknown base object class: {req_leaf_object_class}")
 
-    base_object_class = val_base_object_class or req_base_object_class
-
-    return dict_val, base_object_class
+    return dict_val, get_base_object_class(dict_val)
 
 
+# BIG TODO: Replace this with a true object serialization step using some synthetic weave client!
 # Server-side version of `pydantic_object_record`
 def dump_base_object(val: BaseModel) -> dict:
     cls = val.__class__

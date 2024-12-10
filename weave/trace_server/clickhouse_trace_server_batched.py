@@ -564,7 +564,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         val, base_object_class = process_incoming_object_val(
-            req.obj.val, req.obj.set_base_object_class
+            req.obj.val, req.obj.set_leaf_object_class
         )
 
         json_val = json.dumps(val)

@@ -191,7 +191,7 @@ class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    set_base_object_class: Optional[str] = None
+    set_leaf_object_class: Optional[str] = None
 
 
 class TableSchemaForInsert(BaseModel):

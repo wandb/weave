@@ -13,7 +13,7 @@ import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
 import {
-  TraceObjSchemaForBaseObjectClass,
+  TraceObjSchemaForObjectClass,
   useBaseObjectInstances,
 } from '../wfReactInterface/baseObjectClassQuery';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
@@ -61,7 +61,7 @@ const useRunnableFeedbacksForCall = (call: CallSchema) => {
 
 const useRunnableFeedbackTypeToLatestActionRef = (
   call: CallSchema,
-  actionSpecs: Array<TraceObjSchemaForBaseObjectClass<'ActionSpec'>>
+  actionSpecs: Array<TraceObjSchemaForObjectClass<'ActionSpec'>>
 ): Record<string, string> => {
   return useMemo(() => {
     return _.fromPairs(
@@ -92,7 +92,7 @@ type GroupedRowType = {
 };
 
 const useTableRowsForRunnableFeedbacks = (
-  actionSpecs: Array<TraceObjSchemaForBaseObjectClass<'ActionSpec'>>,
+  actionSpecs: Array<TraceObjSchemaForObjectClass<'ActionSpec'>>,
   runnableFeedbacks: Feedback[],
   runnableFeedbackTypeToLatestActionRef: Record<string, string>
 ): GroupedRowType[] => {
