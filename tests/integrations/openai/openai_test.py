@@ -38,10 +38,10 @@ def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
@@ -86,10 +86,10 @@ async def test_openai_async_quickstart(
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
@@ -315,10 +315,10 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -401,10 +401,10 @@ async def test_openai_function_call_async(
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -577,10 +577,10 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90
@@ -664,10 +664,10 @@ async def test_openai_tool_call_async(
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output.model == "gpt-4o-2024-05-13"
-    assert output.object == "chat.completion"
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output.model]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90

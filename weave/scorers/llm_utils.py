@@ -23,10 +23,17 @@ if TYPE_CHECKING:
     from google.generativeai import GenerativeModel
     from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
-    from openai import AsyncOpenAI, OpenAI
+    from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 
     _LLM_CLIENTS = Union[
-        OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel
+        OpenAI,
+        AsyncOpenAI,
+        AzureOpenAI,
+        AsyncAzureOpenAI,
+        Anthropic,
+        AsyncAnthropic,
+        Mistral,
+        GenerativeModel,
     ]
 else:
     _LLM_CLIENTS = object
@@ -34,6 +41,8 @@ else:
 _LLM_CLIENTS_NAMES = (
     "OpenAI",
     "AsyncOpenAI",
+    "AzureOpenAI",
+    "AsyncAzureOpenAI",
     "Anthropic",
     "AsyncAnthropic",
     "Mistral",
