@@ -169,7 +169,6 @@ class RollingWindowScorer(Scorer):
         stride: int = self.max_tokens - self.overlap
 
         for i in range(0, total_tokens, stride):
-            print("Running window", i)
             chunk_input_ids = input_ids[:, i : i + self.max_tokens]
             chunk_predictions = self.predict_chunk(chunk_input_ids)
             all_predictions.append(chunk_predictions)
