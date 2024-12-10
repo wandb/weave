@@ -7,7 +7,7 @@ import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -379,13 +379,15 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 def get_openai_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
-    global _openai_patcher
-
-    if _openai_patcher is not None:
-        return _openai_patcher
-
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _openai_patcher
+    if _openai_patcher is not None:
+        return _openai_patcher
 
     base = settings.op_settings
 
