@@ -237,7 +237,7 @@ class ContextRelevanceScorer(Scorer):
             - flagged (bool): Whether the output was flagged as irrelevant
             - extras (dict): Contains:
                 - score (float): Overall relevance score
-                - all_spans (list, optional): If return_all_scores=True, includes list of relevant 
+                - all_spans (list, optional): If verbose=True, includes list of relevant 
                   text spans and their scores
 
     Example:
@@ -251,7 +251,7 @@ class ContextRelevanceScorer(Scorer):
             'flagged': False,
             'extras': {
                 'score': 0.92,
-                'all_spans': [  # Only included if return_all_scores=True
+                'all_spans': [  # Only included if verbose=True
                     {'text': 'Paris is the capital of France', 'scores': 0.92}
                 ]
             }
@@ -349,7 +349,7 @@ class ContextRelevanceScorer(Scorer):
         output: str,
         query: str, 
         context: str | list[str],
-        return_all_scores: bool = False
+        verbose: bool = False
         ) -> tuple[list[dict[str, Any]], float]:
         """Score multiple documents and compute weighted average relevance."""
         all_spans = []
@@ -372,6 +372,6 @@ class ContextRelevanceScorer(Scorer):
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
         res = {"flagged": final_score > self.threshold}
         res['extras'] = {'score': final_score}
-        if return_all_scores:
+        if verbose:
             res['extras']['all_spans'] = all_spans
         return res
