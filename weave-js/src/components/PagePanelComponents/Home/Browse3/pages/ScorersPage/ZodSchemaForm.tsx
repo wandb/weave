@@ -163,7 +163,7 @@ const NestedForm: React.FC<{
   hideLabel,
   autoFocus,
 }) => {
-  const currentPath = [...path, keyName];
+  const currentPath = useMemo(() => [...path, keyName], [path, keyName]);
   const [currentValue, setCurrentValue] = useState(
     getNestedValue(config, currentPath)
   );
