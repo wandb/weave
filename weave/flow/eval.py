@@ -463,7 +463,7 @@ class Evaluation(Object):
         return summary
 
     async def get_eval_results(
-        self, model: Union[Callable, Model]
+        self, model: Union[Callable, Model], verbose: bool = True,
     ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
@@ -491,7 +491,8 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            if verbose:
+                print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
