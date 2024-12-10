@@ -137,13 +137,15 @@ class RelevanceScorer(Scorer):
         except Exception:
             relevance = 0
 
-        relevant = False
+        flagged = True
         if relevance > 3:
-            relevant = True
+            flagged = False
         return {
-            "is_relevant": relevant,
-            "score": relevance,
-            "relevance": self._id2label.get(relevance, "Unknown"),
+            "flagged": flagged,
+            "extras": {
+                "relevance_id": relevance,
+                "relevance_label": self._id2label.get(relevance, "Unknown"),
+            },
         }
 
     def _format_messages(

@@ -62,15 +62,17 @@ class CoherenceScorer(Scorer):
         coherence_output = self._classifier(
             inputs={"text": prompt, "text_pair": output}
         )
-        coherent = True
+        flagged = False
         if "incoherent" in coherence_output["label"].lower():
-            coherent = False
+            flagged = True
 
         return {
-            "is_coherent": coherent,
-            "coherence": coherence_output["label"],
-            "coherence_score": self._label2id[coherence_output["label"]],
-            "confidence": coherence_output["score"],
+            "flagged": flagged,
+            "extras": {
+                "coherence_label": coherence_output["label"],
+                "coherence_id": self._label2id[coherence_output["label"]],
+                "coherence_score": coherence_output["score"],
+            },
         }
 
     def _format_chat_history(self, chat_history: list[dict[str, str]]) -> str:

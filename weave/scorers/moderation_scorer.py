@@ -326,7 +326,7 @@ class ToxicityScorer(RollingWindowScorer):
             flagged = True
 
         return {
-            "categories": dict(zip(self._categories, predictions)),
+            "extras": dict(zip(self._categories, predictions)),
             "flagged": flagged,
         }
 
@@ -397,7 +397,7 @@ class BiasScorer(RollingWindowScorer):
         model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias_scorer"`.
         task (str): The pipeline task type. Defaults to `"text-classification"`.
         device (str): The device to use for inference. Defaults to `None`, which will use `cuda` if available.
-        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.45`.
+        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.5`.
         pipeline_kwargs (dict[str, Any]): Additional keyword arguments for the pipeline. Defaults to `{"top_k": 2}`.
 
     Returns:
@@ -479,6 +479,6 @@ class BiasScorer(RollingWindowScorer):
         else:
             categories = dict(zip(self._categories, scores))
         return {
-            "categories": categories,
+            "extras": categories,
             "flagged": any(scores),
         }

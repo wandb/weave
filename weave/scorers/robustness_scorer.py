@@ -49,7 +49,7 @@ class RobustnessScorer(Scorer):
 
     use_exact_match: bool = True
     use_ground_truths: bool = False
-    return_interpretation: bool = False
+    return_interpretation: bool = True
     embedding_model_name: str = "all-MiniLM-L6-v2"
     similarity_metric: str = "cosine"
     embedding_model: Optional[Any] = (
@@ -179,6 +179,7 @@ class RobustnessScorer(Scorer):
             }
             if self.return_interpretation:
                 result["interpretation"] = self.get_cohen_d_interpretation(d)
+                
             return result
         else:
             # Compute Cohen's h for use_exact_match scores

@@ -351,8 +351,11 @@ class HallucinationScorer(Scorer):
                 pairs = [(query + "\n\n" + context, output)]
                 pred = self.llm_model.predict(pairs)
 
-                pred_item = pred.item()
-                return {"flagged": pred_item <= self.hhem_score_threshold}
+                score = pred.item()
+                return {
+                    "flagged": score <= self.hhem_score_threshold,
+                    "score": score,
+                }
             else:
                 inp_template = self.tokenizer.apply_chat_template(
                     messages,
@@ -388,7 +391,10 @@ class HallucinationScorer(Scorer):
                 completion_tokens = output[0][input_length:].tolist()
 
                 is_hallucination = true_token in completion_tokens
-                result = {"flagged": is_hallucination}
+                result = {
+                    "flagged": is_hallucination,
+                    "extras": {"score": 1 if is_hallucination else 0},
+                }
 
                 if self.debug:
                     scorer_worked = (
@@ -401,7 +407,7 @@ class HallucinationScorer(Scorer):
                     completion = self.tokenizer.decode(completion_tokens)
                     print(f"COMPLETION:\n{completion}\n----------------------\n")
 
-                    result.update(
+                    result["extras"].update(
                         {
                             "completion": completion,
                             "completion_tokens": completion_tokens,
