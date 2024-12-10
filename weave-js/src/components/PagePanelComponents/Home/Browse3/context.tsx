@@ -69,7 +69,7 @@ export const Browse3WeaveflowRouteContextProvider = ({
   );
 };
 
-type WFDBTableType =
+export type WFDBTableType =
   | 'Op'
   | 'OpVersion'
   | 'Type'
