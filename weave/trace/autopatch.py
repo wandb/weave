@@ -33,18 +33,41 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     if settings is None:
         settings = AutopatchSettings()
 
-    get_openai_patcher(settings.openai).attempt_patch()
-    get_mistral_patcher(settings.mistral).attempt_patch()
-    get_litellm_patcher(settings.litellm).attempt_patch()
-    get_anthropic_patcher(settings.anthropic).attempt_patch()
-    get_groq_patcher(settings.groq).attempt_patch()
-    get_instructor_patcher(settings.instructor).attempt_patch()
-    get_dspy_patcher(settings.dspy).attempt_patch()
-    get_cerebras_patcher(settings.cerebras).attempt_patch()
-    get_cohere_patcher(settings.cohere).attempt_patch()
-    get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
-    get_notdiamond_patcher(settings.notdiamond).attempt_patch()
-    get_vertexai_patcher(settings.vertexai).attempt_patch()
+    if settings.openai.enabled:
+        get_openai_patcher(settings.openai).attempt_patch()
+
+    if settings.mistral.enabled:
+        get_mistral_patcher(settings.mistral).attempt_patch()
+
+    if settings.litellm.enabled:
+        get_litellm_patcher(settings.litellm).attempt_patch()
+
+    if settings.anthropic.enabled:
+        get_anthropic_patcher(settings.anthropic).attempt_patch()
+
+    if settings.groq.enabled:
+        get_groq_patcher(settings.groq).attempt_patch()
+
+    if settings.instructor.enabled:
+        get_instructor_patcher(settings.instructor).attempt_patch()
+
+    if settings.dspy.enabled:
+        get_dspy_patcher(settings.dspy).attempt_patch()
+
+    if settings.cerebras.enabled:
+        get_cerebras_patcher(settings.cerebras).attempt_patch()
+
+    if settings.cohere.enabled:
+        get_cohere_patcher(settings.cohere).attempt_patch()
+
+    if settings.google_ai_studio.enabled:
+        get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
+
+    if settings.notdiamond.enabled:
+        get_notdiamond_patcher(settings.notdiamond).attempt_patch()
+
+    if settings.vertexai.enabled:
+        get_vertexai_patcher(settings.vertexai).attempt_patch()
 
     # These integrations don't use the op decorator, so there are no settings to pass through
     llamaindex_patcher.attempt_patch()
