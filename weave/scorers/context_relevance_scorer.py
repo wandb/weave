@@ -307,7 +307,7 @@ class ContextRelevanceScorer(Scorer):
             model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
             
             special_tokens_mask = model_inputs.pop("special_tokens_mask")
-            combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
+            combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool()).cpu().numpy().flatten()
             # we should mask the query up to the sep token, 
             # on the combined mask we have to search for the first False
             # TODO: Check that this is now wrong
@@ -320,8 +320,8 @@ class ContextRelevanceScorer(Scorer):
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
-            pred_mask = (probabilities[:,1] > threshold).cpu().numpy().astype(int)
-            label_mask = (pred_mask & combined_mask.cpu().numpy()).flatten()
+            pred_mask = (probabilities[:,1] > threshold).cpu().numpy().astype(int).flatten()
+            label_mask = (pred_mask & combined_mask)
 
             positive_probs = probabilities[:, 1].cpu().numpy()
             transitions = np.diff(np.concatenate([[0], label_mask, [0]]))
