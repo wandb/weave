@@ -31,12 +31,11 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
-from weave.trace_server.trace_server_interface import CallSchema
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call, PaginatedIterator
+    from weave.trace.weave_client import Call
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -152,7 +151,7 @@ class Op(Protocol):
     postprocess_output: Callable[..., Any] | None
 
     call: Callable[..., Any]
-    calls: Callable[..., PaginatedIterator[CallSchema, WeaveObject]]
+    calls: Callable[..., CallIterator]
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -487,7 +486,7 @@ async def _do_call_async(
     return res, call
 
 
-def calls(op: Op) -> PaginatedIterator[CallSchema, WeaveObject]:
+def calls(op: Op) -> CallIterator:
     """
     Get an iterator over all calls to this op.
 

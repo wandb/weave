@@ -4,9 +4,8 @@ from collections.abc import Iterable
 from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
-from weave.trace.weave_client import Call, PaginatedIterator
+from weave.trace.weave_client import Call
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
-from weave.trace_server.trace_server_interface import CallSchema
 
 
 def make_pythonic_function_name(name: str) -> str:
@@ -73,7 +72,7 @@ def _hash_str(s: str, hash_len: int) -> str:
 
 
 def flatten_calls(
-    calls: Union[Iterable[Call], PaginatedIterator[CallSchema, WeaveObject]],
+    calls: Union[Iterable[Call], CallIterator],
     *,
     depth: int = 0,
 ) -> list:
