@@ -35,7 +35,7 @@ from weave.trace.util import log_once
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call, CallsIterator
+    from weave.trace.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -151,7 +151,7 @@ class Op(Protocol):
     postprocess_output: Callable[..., Any] | None
 
     call: Callable[..., Any]
-    calls: Callable[..., CallsIterator]
+    calls: Callable[..., CallsIter]
 
     _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
@@ -486,7 +486,7 @@ async def _do_call_async(
     return res, call
 
 
-def calls(op: Op) -> CallsIterator:
+def calls(op: Op) -> CallsIter:
     """
     Get an iterator over all calls to this op.
 

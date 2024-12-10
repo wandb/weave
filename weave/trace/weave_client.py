@@ -184,7 +184,7 @@ class PaginatedIterator(Generic[T, R]):
 
 
 # TODO: should be Call, not WeaveObject
-CallsIterator = PaginatedIterator[CallSchema, WeaveObject]
+CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 
 
 def _make_calls_iterator(
@@ -192,7 +192,7 @@ def _make_calls_iterator(
     project_id: str,
     filter: CallsFilter,
     include_costs: bool = False,
-) -> CallsIterator:
+) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
             CallsQueryReq(
@@ -392,7 +392,7 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> CallsIterator:
+    def children(self) -> CallsIter:
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
@@ -678,7 +678,7 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> CallsIterator:
+    ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
 
@@ -694,7 +694,7 @@ class WeaveClient:
         self,
         filter: CallsFilter | None = None,
         include_costs: bool = False,
-    ) -> CallsIterator:
+    ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1517,7 +1517,7 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIterator:
+    def _op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
