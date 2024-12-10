@@ -85,6 +85,8 @@ export const TrackedWandbLoader = ({
         const trackedData = {
           componentId: data.id,
           duration: data.duration,
+          start: data.start,
+          stop: data.stop,
           ...additionalData,
         };
         if (onComplete) {
