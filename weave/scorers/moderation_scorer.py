@@ -242,7 +242,7 @@ class ToxicityScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = None
+    model_name_or_path: str = ""
     base_url: Optional[str] = None
     total_threshold: int = 5
     category_threshold: int = 2
@@ -412,7 +412,7 @@ class BiasScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = None
+    model_name_or_path: str = ""
     base_url: Optional[str] = None
     device: str = None
     threshold: float = 0.5

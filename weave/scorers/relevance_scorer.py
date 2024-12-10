@@ -85,7 +85,7 @@ class OldRelevanceScorer(Scorer):
             from transformers import pipeline
         except ImportError:
             print(
-                "The `transformers` package is required to use the RelevanceScorer, please run `pip install transformers`"
+                "The `transformers` package is required to use the ContextRelevanceScorer, please run `pip install transformers`"
             )
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
@@ -217,7 +217,7 @@ class OldRelevanceScorer(Scorer):
         )
         return self.score_messages(messages)
 
-class RelevanceScorer(Scorer):
+class ContextRelevanceScorer(Scorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
 
@@ -241,7 +241,7 @@ class RelevanceScorer(Scorer):
                   text spans and their scores
 
     Example:
-        >>> scorer = RelevanceScorer(model_name_or_path="path/to/model")
+        >>> scorer = ContextRelevanceScorer(model_name_or_path="path/to/model")
         >>> result = scorer.score(
         ...     query="What is the capital of France?",
         ...     documents=["Paris is the capital of France."]
@@ -270,7 +270,7 @@ class RelevanceScorer(Scorer):
             from transformers import AutoModelForTokenClassification, AutoTokenizer
         except ImportError:
             print(
-                "The `transformers` and `torch` packages are required to use the RelevanceScorer, please run `pip install transformers torch`"
+                "The `transformers` and `torch` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch`"
             )
         """Initialize the model, tokenizer and device after pydantic initialization."""
         if os.path.isdir(self.model_name_or_path):

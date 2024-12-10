@@ -259,7 +259,7 @@ class HallucinationScorer(Scorer):
         debug: Enable debug logging, defaults to False
     """
 
-    model_name_or_path: str = None
+    model_name_or_path: str = ""
     base_url: Optional[str] = None
     device: str = "cuda"
     debug: bool = False
