@@ -7,12 +7,12 @@ import classNames from 'classnames';
 import React, {useState} from 'react';
 import {SortableElement, SortableHandle} from 'react-sortable-hoc';
 
-import {Button} from '../../../../Button';
-import {Icon} from '../../../../Icon';
-import {Pill} from '../../../../Tag';
-import {Tailwind} from '../../../../Tailwind';
-import {Tooltip} from '../../../../Tooltip';
-import {ShoppingCartItemDef} from './types';
+import {Button} from '../../../../../../Button';
+import {Icon} from '../../../../../../Icon';
+import {Pill} from '../../../../../../Tag';
+import {Tailwind} from '../../../../../../Tailwind';
+import {Tooltip} from '../../../../../../Tooltip';
+import {ShoppingCartItemDef} from '../../../compare/types';
 
 // TODO: Change cursor to grabbing when dragging
 const DragHandle = SortableHandle(() => (

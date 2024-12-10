@@ -1,14 +1,11 @@
 import {Popover} from '@mui/material';
 import Input from '@wandb/weave/common/components/Input';
-import {
-  DragDropProvider,
-  DropTarget,
-} from '@wandb/weave/common/containers/DragDropContainer';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../../../../Button';
+import {ShoppingCartItemDefs} from '../../../../compare/types';
 import {
   DEFAULT_FILTER_CALLS,
   DEFAULT_SORT_CALLS,
@@ -17,79 +14,82 @@ import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
 import {opNiceName} from '../../../common/Links';
+import {SortableItems} from '../../../common/shoppingCart/ShoppingCart';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,
   ObjectVersionKey,
 } from '../../../wfReactInterface/wfDataModelHooksInterface';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
-import {STANDARD_PADDING} from '../../ecpConstants';
 import {
   EvaluationComparisonState,
   getOrderedCallIds,
+  getOrderedEvalsWithNewBaseline,
   swapEvaluationCalls,
 } from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
-import {useDragDropReorder} from './dragUtils';
-import {EvaluationDefinition, VerticalBar} from './EvaluationDefinition';
+import {VerticalBar} from './EvaluationDefinition';
 
 export const ComparisonDefinitionSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {setEvaluationCallOrder} = useCompareEvaluationsState();
-
-  const reorderItems = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      const currentOrder = getOrderedCallIds(props.state);
-      const newOrder = swapEvaluationCalls(currentOrder, fromIndex, toIndex);
-      setEvaluationCallOrder(newOrder);
-    },
-    [setEvaluationCallOrder, props.state]
-  );
-
-  const {makeDragSourceCallbackRef, onDragOver, onDrop, onDragEnd} =
-    useDragDropReorder({
-      reorder: reorderItems,
-      dropzonePadding: 8,
-    });
+  const {setEvaluationCallOrder, removeEvaluationCall} =
+    useCompareEvaluationsState();
 
   const callIds = useMemo(() => {
     return getOrderedCallIds(props.state);
   }, [props.state]);
 
+  const shoppingCartItems: ShoppingCartItemDefs = useMemo(() => {
+    return callIds.map(callId => ({
+      key: 'evaluations',
+      value: callId,
+      label: props.state.data.evaluationCalls[callId]?.name ?? callId,
+    }));
+  }, [callIds, props.state.data.evaluationCalls]);
+
+  const onSetBaseline = (value: string | null) => {
+    if (!value) {
+      return;
+    }
+    const newSortOrder = getOrderedEvalsWithNewBaseline(callIds, value);
+    setEvaluationCallOrder(newSortOrder);
+  };
+
+  const onRemoveShoppingCartItem = (value: string) => {
+    removeEvaluationCall(value);
+  };
+
+  const onSortEnd = ({
+    oldIndex,
+    newIndex,
+  }: {
+    oldIndex: number;
+    newIndex: number;
+  }) => {
+    const newSortOrder = swapEvaluationCalls(callIds, oldIndex, newIndex);
+    setEvaluationCallOrder(newSortOrder);
+  };
+
   return (
-    <DragDropProvider>
-      <DropTarget
-        style={{width: '100%', overflow: 'auto'}}
-        partRef={{id: `target`}}
-        onDragOver={onDragOver}
-        onDrop={onDrop}>
-        <HorizontalBox
-          sx={{
-            alignItems: 'center',
-            paddingLeft: STANDARD_PADDING,
-            paddingRight: STANDARD_PADDING,
-            width: '100%',
-            overflow: 'auto',
-          }}>
-          {callIds.map((key, ndx) => {
-            return (
-              <div key={key} ref={makeDragSourceCallbackRef(ndx)}>
-                <EvaluationDefinition
-                  state={props.state}
-                  callId={key}
-                  ndx={ndx}
-                  onDragEnd={onDragEnd}
-                />
-              </div>
-            );
-          })}
-          <HorizontalBox>
-            <AddEvaluationButton state={props.state} />
-          </HorizontalBox>
+    <Tailwind>
+      <div className="flex w-full items-center gap-4 px-16 pt-12">
+        <SortableItems
+          useDragHandle
+          axis="xy"
+          items={shoppingCartItems}
+          baselineEnabled={true}
+          selected={null}
+          onClickShoppingCartItem={() => {}}
+          onSetBaseline={onSetBaseline}
+          onRemoveShoppingCartItem={onRemoveShoppingCartItem}
+          onSortEnd={onSortEnd}
+        />
+        <HorizontalBox>
+          <AddEvaluationButton state={props.state} />
         </HorizontalBox>
-      </DropTarget>
-    </DragDropProvider>
+      </div>
+    </Tailwind>
   );
 };
 

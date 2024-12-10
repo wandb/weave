@@ -113,7 +113,7 @@ export const useEvaluationComparisonState = (
 };
 
 export const getOrderedCallIds = (state: EvaluationComparisonState) => {
-  return state.evaluationCallIdsOrdered;
+  return Array.from(state.evaluationCallIdsOrdered);
 };
 
 export const getBaselineCallId = (state: EvaluationComparisonState) => {

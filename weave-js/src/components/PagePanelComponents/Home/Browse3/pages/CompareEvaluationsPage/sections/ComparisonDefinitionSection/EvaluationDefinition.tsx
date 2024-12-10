@@ -1,13 +1,5 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
-import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {
-  DragDropState,
-  DragSource,
-} from '@wandb/weave/common/containers/DragDropContainer';
-import {DragHandle} from '@wandb/weave/common/containers/DragDropContainer/DragHandle';
-import {Button} from '@wandb/weave/components/Button';
-import {Pill} from '@wandb/weave/components/Tag';
 import React, {useMemo} from 'react';
 
 import {
@@ -22,104 +14,8 @@ import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
-import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
-import {
-  BOX_RADIUS,
-  CIRCLE_SIZE,
-  EVAL_DEF_HEIGHT,
-  STANDARD_BORDER,
-} from '../../ecpConstants';
-import {
-  EvaluationComparisonState,
-  getBaselineCallId,
-  getOrderedCallIds,
-  getOrderedEvalsWithNewBaseline,
-} from '../../ecpState';
-import {HorizontalBox} from '../../Layout';
-import {DragHandleIcon} from './dragUtils';
-
-export const EvaluationDefinition: React.FC<{
-  state: EvaluationComparisonState;
-  callId: string;
-  ndx: number;
-  onDragEnd?: (ctx: DragDropState, e: React.DragEvent) => void;
-}> = props => {
-  const {removeEvaluationCall, setEvaluationCallOrder} =
-    useCompareEvaluationsState();
-
-  const menuOptions = useMemo(() => {
-    return [
-      {
-        key: 'add-to-baseline',
-        content: 'Set as baseline',
-        onClick: () => {
-          const currentOrder = getOrderedCallIds(props.state);
-          const newOrder = getOrderedEvalsWithNewBaseline(
-            currentOrder,
-            props.callId
-          );
-          setEvaluationCallOrder(newOrder);
-        },
-        disabled: props.callId === getBaselineCallId(props.state),
-      },
-      {
-        key: 'remove',
-        content: 'Remove',
-        onClick: () => {
-          removeEvaluationCall(props.callId);
-        },
-        disabled: Object.keys(props.state.data.evaluationCalls).length === 1,
-      },
-    ];
-  }, [props.callId, props.state, removeEvaluationCall, setEvaluationCallOrder]);
-
-  const partRef = useMemo(() => ({id: `${props.ndx}`}), [props.ndx]);
-
-  return (
-    <DragSource
-      partRef={partRef}
-      onDragEnd={props.onDragEnd}
-      draggingStyle={{opacity: 0.25}}>
-      <HorizontalBox
-        sx={{
-          height: EVAL_DEF_HEIGHT,
-          borderRadius: BOX_RADIUS,
-          border: STANDARD_BORDER,
-          paddingTop: '12px',
-          paddingBottom: '12px',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <DragHandle
-          partRef={partRef}
-          style={{marginTop: '5px', marginRight: '-20px', marginLeft: '4px'}}>
-          <DragHandleIcon />
-        </DragHandle>
-        <div style={{marginRight: '-8px'}}>
-          <EvaluationCallLink {...props} />
-        </div>
-        {props.callId === getBaselineCallId(props.state) && (
-          <div style={{marginRight: '-8px'}}>
-            <Pill label="Baseline" color="teal" />
-          </div>
-        )}
-        <div style={{marginLeft: '-6px', marginRight: '8px'}}>
-          <PopupDropdown
-            sections={[menuOptions]}
-            trigger={
-              <Button
-                className="ml-4 rotate-90"
-                icon="overflow-horizontal"
-                size="small"
-                variant="ghost"
-              />
-            }
-          />
-        </div>
-      </HorizontalBox>
-    </DragSource>
-  );
-};
+import {CIRCLE_SIZE} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpState';
 
 export const EvaluationCallLink: React.FC<{
   callId: string;

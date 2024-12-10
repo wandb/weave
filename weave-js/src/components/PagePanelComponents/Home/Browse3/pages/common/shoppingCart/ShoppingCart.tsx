@@ -7,9 +7,9 @@ import React from 'react';
 import {useHistory} from 'react-router-dom';
 import {SortableContainer} from 'react-sortable-hoc';
 
-import {queryToggleString, searchParamsSetArray} from '../urlQueryUtil';
+import {ShoppingCartItemDefs} from '../../../compare/types';
+import {queryToggleString, searchParamsSetArray} from '../../../urlQueryUtil';
 import {ShoppingCartItem} from './ShoppingCartItem';
-import {ShoppingCartItemDefs} from './types';
 
 type ShoppingCartItemsProps = {
   items: ShoppingCartItemDefs;
@@ -23,7 +23,7 @@ type SortableItemsProps = ShoppingCartItemsProps & {
   onRemoveShoppingCartItem: (value: string) => void;
 };
 
-const SortableItems = SortableContainer(
+export const SortableItems = SortableContainer(
   ({
     items,
     baselineEnabled,
