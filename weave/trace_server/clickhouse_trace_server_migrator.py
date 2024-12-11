@@ -83,13 +83,13 @@ class ClickHouseTraceServerMigrator:
             ):
                 raise MigrationError(f"Invalid replicated path: {replicated_path}")
 
+            replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
             replicated_engine = (
                 f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
             )
-            replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
 
         create_db_sql = f"""
-            CREATE DATABASE IF NOT EXISTS {db_name}{replicated_engine}{replicated_cluster}
+            CREATE DATABASE IF NOT EXISTS {db_name}{replicated_cluster}{replicated_engine}
         """
         return create_db_sql
 

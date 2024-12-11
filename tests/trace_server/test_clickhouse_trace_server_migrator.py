@@ -163,7 +163,7 @@ def test_create_db_sql_replicated(mock_costs, migrator):
 
     sql = migrator._create_db_sql("test_db")
     expected = """
-        CREATE DATABASE IF NOT EXISTS test_db ENGINE=Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}') ON CLUSTER test_cluster
+        CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE=Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')
     """.strip()
     assert sql.strip() == expected
 
