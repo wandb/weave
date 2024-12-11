@@ -9,6 +9,11 @@ from weave.trace_server.costs.insert_costs import insert_costs, should_insert_co
 
 logger = logging.getLogger(__name__)
 
+# These settings are only used when `replicated` mode is enabled for
+# self managed clickhouse instances.
+DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
+DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
+
 
 class MigrationError(RuntimeError):
     """Raised when a migration error occurs."""
@@ -16,16 +21,22 @@ class MigrationError(RuntimeError):
 
 class ClickHouseTraceServerMigrator:
     ch_client: CHClient
-    cluster_name: Optional[str]
+    replicated: bool
+    replicated_path: str
+    replicated_cluster: str
 
     def __init__(
         self,
         ch_client: CHClient,
-        cluster_name: Optional[str] = None,
+        replicated: Optional[bool] = None,
+        replicated_path: Optional[str] = None,
+        replicated_cluster: Optional[str] = None,
     ):
         super().__init__()
         self.ch_client = ch_client
-        self.cluster_name = cluster_name
+        self.replicated = False if replicated is None else replicated
+        self.replicated_path = DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
+        self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
         self._initialize_migration_db()
 
     def _format_sql(self, sql_query: str, create_db: bool = False) -> str:
