@@ -8,6 +8,7 @@ type ChoiceViewProps = {
   isStructuredOutput?: boolean;
   isNested?: boolean;
   choiceIndex?: number;
+  messageHeader?: React.ReactNode;
 };
 
 export const ChoiceView = ({
@@ -15,6 +16,7 @@ export const ChoiceView = ({
   isStructuredOutput,
   isNested,
   choiceIndex,
+  messageHeader,
 }: ChoiceViewProps) => {
   const {message} = choice;
   return (
@@ -24,6 +26,7 @@ export const ChoiceView = ({
       isStructuredOutput={isStructuredOutput}
       isNested={isNested}
       choiceIndex={choiceIndex}
+      messageHeader={messageHeader}
     />
   );
 };
