@@ -29,6 +29,7 @@ export const ChoicesViewCarousel = ({
   };
 
   return (
+
     <ChoiceView
       choice={choices[selectedChoiceIndex]}
       isStructuredOutput={isStructuredOutput}
