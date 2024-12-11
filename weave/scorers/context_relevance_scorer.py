@@ -261,6 +261,7 @@ class ContextRelevanceScorer(Scorer):
     base_url: Optional[str] = None
     device: str = "cpu"
     threshold: float = 0.7
+    model_max_length: int = 1280
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
 
@@ -283,7 +284,10 @@ class ContextRelevanceScorer(Scorer):
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
             )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._local_model_path,
+            model_max_length=self.model_max_length,
+        )
         self._model.eval()
         self.device = set_device(self.device)
 
@@ -298,7 +302,8 @@ class ContextRelevanceScorer(Scorer):
             input_text = query + f" {self._tokenizer.sep_token} " + document
             model_inputs = self._tokenizer(
                 input_text, 
-                truncation=True, 
+                truncation=True,
+                max_length=self.model_max_length,
                 padding=False, 
                 return_tensors="pt", 
                 return_special_tokens_mask=True

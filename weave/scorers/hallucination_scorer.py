@@ -308,6 +308,7 @@ class HallucinationScorer(Scorer):
                     trust_remote_code=True,
                 ).to(self.device)
                 self.tokenizer = self.llm_model.tokenzier
+                self.tokenizer.model_max_length = self.model_max_length
             else:
                 self.llm_model = AutoModelForCausalLM.from_pretrained(
                     self._local_model_path, torch_dtype="bfloat16"
@@ -347,7 +348,28 @@ class HallucinationScorer(Scorer):
             res = res["data"]
         else:
             if self.use_hhem:
-                pairs = [(query + "\n\n" + context, output)]
+                inps = query + "\n\n" + context
+                outs = output
+                
+                inps_toks = self.tokenizer(inps, truncation=False)
+                outs_toks = self.tokenizer(outs, truncation=False)
+                
+                len_inps = len(inps_toks.input_ids)
+                len_outs = len(outs_toks.input_ids)
+                if len_inps + len_outs > self.model_max_length:
+                    print(f"inps and outs > max_lenth: {len_inps + len_outs}")
+                    if len_outs < self.model_max_length - 1000:
+                        inp_remaining = self.model_max_length - (len_outs + 975)
+                        inps_input_ids = inps_toks.input_ids[:inp_remaining]
+                        out_input_ids = outs_toks.input_ids
+                    else:
+                        inps_input_ids = inps_toks.input_ids[:975]
+                        out_input_ids = outs_toks.input_ids[:self.model_max_length - 1025]
+
+                    inps = self.tokenizer.decode(inps_input_ids)
+                    outs = self.tokenizer.decode(out_input_ids)
+
+                pairs = [(inps, outs)]
                 pred = self.llm_model.predict(pairs)
                 score = pred.item()
                 return {

@@ -27,6 +27,7 @@ class CoherenceScorer(Scorer):
 
     device: str = None
     model_name_or_path: str = ""
+    model_max_length: int = 1024
     base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
     _label2id: dict[str, int] = PrivateAttr()
@@ -46,7 +47,11 @@ class CoherenceScorer(Scorer):
             )
 
         self._classifier = pipeline(
-            task="sentiment-analysis", model=self._local_model_path, device=self.device
+            task="sentiment-analysis", 
+            model=self._local_model_path, 
+            device=self.device,
+            max_length=self.model_max_length,
+            truncation=True
         )
         self._label2id = {
             "Completely Incoherent": 0,
