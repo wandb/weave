@@ -39,7 +39,7 @@ class ClickHouseTraceServerMigrator:
         self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
         self._initialize_migration_db()
 
-    def _format_sql(self, sql_query: str) -> str:
+    def _format_replicated_sql(self, sql_query: str) -> str:
         return sql_query
 
     def _create_db_sql(self, db_name: str) -> str:
@@ -93,7 +93,7 @@ class ClickHouseTraceServerMigrator:
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
-        self.ch_client.command(self._format_sql(create_table_sql))
+        self.ch_client.command(self._format_replicated_sql(create_table_sql))
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -215,7 +215,7 @@ class ClickHouseTraceServerMigrator:
             return
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
-        self.ch_client.command(self._format_sql(command))
+        self.ch_client.command(self._format_replicated_sql(command))
         self.ch_client.database = curr_db
 
     def _update_migration_status(self, target_db: str, target_version: int, is_start: bool = True) -> None:
