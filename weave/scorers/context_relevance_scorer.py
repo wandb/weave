@@ -297,7 +297,9 @@ class ContextRelevanceScorer(Scorer):
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._local_model_path, model_max_length=1280
+        )
         self._model.eval()
         self.device = set_device(self.device)
 
@@ -359,6 +361,7 @@ class ContextRelevanceScorer(Scorer):
                 return_tensors="pt",
                 return_special_tokens_mask=True,
                 return_offsets_mapping=True,
+                max_length=1280,
             )
             model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
 
