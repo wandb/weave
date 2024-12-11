@@ -69,10 +69,11 @@ export const CallPage: FC<{
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
-return false;
-// Uncomment to re-enable.
-// const viewerInfo = useViewerInfo();
-// return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+export const useShowRunnableUI = () => {
+  return false;
+  // Uncomment to re-enable.
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
