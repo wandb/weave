@@ -20,9 +20,10 @@ export type PlaygroundState = {
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
-  //   nTimes: number;
+  nTimes: number;
   maxTokensLimit: number;
   model: LLMMaxTokensKey;
+  selectedChoiceIndex: number;
 };
 
 export type PlaygroundStateKey = keyof PlaygroundState;

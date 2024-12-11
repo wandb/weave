@@ -114,16 +114,9 @@ export const useChatFunctions = (
         newTraceCall?.output &&
         Array.isArray((newTraceCall.output as TraceCallOutput).choices)
       ) {
-        // Delete the old choice
-        (newTraceCall.output as TraceCallOutput).choices!.splice(
-          choiceIndex,
-          1
-        );
-
-        // Add the new choice as a message
-        newTraceCall.inputs = newTraceCall.inputs ?? {};
-        newTraceCall.inputs.messages = newTraceCall.inputs.messages ?? [];
-        newTraceCall.inputs.messages.push(newChoice);
+        // Replace the choice
+        (newTraceCall.output as TraceCallOutput).choices![choiceIndex].message =
+          newChoice;
       }
       return newTraceCall;
     });

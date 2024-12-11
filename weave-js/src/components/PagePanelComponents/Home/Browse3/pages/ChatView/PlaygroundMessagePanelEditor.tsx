@@ -13,7 +13,7 @@ type PlaygroundMessagePanelEditorProps = {
   pendingToolResponseId?: string;
   message: Message;
   index: number;
-  isChoice: boolean;
+  choiceIndex?: number;
   setEditorHeight: (height: number | null) => void;
 };
 
@@ -21,7 +21,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
 > = ({
   index,
-  isChoice,
+  choiceIndex,
   setEditorHeight,
   editorHeight,
   isNested,
@@ -45,10 +45,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
   }, [initialContent]);
 
   const handleSave = () => {
-    if (isChoice) {
-      editChoice?.(index, {
+    if (choiceIndex !== undefined) {
+      editChoice?.(choiceIndex, {
+        ...message,
         content: editedContent,
-        role: message.role,
       });
     } else {
       editMessage?.(index, {

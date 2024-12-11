@@ -15,7 +15,7 @@ type MessagePanelProps = {
   index: number;
   message: Message;
   isStructuredOutput?: boolean;
-  isChoice?: boolean;
+  choiceIndex?: number;
   isNested?: boolean;
   pendingToolResponseId?: string;
 };
@@ -24,7 +24,7 @@ export const MessagePanel = ({
   index,
   message,
   isStructuredOutput,
-  isChoice,
+  choiceIndex,
   isNested,
   // The id of the tool call response that is pending
   // If the tool call response is pending, the editor will be shown automatically
@@ -120,7 +120,7 @@ export const MessagePanel = ({
                 <PlaygroundMessagePanelEditor
                   message={message}
                   index={index}
-                  isChoice={isChoice ?? false}
+                  choiceIndex={choiceIndex}
                   editorHeight={editorHeight}
                   isNested={isNested ?? false}
                   pendingToolResponseId={pendingToolResponseId}
@@ -173,7 +173,7 @@ export const MessagePanel = ({
         <div className="flex w-full items-center justify-start opacity-0 group-hover:opacity-100">
           <PlaygroundMessagePanelButtons
             index={message.original_index ?? index}
-            isChoice={isChoice ?? false}
+            choiceIndex={choiceIndex}
             isTool={isTool}
             hasContent={hasContent}
             contentRef={contentRef}

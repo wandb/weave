@@ -10,14 +10,16 @@ export type PlaygroundContextType = {
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
 
   editChoice: (choiceIndex: number, newChoice: Message) => void;
-  deleteChoice: (choiceIndex: number) => void;
+  deleteChoice: (messageIndex: number, choiceIndex: number) => void;
 
-  retry: (messageIndex: number, isChoice?: boolean) => void;
+  retry: (messageIndex: number, choiceIndex?: number) => void;
   sendMessage: (
     role: PlaygroundMessageRole,
     content: string,
     toolCallId?: string
   ) => void;
+
+  setSelectedChoiceIndex: (choiceIndex: number) => void;
 };
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
@@ -31,6 +33,7 @@ const DEFAULT_CONTEXT: PlaygroundContextType = {
 
   retry: () => {},
   sendMessage: () => {},
+  setSelectedChoiceIndex: () => {},
 };
 
 // Create context that can be undefined

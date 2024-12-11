@@ -93,6 +93,7 @@ export const ChoicesDrawer = ({
               <ChoiceView
                 choice={c}
                 isStructuredOutput={isStructuredOutput}
+                choiceIndex={index}
                 isNested
               />
             </div>
