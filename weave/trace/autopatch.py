@@ -32,20 +32,22 @@ class IntegrationSettings(BaseModel):
 class AutopatchSettings(BaseModel):
     """Settings for auto-patching integrations."""
 
-    anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # These will be uncommented as we add support for more integrations.  Note that
+
+    # anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
