@@ -48,6 +48,9 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
   const codeFeedback =
     selectedTab === 'javascript' ? codeFeedbackJS : codeFeedbackPython;
 
+  if (1 + 1 === 2) {
+    throw new Error('Not implemented');
+  }
   return (
     <Box className="text-sm">
       <Tabs.Root

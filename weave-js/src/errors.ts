@@ -37,7 +37,8 @@ type DDErrorPayload = {
 
 export const weaveErrorToDDPayload = (
   error: Error,
-  weave?: WeaveApp
+  weave?: WeaveApp,
+  uuid?: string
 ): DDErrorPayload => {
   try {
     return {
@@ -49,6 +50,7 @@ export const weaveErrorToDDPayload = (
       windowLocationURL: trimString(window.location.href),
       weaveContext: weave?.client.debugMeta(),
       isServerError: error instanceof UseNodeValueServerExecutionError,
+      ...(uuid != null && {uuid}),
     };
   } catch (e) {
     // If we fail to serialize the error, just return an empty object.
