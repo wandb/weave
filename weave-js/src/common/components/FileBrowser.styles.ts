@@ -1,4 +1,4 @@
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from './elements/WBIcon';
 import {Table} from 'semantic-ui-react';
 import styled from 'styled-components';
 

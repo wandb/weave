@@ -1,5 +1,5 @@
 import {foundations} from '@wandb/ui';
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from './elements/WBIcon';
 import styled from 'styled-components';
 
 import type {WBMenuTheme} from './WBMenu';

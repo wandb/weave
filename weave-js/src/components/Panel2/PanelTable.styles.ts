@@ -1,4 +1,4 @@
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from '../../common/components/elements/WBIcon';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 

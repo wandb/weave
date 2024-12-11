@@ -1,4 +1,4 @@
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from '../../common/components/elements/WBIcon';
 import React from 'react';
 
 import {ControlsImageOverlaysControls} from './ControlImageOverlays';

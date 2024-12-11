@@ -1,4 +1,4 @@
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from './elements/WBIcon';
 import styled, {css} from 'styled-components';
 
 const IconVariants = {

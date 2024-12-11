@@ -1,4 +1,4 @@
-import {WBIcon} from '@wandb/ui';
+import {WBIcon} from './elements/WBIcon';
 import {WBPopup} from '@wandb/ui';
 import React from 'react';
 
