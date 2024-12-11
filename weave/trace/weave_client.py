@@ -239,7 +239,9 @@ class Call:
     @property
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
-            raise ValueError("Can't get feedback for call without ID")
+            raise ValueError(
+                "Can't get feedback for call without ID, was `weave.init` called?"
+            )
 
         if self._feedback is None:
             try:
@@ -253,7 +255,9 @@ class Call:
     @property
     def ui_url(self) -> str:
         if not self.id:
-            raise ValueError("Can't get URL for call without ID")
+            raise ValueError(
+                "Can't get URL for call without ID, was `weave.init` called?"
+            )
 
         try:
             entity, project = self.project_id.split("/")
@@ -265,7 +269,9 @@ class Call:
     def ref(self) -> CallRef:
         entity, project = self.project_id.split("/")
         if not self.id:
-            raise ValueError("Can't get ref for call without ID")
+            raise ValueError(
+                "Can't get ref for call without ID, was `weave.init` called?"
+            )
 
         return CallRef(entity, project, self.id)
 
@@ -273,7 +279,9 @@ class Call:
     def children(self) -> CallsIter:
         client = weave_client_context.require_weave_client()
         if not self.id:
-            raise ValueError("Can't get children of call without ID")
+            raise ValueError(
+                "Can't get children of call without ID, was `weave.init` called?"
+            )
 
         client = weave_client_context.require_weave_client()
         return CallsIter(
