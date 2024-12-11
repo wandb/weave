@@ -59,6 +59,12 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 gap: '4px',
                 mt: 2,
               }}>
+              <ResponseFormatEditor
+                responseFormat={playgroundState.responseFormat}
+                setResponseFormat={value =>
+                  setPlaygroundStateField(idx, 'responseFormat', value)
+                }
+              />
               <FunctionEditor
                 playgroundState={playgroundState}
                 functions={playgroundState.functions}
@@ -71,22 +77,24 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 }
               />
 
-              <ResponseFormatEditor
-                responseFormat={playgroundState.responseFormat}
-                setResponseFormat={value =>
-                  setPlaygroundStateField(idx, 'responseFormat', value)
+              <StopSequenceEditor
+                stopSequences={playgroundState.stopSequences}
+                setStopSequences={value =>
+                  setPlaygroundStateField(idx, 'stopSequences', value)
                 }
               />
 
+              {/* TODO: N times to run is not supported for all models */}
+              {/* TODO: rerun if this is not supported in the backend */}
               <PlaygroundSlider
-                min={0}
-                max={2}
-                step={0.01}
+                min={1}
+                max={100}
+                step={1}
                 setValue={value =>
-                  setPlaygroundStateField(idx, 'temperature', value)
+                  setPlaygroundStateField(idx, 'nTimes', value)
                 }
-                label="Temperature"
-                value={playgroundState.temperature}
+                label="Completion iterations"
+                value={playgroundState.nTimes}
               />
 
               <PlaygroundSlider
@@ -100,11 +108,15 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 value={playgroundState.maxTokens}
               />
 
-              <StopSequenceEditor
-                stopSequences={playgroundState.stopSequences}
-                setStopSequences={value =>
-                  setPlaygroundStateField(idx, 'stopSequences', value)
+              <PlaygroundSlider
+                min={0}
+                max={2}
+                step={0.01}
+                setValue={value =>
+                  setPlaygroundStateField(idx, 'temperature', value)
                 }
+                label="Temperature"
+                value={playgroundState.temperature}
               />
 
               <PlaygroundSlider
@@ -137,6 +149,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 label="Presence penalty"
                 value={playgroundState.presencePenalty}
               />
+
               <Box
                 sx={{
                   width: '100%',
