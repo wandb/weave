@@ -22,6 +22,10 @@ model_args = dict(
     },
 )
 
+input_text = "My name is Carlos and I am 42 years old."
+
+expected_result = {"age": 42, "name": "Carlos"}
+
 
 def test_publishing_alignment(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
@@ -45,7 +49,7 @@ def test_publishing_alignment(client: WeaveClient):
 
 def test_local_create_local_use(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
-    predict_result = model.predict(input="My name is Carlos and I am 42 years old.")
+    predict_result = model.predict(input=input_text)
     assert predict_result == {"age": 42, "name": "Carlos"}
 
 
@@ -58,11 +62,11 @@ def test_local_create_remote_use(client: WeaveClient):
                 "project_id": client._project_id(),
                 "object_ref": publish_ref.uri(),
                 "method_name": "predict",
-                "args": {"input": "Hello, World!"},
+                "args": {"input": input_text},
             }
         )
     )
-    assert remote_call_res.call.output == "Hello, World!"
+    assert remote_call_res.call.output == expected_result
 
     remote_call_query = client.server.calls_query(
         tsi.CallReadReq.model_validate(
@@ -72,7 +76,7 @@ def test_local_create_remote_use(client: WeaveClient):
             }
         )
     )
-    assert remote_call_query.call.output == "Hello, World!"
+    assert remote_call_query.call.output == expected_result
 
 
 def test_remote_create_local_use(client: WeaveClient):
@@ -95,8 +99,8 @@ def test_remote_create_local_use(client: WeaveClient):
         _digest=obj_create_res.digest,
     )
     fetched = obj_ref.get()
-    predict_res = fetched.predict(input="Hello, World!")
-    assert predict_res == "Hello, World!"
+    predict_res = fetched.predict(input=input_text)
+    assert predict_res == expected_result
 
 
 def test_remote_create_remote_use(client: WeaveClient):
@@ -124,8 +128,8 @@ def test_remote_create_remote_use(client: WeaveClient):
                 "project_id": client._project_id(),
                 "object_ref": obj_ref.uri(),
                 "method_name": "predict",
-                "args": {"input": "Hello, World!"},
+                "args": {"input": input_text},
             }
         )
     )
-    assert obj_call_res.call.output == "Hello, World!"
+    assert obj_call_res.call.output == expected_result
