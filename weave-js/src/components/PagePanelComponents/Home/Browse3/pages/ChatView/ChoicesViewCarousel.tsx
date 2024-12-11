@@ -33,6 +33,7 @@ export const ChoicesViewCarousel = ({
       <ChoiceView
         choice={choices[selectedChoiceIndex]}
         isStructuredOutput={isStructuredOutput}
+        choiceIndex={selectedChoiceIndex}
       />
       <div className="flex items-center">
         <div className="flex-auto">
