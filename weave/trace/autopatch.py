@@ -30,6 +30,9 @@ def autopatch(settings: AutopatchSettings | None = None) -> None:
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
+    if settings is None:
+        settings = AutopatchSettings()
+
     get_openai_patcher(settings.openai).attempt_patch()
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
