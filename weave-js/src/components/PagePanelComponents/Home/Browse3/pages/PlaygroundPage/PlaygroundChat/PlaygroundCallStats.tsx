@@ -1,16 +1,18 @@
+import React, {useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useMemo} from 'react';
-import {useHistory} from 'react-router-dom';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {Pill} from '@wandb/weave/components/Tag';
 
 import {useWeaveflowRouteContext} from '../../../context';
 import {Reactions} from '../../../feedback/Reactions';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
-import {formatTokenCount, formatTokenCost, getUsageInputTokens, getUsageOutputTokens} from '../../CallPage/cost/costUtils';
 import {useWFHooks} from '../../wfReactInterface/context';
 import {addCostsToCallResults} from '../../CallPage/cost/costUtils';
 import {CallSchema} from '../../wfReactInterface/wfDataModelHooksInterface';
+import {TraceCostStats} from '../../CallPage/cost/TraceCostStats';
 
 export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
   const {useCalls} = useWFHooks();
@@ -51,43 +53,19 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
     }
   );
 
-  // Debug logging
-  // console.log('Cost query results:', costs.result);
-  // console.log('Original call:', call);
-  // console.log('Call schema:', callSchema);
-
   // Merge cost data with the call
   const callWithCosts = useMemo(() => {
     if (!costs.result || costs.result.length === 0) {
       return callSchema;
     }
     const [updatedCall] = addCostsToCallResults([callSchema], costs.result);
-    console.log('Updated call with costs:', updatedCall);
     return updatedCall;
   }, [callSchema, costs.result]);
 
-  let totalTokens = 0;
-  let totalCost = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
+  const latency = callWithCosts?.traceCall?.summary?.weave?.latency_ms ?? 0;
+  const usageData = callWithCosts?.traceCall?.summary?.usage;
+  const costData = callWithCosts?.traceCall?.summary?.weave?.costs;
 
-  if (callWithCosts?.traceCall?.summary?.usage) {
-    for (const key of Object.keys(callWithCosts.traceCall.summary.usage)) {
-      const usage = callWithCosts.traceCall.summary.usage[key];
-      inputTokens += getUsageInputTokens(usage);
-      outputTokens += getUsageOutputTokens(usage);
-      totalTokens = inputTokens + outputTokens;
-    }
-  }
-
-  if (callWithCosts?.traceCall?.summary?.weave?.costs) {
-    for (const modelCosts of Object.values(callWithCosts.traceCall.summary.weave.costs)) {
-      totalCost += (modelCosts.prompt_tokens_total_cost ?? 0) + 
-                  (modelCosts.completion_tokens_total_cost ?? 0);
-    }
-  }
-
-  const latency = callWithCosts?.traceCall?.summary?.weave?.latency_ms;
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
@@ -107,23 +85,28 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
 
   return (
     <Tailwind>
-      <div className="flex w-full flex-wrap items-center justify-center gap-8 py-8 text-sm text-moon-500">
-        <span>Latency: {latency}ms</span>
-        <span>•</span>
+      <div className="flex w-full items-center justify-center gap-8 py-8">
+        <TraceCostStats 
+          usageData={usageData}
+          costData={costData}
+          latency_ms={latency}
+          costLoading={costs.loading}
+        />
         {(call.output as any)?.choices?.[0]?.finish_reason && (
-          <>
-            <span>
-              Finish reason: {(call.output as any).choices[0].finish_reason}
-            </span>
-            <span>•</span>
-          </>
+          <Tooltip
+            content="Finish Reason"
+            trigger={
+              <span>
+                <Pill
+                  icon="checkmark-circle"
+                  label={(call.output as any).choices[0].finish_reason}
+                  color="moon"
+                  className="-ml-[8px] bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500"
+                />
+              </span>
+            }
+          />
         )}
-        <span>{formatTokenCount(inputTokens)} input tokens</span>
-        <span>•</span>
-        <span>{formatTokenCount(outputTokens)} output tokens</span>
-        <span>•</span>
-        <span>{formatTokenCost(totalCost)}</span>
-        <span>•</span>
         {callLink && (
           <Button
             size="small"
