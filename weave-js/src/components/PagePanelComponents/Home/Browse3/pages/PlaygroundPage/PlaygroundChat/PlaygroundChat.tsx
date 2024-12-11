@@ -115,11 +115,15 @@ export const PlaygroundChat = ({
               }}>
               <Box
                 sx={{
+                  backgroundColor: 'white',
+                  borderBottom: `1px solid ${MOON_200}`,
                   position: 'absolute',
-                  top: '8px',
-                  width: 'calc(100% - 32px)',
-                  left: '16px',
-                  right: '16px',
+                  top: '0',
+                  width: '100%',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -143,7 +147,7 @@ export const PlaygroundChat = ({
                   flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{

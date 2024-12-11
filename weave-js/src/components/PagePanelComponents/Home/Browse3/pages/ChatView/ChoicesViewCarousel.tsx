@@ -1,34 +1,37 @@
-import React, {useState} from 'react';
+import React from 'react';
 
 import {Button} from '../../../../../Button';
 import {ChoiceView} from './ChoiceView';
-import {Choice, ChoicesMode} from './types';
+import {Choice} from './types';
 
 type ChoicesViewCarouselProps = {
   choices: Choice[];
   isStructuredOutput?: boolean;
-  setMode: React.Dispatch<React.SetStateAction<ChoicesMode>>;
+  setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedChoiceIndex: number;
+  setSelectedChoiceIndex: (choiceIndex: number) => void;
 };
 
 export const ChoicesViewCarousel = ({
   choices,
   isStructuredOutput,
-  setMode,
+  setIsDrawerOpen,
+  selectedChoiceIndex,
+  setSelectedChoiceIndex,
 }: ChoicesViewCarouselProps) => {
-  const [step, setStep] = useState(0);
-
   const onNext = () => {
-    setStep((step + 1) % choices.length);
+    setSelectedChoiceIndex((selectedChoiceIndex + 1) % choices.length);
   };
   const onBack = () => {
-    const newStep = step === 0 ? choices.length - 1 : step - 1;
-    setStep(newStep);
+    const newStep =
+      selectedChoiceIndex === 0 ? choices.length - 1 : selectedChoiceIndex - 1;
+    setSelectedChoiceIndex(newStep);
   };
 
   return (
     <>
       <ChoiceView
-        choice={choices[step]}
+        choice={choices[selectedChoiceIndex]}
         isStructuredOutput={isStructuredOutput}
       />
       <div className="flex items-center">
@@ -37,7 +40,7 @@ export const ChoicesViewCarousel = ({
             size="small"
             variant="quiet"
             icon="expand-uncollapse"
-            onClick={() => setMode('linear')}
+            onClick={() => setIsDrawerOpen(true)}
             tooltip="Switch to linear view"
           />
         </div>
@@ -48,7 +51,7 @@ export const ChoicesViewCarousel = ({
             size="small"
             onClick={onBack}
           />
-          {step + 1} of {choices.length}
+          {selectedChoiceIndex + 1} of {choices.length}
           <Button
             variant="ghost"
             icon="chevron-next"
