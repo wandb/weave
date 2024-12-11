@@ -408,11 +408,11 @@ def _do_call(
     func = op.resolve_fn
     call = _placeholder_call()
 
-    pargs = (
-        op._on_input_handler(op, args, kwargs)
-        if op._on_input_handler
-        else _default_on_input_handler(op, args, kwargs)
-    )
+    pargs = None
+    if op._on_input_handler is not None:
+        pargs = op._on_input_handler(op, args, kwargs)
+    if not pargs:
+        pargs = _default_on_input_handler(op, args, kwargs)
 
     skip_tracing = (
         settings.should_disable_weave()
@@ -454,6 +454,7 @@ def _do_call(
                 raise TypeError(
                     "Internal error: Expected `_execute_call` to return a sync result"
                 )
+            execute_result = cast(tuple[Any, "Call"], execute_result)
             res, call = execute_result
     return res, call
 
@@ -468,12 +469,6 @@ async def _do_call_async(
     func = op.resolve_fn
     call = _placeholder_call()
 
-    pargs = (
-        op._on_input_handler(op, args, kwargs)
-        if op._on_input_handler
-        else _default_on_input_handler(op, args, kwargs)
-    )
-
     skip_tracing = (
         settings.should_disable_weave()
         or weave_client_context.get_weave_client() is None
@@ -482,7 +477,7 @@ async def _do_call_async(
     )
 
     if skip_tracing:
-        res = await func(*pargs.args, **pargs.kwargs)
+        res = await func(*args, **kwargs)
     else:
         current_call = call_context.get_current_call()
         if current_call is None:
@@ -490,7 +485,7 @@ async def _do_call_async(
             if random.random() > op.tracing_sample_rate:
                 # Disable tracing for this call and all descendants
                 with tracing_disabled():
-                    res = await func(*pargs.args, **pargs.kwargs)
+                    res = await func(*args, **kwargs)
                     return res, call
 
         # Proceed with tracing
@@ -505,10 +500,10 @@ async def _do_call_async(
                 logger.error,
                 ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
             )
-            res = await func(*pargs.args, **pargs.kwargs)
+            res = await func(*args, **kwargs)
         else:
             execute_result = _execute_op(
-                op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
+                op, call, *args, __should_raise=__should_raise, **kwargs
             )
             if not inspect.iscoroutine(execute_result):
                 raise TypeError(
@@ -626,7 +621,7 @@ def op(
     ```
     """
     if not isinstance(tracing_sample_rate, (int, float)):
-        raise ValueError("tracing_sample_rate must be a float")
+        raise TypeError("tracing_sample_rate must be a float")
     if not 0 <= tracing_sample_rate <= 1:
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
