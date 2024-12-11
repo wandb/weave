@@ -5,6 +5,12 @@ on:
     types:
       - core-updated
   workflow_dispatch:
+  push:
+    paths-ignore:
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
 
 jobs:
   update-frontend:
