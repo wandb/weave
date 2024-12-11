@@ -1,8 +1,8 @@
 # Clickhouse Trace Server Manager
 import logging
 import os
-from typing import Optional
 import re
+from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -36,13 +36,19 @@ class ClickHouseTraceServerMigrator:
         super().__init__()
         self.ch_client = ch_client
         self.replicated = False if replicated is None else replicated
-        self.replicated_path = DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
-        self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
+        self.replicated_path = (
+            DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
+        )
+        self.replicated_cluster = (
+            DEFAULT_REPLICATED_CLUSTER
+            if replicated_cluster is None
+            else replicated_cluster
+        )
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
         """Check if a string is safe to use as an identifier in SQL."""
-        return bool(re.match(r'^[a-zA-Z0-9_\.]+$', value))
+        return bool(re.match(r"^[a-zA-Z0-9_\.]+$", value))
 
     def _format_replicated_sql(self, sql_query: str) -> str:
         """Format SQL query to use replicated engines if replicated mode is enabled."""
@@ -50,11 +56,11 @@ class ClickHouseTraceServerMigrator:
             return sql_query
 
         # Match "ENGINE = <optional words>MergeTree" followed by word boundary
-        pattern = r'ENGINE\s*=\s*(\w+)?MergeTree\b'
+        pattern = r"ENGINE\s*=\s*(\w+)?MergeTree\b"
 
-        def replace_engine(match):
+        def replace_engine(match: re.Match[str]) -> str:
             engine_prefix = match.group(1) or ""
-            return f'ENGINE = Replicated{engine_prefix}MergeTree'
+            return f"ENGINE = Replicated{engine_prefix}MergeTree"
 
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
 
@@ -68,14 +74,20 @@ class ClickHouseTraceServerMigrator:
         if self.replicated:
             if not self._is_safe_identifier(self.replicated_cluster):
                 raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
-            
+
             replicated_path = self.replicated_path.replace("{db}", db_name)
-            if not all(self._is_safe_identifier(part) for part in replicated_path.split('/') if part):
+            if not all(
+                self._is_safe_identifier(part)
+                for part in replicated_path.split("/")
+                if part
+            ):
                 raise MigrationError(f"Invalid replicated path: {replicated_path}")
-            
-            replicated_engine = f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+
+            replicated_engine = (
+                f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+            )
             replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
-        
+
         create_db_sql = f"""
             CREATE DATABASE IF NOT EXISTS {db_name}{replicated_engine}{replicated_cluster}
         """
@@ -245,7 +257,9 @@ class ClickHouseTraceServerMigrator:
         self.ch_client.command(self._format_replicated_sql(command))
         self.ch_client.database = curr_db
 
-    def _update_migration_status(self, target_db: str, target_version: int, is_start: bool = True) -> None:
+    def _update_migration_status(
+        self, target_db: str, target_version: int, is_start: bool = True
+    ) -> None:
         """Update the migration status in db_management.migrations table."""
         if is_start:
             self.ch_client.command(
