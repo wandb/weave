@@ -1,8 +1,7 @@
 ---
-title: Log Audio With Weave
+title: Log Audio with Weave
 ---
-
-
+<!--- @wandbcode{feedback-colab} -->
 :::tip[This is a notebook]
 
 <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/audio_with_weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
@@ -10,15 +9,7 @@ title: Log Audio With Weave
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/audio_with_weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
-
-
-
-<!--- @wandbcode{feedback-colab} -->
-
-# How to use Weave with Audio Data: An OpenAI Example
-
 This demo uses the OpenAI chat completions API with GPT 4o Audio Preview to generate audio responses to text prompts and track these in Weave.
-
 
 <img src="https://i.imgur.com/OUfsZ2x.png"></img>
 
@@ -27,10 +18,10 @@ For the advanced use case, we leverage the OpenAI Realtime API to stream audio i
 [![Everything Is AWESOME](https://img.youtube.com/vi/lnnd73xDElw/0.jpg)](https://www.youtube.com/watch?v=lnnd73xDElw "Everything Is AWESOME")
 
 
-
-## Setup
+## General prerequisites
 
 Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as well as API key management dependencey `set-env`.
+
 
 
 ```python
@@ -40,7 +31,8 @@ Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as w
 !pip install set-env-colab-kaggle-dotenv -q # for env var
 ```
 
-Next, load the required API keys for OpenAI and Weave. Here, we use set_env which is compatible with google colab's secret keys manager, and is an alternative to colab's specific `google.colab.userdata`. See: [here](https://pypi.org/project/set-env-colab-kaggle-dotenv/) for usage instructions. 
+Next, load the required API keys for OpenAI and Weave. Here, we use set_env which is compatible with google colab's secret keys manager, and is an alternative to colab's specific `google.colab.userdata`. See: [here](https://pypi.org/project/set-env-colab-kaggle-dotenv/) for usage instructions.
+
 
 
 ```python
@@ -52,6 +44,7 @@ _ = set_env("WANDB_API_KEY")
 ```
 
 And finally import the required libraries.
+
 
 
 ```python
@@ -67,9 +60,13 @@ from openai import OpenAI
 import weave
 ```
 
-## Audio Streaming and Storage Example
+## Basic example: audio streaming and storage
 
-Now we will setup a call to OpenAI's completions endpoint with audio modality enabled. First create the OpenAI client and initiate a Weave project.
+
+### Prerequisites
+
+First create the OpenAI client and initiate a Weave project.
+
 
 
 ```python
@@ -77,16 +74,21 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 weave.init("openai-audio-chat")
 ```
 
-Now we will define our OpenAI completions request and add our Weave decorator (op).
+### Step 1: Call the completions endpoint with audio enabled and log to Weave
 
-Here, we define the function `prompt_endpont_and_log_trace`. This function has three primary steps:
+Next, we will make a call to OpenAI's completions endpoint with audio modality enabled and add our Weave decorator (op).
+
+Here, we define the function `prompt_endpont_and_log_trace`. This function does the following:
+
 1. We make a completion object using the `GPT 4o Audio Preview` model that supports text and audio inputs and outputs.
-    - We prompt the model to count to 13 slowly with varying accents.
-    - We set the completion to "stream".
+
+   - We prompt the model to count to 13 slowly with varying accents.
+   - We set the completion to `stream`.
 
 2. We open a new output file to which the streamed data is writen chunk by chunk.
 
 3. We return an open file handler to the audio file so Weave logs the audio data in the trace.
+
 
 
 ```python
@@ -140,10 +142,11 @@ def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
     return wave.open("output.wav", "rb")
 ```
 
-## Testing
+### Step 2: Test the basic example and view the trace
 
 Run the following cell. The system and user prompt will be stored in a Weave trace as well as the output audio.
 After running the cell, click the link next to the "🍩" emoji to view your trace.
+
 
 
 ```python
@@ -159,21 +162,24 @@ prompt_endpoint_and_log_trace(
 display(Audio("output.wav", rate=SAMPLE_RATE, autoplay=True))
 ```
 
-# Advanced Usage: Realtime Audio API with Weave
+## Advanced example: Use the Realtime Audio API with Weave
+
 <img src="https://i.imgur.com/ZiW3IVu.png"/>
 <details>
 <summary> (Advanced) Realtime Audio API with Weave </summary>
 OpenAI's realtime API is a highly functional and reliable conversational API for building realtime audio and text assistants.
 
 Please note:
+
 - Review the cells in [Microphone Configuration](#microphone-configuration)
 - Due to limitations of the Google Colab execution environment, **this must be run on your host machine** as a Jupyter Notebook. This cannot be ran in the browser.
-    - On MacOS you will need to install `portaudio` via Brew (see [here](https://formulae.brew.sh/formula/portaudio)) for Pyaudio to function.
+  - On MacOS you will need to install `portaudio` via Brew (see [here](https://formulae.brew.sh/formula/portaudio)) for Pyaudio to function.
 - OpenAI's Python SDK does not yet provide Realtime API support. We implement the complete OAI Realtime API schema in Pydantic for greater legibility, and may deprecate once official support is released.
 - The `enable_audio_playback` toggle will cause playback of assistant outputted audio. Please note that **headphones are required if this is enabled**, as echo detection requires a highly complex implementation.
 
 
-## Requirements Setup
+### Prerequisites
+
 
 
 ```python
@@ -195,7 +201,7 @@ import os
 import threading
 import time
 import wave
-from typing import Dict, List, Optional
+from typing import Optional
 
 import numpy as np
 import pyaudio
@@ -214,9 +220,10 @@ _ = set_env("OPENAI_API_KEY")
 _ = set_env("WANDB_API_KEY")
 ```
 
-## Microphone Configuration
+### Step 1: Configure the microphone 
 
 Run the following cell to find all available audio devices. Then, populate the `INPUT_DEVICE_INDEX` and the `OUTPUT_DEVICE_INDEX` based on the devices listed. Your input device will have at least 1 input channels, and your output device will have at least 1 output channels.
+
 
 
 ```python
@@ -251,7 +258,7 @@ OAI_SAMPLE_RATE = (
 OUTPUT_DEVICE_CHANNELS = 1  # Set to 1 for mono output
 ```
 
-## OpenAI Realtime API Schema Implementation
+### Step 2: Implement the OpenAI Realtime API Schema
 
 The OpenAI Python SDK does not yet provide Realtime API support. We implement the complete OAI Realtime API schema in Pydantic for greater legibility, and may deprecate once official support is released.
 
@@ -259,9 +266,10 @@ The OpenAI Python SDK does not yet provide Realtime API support. We implement th
 <summary> Pydantic Schema for OpenAI Realtime API (OpenAI's SDK lacks Realtime API support) </summary>
 
 
+
 ```python
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -315,8 +323,8 @@ class ToolParameterProperty(BaseModel):
 
 class ToolParameter(BaseModel):
     type: str
-    properties: Dict[str, ToolParameterProperty]
-    required: List[str]
+    properties: dict[str, ToolParameterProperty]
+    required: list[str]
 
 
 class Tool(BaseModel):
@@ -327,14 +335,14 @@ class Tool(BaseModel):
 
 
 class Session(BaseModel):
-    modalities: Optional[List[str]] = None
+    modalities: Optional[list[str]] = None
     instructions: Optional[str] = None
     voice: Optional[str] = None
     input_audio_format: Optional[str] = None
     output_audio_format: Optional[str] = None
     input_audio_transcription: Optional[InputAudioTranscription] = None
     turn_detection: Optional[TurnDetection] = None
-    tools: Optional[List[Tool]] = None
+    tools: Optional[list[Tool]] = None
     tool_choice: Optional[str] = None
     temperature: Optional[float] = None
     max_output_tokens: Optional[int] = None
@@ -393,7 +401,7 @@ class ConversationItem(BaseModel):
     type: Literal["message", "function_call", "function_call_output"]
     status: Optional[Literal["completed", "in_progress", "incomplete"]] = None
     role: Literal["user", "assistant", "system"]
-    content: List[
+    content: list[
         Union[ConversationItemContent, FunctionCallContent, FunctionCallOutputContent]
     ]
     call_id: Optional[str] = None
@@ -545,7 +553,7 @@ class ConversationItemInputAudioTranscriptionFailed(BaseEvent):
     ] = ServerEventTypes.CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_FAILED
     item_id: str
     content_index: int
-    error: Dict[str, Any]
+    error: dict[str, Any]
 
 
 class ConversationItemTruncated(BaseEvent):
@@ -569,8 +577,8 @@ class ResponseUsage(BaseModel):
     total_tokens: int
     input_tokens: int
     output_tokens: int
-    input_token_details: Optional[Dict[str, int]] = None
-    output_token_details: Optional[Dict[str, int]] = None
+    input_token_details: Optional[dict[str, int]] = None
+    output_token_details: Optional[dict[str, int]] = None
 
 
 class ResponseOutput(BaseModel):
@@ -579,7 +587,7 @@ class ResponseOutput(BaseModel):
     type: str
     status: str
     role: str
-    content: List[Dict[str, Any]]
+    content: list[dict[str, Any]]
 
 
 class ResponseContentPart(BaseModel):
@@ -603,7 +611,7 @@ class ResponseOutputItem(BaseModel):
     type: str
     status: str
     role: str
-    content: List[ResponseOutputItemContent]
+    content: list[ResponseOutputItemContent]
 
 
 class Response(BaseModel):
@@ -611,7 +619,7 @@ class Response(BaseModel):
     object: Literal["realtime.response"]
     status: str
     status_details: Optional[ResponseStatusDetails] = None
-    output: List[ResponseOutput]
+    output: list[ResponseOutput]
     usage: Optional[ResponseUsage]
 
 
@@ -788,7 +796,7 @@ class RateLimitsUpdated(BaseEvent):
     type: Literal[ServerEventTypes.RATE_LIMITS_UPDATED] = (
         ServerEventTypes.RATE_LIMITS_UPDATED
     )
-    rate_limits: List[RateLimit]
+    rate_limits: list[RateLimit]
 
 
 ServerEvent = Union[
@@ -866,7 +874,9 @@ def parse_server_event(event_data: dict) -> ServerEvent:
 
 </details>
 
-## Audio Stream Writer (To Disk and In Memory)
+
+### Step 3: Create a stream writer to stream to disk and in memory
+
 
 
 ```python
@@ -911,28 +921,29 @@ class StreamingWavWriter:
         return self.buffer
 ```
 
-## Realtime Audio Model
+### Step 4: Create the realtime audio model
 
 The realtime (RT) audio model uses a websocket to send events to OpenAI's Realtime audio API. This works as follows:
 
-1. __init:__ We initialize local buffers (input audio) and streams (assistant playback stream, user audio disk writer stream) and open a connection to the Realtime API.
-2. __receive_messages_thread__: A thread handles receiving messages from the API. Four primary event types are handled:
-    - RESPONSE_AUDIO_TRANSCRIPT_DONE:
+1.  **init:** We initialize local buffers (input audio) and streams (assistant playback stream, user audio disk writer stream) and open a connection to the Realtime API.
+2.  **receive_messages_thread**: A thread handles receiving messages from the API. Four primary event types are handled: - RESPONSE_AUDIO_TRANSCRIPT_DONE:
 
-        The server indicates the assistant's response is completed and provides the transcript.
+            The server indicates the assistant's response is completed and provides the transcript.
 
-    - CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
-    
-        The server indicates the user's audio has been transcribed, and sends the transcript of the user's audio. We log the transcript to Weave and print it for the user.
+        - CONVERSATION_ITEM_INPUT_AUDIO_TRANSCRIPTION_COMPLETED:
 
-    - RESPONSE_AUDIO_DELTA:
-    
-        The server sends a new chunk of assistant response audio. We append this to the ongoing response data via the response ID, and add this to the output stream for playback.
+            The server indicates the user's audio has been transcribed, and sends the transcript of the user's audio. We log the transcript to Weave and print it for the user.
 
-    - RESPONSE_DONE:
-    
-        The server indicates completion of an assistant response. We get all audio chunks associated with the response, as well as the transcript, and log these in Weave.
-3.__send_audio__: A handler appends user audio chunks to a buffer, and sends chunks of audio when the audio buffer reaches a certain size.
+        - RESPONSE_AUDIO_DELTA:
+
+            The server sends a new chunk of assistant response audio. We append this to the ongoing response data via the response ID, and add this to the output stream for playback.
+
+        - RESPONSE_DONE:
+
+            The server indicates completion of an assistant response. We get all audio chunks associated with the response, as well as the transcript, and log these in Weave.
+
+    3.**send_audio**: A handler appends user audio chunks to a buffer, and sends chunks of audio when the audio buffer reaches a certain size.
+
 
 
 ```python
@@ -948,7 +959,7 @@ class RTAudioModel(weave.Model):
         None  # Stream for writing user output to file
     )
     input_audio_buffer: Optional[np.ndarray] = None  # Buffer for user audio chunks
-    assistant_outputs: Dict[str, StreamingWavWriter] = (
+    assistant_outputs: dict[str, StreamingWavWriter] = (
         None  # Assistant outputs aggregated to send to weave
     )
     playback_stream: Optional[pyaudio.Stream] = (
@@ -1129,9 +1140,10 @@ class RTAudioModel(weave.Model):
         self.user_wav_writer.close()
 ```
 
-## Audio recorder
+### Step 5: Record audio
 
 We use a pyaudio input stream with a handler linked to the `send_audio` method of the RTAudio model. The stream is returned to the main thread so it can be safely exited upon program completion.
+
 
 
 ```python
@@ -1159,9 +1171,10 @@ def record_audio(realtime_model: RTAudioModel) -> pyaudio.Stream:
     return stream
 ```
 
-## Main Thread (Run me!)
+### Step 6: Run the model
 
-The main thread initiates a Realtime Audio Model with Weave integrated. Next, a reccording is opened and we wait for a keyboard interrupt from the user.
+The main thread initiates a Realtime Audio Model with Weave integrated. Next, a recording is opened and we wait for a keyboard interrupt from the user.
+
 
 
 ```python
@@ -1194,5 +1207,5 @@ else:
     )
 ```
 
-
 </details>
+
