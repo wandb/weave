@@ -60,7 +60,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 
 
 def test_simple_op(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -229,7 +229,7 @@ def test_call_read_not_found(client):
 
 
 def test_graph_call_ordering(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -263,27 +263,27 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     class Number(weave.Object):
         value: int
 
-    @weave.op()
+    @weave.op
     def adder(a: Number) -> Number:
         return Number(value=a.value + a.value)
 
     adder_v0 = adder
 
-    @weave.op()  # type: ignore
+    @weave.op  # type: ignore
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
 
-    @weave.op()
+    @weave.op
     def subtractor(a: Number, b) -> Number:
         return Number(value=a.value - b)
 
-    @weave.op()
+    @weave.op
     def multiplier(
         a: Number, b
     ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
-    @weave.op()
+    @weave.op
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
@@ -691,7 +691,7 @@ def test_trace_call_query_offset(client):
 
 
 def test_trace_call_sort(client):
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict, delay) -> dict:
         import time
 
@@ -727,7 +727,7 @@ def test_trace_call_sort_with_mixed_types(client):
         # SQLite does not support sorting over mixed types in a column, so we skip this test
         return
 
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict) -> dict:
         import time
 
@@ -769,7 +769,7 @@ def test_trace_call_sort_with_mixed_types(client):
 def test_trace_call_filter(client):
     is_sqlite = client_is_sqlite(client)
 
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict, delay) -> dict:
         return in_val
 
@@ -1160,7 +1160,7 @@ def test_trace_call_filter(client):
 
 
 def test_ops_with_default_params(client):
-    @weave.op()
+    @weave.op
     def op_with_default(a: int, b: int = 10) -> int:
         return a + b
 
@@ -1234,7 +1234,7 @@ def test_root_type(client):
 
 
 def test_attributes_on_ops(client):
-    @weave.op()
+    @weave.op
     def op_with_attrs(a: int, b: int) -> int:
         return a + b
 
@@ -1277,7 +1277,7 @@ def test_dataclass_support(client):
     class MyDataclass:
         val: int
 
-    @weave.op()
+    @weave.op
     def dataclass_maker(a: MyDataclass, b: MyDataclass) -> MyDataclass:
         return MyDataclass(a.val + b.val)
 
@@ -1322,7 +1322,7 @@ def test_dataclass_support(client):
 
 
 def test_op_retrieval(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -1336,7 +1336,7 @@ def test_bound_op_retrieval(client):
     class CustomType(weave.Object):
         a: int
 
-        @weave.op()
+        @weave.op
         def op_with_custom_type(self, v):
             return self.a + v
 
@@ -1359,7 +1359,7 @@ def test_bound_op_retrieval_no_self(client):
     class CustomTypeWithoutSelf(weave.Object):
         a: int
 
-        @weave.op()
+        @weave.op
         def op_with_custom_type(me, v):
             return me.a + v
 
@@ -1387,7 +1387,7 @@ def test_dataset_row_ref(client):
 
 
 def test_tuple_support(client):
-    @weave.op()
+    @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
@@ -1411,7 +1411,7 @@ def test_tuple_support(client):
 
 
 def test_namedtuple_support(client):
-    @weave.op()
+    @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
@@ -1442,7 +1442,7 @@ def test_named_reuse(client):
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri()).get()
 
-    @weave.op()
+    @weave.op
     async def dummy_score(output):
         return 1
 
@@ -1489,7 +1489,7 @@ def test_unknown_input_and_output_types(client):
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
-    @weave.op()
+    @weave.op
     def op_with_unknown_types(a: MyUnknownClassA, b: float) -> MyUnknownClassB:
         return MyUnknownClassB(a.a_val + b)
 
@@ -1564,19 +1564,19 @@ def _patched_default_initializer(trace_client: weave_client.WeaveClient):
 
 
 def test_single_primitive_output(client):
-    @weave.op()
+    @weave.op
     def single_int_output(a: int) -> int:
         return a
 
-    @weave.op()
+    @weave.op
     def single_bool_output(a: int) -> bool:
         return a == 1
 
-    @weave.op()
+    @weave.op
     def single_none_output(a: int) -> None:
         return None
 
-    @weave.op()
+    @weave.op
     def dict_output(a: int, b: bool, c: None) -> dict:
         return {"a": a, "b": b, "c": c}
 
@@ -1669,14 +1669,14 @@ def test_mapped_execution(client, mapper):
 
     events = []
 
-    @weave.op()
+    @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
         time.sleep(0.3)
         events.append("A(E):" + str(a))
         return a
 
-    @weave.op()
+    @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
         time.sleep(0.2)
@@ -1684,7 +1684,7 @@ def test_mapped_execution(client, mapper):
         events.append("B(E):" + str(b))
         return res
 
-    @weave.op()
+    @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
         time.sleep(0.1)
@@ -1692,7 +1692,7 @@ def test_mapped_execution(client, mapper):
         events.append("C(E):" + str(c))
         return res
 
-    @weave.op()
+    @weave.op
     def op_mapper(vals):
         return mapper(op_c, vals)
 
@@ -2238,7 +2238,7 @@ def test_call_query_stream_columns_with_costs(client):
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
-    @weave.op()
+    @weave.op
     def test_op(label, val):
         return val
 
@@ -2356,7 +2356,7 @@ def test_sort_and_filter_through_refs(client):
 
 
 def test_in_operation(client):
-    @weave.op()
+    @weave.op
     def test_op(label, val):
         return val
 
@@ -2501,7 +2501,7 @@ def test_calls_iter_different_value_same_page_cached(client):
 
 
 class BasicModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, x):
         return {"answer": "42"}
 
@@ -2547,7 +2547,7 @@ def test_calls_stream_column_expansion(client):
     class NestedObject(weave.Object):
         b: SimpleObject
 
-    @weave.op()
+    @weave.op
     def return_nested_object(nested_obj: NestedObject):
         return nested_obj
 
@@ -3099,7 +3099,7 @@ def test_op_sampling_inheritance(client):
     parent_calls = 0
     child_calls = 0
 
-    @weave.op()
+    @weave.op
     def child_op(x: int) -> int:
         nonlocal child_calls
         child_calls += 1
@@ -3135,7 +3135,7 @@ def test_op_sampling_inheritance_async(client):
     parent_calls = 0
     child_calls = 0
 
-    @weave.op()
+    @weave.op
     async def child_op(x: int) -> int:
         nonlocal child_calls
         child_calls += 1

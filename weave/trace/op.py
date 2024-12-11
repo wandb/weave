@@ -414,48 +414,52 @@ def _do_call(
     if not pargs:
         pargs = _default_on_input_handler(op, args, kwargs)
 
-    skip_tracing = (
-        settings.should_disable_weave()
-        or weave_client_context.get_weave_client() is None
-        or not op._tracing_enabled
-        or not get_tracing_enabled()
-    )
+    # Handle all of the possible cases where we would skip tracing.
+    if settings.should_disable_weave():
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
+    if weave_client_context.get_weave_client() is None:
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
+    if not op._tracing_enabled:
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
+    if not get_tracing_enabled():
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
 
-    if skip_tracing:
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        # Root call: decide whether to trace based on sample rate
+        if random.random() > op.tracing_sample_rate:
+            # Disable tracing for this call and all descendants
+            with tracing_disabled():
+                res = func(*pargs.args, **pargs.kwargs)
+                return res, call
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
         res = func(*pargs.args, **pargs.kwargs)
     else:
-        current_call = call_context.get_current_call()
-        if current_call is None:
-            # Root call: decide whether to trace based on sample rate
-            if random.random() > op.tracing_sample_rate:
-                # Disable tracing for this call and all descendants
-                with tracing_disabled():
-                    res = func(*pargs.args, **pargs.kwargs)
-                    return res, call
-
-        # Proceed with tracing
-        try:
-            call = _create_call(op, *args, __weave=__weave, **kwargs)
-        except OpCallError as e:
-            raise e
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(
-                logger.error,
-                CALL_CREATE_MSG.format(traceback.format_exc()),
+        execute_result = _execute_op(
+            op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
+        )
+        if inspect.iscoroutine(execute_result):
+            raise TypeError(
+                "Internal error: Expected `_execute_call` to return a sync result"
             )
-            res = func(*pargs.args, **pargs.kwargs)
-        else:
-            execute_result = _execute_op(
-                op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
-            )
-            if inspect.iscoroutine(execute_result):
-                raise TypeError(
-                    "Internal error: Expected `_execute_call` to return a sync result"
-                )
-            execute_result = cast(tuple[Any, "Call"], execute_result)
-            res, call = execute_result
+        execute_result = cast(tuple[Any, "Call"], execute_result)
+        res, call = execute_result
     return res, call
 
 
@@ -469,47 +473,51 @@ async def _do_call_async(
     func = op.resolve_fn
     call = _placeholder_call()
 
-    skip_tracing = (
-        settings.should_disable_weave()
-        or weave_client_context.get_weave_client() is None
-        or not op._tracing_enabled
-        or not get_tracing_enabled()
-    )
+    # Handle all of the possible cases where we would skip tracing.
+    if settings.should_disable_weave():
+        res = await func(*args, **kwargs)
+        return res, call
+    if weave_client_context.get_weave_client() is None:
+        res = await func(*args, **kwargs)
+        return res, call
+    if not op._tracing_enabled:
+        res = await func(*args, **kwargs)
+        return res, call
+    if not get_tracing_enabled():
+        res = await func(*args, **kwargs)
+        return res, call
 
-    if skip_tracing:
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        # Root call: decide whether to trace based on sample rate
+        if random.random() > op.tracing_sample_rate:
+            # Disable tracing for this call and all descendants
+            with tracing_disabled():
+                res = await func(*args, **kwargs)
+                return res, call
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
         res = await func(*args, **kwargs)
     else:
-        current_call = call_context.get_current_call()
-        if current_call is None:
-            # Root call: decide whether to trace based on sample rate
-            if random.random() > op.tracing_sample_rate:
-                # Disable tracing for this call and all descendants
-                with tracing_disabled():
-                    res = await func(*args, **kwargs)
-                    return res, call
-
-        # Proceed with tracing
-        try:
-            call = _create_call(op, *args, __weave=__weave, **kwargs)
-        except OpCallError as e:
-            raise e
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(
-                logger.error,
-                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        execute_result = _execute_op(
+            op, call, *args, __should_raise=__should_raise, **kwargs
+        )
+        if not inspect.iscoroutine(execute_result):
+            raise TypeError(
+                "Internal error: Expected `_execute_call` to return a coroutine"
             )
-            res = await func(*args, **kwargs)
-        else:
-            execute_result = _execute_op(
-                op, call, *args, __should_raise=__should_raise, **kwargs
-            )
-            if not inspect.iscoroutine(execute_result):
-                raise TypeError(
-                    "Internal error: Expected `_execute_call` to return a coroutine"
-                )
-            res, call = await execute_result
+        res, call = await execute_result
     return res, call
 
 
