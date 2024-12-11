@@ -10,11 +10,13 @@ export interface WBIconProps extends Omit<LegacyWBIconProps, 'size' | 'ref'> {
   size?: WBIconSize;
 }
 
-const WBIconComponent = forwardRef<HTMLElement, WBIconProps>(({size, ...props}, ref) => {
-  // Map 'medium' size to 'small' for backward compatibility
-  const mappedSize = size === 'medium' ? 'small' : size;
-  return <LegacyWBIcon ref={ref} {...props} size={mappedSize} />;
-});
+const WBIconComponent = forwardRef<HTMLElement, WBIconProps>(
+  ({size, ...props}, ref) => {
+    // Map 'medium' size to 'small' for backward compatibility
+    const mappedSize = size === 'medium' ? 'small' : size;
+    return <LegacyWBIcon ref={ref} {...props} size={mappedSize} />;
+  }
+);
 
 WBIconComponent.displayName = 'WBIcon';
 

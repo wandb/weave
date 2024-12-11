@@ -1,5 +1,3 @@
-import React, {CSSProperties, useCallback, useContext, useMemo, useState} from 'react';
-import {Button, Popup, DropdownProps} from 'semantic-ui-react';
 import {WBMenuOption, WBPopupMenuTrigger} from '@wandb/ui';
 import {
   canGroupType,
@@ -12,24 +10,26 @@ import {
   Node,
   NodeOrVoidNode,
   opCount,
-  voidNode,
-  VarNode,
-  OutputNode,
   Type,
+  VarNode,
+  voidNode,
 } from '@wandb/weave/core';
-import ModifiedDropdown from '../../../common/components/elements/ModifiedDropdown';
+import React, {CSSProperties, useCallback, useMemo, useState} from 'react';
+import {Button, DropdownProps, Popup} from 'semantic-ui-react';
+
 import EditableField from '../../../common/components/EditableField';
+import ModifiedDropdown from '../../../common/components/elements/ModifiedDropdown';
+import * as SemanticHacks from '../../../common/util/semanticHacks';
+import {useWeaveContext} from '../../../context';
+import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {Tooltip} from '../../Tooltip';
+import {usePanelStacksForType} from '../availablePanels';
+import {ExpressionView} from '../ExpressionView';
+import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
-import * as SemanticHacks from '../../../common/util/semanticHacks';
-import {ExpressionView} from '../ExpressionView';
-import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
-import {PanelComp2} from '../PanelComp';
-import {Tooltip} from '../../Tooltip';
 import * as S from './ColumnHeader.styles';
 import * as Table from './tableState';
-import {WeaveContext, useWeaveContext} from '../../../context';
-import {usePanelStacksForType} from '../availablePanels';
 import {stripTag} from './util';
 
 // Constants
@@ -44,8 +44,6 @@ interface Column {
   id: string;
   select: EditingNode;
 }
-
-type MenuItem = WBMenuOption;
 
 interface PanelConfig {
   [key: string]: any;
@@ -124,7 +122,10 @@ const makeSortingMenuItems = (
   return menuItems;
 };
 
-const getColumnSelect = (state: Table.TableState, colId: string): EditingNode | null => {
+const getColumnSelect = (
+  state: Table.TableState,
+  colId: string
+): EditingNode | null => {
   const column = state.columns.find((col: Column) => col.id === colId);
   return column?.select ?? null;
 };
@@ -179,7 +180,7 @@ export const ColumnHeader: React.FC<{
   const {stack} = usePanelContext();
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
-  const [textAlign, setTextAlign] = useState<'left' | 'right' | 'center'>('center');
+  const textAlign = useState<'left' | 'right' | 'center'>('center')[0];
   const [workingSelectFunction, setWorkingSelectFunction] =
     useState<EditingNode>(propsSelectFunction);
   const [workingColumnName, setWorkingColumnName] =
@@ -187,13 +188,6 @@ export const ColumnHeader: React.FC<{
   const [workingPanelId, setWorkingPanelId] = useState<string>(propsPanelId);
   const [workingPanelConfig, setWorkingPanelConfig] =
     useState<any>(propsPanelConfig);
-  const [focusEditorRef, setFocusEditorRef] = useState<(() => void) | null>(null);
-
-  const focusEditor = useCallback(() => {
-    if (focusEditorRef) {
-      focusEditorRef();
-    }
-  }, [focusEditorRef]);
 
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
@@ -428,7 +422,11 @@ export const ColumnHeader: React.FC<{
       });
     }
     if (canSortType(workingSelectFunction.type)) {
-      const sortMenuItems = makeSortingMenuItems(tableState, colId, updateTableState);
+      const sortMenuItems = makeSortingMenuItems(
+        tableState,
+        colId,
+        updateTableState
+      );
       menuItems = [...menuItems, ...sortMenuItems];
     }
     if (!isGroupCol) {
@@ -447,7 +445,9 @@ export const ColumnHeader: React.FC<{
               cancelable: true,
             }) as unknown as React.MouseEvent<HTMLElement>;
 
-            const handleInsertRight = async (e: React.MouseEvent<HTMLElement>) => {
+            const handleInsertRight = async (
+              e: React.MouseEvent<HTMLElement>
+            ) => {
               e.stopPropagation();
               const newTableState = Table.insertColumnRight(
                 tableState,
@@ -471,7 +471,9 @@ export const ColumnHeader: React.FC<{
               cancelable: true,
             }) as unknown as React.MouseEvent<HTMLElement>;
 
-            const handleInsertLeft = async (e: React.MouseEvent<HTMLElement>) => {
+            const handleInsertLeft = async (
+              e: React.MouseEvent<HTMLElement>
+            ) => {
               e.stopPropagation();
               const newTableState = Table.insertColumnLeft(
                 tableState,
@@ -534,9 +536,14 @@ export const ColumnHeader: React.FC<{
               cancelable: true,
             }) as unknown as React.MouseEvent<HTMLElement>;
 
-            const handleRemoveAllRight = async (e: React.MouseEvent<HTMLElement>) => {
+            const handleRemoveAllRight = async (
+              e: React.MouseEvent<HTMLElement>
+            ) => {
               e.stopPropagation();
-              const newTableState = Table.removeColumnsToRight(tableState, colId);
+              const newTableState = Table.removeColumnsToRight(
+                tableState,
+                colId
+              );
               recordEvent('REMOVE_COLUMNS_TO_RIGHT');
               await updateTableState(newTableState);
             };
@@ -553,9 +560,14 @@ export const ColumnHeader: React.FC<{
               cancelable: true,
             }) as unknown as React.MouseEvent<HTMLElement>;
 
-            const handleRemoveAllLeft = async (e: React.MouseEvent<HTMLElement>) => {
+            const handleRemoveAllLeft = async (
+              e: React.MouseEvent<HTMLElement>
+            ) => {
               e.stopPropagation();
-              const newTableState = Table.removeColumnsToLeft(tableState, colId);
+              const newTableState = Table.removeColumnsToLeft(
+                tableState,
+                colId
+              );
               recordEvent('REMOVE_COLUMNS_TO_LEFT');
               await updateTableState(newTableState);
             };
@@ -627,10 +639,7 @@ export const ColumnHeader: React.FC<{
         workingColumnName !== '' ? (
           <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
         ) : (
-          <ExpressionView
-            frame={cellFrame}
-            node={workingSelectFunction}
-          />
+          <ExpressionView frame={cellFrame} node={workingSelectFunction} />
         )
       ) : (
         <Popup
@@ -650,8 +659,7 @@ export const ColumnHeader: React.FC<{
               .join(',');
 
             const inPopup =
-              (e.target as HTMLElement).closest(nestedPopupSelector) !=
-              null;
+              (e.target as HTMLElement).closest(nestedPopupSelector) != null;
 
             if (!inPopup) {
               SemanticHacks.withIgnoreBlockedClicks(() => {
@@ -667,10 +675,7 @@ export const ColumnHeader: React.FC<{
               {propsColumnName !== '' ? (
                 <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
               ) : (
-                <ExpressionView
-                  frame={cellFrame}
-                  node={propsSelectFunction}
-                />
+                <ExpressionView frame={cellFrame} node={propsSelectFunction} />
               )}
             </S.ColumnName>
           }

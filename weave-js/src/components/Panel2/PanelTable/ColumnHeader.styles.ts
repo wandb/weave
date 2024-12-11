@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+
 import {WBIcon} from '../../../common/components/elements/WBIcon';
 
 export const ColumnHeader = styled.div`
@@ -86,7 +87,6 @@ export const ColumnEditorFieldLabel = styled.div`
 export const PanelNameEditor = styled.div`
   width: 100%;
 `;
-
 
 export const PanelSettings = styled.div`
   margin-top: 16px;
