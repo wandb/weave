@@ -4,10 +4,12 @@ from typing import Any, Callable, Tuple
 
 import weave
 from weave.trace import autopatch
+from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_uri
 
 
 class RunAsUser:
@@ -144,6 +146,80 @@ class RunAsUser:
         except Exception as e:
             result_queue.put(("error", str(e)))  # Put any errors in the queue
 
+    def run_call_method(
+        self,
+        obj_ref: str,
+        project_id: str,
+        user_id: str,
+        method_name: str,
+        args: dict[str, Any],
+    ) -> str:
+        result_queue = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._call_method,
+            args=(obj_ref, project_id, user_id, method_name, args, result_queue),
+        )
+
+        process.start()
+        status, result = result_queue.get()
+        process.join()
+
+        if status == "error":
+            raise Exception(f"Process execution failed: {result}")
+
+        return result
+
+    def _call_method(
+        self,
+        obj_ref: str,
+        project_id: str,
+        user_id: str,
+        method_name: str,
+        args: dict[str, Any],
+        result_queue: multiprocessing.Queue,
+    ) -> None:
+        try:
+            from weave.trace_server.clickhouse_trace_server_batched import (
+                ClickHouseTraceServer,
+            )
+
+            client = WeaveClient(
+                "_SERVER_",
+                project_id,
+                UserInjectingExternalTraceServer(
+                    ClickHouseTraceServer(**self.ch_server_dump),
+                    id_converter=IdConverter(),
+                    user_id=user_id,
+                ),
+                False,
+            )
+
+            ic = InitializedClient(client)
+            autopatch.autopatch()
+
+            # TODO: validate project alignment?
+            int_ref = parse_internal_uri(obj_ref)
+            assert isinstance(int_ref, InternalObjectRef)
+            ref = ObjectRef(
+                entity="_SERVER_",
+                project=int_ref.project_id,
+                name=int_ref.name,
+                _digest=int_ref.version,
+            )
+            obj = client.get(ref)
+            method = getattr(obj, method_name)
+            # TODO: Self might be wrong
+            res, call = method.call(self=obj, **args)
+            autopatch.reset_autopatch()
+            client._flush()
+            ic.reset()
+            result_queue.put(
+                ("success", {"output": res, "call_id": call.id})
+            )  # Put the result in the queue
+        except Exception as e:
+            result_queue.put(("error", str(e)))  # Put any errors in the queue
+
 
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
@@ -151,7 +227,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         return project_id[len("_SERVER_/") :]
 
     def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
-        raise Exception("Not implemented")
+        return "_SERVER_/" + project_id
 
     def ext_to_int_run_id(self, run_id: str) -> str:
         return run_id
@@ -203,3 +279,7 @@ class UserInjectingExternalTraceServer(
     ) -> tsi.ActionsExecuteBatchRes:
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
+
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        req.wb_user_id = self._user_id
+        return super().call_method(req)

@@ -1525,6 +1525,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             response=res.response, weave_call_id=start_call.id
         )
 
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        from weave.trace_server.server_side_object_saver import RunAsUser
+
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        # TODO: handle errors here
+        res = runner.run_call_method(
+            req.object_ref, req.project_id, req.wb_user_id, req.method_name, req.args
+        )
+        return tsi.CallMethodRes.model_validate(res)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

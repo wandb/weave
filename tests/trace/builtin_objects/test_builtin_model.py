@@ -66,17 +66,17 @@ def test_local_create_remote_use(client: WeaveClient):
             }
         )
     )
-    assert remote_call_res.call.output == expected_result
+    assert remote_call_res.output == expected_result
 
-    remote_call_query = client.server.calls_query(
+    remote_call_read = client.server.call_read(
         tsi.CallReadReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "id": remote_call_res.call.id,
+                "id": remote_call_res.call_id,
             }
         )
     )
-    assert remote_call_query.call.output == expected_result
+    assert remote_call_read.call.output == expected_result
 
 
 def test_remote_create_local_use(client: WeaveClient):
@@ -99,6 +99,7 @@ def test_remote_create_local_use(client: WeaveClient):
         _digest=obj_create_res.digest,
     )
     fetched = obj_ref.get()
+    assert isinstance(fetched, LiteLLMCompletionModel)
     predict_res = fetched.predict(input=input_text)
     assert predict_res == expected_result
 
@@ -132,4 +133,14 @@ def test_remote_create_remote_use(client: WeaveClient):
             }
         )
     )
-    assert obj_call_res.call.output == expected_result
+    assert obj_call_res.output == expected_result
+
+    remote_call_read = client.server.call_read(
+        tsi.CallReadReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "id": obj_call_res.call_id,
+            }
+        )
+    )
+    assert remote_call_read.call.output == expected_result
