@@ -3182,7 +3182,7 @@ def test_op_sampling_invalid_rates(client):
         def too_high_rate():
             pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
 
         @weave.op(tracing_sample_rate="invalid")  # type: ignore
         def invalid_type():
