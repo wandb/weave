@@ -1,16 +1,22 @@
-* Finish Porting over weave client
+* [x] Finish Porting over weave client
 * [ ] Add end-to-end test with new lifecycle: 
-  * Create Dummy Model via API -> See in object explorer
-    * Requires finishing the leaf object registry
-    * Requires sub process construction & saving?
-  * Invoke Dummy Model via API -> See in trace explorer
-    * Requires execution in sub process
+  * [x] Create Dummy Model via API -> See in object explorer
+    * [x] Requires finishing the leaf object registry
+    * [x] Requires sub process construction & saving?
+  * [x] Invoke Dummy Model via API -> See in trace explorer
+    * [x] Requires execution in sub process
+  * New TODOs:
+    * API Keys are not correctly setup in the sub runner
+    * A bunch of naming issues all around (leaf, saver, etc...)
+    * Not very good error handling
+    * Server seems to get stuck when it crashes
+    * Accidentally checked in parallelization disabling
   * Create a Dummy Scorer via API -> See in object explorer
     * Should be pretty straight forward at this point
   * Invoke the Scorer against the previous call via API -> see in traces AND in feedback
     * Should be mostly straight forward (the Scorer API itself is a bit wonky)
   * Important Proof of system: 
-    * create the same dummy model locally & invoke -> notice no version change
+    * [x] create the same dummy model locally & invoke -> notice no version change
     * Run locally against the call -> notice that there are no extra objects
 * [ ] Refactor the entire "base model" system to conform to this new way of doing things (leaf models)
 * [ ] Figure out how to refactor scorers that use LLMs
