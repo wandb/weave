@@ -2,11 +2,14 @@ import importlib
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
+
+_litellm_patcher: Optional[MultiPatcher] = None
 
 
 # This accumulator is nearly identical to the mistral accumulator, just with different types.
@@ -82,10 +85,10 @@ def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def make_wrapper(name: str) -> Callable:
+def make_wrapper(settings: OpSettings) -> Callable:
     def litellm_wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: litellm_accumulator,
@@ -96,17 +99,37 @@ def make_wrapper(name: str) -> Callable:
     return litellm_wrapper
 
 
-litellm_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("litellm"),
-            "completion",
-            make_wrapper("litellm.completion"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("litellm"),
-            "acompletion",
-            make_wrapper("litellm.acompletion"),
-        ),
-    ]
-)
+def get_litellm_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
+    global _litellm_patcher
+
+    if _litellm_patcher is not None:
+        return _litellm_patcher
+
+    if settings is None:
+        settings = IntegrationSettings()
+
+    base = settings.op_settings
+
+    completion_settings = base.model_copy(
+        update={"name": base.name or "litellm.completion"}
+    )
+    acompletion_settings = base.model_copy(
+        update={"name": base.name or "litellm.acompletion"}
+    )
+
+    _litellm_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "completion",
+                make_wrapper(completion_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "acompletion",
+                make_wrapper(acompletion_settings),
+            ),
+        ]
+    )
+
+    return _litellm_patcher

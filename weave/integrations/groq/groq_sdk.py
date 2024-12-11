@@ -1,7 +1,7 @@
 import importlib
 from typing import TYPE_CHECKING, Callable, Optional
 
-from weave.trace.autopatch import OpSettings
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
@@ -100,14 +100,14 @@ def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def get_groq_patcher(settings: Optional[OpSettings] = None) -> MultiPatcher:
+def get_groq_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
     global _groq_patcher
 
     if _groq_patcher is not None:
         return _groq_patcher
 
     if settings is None:
-        settings = OpSettings()
+        settings = IntegrationSettings()
 
     base = settings.op_settings
 

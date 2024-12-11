@@ -3,7 +3,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.autopatch import OpSettings
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
@@ -135,14 +135,16 @@ def gemini_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
-def get_google_genai_patcher(settings: Optional[OpSettings] = None) -> MultiPatcher:
+def get_google_genai_patcher(
+    settings: Optional[IntegrationSettings] = None,
+) -> MultiPatcher:
     global _google_genai_patcher
 
     if _google_genai_patcher is not None:
         return _google_genai_patcher
 
     if settings is None:
-        settings = OpSettings()
+        settings = IntegrationSettings()
 
     base = settings.op_settings
 

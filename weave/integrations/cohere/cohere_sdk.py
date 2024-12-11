@@ -3,7 +3,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.autopatch import OpSettings
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
@@ -185,14 +185,14 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def get_cohere_patcher(settings: Optional[OpSettings] = None) -> MultiPatcher:
+def get_cohere_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
     global _cohere_patcher
 
     if _cohere_patcher is not None:
         return _cohere_patcher
 
     if settings is None:
-        settings = OpSettings()
+        settings = IntegrationSettings()
 
     base = settings.op_settings
 
