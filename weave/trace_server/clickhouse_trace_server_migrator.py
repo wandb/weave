@@ -40,14 +40,13 @@ class ClickHouseTraceServerMigrator:
         self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
         self._initialize_migration_db()
 
-    def _format_replicated_sql(self, sql_query: str) -> str:
-        """Format SQL query to use replicated engines if replicated mode is enabled.
+    def _is_safe_identifier(self, value: str) -> bool:
+        """Check if a string is safe to use as an identifier in SQL.
+        Only allows alphanumeric chars, underscores, and dots."""
+        return bool(re.match(r'^[a-zA-Z0-9_\.]+$', value))
 
-        Converts MergeTree engine variants to their Replicated counterparts:
-        - MergeTree -> ReplicatedMergeTree
-        - SummingMergeTree -> ReplicatedSummingMergeTree
-        - etc.
-        """
+    def _format_replicated_sql(self, sql_query: str) -> str:
+        """Format SQL query to use replicated engines if replicated mode is enabled."""
         if not self.replicated:
             return sql_query
 
@@ -61,14 +60,24 @@ class ClickHouseTraceServerMigrator:
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
 
     def _create_db_sql(self, db_name: str) -> str:
+        if not self._is_safe_identifier(db_name):
+            raise MigrationError(f"Invalid database name: {db_name}")
+
         replicated_engine = ""
         replicated_cluster = ""
         if self.replicated:
-            replicated_path = self.replicated_path.replace("{db}", migration_db)
+            if not self._is_safe_identifier(self.replicated_cluster):
+                raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
+            
+            replicated_path = self.replicated_path.replace("{db}", db_name)
+            if not all(self._is_safe_identifier(part) for part in replicated_path.split('/') if part):
+                raise MigrationError(f"Invalid replicated path: {replicated_path}")
+            
             replicated_engine = f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
             replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
-        create_db_sql = """
-            CREATE DATABASE IF NOT EXISTS {db_name}{replicated_engine}{replicated_cluster}"
+        
+        create_db_sql = f"""
+            CREATE DATABASE IF NOT EXISTS {db_name}{replicated_engine}{replicated_cluster}
         """
         return create_db_sql
 

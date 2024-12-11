@@ -111,3 +111,33 @@ def test_update_migration_status(mock_costs, migrator):
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
     )
+
+
+def test_is_safe_identifier(mock_costs, migrator):
+    # Valid identifiers
+    assert migrator._is_safe_identifier("test_db")
+    assert migrator._is_safe_identifier("my_db123")
+    assert migrator._is_safe_identifier("db.table")
+    
+    # Invalid identifiers
+    assert not migrator._is_safe_identifier("test-db")
+    assert not migrator._is_safe_identifier("db;")
+    assert not migrator._is_safe_identifier("db'name")
+    assert not migrator._is_safe_identifier("db/*")
+
+
+def test_create_db_sql_validation(mock_costs, migrator):
+    # Test invalid database name
+    with pytest.raises(MigrationError, match="Invalid database name"):
+        migrator._create_db_sql("test;db")
+    
+    # Test replicated mode with invalid values
+    migrator.replicated = True
+    migrator.replicated_cluster = "test;cluster"
+    with pytest.raises(MigrationError, match="Invalid cluster name"):
+        migrator._create_db_sql("test_db")
+        
+    migrator.replicated_cluster = "test_cluster"
+    migrator.replicated_path = "/clickhouse/bad;path/{db}"
+    with pytest.raises(MigrationError, match="Invalid replicated path"):
+        migrator._create_db_sql("test_db")
