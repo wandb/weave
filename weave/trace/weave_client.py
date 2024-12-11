@@ -41,7 +41,6 @@ from weave.trace.refs import (
 from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -541,7 +540,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.future_executor = FutureExecutor(max_workers=client_parallelism())
+        self.future_executor = FutureExecutor(max_workers=0)  # client_parallelism())
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -1471,6 +1470,8 @@ class WeaveClient:
         return isinstance(ref, Ref)
 
     def _project_id(self) -> str:
+        # if self.entity == "":
+        #     return self.project
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()

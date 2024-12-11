@@ -93,7 +93,7 @@ def process_incoming_object_val(
         if object_class_type := BASE_OBJECT_REGISTRY.get(req_leaf_object_class):
             dict_val = dump_base_object(object_class_type.model_validate(dict_val))
         else:
-            raise ValueError(f"Unknown base object class: {req_leaf_object_class}")
+            raise ValueError(f"Unknown leaf object class: {req_leaf_object_class}")
 
     return dict_val, get_base_object_class(dict_val)
 

@@ -1,0 +1,205 @@
+import multiprocessing
+import typing
+from typing import Any, Callable, Tuple
+
+import weave
+from weave.trace import autopatch
+from weave.trace.weave_client import WeaveClient
+from weave.trace.weave_init import InitializedClient
+from weave.trace_server import external_to_internal_trace_server_adapter
+from weave.trace_server import trace_server_interface as tsi
+
+
+class RunAsUser:
+    """Executes a function in a separate process for memory isolation.
+
+    This class provides a way to run functions in an isolated memory space using
+    multiprocessing. The function and its arguments are executed in a new Process,
+    ensuring complete memory isolation from the parent process.
+    """
+
+    def __init__(self, ch_server_dump: dict[str, Any]):
+        self.ch_server_dump = ch_server_dump
+
+    @staticmethod
+    def _process_runner(
+        func: Callable[..., Any],
+        args: Tuple[Any, ...],
+        kwargs: dict[str, Any],
+        result_queue: multiprocessing.Queue,
+    ) -> None:
+        """Execute the function and put its result in the queue.
+
+        Args:
+            func: The function to execute
+            args: Positional arguments for the function
+            kwargs: Keyword arguments for the function
+            result_queue: Queue to store the function's result
+        """
+        try:
+            result = func(*args, **kwargs)
+            result_queue.put(("success", result))
+        except Exception as e:
+            result_queue.put(("error", str(e)))
+
+    def run(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Run the provided function in a separate process.
+
+        Args:
+            func: The function to execute
+            *args: Positional arguments to pass to the function
+            **kwargs: Keyword arguments to pass to the function
+
+        Returns:
+            The result of the function execution
+
+        Raises:
+            Exception: If the function execution fails in the child process
+        """
+        result_queue = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._process_runner, args=(func, args, kwargs, result_queue)
+        )
+
+        process.start()
+        status, result = result_queue.get()
+        process.join()
+
+        if status == "error":
+            raise Exception(f"Process execution failed: {result}")
+
+        return result
+
+    def run_save_object(self, new_obj: Any, project_id: str, user_id: str) -> str:
+        """Run the save_object operation in a separate process.
+
+        Args:
+            new_obj: The object to save
+            project_id: The project identifier
+            user_id: The user identifier
+
+        Returns:
+            str: The digest of the saved object
+
+        Raises:
+            Exception: If the save operation fails in the child process
+        """
+        result_queue = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._save_object,
+            args=(new_obj, project_id, user_id, result_queue),  # Pass result_queue here
+        )
+
+        process.start()
+        status, result = result_queue.get()
+        process.join()
+
+        if status == "error":
+            raise Exception(f"Process execution failed: {result}")
+
+        return result
+
+    def _save_object(
+        self,
+        new_obj: Any,
+        project_id: str,
+        user_id: str,
+        result_queue: multiprocessing.Queue,
+    ) -> None:
+        """Save an object in a separate process.
+
+        Args:
+            new_obj: The object to save
+            project_id: The project identifier
+            user_id: The user identifier
+            result_queue: Queue to store the operation's result
+        """
+        try:
+            from weave.trace_server.clickhouse_trace_server_batched import (
+                ClickHouseTraceServer,
+            )
+
+            client = WeaveClient(
+                "_SERVER_",
+                project_id,
+                UserInjectingExternalTraceServer(
+                    ClickHouseTraceServer(**self.ch_server_dump),
+                    id_converter=IdConverter(),
+                    user_id=user_id,
+                ),
+                False,
+            )
+
+            ic = InitializedClient(client)
+            autopatch.autopatch()
+
+            # TODO: get the name
+            res = weave.publish(new_obj).digest
+            autopatch.reset_autopatch()
+            client._flush()
+            ic.reset()
+            result_queue.put(("success", res))  # Put the result in the queue
+        except Exception as e:
+            result_queue.put(("error", str(e)))  # Put any errors in the queue
+
+
+class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
+    def ext_to_int_project_id(self, project_id: str) -> str:
+        assert project_id.startswith("_SERVER_/")
+        return project_id[len("_SERVER_/") :]
+
+    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+        raise Exception("Not implemented")
+
+    def ext_to_int_run_id(self, run_id: str) -> str:
+        return run_id
+
+    def int_to_ext_run_id(self, run_id: str) -> str:
+        return run_id
+
+    def ext_to_int_user_id(self, user_id: str) -> str:
+        return user_id
+
+    def int_to_ext_user_id(self, user_id: str) -> str:
+        return user_id
+
+
+class UserInjectingExternalTraceServer(
+    external_to_internal_trace_server_adapter.ExternalTraceServer
+):
+    def __init__(
+        self,
+        internal_trace_server: tsi.TraceServerInterface,
+        id_converter: external_to_internal_trace_server_adapter.IdConverter,
+        user_id: str,
+    ):
+        super().__init__(internal_trace_server, id_converter)
+        self._user_id = user_id
+
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        req.start.wb_user_id = self._user_id
+        return super().call_start(req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().calls_delete(req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        req.wb_user_id = self._user_id
+        return super().call_update(req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        req.wb_user_id = self._user_id
+        return super().feedback_create(req)
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        req.wb_user_id = self._user_id
+        return super().cost_create(req)
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        req.wb_user_id = self._user_id
+        return super().actions_execute_batch(req)

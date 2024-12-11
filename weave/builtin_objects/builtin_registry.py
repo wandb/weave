@@ -1,0 +1,21 @@
+import weave
+from weave.builtin_objects.models.CompletionModel import LiteLLMCompletionModel
+
+_BUILTIN_REGISTRY: dict[str, type[weave.Object]] = {}
+
+
+def register_builtin(cls: type[weave.Object]):
+    if not issubclass(cls, weave.Object):
+        raise ValueError(f"Object {cls} is not a subclass of weave.Object")
+
+    if cls.__name__ in _BUILTIN_REGISTRY:
+        raise ValueError(f"Object {cls} already registered")
+
+    _BUILTIN_REGISTRY[cls.__name__] = cls
+
+
+def get_builtin(name: str) -> type[weave.Object]:
+    return _BUILTIN_REGISTRY[name]
+
+
+register_builtin(LiteLLMCompletionModel)

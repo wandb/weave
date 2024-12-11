@@ -196,6 +196,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
 
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "host": self._host,
+            "port": self._port,
+            "user": self._user,
+            "password": self._password,
+            "database": self._database,
+            "use_async_insert": self._use_async_insert,
+        }
+
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
@@ -563,6 +573,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        from weave.builtin_objects.builtin_registry import get_builtin
+
+        if req.obj.set_leaf_object_class is not None:
+            from weave.trace_server.server_side_object_saver import RunAsUser
+
+            object_class_type = get_builtin(req.obj.set_leaf_object_class)
+
+            new_obj = object_class_type.model_validate(req.obj.val)
+            runner = RunAsUser(ch_server_dump=self.model_dump())
+            digest = runner.run_save_object(new_obj, req.obj.project_id, None)
+            return tsi.ObjCreateRes(digest=digest)
+
         val, base_object_class = process_incoming_object_val(
             req.obj.val, req.obj.set_leaf_object_class
         )
