@@ -29,6 +29,8 @@ import {Tooltip} from '../../Tooltip';
 import * as S from './ColumnHeader.styles';
 import * as Table from './tableState';
 import {WeaveContext, useWeaveContext} from '../../../context';
+import {usePanelStacksForType} from '../availablePanels';
+import {stripTag} from './util';
 
 // Constants
 const INPUT_SLIDER_CLASS = 'input-slider';
@@ -77,15 +79,14 @@ const makeSortingMenuItems = (
       value: 'sort-asc',
       name: 'Sort Asc',
       icon: 'up-arrow',
-      onSelect: async (e: React.MouseEvent<HTMLElement>) => {
-        e.stopPropagation();
+      onSelect: () => {
         recordEvent('UPDATE_COLUMN_SORT_ASC');
         const newTableState = Table.enableSortByCol(
           Table.disableSort(tableState),
           colId,
           true
         );
-        await updateTableState(newTableState);
+        updateTableState(newTableState);
       },
     });
   }
@@ -95,11 +96,10 @@ const makeSortingMenuItems = (
       value: 'sort-remove',
       name: 'Remove Sort',
       icon: 'delete',
-      onSelect: async (e: React.MouseEvent<HTMLElement>) => {
-        e.stopPropagation();
+      onSelect: () => {
         recordEvent('REMOVE_COLUMN_SORT');
         const newTableState = Table.disableSortByCol(tableState, colId);
-        await updateTableState(newTableState);
+        updateTableState(newTableState);
       },
     });
   }
@@ -109,15 +109,14 @@ const makeSortingMenuItems = (
       value: 'sort-desc',
       name: 'Sort Desc',
       icon: 'down-arrow',
-      onSelect: async (e: React.MouseEvent<HTMLElement>) => {
-        e.stopPropagation();
+      onSelect: () => {
         recordEvent('UPDATE_COLUMN_SORT_DESC');
         const newTableState = Table.enableSortByCol(
           Table.disableSort(tableState),
           colId,
           false
         );
-        await updateTableState(newTableState);
+        updateTableState(newTableState);
       },
     });
   }
@@ -710,10 +709,11 @@ export const ColumnHeader: React.FC<{
                     </S.ColumnEditorFieldLabel>
                     <EditableField
                       value={workingColumnName}
-                      placeholder={ExpressionView.simpleNodeString(
-                        workingSelectFunction,
-                        weave.client.opStore
-                      )}
+                      placeholder={
+                        workingSelectFunction.nodeType !== 'void'
+                          ? weave.expToString(workingSelectFunction)
+                          : ''
+                      }
                       save={setWorkingColumnName}
                     />
                   </S.ColumnEditorColumnName>
@@ -778,10 +778,10 @@ export const ColumnHeader: React.FC<{
                 {isGroupCol && (
                   <S.ControlIcon
                     name="group-runs"
-                    onClick={async (e: React.MouseEvent) => {
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
                       recordEvent('REMOVE_COLUMN_GROUPING');
-                      await doUngroup();
+                      doUngroup();
                     }}
                   />
                 )}
@@ -803,7 +803,7 @@ export const ColumnHeader: React.FC<{
                   data-test="column-options"
                   name="overflow"
                   className="column-actions-trigger"
-                  onClick={(e: React.MouseEvent) => {
+                  onClick={(e: React.MouseEvent<HTMLElement>) => {
                     e.stopPropagation();
                     setOpen(o => !o);
                   }}
