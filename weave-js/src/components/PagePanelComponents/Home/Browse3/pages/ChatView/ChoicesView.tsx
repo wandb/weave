@@ -31,7 +31,11 @@ export const ChoicesView = ({
   }
   if (choices.length === 1) {
     return (
-      <ChoiceView choice={choices[0]} isStructuredOutput={isStructuredOutput} />
+      <ChoiceView
+        choice={choices[0]}
+        isStructuredOutput={isStructuredOutput}
+        choiceIndex={0}
+      />
     );
   }
   return (
