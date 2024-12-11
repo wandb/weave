@@ -4,6 +4,7 @@ import os
 import types
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
 
 
 @pytest.fixture
@@ -141,3 +142,90 @@ def test_create_db_sql_validation(mock_costs, migrator):
     migrator.replicated_path = "/clickhouse/bad;path/{db}"
     with pytest.raises(MigrationError, match="Invalid replicated path"):
         migrator._create_db_sql("test_db")
+
+
+def test_create_db_sql_non_replicated(mock_costs, migrator):
+    # Test non-replicated mode
+    migrator.replicated = False
+    sql = migrator._create_db_sql("test_db")
+    assert sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db"
+
+
+def test_create_db_sql_replicated(mock_costs, migrator):
+    # Test replicated mode
+    migrator.replicated = True
+    migrator.replicated_path = "/clickhouse/tables/{db}"
+    migrator.replicated_cluster = "test_cluster"
+    
+    sql = migrator._create_db_sql("test_db")
+    expected = """
+        CREATE DATABASE IF NOT EXISTS test_db ENGINE=Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}') ON CLUSTER test_cluster
+    """.strip()
+    assert sql.strip() == expected
+
+
+def test_format_replicated_sql_non_replicated(mock_costs, migrator):
+    # Test that SQL is unchanged when replicated=False
+    migrator.replicated = False
+    test_cases = [
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree",
+        "CREATE TABLE test (id Int32) ENGINE = SummingMergeTree",
+        "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
+    ]
+    
+    for sql in test_cases:
+        assert migrator._format_replicated_sql(sql) == sql
+
+
+def test_format_replicated_sql_replicated(mock_costs, migrator):
+    # Test that MergeTree engines are converted to Replicated variants
+    migrator.replicated = True
+    
+    test_cases = [
+        (
+            "CREATE TABLE test (id Int32) ENGINE = MergeTree",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree"
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = SummingMergeTree",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedSummingMergeTree"
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree"
+        ),
+        # Test case insensitivity
+        (
+            "CREATE TABLE test (id Int32) engine = mergetree",
+            "CREATE TABLE test (id Int32) engine = ReplicatedMergeTree"
+        ),
+        # Test with extra whitespace
+        (
+            "CREATE TABLE test (id Int32) ENGINE  =   MergeTree",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree"
+        ),
+        # Test with parameters
+        (
+            "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree()"
+        ),
+    ]
+    
+    for input_sql, expected_sql in test_cases:
+        assert migrator._format_replicated_sql(input_sql) == expected_sql
+
+
+def test_format_replicated_sql_non_mergetree(mock_costs, migrator):
+    # Test that non-MergeTree engines are left unchanged
+    migrator.replicated = True
+    
+    test_cases = [
+        "CREATE TABLE test (id Int32) ENGINE = Memory",
+        "CREATE TABLE test (id Int32) ENGINE = Log",
+        "CREATE TABLE test (id Int32) ENGINE = TinyLog",
+        # This should not be changed as it's not a complete word match
+        "CREATE TABLE test (id Int32) ENGINE = MyMergeTreeCustom",
+    ]
+    
+    for sql in test_cases:
+        assert migrator._format_replicated_sql(sql) == sql

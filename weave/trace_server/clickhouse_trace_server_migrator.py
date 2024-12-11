@@ -41,8 +41,7 @@ class ClickHouseTraceServerMigrator:
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
-        """Check if a string is safe to use as an identifier in SQL.
-        Only allows alphanumeric chars, underscores, and dots."""
+        """Check if a string is safe to use as an identifier in SQL."""
         return bool(re.match(r'^[a-zA-Z0-9_\.]+$', value))
 
     def _format_replicated_sql(self, sql_query: str) -> str:
@@ -60,6 +59,7 @@ class ClickHouseTraceServerMigrator:
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
 
     def _create_db_sql(self, db_name: str) -> str:
+        """Geneate SQL database create string for normal and replicated databases."""
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
 
