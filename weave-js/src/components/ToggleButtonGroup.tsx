@@ -1,5 +1,5 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import React from 'react';
+import React, {ReactElement} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Button, ButtonSize} from './Button';
@@ -9,6 +9,8 @@ import {Tailwind} from './Tailwind';
 export type ToggleOption = {
   value: string;
   icon?: IconName;
+  label?: string;
+  tooltip?: ReactElement | string;
 };
 
 export type ToggleButtonGroupProps = {
@@ -49,7 +51,7 @@ export const ToggleButtonGroup = React.forwardRef<
         onValueChange={handleValueChange}
         className="flex gap-px"
         ref={ref}>
-        {options.map(({value: optionValue, icon}) => (
+        {options.map(({value: optionValue, label, icon, tooltip}) => (
           <ToggleGroup.Item
             key={optionValue}
             value={optionValue}
@@ -57,6 +59,7 @@ export const ToggleButtonGroup = React.forwardRef<
             <Button
               icon={icon}
               size={size}
+              tooltip={tooltip}
               className={twMerge(
                 size === 'small' &&
                   (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
@@ -73,7 +76,7 @@ export const ToggleButtonGroup = React.forwardRef<
                 'first:rounded-l-sm', // First button rounded left
                 'last:rounded-r-sm' // Last button rounded right
               )}>
-              {optionValue}
+              {label ?? optionValue}
             </Button>
           </ToggleGroup.Item>
         ))}
