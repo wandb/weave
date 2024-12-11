@@ -333,7 +333,9 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
         type: 'bar',
         y: metricBin.values,
         x: metricBin.callIds,
-        text: metricBin.values.map(value => value.toFixed(3)),
+        text: metricBin.values.map(value =>
+          Number.isInteger(value) ? value.toString() : value.toFixed(3)
+        ),
         textposition: 'outside',
         textfont: {size: 14, color: 'black'},
         name: metric,
