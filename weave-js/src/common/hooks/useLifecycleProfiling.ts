@@ -11,6 +11,7 @@ export type ProfileData = {
  * Tracks the duration that a component is mounted.
  * @param id - a unique identifier for the component
  * @param cb - a callback to handle the data, e.g. log it for performance profiling
+ * @param onStart - invoked when the containing component mounts
  */
 export function useLifecycleProfiling(
   id: string,
