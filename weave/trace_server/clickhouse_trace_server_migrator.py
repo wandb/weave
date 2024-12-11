@@ -39,8 +39,20 @@ class ClickHouseTraceServerMigrator:
         self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
         self._initialize_migration_db()
 
-    def _format_sql(self, sql_query: str, create_db: bool = False) -> str:
+    def _format_sql(self, sql_query: str) -> str:
         return sql_query
+
+    def _create_db_sql(self, db_name: str) -> str:
+        replicated_engine = ""
+        replicated_cluster = ""
+        if self.replicated:
+            replicated_path = self.replicated_path.replace("{db}", migration_db)
+            replicated_engine = f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+            replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
+        create_db_sql = """
+            CREATE DATABASE IF NOT EXISTS {db_name}{replicated_engine}{replicated_cluster}"
+        """
+        return create_db_sql
 
     def apply_migrations(
         self, target_db: str, target_version: Optional[int] = None
@@ -63,18 +75,14 @@ class ClickHouseTraceServerMigrator:
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
-            create_db_sql = f"CREATE DATABASE IF NOT EXISTS {target_db}"
-            self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
+            self.ch_client.command(self._create_db_sql(target_db))
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        create_db_sql = """
-            CREATE DATABASE IF NOT EXISTS db_management
-        """
-        self.ch_client.command(self._format_sql(create_db_sql, create_db=True))
+        self.ch_client.command(self._create_db_sql("db_management"))
         create_table_sql = """
             CREATE TABLE IF NOT EXISTS db_management.migrations
             (
