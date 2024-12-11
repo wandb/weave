@@ -568,6 +568,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
         )
+    
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        return self._generic_request(
+            "/execute/method", req, tsi.CallMethodReq, tsi.CallMethodRes
+        )
 
 
 __docspec__ = [
