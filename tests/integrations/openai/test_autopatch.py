@@ -84,3 +84,33 @@ def test_passthrough_op_kwargs(client_creator):
 
         call = calls[0]
         assert all(v == "REDACTED" for v in call.inputs.values())
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_configuration_with_dicts(client_creator):
+    def redact_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+        return dict.fromkeys(inputs, "REDACTED")
+
+    autopatch_settings = {
+        "openai": {
+            "op_settings": {"postprocess_inputs": redact_inputs},
+        }
+    }
+
+    openai_sdk._openai_patcher = None
+
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        oaiclient = OpenAI()
+        oaiclient.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": "tell me a joke"}],
+        )
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert all(v == "REDACTED" for v in call.inputs.values())

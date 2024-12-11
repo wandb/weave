@@ -4,15 +4,52 @@ This module should not require any dependencies beyond the standard library. It 
 check if libraries are installed and imported and patch in the case that they are.
 """
 
-from __future__ import annotations
+from typing import Any, Callable, Optional
 
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from pydantic import BaseModel, Field, validate_call
 
 from weave.trace.weave_client import Call
 
 
-def autopatch(settings: AutopatchSettings | None = None) -> None:
+class OpSettings(BaseModel):
+    """Op settings for a specific integration.
+    These currently subset the `op` decorator args to provide a consistent interface
+    when working with auto-patched functions.  See the `op` decorator for more details."""
+
+    name: Optional[str] = None
+    call_display_name: Optional[str | Callable[[Call], str]] = None
+    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
+    postprocess_output: Optional[Callable[[Any], Any]] = None
+
+
+class IntegrationSettings(BaseModel):
+    """Configuration for a specific integration."""
+
+    enabled: bool = True
+    op_settings: OpSettings = Field(default_factory=OpSettings)
+
+
+class AutopatchSettings(BaseModel):
+    """Settings for auto-patching integrations."""
+
+    anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+
+
+@validate_call
+def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.anthropic.anthropic_sdk import anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import cohere_patcher
@@ -81,43 +118,3 @@ def reset_autopatch() -> None:
     google_genai_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
     vertexai_patcher.undo_patch()
-
-
-@dataclass
-class OpSettings:
-    """Op settings for a specific integration.
-    These currently subset the `op` decorator args to provide a consistent interface
-    when working with auto-patched functions.  See the `op` decorator for more details."""
-
-    name: str | None = None
-    call_display_name: str | Callable[[Call], str] | None = None
-    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None
-    postprocess_output: Callable[[Any], Any] | None = None
-
-
-@dataclass
-class IntegrationSettings:
-    """Configuration for a specific integration."""
-
-    enabled: bool = True
-    op_settings: OpSettings = field(default_factory=OpSettings)
-
-
-@dataclass
-class AutopatchSettings:
-    """Settings for auto-patching integrations."""
-
-    anthropic: IntegrationSettings = field(default_factory=IntegrationSettings)
-    cerebras: IntegrationSettings = field(default_factory=IntegrationSettings)
-    cohere: IntegrationSettings = field(default_factory=IntegrationSettings)
-    dspy: IntegrationSettings = field(default_factory=IntegrationSettings)
-    google_ai_studio: IntegrationSettings = field(default_factory=IntegrationSettings)
-    groq: IntegrationSettings = field(default_factory=IntegrationSettings)
-    instructor: IntegrationSettings = field(default_factory=IntegrationSettings)
-    langchain: IntegrationSettings = field(default_factory=IntegrationSettings)
-    litellm: IntegrationSettings = field(default_factory=IntegrationSettings)
-    llamaindex: IntegrationSettings = field(default_factory=IntegrationSettings)
-    mistral: IntegrationSettings = field(default_factory=IntegrationSettings)
-    notdiamond: IntegrationSettings = field(default_factory=IntegrationSettings)
-    openai: IntegrationSettings = field(default_factory=IntegrationSettings)
-    vertexai: IntegrationSettings = field(default_factory=IntegrationSettings)

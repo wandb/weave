@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
@@ -327,7 +326,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
                 return True
             return False
 
-        op_kwargs = dataclasses.asdict(settings)
+        op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
@@ -363,7 +362,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
                 return True
             return False
 
-        op_kwargs = dataclasses.asdict(settings)
+        op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
@@ -393,21 +392,17 @@ def get_openai_patcher(
 
     base = settings.op_settings
 
-    completions_create_settings = dataclasses.replace(
-        base,
-        name=base.name or "openai.chat.completions.create",
+    completions_create_settings = base.model_copy(
+        update={"name": base.name or "openai.chat.completions.create"}
     )
-    async_completions_create_settings = dataclasses.replace(
-        base,
-        name=base.name or "openai.chat.completions.create",
+    async_completions_create_settings = base.model_copy(
+        update={"name": base.name or "openai.chat.completions.create"}
     )
-    completions_parse_settings = dataclasses.replace(
-        base,
-        name=base.name or "openai.beta.chat.completions.parse",
+    completions_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.beta.chat.completions.parse"}
     )
-    async_completions_parse_settings = dataclasses.replace(
-        base,
-        name=base.name or "openai.beta.chat.completions.parse",
+    async_completions_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.beta.chat.completions.parse"}
     )
 
     _openai_patcher = MultiPatcher(
