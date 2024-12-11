@@ -56,7 +56,6 @@ def test_enabled_integration_patches(client_creator):
 )
 def test_passthrough_op_kwargs(client_creator):
     def redact_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-        print("CALLING THIS FUNC")
         return dict.fromkeys(inputs, "REDACTED")
 
     autopatch_settings = AutopatchSettings(
