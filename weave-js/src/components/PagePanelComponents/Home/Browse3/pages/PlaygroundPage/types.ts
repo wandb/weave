@@ -23,6 +23,7 @@ export type PlaygroundState = {
   //   nTimes: number;
   maxTokensLimit: number;
   model: LLMMaxTokensKey;
+  selectedChoiceIndex: number;
 };
 
 export type PlaygroundStateKey = keyof PlaygroundState;

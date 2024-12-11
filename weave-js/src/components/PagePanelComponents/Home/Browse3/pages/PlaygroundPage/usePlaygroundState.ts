@@ -37,6 +37,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   //   nTimes: 1,
   maxTokensLimit: 16384,
   model: DEFAULT_MODEL,
+  selectedChoiceIndex: 0,
 };
 
 export const usePlaygroundState = () => {
