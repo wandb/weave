@@ -255,6 +255,7 @@ export const IconNames = {
   VertexGCP: 'vertex-gcp',
   VideoPlay: 'video-play',
   ViewGlasses: 'view-glasses',
+  Visible: 'visible',
   Wandb: 'wandb',
   Warning: 'warning',
   WarningAlt: 'warning-alt',

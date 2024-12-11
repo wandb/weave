@@ -18,6 +18,7 @@ type MessagePanelProps = {
   choiceIndex?: number;
   isNested?: boolean;
   pendingToolResponseId?: string;
+  messageHeader?: React.ReactNode;
 };
 
 export const MessagePanel = ({
@@ -30,6 +31,7 @@ export const MessagePanel = ({
   // If the tool call response is pending, the editor will be shown automatically
   // and on save the tool call response will be updated and sent to the LLM
   pendingToolResponseId,
+  messageHeader,
 }: MessagePanelProps) => {
   const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -116,6 +118,7 @@ export const MessagePanel = ({
                 'max-h-[400px]': !isShowingMore,
                 'max-h-full': isShowingMore,
               })}>
+              {messageHeader}
               {isPlayground && editorHeight ? (
                 <PlaygroundMessagePanelEditor
                   message={message}

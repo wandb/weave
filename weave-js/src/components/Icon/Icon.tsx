@@ -256,6 +256,7 @@ import {ReactComponent as ImportVersionsLayers} from '../../assets/icons/icon-ve
 import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-gcp.svg';
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
 import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-glasses.svg';
+import {ReactComponent as ImportVisible} from '../../assets/icons/icon-visible.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
@@ -1048,6 +1049,9 @@ export const IconVideoPlay = (props: SVGIconProps) => (
 export const IconViewGlasses = (props: SVGIconProps) => (
   <ImportViewGlasses {...updateIconProps(props)} />
 );
+export const IconVisible = (props: SVGIconProps) => (
+  <ImportVisible {...updateIconProps(props)} />
+);
 export const IconWandb = (props: SVGIconProps) => (
   <ImportWandb {...updateIconProps(props)} />
 );
@@ -1336,6 +1340,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'vertex-gcp': IconVertexGCP,
   'video-play': IconVideoPlay,
   'view-glasses': IconViewGlasses,
+  visible: IconVisible,
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,

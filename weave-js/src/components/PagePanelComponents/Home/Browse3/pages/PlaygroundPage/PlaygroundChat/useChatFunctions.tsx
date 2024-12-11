@@ -43,6 +43,8 @@ export const useChatFunctions = (
     messageIndex: number,
     newMessage: Message
   ) => {
+    console.log('editMessage', callIndex, messageIndex, newMessage);
+
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
         cloneDeep(prevTraceCall as OptionalTraceCallSchema)
@@ -106,6 +108,7 @@ export const useChatFunctions = (
     choiceIndex: number,
     newChoice: Message
   ) => {
+    console.log('editChoice', callIndex, choiceIndex, newChoice);
     setPlaygroundStateField(callIndex, 'traceCall', prevTraceCall => {
       const newTraceCall = clearTraceCall(
         cloneDeep(prevTraceCall as OptionalTraceCallSchema)
