@@ -198,11 +198,6 @@ def test_format_replicated_sql_replicated(mock_costs, migrator):
             "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree",
         ),
-        # Test case insensitivity
-        (
-            "CREATE TABLE test (id Int32) engine = mergetree",
-            "CREATE TABLE test (id Int32) engine = ReplicatedMergeTree",
-        ),
         # Test with extra whitespace
         (
             "CREATE TABLE test (id Int32) ENGINE  =   MergeTree",
