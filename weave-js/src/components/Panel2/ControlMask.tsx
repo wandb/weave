@@ -1,6 +1,6 @@
-import {WBIcon} from '../../common/components/elements/WBIcon';
 import React from 'react';
 
+import {WBIcon} from '../../common/components/elements/WBIcon';
 import {ControlsImageOverlaysControls} from './ControlImageOverlays';
 import * as Controls from './controlsImage';
 import {DEFAULT_TILE_LAYOUT, defaultHideImageState} from './ImageWithOverlays';

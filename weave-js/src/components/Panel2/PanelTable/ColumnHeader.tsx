@@ -676,7 +676,8 @@ export const ColumnHeader: React.FC<{
                 {isGroupCol && (
                   <S.ControlIcon
                     name="group-runs"
-                    onClick={e => {
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
                       recordEvent('REMOVE_COLUMN_GROUPING');
                       doUngroup();
                     }}
@@ -696,7 +697,7 @@ export const ColumnHeader: React.FC<{
               </S.ColumnAction>
               <S.ColumnAction>
                 <S.EllipsisIcon
-                  ref={anchorRef}
+                  ref={(node: HTMLElement | null) => anchorRef(node)}
                   data-test="column-options"
                   name="overflow"
                   className="column-actions-trigger"
@@ -723,9 +724,10 @@ const SortStateToggle: React.FC<{
     return (
       <S.ControlIcon
         name="down-arrow"
-        onClick={async e => {
+        onClick={async (e: React.MouseEvent) => {
+          e.stopPropagation();
           recordEvent('REMOVE_COLUMN_SORT');
-          updateTableState(Table.disableSortByCol(tableState, colId));
+          await updateTableState(Table.disableSortByCol(tableState, colId));
         }}
       />
     );
@@ -733,9 +735,10 @@ const SortStateToggle: React.FC<{
     return (
       <S.ControlIcon
         name="up-arrow"
-        onClick={async e => {
+        onClick={async (e: React.MouseEvent) => {
+          e.stopPropagation();
           recordEvent('UPDATE_COLUMN_SORT_DESC');
-          updateTableState(
+          await updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
           );
         }}

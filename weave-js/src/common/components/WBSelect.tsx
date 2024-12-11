@@ -1,8 +1,8 @@
-import {WBIcon} from './elements/WBIcon';
 import {WBPopup} from '@wandb/ui';
 import React from 'react';
 
 import {useOnMouseDownOutside} from '../util/dom';
+import {WBIcon} from './elements/WBIcon';
 import {
   getOptionDisplayName,
   WBMenu,

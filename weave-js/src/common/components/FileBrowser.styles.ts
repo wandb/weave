@@ -1,8 +1,8 @@
-import {WBIcon} from './elements/WBIcon';
 import {Table} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import * as globals from '../css/globals.styles';
+import {WBIcon} from './elements/WBIcon';
 
 export const FileTableBody = styled(Table.Body)`
   border-top-left-radius: 4px;

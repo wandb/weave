@@ -1,7 +1,7 @@
-import {WBIcon} from '../elements/WBIcon';
 import styled, {css} from 'styled-components';
 
 import {GLOBAL_COLORS} from '../../util/colors';
+import {WBIcon} from '../elements/WBIcon';
 
 export const Wrapper = styled.div<{showBindings?: boolean}>`
   width: 100%;

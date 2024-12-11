@@ -1,7 +1,7 @@
-import {WBIcon} from '../../common/components/elements/WBIcon';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 
+import {WBIcon} from '../../common/components/elements/WBIcon';
 import {OBLIVION} from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/utils';
 

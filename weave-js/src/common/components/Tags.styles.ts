@@ -1,5 +1,6 @@
-import {WBIcon} from './elements/WBIcon';
 import styled, {css} from 'styled-components';
+
+import {WBIcon} from './elements/WBIcon';
 
 const IconVariants = {
   small: css`
