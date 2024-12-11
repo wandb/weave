@@ -1,5 +1,5 @@
 import {
-  Dialog,
+  Dialog as MaterialDialog,
   DialogActions as MaterialDialogActions,
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
@@ -23,6 +23,14 @@ interface DeleteModalProps {
   deleteTargetStr: string;
   onSuccess?: () => void;
 }
+
+const Dialog = styled(MaterialDialog)`
+  .MuiDialog-paper {
+    min-width: 400px;
+    max-width: min(800px, 90vw);
+    width: auto !important;
+  }
+`;
 
 export const DeleteModal: React.FC<DeleteModalProps> = ({
   open,
@@ -55,12 +63,10 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
       onClose={() => {
         onClose();
         setError(null);
-      }}
-      maxWidth="xs"
-      fullWidth>
+      }}>
       <Tailwind>
         <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
-        <DialogContent style={{overflow: 'hidden'}}>
+        <DialogContent className="overflow-hidden">
           <div className="mb-16">
             {error != null ? (
               <p style={{color: 'red'}}>{error}</p>

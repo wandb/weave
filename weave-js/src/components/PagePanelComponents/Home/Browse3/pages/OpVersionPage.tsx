@@ -77,7 +77,7 @@ const OpVersionPageInner: React.FC<{
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr_auto] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -139,8 +139,7 @@ const OpVersionPageInner: React.FC<{
                 <p>-</p>
               )}
             </div>
-            <div className="flex-grow" />
-            <div className="ml-1 flex">
+            <div className="block">
               <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
             </div>
           </div>

@@ -215,7 +215,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr_auto] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -256,10 +256,9 @@ const ObjectVersionPageInner: React.FC<{
                 <p>{refExtra}</p>
               </div>
             )}
-          </div>
-          <div className="flex-grow" />
-          <div className="ml-1 flex">
-            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+            <div className="ml-auto">
+              <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+            </div>
           </div>
         </Tailwind>
       }
