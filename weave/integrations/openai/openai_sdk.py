@@ -378,7 +378,9 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
-def get_openai_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
+def get_openai_patcher(
+    settings: Optional[IntegrationSettings] = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 
