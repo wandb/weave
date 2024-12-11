@@ -17,6 +17,14 @@ class Patcher:
         raise NotImplementedError()
 
 
+class NoOpPatcher(Patcher):
+    def attempt_patch(self) -> bool:
+        return True
+
+    def undo_patch(self) -> bool:
+        return True
+
+
 class MultiPatcher(Patcher):
     def __init__(self, patchers: Sequence[Patcher]) -> None:
         self.patchers = patchers
