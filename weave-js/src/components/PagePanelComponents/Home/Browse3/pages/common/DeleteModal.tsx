@@ -127,9 +127,16 @@ export const DeleteObjectButtonWithModal: React.FC<{
 }> = ({objVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
-  const {objectVersionDelete} = useObjectDeleteFunc();
-
+  const {opVersionDelete, objectVersionDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const doDelete = () => {
+    if (versionSchemaIsOp(objVersionSchema)) {
+      return opVersionDelete(objVersionSchema);
+    }
+    return objectVersionDelete(objVersionSchema);
+  };
+
   const deleteStr =
     overrideDisplayStr ?? makeDefaultObjectDeleteStr(objVersionSchema);
 
@@ -144,18 +151,24 @@ export const DeleteObjectButtonWithModal: React.FC<{
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         deleteTargetStr={deleteStr}
-        onDelete={() => objectVersionDelete(objVersionSchema)}
+        onDelete={doDelete}
         onSuccess={closePeek}
       />
     </>
   );
 };
 
+function versionSchemaIsOp(
+  objVersionSchema: OpVersionSchema | ObjectVersionSchema
+) {
+  return 'opId' in objVersionSchema;
+}
+
 function makeDefaultObjectDeleteStr(
   objVersionSchema: OpVersionSchema | ObjectVersionSchema
 ) {
-  if ('objectId' in objVersionSchema) {
-    return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+  if (versionSchemaIsOp(objVersionSchema)) {
+    return `${objVersionSchema.opId}:v${objVersionSchema.versionIndex}`;
   }
-  return `${objVersionSchema.opId}:v${objVersionSchema.versionIndex}`;
+  return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
 }

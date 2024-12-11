@@ -10,7 +10,14 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {
+  isWeaveObjectRef,
+  ObjectRef,
+  parseRef,
+  refUri,
+  WeaveObjectRef,
+} from '../../../../../../react';
+import {makeObjRefUri} from '../../../Browse2/CommonLib';
 import {
   callCache,
   objectVersionCache,
@@ -1094,48 +1101,108 @@ const useRootObjectVersions = (
 const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
-  const _getObjectId = (key: ObjectVersionKey | OpVersionKey) => {
-    // Get object id from op or object version key
-    let objectId = '';
-    if ('objectId' in key) {
-      objectId = key.objectId;
-    } else {
-      objectId = key.opId;
-    }
-    return objectId;
+  const makeObjectRef = (key: ObjectVersionKey) => {
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: key.entity,
+      projectName: key.project,
+      weaveKind: 'object',
+      artifactName: key.objectId,
+      artifactVersion: key.versionHash,
+    };
+    return refUri(ref);
   };
 
+  const makeOpRef = (key: OpVersionKey) => {
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: key.entity,
+      projectName: key.project,
+      weaveKind: 'op',
+      artifactName: key.opId,
+      artifactVersion: key.versionHash,
+    };
+    return refUri(ref);
+  };
+
+  const updateObjectCaches = useCallback((key: ObjectVersionKey) => {
+    objectVersionCache.del(key);
+    const ref = makeObjectRef(key);
+    refDataCache.del(ref);
+  }, []);
+
+  const updateOpCaches = useCallback((key: OpVersionKey) => {
+    opVersionCache.del(key);
+    const ref = makeOpRef(key);
+    refDataCache.del(ref);
+  }, []);
+
   const objectVersionDelete = useCallback(
-    (key: ObjectVersionKey | OpVersionKey) => {
-      const objectId = _getObjectId(key);
+    (key: ObjectVersionKey) => {
+      updateObjectCaches(key);
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
         }),
-        object_id: objectId,
+        object_id: key.objectId,
         digests: [key.versionHash],
       });
     },
-    [getTsClient]
+    [getTsClient, updateObjectCaches]
   );
 
   const objectDeleteAllVersions = useCallback(
-    (key: ObjectVersionKey | OpVersionKey) => {
-      const objectId = _getObjectId(key);
+    (key: ObjectVersionKey) => {
+      updateObjectCaches(key);
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
         }),
-        object_id: objectId,
+        object_id: key.objectId,
         digests: [],
       });
     },
-    [getTsClient]
+    [getTsClient, updateObjectCaches]
   );
 
-  return {objectVersionDelete, objectDeleteAllVersions};
+  const opVersionDelete = useCallback(
+    (key: OpVersionKey) => {
+      updateOpCaches(key);
+      return getTsClient().objectDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: key.opId,
+        digests: [key.versionHash],
+      });
+    },
+    [getTsClient, updateOpCaches]
+  );
+
+  const opDeleteAllVersions = useCallback(
+    (key: OpVersionKey) => {
+      updateOpCaches(key);
+      return getTsClient().objectDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: key.opId,
+        digests: [],
+      });
+    },
+    [getTsClient, updateOpCaches]
+  );
+
+  return {
+    objectVersionDelete,
+    objectDeleteAllVersions,
+    opVersionDelete,
+    opDeleteAllVersions,
+  };
 };
 
 const useRefsReadBatch = makeTraceServerEndpointHook<
