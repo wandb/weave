@@ -3,6 +3,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
+from weave.trace.autopatch import OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
@@ -10,6 +11,8 @@ from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse
+
+_google_genai_patcher: Optional[MultiPatcher] = None
 
 
 def gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -89,10 +92,13 @@ def gemini_on_finish(
         call.summary.update(summary_update)
 
 
-def gemini_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
+def gemini_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=gemini_postprocess_inputs)(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = gemini_postprocess_inputs
+
+        op = weave.op(fn, **op_kwargs)
         op._set_on_finish_handler(gemini_on_finish)
         return add_accumulator(
             op,  # type: ignore
@@ -104,7 +110,7 @@ def gemini_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def gemini_wrapper_async(name: str) -> Callable[[Callable], Callable]:
+def gemini_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -113,9 +119,11 @@ def gemini_wrapper_async(name: str) -> Callable[[Callable], Callable]:
 
             return _async_wrapper
 
-        "We need to do this so we can check if `stream` is used"
-        op = weave.op(postprocess_inputs=gemini_postprocess_inputs)(_fn_wrapper(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = gemini_postprocess_inputs
+
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
         op._set_on_finish_handler(gemini_on_finish)
         return add_accumulator(
             op,  # type: ignore
@@ -127,33 +135,68 @@ def gemini_wrapper_async(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-google_genai_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai.generative_models"),
-            "GenerativeModel.generate_content",
-            gemini_wrapper_sync(
-                name="google.generativeai.GenerativeModel.generate_content"
+def get_google_genai_patcher(settings: Optional[OpSettings] = None) -> MultiPatcher:
+    global _google_genai_patcher
+
+    if _google_genai_patcher is not None:
+        return _google_genai_patcher
+
+    if settings is None:
+        settings = OpSettings()
+
+    base = settings.op_settings
+
+    generate_content_settings = base.model_copy(
+        update={
+            "name": base.name or "google.generativeai.GenerativeModel.generate_content"
+        }
+    )
+    generate_content_async_settings = base.model_copy(
+        update={
+            "name": base.name
+            or "google.generativeai.GenerativeModel.generate_content_async"
+        }
+    )
+    send_message_settings = base.model_copy(
+        update={"name": base.name or "google.generativeai.ChatSession.send_message"}
+    )
+    send_message_async_settings = base.model_copy(
+        update={
+            "name": base.name or "google.generativeai.ChatSession.send_message_async"
+        }
+    )
+
+    _google_genai_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "google.generativeai.generative_models"
+                ),
+                "GenerativeModel.generate_content",
+                gemini_wrapper_sync(generate_content_settings),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai.generative_models"),
-            "GenerativeModel.generate_content_async",
-            gemini_wrapper_async(
-                name="google.generativeai.GenerativeModel.generate_content_async"
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "google.generativeai.generative_models"
+                ),
+                "GenerativeModel.generate_content_async",
+                gemini_wrapper_async(generate_content_async_settings),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai.generative_models"),
-            "ChatSession.send_message",
-            gemini_wrapper_sync(name="google.generativeai.ChatSession.send_message"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai.generative_models"),
-            "ChatSession.send_message_async",
-            gemini_wrapper_async(
-                name="google.generativeai.ChatSession.send_message_async"
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "google.generativeai.generative_models"
+                ),
+                "ChatSession.send_message",
+                gemini_wrapper_sync(send_message_settings),
             ),
-        ),
-    ]
-)
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "google.generativeai.generative_models"
+                ),
+                "ChatSession.send_message_async",
+                gemini_wrapper_async(send_message_async_settings),
+            ),
+        ]
+    )
+
+    return _google_genai_patcher

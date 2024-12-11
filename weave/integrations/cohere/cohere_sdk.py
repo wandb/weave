@@ -3,12 +3,16 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
+from weave.trace.autopatch import OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
     from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
+
+
+_cohere_patcher: Optional[MultiPatcher] = None
 
 
 def cohere_accumulator(
@@ -86,16 +90,16 @@ def cohere_accumulator_v2(
     return acc
 
 
-def cohere_wrapper(name: str) -> Callable:
+def cohere_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
         return op
 
     return wrapper
 
 
-def cohere_wrapper_v2(name: str) -> Callable:
+def cohere_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         def _post_process_response(fn: Callable) -> Any:
             @wraps(fn)
@@ -122,14 +126,14 @@ def cohere_wrapper_v2(name: str) -> Callable:
 
             return _wrapper
 
-        op = weave.op(_post_process_response(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
         return op
 
     return wrapper
 
 
-def cohere_wrapper_async_v2(name: str) -> Callable:
+def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         def _post_process_response(fn: Callable) -> Any:
             @wraps(fn)
@@ -156,81 +160,115 @@ def cohere_wrapper_async_v2(name: str) -> Callable:
 
             return _wrapper
 
-        op = weave.op(_post_process_response(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
         return op
 
     return wrapper
 
 
-def cohere_stream_wrapper(name: str) -> Callable:
+def cohere_stream_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(fn)
-        op.name = name  # type: ignore
-        return add_accumulator(op, lambda inputs: cohere_accumulator)  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        return add_accumulator(op, lambda inputs: cohere_accumulator)
 
     return wrapper
 
 
-def cohere_stream_wrapper_v2(name: str) -> Callable:
+def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(fn)
-        op.name = name  # type: ignore
-        return add_accumulator(
-            op, make_accumulator=lambda inputs: cohere_accumulator_v2
-        )
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        return add_accumulator(op, lambda inputs: cohere_accumulator_v2)
 
     return wrapper
 
 
-cohere_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "Client.chat",
-            cohere_wrapper("cohere.Client.chat"),
-        ),
-        # Patch the async chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "AsyncClient.chat",
-            cohere_wrapper("cohere.AsyncClient.chat"),
-        ),
-        # Add patch for chat_stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "Client.chat_stream",
-            cohere_stream_wrapper("cohere.Client.chat_stream"),
-        ),
-        # Add patch for async chat_stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "AsyncClient.chat_stream",
-            cohere_stream_wrapper("cohere.AsyncClient.chat_stream"),
-        ),
-        # Add patch for cohere v2
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "ClientV2.chat",
-            cohere_wrapper_v2("cohere.ClientV2.chat"),
-        ),
-        # Add patch for cohre v2 async chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "AsyncClientV2.chat",
-            cohere_wrapper_async_v2("cohere.AsyncClientV2.chat"),
-        ),
-        # Add patch for chat_stream method v2
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "ClientV2.chat_stream",
-            cohere_stream_wrapper_v2("cohere.ClientV2.chat_stream"),
-        ),
-        # Add patch for async chat_stream method v2
-        SymbolPatcher(
-            lambda: importlib.import_module("cohere"),
-            "AsyncClientV2.chat_stream",
-            cohere_stream_wrapper_v2("cohere.AsyncClientV2.chat_stream"),
-        ),
-    ]
-)
+def get_cohere_patcher(settings: Optional[OpSettings] = None) -> MultiPatcher:
+    global _cohere_patcher
+
+    if _cohere_patcher is not None:
+        return _cohere_patcher
+
+    if settings is None:
+        settings = OpSettings()
+
+    base = settings.op_settings
+
+    chat_settings = base.model_copy(update={"name": base.name or "cohere.Client.chat"})
+    async_chat_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClient.chat"}
+    )
+    chat_stream_settings = base.model_copy(
+        update={"name": base.name or "cohere.Client.chat_stream"}
+    )
+    async_chat_stream_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClient.chat_stream"}
+    )
+    chat_v2_settings = base.model_copy(
+        update={"name": base.name or "cohere.ClientV2.chat"}
+    )
+    async_chat_v2_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClientV2.chat"}
+    )
+    chat_stream_v2_settings = base.model_copy(
+        update={"name": base.name or "cohere.ClientV2.chat_stream"}
+    )
+    async_chat_stream_v2_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClientV2.chat_stream"}
+    )
+
+    _cohere_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "Client.chat",
+                cohere_wrapper(chat_settings),
+            ),
+            # Patch the async chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClient.chat",
+                cohere_wrapper(async_chat_settings),
+            ),
+            # Add patch for chat_stream method
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "Client.chat_stream",
+                cohere_stream_wrapper(chat_stream_settings),
+            ),
+            # Add patch for async chat_stream method
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClient.chat_stream",
+                cohere_stream_wrapper(async_chat_stream_settings),
+            ),
+            # Add patch for cohere v2
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "ClientV2.chat",
+                cohere_wrapper_v2(chat_v2_settings),
+            ),
+            # Add patch for cohre v2 async chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClientV2.chat",
+                cohere_wrapper_async_v2(async_chat_v2_settings),
+            ),
+            # Add patch for chat_stream method v2
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "ClientV2.chat_stream",
+                cohere_stream_wrapper_v2(chat_stream_v2_settings),
+            ),
+            # Add patch for async chat_stream method v2
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClientV2.chat_stream",
+                cohere_stream_wrapper_v2(async_chat_stream_v2_settings),
+            ),
+        ]
+    )
+
+    return _cohere_patcher
