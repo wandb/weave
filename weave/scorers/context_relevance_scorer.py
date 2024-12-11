@@ -217,7 +217,6 @@ class OldRelevanceScorer(Scorer):
         )
         return self.score_messages(messages)
 
-
 class ContextRelevanceScorer(Scorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
@@ -238,35 +237,26 @@ class ContextRelevanceScorer(Scorer):
             - flagged (bool): Whether the output was flagged as irrelevant
             - extras (dict): Contains:
                 - score (float): Overall relevance score
-                - document_scores (list[float]): List of relevance scores for each document
-                - relevant_sentences (list[dict]): List of dictionaries containing:
-                    - document (str): The document text
-                    - relevant_sentences (list[tuple[str, float]]): List of tuples with relevant sentence and its score
+                - all_spans (list, optional): If verbose=True, includes list of relevant 
+                  text spans and their scores
 
     Example:
         >>> scorer = ContextRelevanceScorer(model_name_or_path="path/to/model")
         >>> result = scorer.score(
         ...     query="What is the capital of France?",
-        ...     context=["Paris is the capital of France."]
+        ...     documents=["Paris is the capital of France."]
         ... )
         >>> print(result)
         {
             'flagged': False,
             'extras': {
                 'score': 0.92,
-                'document_scores': [0.92],
-                'relevant_sentences': [
-                    {
-                        'document': 'Paris is the capital of France.',
-                        'relevant_sentences': [
-                            ('Paris is the capital of France.', 0.92)
-                        ]
-                    }
+                'all_spans': [  # Only included if verbose=True
+                    {'text': 'Paris is the capital of France', 'scores': 0.92}
                 ]
             }
         }
     """
-
     model_name_or_path: str = None
     base_url: Optional[str] = None
     device: str = "cpu"
@@ -278,13 +268,9 @@ class ContextRelevanceScorer(Scorer):
         try:
             import torch
             from transformers import AutoModelForTokenClassification, AutoTokenizer
-            import nltk
-
-            nltk.download("punkt")
-
         except ImportError:
             print(
-                "The `transformers`, `torch` and `nltk` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch nltk`"
+                "The `transformers` and `torch` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch`"
             )
         """Initialize the model, tokenizer and device after pydantic initialization."""
         if os.path.isdir(self.model_name_or_path):
@@ -296,166 +282,96 @@ class ContextRelevanceScorer(Scorer):
         assert self._local_model_path, "Model path not found"
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
-        )
+            )
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         self._model.eval()
         self.device = set_device(self.device)
 
-    @staticmethod
-    def sentence_level_aggregation(
-        document, label_mask, offsets, threshold=0.5
-    ) -> tuple[Any, Any]:
-        """Compute sentence-level relevance scores."""
-        from nltk.tokenize import sent_tokenize
-
-        sentences = [sent_tokenize(chunk) for chunk in document.split("\n")]
-        sentences = [sent for sent_list in sentences for sent in sent_list]
-
-        char_index = 0
-        sentence_spans = []
-        for sent in sentences:
-            start_idx = document.find(sent, char_index)
-            end_idx = start_idx + len(sent)
-            sentence_spans.append((start_idx, end_idx))
-            char_index = end_idx
-
-        sentence_relevances = []
-        for sent_start, sent_end in sentence_spans:
-            token_indices_in_sentence = []
-            for i, (t_start, t_end) in enumerate(offsets):
-                if t_start < sent_end and t_end > sent_start:
-                    token_indices_in_sentence.append(i)
-
-            if not token_indices_in_sentence:
-                sentence_relevances.append((document[sent_start:sent_end], 0.0))
-                continue
-
-            token_indices_in_sentence = np.array(token_indices_in_sentence)
-            relevant_count = label_mask[token_indices_in_sentence].sum()
-            total_count = len(token_indices_in_sentence)
-            fraction_relevant = relevant_count / total_count
-            sentence_text = document[sent_start:sent_end]
-            sentence_relevances.append((sentence_text, fraction_relevant))
-
-        relevant_sentences = [
-            (sent, round(float(frac), 4))
-            for (sent, frac) in sentence_relevances
-            if frac >= threshold
-        ]
-        return sentence_relevances, relevant_sentences
-
     def _score_document(
-        self, query: str, document: str, threshold: float
-    ) -> tuple[list[tuple[str, float]], float, int, int]:
-        """Score a single document and compute sentence-level scores and relevant sentences."""
+            self, 
+            query: str, 
+            document: str, 
+            threshold: float) -> tuple[list[dict[str, Any]], int, int]:
+        """Score a single document."""
         import torch
-
         with torch.no_grad():
             input_text = query + f" {self._tokenizer.sep_token} " + document
             model_inputs = self._tokenizer(
-                input_text,
-                truncation=True,
-                padding=False,
-                return_tensors="pt",
-                return_special_tokens_mask=True,
-                return_offsets_mapping=True,
+                input_text, 
+                truncation=True, 
+                padding=False, 
+                return_tensors="pt", 
+                return_special_tokens_mask=True
             )
+            
             model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
-
-            offsets = model_inputs.pop("offset_mapping")[0].cpu().numpy()
+            
             special_tokens_mask = model_inputs.pop("special_tokens_mask")
+            combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool()).cpu().numpy().flatten()
+            # we should mask the query up to the sep token, 
+            # on the combined mask we have to search for the first False
+            # TODO: Check that this is not wrong
+            false_indices = np.where(~combined_mask)[0]
+            start = false_indices[0]
+            end = false_indices[1]
+            combined_mask[start:end] = False
+
 
             results = self._model(**model_inputs)
+
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
-            sep_token_id = self._tokenizer.sep_token_id
-            input_ids = model_inputs["input_ids"][0]  # assuming a batch size of 1
+            pred_mask = (probabilities[:,1] > threshold).cpu().numpy().astype(int).flatten()
+            label_mask = (pred_mask & combined_mask)
 
-            sep_positions = (input_ids == sep_token_id).nonzero(as_tuple=True)[0]
+            positive_probs = probabilities[:, 1].cpu().numpy()
+            transitions = np.diff(np.concatenate([[0], label_mask, [0]]))
+            starts = np.where(transitions == 1)[0]
+            ends = np.where(transitions == -1)[0]
 
-            if len(sep_positions) < 2:
-                # If there's only one or no SEP token found, this logic won't hold.
-                raise ValueError(
-                    "Expected at least two SEP tokens (one after query, one after document)."
-                )
+            spans_with_probs = []
+            token_ids = model_inputs["input_ids"].cpu().numpy()[0]
+            
+            for start, end in zip(starts, ends):
+                span_text = self._tokenizer.decode(token_ids[start:end])
+                span_prob = positive_probs[start:end].mean()
+                spans_with_probs.append({
+                    "text": span_text,
+                    "score": float(span_prob)
+                })
 
-            doc_start = sep_positions[0].item() + 1
-            doc_end = sep_positions[-1].item()
-
-            combined_mask = np.zeros_like(
-                special_tokens_mask.cpu().numpy()[0], dtype=bool
-            )
-            combined_mask[doc_start:doc_end] = True
-
-            pred_mask = (
-                (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
-            )
-            label_mask = pred_mask & combined_mask
-
-            doc_start_str = query + f" {self._tokenizer.sep_token} "
-            doc_start_char = len(doc_start_str)
-
-            doc_token_indices = np.where(combined_mask == 1)[0]
-            doc_offsets = offsets[doc_token_indices]
-            doc_offsets_adjusted = doc_offsets - doc_start_char
-            doc_label_mask = label_mask[doc_token_indices]
-
-            sentence_relevances, relevant_sentences = self.sentence_level_aggregation(
-                document=document,
-                label_mask=doc_label_mask,
-                offsets=doc_offsets_adjusted,
-                threshold=0.5,
-            )
-
-            if len(sentence_relevances) > 0:
-                doc_score = len(relevant_sentences) / len(sentence_relevances)
-            else:
-                doc_score = 0.0
-
-            return (
-                relevant_sentences,
-                doc_score,
-                int(doc_label_mask.sum()),
-                int(len(doc_label_mask)),
-            )
-
+            return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
+        
     @weave.op
     def score(
-        self, output: str, query: str, context: str | list[str], verbose: bool = False
-    ) -> dict[str, Any]:
+        self, 
+        output: str,
+        query: str, 
+        context: str | list[str],
+        verbose: bool = False
+        ) -> tuple[list[dict[str, Any]], float]:
         """Score multiple documents and compute weighted average relevance."""
+        all_spans = []
         total_weighted_score = 0.0
         total_length = 0
-        all_relevant_sentences = []
 
         if isinstance(context, str):
             context = [context]
-        if not query:
-            raise ValueError(
-                "The query must not be empty to score relevance of the context."
-            )
-
-        doc_scores = []
         for doc in context:
-            relevant_sents, doc_score, relevant_tokens, total_tokens = (
-                self._score_document(query, doc, self.threshold)
-            )
-            doc_scores.append(doc_score)
-            if verbose:
-                all_relevant_sentences.append(
-                    {"document": doc, "relevant_sentences": relevant_sents}
-                )
-
+            spans, relevant_tokens, total_tokens = self._score_document(query, doc, self.threshold)
+            
+            all_spans.extend(spans)
+            
             if total_tokens > 0:
+                doc_score = relevant_tokens / total_tokens
                 doc_weight = total_tokens
                 total_weighted_score += doc_score * doc_weight
-                total_length += doc_weight
+                total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
         res = {"flagged": final_score > self.threshold}
-        extras = {"score": round(final_score, 4), "document_scores": doc_scores}
+        res['extras'] = {'score': final_score}
         if verbose:
-            extras["relevant_sentences"] = all_relevant_sentences
-        res["extras"] = extras
+            res['extras']['all_spans'] = all_spans
         return res
