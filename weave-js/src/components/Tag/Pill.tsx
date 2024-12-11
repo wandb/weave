@@ -59,3 +59,42 @@ export const IconOnlyPill: FC<IconOnlyPillProps> = ({
     </Tailwind>
   );
 };
+
+export type ExpandingPillProps = {
+  className?: string;
+  color?: TagColorName;
+  icon: IconName;
+  label: string;
+};
+export const ExpandingPill = ({
+  className,
+  color,
+  icon,
+  label,
+}: ExpandingPillProps) => {
+  const classes = useTagClasses({color, isInteractive: true});
+  return (
+    <Tailwind>
+      <div
+        className={twMerge(
+          classes,
+          'rounded-2xl p-4',
+          'max-w-[22px] hover:max-w-[25ch]',
+          // note: transition delay + duration = 500ms, which matches our default tooltip delay
+          // so that when pairing a pill with a tooltip, the tooltip doesn't lag and appear later
+          'transition-[max-width] delay-200 duration-300',
+          '[&:hover_span]:opacity-100 [&_span]:opacity-0',
+          className
+        )}>
+        <Icon className="h-14 w-14 shrink-0" name={icon} role="presentation" />
+        <span
+          className={twMerge(
+            'max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap px-4',
+            'transition-opacity delay-200 duration-300'
+          )}>
+          {label}
+        </span>
+      </div>
+    </Tailwind>
+  );
+};

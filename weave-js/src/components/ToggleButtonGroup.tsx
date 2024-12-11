@@ -9,6 +9,7 @@ import {Tailwind} from './Tailwind';
 export type ToggleOption = {
   value: string;
   icon?: IconName;
+  isDisabled?: boolean;
 };
 
 export type ToggleButtonGroupProps = {
@@ -37,7 +38,10 @@ export const ToggleButtonGroup = React.forwardRef<
   }
 
   const handleValueChange = (newValue: string) => {
-    if (newValue !== value) {
+    if (
+      newValue !== value &&
+      options.find(option => option.value === newValue)?.isDisabled !== true
+    ) {
       onValueChange(newValue);
     }
   };
@@ -49,34 +53,39 @@ export const ToggleButtonGroup = React.forwardRef<
         onValueChange={handleValueChange}
         className="flex gap-px"
         ref={ref}>
-        {options.map(({value: optionValue, icon}) => (
-          <ToggleGroup.Item
-            key={optionValue}
-            value={optionValue}
-            disabled={isDisabled || value === optionValue}>
-            <Button
-              icon={icon}
-              size={size}
-              className={twMerge(
-                size === 'small' &&
-                  (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
-                size === 'medium' &&
-                  (icon ? 'gap-5 px-7 py-4 text-base' : 'px-10 py-4 text-base'),
-                size === 'large' &&
-                  (icon
-                    ? 'gap-6 px-10 py-8 text-base'
-                    : 'px-12 py-8 text-base'),
-                isDisabled && 'pointer-events-none opacity-35',
-                value === optionValue
-                  ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
-                  : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
-                'first:rounded-l-sm', // First button rounded left
-                'last:rounded-r-sm' // Last button rounded right
-              )}>
-              {optionValue}
-            </Button>
-          </ToggleGroup.Item>
-        ))}
+        {options.map(
+          ({value: optionValue, icon, isDisabled: optionIsDisabled}) => (
+            <ToggleGroup.Item
+              key={optionValue}
+              value={optionValue}
+              disabled={isDisabled}
+              asChild>
+              <Button
+                icon={icon}
+                size={size}
+                className={twMerge(
+                  size === 'small' &&
+                    (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
+                  size === 'medium' &&
+                    (icon
+                      ? 'gap-5 px-7 py-4 text-base'
+                      : 'px-10 py-4 text-base'),
+                  size === 'large' &&
+                    (icon
+                      ? 'gap-6 px-10 py-8 text-base'
+                      : 'px-12 py-8 text-base'),
+                  (isDisabled || optionIsDisabled) && 'cursor-auto opacity-35',
+                  value === optionValue
+                    ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
+                    : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
+                  'first:rounded-l-sm', // First button rounded left
+                  'last:rounded-r-sm' // Last button rounded right
+                )}>
+                {optionValue}
+              </Button>
+            </ToggleGroup.Item>
+          )
+        )}
       </ToggleGroup.Root>
     </Tailwind>
   );

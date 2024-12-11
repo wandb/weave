@@ -149,7 +149,7 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
 
 /**
  * This component will occupy the entire space provided by the parent container.
- * It is intended to be used in teh CompareEvaluations page, as it depends on
+ * It is intended to be used in the CompareEvaluations page, as it depends on
  * the EvaluationComparisonState. However, in principle, it is a general purpose
  * model-output comparison tool. It allows the user to view inputs, then compare
  * model outputs and evaluation metrics across multiple trials.

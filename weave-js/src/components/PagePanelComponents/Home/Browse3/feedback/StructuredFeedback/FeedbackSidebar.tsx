@@ -96,7 +96,7 @@ export const FeedbackSidebar = ({
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
       </div>
-      <div className="min-h-1 mb-8 h-1 flex-grow overflow-auto bg-moon-300" />
+      <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
         <>
           <div className="ml-6 h-full flex-grow overflow-auto">

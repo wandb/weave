@@ -4,6 +4,7 @@ import {
   DEFAULT_POINT_COLOR,
   getFilteringOptionsForPointCloud,
   getVertexCompatiblePositionsAndColors,
+  loadPointCloud,
   MAX_BOUNDING_BOX_LABELS_FOR_DISPLAY,
   MaxAlphaValue,
 } from './SdkPointCloudToBabylon';
@@ -172,5 +173,18 @@ describe('getFilteringOptionsForPointCloud', () => {
     });
     expect(newClassIdToLabel.get(0)).toEqual('label0');
     expect(newClassIdToLabel.get(49)).toEqual('label49');
+  });
+});
+describe('loadPointCloud', () => {
+  it('appropriate defaults set when loading point cloud from file', () => {
+    const fileContents = JSON.stringify({
+      boxes: [],
+      points: [[]],
+      type: 'lidar/beta',
+      vectors: [],
+    });
+    const babylonPointCloud = loadPointCloud(fileContents);
+    expect(babylonPointCloud.points).toHaveLength(1);
+    expect(babylonPointCloud.points[0].position).toEqual([0, 0, 0]);
   });
 });
