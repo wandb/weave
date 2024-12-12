@@ -1,5 +1,5 @@
-import {Button} from '@wandb/weave/components/Button';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Button} from '@wandb/weave/components/Button';
 import React from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
