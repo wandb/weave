@@ -153,6 +153,7 @@ const SelectionHeader: FC<{
   effectiveFilter: WFHighLevelCallFilter;
   filterModel?: GridFilterModel;
   sortModel?: GridSortModel;
+  tableData: FlattenedCallData[];
 }> = ({
   selectedCount,
   isEvaluateTable,
@@ -167,16 +168,30 @@ const SelectionHeader: FC<{
   effectiveFilter,
   filterModel,
   sortModel,
+  tableData,
 }) => {
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const isReadonly =
+    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
+
+  // Get the full call objects for selected calls to send, for bulk actions (like delete)
+  const selectedCallObjects = useMemo(
+    () =>
+      tableData
+        .filter(row => selectedCalls.includes(row.id))
+        .map(traceCallToUICallSchema),
+    [tableData, selectedCalls]
+  );
+
   return (
-    <div className="flex w-full justify-between items-center">
+    <div className="flex w-full items-center justify-between">
       <div className="flex items-center gap-[8px]">
         <Typography>
           {selectedCount} items selected
           <span
-            className="text-teal-600 hover:text-teal-700 font-semibold cursor-pointer ml-[8px]"
-            onClick={onClearSelection}
-          >
+            className="ml-[8px] cursor-pointer font-semibold text-teal-600 hover:text-teal-700"
+            onClick={onClearSelection}>
             Clear selection
           </span>
         </Typography>
@@ -201,10 +216,30 @@ const SelectionHeader: FC<{
             defaultToSelected={true}
           />
         </div>
+        {!isReadonly && (
+          <div className="flex-none">
+            <BulkDeleteButton
+              onClick={() => setDeleteConfirmModalOpen(true)}
+              disabled={selectedCalls.length === 0}
+            />
+            <ConfirmDeleteModal
+              calls={selectedCallObjects}
+              confirmDelete={deleteConfirmModalOpen}
+              setConfirmDelete={setDeleteConfirmModalOpen}
+              onDeleteCallback={onClearSelection}
+            />
+          </div>
+        )}
         {isEvaluateTable ? (
-          <CompareEvaluationsTableButton onClick={onCompareClick} disabled={selectedCount === 0} />
+          <CompareEvaluationsTableButton
+            onClick={onCompareClick}
+            disabled={selectedCount === 0}
+          />
         ) : (
-          <CompareTracesTableButton onClick={onCompareClick} disabled={selectedCount < 2} />
+          <CompareTracesTableButton
+            onClick={onCompareClick}
+            disabled={selectedCount < 2}
+          />
         )}
       </div>
     </div>
@@ -260,11 +295,7 @@ export const CallsTable: FC<{
   setPaginationModel,
   allowedColumnPatterns,
 }) => {
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
-
-  const isReadonly =
-    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
@@ -754,8 +785,6 @@ export const CallsTable: FC<{
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
-  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
-
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
     ? (newModel: GridColumnVisibilityModel) => {
@@ -825,7 +854,7 @@ export const CallsTable: FC<{
       filterListItems={
         selectedCalls.length > 0 ? (
           <TailwindContents>
-            <SelectionHeader 
+            <SelectionHeader
               selectedCount={selectedCalls.length}
               isEvaluateTable={isEvaluateTable}
               onCompareClick={() => {
@@ -854,11 +883,12 @@ export const CallsTable: FC<{
               effectiveFilter={effectiveFilter}
               filterModel={filterModel}
               sortModel={sortModel}
+              tableData={tableData}
             />
           </TailwindContents>
         ) : (
           <TailwindContents>
-            <div className="flex w-full justify-between items-center">
+            <div className="flex w-full items-center justify-between">
               {/* Left side group */}
               <div className="flex items-center gap-[8px]">
                 <RefreshButton
@@ -954,8 +984,8 @@ export const CallsTable: FC<{
                     numTotalCalls={callsTotal}
                     disabled={callsTotal === 0}
                     visibleColumns={visibleColumns}
-                    refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
-                      visibleColumns.includes(col)
+                    refColumnsToExpand={Array.from(expandedRefCols).filter(
+                      col => visibleColumns.includes(col)
                     )}
                     callQueryParams={{
                       entity,
@@ -1061,7 +1091,8 @@ export const CallsTable: FC<{
                 effectiveFilter.traceRootsOnly &&
                 filterModelResolved.items.length === 0
               ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;              }
+                return <Empty {...EMPTY_PROPS_TRACES} />;
+              }
             }
             return (
               <Box
@@ -1161,9 +1192,9 @@ const OpSelector = ({
               sx: {
                 fontSize: '14px',
                 '& .MuiAutocomplete-option': {
-                  fontSize: '14px'
-                }
-              }
+                  fontSize: '14px',
+                },
+              },
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
