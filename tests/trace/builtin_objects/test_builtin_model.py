@@ -4,10 +4,10 @@ from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
-model_args = dict(
-    model="gpt-4o",
-    messages_template=[{"role": "user", "content": "{input}"}],
-    response_format={
+model_args = {
+    "model": "gpt-4o",
+    "messages_template": [{"role": "user", "content": "{input}"}],
+    "response_format": {
         "type": "json_schema",
         "json_schema": {
             "name": "Person",
@@ -20,14 +20,14 @@ model_args = dict(
             },
         },
     },
-)
+}
 
 input_text = "My name is Carlos and I am 42 years old."
 
 expected_result = {"age": 42, "name": "Carlos"}
 
 
-def test_publishing_alignment(client: WeaveClient):
+def test_model_publishing_alignment(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
     publish_ref = weave.publish(model)
 
@@ -46,14 +46,17 @@ def test_publishing_alignment(client: WeaveClient):
 
     assert obj_create_res.digest == publish_ref.digest
 
+    gotten_model = weave.ref(publish_ref.uri()).get()
+    assert isinstance(gotten_model, LiteLLMCompletionModel)
 
-def test_local_create_local_use(client: WeaveClient):
+
+def test_model_local_create_local_use(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
     predict_result = model.predict(input=input_text)
     assert predict_result == {"age": 42, "name": "Carlos"}
 
 
-def test_local_create_remote_use(client: WeaveClient):
+def test_model_local_create_remote_use(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
     publish_ref = weave.publish(model)
     remote_call_res = client.server.call_method(
@@ -79,7 +82,7 @@ def test_local_create_remote_use(client: WeaveClient):
     assert remote_call_read.call.output == expected_result
 
 
-def test_remote_create_local_use(client: WeaveClient):
+def test_model_remote_create_local_use(client: WeaveClient):
     obj_create_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
@@ -104,7 +107,7 @@ def test_remote_create_local_use(client: WeaveClient):
     assert predict_res == expected_result
 
 
-def test_remote_create_remote_use(client: WeaveClient):
+def test_model_remote_create_remote_use(client: WeaveClient):
     obj_create_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {

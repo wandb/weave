@@ -1,5 +1,6 @@
 import weave
 from weave.builtin_objects.models.CompletionModel import LiteLLMCompletionModel
+from weave.builtin_objects.scorers.LLMJudgeScorer import LLMJudgeScorer
 
 _BUILTIN_REGISTRY: dict[str, type[weave.Object]] = {}
 
@@ -19,3 +20,4 @@ def get_builtin(name: str) -> type[weave.Object]:
 
 
 register_builtin(LiteLLMCompletionModel)
+register_builtin(LLMJudgeScorer)

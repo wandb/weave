@@ -18,7 +18,12 @@
   * Important Proof of system: 
     * [x] create the same dummy model locally & invoke -> notice no version change
     * Run locally against the call -> notice that there are no extra objects
+  * [ ]Should de-ref inputs if they contain refs
 * [ ] Refactor the entire "base model" system to conform to this new way of doing things (leaf models)
+  * [ ] Might get hairy with nested refs - consider implications
 * [ ] Figure out how to refactor scorers that use LLMs
   * [ ] a new process with correct env setup (from secret fetcher?)
   * [ ] scorers should have a client-spec, not a specific client
+  * [ ] How to model a scorers's stub (input, output, context, reference(s), etc...)
+  * [ ] How to handle output types from scorers (boolean, number, reason, etc...)
+  
