@@ -116,7 +116,7 @@ def get_mistral_patcher(settings: Optional[IntegrationSettings] = None) -> Multi
         update={"name": base.name or "mistralai.async_client.chat_stream"}
     )
 
-    mistral_patcher = MultiPatcher(
+    _mistral_patcher = MultiPatcher(
         [
             # Patch the sync, non-streaming chat method
             SymbolPatcher(
@@ -144,3 +144,5 @@ def get_mistral_patcher(settings: Optional[IntegrationSettings] = None) -> Multi
             ),
         ]
     )
+
+    return _mistral_patcher
