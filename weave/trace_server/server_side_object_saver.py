@@ -1,6 +1,6 @@
 import multiprocessing
 import typing
-from typing import Any, Callable, Tuple, TypedDict
+from typing import Any, Callable, TypedDict
 
 import weave
 from weave.trace import autopatch
@@ -21,6 +21,18 @@ class ScoreCallResult(TypedDict):
     scorer_call_id: str
 
 
+class RunSaveObjectException(Exception):
+    pass
+
+
+class RunCallMethodException(Exception):
+    pass
+
+
+class RunScoreCallException(Exception):
+    pass
+
+
 class RunAsUser:
     """Executes a function in a separate process for memory isolation.
 
@@ -35,7 +47,7 @@ class RunAsUser:
     @staticmethod
     def _process_runner(
         func: Callable[..., Any],
-        args: Tuple[Any, ...],
+        args: tuple[Any, ...],
         kwargs: dict[str, Any],
         result_queue: multiprocessing.Queue,
     ) -> None:
@@ -52,35 +64,6 @@ class RunAsUser:
             result_queue.put(("success", result))
         except Exception as e:
             result_queue.put(("error", str(e)))
-
-    def run(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-        """Run the provided function in a separate process.
-
-        Args:
-            func: The function to execute
-            *args: Positional arguments to pass to the function
-            **kwargs: Keyword arguments to pass to the function
-
-        Returns:
-            The result of the function execution
-
-        Raises:
-            Exception: If the function execution fails in the child process
-        """
-        result_queue: multiprocessing.Queue[Tuple[str, Any]] = multiprocessing.Queue()
-
-        process = multiprocessing.Process(
-            target=self._process_runner, args=(func, args, kwargs, result_queue)
-        )
-
-        process.start()
-        status, result = result_queue.get()
-        process.join()
-
-        if status == "error":
-            raise Exception(f"Process execution failed: {result}")
-
-        return result
 
     def run_save_object(
         self,
@@ -102,7 +85,7 @@ class RunAsUser:
         Raises:
             Exception: If the save operation fails in the child process
         """
-        result_queue: multiprocessing.Queue[Tuple[str, str]] = multiprocessing.Queue()
+        result_queue: multiprocessing.Queue[tuple[str, str]] = multiprocessing.Queue()
 
         process = multiprocessing.Process(
             target=self._save_object,
@@ -120,7 +103,7 @@ class RunAsUser:
         process.join()
 
         if status == "error":
-            raise Exception(f"Process execution failed: {result}")
+            raise RunSaveObjectException(f"Process execution failed: {result}")
 
         return result
 
@@ -176,7 +159,7 @@ class RunAsUser:
         method_name: str,
         args: dict[str, Any],
     ) -> str:
-        result_queue: multiprocessing.Queue[Tuple[str, Any]] = multiprocessing.Queue()
+        result_queue: multiprocessing.Queue[tuple[str, Any]] = multiprocessing.Queue()
 
         process = multiprocessing.Process(
             target=self._call_method,
@@ -188,7 +171,7 @@ class RunAsUser:
         process.join()
 
         if status == "error":
-            raise Exception(f"Process execution failed: {result}")
+            raise RunCallMethodException(f"Process execution failed: {result}")
 
         return result
 
@@ -243,7 +226,7 @@ class RunAsUser:
             result_queue.put(("error", str(e)))  # Put any errors in the queue
 
     def run_score_call(self, req: tsi.ScoreCallReq) -> ScoreCallResult:
-        result_queue: multiprocessing.Queue[Tuple[str, ScoreCallResult | str]] = (
+        result_queue: multiprocessing.Queue[tuple[str, ScoreCallResult | str]] = (
             multiprocessing.Queue()
         )
 
@@ -257,17 +240,17 @@ class RunAsUser:
         process.join()
 
         if status == "error":
-            raise Exception(f"Process execution failed: {result}")
+            raise RunScoreCallException(f"Process execution failed: {result}")
 
         if isinstance(result, dict):
             return result
         else:
-            raise Exception(f"Unexpected result: {result}")
+            raise RunScoreCallException(f"Unexpected result: {result}")
 
     def _score_call(
         self,
         req: tsi.ScoreCallReq,
-        result_queue: multiprocessing.Queue[Tuple[str, ScoreCallResult | str]],
+        result_queue: multiprocessing.Queue[tuple[str, ScoreCallResult | str]],
     ) -> None:
         try:
             from weave.trace.weave_client import Call
@@ -291,13 +274,13 @@ class RunAsUser:
 
             target_call_ref = parse_internal_uri(req.call_ref)
             if not isinstance(target_call_ref, InternalCallRef):
-                raise ValueError("Invalid call reference")
+                raise TypeError("Invalid call reference")
             target_call = client.get_call(target_call_ref.id)._val
             if not isinstance(target_call, Call):
-                raise ValueError("Invalid call reference")
+                raise TypeError("Invalid call reference")
             scorer_ref = parse_internal_uri(req.scorer_ref)
             if not isinstance(scorer_ref, InternalObjectRef):
-                raise ValueError("Invalid scorer reference")
+                raise TypeError("Invalid scorer reference")
             scorer = weave.ref(
                 ObjectRef(
                     entity="_SERVER_",
@@ -307,7 +290,7 @@ class RunAsUser:
                 ).uri()
             ).get()
             if not isinstance(scorer, weave.Scorer):
-                raise ValueError("Invalid scorer reference")
+                raise TypeError("Invalid scorer reference")
             apply_scorer_res = target_call._apply_scorer(scorer)
 
             autopatch.reset_autopatch()
