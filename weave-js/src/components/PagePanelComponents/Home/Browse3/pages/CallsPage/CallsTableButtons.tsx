@@ -47,6 +47,7 @@ export const ExportSelector = ({
   refColumnsToExpand,
   disabled,
   callQueryParams,
+  defaultToSelected
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
@@ -60,8 +61,11 @@ export const ExportSelector = ({
     gridSort?: GridSortModel;
   };
   disabled: boolean;
+  defaultToSelected?: boolean;
 }) => {
-  const [selectionState, setSelectionState] = useState<SelectionState>('all');
+  const [selectionState, setSelectionState] = useState<SelectionState>(
+    defaultToSelected && selectedCalls.length > 0 ? 'selected' : 'all'
+  );
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
     null
   );

@@ -144,7 +144,30 @@ const SelectionHeader: FC<{
   isEvaluateTable: boolean;
   onCompareClick: () => void;
   onClearSelection: () => void;
-}> = ({selectedCount, isEvaluateTable, onCompareClick, onClearSelection}) => {
+  selectedCalls: string[];
+  callsTotal: number;
+  visibleColumns: string[];
+  expandedRefCols: Set<string>;
+  entity: string;
+  project: string;
+  effectiveFilter: WFHighLevelCallFilter;
+  filterModel?: GridFilterModel;
+  sortModel?: GridSortModel;
+}> = ({
+  selectedCount,
+  isEvaluateTable,
+  onCompareClick,
+  onClearSelection,
+  selectedCalls,
+  callsTotal,
+  visibleColumns,
+  expandedRefCols,
+  entity,
+  project,
+  effectiveFilter,
+  filterModel,
+  sortModel,
+}) => {
   return (
     <div className="flex w-full justify-between items-center">
       <div className="flex items-center gap-[8px]">
@@ -159,6 +182,25 @@ const SelectionHeader: FC<{
         </Typography>
       </div>
       <div className="flex items-center gap-[8px]">
+        <div className="flex-none">
+          <ExportSelector
+            selectedCalls={selectedCalls}
+            numTotalCalls={callsTotal}
+            disabled={callsTotal === 0}
+            visibleColumns={visibleColumns}
+            refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+              visibleColumns.includes(col)
+            )}
+            callQueryParams={{
+              entity,
+              project,
+              filter: effectiveFilter,
+              gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+              gridSort: sortModel,
+            }}
+            defaultToSelected={true}
+          />
+        </div>
         {isEvaluateTable ? (
           <CompareEvaluationsTableButton onClick={onCompareClick} disabled={selectedCount === 0} />
         ) : (
@@ -797,6 +839,15 @@ export const CallsTable: FC<{
                 }
               }}
               onClearSelection={() => setSelectedCalls([])}
+              selectedCalls={selectedCalls}
+              callsTotal={callsTotal}
+              visibleColumns={visibleColumns}
+              expandedRefCols={expandedRefCols}
+              entity={entity}
+              project={project}
+              effectiveFilter={effectiveFilter}
+              filterModel={filterModel}
+              sortModel={sortModel}
             />
           </TailwindContents>
         ) : (
