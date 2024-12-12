@@ -227,7 +227,7 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
+        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400"
         onClick={onClick}>
         <div>
           <IconFilterAlt />
