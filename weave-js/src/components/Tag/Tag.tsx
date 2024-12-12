@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import React, {FC, ReactElement, useMemo, useRef} from 'react';
+import React, {FC, ReactElement, useMemo, useRef, useState, useEffect} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
@@ -100,11 +100,30 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   Wrapper = Tailwind,
 }) => {
   const labelRef = useRef<HTMLParagraphElement>(null);
-  const isTooltipEnabled = isTagLabelTruncated(labelRef);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    const checkTruncation = () => {
+      if (labelRef.current) {
+        setIsTruncated(isTagLabelTruncated(labelRef));
+      }
+    };
+
+    checkTruncation();
+    window.addEventListener('resize', checkTruncation);
+    
+    const timer = setTimeout(checkTruncation, 100);
+
+    return () => {
+      window.removeEventListener('resize', checkTruncation);
+      clearTimeout(timer);
+    };
+  }, [label]);
+
   const classes = useTagClasses({color, isInteractive: true, label});
 
   const nakedTag = (
-    <TagTooltip value={label} disabled={!isTooltipEnabled}>
+    <TagTooltip value={label} disabled={!isTruncated}>
       <div
         key={`tag-${label}`}
         className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
@@ -129,6 +148,5 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   if (Wrapper) {
     return <Wrapper>{nakedTag}</Wrapper>;
   }
-
   return nakedTag;
 };
