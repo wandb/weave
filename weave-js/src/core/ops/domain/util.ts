@@ -1,4 +1,4 @@
-import {list, typedDict, TypedDictType, union} from '../../model';
+import {dict, list, typedDict, union} from '../../model';
 
 /**
  * `connectionToNodes` is a helper function that converts a `connection` type
@@ -66,3 +66,4 @@ export const traceSortByType = union([
   'none',
   list(typedDict({field: 'string', direction: 'string'})),
 ]);
+export const traceQueryType = union(['none', dict('any')])

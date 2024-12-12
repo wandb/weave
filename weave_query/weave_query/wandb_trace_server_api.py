@@ -10,7 +10,7 @@ import requests
 
 from weave_query import errors
 from weave_query import environment as weave_env
-from weave_query import wandb_client_api, engine_trace
+from weave_query import wandb_client_api, engine_trace, weave_http
 
 from weave_query.context_state import WandbApiContext, _wandb_api_context
 
@@ -19,11 +19,10 @@ tracer = engine_trace.tracer()  # type: ignore
 def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
     return _wandb_api_context.get()
 
-# todo(dom): Figure out how to use this async client API within ops.
 class WandbTraceApiAsync:
-    def __init__(self) -> None:
-        self.connector = aiohttp.TCPConnector(limit=50)
-    
+    def __init__(self, http: weave_http.HttpAsync) -> None:
+        self.http = http
+
     async def query_calls_stream(
             self,
             project_id: str,
@@ -31,28 +30,24 @@ class WandbTraceApiAsync:
             limit: typing.Optional[int] = None,
             offset: typing.Optional[int] = None,
             sort_by: typing.Optional[list] = None,
+            query: typing.Optional[dict] = None,
             include_costs: bool = False,
             include_feedback: bool = False,
-            **kwargs: typing.Any
-        ) -> typing.AsyncIterator[dict]:
-            wandb_context = get_wandb_api_context()
-            headers = {'content-type: application/json'}
+        ) -> typing.List[dict]:
+            wandb_api_context = get_wandb_api_context()
+            headers = {'content-type': 'application/json'}
             auth = None
-            
-            if wandb_context is not None:
-                if wandb_context.headers:
-                    headers.update(wandb_context.headers)
-                if wandb_context.api_key is not None:
-                    auth = aiohttp.BasicAuth("api", wandb_context.api_key)
+            cookies = None
+            if wandb_api_context is not None:
+                headers = wandb_api_context.headers
+                cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = aiohttp.BasicAuth("api", wandb_api_context.api_key)
+                if cookies:
+                    headers["authorization"] = "Basic Og=="
 
-            api_key_override = kwargs.pop("api_key", None)
-            if api_key_override:
-                auth = aiohttp.BasicAuth("api", api_key_override)
+            url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
 
-            # todo(dom): Add env var support instead of hardcoding
-            # url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
-            url = "http://127.0.0.1:6345/calls/stream_query"
-            
             payload = {
                 "project_id": project_id,
                 "include_costs": include_costs,
@@ -67,20 +62,10 @@ class WandbTraceApiAsync:
                 payload["offset"] = offset
             if sort_by:
                 payload["sort_by"] = sort_by
+            if query:
+                payload["query"] = query
             
-            payload.update(kwargs)
-
-            async with aiohttp.ClientSession(
-                connector=self.connector,
-                headers=headers,
-            ) as session:
-                async with session.post(url, json=payload) as response:
-                    response.raise_for_status()
-                    async for line in response.content:
-                        if line:
-                            decoded_line = line.decode('utf-8').strip()
-                            if decoded_line:
-                                yield json.loads(decoded_line)
+            return await self.http.query_traces(url, payload, headers=headers, cookies=cookies, auth=auth)
 
 class WandbTraceApiSync:
     def query_calls_stream(
@@ -90,27 +75,28 @@ class WandbTraceApiSync:
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
+        query: typing.Optional[dict] = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         **kwargs: typing.Any
     ) -> typing.Any:
         wandb_context = get_wandb_api_context()
-        headers = {}
+        headers = {'content-type': 'application/json'}
+        auth = None
         
         if wandb_context is not None:
             if wandb_context.headers:
                 headers.update(wandb_context.headers)
-                headers["authorization"] = "Basic Og=="
             if wandb_context.api_key is not None:
                 auth = ("api", wandb_context.api_key)
+            else:
+                headers["authorization"] = "Basic Og=="
 
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
             auth = ("api", api_key_override)
 
-        # todo(dom): Add env var support instead of hardcoding
-        # url = f"https://trace_server.wandb.test/calls/stream_query"
-        url = "http://127.0.0.1:6345/calls/stream_query"
+        url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
         
         payload = {
             "project_id": project_id,
@@ -126,15 +112,16 @@ class WandbTraceApiSync:
             payload["offset"] = offset
         if sort_by:
             payload["sort_by"] = sort_by
+        if query:
+            payload["query"] = query
         
         payload.update(kwargs)
 
-        # todo(dom): Figure out a way to specify the auth kwarg with it
-        # causing a 403 error when it is None (when using the authorization header)
         response = requests.post(
             url,
             json=payload,
             headers=headers,
+            auth=auth if auth else None,
             stream=True
         )
         response.raise_for_status()
@@ -142,9 +129,3 @@ class WandbTraceApiSync:
         for line in response.iter_lines():
             if line:
                 yield json.loads(line.decode('utf-8'))
-
-async def get_wandb_trace_api() -> WandbTraceApiAsync:
-    return WandbTraceApiAsync()
-
-def get_wandb_trace_api_sync() -> WandbTraceApiSync:
-    return WandbTraceApiSync()

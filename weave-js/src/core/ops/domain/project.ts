@@ -1,5 +1,5 @@
 import * as Urls from '../../_external/util/urls';
-import {hash, list, maybe, typedDict, union} from '../../model';
+import {hash, list, typedDict, union} from '../../model';
 import {docType} from '../../util/docs';
 import * as OpKinds from '../opKinds';
 import {
@@ -7,6 +7,7 @@ import {
   traceFilterType,
   traceLimitType,
   traceOffsetType,
+  traceQueryType,
   traceSortByType,
 } from './util';
 
@@ -314,8 +315,9 @@ const projectTracesArgTypes = {
         limit: traceLimitType,
         offset: traceOffsetType,
         sort_by: traceSortByType,
+        query: traceQueryType,
       },
-      ['filter', 'limit', 'offset', 'sort_by']
+      ['filter', 'limit', 'offset', 'sort_by', 'query']
     ),
   ]),
 };
@@ -327,6 +329,7 @@ const projectTracesArgTypesDescription = {
   'payload.limit': `A number representing the limit for number of trace calls`,
   'payload.offset': `A number representing the offset for the number of trace calls`,
   'payload.sort_by': `An array with a dictionary with keys \`field\`(<string>) and \`direction\` ("asc"|"desc")`,
+  'payload.query': `A dictionary to query data inspired by mongodb aggregation operators`,
 };
 
 export const opProjectTracesType = makeProjectOp({

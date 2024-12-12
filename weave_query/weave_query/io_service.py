@@ -35,6 +35,7 @@ from weave_query import (
     uris,
     wandb_api,
     wandb_file_manager,
+    wandb_trace_server_api
 )
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -217,6 +218,7 @@ class Server:
         self.register_handler_fn("ensure_file", self.handle_ensure_file)
         self.register_handler_fn("direct_url", self.handle_direct_url)
         self.register_handler_fn("sleep", self.handle_sleep)
+        self.register_handler_fn("query_traces", self.handle_query_traces)
 
         if process:
             self.request_handler = aioprocessing.AioProcess(
@@ -343,6 +345,7 @@ class Server:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 fs, net, await wandb_api.get_wandb_api()
             )
+            self.wandb_trace_server_api = wandb_trace_server_api.WandbTraceApiAsync(net)
 
             self._request_handler_ready_event.set()
             while True:
@@ -417,6 +420,28 @@ class Server:
         ):
             raise errors.WeaveInternalError("invalid scheme ", uri)
         return await self.wandb_file_manager.ensure_file(uri)
+    
+    async def handle_query_traces(
+        self,
+        project_id: str,
+        filter: typing.Optional[dict] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        sort_by: typing.Optional[list] = None,
+        query: typing.Optional[dict] = None,
+        include_costs: bool = False,
+        include_feedback: bool = False,
+    ) -> list[dict]:
+        return await self.wandb_trace_server_api.query_calls_stream(
+            project_id,
+            filter,
+            limit,
+            offset,
+            sort_by,
+            query,
+            include_costs,
+            include_feedback
+        )
 
     async def handle_ensure_file_downloaded(
         self, download_url: str
@@ -481,12 +506,24 @@ class AsyncConnection:
 
     async def close(self) -> None:
         self.connected = False
+        sentinel = ServerResponse(http_error_code=200, error=False, client_id=self.client_id, id=-1, value=None)
+        await self.response_queue.async_put(sentinel)
+        await self.response_task
 
     async def handle_responses(self) -> None:
-        while self.connected:
-            resp = await self.response_queue.async_get()
-            self.response_queue.task_done()
-            self.requests[resp.id].set_result(resp)
+        try:
+            while self.connected:
+                resp = await self.response_queue.async_get()
+
+                if resp.id == -1:
+                    break
+
+                self.response_queue.task_done()
+                self.requests[resp.id].set_result(resp)
+        finally:
+            for future in self.requests.values():
+                if not future.done():
+                    future.cancel()
 
     async def request(self, name: str, *args: typing.Any) -> typing.Any:
         # Caller must check ServerResponse.error!
@@ -569,6 +606,30 @@ class AsyncConnection:
 
     async def sleep(self, seconds: float) -> float:
         return await self.request("sleep", seconds)
+    
+    async def query_traces(
+        self,
+        project_id: str,
+        filter: typing.Optional[dict] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        sort_by: typing.Optional[list] = None,
+        query: typing.Optional[dict] = None,
+        include_costs: bool = False,
+        include_feedback: bool = False
+    ):
+        res = await self.request(
+            "query_traces",
+            project_id,
+            filter,
+            limit,
+            offset,
+            sort_by,
+            query,
+            include_costs,
+            include_feedback
+        )
+        return res
 
 
 class AsyncClient:
