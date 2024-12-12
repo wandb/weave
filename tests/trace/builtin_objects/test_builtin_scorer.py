@@ -6,7 +6,7 @@
 # 5. Remote Create, Remote Direct Score
 import weave
 from weave.builtin_objects.scorers.LLMJudgeScorer import LLMJudgeScorer
-from weave.trace.weave_client import ApplyScorerResult, Call, WeaveClient
+from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 scorer_args = {
@@ -64,7 +64,9 @@ def make_simple_call():
 
 
 def assert_expected_outcome(
-    target_call: Call, scorer_res: ApplyScorerResult | tsi.ScoreCallRes
+    # target_call: Call, scorer_res: ApplyScorerResult | tsi.ScoreCallRes
+    target_call: Call,
+    scorer_res: dict | tsi.ScoreCallRes,
 ):
     scorer_output = None
     feedback_id = None
