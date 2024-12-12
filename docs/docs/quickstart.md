@@ -50,7 +50,7 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
     import weave
     from openai import OpenAI
 
-    client = OpenAI(api_key="...")
+    client = OpenAI()
 
     # Weave will track the inputs, outputs and code of this function
     # highlight-next-line

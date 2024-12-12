@@ -24,7 +24,7 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     import json
     from openai import OpenAI
 
-    client = OpenAI(api_key="...")
+    client = OpenAI()
 
     # highlight-next-line
     @weave.op()

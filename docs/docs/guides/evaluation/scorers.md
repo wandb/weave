@@ -455,7 +455,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     from weave.scorers import OpenAIModerationScorer
     from openai import OpenAI
 
-    oai_client = OpenAI(api_key=...) # initialize your LLM client here
+    oai_client = OpenAI() # initialize your LLM client here
 
     scorer = OpenAIModerationScorer(
         client=oai_client,
