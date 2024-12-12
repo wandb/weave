@@ -25,37 +25,42 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
   const callId = call?.id || '';
 
   // Convert TraceCallSchema to CallSchema
-  const callSchema: CallSchema = useMemo(() => ({
-    entity: entityName,
-    project: projectName,
-    callId,
-    traceId: call.trace_id,
-    parentId: call.parent_id ?? null,
-    userId: call.wb_user_id ?? null,
-    runId: call.wb_run_id ?? null,
-    spanName: call.op_name ?? '',
-    displayName: call.display_name ?? null,
-    opVersionRef: call.op_name ?? null,
-    rawSpan: {
-      name: call.op_name,
-      inputs: call.inputs,
-      output: call.output ?? {},
-      status_code: traceCallStatusCode(call),
-      exception: call.exception,
-      attributes: call.attributes,
-      summary: {
-        ...call.summary ?? {},
-        latency_s: (call.summary?.weave?.latency_ms ?? 0) / 1000,
+  const callSchema: CallSchema = useMemo(
+    () => ({
+      entity: entityName,
+      project: projectName,
+      callId,
+      traceId: call.trace_id,
+      parentId: call.parent_id ?? null,
+      userId: call.wb_user_id ?? null,
+      runId: call.wb_run_id ?? null,
+      spanName: call.op_name ?? '',
+      displayName: call.display_name ?? null,
+      opVersionRef: call.op_name ?? null,
+      rawSpan: {
+        name: call.op_name,
+        inputs: call.inputs,
+        output: call.output ?? {},
+        status_code: traceCallStatusCode(call),
+        exception: call.exception,
+        attributes: call.attributes,
+        summary: {
+          ...(call.summary ?? {}),
+          latency_s: (call.summary?.weave?.latency_ms ?? 0) / 1000,
+        },
+        span_id: call.id,
+        trace_id: call.trace_id,
+        parent_id: call.parent_id ?? undefined,
+        timestamp: new Date(call.started_at).getTime(),
+        start_time_ms: new Date(call.started_at).getTime(),
+        end_time_ms: call.ended_at
+          ? new Date(call.ended_at).getTime()
+          : undefined,
       },
-      span_id: call.id,
-      trace_id: call.trace_id,
-      parent_id: call.parent_id ?? undefined,
-      timestamp: new Date(call.started_at).getTime(),
-      start_time_ms: new Date(call.started_at).getTime(),
-      end_time_ms: call.ended_at ? new Date(call.ended_at).getTime() : undefined,
-    },
-    traceCall: call
-  }), [call, entityName, projectName, callId]);
+      traceCall: call,
+    }),
+    [call, entityName, projectName, callId]
+  );
 
   // Fetch cost data
   const costCols = useMemo(() => ['id'], []);
@@ -109,7 +114,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
   return (
     <Tailwind>
       <div className="flex w-full items-center justify-center gap-8 py-8">
-        <TraceCostStats 
+        <TraceCostStats
           usageData={usageData}
           costData={costData}
           latency_ms={latency}
