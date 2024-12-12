@@ -1,4 +1,5 @@
 import {SetStateAction, useCallback, useState} from 'react';
+import {cloneDeep} from 'lodash';
 
 import {
   anthropicContentBlocksToChoices,
@@ -12,7 +13,6 @@ import {
   PlaygroundState,
   PlaygroundStateKey,
 } from './types';
-import {cloneDeep} from 'lodash';
 
 export const DEFAULT_SYSTEM_MESSAGE_CONTENT =
   'You are an AI assistant designed to assist users by providing clear, concise, and helpful responses.';
