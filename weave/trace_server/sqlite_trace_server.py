@@ -1110,11 +1110,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
-        return tsi.CostCreateRes()
+        return tsi.CostCreateRes(ids=[])
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         print("COST QUERY is not implemented for local sqlite", req)
-        return tsi.CostQueryRes()
+        return tsi.CostQueryRes(results=[])
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
@@ -1124,7 +1124,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
-        return tsi.CompletionsCreateRes()
+        return tsi.CompletionsCreateRes(response={})
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
