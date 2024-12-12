@@ -210,6 +210,7 @@ export const IconNames = {
   Sort: 'sort',
   SortAscending: 'sort-ascending',
   SortDescending: 'sort-descending',
+  Spiral: 'spiral',
   Split: 'split',
   Square: 'square',
   Star: 'star',
