@@ -431,6 +431,34 @@ def get_openai_patcher(
                 "AsyncCompletions.parse",
                 create_wrapper_async(settings=async_completions_parse_settings),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.moderations"
+                ),
+                "Moderations.create",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.moderations"
+                ),
+                "AsyncModerations.create",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.embeddings"
+                ),
+                "Embeddings.create",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.embeddings"
+                ),
+                "AsyncEmbeddings.create",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
         ]
     )
 
