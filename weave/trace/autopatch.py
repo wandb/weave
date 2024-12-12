@@ -41,10 +41,8 @@ class AutopatchSettings(BaseModel):
     google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -64,7 +62,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
@@ -73,7 +71,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         settings = AutopatchSettings()
 
     get_openai_patcher(settings.openai).attempt_patch()
-    mistral_patcher.attempt_patch()
+    get_mistral_patcher(settings.mistral).attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -101,13 +99,13 @@ def reset_autopatch() -> None:
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mistral import mistral_patcher
+    from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
     get_openai_patcher().undo_patch()
-    mistral_patcher.undo_patch()
+    get_mistral_patcher().undo_patch()
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
