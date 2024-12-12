@@ -73,7 +73,13 @@ class RunAsUser:
 
         return result
 
-    def run_save_object(self, new_obj: Any, project_id: str, user_id: str) -> str:
+    def run_save_object(
+        self,
+        new_obj: Any,
+        project_id: str,
+        object_name: str | None,
+        user_id: str | None,
+    ) -> str:
         """Run the save_object operation in a separate process.
 
         Args:
@@ -91,7 +97,13 @@ class RunAsUser:
 
         process = multiprocessing.Process(
             target=self._save_object,
-            args=(new_obj, project_id, user_id, result_queue),  # Pass result_queue here
+            args=(
+                new_obj,
+                project_id,
+                object_name,
+                user_id,
+                result_queue,
+            ),  # Pass result_queue here
         )
 
         process.start()
@@ -107,7 +119,8 @@ class RunAsUser:
         self,
         new_obj: Any,
         project_id: str,
-        user_id: str,
+        object_name: str | None,
+        user_id: str | None,
         result_queue: multiprocessing.Queue,
     ) -> None:
         """Save an object in a separate process.
@@ -115,6 +128,7 @@ class RunAsUser:
         Args:
             new_obj: The object to save
             project_id: The project identifier
+            object_name: The name of the object
             user_id: The user identifier
             result_queue: Queue to store the operation's result
         """
@@ -137,8 +151,7 @@ class RunAsUser:
             ic = InitializedClient(client)
             autopatch.autopatch()
 
-            # TODO: get the name
-            res = weave.publish(new_obj).digest
+            res = weave.publish(new_obj, name=object_name).digest
             autopatch.reset_autopatch()
             client._flush()
             ic.reset()

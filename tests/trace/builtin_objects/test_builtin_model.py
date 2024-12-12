@@ -53,7 +53,7 @@ def test_model_publishing_alignment(client: WeaveClient):
 def test_model_local_create_local_use(client: WeaveClient):
     model = LiteLLMCompletionModel(**model_args)
     predict_result = model.predict(input=input_text)
-    assert predict_result == {"age": 42, "name": "Carlos"}
+    assert predict_result == expected_result
 
 
 def test_model_local_create_remote_use(client: WeaveClient):

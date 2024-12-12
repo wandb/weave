@@ -14,11 +14,11 @@ class LLMJudgeScorer(weave.Scorer):
     response_format: dict = None
 
     @weave.op()
-    def score(self, call_inputs, call_output) -> str:
+    def score(self, inputs, output) -> str:
         user_prompt = json.dumps(
             {
-                "inputs": call_inputs,
-                "output": call_output,
+                "inputs": inputs,
+                "output": output,
             }
         )
 

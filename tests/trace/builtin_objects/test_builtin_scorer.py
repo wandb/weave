@@ -6,7 +6,7 @@
 # 5. Remote Create, Remote Direct Score
 import weave
 from weave.builtin_objects.scorers.LLMJudgeScorer import LLMJudgeScorer
-from weave.trace.weave_client import WeaveClient
+from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 scorer_args = {
@@ -20,12 +20,15 @@ scorer_args = {
                 "type": "object",
                 "properties": {
                     "is_correct": {"type": "boolean"},
-                    "reasoning": {"type": "string"},
                 },
             },
         },
     },
 }
+
+score_input = {"inputs": {"question": "What color is the sky?"}, "output": "blue"}
+
+expected_score = {"is_correct": True}
 
 
 def test_scorer_publishing_alignment(client: WeaveClient):
@@ -49,3 +52,88 @@ def test_scorer_publishing_alignment(client: WeaveClient):
 
     gotten_model = weave.ref(publish_ref.uri()).get()
     assert isinstance(gotten_model, LLMJudgeScorer)
+
+
+def make_simple_call():
+    @weave.op
+    def simple_op(question: str) -> str:
+        return "blue"
+
+    res, call = simple_op.call("What color is the sky?")
+    return res, call
+
+
+def assert_expected_outcome(target_call: Call, scorer_res_as_dict: dict):
+    assert scorer_res_as_dict["score_call"].output == expected_score
+    feedbacks = list(target_call.feedback)
+    assert len(feedbacks) == 1
+    assert feedbacks[0].payload["output"] == expected_score
+    assert feedbacks[0].id == scorer_res_as_dict["feedback_id"]
+
+
+def do_remote_score(
+    client: WeaveClient, target_call: Call, scorer_ref: weave.ObjectRef
+):
+    return client.server.score_call(
+        tsi.ScoreCallReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "call_ref": target_call.ref.uri(),
+                "scorer_ref": scorer_ref.uri(),
+            }
+        )
+    )
+
+
+def make_remote_scorer(client: WeaveClient):
+    obj_create_res = client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client._project_id(),
+                    "object_id": "CorrectnessJudge",
+                    "val": scorer_args,
+                    "set_leaf_object_class": "LLMJudgeScorer",
+                }
+            }
+        )
+    )
+    client._flush()
+    obj_ref = weave.ObjectRef(
+        entity=client._project_id().split("/")[0],
+        project=client._project_id().split("/")[1],
+        name="CorrectnessJudge",
+        _digest=obj_create_res.digest,
+    )
+    return obj_ref
+
+
+def test_scorer_local_create_local_use(client: WeaveClient):
+    scorer = LLMJudgeScorer(**scorer_args)
+    res, call = make_simple_call()
+    apply_scorer_res = call._apply_scorer(scorer)
+    assert_expected_outcome(call, apply_scorer_res)
+
+
+def test_scorer_local_create_remote_use(client: WeaveClient):
+    scorer = LLMJudgeScorer(**scorer_args)
+    res, call = make_simple_call()
+    publish_ref = weave.publish(scorer)
+    remote_score_res = do_remote_score(client, call, publish_ref)
+    assert_expected_outcome(call, remote_score_res.model_dump())
+
+
+def test_scorer_remote_create_local_use(client: WeaveClient):
+    obj_ref = make_remote_scorer(client)
+    fetched = weave.ref(obj_ref.uri()).get()
+    assert isinstance(fetched, LLMJudgeScorer)
+    res, call = make_simple_call()
+    apply_scorer_res = call._apply_scorer(fetched)
+    assert_expected_outcome(call, apply_scorer_res)
+
+
+def test_scorer_remote_create_remote_use(client: WeaveClient):
+    obj_ref = make_remote_scorer(client)
+    res, call = make_simple_call()
+    remote_score_res = do_remote_score(client, call, obj_ref)
+    assert_expected_outcome(call, remote_score_res.model_dump())

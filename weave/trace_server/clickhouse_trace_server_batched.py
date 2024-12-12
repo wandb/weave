@@ -582,7 +582,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             new_obj = object_class_type.model_validate(req.obj.val)
             runner = RunAsUser(ch_server_dump=self.model_dump())
-            digest = runner.run_save_object(new_obj, req.obj.project_id, None)
+            digest = runner.run_save_object(
+                new_obj, req.obj.project_id, req.obj.object_id, None
+            )
             return tsi.ObjCreateRes(digest=digest)
 
         val, base_object_class = process_incoming_object_val(
