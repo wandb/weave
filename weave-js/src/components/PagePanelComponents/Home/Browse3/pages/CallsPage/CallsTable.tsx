@@ -27,6 +27,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
   Icon,
@@ -110,7 +111,6 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import {Button} from '@wandb/weave/components/Button';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 

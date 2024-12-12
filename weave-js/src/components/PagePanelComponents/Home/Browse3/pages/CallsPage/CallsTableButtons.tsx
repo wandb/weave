@@ -47,7 +47,7 @@ export const ExportSelector = ({
   refColumnsToExpand,
   disabled,
   callQueryParams,
-  defaultToSelected
+  defaultToSelected,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
