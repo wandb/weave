@@ -54,7 +54,7 @@ class AutopatchSettings(BaseModel):
 def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
-    from weave.integrations.cohere.cohere_sdk import cohere_patcher
+    from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         google_genai_patcher,
@@ -82,7 +82,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     instructor_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
     get_cerebras_patcher(settings.cerebras).attempt_patch()
-    cohere_patcher.attempt_patch()
+    get_cohere_patcher(settings.cohere).attempt_patch()
     google_genai_patcher.attempt_patch()
     notdiamond_patcher.attempt_patch()
     vertexai_patcher.attempt_patch()
@@ -91,7 +91,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
 def reset_autopatch() -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
-    from weave.integrations.cohere.cohere_sdk import cohere_patcher
+    from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.dspy.dspy_sdk import dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         google_genai_patcher,
@@ -116,7 +116,7 @@ def reset_autopatch() -> None:
     instructor_patcher.undo_patch()
     dspy_patcher.undo_patch()
     get_cerebras_patcher().undo_patch()
-    cohere_patcher.undo_patch()
+    get_cohere_patcher().undo_patch()
     google_genai_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
     vertexai_patcher.undo_patch()
