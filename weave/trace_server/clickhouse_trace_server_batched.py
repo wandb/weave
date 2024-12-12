@@ -1503,6 +1503,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             response=res.response, weave_call_id=start_call.id
         )
 
+    def _make_purge_query(self, project_id: str, table_name: str) -> str:
+        return f"DELETE FROM {table_name} WHERE project_id = '{project_id}'"
+
+    def permanently_delete_project(
+        self, req: tsi.PermanentlyDeleteProjectReq
+    ) -> tsi.PermanentlyDeleteProjectRes:
+        """Purge all data in a project. Irreversible.
+
+        1. Delete all call data
+        2. Delete all object data
+        3. Delete all table/table_row data
+        4. Delete all file data
+        5. Delete all feedback data
+        6. Delete all cost data (?)
+        """
+        tables_to_purge = [
+            "call_parts",
+            "object_versions",
+            "tables",
+            "table_rows",
+            "files",
+            "feedback",
+            "cost",
+        ]
+
+        for table in tables_to_purge:
+            query = self._make_purge_query(req.project_id, table)
+            self.ch_client.query(query)
+
+        return tsi.PermanentlyDeleteProjectRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
