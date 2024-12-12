@@ -53,17 +53,11 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
   const feedbackSpecRef = props.hfSpec.ref;
 
   useEffect(() => {
-    if (!props.readOnly) {
-      // We don't need to listen for feedback changes if the cell is editable
-      // it is being controlled by local state
-      return;
-    }
     return getTsClient().registerOnFeedbackListener(
       props.callRef,
       query.refetch
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.callRef]);
+  }, [props.callRef, query.refetch, getTsClient]);
 
   useEffect(() => {
     if (foundFeedbackCallRef && props.callRef !== foundFeedbackCallRef) {
@@ -183,13 +177,22 @@ const FeedbackComponentSelector: React.FC<{
   }) => {
     const wrappedOnAddFeedback = useCallback(
       async (value: any) => {
+        if (value == null || value === foundValue || value === '') {
+          // Remove from unsaved changes if value is invalid
+          setUnsavedFeedbackChanges(curr => {
+            const rest = {...curr};
+            delete rest[feedbackSpecRef];
+            return rest;
+          });
+          return true;
+        }
         setUnsavedFeedbackChanges(curr => ({
           ...curr,
           [feedbackSpecRef]: () => onAddFeedback(value),
         }));
         return true;
       },
-      [onAddFeedback, setUnsavedFeedbackChanges, feedbackSpecRef]
+      [onAddFeedback, setUnsavedFeedbackChanges, feedbackSpecRef, foundValue]
     );
 
     switch (type) {
@@ -346,21 +349,10 @@ export const NumericalFeedbackColumn = ({
   focused?: boolean;
   isInteger?: boolean;
 }) => {
-  const debouncedFn = useMemo(
-    () =>
-      _.debounce((val: number | null) => onAddFeedback?.(val), DEBOUNCE_VAL),
-    [onAddFeedback]
-  );
-  useEffect(() => {
-    return () => {
-      debouncedFn.cancel();
-    };
-  }, [debouncedFn]);
-
   return (
     <NumericalTextField
       value={defaultValue}
-      onChange={debouncedFn}
+      onChange={value => onAddFeedback?.(value)}
       min={min}
       max={max}
       isInteger={isInteger}
@@ -446,7 +438,7 @@ export const EnumFeedbackColumn = ({
     }));
     return opts;
   }, [options]);
-  const [value, setValue] = useState<Option | undefined>(undefined);
+  const [value, setValue] = useState<Option | null>(null);
 
   useEffect(() => {
     const found = dropdownOptions.find(option => option.value === defaultValue);
@@ -457,17 +449,19 @@ export const EnumFeedbackColumn = ({
 
   const onValueChange = useCallback(
     (newValue: Option | null) => {
-      if (newValue == null || newValue.value === value?.value) {
-        return;
-      }
       setValue(newValue);
-      onAddFeedback?.(newValue.value);
+      onAddFeedback?.(newValue?.value ?? '');
     },
-    [value?.value, onAddFeedback]
+    [onAddFeedback]
   );
 
   return (
-    <Select options={dropdownOptions} value={value} onChange={onValueChange} />
+    <Select
+      autoFocus={focused}
+      options={dropdownOptions}
+      value={value}
+      onChange={onValueChange}
+    />
   );
 };
 
@@ -573,6 +567,7 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
       // If val is null but v isn't empty, there's a format error
       if (val === null) {
         setError(true);
+        onChange(null);
         return;
       }
 
@@ -582,6 +577,7 @@ export const NumericalTextField: React.FC<NumericalTextFieldProps> = ({
         (max != null && parsedVal > max)
       ) {
         setError(true);
+        onChange(null);
         return;
       }
 
