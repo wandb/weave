@@ -35,7 +35,6 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
 }: PlaygroundChatProps) => {
-  console.log('playgroundStates', playgroundStates);
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
