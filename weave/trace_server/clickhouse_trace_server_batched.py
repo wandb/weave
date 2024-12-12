@@ -84,12 +84,6 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.objects_query_builder import (
     ObjectQueryBuilder,
     format_metadata_objects_from_query_result,
-    format_object_metadata_from_query_result,
-    format_object_values_from_query_result,
-    format_objects_from_query_result,
-    make_object_values_query,
-    make_object_values_query_and_parameters,
-    make_select_object_metadata_query,
 )
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -106,7 +100,6 @@ from weave.trace_server.token_costs import (
 )
 from weave.trace_server.trace_server_common import (
     LRUCache,
-    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
