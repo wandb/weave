@@ -27,6 +27,7 @@
   * [ ] How to model a scorers's stub (input, output, context, reference(s), etc...)
   * [ ] How to handle output types from scorers (boolean, number, reason, etc...)
   * [ ]Investigate why the tests are running so slowly
+* [ ] Consider a rule: objectId must be different than the name of the class when creating these objects
 
 
 ---- Decomposition PRs ----

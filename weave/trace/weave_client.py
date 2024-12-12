@@ -487,7 +487,9 @@ class Call:
         scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
         if "inputs" in scorer_arg_names:
-            score_args = {"inputs": {k: v for k, v in self.inputs.items() if k != "self"}}
+            score_args = {
+                "inputs": {k: v for k, v in self.inputs.items() if k != "self"}
+            }
         else:
             score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
         if self_arg is not None:
