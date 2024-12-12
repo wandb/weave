@@ -384,3 +384,11 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
         return self._ref_apply(self._internal_trace_server.call_method, req)
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_user_id = req.wb_user_id
+        if original_user_id is None:
+            raise ValueError("wb_user_id cannot be None")
+        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
+        return self._ref_apply(self._internal_trace_server.score_call, req)

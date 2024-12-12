@@ -880,6 +880,18 @@ class CallMethodRes(BaseModel):
     output: Any
 
 
+class ScoreCallReq(BaseModel):
+    project_id: str
+    call_ref: str
+    scorer_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreCallRes(BaseModel):
+    feedback_id: str
+    score_call: CallSchema
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -925,6 +937,7 @@ class TraceServerInterface(Protocol):
 
     # Execute API
     def call_method(self, req: CallMethodReq) -> CallMethodRes: ...
+    def score_call(self, req: ScoreCallReq) -> ScoreCallRes: ...
 
     # Action API
     def actions_execute_batch(

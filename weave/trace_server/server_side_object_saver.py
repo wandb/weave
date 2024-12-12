@@ -9,7 +9,11 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_uri
+from weave.trace_server.refs_internal import (
+    InternalCallRef,
+    InternalObjectRef,
+    parse_internal_uri,
+)
 
 
 class RunAsUser:
@@ -233,6 +237,84 @@ class RunAsUser:
         except Exception as e:
             result_queue.put(("error", str(e)))  # Put any errors in the queue
 
+    def run_score_call(self, req: tsi.ScoreCallReq) -> str:
+        result_queue = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._score_call,
+            args=(req, result_queue),
+        )
+
+        process.start()
+        status, result = result_queue.get()
+        process.join()
+
+        if status == "error":
+            raise Exception(f"Process execution failed: {result}")
+
+        return result
+
+    def _score_call(
+        self,
+        req: tsi.ScoreCallReq,
+        result_queue: multiprocessing.Queue,
+    ) -> None:
+        try:
+            from weave.trace.weave_client import Call
+            from weave.trace_server.clickhouse_trace_server_batched import (
+                ClickHouseTraceServer,
+            )
+
+            client = WeaveClient(
+                "_SERVER_",
+                req.project_id,
+                UserInjectingExternalTraceServer(
+                    ClickHouseTraceServer(**self.ch_server_dump),
+                    id_converter=IdConverter(),
+                    user_id=req.wb_user_id,
+                ),
+                False,
+            )
+
+            ic = InitializedClient(client)
+            autopatch.autopatch()
+
+            target_call_ref = parse_internal_uri(req.call_ref)
+            if not isinstance(target_call_ref, InternalCallRef):
+                raise ValueError("Invalid call reference")
+            target_call = client.get_call(target_call_ref.id)._val
+            if not isinstance(target_call, Call):
+                raise ValueError("Invalid call reference")
+            scorer_ref = parse_internal_uri(req.scorer_ref)
+            if not isinstance(scorer_ref, InternalObjectRef):
+                raise ValueError("Invalid scorer reference")
+            scorer = weave.ref(
+                ObjectRef(
+                    entity="_SERVER_",
+                    project=scorer_ref.project_id,
+                    name=scorer_ref.name,
+                    _digest=scorer_ref.version,
+                ).uri()
+            ).get()
+            if not isinstance(scorer, weave.Scorer):
+                raise ValueError("Invalid scorer reference")
+            apply_scorer_res = target_call._apply_scorer(scorer)
+
+            autopatch.reset_autopatch()
+            client._flush()
+            ic.reset()
+            result_queue.put(
+                (
+                    "success",
+                    {
+                        "feedback_id": apply_scorer_res["feedback_id"],
+                        "scorer_call_id": apply_scorer_res["score_call"].id,
+                    },
+                )
+            )  # Put the result in the queue
+        except Exception as e:
+            result_queue.put(("error", str(e)))  # Put any errors in the queue
+
 
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
@@ -296,3 +378,7 @@ class UserInjectingExternalTraceServer(
     def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
         req.wb_user_id = self._user_id
         return super().call_method(req)
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        req.wb_user_id = self._user_id
+        return super().score_call(req)

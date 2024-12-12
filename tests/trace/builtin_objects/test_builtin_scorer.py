@@ -6,7 +6,7 @@
 # 5. Remote Create, Remote Direct Score
 import weave
 from weave.builtin_objects.scorers.LLMJudgeScorer import LLMJudgeScorer
-from weave.trace.weave_client import Call, WeaveClient
+from weave.trace.weave_client import ApplyScorerResult, Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 scorer_args = {
@@ -63,12 +63,23 @@ def make_simple_call():
     return res, call
 
 
-def assert_expected_outcome(target_call: Call, scorer_res_as_dict: dict):
-    assert scorer_res_as_dict["score_call"].output == expected_score
+def assert_expected_outcome(
+    target_call: Call, scorer_res: ApplyScorerResult | tsi.ScoreCallRes
+):
+    scorer_output = None
+    feedback_id = None
+    if isinstance(scorer_res, tsi.ScoreCallRes):
+        scorer_output = scorer_res.score_call.output
+        feedback_id = scorer_res.feedback_id
+    else:
+        scorer_output = scorer_res["score_call"].output
+        feedback_id = scorer_res["feedback_id"]
+
+    assert scorer_output == expected_score
     feedbacks = list(target_call.feedback)
     assert len(feedbacks) == 1
     assert feedbacks[0].payload["output"] == expected_score
-    assert feedbacks[0].id == scorer_res_as_dict["feedback_id"]
+    assert feedbacks[0].id == feedback_id
 
 
 def do_remote_score(
@@ -120,7 +131,7 @@ def test_scorer_local_create_remote_use(client: WeaveClient):
     res, call = make_simple_call()
     publish_ref = weave.publish(scorer)
     remote_score_res = do_remote_score(client, call, publish_ref)
-    assert_expected_outcome(call, remote_score_res.model_dump())
+    assert_expected_outcome(call, remote_score_res)
 
 
 def test_scorer_remote_create_local_use(client: WeaveClient):
@@ -136,4 +147,4 @@ def test_scorer_remote_create_remote_use(client: WeaveClient):
     obj_ref = make_remote_scorer(client)
     res, call = make_simple_call()
     remote_score_res = do_remote_score(client, call, obj_ref)
-    assert_expected_outcome(call, remote_score_res.model_dump())
+    assert_expected_outcome(call, remote_score_res)

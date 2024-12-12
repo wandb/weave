@@ -1537,6 +1537,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.CallMethodRes.model_validate(res)
 
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        from weave.trace_server.server_side_object_saver import RunAsUser
+
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        res = runner.run_score_call(req)
+
+        return tsi.ScoreCallRes(
+            feedback_id=res["feedback_id"],
+            score_call=self.call_read(
+                tsi.CallReadReq(project_id=req.project_id, id=res["scorer_call_id"])
+            ).call,
+        )
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

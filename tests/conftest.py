@@ -334,6 +334,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().call_method(req)
 
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        req.wb_user_id = self._user_id
+        return super().score_call(req)
+
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():
