@@ -40,7 +40,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
       rawSpan: {
         name: call.op_name,
         inputs: call.inputs,
-        output: call.output ?? {},
+        output: (call.output ?? {}) as {[key: string]: any; _keys?: string[]},
         status_code: traceCallStatusCode(call),
         exception: call.exception,
         attributes: call.attributes,
