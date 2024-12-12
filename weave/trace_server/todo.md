@@ -27,3 +27,8 @@
   * [ ] How to model a scorers's stub (input, output, context, reference(s), etc...)
   * [ ] How to handle output types from scorers (boolean, number, reason, etc...)
   * [ ]Investigate why the tests are running so slowly
+
+
+---- Decomposition PRs ----
+1. Change/Add the set_object_class instead of base_object_class
+2. Add new methods to the server

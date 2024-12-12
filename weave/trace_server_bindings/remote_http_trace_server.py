@@ -574,6 +574,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/execute/method", req, tsi.CallMethodReq, tsi.CallMethodRes
         )
 
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        return self._generic_request(
+            "/execute/score_call", req, tsi.ScoreCallReq, tsi.ScoreCallRes
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
