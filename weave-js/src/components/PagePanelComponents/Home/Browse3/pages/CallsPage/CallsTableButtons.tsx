@@ -411,14 +411,13 @@ export const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare
+      Compare evals
     </Button>
   </Box>
 );
@@ -435,13 +434,13 @@ export const CompareTracesTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
       size="medium"
-      variant="primary"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
+      icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare
+      Compare traces
     </Button>
   </Box>
 );
@@ -481,7 +480,7 @@ export const RefreshButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant="outline"
+        variant="ghost"
         size="medium"
         onClick={onClick}
         disabled={disabled}
