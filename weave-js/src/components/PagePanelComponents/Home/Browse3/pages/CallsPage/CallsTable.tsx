@@ -27,7 +27,6 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {Switch} from '@wandb/weave/components';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
   Icon,
@@ -111,6 +110,7 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {Button} from '@wandb/weave/components/Button';
 const MAX_EVAL_COMPARISONS = 5;
 const MAX_SELECT = 100;
 
@@ -640,6 +640,12 @@ export const CallsTable: FC<{
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  // Add useEffect to clear selections when isEvaluateTable changes
+  useEffect(() => {
+    setSelectedCalls([]);
+  }, [isEvaluateTable]);
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -916,6 +922,7 @@ export const CallsTable: FC<{
                   />
                 )}
                 <ButtonDivider />
+                {/* Column Visibility Button */}
                 {columnVisibilityModel && setColumnVisibilityModel && (
                   <div className="flex-none">
                     <ManageColumnsButton
@@ -925,18 +932,18 @@ export const CallsTable: FC<{
                     />
                   </div>
                 )}
-                <div className="flex items-center gap-6">
-                  <Switch.Root
-                    id="tracesMetricsSwitch"
-                    size="small"
-                    checked={isMetricsChecked}
-                    onCheckedChange={setMetricsChecked}>
-                    <Switch.Thumb size="small" checked={isMetricsChecked} />
-                </Switch.Root>
-                <label className="cursor-pointer" htmlFor="tracesMetricsSwitch">
-                  Metrics
-                  </label>
-                </div>
+                {/* Metrics Button */}
+                {!hideOpSelector && (
+                  <div className="flex items-center gap-6">
+                    <div className="flex-none">
+                      <Button
+                        icon="chart-vertical-bars"
+                        variant={isMetricsChecked ? 'secondary' : 'ghost'}
+                        onClick={() => setMetricsChecked(!isMetricsChecked)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right side group */}
@@ -1054,8 +1061,7 @@ export const CallsTable: FC<{
                 effectiveFilter.traceRootsOnly &&
                 filterModelResolved.items.length === 0
               ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;
-              }
+                return <Empty {...EMPTY_PROPS_TRACES} />;              }
             }
             return (
               <Box
