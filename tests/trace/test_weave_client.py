@@ -1544,3 +1544,147 @@ def test_long_display_names_are_elided(client):
     calls = list(func.calls())
     call = calls[0]
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+
+def test_object_deletion(client):
+    # Simple case, delete a single version of an object
+    obj = {"a": 5}
+    weave_obj = client.save(obj, "my-obj")
+    assert client.get(weave_obj.ref) == obj
+
+    client.delete_object_version(weave_obj.ref)
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj.ref)
+
+    # create 3 versions of the object
+    obj["a"] = 6
+    weave_obj2 = client.save(obj, "my-obj")
+    obj["a"] = 7
+    weave_obj3 = client.save(obj, "my-obj")
+    obj["a"] = 8
+    weave_obj4 = client.save(obj, "my-obj")
+
+    # delete weave_obj3 with class method
+    weave_obj3.delete()
+
+    # make sure we can't get the deleted object
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj3.ref)
+
+    # make sure we can still get the existing object versions
+    assert client.get(weave_obj4.ref)
+    assert client.get(weave_obj2.ref)
+
+    # count the number of versions of the object
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
+        )
+    )
+    assert len(versions.objs) == 2
+
+    # iterate over the versions, confirm the indexes are correct
+    assert versions.objs[0].version_index == 3
+    assert versions.objs[1].version_index == 1
+
+    weave_obj4.delete()
+    weave_obj2.delete()
+
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+        )
+    )
+    assert len(versions.objs) == 0
+
+
+def test_recursive_object_deletion(client):
+    # Create a bunch of objects that refer to each other
+    obj1 = {"a": 5}
+    obj1_ref = client.save(obj1, "obj1").ref
+
+    obj2 = {"b": obj1_ref}
+    obj2_ref = client.save(obj2, "obj2").ref
+
+    obj3 = {"c": obj2_ref}
+    obj3_ref = client.save(obj3, "obj3").ref
+
+    # Delete obj1
+    client.get(obj1_ref).delete()
+
+    # Make sure we can't get obj1
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        out = client.get(obj1_ref)
+        print(out)
+
+    # Make sure we can get obj2, but the ref to object 1 should return None
+    assert client.get(obj2_ref) == {"b": None}
+    # Object2 should store the ref to object2, as instantiated
+    assert client.get(obj3_ref) == {"c": obj2}
+
+
+def test_delete_all_versions(client):
+    obj = {"a": 5}
+    weave_obj = client.save(obj, "my-obj")
+    assert client.get(weave_obj.ref) == obj
+
+    client.delete_object_all_versions(weave_obj.ref)
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj.ref)
+
+    # create 10 versions of the object
+    for i in range(10):
+        obj["a"] = i
+        weave_obj = client.save(obj, "my-obj-2")
+
+    client.delete_object_all_versions(weave_obj.ref)
+    objs = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj-2"],
+        )
+    ).objs
+    assert len(objs) == 0
+
+
+@pytest.mark.skip("Deleting tables is not yet supported.")
+def test_table_object_deletion(client):
+    # create a dataset
+    data = [{"a": 1}, {"a": 2}, {"a": 3}]
+    dataset = weave.Table(data)
+    dataset_ref = client.save(dataset, "my-dataset").ref
+
+    # get the dataset
+    assert client.get(dataset_ref) == dataset
+
+    # delete the dataset
+    client.delete_object_version(dataset_ref)
+
+    # make sure we can't get the dataset
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(dataset_ref)
+
+    # recreate the EXACT SAME dataset
+    dataset = weave.Table(data)
+    dataset_ref = client.save(dataset, "my-dataset").ref
+
+    assert client.get(dataset_ref) == dataset
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=dataset_ref.name,
+            digest=dataset_ref.digest,
+        )
+    )
+    # Version should be bumped
+    assert read_res.obj.version_index == 1
+
+    # delete the dataset again
+    client.delete_object_version(dataset_ref)
+
+    # make sure we can't get the dataset
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(dataset_ref)
