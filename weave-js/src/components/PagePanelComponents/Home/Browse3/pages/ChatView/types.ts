@@ -113,5 +113,3 @@ export type Chat = {
   request: ChatRequest | null;
   result: ChatCompletion | null;
 };
-
-export type ChoicesMode = 'linear' | 'carousel';
