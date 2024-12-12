@@ -206,6 +206,7 @@ export {
   IconSort,
   IconSortAscending,
   IconSortDescending,
+  IconSpiral,
   IconSplit,
   IconSquare,
   IconStar,
