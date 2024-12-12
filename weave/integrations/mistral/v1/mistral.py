@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import importlib
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from mistralai.models import (
@@ -12,13 +14,13 @@ if TYPE_CHECKING:
         CompletionEvent,
     )
 
-_mistral_patcher: Optional[MultiPatcher] = None
+_mistral_patcher: MultiPatcher | None = None
 
 
 def mistral_accumulator(
-    acc: Optional["ChatCompletionResponse"],
-    value: "CompletionEvent",
-) -> "ChatCompletionResponse":
+    acc: ChatCompletionResponse | None,
+    value: CompletionEvent,
+) -> ChatCompletionResponse:
     # This import should be safe at this point
     from mistralai.models import (
         AssistantMessage,
@@ -101,14 +103,18 @@ def mistral_wrapper(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def get_mistral_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
-    global _mistral_patcher
-
-    if _mistral_patcher is not None:
-        return _mistral_patcher
-
+def get_mistral_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _mistral_patcher
+    if _mistral_patcher is not None:
+        return _mistral_patcher
 
     base = settings.op_settings
     chat_complete_settings = base.model_copy(

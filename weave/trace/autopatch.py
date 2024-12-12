@@ -30,9 +30,10 @@ class IntegrationSettings(BaseModel):
 
 
 class AutopatchSettings(BaseModel):
-    """Settings for auto-patching integrations."""
+    """Settings for auto-patching integrations.
 
-    # These will be uncommented as we add support for more integrations.  Note that
+    NOTE: There are no langchain or llamaindex settings here because those integrations
+    don't make use of the op decorator."""
 
     anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -41,9 +42,7 @@ class AutopatchSettings(BaseModel):
     google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
     instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
     litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    llamaindex: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)

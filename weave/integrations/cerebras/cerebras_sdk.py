@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import importlib
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
-_cerebras_patcher: Optional[MultiPatcher] = None
+_cerebras_patcher: MultiPatcher | None = None
 
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -35,15 +37,17 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 def get_cerebras_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _cerebras_patcher
-
-    if _cerebras_patcher is not None:
-        return _cerebras_patcher
-
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _cerebras_patcher
+    if _cerebras_patcher is not None:
+        return _cerebras_patcher
 
     base = settings.op_settings
 

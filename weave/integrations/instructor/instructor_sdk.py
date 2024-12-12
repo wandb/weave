@@ -1,25 +1,28 @@
+from __future__ import annotations
+
 import importlib
-from typing import Optional
 
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 from .instructor_iterable_utils import instructor_wrapper_async, instructor_wrapper_sync
 from .instructor_partial_utils import instructor_wrapper_partial
 
-_instructor_patcher: Optional[MultiPatcher] = None
+_instructor_patcher: MultiPatcher | None = None
 
 
 def get_instructor_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _instructor_patcher
-
-    if _instructor_patcher is not None:
-        return _instructor_patcher
-
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _instructor_patcher
+    if _instructor_patcher is not None:
+        return _instructor_patcher
 
     base = settings.op_settings
 

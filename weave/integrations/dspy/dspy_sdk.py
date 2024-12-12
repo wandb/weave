@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import importlib
-from typing import Callable, Optional
+from typing import Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
-_dspy_patcher: Optional[MultiPatcher] = None
+_dspy_patcher: MultiPatcher | None = None
 
 
 def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -53,13 +55,18 @@ def dspy_get_patched_lm_functions(
     ]
 
 
-def get_dspy_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
+def get_dspy_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
     global _dspy_patcher
     if _dspy_patcher is not None:
         return _dspy_patcher
-
-    if settings is None:
-        settings = IntegrationSettings()
 
     base = settings.op_settings
 

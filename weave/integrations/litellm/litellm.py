@@ -1,22 +1,24 @@
+from __future__ import annotations
+
 import importlib
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
 
-_litellm_patcher: Optional[MultiPatcher] = None
+_litellm_patcher: MultiPatcher | None = None
 
 
 # This accumulator is nearly identical to the mistral accumulator, just with different types.
 def litellm_accumulator(
-    acc: Optional["ModelResponse"],
-    value: "ModelResponse",
-) -> "ModelResponse":
+    acc: ModelResponse | None,
+    value: ModelResponse,
+) -> ModelResponse:
     # This import should be safe at this point
     from litellm.utils import Choices, Message, ModelResponse, Usage
 
@@ -99,14 +101,18 @@ def make_wrapper(settings: OpSettings) -> Callable:
     return litellm_wrapper
 
 
-def get_litellm_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
-    global _litellm_patcher
-
-    if _litellm_patcher is not None:
-        return _litellm_patcher
-
+def get_litellm_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _litellm_patcher
+    if _litellm_patcher is not None:
+        return _litellm_patcher
 
     base = settings.op_settings
 

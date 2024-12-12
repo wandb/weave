@@ -1,24 +1,23 @@
+from __future__ import annotations
+
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
     from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
 
 
-_cohere_patcher: Optional[MultiPatcher] = None
+_cohere_patcher: MultiPatcher | None = None
 
 
-def cohere_accumulator(
-    acc: Optional[dict],
-    value: Any,
-) -> "NonStreamedChatResponse":
+def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
     # don't need to accumulate, is build-in by cohere!
     # https://docs.cohere.com/docs/streaming
     # A stream-end event is the final event of the stream, and is returned only when streaming is finished.
@@ -35,10 +34,7 @@ def cohere_accumulator(
     return acc
 
 
-def cohere_accumulator_v2(
-    acc: Optional[dict],
-    value: Any,
-) -> "NonStreamedChatResponse2":
+def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatResponse2:
     from cohere.v2.types.assistant_message_response import AssistantMessageResponse
     from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
 
@@ -185,14 +181,18 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def get_cohere_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
-    global _cohere_patcher
-
-    if _cohere_patcher is not None:
-        return _cohere_patcher
-
+def get_cohere_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _cohere_patcher
+    if _cohere_patcher is not None:
+        return _cohere_patcher
 
     base = settings.op_settings
 

@@ -1,24 +1,26 @@
+from __future__ import annotations
+
 import importlib
 from collections.abc import AsyncIterator, Iterator
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
     from anthropic.types import Message, MessageStreamEvent
 
-_anthropic_patcher: Optional[MultiPatcher] = None
+_anthropic_patcher: MultiPatcher | None = None
 
 
 def anthropic_accumulator(
-    acc: Optional["Message"],
-    value: "MessageStreamEvent",
-) -> "Message":
+    acc: Message | None,
+    value: MessageStreamEvent,
+) -> Message:
     from anthropic.types import (
         ContentBlockDeltaEvent,
         Message,
@@ -116,9 +118,9 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 def anthropic_stream_accumulator(
-    acc: Optional["Message"],
-    value: "MessageStream",
-) -> "Message":
+    acc: Message | None,
+    value: MessageStream,
+) -> Message:
     from anthropic.lib.streaming._types import MessageStopEvent
 
     if acc is None:
@@ -143,7 +145,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
+    def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
             return self.__async_stream_text__()
         else:
@@ -160,7 +162,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
                 yield chunk.delta.text  # type: ignore
 
     @property
-    def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
+    def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
         return self.__stream_text__()
 
 
@@ -179,15 +181,17 @@ def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable
 
 
 def get_anthropic_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _anthropic_patcher
-
-    if _anthropic_patcher is not None:
-        return _anthropic_patcher
-
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _anthropic_patcher
+    if _anthropic_patcher is not None:
+        return _anthropic_patcher
 
     base = settings.op_settings
 

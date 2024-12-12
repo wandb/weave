@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import importlib
-from typing import Callable, Optional
+from typing import Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
-_notdiamond_patcher: Optional[MultiPatcher] = None
+_notdiamond_patcher: MultiPatcher | None = None
 
 
 def nd_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -41,15 +43,17 @@ def _patch_client_op(method_name: str) -> list[SymbolPatcher]:
 
 
 def get_notdiamond_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _notdiamond_patcher
-
-    if _notdiamond_patcher is not None:
-        return _notdiamond_patcher
-
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _notdiamond_patcher
+    if _notdiamond_patcher is not None:
+        return _notdiamond_patcher
 
     base = settings.op_settings
 

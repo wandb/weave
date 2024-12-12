@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse
 
-_google_genai_patcher: Optional[MultiPatcher] = None
+_google_genai_patcher: MultiPatcher | None = None
 
 
 def gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -22,8 +24,8 @@ def gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def gemini_accumulator(
-    acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
-) -> "GenerateContentResponse":
+    acc: GenerateContentResponse | None, value: GenerateContentResponse
+) -> GenerateContentResponse:
     if acc is None:
         return value
 
@@ -67,9 +69,7 @@ def gemini_accumulator(
     return acc
 
 
-def gemini_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException]
-) -> None:
+def gemini_on_finish(call: Call, output: Any, exception: BaseException | None) -> None:
     if "model_name" in call.inputs["self"]:
         original_model_name = call.inputs["self"]["model_name"]
     elif "model" in call.inputs["self"]:
@@ -136,15 +136,17 @@ def gemini_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
 
 def get_google_genai_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _google_genai_patcher
-
-    if _google_genai_patcher is not None:
-        return _google_genai_patcher
-
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _google_genai_patcher
+    if _google_genai_patcher is not None:
+        return _google_genai_patcher
 
     base = settings.op_settings
 

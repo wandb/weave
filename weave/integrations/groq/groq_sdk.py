@@ -1,21 +1,23 @@
-import importlib
-from typing import TYPE_CHECKING, Callable, Optional
+from __future__ import annotations
 
+import importlib
+from typing import TYPE_CHECKING, Callable
+
+import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
 
-import weave
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
-_groq_patcher: Optional[MultiPatcher] = None
+_groq_patcher: MultiPatcher | None = None
 
 
 def groq_accumulator(
-    acc: Optional["ChatCompletion"], value: "ChatCompletionChunk"
-) -> "ChatCompletion":
+    acc: ChatCompletion | None, value: ChatCompletionChunk
+) -> ChatCompletion:
     from groq.types.chat import ChatCompletion, ChatCompletionMessage
     from groq.types.chat.chat_completion import Choice
     from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
@@ -100,14 +102,18 @@ def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def get_groq_patcher(settings: Optional[IntegrationSettings] = None) -> MultiPatcher:
-    global _groq_patcher
-
-    if _groq_patcher is not None:
-        return _groq_patcher
-
+def get_groq_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _groq_patcher
+    if _groq_patcher is not None:
+        return _groq_patcher
 
     base = settings.op_settings
 

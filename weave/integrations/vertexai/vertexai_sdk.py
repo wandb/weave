@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse
 
 
-_vertexai_patcher: Optional[MultiPatcher] = None
+_vertexai_patcher: MultiPatcher | None = None
 
 
 def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -29,8 +31,8 @@ def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def vertexai_accumulator(
-    acc: Optional["GenerationResponse"], value: "GenerationResponse"
-) -> "GenerationResponse":
+    acc: GenerationResponse | None, value: GenerationResponse
+) -> GenerationResponse:
     from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
     from google.cloud.aiplatform_v1beta1.types import (
         prediction_service as gapic_prediction_service_types,
@@ -66,7 +68,7 @@ def vertexai_accumulator(
 
 
 def vertexai_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException]
+    call: Call, output: Any, exception: BaseException | None
 ) -> None:
     original_model_name = call.inputs["model_name"]
     model_name = original_model_name.split("/")[-1]
@@ -128,16 +130,16 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
     return wrapper
 
 
-def get_vertexai_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher:
-    global _vertexai_patcher
-
-    if _vertexai_patcher is not None:
-        return _vertexai_patcher
-
+def get_vertexai_patcher(settings: IntegrationSettings | None = None) -> MultiPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _vertexai_patcher
+    if _vertexai_patcher is not None:
+        return _vertexai_patcher
 
     base = settings.op_settings
 
