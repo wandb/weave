@@ -1,1 +1,1 @@
-from weave.integrations.cohere.cohere_sdk import cohere_patcher as cohere_patcher
+from weave.integrations.cohere.cohere_sdk import get_cohere_patcher  # noqa: F401

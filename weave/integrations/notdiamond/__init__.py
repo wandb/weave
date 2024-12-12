@@ -1,1 +1,1 @@
-from .tracing import notdiamond_patcher as notdiamond_patcher
+from .tracing import get_notdiamond_patcher  # noqa: F401

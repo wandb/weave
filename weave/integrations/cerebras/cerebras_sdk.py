@@ -1,25 +1,26 @@
+from __future__ import annotations
+
 import importlib
 from functools import wraps
 from typing import Any, Callable
 
 import weave
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+
+_cerebras_patcher: MultiPatcher | None = None
 
 
-def create_wrapper_sync(
-    name: str,
-) -> Callable[[Callable], Callable]:
+def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
         return op
 
     return wrapper
 
 
-def create_wrapper_async(
-    name: str,
-) -> Callable[[Callable], Callable]:
+def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -28,24 +29,45 @@ def create_wrapper_async(
 
             return _async_wrapper
 
-        op = weave.op()(_fn_wrapper(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
         return op
 
     return wrapper
 
 
-cerebras_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("cerebras.cloud.sdk.resources.chat"),
-            "CompletionsResource.create",
-            create_wrapper_sync(name="cerebras.chat.completions.create"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("cerebras.cloud.sdk.resources.chat"),
-            "AsyncCompletionsResource.create",
-            create_wrapper_async(name="cerebras.chat.completions.create"),
-        ),
-    ]
-)
+def get_cerebras_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _cerebras_patcher
+    if _cerebras_patcher is not None:
+        return _cerebras_patcher
+
+    base = settings.op_settings
+
+    create_settings = base.model_copy(
+        update={"name": base.name or "cerebras.chat.completions.create"}
+    )
+
+    _cerebras_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("cerebras.cloud.sdk.resources.chat"),
+                "CompletionsResource.create",
+                create_wrapper_sync(create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("cerebras.cloud.sdk.resources.chat"),
+                "AsyncCompletionsResource.create",
+                create_wrapper_async(create_settings),
+            ),
+        ]
+    )
+
+    return _cerebras_patcher
