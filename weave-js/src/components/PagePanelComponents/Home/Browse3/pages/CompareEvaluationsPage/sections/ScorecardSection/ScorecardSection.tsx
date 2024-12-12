@@ -32,6 +32,7 @@ import {
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
+  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';
@@ -414,7 +415,7 @@ export const ScorecardSection: React.FC<{
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline = resolveSummaryMetricResult(
-                        props.state.baselineEvaluationCallId,
+                        getBaselineCallId(props.state),
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,

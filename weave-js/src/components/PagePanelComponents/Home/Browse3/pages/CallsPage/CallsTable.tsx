@@ -744,7 +744,10 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <TailwindContents>
-          <RefreshButton onClick={() => calls.refetch()} />
+          <RefreshButton
+            onClick={() => calls.refetch()}
+            disabled={callsLoading}
+          />
           {!hideOpSelector && (
             <OpSelector
               frozenFilter={frozenFilter}
