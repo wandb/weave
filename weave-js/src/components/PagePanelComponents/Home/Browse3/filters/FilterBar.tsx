@@ -232,7 +232,7 @@ export const FilterBar = ({
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none">
+        <div ref={refLabel} className="font-semibold select-none">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
