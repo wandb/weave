@@ -40,7 +40,7 @@ class AutopatchSettings(BaseModel):
     dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
     google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -58,7 +58,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.instructor.instructor_sdk import instructor_patcher
+    from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
@@ -75,7 +75,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_litellm_patcher(settings.litellm).attempt_patch()
     get_anthropic_patcher(settings.anthropic).attempt_patch()
     get_groq_patcher(settings.groq).attempt_patch()
-    instructor_patcher.attempt_patch()
+    get_instructor_patcher(settings.instructor).attempt_patch()
     get_dspy_patcher(settings.dspy).attempt_patch()
     get_cerebras_patcher(settings.cerebras).attempt_patch()
     get_cohere_patcher(settings.cohere).attempt_patch()
@@ -96,7 +96,7 @@ def reset_autopatch() -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.instructor.instructor_sdk import instructor_patcher
+    from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
@@ -110,7 +110,7 @@ def reset_autopatch() -> None:
     get_litellm_patcher().undo_patch()
     get_anthropic_patcher().undo_patch()
     get_groq_patcher().undo_patch()
-    instructor_patcher.undo_patch()
+    get_instructor_patcher().undo_patch()
     get_dspy_patcher().undo_patch()
     get_cerebras_patcher().undo_patch()
     get_cohere_patcher().undo_patch()
