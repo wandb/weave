@@ -35,6 +35,7 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
 }: PlaygroundChatProps) => {
+  console.log('playgroundStates', playgroundStates);
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -161,8 +162,8 @@ export const PlaygroundChat = ({
                           addMessage: newMessage => addMessage(idx, newMessage),
                           editChoice: (choiceIndex, newChoice) =>
                             editChoice(idx, choiceIndex, newChoice),
-                          retry: (messageIndex: number, isChoice?: boolean) =>
-                            handleRetry(idx, messageIndex, isChoice),
+                          retry: (messageIndex: number, choiceIndex?: number) =>
+                            handleRetry(idx, messageIndex, choiceIndex),
                           sendMessage: (
                             role: PlaygroundMessageRole,
                             content: string,
@@ -170,6 +171,12 @@ export const PlaygroundChat = ({
                           ) => {
                             handleSend(role, idx, content, toolCallId);
                           },
+                          setSelectedChoiceIndex: (choiceIndex: number) =>
+                            setPlaygroundStateField(
+                              idx,
+                              'selectedChoiceIndex',
+                              choiceIndex
+                            ),
                         }}>
                         <CallChat call={state.traceCall as TraceCallSchema} />
                       </PlaygroundContext.Provider>
