@@ -36,7 +36,7 @@ class AutopatchSettings(BaseModel):
 
     anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
