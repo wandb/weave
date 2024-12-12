@@ -43,7 +43,7 @@ class AutopatchSettings(BaseModel):
     # instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
@@ -63,7 +63,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import get_mistral_patcher
-    from weave.integrations.notdiamond.tracing import notdiamond_patcher
+    from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
@@ -82,7 +82,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_cerebras_patcher(settings.cerebras).attempt_patch()
     get_cohere_patcher(settings.cohere).attempt_patch()
     get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
-    notdiamond_patcher.attempt_patch()
+    get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     vertexai_patcher.attempt_patch()
 
 
@@ -100,7 +100,7 @@ def reset_autopatch() -> None:
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import get_mistral_patcher
-    from weave.integrations.notdiamond.tracing import notdiamond_patcher
+    from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
 
@@ -116,5 +116,5 @@ def reset_autopatch() -> None:
     get_cerebras_patcher().undo_patch()
     get_cohere_patcher().undo_patch()
     get_google_genai_patcher().undo_patch()
-    notdiamond_patcher.undo_patch()
+    get_notdiamond_patcher().undo_patch()
     vertexai_patcher.undo_patch()
