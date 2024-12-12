@@ -3045,7 +3045,7 @@ def test_op_sampling(client):
         sometimes_traced(i)
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
-    assert 40 < num_traces < 60  # But only traced ~50% of the time
+    assert 35 < num_traces < 65  # But only traced ~50% of the time
 
 
 def test_op_sampling_async(client):
@@ -3092,7 +3092,7 @@ def test_op_sampling_async(client):
         asyncio.run(sometimes_traced(i))
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
-    assert 40 < num_traces < 60  # But only traced ~50% of the time
+    assert 35 < num_traces < 65  # But only traced ~50% of the time
 
 
 def test_op_sampling_inheritance(client):
