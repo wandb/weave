@@ -191,7 +191,7 @@ class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    set_base_object_class: Optional[str] = None
+    set_leaf_object_class: Optional[str] = None
 
 
 class TableSchemaForInsert(BaseModel):
@@ -867,6 +867,31 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class CallMethodReq(BaseModel):
+    project_id: str
+    object_ref: str
+    method_name: str
+    args: dict[str, Any]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallMethodRes(BaseModel):
+    call_id: str
+    output: Any
+
+
+class ScoreCallReq(BaseModel):
+    project_id: str
+    call_ref: str
+    scorer_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreCallRes(BaseModel):
+    feedback_id: str
+    score_call: CallSchema
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -909,6 +934,10 @@ class TraceServerInterface(Protocol):
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
+
+    # Execute API
+    def call_method(self, req: CallMethodReq) -> CallMethodRes: ...
+    def score_call(self, req: ScoreCallReq) -> ScoreCallRes: ...
 
     # Action API
     def actions_execute_batch(

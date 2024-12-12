@@ -2,7 +2,7 @@ import {expectType} from 'tsd';
 
 import {
   useBaseObjectInstances,
-  useCreateBaseObjectInstance,
+  useCreateLeafObjectInstance,
 } from './baseObjectClassQuery';
 import {
   TestOnlyExample,
@@ -74,7 +74,7 @@ describe('Type Tests', () => {
 
   it('useCreateCollectionObject return type matches expected structure', () => {
     type CreateCollectionObjectReturn = ReturnType<
-      typeof useCreateBaseObjectInstance<'TestOnlyExample'>
+      typeof useCreateLeafObjectInstance<'TestOnlyExample'>
     >;
 
     // Define the expected type structure
