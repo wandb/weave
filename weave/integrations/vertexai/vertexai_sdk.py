@@ -130,7 +130,9 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
     return wrapper
 
 
-def get_vertexai_patcher(settings: IntegrationSettings | None = None) -> MultiPatcher:
+def get_vertexai_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 
