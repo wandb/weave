@@ -45,7 +45,7 @@ class AutopatchSettings(BaseModel):
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
@@ -65,7 +65,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
+    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     if settings is None:
         settings = AutopatchSettings()
@@ -83,7 +83,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_cohere_patcher(settings.cohere).attempt_patch()
     get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
-    vertexai_patcher.attempt_patch()
+    get_vertexai_patcher(settings.vertexai).attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -102,7 +102,7 @@ def reset_autopatch() -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
+    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()
@@ -117,4 +117,4 @@ def reset_autopatch() -> None:
     get_cohere_patcher().undo_patch()
     get_google_genai_patcher().undo_patch()
     get_notdiamond_patcher().undo_patch()
-    vertexai_patcher.undo_patch()
+    get_vertexai_patcher().undo_patch()
