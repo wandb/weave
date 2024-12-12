@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {ChoicesDrawer} from './ChoicesDrawer';
 import {ChoicesViewCarousel} from './ChoicesViewCarousel';
 import {ChoiceView} from './ChoiceView';
@@ -14,11 +15,15 @@ export const ChoicesView = ({
   choices,
   isStructuredOutput,
 }: ChoicesViewProps) => {
+  const {setSelectedChoiceIndex: setGlobalSelectedChoiceIndex} =
+    usePlaygroundContext();
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [localSelectedChoiceIndex, setLocalSelectedChoiceIndex] = useState(0);
 
   const handleSetSelectedChoiceIndex = (choiceIndex: number) => {
     setLocalSelectedChoiceIndex(choiceIndex);
+    setGlobalSelectedChoiceIndex(choiceIndex);
   };
 
   if (choices.length === 0) {

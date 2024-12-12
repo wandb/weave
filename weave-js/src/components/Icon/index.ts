@@ -256,6 +256,7 @@ export {
   IconVertexGCP,
   IconVideoPlay,
   IconViewGlasses,
+  IconVisible,
   IconWandb,
   IconWarning,
   IconWarningAlt,
