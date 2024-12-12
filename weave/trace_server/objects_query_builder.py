@@ -1,0 +1,287 @@
+from collections.abc import Iterator
+from typing import Any, Literal, cast
+
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+from weave.trace_server.orm import combine_conditions
+from weave.trace_server.trace_server_common import digest_is_version_like
+
+VALID_OBJECT_SORT_FIELDS = {"created_at", "object_id"}
+VALID_SORT_DIRECTIONS = {"asc", "desc"}
+OBJECT_SELECT_COLUMNS = [
+    "project_id",
+    "object_id",
+    "created_at",
+    "kind",
+    "base_object_class",
+    "refs",
+    "digest",
+    "is_op",
+    "version_index",
+    "version_count",
+    "is_latest",
+    "val_dump",
+]
+
+
+def _make_optional_part(query_keyword: str, part: str | None) -> str:
+    if part is None or part == "":
+        return ""
+    return f"{query_keyword} {part}"
+
+
+def _make_limit_part(limit: int | None) -> str:
+    return _make_optional_part("LIMIT", str(limit))
+
+
+def _make_offset_part(offset: int | None) -> str:
+    return _make_optional_part("OFFSET", str(offset))
+
+
+def _make_sort_part(sort_by: list[tsi.SortBy] | None) -> str:
+    if not sort_by:
+        return ""
+
+    sort_clauses = []
+    for sort in sort_by:
+        if (
+            sort.field in VALID_OBJECT_SORT_FIELDS
+            and sort.direction in VALID_SORT_DIRECTIONS
+        ):
+            sort_clause = f"{sort.field} {sort.direction.upper()}"
+            sort_clauses.append(sort_clause)
+    return _make_optional_part("ORDER BY", ", ".join(sort_clauses))
+
+
+def _make_conditions_part(conditions: list[str] | None) -> str:
+    if not conditions:
+        return ""
+    conditions_str = combine_conditions(conditions, "AND")
+    return _make_optional_part("WHERE", conditions_str)
+
+
+def _make_object_id_conditions_part(object_id_conditions: list[str] | None) -> str:
+    if not object_id_conditions:
+        return ""
+    conditions_str = combine_conditions(object_id_conditions, "AND")
+    return _make_optional_part("AND", conditions_str)
+
+
+def format_metadata_objects_from_query_result(
+    query_result: Iterator[tuple[Any, ...]],
+) -> list[SelectableCHObjSchema]:
+    result = []
+    for row in query_result:
+        # Add an empty val_dump to the end of the row
+        row_with_val_dump = row + ("{}",)
+        row_dict = dict(zip(OBJECT_SELECT_COLUMNS, row_with_val_dump))
+        row_model = SelectableCHObjSchema.model_validate(row_dict)
+        result.append(row_model)
+    return result
+
+
+class ObjectQueryBuilder:
+    def __init__(
+        self,
+        project_id: str,
+        conditions: list[str] | None = None,
+        object_id_conditions: list[str] | None = None,
+        parameters: dict[str, Any] | None = None,
+        metadata_only: bool = False,
+    ):
+        self.project_id = project_id
+        self.parameters: dict[str, Any] = parameters or {}
+        if not self.parameters.get(project_id):
+            self.parameters.update({project_id: project_id})
+        self.metadata_only: bool = metadata_only or False
+
+        self._conditions: list[str] = conditions or []
+        self._object_id_conditions: list[str] = object_id_conditions or []
+        self._limit: int | None = None
+        self._offset: int | None = None
+        self._sort_by: list[tsi.SortBy] = []
+
+    @property
+    def conditions_part(self) -> str:
+        return _make_conditions_part(self._conditions)
+
+    @property
+    def object_id_conditions_part(self) -> str:
+        return _make_object_id_conditions_part(self._object_id_conditions)
+
+    @property
+    def sort_part(self) -> str:
+        return _make_sort_part(self._sort_by)
+
+    @property
+    def limit_part(self) -> str:
+        return _make_limit_part(self._limit)
+
+    @property
+    def offset_part(self) -> str:
+        return _make_offset_part(self._offset)
+
+    def add_digest_condition(self, digest: str, param_key: str | None = None) -> None:
+        if digest == "latest":
+            self.add_is_latest_condition()
+            return
+
+        param_key = param_key or "version_digest"
+        (is_version, version_index) = digest_is_version_like(digest)
+        if is_version:
+            self._add_version_index_condition(version_index, param_key)
+        else:
+            self._add_version_digest_condition(digest, param_key)
+
+    def _add_version_digest_condition(
+        self, digest: str, param_key: str | None = None
+    ) -> None:
+        param_key = param_key or "version_digest"
+        self._conditions.append(f"digest = {{{param_key}: String}}")
+        self.parameters.update({param_key: digest})
+
+    def _add_version_index_condition(
+        self, version_index: int, param_key: str | None = None
+    ) -> None:
+        param_key = param_key or "version_index"
+        self._conditions.append(f"version_index = {{{param_key}: UInt64}}")
+        self.parameters.update({param_key: version_index})
+
+    def add_object_ids_condition(
+        self, object_ids: list[str], param_key: str | None = None
+    ) -> None:
+        param_key = param_key or "object_ids"
+        if len(object_ids) == 1:
+            self._object_id_conditions.append(f"object_id = {{{param_key}: String}}")
+            self.parameters.update({param_key: object_ids[0]})
+        else:
+            self._object_id_conditions.append(
+                f"object_id IN {{{param_key}: Array(String)}}"
+            )
+            self.parameters.update({param_key: object_ids})
+
+    def add_is_latest_condition(self) -> None:
+        self._conditions.append("is_latest = 1")
+
+    def add_is_op_condition(self, is_op: bool) -> None:
+        self._conditions.append(f"is_op = {{{'is_op': Boolean}}}")
+        self.parameters.update({"is_op": is_op})
+
+    def add_base_object_classes_condition(self, base_object_classes: list[str]) -> None:
+        self._conditions.append(
+            f"base_object_class IN {{{'base_object_classes': Array(String)}}}"
+        )
+        self.parameters.update({"base_object_classes": base_object_classes})
+
+    def add_order(self, field: str, direction: str) -> None:
+        direction = direction.upper()
+        if direction not in ("ASC", "DESC"):
+            raise ValueError(f"Direction {direction} is not allowed")
+        direction = cast(Literal["ASC", "DESC"], direction)
+        self._sort_by.append(tsi.SortBy(field=field, direction=direction))
+
+    def set_limit(self, limit: int) -> None:
+        if limit < 0:
+            raise ValueError("Limit must be a positive integer")
+        if self._limit is not None:
+            raise ValueError("Limit can only be set once")
+        self._limit = limit
+
+    def set_offset(self, offset: int) -> None:
+        if offset < 0:
+            raise ValueError("Offset must be a positive integer")
+        if self._offset is not None:
+            raise ValueError("Offset can only be set once")
+        self._offset = offset
+
+    def set_metadata_only(self, metadata_only: bool) -> None:
+        self.metadata_only = metadata_only
+
+    def make_metadata_query(self) -> str:
+        return f"""
+            SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                digest,
+                is_op,
+                version_index,
+                version_count,
+                is_latest
+            FROM (
+                SELECT project_id,
+                    object_id,
+                    created_at,
+                    kind,
+                    base_object_class,
+                    refs,
+                    digest,
+                    is_op,
+                    row_number() OVER (
+                        PARTITION BY project_id,
+                        kind,
+                        object_id
+                        ORDER BY created_at ASC
+                    ) - 1 AS version_index,
+                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+                    if(version_index + 1 = version_count, 1, 0) AS is_latest
+                FROM (
+                    SELECT project_id,
+                        object_id,
+                        created_at,
+                        kind,
+                        base_object_class,
+                        refs,
+                        digest,
+                        if (kind = 'op', 1, 0) AS is_op,
+                        row_number() OVER (
+                            PARTITION BY project_id,
+                            kind,
+                            object_id,
+                            digest
+                            ORDER BY created_at ASC
+                        ) AS rn
+                    FROM object_versions
+                    WHERE project_id = {{project_id: String}}
+                    {self.object_id_conditions_part}
+                )
+                WHERE rn = 1
+            )
+            {self.conditions_part}
+            {self.sort_part}
+            {self.limit_part}
+            {self.offset_part}
+        """
+
+
+def make_objects_val_query_and_parameters(
+    project_id: str, object_ids: list[str], digests: list[str]
+) -> tuple[str, dict[str, Any]]:
+    query = f"""
+        SELECT object_id, digest, any(val_dump)
+        FROM object_versions
+        WHERE project_id = {{{'project_id': String}}} AND
+            object_id IN {{{'object_ids': Array(String)}}} AND
+            digest IN {{{'digests': Array(String)}}}
+        GROUP BY object_id, digest
+    """
+    parameters = {
+        "project_id": project_id,
+        "object_ids": object_ids,
+        "digests": digests,
+    }
+    return query, parameters
+
+
+def format_value_objects_from_query_result(
+    query_result: Iterator[tuple[Any, ...]],
+) -> dict[tuple[str, str], Any]:
+    # Map (object_id, digest) to val_dump
+    object_values: dict[tuple[str, str], Any] = {}
+    for row in query_result:
+        (object_id, digest, val_dump) = row
+        object_values[(object_id, digest)] = val_dump
+    return object_values

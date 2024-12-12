@@ -81,9 +81,15 @@ from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
-from weave.trace_server.objects import (
+from weave.trace_server.objects_query_builder import (
+    ObjectQueryBuilder,
+    format_metadata_objects_from_query_result,
+    format_object_metadata_from_query_result,
+    format_object_values_from_query_result,
     format_objects_from_query_result,
-    select_object_metadata_clickhouse_query,
+    make_object_values_query,
+    make_object_values_query_and_parameters,
+    make_select_object_metadata_query,
 )
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -544,40 +550,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        conds = [
-            "is_op = 1",
-            "digest = {digest: String}",
-        ]
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters = {"name": req.name, "digest": req.digest}
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
+        object_query_builder.add_digest_condition(req.digest)
+        object_query_builder.add_object_ids_condition([req.name], "op_name")
+
+        objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        parameters = {}
-        conds: list[str] = ["is_op = 1"]
-        object_id_conditions: list[str] = []
+        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
         if req.filter:
             if req.filter.op_names:
-                object_id_conditions.append("object_id IN {op_names: Array(String)}")
-                parameters["op_names"] = req.filter.op_names
+                object_query_builder.add_object_ids_condition(
+                    req.filter.op_names, "op_names"
+                )
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                object_query_builder.add_is_latest_condition()
 
-        ch_objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        ch_objs = self._select_objs_query(object_query_builder)
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
@@ -607,61 +602,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds: list[str] = []
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
-            if is_version:
-                conds.append("version_index = {version_index: UInt64}")
-                parameters["version_index"] = version_index
-            else:
-                conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder.add_digest_condition(req.digest)
+        object_query_builder.add_object_ids_condition([req.object_id])
+
+        objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conds: list[str] = []
-        object_id_conditions: list[str] = []
-        parameters = {}
+        object_query_builder = ObjectQueryBuilder(req.project_id)
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append("is_op = 1")
+                    object_query_builder.add_is_op_condition(True)
                 else:
-                    conds.append("is_op = 0")
+                    object_query_builder.add_is_op_condition(False)
             if req.filter.object_ids:
-                object_id_conditions.append("object_id IN {object_ids: Array(String)}")
-                parameters["object_ids"] = req.filter.object_ids
-            if req.filter.latest_only:
-                conds.append("is_latest = 1")
-            if req.filter.base_object_classes:
-                conds.append(
-                    "base_object_class IN {base_object_classes: Array(String)}"
+                object_query_builder.add_object_ids_condition(
+                    req.filter.object_ids, "object_ids"
                 )
-                parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.latest_only:
+                object_query_builder.add_is_latest_condition()
+            if req.filter.base_object_classes:
+                object_query_builder.add_base_object_classes_condition(
+                    req.filter.base_object_classes
+                )
+        if req.metadata_only:
+            object_query_builder.set_metadata_only(True)
+        if req.limit is not None:
+            object_query_builder.set_limit(req.limit)
+        if req.offset is not None:
+            object_query_builder.set_offset(req.offset)
+        if req.sort_by:
+            for sort in req.sort_by:
+                object_query_builder.add_order(sort.field, sort.direction)
 
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-            metadata_only=req.metadata_only,
-            limit=req.limit,
-            offset=req.offset,
-            sort_by=req.sort_by,
-        )
+        objs = self._select_objs_query(object_query_builder)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
@@ -969,7 +948,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> Any:
             conds: list[str] = []
             object_id_conds: list[str] = []
-            parameters = {}
+            parameters: dict[str, str | int] = {}
 
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
@@ -998,12 +977,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
-                objs = self._select_objs_query(
+                object_query_builder = ObjectQueryBuilder(
                     project_id=project_id_scope,
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
                     parameters=parameters,
                 )
+                objs = self._select_objs_query(object_query_builder)
                 for obj in objs:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
@@ -1559,15 +1539,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
     def _select_objs_query(
-        self,
-        project_id: str,
-        conditions: Optional[list[str]] = None,
-        object_id_conditions: Optional[list[str]] = None,
-        parameters: Optional[dict[str, Any]] = None,
-        metadata_only: Optional[bool] = False,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        sort_by: Optional[list[tsi.SortBy]] = None,
+        self, object_query_builder: ObjectQueryBuilder
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1585,43 +1557,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
         """
-        obj_metadata_query = select_object_metadata_clickhouse_query(
-            conditions,
-            object_id_conditions,
-            limit,
-            offset,
-            sort_by,
-        )
-        parameters = parameters or {}
-        query_result = self._query_stream(
-            obj_metadata_query,
-            {"project_id": project_id, **parameters},
-        )
-        result: list[SelectableCHObjSchema] = format_objects_from_query_result(
-            query_result
-        )
+        obj_metadata_query = object_query_builder.make_metadata_query()
+        parameters = object_query_builder.parameters or {}
+        query_result = self._query_stream(obj_metadata_query, parameters)
+        metadata_result = format_metadata_objects_from_query_result(query_result)
 
         # -- Don't make second query for object values if metadata_only --
-        if metadata_only:
-            return result
+        if object_query_builder.metadata_only:
+            return metadata_result
 
-        # now get the val_dump for each object
-        object_ids = list({row.object_id for row in result})
-        digests = list({row.digest for row in result})
-        query = """
-            SELECT object_id, digest, any(val_dump)
-            FROM object_versions
-            WHERE project_id = {project_id: String} AND
-                object_id IN {object_ids: Array(String)} AND
-                digest IN {digests: Array(String)}
-            GROUP BY object_id, digest
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_ids": object_ids,
-            "digests": digests,
-        }
-        query_result = self._query_stream(query, parameters)
+        value_query, value_parameters = make_objects_val_query_and_parameters(
+            project_id=object_query_builder.project_id,
+            object_ids=list({row.object_id for row in metadata_result}),
+            digests=list({row.digest for row in metadata_result}),
+        )
+        query_result = self._query_stream(value_query, value_parameters)
         # Map (object_id, digest) to val_dump
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
@@ -1629,9 +1579,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_values[(object_id, digest)] = val_dump
 
         # update the val_dump for each object
-        for obj in result:
+        for obj in metadata_result:
             obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
-        return result
+        return metadata_result
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
