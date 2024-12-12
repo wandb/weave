@@ -1869,6 +1869,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in query_result:
             (object_id, digest, val_dump) = row
             object_values[(object_id, digest)] = val_dump
+
+        # update the val_dump for each object
+        for obj in result:
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+
         return result
 
     def _run_migrations(self) -> None:
