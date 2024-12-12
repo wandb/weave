@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import litellm
 
@@ -8,11 +8,11 @@ import weave
 
 class LiteLLMCompletionModel(weave.Model):
     model: str
-    messages_template: list[dict[str, str]] = None
+    messages_template: list[dict[str, str]]
     response_format: Optional[dict] = None
 
     @weave.op()
-    def predict(self, **kwargs) -> str:
+    def predict(self, **kwargs: Any) -> str:
         messages: list[dict] = [
             {**m, "content": m["content"].format(**kwargs)}
             for m in self.messages_template

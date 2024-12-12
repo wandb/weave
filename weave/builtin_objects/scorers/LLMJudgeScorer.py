@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import litellm
 
@@ -10,11 +11,11 @@ import weave
 
 class LLMJudgeScorer(weave.Scorer):
     model: str
-    system_prompt: str = None
-    response_format: dict = None
+    system_prompt: str
+    response_format: dict
 
     @weave.op()
-    def score(self, inputs, output) -> str:
+    def score(self, inputs: dict, output: Any) -> str:
         user_prompt = json.dumps(
             {
                 "inputs": inputs,

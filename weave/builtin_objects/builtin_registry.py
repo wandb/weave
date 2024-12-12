@@ -5,7 +5,7 @@ from weave.builtin_objects.scorers.LLMJudgeScorer import LLMJudgeScorer
 _BUILTIN_REGISTRY: dict[str, type[weave.Object]] = {}
 
 
-def register_builtin(cls: type[weave.Object]):
+def register_builtin(cls: type[weave.Object]) -> None:
     if not issubclass(cls, weave.Object):
         raise ValueError(f"Object {cls} is not a subclass of weave.Object")
 

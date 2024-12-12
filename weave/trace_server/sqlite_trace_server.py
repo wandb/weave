@@ -1221,6 +1221,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         results = self.table_query(req)
         yield from results.rows
 
+    def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
+        raise NotImplementedError("call_method is not implemented for local sqlite")
+
+    def score_call(self, req: tsi.ScoreCallReq) -> tsi.ScoreCallRes:
+        raise NotImplementedError("score_call is not implemented for local sqlite")
+
 
 def get_type(val: Any) -> str:
     if val == None:

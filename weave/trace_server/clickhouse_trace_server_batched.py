@@ -1530,6 +1530,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def call_method(self, req: tsi.CallMethodReq) -> tsi.CallMethodRes:
         from weave.trace_server.server_side_object_saver import RunAsUser
 
+        if req.wb_user_id is None:
+            raise ValueError("User ID is required")
+
         runner = RunAsUser(ch_server_dump=self.model_dump())
         # TODO: handle errors here
         res = runner.run_call_method(
