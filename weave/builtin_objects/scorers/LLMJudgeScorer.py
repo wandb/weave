@@ -7,6 +7,7 @@ import weave
 # TODO: Questions
 # Should "reasoning" be built into the system itself?
 
+
 class LLMJudgeScorer(weave.Scorer):
     model: str
     system_prompt: str = None
@@ -14,10 +15,12 @@ class LLMJudgeScorer(weave.Scorer):
 
     @weave.op()
     def score(self, call_inputs, call_output) -> str:
-        user_prompt = json.dumps({
-            "inputs": call_inputs,
-            "output": call_output,
-        })
+        user_prompt = json.dumps(
+            {
+                "inputs": call_inputs,
+                "output": call_output,
+            }
+        )
 
         messages = [
             {"role": "system", "content": self.system_prompt},
