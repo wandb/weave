@@ -38,7 +38,7 @@ class AutopatchSettings(BaseModel):
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
     dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
-    # google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     # langchain: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -57,7 +57,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
-        google_genai_patcher,
+        get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
@@ -83,7 +83,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_dspy_patcher(settings.dspy).attempt_patch()
     get_cerebras_patcher(settings.cerebras).attempt_patch()
     get_cohere_patcher(settings.cohere).attempt_patch()
-    google_genai_patcher.attempt_patch()
+    get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
     notdiamond_patcher.attempt_patch()
     vertexai_patcher.attempt_patch()
 
@@ -94,7 +94,7 @@ def reset_autopatch() -> None:
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
-        google_genai_patcher,
+        get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
@@ -117,6 +117,6 @@ def reset_autopatch() -> None:
     get_dspy_patcher().undo_patch()
     get_cerebras_patcher().undo_patch()
     get_cohere_patcher().undo_patch()
-    google_genai_patcher.undo_patch()
+    get_google_genai_patcher().undo_patch()
     notdiamond_patcher.undo_patch()
     vertexai_patcher.undo_patch()
