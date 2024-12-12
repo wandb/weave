@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import multiprocessing
-import typing
 from typing import Any, Callable, TypedDict
 
 import weave
@@ -317,7 +318,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         assert project_id.startswith("_SERVER_/")
         return project_id[len("_SERVER_/") :]
 
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
         return "_SERVER_/" + project_id
 
     def ext_to_int_run_id(self, run_id: str) -> str:
