@@ -6,6 +6,7 @@ import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
 import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState} from '../types';
+import {PlaygroundMessageRole} from '../types';
 import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
 
@@ -57,7 +58,7 @@ export const useChatCompletionFunctions = (
   };
 
   const handleSend = async (
-    role: 'assistant' | 'user' | 'tool',
+    role: PlaygroundMessageRole,
     callIndex?: number,
     content?: string,
     toolCallId?: string
@@ -69,7 +70,7 @@ export const useChatCompletionFunctions = (
         if (callIndex !== undefined && callIndex !== index) {
           return state;
         }
-        const updatedState = appendChoicesToMessages(state);
+        const updatedState = appendChoiceToMessages(state);
         if (updatedState.traceCall?.inputs?.messages) {
           updatedState.traceCall.inputs.messages.push(newMessage);
         }
@@ -98,14 +99,14 @@ export const useChatCompletionFunctions = (
   const handleRetry = async (
     callIndex: number,
     messageIndex: number,
-    isChoice?: boolean
+    choiceIndex?: number
   ) => {
     try {
       setIsLoading(true);
       const updatedStates = playgroundStates.map((state, index) => {
         if (index === callIndex) {
-          if (isChoice) {
-            return appendChoicesToMessages(state);
+          if (choiceIndex !== undefined) {
+            return appendChoiceToMessages(state, choiceIndex);
           }
           const updatedState = JSON.parse(JSON.stringify(state));
           if (updatedState.traceCall?.inputs?.messages) {
@@ -135,7 +136,7 @@ export const useChatCompletionFunctions = (
 
 // Helper functions
 const createMessage = (
-  role: 'assistant' | 'user' | 'tool',
+  role: PlaygroundMessageRole,
   content: string,
   toolCallId?: string
 ): Message | undefined => {
@@ -202,17 +203,25 @@ const handleUpdateCallWithResponse = (
   };
 };
 
-const appendChoicesToMessages = (state: PlaygroundState): PlaygroundState => {
+const appendChoiceToMessages = (
+  state: PlaygroundState,
+  choiceIndex?: number
+): PlaygroundState => {
   const updatedState = JSON.parse(JSON.stringify(state));
   if (
     updatedState.traceCall?.inputs?.messages &&
     updatedState.traceCall.output?.choices
   ) {
-    updatedState.traceCall.output.choices.forEach((choice: any) => {
-      if (choice.message) {
-        updatedState.traceCall.inputs.messages.push(choice.message);
-      }
-    });
+    if (choiceIndex !== undefined) {
+      updatedState.traceCall.inputs.messages.push(
+        updatedState.traceCall.output.choices[choiceIndex].message
+      );
+    } else {
+      updatedState.traceCall.inputs.messages.push(
+        updatedState.traceCall.output.choices[updatedState.selectedChoiceIndex]
+          .message
+      );
+    }
     updatedState.traceCall.output.choices = undefined;
   }
   return updatedState;

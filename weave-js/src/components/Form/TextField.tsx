@@ -36,10 +36,12 @@ type TextFieldProps = {
   autoComplete?: string;
   dataTest?: string;
   step?: number;
+  variant?: 'default' | 'ghost';
 };
 
 export const TextField = ({
   size,
+  variant = 'default',
   placeholder,
   value,
   onChange,
@@ -86,13 +88,17 @@ export const TextField = ({
           textFieldSize === 'medium' ? 'h-32' : 'h-40',
           'bg-white dark:bg-moon-900',
           'text-moon-800 dark:text-moon-200',
-          'outline outline-1 outline-moon-250 dark:outline-moon-700',
+          variant === 'default' &&
+            'outline outline-1 outline-moon-250 dark:outline-moon-700',
+          variant === 'ghost' &&
+            'outline outline-1 outline-transparent dark:outline-transparent',
           {
             'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB] dark:[&:hover:not(:focus-within)]:outline-teal-650':
-              !errorState,
+              !errorState && variant === 'default',
             'focus-within:outline-2 focus-within:outline-teal-400 dark:focus-within:outline-teal-600':
-              !errorState,
-            'outline-2 outline-red-450 dark:outline-red-550': errorState,
+              !errorState && variant === 'default',
+            'outline-2 outline-red-450 dark:outline-red-550':
+              errorState && variant === 'default',
             'pointer-events-none opacity-50': disabled,
           }
         )}>

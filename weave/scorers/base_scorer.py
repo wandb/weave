@@ -1,4 +1,5 @@
 import inspect
+import textwrap
 from collections.abc import Sequence
 from numbers import Number
 from typing import Any, Callable, Optional, Union
@@ -19,6 +20,10 @@ class Scorer(Object):
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
 
+    def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
+        _validate_scorer_signature(self)
+
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
@@ -26,6 +31,30 @@ class Scorer(Object):
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
+
+
+def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
+    """Validate that the scorer signature does not have both `output` and `model_output`.
+
+    Having both `output` and `model_output` in the scorer signature causes
+    issues with scoring because it's ambigious as to which one is the
+    canonical "output", and which is just a regular kwarg.
+    """
+    if isinstance(scorer, Scorer):
+        params = inspect.signature(scorer.score).parameters
+    else:
+        params = inspect.signature(scorer).parameters
+    if "output" in params and "model_output" in params:
+        raise ValueError(
+            textwrap.dedent(
+                """
+                The scorer signature cannot include both `output` and `model_output` at the same time.
+
+                To resolve, rename one of the arguments to avoid conflict. Prefer using `output` as the model's output.
+                """
+            )
+        )
+    return True
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
@@ -122,11 +151,7 @@ def _has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
         _, score_fn, _ = get_scorer_attributes(scorer)
-        if is_op(score_fn):
-            score_fn = as_op(score_fn)
-            score_signature = score_fn.signature
-        else:
-            score_signature = inspect.signature(score_fn)
+        score_signature = inspect.signature(score_fn)
         if "model_output" in score_signature.parameters:
             return True
     return False

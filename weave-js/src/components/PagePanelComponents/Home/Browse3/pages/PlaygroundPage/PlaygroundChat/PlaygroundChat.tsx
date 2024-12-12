@@ -6,7 +6,7 @@ import React, {useState} from 'react';
 import {CallChat} from '../../CallPage/CallChat';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
-import {PlaygroundState} from '../types';
+import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
 import {PlaygroundChatTopBar} from './PlaygroundChatTopBar';
@@ -51,7 +51,7 @@ export const PlaygroundChat = ({
   const {deleteMessage, editMessage, deleteChoice, editChoice, addMessage} =
     useChatFunctions(setPlaygroundStateField);
 
-  const handleAddMessage = (role: 'assistant' | 'user', text: string) => {
+  const handleAddMessage = (role: PlaygroundMessageRole, text: string) => {
     for (let i = 0; i < playgroundStates.length; i++) {
       addMessage(i, {role, content: text});
     }
@@ -66,6 +66,7 @@ export const PlaygroundChat = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        overflow: 'hidden', // Rely on inner overflows, not outer page
       }}>
       <Box
         sx={{
@@ -114,11 +115,15 @@ export const PlaygroundChat = ({
               }}>
               <Box
                 sx={{
+                  backgroundColor: 'white',
+                  borderBottom: `1px solid ${MOON_200}`,
                   position: 'absolute',
-                  top: '8px',
-                  width: 'calc(100% - 16px)',
-                  left: '8px',
-                  right: '8px',
+                  top: '0',
+                  width: '100%',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -139,9 +144,10 @@ export const PlaygroundChat = ({
                   overflow: 'scroll',
                   paddingTop: '48px', // Height of the top bar
                   paddingX: '16px',
+                  flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
@@ -155,20 +161,28 @@ export const PlaygroundChat = ({
                           addMessage: newMessage => addMessage(idx, newMessage),
                           editChoice: (choiceIndex, newChoice) =>
                             editChoice(idx, choiceIndex, newChoice),
-                          retry: (messageIndex: number, isChoice?: boolean) =>
-                            handleRetry(idx, messageIndex, isChoice),
+                          retry: (messageIndex: number, choiceIndex?: number) =>
+                            handleRetry(idx, messageIndex, choiceIndex),
                           sendMessage: (
-                            role: 'assistant' | 'user' | 'tool',
+                            role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
                             handleSend(role, idx, content, toolCallId);
                           },
+                          setSelectedChoiceIndex: (choiceIndex: number) =>
+                            setPlaygroundStateField(
+                              idx,
+                              'selectedChoiceIndex',
+                              choiceIndex
+                            ),
                         }}>
                         <CallChat call={state.traceCall as TraceCallSchema} />
                       </PlaygroundContext.Provider>
                     )}
                   </div>
+                  {/* Spacer used for leaving room for the input */}
+                  <div className="h-[125px] w-full" />
                 </Tailwind>
               </Box>
               <Box
@@ -196,6 +210,7 @@ export const PlaygroundChat = ({
         isLoading={isLoading}
         onSend={handleSend}
         onAdd={handleAddMessage}
+        settingsTab={settingsTab}
       />
     </Box>
   );

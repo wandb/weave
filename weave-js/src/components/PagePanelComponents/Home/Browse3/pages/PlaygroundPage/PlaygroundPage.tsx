@@ -1,12 +1,17 @@
 import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
+import {Pill} from '@wandb/weave/components/Tag/Pill';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
+import {
+  DEFAULT_SYSTEM_MESSAGE,
+  parseTraceCall,
+  usePlaygroundState,
+} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
@@ -16,9 +21,15 @@ export type PlaygroundPageProps = {
 
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   return (
-    <SimplePageLayout
-      title={'Playground (preview)'}
+    <SimplePageLayoutWithHeader
+      title={
+        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
+          Playground
+          <Pill label="Preview" color="moon" />
+        </Box>
+      }
       hideTabsIfSingle
+      headerContent={null}
       tabs={[
         {
           label: 'main',
@@ -38,7 +49,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   } = usePlaygroundState();
 
   const {useCall, useCalls} = useWFHooks();
-  const [settingsTab, setSettingsTab] = useState<number | null>(null);
+  const [settingsTab, setSettingsTab] = useState<number | null>(0);
 
   const call = useCall(
     useMemo(() => {
@@ -82,7 +93,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       for (const [idx, state] of newStates.entries()) {
         for (const c of calls || []) {
           if (state.traceCall.id === c.callId) {
-            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            newStates[idx] = {
+              ...state,
+              traceCall: parseTraceCall(c.traceCall || {}),
+            };
             break;
           }
         }

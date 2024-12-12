@@ -160,7 +160,7 @@ export const SplitPanelRight = ({
                     bottom: 0,
                     width: numW,
                     overflow: 'hidden',
-                    transform: `translateX(0)`,
+                    transform: `translateX(-${DIVIDER_BORDER_WIDTH}px)`,
                     willChange: isDragging ? 'transform' : 'auto',
                   }}>
                   {drawer}

@@ -29,6 +29,7 @@ import {
   getCostsFromCellParams,
   getTokensFromCellParams,
 } from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -228,6 +229,7 @@ function buildCallsTableColumns(
           rowParams.row.display_name ??
           opVersionRefOpName(rowParams.row.op_name) ??
           rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
@@ -237,6 +239,7 @@ function buildCallsTableColumns(
             fullWidth={true}
             preservePath={preservePath}
             color={TEAL_600}
+            isEval={isEval}
           />
         );
       },
