@@ -12,6 +12,7 @@ import {
   PlaygroundState,
   PlaygroundStateKey,
 } from './types';
+import {cloneDeep} from 'lodash';
 
 export const DEFAULT_SYSTEM_MESSAGE_CONTENT =
   'You are an AI assistant designed to assist users by providing clear, concise, and helpful responses.';
@@ -164,7 +165,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
 // This is a helper function to parse the trace call output for anthropic
 // so that the playground can display the choices
 export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
-  const parsedTraceCall = traceCall;
+  const parsedTraceCall = cloneDeep(traceCall);
 
   // Handles anthropic outputs
   // Anthropic has content and stop_reason as top-level fields
