@@ -17,35 +17,12 @@ def create_wrapper_sync(
     return wrapper
 
 
-def create_wrapper_async(
-    name: str,
-) -> Callable[[Callable], Callable]:
-    def wrapper(fn: Callable) -> Callable:
-        def _fn_wrapper(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
-
-            return _async_wrapper
-
-        op = weave.op()(_fn_wrapper(fn))
-        op.name = name  # type: ignore
-        return op
-
-    return wrapper
-
-
 langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints._common"),
-            "_NVIDIAClient._post",
-            create_wrapper_sync(name="langchain.Llm.ChatNVIDIA.invoke"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints._common"),
-            "_NVIDIAClient._post",
-            create_wrapper_async(name="langchain.Llm.ChatNVIDIA.invoke"),
-        ),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            "ChatNVIDIA._generate",
+            create_wrapper_sync(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.invoke"),
+        )
     ]
 )
