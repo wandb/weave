@@ -13,10 +13,10 @@ yarn quicktype -s schema "$SCHEMA_INPUT_PATH" -o "$SCHEMA_OUTPUT_PATH" --lang ty
 
 # Transform the schema to extract the type map
 sed -i.bak '
-  # Find the generatedBuiltinObjectClassesZodSchema definition and capture its contents
-  /export const generatedBuiltinObjectClassesZodSchema = z.object({/,/});/ {
+  # Find the GeneratedBuiltinObjectClassesZodSchema definition and capture its contents
+  /export const GeneratedBuiltinObjectClassesZodSchema = z.object({/,/});/ {
     # Replace the opening line with typeMap declaration
-    s/export const generatedBuiltinObjectClassesZodSchema = z.object({/export const builtinObjectClassRegistry = ({/
+    s/export const GeneratedBuiltinObjectClassesZodSchema = z.object({/export const builtinObjectClassRegistry = ({/
     # Store the pattern
     h
     # If this is the last line (with closing brace), append the schema definition
@@ -27,7 +27,7 @@ sed -i.bak '
       s/.*//
       i\
 \
-export const generatedBuiltinObjectClassesZodSchema = z.object(builtinObjectClassRegistry)
+export const GeneratedBuiltinObjectClassesZodSchema = z.object(builtinObjectClassRegistry)
     }
   }
 ' "$SCHEMA_OUTPUT_PATH"
