@@ -917,7 +917,7 @@ def test_openai_moderation_patching(
     call = calls[0]
 
     exp_harassment = False
-    assert response.results.categories.harassment == exp_harassment
+    assert response.results[0].categories.harassment == exp_harassment
 
     assert op_name_from_ref(call.op_name) == "openai.moderations.create"
     assert call.started_at is not None
@@ -953,7 +953,7 @@ async def test_openai_async_moderation_patching(
     call = calls[0]
 
     exp_harassment = False
-    assert response.results.categories.harassment == exp_harassment
+    assert response.results[0].categories.harassment == exp_harassment
 
     assert op_name_from_ref(call.op_name) == "openai.moderations.create"
     assert call.started_at is not None
@@ -996,11 +996,11 @@ def test_openai_embeddings_patching(
     assert call.started_at < call.ended_at  # type: ignore
 
     output = call.output
-    assert output["model"] == "omni-moderation-latest-intents"
+    assert output["model"] == "text-embedding-3-small"
 
     inputs = call.inputs
-    assert inputs["model"] == "omni-moderation-latest"
-    assert inputs["input"] == "...text to classify goes here..."
+    assert inputs["model"] == "text-embedding-3-small"
+    assert inputs["input"] == "embed this"
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
