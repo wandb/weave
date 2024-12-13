@@ -9,7 +9,7 @@ from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
-from weave.trace_server.interface.base_object_classes.builtin_object_registry import (
+from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
 from weave.trace_server.trace_server_interface import (
