@@ -211,6 +211,7 @@ import {ReactComponent as ImportSmoothing} from '../../assets/icons/icon-smoothi
 import {ReactComponent as ImportSort} from '../../assets/icons/icon-sort.svg';
 import {ReactComponent as ImportSortAscending} from '../../assets/icons/icon-sort-ascending.svg';
 import {ReactComponent as ImportSortDescending} from '../../assets/icons/icon-sort-descending.svg';
+import {ReactComponent as ImportSpiral} from '../../assets/icons/icon-spiral.svg';
 import {ReactComponent as ImportSplit} from '../../assets/icons/icon-split.svg';
 import {ReactComponent as ImportSquare} from '../../assets/icons/icon-square.svg';
 import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
@@ -914,6 +915,9 @@ export const IconSortAscending = (props: SVGIconProps) => (
 export const IconSortDescending = (props: SVGIconProps) => (
   <ImportSortDescending {...updateIconProps(props)} />
 );
+export const IconSpiral = (props: SVGIconProps) => (
+  <ImportSpiral {...updateIconProps(props)} />
+);
 export const IconSplit = (props: SVGIconProps) => (
   <ImportSplit {...updateIconProps(props)} />
 );
@@ -1295,6 +1299,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   sort: IconSort,
   'sort-ascending': IconSortAscending,
   'sort-descending': IconSortDescending,
+  spiral: IconSpiral,
   split: IconSplit,
   square: IconSquare,
   star: IconStar,
