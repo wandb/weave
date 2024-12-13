@@ -11,13 +11,15 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 def lite_llm_completion(
     api_key: str,
     inputs: tsi.CompletionsCreateRequestInputs,
-    isBedrock: bool,
+    provider: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
-    if isBedrock:
+    if provider == "bedrock":
         aws_access_key_id, aws_secret_access_key, aws_region_name = (
             get_bedrock_credentials(inputs.model)
         )
+    elif provider == "xai":
+        inputs.response_format = None
 
     import litellm
 
