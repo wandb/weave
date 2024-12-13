@@ -150,7 +150,7 @@ class ObjectQueryBuilder:
         self, version_index: int, param_key: Optional[str] = None
     ) -> None:
         param_key = param_key or "version_index"
-        self._conditions.append(f"version_index = {{{param_key}: UInt64}}")
+        self._conditions.append(f"version_index = {{{param_key}: Int64}}")
         self.parameters.update({param_key: version_index})
 
     def add_object_ids_condition(
@@ -177,7 +177,7 @@ class ObjectQueryBuilder:
 
     def add_base_object_classes_condition(self, base_object_classes: list[str]) -> None:
         self._conditions.append(
-            f"base_object_class IN {{{'base_object_classes': Array(String)}}}"
+            f"base_object_class IN {base_object_classes: Array(String)}"
         )
         self.parameters.update({"base_object_classes": base_object_classes})
 
