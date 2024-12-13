@@ -4,7 +4,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
-  darkMode: ['class', '[data-mode="dark"]'],
+  darkMode: ['class', '.night-mode'],
   theme: {
     /**
      * This overrides Tailwind's default spacing system.
