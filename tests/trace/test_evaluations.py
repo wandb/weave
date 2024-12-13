@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 
 import weave
-from tests.trace.util import AnyIntMatcher
+from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.scorers import Scorer
 from weave.trace.refs import CallRef
@@ -504,8 +504,8 @@ async def test_evaluation_data_topology(client):
             }
         },
         "weave": {
+            "display_name": AnyStrMatcher(),
             "latency_ms": AnyIntMatcher(),
-            "trace_name": "Evaluation.evaluate",
             "status": "success",
         },
     }
@@ -1021,11 +1021,35 @@ def test_scorers_with_output_and_model_output_raise_error():
 
     ds = [{"text": "hello"}]
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         scorer = MyScorer()
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         evaluation = weave.Evaluation(dataset=ds, scorers=[MyScorer()])
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
+
+
+@pytest.mark.asyncio
+async def test_evaluation_with_custom_name(client):
+    dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
+    evaluation = weave.Evaluation(dataset=dataset, evaluation_name="wow-custom!")
+
+    @weave.op()
+    def model(input: str) -> str:
+        return "hmmm"
+
+    await evaluation.evaluate(model)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.display_name == "wow-custom!"

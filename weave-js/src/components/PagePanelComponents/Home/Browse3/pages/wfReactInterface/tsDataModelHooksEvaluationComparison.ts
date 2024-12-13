@@ -69,7 +69,6 @@
  *  across different datasets.
  */
 
-import _ from 'lodash';
 import {sum} from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
@@ -479,17 +478,8 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const possiblePredictNames = [
-              'predict',
-              'infer',
-              'forward',
-              'invoke',
-            ];
             const isProbablyPredictCall =
-              (_.some(possiblePredictNames, name =>
-                traceCall.op_name.includes(`.${name}:`)
-              ) &&
-                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.inputs.self) ||
               modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
