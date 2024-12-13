@@ -10,8 +10,8 @@ import _ from 'lodash';
 import React, {FC, useCallback, useState} from 'react';
 import {z} from 'zod';
 
+import {LlmJudgeActionSpecSchema} from '../wfReactInterface/builtinObjectClasses.zod';
 import {ActionSpecSchema} from '../wfReactInterface/generatedBuiltinObjectClasses.zod';
-import {LlmJudgeActionSpecSchema} from '../wfReactInterface/objectClasses.zod';
 import {createBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
