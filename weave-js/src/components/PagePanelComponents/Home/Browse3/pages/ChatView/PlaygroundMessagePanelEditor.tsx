@@ -68,13 +68,12 @@ export const PlaygroundMessagePanelEditor: React.FC<
     <div
       className={classNames(
         'w-full pt-[6px]',
-        isNested ? 'px-[4px]' : 'px-[8px]'
+        isNested ? 'px-[4px]' : 'px-[16px]'
       )}>
       <StyledTextArea
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
-        autoGrow
-        maxHeight={160}
+        startHeight={320}
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
