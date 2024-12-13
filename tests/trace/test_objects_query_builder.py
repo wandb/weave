@@ -2,12 +2,13 @@ import pytest
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.objects_query_builder import (
-    ObjectQueryBuilder,
+    ObjectMetadataQueryBuilder,
     _make_conditions_part,
     _make_limit_part,
     _make_object_id_conditions_part,
     _make_offset_part,
     _make_sort_part,
+    make_objects_val_query_and_parameters,
 )
 
 
@@ -62,35 +63,35 @@ def test_make_object_id_conditions_part():
 
 
 def test_object_query_builder_basic():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     assert "project_id = {project_id: String}" in builder.make_metadata_query()
     assert builder.parameters["project_id"] == "test_project"
 
 
 def test_object_query_builder_add_digest_condition():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
 
     # Test latest digest
     builder.add_digest_condition("latest")
     assert "is_latest = 1" in builder.conditions_part
 
     # Test specific digest
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_digest_condition("abc123")
     assert "digest = {version_digest: String}" in builder.conditions_part
     assert builder.parameters["version_digest"] == "abc123"
 
 
 def test_object_query_builder_add_object_ids_condition():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
 
     # Test single object ID
     builder.add_object_ids_condition(["obj1"])
-    assert "object_id = {object_ids: String}" in builder.object_id_conditions_part
-    assert builder.parameters["object_ids"] == "obj1"
+    assert "object_id = {object_id: String}" in builder.object_id_conditions_part
+    assert builder.parameters["object_id"] == "obj1"
 
     # Test multiple object IDs
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_object_ids_condition(["obj1", "obj2"])
     assert (
         "object_id IN {object_ids: Array(String)}" in builder.object_id_conditions_part
@@ -99,13 +100,13 @@ def test_object_query_builder_add_object_ids_condition():
 
 
 def test_object_query_builder_add_is_op_condition():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
     assert "is_op = 1" in builder.conditions_part
 
 
 def test_object_query_builder_limit_offset():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     assert builder.limit_part == ""
     assert builder.offset_part == ""
 
@@ -126,9 +127,163 @@ def test_object_query_builder_limit_offset():
 
 
 def test_object_query_builder_sort():
-    builder = ObjectQueryBuilder(project_id="test_project")
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_order("created_at", "DESC")
     assert builder.sort_part == "ORDER BY created_at DESC"
 
     with pytest.raises(ValueError):
         builder.add_order("created_at", "INVALID")
+
+
+STATIC_METADATA_QUERY_PART = """
+SELECT
+    project_id,
+    object_id,
+    created_at,
+    refs,
+    kind,
+    base_object_class,
+    digest,
+    version_index,
+    is_latest,
+    version_count,
+    is_op
+FROM (
+    SELECT
+        project_id,
+        object_id,
+        created_at,
+        kind,
+        base_object_class,
+        refs,
+        digest,
+        is_op,
+        row_number() OVER (
+            PARTITION BY project_id,
+            kind,
+            object_id
+            ORDER BY created_at ASC
+        ) - 1 AS version_index,
+        count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+        if(version_index + 1 = version_count, 1, 0) AS is_latest
+    FROM (
+        SELECT
+            project_id,
+            object_id,
+            created_at,
+            kind,
+            base_object_class,
+            refs,
+            digest,
+            if (kind = 'op', 1, 0) AS is_op,
+            row_number() OVER (
+                PARTITION BY project_id,
+                kind,
+                object_id,
+                digest
+                ORDER BY created_at ASC
+            ) AS rn
+        FROM object_versions"""
+
+
+def test_object_query_builder_metadata_query_basic():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_digest_condition("latest")
+
+    query = builder.make_metadata_query()
+    parameters = builder.parameters
+
+    expected_query = f"""{STATIC_METADATA_QUERY_PART}
+        WHERE project_id = {{project_id: String}}
+    )
+    WHERE rn = 1
+)
+WHERE is_latest = 1"""
+
+    assert query == expected_query
+    assert parameters == {"project_id": "test_project"}
+
+
+def test_object_query_builder_metadata_query_with_limit_offset_sort():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+
+    limit = 10
+    offset = 5
+
+    builder.set_limit(limit)
+    builder.set_offset(offset)
+    builder.add_order("created_at", "desc")
+    builder.add_object_ids_condition(["object_1"])
+    builder.add_digest_condition("digestttttttttttttttt")
+    builder.add_base_object_classes_condition(["Model", "Model2"])
+
+    query = builder.make_metadata_query()
+    parameters = builder.parameters
+
+    expected_query = f"""{STATIC_METADATA_QUERY_PART}
+        WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
+    )
+    WHERE rn = 1
+)
+WHERE ((digest = {{version_digest: String}}) AND (base_object_class IN {{base_object_classes: Array(String)}}))
+ORDER BY created_at DESC
+LIMIT 10
+OFFSET 5"""
+
+    assert query == expected_query
+    assert parameters == {
+        "project_id": "test_project",
+        "object_id": "object_1",
+        "version_digest": "digestttttttttttttttt",
+        "base_object_classes": ["Model", "Model2"],
+    }
+
+
+def test_objects_query_metadata_op():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_is_op_condition(True)
+    builder.add_object_ids_condition(["my_op"])
+    builder.add_digest_condition("v3", "vvvvvversion")
+
+    query = builder.make_metadata_query()
+    parameters = builder.parameters
+
+    expected_query = f"""{STATIC_METADATA_QUERY_PART}
+        WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
+    )
+    WHERE rn = 1
+)
+WHERE ((is_op = 1) AND (version_index = {{vvvvvversion: Int64}}))"""
+
+    assert query == expected_query
+    assert parameters == {
+        "project_id": "test_project",
+        "object_id": "my_op",
+        "vvvvvversion": 3,
+    }
+
+
+def test_make_objects_val_query_and_parameters():
+    project_id = "test_project"
+    object_ids = ["object_1"]
+    digests = ["digestttttttttttttttt", "digestttttttttttttttt2"]
+
+    query, parameters = make_objects_val_query_and_parameters(
+        project_id, object_ids, digests
+    )
+
+    expected_query = """
+        SELECT object_id, digest, any(val_dump)
+        FROM object_versions
+        WHERE project_id = {project_id: String} AND
+            object_id IN {object_ids: Array(String)} AND
+            digest IN {digests: Array(String)}
+        GROUP BY object_id, digest
+    """
+
+    assert query == expected_query
+    assert parameters == {
+        "project_id": "test_project",
+        "object_ids": ["object_1"],
+        "digests": ["digestttttttttttttttt", "digestttttttttttttttt2"],
+    }

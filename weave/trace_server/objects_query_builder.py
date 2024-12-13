@@ -85,20 +85,18 @@ def format_metadata_objects_from_query_result(
     return result
 
 
-class ObjectQueryBuilder:
+class ObjectMetadataQueryBuilder:
     def __init__(
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
         object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[dict[str, Any]] = None,
-        metadata_only: bool = False,
     ):
         self.project_id = project_id
         self.parameters: dict[str, Any] = parameters or {}
         if not self.parameters.get(project_id):
             self.parameters.update({"project_id": project_id})
-        self.metadata_only: bool = metadata_only or False
 
         self._conditions: list[str] = conditions or []
         self._object_id_conditions: list[str] = object_id_conditions or []
@@ -140,28 +138,23 @@ class ObjectQueryBuilder:
         else:
             self._add_version_digest_condition(digest, param_key)
 
-    def _add_version_digest_condition(
-        self, digest: str, param_key: Optional[str] = None
-    ) -> None:
-        param_key = param_key or "version_digest"
+    def _add_version_digest_condition(self, digest: str, param_key: str) -> None:
         self._conditions.append(f"digest = {{{param_key}: String}}")
         self.parameters.update({param_key: digest})
 
-    def _add_version_index_condition(
-        self, version_index: int, param_key: Optional[str] = None
-    ) -> None:
-        param_key = param_key or "version_index"
+    def _add_version_index_condition(self, version_index: int, param_key: str) -> None:
         self._conditions.append(f"version_index = {{{param_key}: Int64}}")
         self.parameters.update({param_key: version_index})
 
     def add_object_ids_condition(
         self, object_ids: list[str], param_key: Optional[str] = None
     ) -> None:
-        param_key = param_key or "object_ids"
         if len(object_ids) == 1:
+            param_key = param_key or "object_id"
             self._object_id_conditions.append(f"object_id = {{{param_key}: String}}")
             self.parameters.update({param_key: object_ids[0]})
         else:
+            param_key = param_key or "object_ids"
             self._object_id_conditions.append(
                 f"object_id IN {{{param_key}: Array(String)}}"
             )
@@ -202,58 +195,60 @@ class ObjectQueryBuilder:
             raise ValueError("Offset can only be set once")
         self._offset = offset
 
-    def set_metadata_only(self, metadata_only: bool) -> None:
-        self.metadata_only = metadata_only
-
     def make_metadata_query(self) -> str:
-        columns = ",\n".join(OBJECT_METADATA_COLUMNS) + "\n"
-        return f"""
-            SELECT
-                {columns}
-            FROM (
-                SELECT project_id,
-                    object_id,
-                    created_at,
-                    kind,
-                    base_object_class,
-                    refs,
-                    digest,
-                    is_op,
-                    row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
-                        ORDER BY created_at ASC
-                    ) - 1 AS version_index,
-                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(version_index + 1 = version_count, 1, 0) AS is_latest
-                FROM (
-                    SELECT project_id,
-                        object_id,
-                        created_at,
-                        kind,
-                        base_object_class,
-                        refs,
-                        digest,
-                        if (kind = 'op', 1, 0) AS is_op,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {{project_id: String}}
-                    {self.object_id_conditions_part}
-                )
-                WHERE rn = 1
-            )
-            {self.conditions_part}
-            {self.sort_part}
-            {self.limit_part}
-            {self.offset_part}
-        """
+        columns = ",\n    ".join(OBJECT_METADATA_COLUMNS)
+        query = f"""
+SELECT
+    {columns}
+FROM (
+    SELECT
+        project_id,
+        object_id,
+        created_at,
+        kind,
+        base_object_class,
+        refs,
+        digest,
+        is_op,
+        row_number() OVER (
+            PARTITION BY project_id,
+            kind,
+            object_id
+            ORDER BY created_at ASC
+        ) - 1 AS version_index,
+        count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+        if(version_index + 1 = version_count, 1, 0) AS is_latest
+    FROM (
+        SELECT
+            project_id,
+            object_id,
+            created_at,
+            kind,
+            base_object_class,
+            refs,
+            digest,
+            if (kind = 'op', 1, 0) AS is_op,
+            row_number() OVER (
+                PARTITION BY project_id,
+                kind,
+                object_id,
+                digest
+                ORDER BY created_at ASC
+            ) AS rn
+        FROM object_versions
+        WHERE project_id = {{project_id: String}} {self.object_id_conditions_part}
+    )
+    WHERE rn = 1
+)"""
+        if self.conditions_part:
+            query += f"\n{self.conditions_part}"
+        if self.sort_part:
+            query += f"\n{self.sort_part}"
+        if self.limit_part:
+            query += f"\n{self.limit_part}"
+        if self.offset_part:
+            query += f"\n{self.offset_part}"
+        return query
 
 
 def make_objects_val_query_and_parameters(

@@ -82,7 +82,7 @@ from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
 from weave.trace_server.objects_query_builder import (
-    ObjectQueryBuilder,
+    ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
@@ -529,7 +529,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
         object_query_builder.add_digest_condition(req.digest)
         object_query_builder.add_object_ids_condition([req.name], "op_name")
@@ -541,7 +541,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
         if req.filter:
             if req.filter.op_names:
@@ -581,7 +581,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_digest_condition(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
 
@@ -592,7 +592,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        object_query_builder = ObjectQueryBuilder(req.project_id)
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -609,8 +609,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
-        if req.metadata_only:
-            object_query_builder.set_metadata_only(True)
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
         if req.offset is not None:
@@ -618,8 +616,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by:
             for sort in req.sort_by:
                 object_query_builder.add_order(sort.field, sort.direction)
+        metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
@@ -956,7 +955,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
-                object_query_builder = ObjectQueryBuilder(
+                object_query_builder = ObjectMetadataQueryBuilder(
                     project_id=project_id_scope,
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
@@ -1539,7 +1538,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
     def _select_objs_query(
-        self, object_query_builder: ObjectQueryBuilder
+        self,
+        object_query_builder: ObjectMetadataQueryBuilder,
+        metadata_only: bool = False,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1563,7 +1564,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         metadata_result = format_metadata_objects_from_query_result(query_result)
 
         # -- Don't make second query for object values if metadata_only --
-        if object_query_builder.metadata_only:
+        if metadata_only or len(metadata_result) == 0:
             return metadata_result
 
         value_query, value_parameters = make_objects_val_query_and_parameters(
