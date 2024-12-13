@@ -7,6 +7,8 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
+nova_models = ["nova-pro-v1", "nova-lite-v1", "nova-micro-v1"]
+
 
 def lite_llm_completion(
     api_key: str,
@@ -18,6 +20,11 @@ def lite_llm_completion(
         aws_access_key_id, aws_secret_access_key, aws_region_name = (
             get_bedrock_credentials(inputs.model)
         )
+
+        # Nova models need the region in the model name
+        if any(x in inputs.model for x in nova_models) and aws_region_name:
+            aws_inference_region = aws_region_name.split("-")[0]
+            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
 
     import litellm
 

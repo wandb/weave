@@ -233,6 +233,21 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8191,
     supports_function_calling: false,
   },
+  'amazon.nova-micro-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'amazon.nova-lite-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'amazon.nova-pro-v1:0': {
+    provider: 'bedrock',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
   'amazon.titan-text-lite-v1': {
     provider: 'bedrock',
     max_tokens: 4000,

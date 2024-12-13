@@ -1447,7 +1447,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        isBedrock = model_info.get("litellm_provider") == "bedrock"
+        isBedrock = (
+            model_info.get("litellm_provider") == "bedrock"
+            or model_info.get("litellm_provider") == "bedrock_converse"
+        )
         if not api_key and not isBedrock:
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
