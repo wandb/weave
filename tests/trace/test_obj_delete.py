@@ -1,3 +1,5 @@
+import pytest
+
 import weave
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -8,6 +10,7 @@ def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
         tsi.ObjQueryReq(
             project_id=client._project_id(),
             filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
         )
     )
     return objs.objs
@@ -38,12 +41,12 @@ def test_delete_object_versions(client: WeaveClient):
     assert len(objs) == 2
 
     # test deleting an already deleted digest
-    num_deleted = _obj_delete(client, "obj_1", [v0.digest])
-    assert num_deleted == 0
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        _obj_delete(client, "obj_1", [v0.digest])
 
     # test deleting a non-existent digest
-    num_deleted = _obj_delete(client, "obj_1", ["non-existent-digest"])
-    assert num_deleted == 0
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        _obj_delete(client, "obj_1", ["non-existent-digest"])
 
     # test deleting multiple digests
     digests = [v1.digest, v2.digest]
@@ -65,8 +68,8 @@ def test_delete_all_object_versions(client: WeaveClient):
     objs = _objs_query(client, "obj_1")
     assert len(objs) == 0
 
-    num_deleted = _obj_delete(client, "obj_1", None)
-    assert num_deleted == 0
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        _obj_delete(client, "obj_1", None)
 
 
 def test_delete_version_correctness(client: WeaveClient):
@@ -85,6 +88,7 @@ def test_delete_version_correctness(client: WeaveClient):
     assert objs[1].version_index == 2
 
     v3 = weave.publish({"i": 4}, name="obj_1")
+    objs = _objs_query(client, "obj_1")
     assert len(objs) == 3
     assert objs[0].digest == v0.digest
     assert objs[0].val == {"i": 1}

@@ -70,6 +70,7 @@ from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
 )
@@ -129,10 +130,6 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 100
 INITIAL_CALLS_STREAM_BATCH_SIZE = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-
-class NotFoundError(Exception):
-    pass
 
 
 CallCHInsertable = Union[
@@ -633,7 +630,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for sort in req.sort_by:
                 object_query_builder.add_order(sort.field, sort.direction)
         metadata_only = req.metadata_only or False
-
+        object_query_builder.set_deleted_at_condition(include_deleted=False)
         objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -657,12 +654,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_object_ids_condition([req.object_id])
+        metadata_only = True
         if req.digests:
-            for i, digest in enumerate(req.digests):
-                object_query_builder._add_version_digest_condition(
-                    digest, f"digest_{i}"
-                )
-        metadata_only = req.digests is not None and len(req.digests) > 0
+            object_query_builder.add_digests_or_condition(req.digests)
+            metadata_only = False
+        object_query_builder.set_deleted_at_condition(include_deleted=False)
+
         object_versions = self._select_objs_query(object_query_builder, metadata_only)
 
         delete_insertables = []
@@ -690,8 +687,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         data = [list(obj.model_dump().values()) for obj in delete_insertables]
         column_names = list(delete_insertables[0].model_fields.keys())
-        self._insert("object_versions", data=data, column_names=column_names)
 
+        self._insert("object_versions", data=data, column_names=column_names)
         num_deleted = len(delete_insertables)
 
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
