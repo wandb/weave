@@ -1,13 +1,14 @@
 import pytest
+
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.objects_query_builder import (
     ObjectQueryBuilder,
+    _make_conditions_part,
     _make_limit_part,
+    _make_object_id_conditions_part,
     _make_offset_part,
     _make_sort_part,
-    _make_conditions_part,
-    _make_object_id_conditions_part,
 )
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_make_limit_part():

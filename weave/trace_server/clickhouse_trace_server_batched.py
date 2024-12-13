@@ -84,6 +84,7 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.objects_query_builder import (
     ObjectQueryBuilder,
     format_metadata_objects_from_query_result,
+    make_objects_val_query_and_parameters,
 )
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context

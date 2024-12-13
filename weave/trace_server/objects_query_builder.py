@@ -276,14 +276,3 @@ def make_objects_val_query_and_parameters(
         "digests": digests,
     }
     return query, parameters
-
-
-def format_value_objects_from_query_result(
-    query_result: Iterator[tuple[Any, ...]],
-) -> dict[tuple[str, str], Any]:
-    # Map (object_id, digest) to val_dump
-    object_values: dict[tuple[str, str], Any] = {}
-    for row in query_result:
-        (object_id, digest, val_dump) = row
-        object_values[(object_id, digest)] = val_dump
-    return object_values
