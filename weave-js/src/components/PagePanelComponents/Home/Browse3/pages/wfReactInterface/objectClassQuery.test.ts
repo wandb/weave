@@ -1,13 +1,13 @@
 import {expectType} from 'tsd';
 
 import {
-  useBaseObjectInstances,
-  useCreateObjectInstance,
-} from './objectClassQuery';
-import {
   TestOnlyExample,
   TestOnlyExampleSchema,
 } from './generatedBuiltinObjectClasses.zod';
+import {
+  useBaseObjectInstances,
+  useCreateObjectInstance,
+} from './objectClassQuery';
 import {
   TraceObjCreateReq,
   TraceObjCreateRes,

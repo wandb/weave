@@ -23,7 +23,9 @@ export type TraceObjSchemaForBaseObjectClass<
   C extends BuiltinObjectClassRegistryKeys
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
-export const useBaseObjectInstances = <C extends BuiltinObjectClassRegistryKeys>(
+export const useBaseObjectInstances = <
+  C extends BuiltinObjectClassRegistryKeys
+>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
