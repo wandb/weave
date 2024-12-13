@@ -125,7 +125,6 @@ def create_wrapper_sync(
         op = weave.op()(fn)
         op.name = name  # type: ignore
         op._set_on_input_handler(chat_nvidia_input_handler)
-        op._set_on_output_handler()
         op._set_on_finish_handler(chat_nvidia_post_processor)
         return op
 
