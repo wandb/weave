@@ -84,7 +84,8 @@ def chat_nvidia_input_handler(
         inputs=inputs,
     )
 
-def chat_nvidia_post_processor(response) -> ChatCompletion:
+def chat_nvidia_post_processor(call, original_output, exception) -> ChatCompletion:
+    response = original_output
 
     # Extract token usage
     usage = response["llm_output"].get("token_usage", {})
