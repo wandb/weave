@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any, Literal, Optional, cast
+from typing import Any, Optional
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
@@ -31,10 +31,14 @@ def _make_optional_part(query_keyword: str, part: Optional[str]) -> str:
 
 
 def _make_limit_part(limit: Optional[int]) -> str:
+    if limit is None:
+        return ""
     return _make_optional_part("LIMIT", str(limit))
 
 
 def _make_offset_part(offset: Optional[int]) -> str:
+    if offset is None:
+        return ""
     return _make_optional_part("OFFSET", str(offset))
 
 
@@ -92,7 +96,7 @@ class ObjectQueryBuilder:
         self.project_id = project_id
         self.parameters: dict[str, Any] = parameters or {}
         if not self.parameters.get(project_id):
-            self.parameters.update({project_id: project_id})
+            self.parameters.update({"project_id": project_id})
         self.metadata_only: bool = metadata_only or False
 
         self._conditions: list[str] = conditions or []
@@ -166,8 +170,10 @@ class ObjectQueryBuilder:
         self._conditions.append("is_latest = 1")
 
     def add_is_op_condition(self, is_op: bool) -> None:
-        self._conditions.append(f"is_op = {{{'is_op': Boolean}}}")
-        self.parameters.update({"is_op": is_op})
+        if is_op:
+            self._conditions.append("is_op = 1")
+        else:
+            self._conditions.append("is_op = 0")
 
     def add_base_object_classes_condition(self, base_object_classes: list[str]) -> None:
         self._conditions.append(
@@ -176,10 +182,9 @@ class ObjectQueryBuilder:
         self.parameters.update({"base_object_classes": base_object_classes})
 
     def add_order(self, field: str, direction: str) -> None:
-        direction = direction.upper()
-        if direction not in ("ASC", "DESC"):
+        direction = direction.lower()
+        if direction not in ("asc", "desc"):
             raise ValueError(f"Direction {direction} is not allowed")
-        direction = cast(Literal["ASC", "DESC"], direction)
         self._sort_by.append(tsi.SortBy(field=field, direction=direction))
 
     def set_limit(self, limit: int) -> None:

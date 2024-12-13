@@ -47,7 +47,7 @@ def test_make_conditions_part():
     assert _make_conditions_part(["condition1"]) == "WHERE condition1"
     assert (
         _make_conditions_part(["condition1", "condition2"])
-        == "WHERE condition1 AND condition2"
+        == "WHERE ((condition1) AND (condition2))"
     )
 
 
@@ -56,7 +56,8 @@ def test_make_object_id_conditions_part():
     assert _make_object_id_conditions_part([]) == ""
     assert _make_object_id_conditions_part(["id = 1"]) == "AND id = 1"
     assert (
-        _make_object_id_conditions_part(["id = 1", "id = 2"]) == "AND id = 1 AND id = 2"
+        _make_object_id_conditions_part(["id = 1", "id = 2"])
+        == "AND ((id = 1) AND (id = 2))"
     )
 
 
@@ -100,8 +101,7 @@ def test_object_query_builder_add_object_ids_condition():
 def test_object_query_builder_add_is_op_condition():
     builder = ObjectQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
-    assert "is_op = {is_op: Boolean}" in builder.conditions_part
-    assert builder.parameters["is_op"] is True
+    assert "is_op = 1" in builder.conditions_part
 
 
 def test_object_query_builder_limit_offset():
