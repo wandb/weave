@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any, Literal, Optional, cast
+from typing import Any, Optional
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
@@ -176,10 +176,11 @@ class ObjectQueryBuilder:
             self._conditions.append("is_op = 0")
 
     def add_base_object_classes_condition(self, base_object_classes: list[str]) -> None:
+        param_key = "base_object_classes"
         self._conditions.append(
-            f"base_object_class IN {base_object_classes: Array(String)}"
+            f"base_object_classes IN {{{param_key}: Array(String)}}"
         )
-        self.parameters.update({"base_object_classes": base_object_classes})
+        self.parameters.update({param_key: base_object_classes})
 
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
