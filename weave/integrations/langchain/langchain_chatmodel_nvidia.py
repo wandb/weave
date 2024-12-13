@@ -88,27 +88,30 @@ def chat_nvidia_post_processor(call, original_output, exception) -> ChatCompleti
     response = original_output
 
     # Extract token usage
-    usage = response["llm_output"].get("token_usage", {})
+    usage = response.llm_output.get("token_usage", {})
+    llmoutput = original_output.llmoutput
+    generations = original_output.generations
+
 
     # Prepare choices
     choices = [
         {
             "index": idx,
             "message": {
-                "role": generation["message"].get("role", "assistant"),
-                "content": generation["message"].get("content", ""),
+                "role": generation.message.role,
+                "content": generation.message.content,
             },
-            "finish_reason": response["llm_output"].get("finish_reason", "stop"),
+            "finish_reason": llmoutput.get("finish_reason", "stop"),
         }
-        for idx, generation in enumerate(response["generations"])
+        for idx, generation in enumerate(generations)
     ]
 
     # Construct ChatCompletion
     chat_completion = ChatCompletion(
         id=response.get("id", "unique-id"),
-        object="chat.completion",
-        created=response["llm_output"].get("created", 0),
-        model=response["llm_output"].get("model_name", "unknown-model"),
+        object="invoke",
+        created=llmoutput.get("created", 0),
+        model=llmoutput.get("model_name", "unknown-model"),
         choices=choices,
         usage={
             "prompt_tokens": usage.get("prompt_tokens", 0),
