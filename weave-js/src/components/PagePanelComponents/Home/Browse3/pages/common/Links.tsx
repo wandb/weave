@@ -9,6 +9,7 @@ import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {
   FEEDBACK_EXPAND_PARAM,
   PATH_PARAM,
@@ -414,7 +415,8 @@ export const CallsLink: React.FC<{
       $variant={props.variant}
       to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount}
-      {props.countIsLimited ? '+' : ''} calls
+      {props.countIsLimited ? '+' : ''}{' '}
+      {maybePluralizeWord(props.callCount, 'call')}
     </Link>
   );
 };
@@ -427,6 +429,7 @@ export const ObjectVersionsLink: React.FC<{
   filter?: WFHighLevelObjectVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
+  children?: React.ReactNode;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
@@ -438,9 +441,13 @@ export const ObjectVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount}
-      {props.countIsLimited ? '+' : ''} version
-      {props.versionCount !== 1 ? 's' : ''}
+      {props.children ?? (
+        <>
+          {props.versionCount}
+          {props.countIsLimited ? '+' : ''} version
+          {props.versionCount !== 1 ? 's' : ''}
+        </>
+      )}
     </Link>
   );
 };
@@ -453,6 +460,7 @@ export const OpVersionsLink: React.FC<{
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
+  children?: React.ReactNode;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
@@ -460,9 +468,13 @@ export const OpVersionsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
-      {props.versionCount}
-      {props.countIsLimited ? '+' : ''} version
-      {props.versionCount !== 1 ? 's' : ''}
+      {props.children ?? (
+        <>
+          {props.versionCount}
+          {props.countIsLimited ? '+' : ''} version
+          {props.versionCount !== 1 ? 's' : ''}
+        </>
+      )}
     </Link>
   );
 };

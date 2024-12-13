@@ -260,4 +260,3 @@ The following section describes how to output the standard final summarization f
 
   </TabItem>
 </Tabs>
-
