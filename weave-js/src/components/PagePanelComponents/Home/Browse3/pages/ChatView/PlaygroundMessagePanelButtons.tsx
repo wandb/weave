@@ -6,7 +6,7 @@ import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 
 type PlaygroundMessagePanelButtonsProps = {
   index: number;
-  isChoice: boolean;
+  choiceIndex?: number;
   isTool: boolean;
   hasContent: boolean;
   contentRef: React.RefObject<HTMLDivElement>;
@@ -18,7 +18,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
   PlaygroundMessagePanelButtonsProps
 > = ({
   index,
-  isChoice,
+  choiceIndex,
   isTool,
   hasContent,
   contentRef,
@@ -53,7 +53,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         variant="quiet"
         size="small"
         startIcon="randomize-reset-reload"
-        onClick={() => retry?.(index, isChoice)}
+        onClick={() => retry?.(index, choiceIndex)}
         tooltip={
           !hasContent
             ? 'We currently do not support retrying functions'
@@ -85,8 +85,8 @@ export const PlaygroundMessagePanelButtons: React.FC<
         size="small"
         startIcon="delete"
         onClick={() => {
-          if (isChoice) {
-            deleteChoice?.(index);
+          if (choiceIndex !== undefined) {
+            deleteChoice?.(index, choiceIndex);
           } else {
             deleteMessage?.(index, responseIndexes);
           }
