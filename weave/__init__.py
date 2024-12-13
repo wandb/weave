@@ -1,5 +1,7 @@
 """The top-level functions and classes for working with Weave."""
 
+from typing import Any
+
 from weave import version
 from weave.trace.api import *
 
@@ -17,6 +19,18 @@ from weave.trace.util import (
     Thread,  # noqa: F401
     ThreadPoolExecutor,  # noqa: F401
 )
+
+
+def __getattr__(name: str) -> Any:
+    """This function defines module-level lazy imports.
+
+    The scorer module is particularly heavy, so we defer to speed up weave import."""
+    if name == "Scorer":
+        from weave.flow.scorer import Scorer
+
+        return Scorer
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 # Alias for succinct code
 P = EasyPrompt
