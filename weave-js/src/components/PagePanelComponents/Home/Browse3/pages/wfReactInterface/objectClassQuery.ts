@@ -23,6 +23,7 @@ export type TraceObjSchemaForBaseObjectClass<
   C extends BuiltinObjectClassRegistryKeys
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
+// Notice: this is still `base` object class, not `builtin` object class.
 export const useBaseObjectInstances = <
   C extends BuiltinObjectClassRegistryKeys
 >(
@@ -94,7 +95,7 @@ const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
     );
 };
 
-export const useCreateObjectInstance = <
+export const useCreateBuiltinObjectInstance = <
   C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
@@ -103,32 +104,33 @@ export const useCreateObjectInstance = <
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createObjectInstance(client, objectClassName, req);
+    createBuiltinObjectInstance(client, objectClassName, req);
 };
 
-export const createObjectInstance = async <
+export const createBuiltinObjectInstance = async <
   C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
   client: TraceServerClient,
-  objectClassName: C,
+  builtinObjectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
-    req.obj.object_class != null &&
-    req.obj.object_class !== objectClassName
+    req.obj.builtin_object_class != null &&
+    req.obj.builtin_object_class !== builtinObjectClassName
   ) {
     throw new Error(
-      `object_class must match objectClassName: ${objectClassName}`
+      `object_class must match objectClassName: ${builtinObjectClassName}`
     );
   }
 
-  const knownBaseObjectClass = builtinObjectClassRegistry[objectClassName];
-  if (!knownBaseObjectClass) {
-    throw new Error(`Unknown object class: ${objectClassName}`);
+  const knownBuiltinObjectClass =
+    builtinObjectClassRegistry[builtinObjectClassName];
+  if (!knownBuiltinObjectClass) {
+    throw new Error(`Unknown object class: ${builtinObjectClassName}`);
   }
 
-  const verifiedObject = knownBaseObjectClass.safeParse(req.obj.val);
+  const verifiedObject = knownBuiltinObjectClass.safeParse(req.obj.val);
 
   if (!verifiedObject.success) {
     throw new Error(
@@ -140,7 +142,7 @@ export const createObjectInstance = async <
     ...req,
     obj: {
       ...req.obj,
-      object_class: objectClassName,
+      builtin_object_class: builtinObjectClassName,
     },
   };
 

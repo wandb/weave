@@ -6,7 +6,7 @@ import {
 } from './generatedBuiltinObjectClasses.zod';
 import {
   useBaseObjectInstances,
-  useCreateObjectInstance,
+  useCreateBuiltinObjectInstance,
 } from './objectClassQuery';
 import {
   TraceObjCreateReq,
@@ -74,7 +74,7 @@ describe('Type Tests', () => {
 
   it('useCreateCollectionObject return type matches expected structure', () => {
     type CreateCollectionObjectReturn = ReturnType<
-      typeof useCreateObjectInstance<'TestOnlyExample'>
+      typeof useCreateBuiltinObjectInstance<'TestOnlyExample'>
     >;
 
     // Define the expected type structure

@@ -12,7 +12,7 @@ import {z} from 'zod';
 
 import {ActionSpecSchema} from '../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {LlmJudgeActionSpecSchema} from '../wfReactInterface/objectClasses.zod';
-import {createObjectInstance} from '../wfReactInterface/objectClassQuery';
+import {createBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {AutocompleteWithLabel} from './FormComponents';
@@ -185,7 +185,7 @@ export const onLLMJudgeScorerSave = async (
     config: judgeAction,
   });
 
-  return createObjectInstance(client, 'ActionSpec', {
+  return createBuiltinObjectInstance(client, 'ActionSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
       object_id: objectId,
