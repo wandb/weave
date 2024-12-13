@@ -155,7 +155,7 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 ### Architecture Flow
 
 1. Define your schema in a python file in the `weave/trace_server/interface/base_object_classes/test_only_example.py` directory. See `weave/trace_server/interface/base_object_classes/test_only_example.py` as an example.
-2. Make sure to register your schemas in `weave/trace_server/interface/base_object_classes/base_object_registry.py` by calling `register_base_object`.
+2. Make sure to register your schemas in `weave/trace_server/interface/base_object_classes/builtin_object_registry.py` by calling `register_base_object`.
 3. Run `make synchronize-base-object-schemas` to generate the frontend types.
     * The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/trace_server/interface/base_object_classes/generated/generated_base_object_class_schemas.json`.
     * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts`.
@@ -171,7 +171,7 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 graph TD
     subgraph Schema Definition
         F["weave/trace_server/interface/<br>base_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
-        P --> |register_base_object| R["base_object_registry.py"]
+        P --> |register_base_object| R["builtin_object_registry.py"]
     end
 
     subgraph Schema Generation
