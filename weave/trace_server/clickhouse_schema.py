@@ -136,6 +136,11 @@ class ObjCHInsertable(BaseModel):
     _refs = field_validator("refs")(validation.refs_list_validator)
 
 
+class ObjDeleteCHInsertable(ObjCHInsertable):
+    deleted_at: datetime.datetime
+    created_at: datetime.datetime
+
+
 class SelectableCHObjSchema(BaseModel):
     project_id: str
     object_id: str

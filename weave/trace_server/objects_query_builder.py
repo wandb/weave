@@ -195,6 +195,11 @@ class ObjectMetadataQueryBuilder:
             raise ValueError("Offset can only be set once")
         self._offset = offset
 
+    def set_deleted_at_condition(self, include_deleted: bool) -> None:
+        if include_deleted:
+            return
+        self._conditions.append("deleted_at IS NULL")
+
     def make_metadata_query(self) -> str:
         columns = ",\n    ".join(OBJECT_METADATA_COLUMNS)
         query = f"""
@@ -242,6 +247,8 @@ FROM (
 )"""
         if self.conditions_part:
             query += f"\n{self.conditions_part}"
+        if self.set_deleted_at_condition(include_deleted=False):
+            query += f"\n{self.deleted_at_condition}"
         if self.sort_part:
             query += f"\n{self.sort_part}"
         if self.limit_part:
