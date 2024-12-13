@@ -46,8 +46,9 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
         />
         {(call.output as any)?.choices?.[0]?.finish_reason && (
           <Tooltip
-            content="Finish Reason"
+            content="Finish reason"
             trigger={
+              // Placing in span so tooltip shows up
               <span>
                 <Pill
                   icon="checkmark-circle"
