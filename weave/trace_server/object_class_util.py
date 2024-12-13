@@ -3,7 +3,7 @@ from typing import Any, Optional, TypedDict
 from pydantic import BaseModel
 
 from weave.trace_server.interface.base_object_classes.base_object_registry import (
-    BASE_OBJECT_REGISTRY,
+    BUILTIN_OBJECT_REGISTRY,
 )
 
 """
@@ -92,10 +92,10 @@ def process_incoming_object_val(
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
     if req_object_class is not None:
-        if object_class_type := BASE_OBJECT_REGISTRY.get(req_object_class):
+        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(req_object_class):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object
             # using the weave publish API instead of just dumping it.
-            dict_val = dump_object(object_class_type.model_validate(val))
+            dict_val = dump_object(builtin_object_class.model_validate(val))
             new_val_object_classes = get_object_classes(dict_val)
             if not new_val_object_classes:
                 raise ValueError(

@@ -9,7 +9,7 @@ from weave.trace_server.interface.base_object_classes.test_only_example import (
     TestOnlyNestedBaseObject,
 )
 
-BASE_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
+BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
 
 def register_base_object(cls: type[BaseObject]) -> None:
@@ -19,7 +19,7 @@ def register_base_object(cls: type[BaseObject]) -> None:
     Args:
         cls: The BaseObject class to register
     """
-    BASE_OBJECT_REGISTRY[cls.__name__] = cls
+    BUILTIN_OBJECT_REGISTRY[cls.__name__] = cls
 
 
 register_base_object(TestOnlyExample)
