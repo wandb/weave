@@ -1,9 +1,9 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Custom Scorers
+# Custom scorers
 
-In Weave, you can create your own custom scorers. The Scorers can either be class-based or function-based. 
+In Weave, you can create your own custom [scorers](../evaluation/scorers.md). The scorers can either be class-based or function-based. 
 
 :::tip
 If you're using Python, there are various  predefined scorers available for common use cases. For more information, see [Select a predefined scorer](../evaluation/predefined-scorers.md#select-a-predefined-scorer) on the [Predefined scorers page](../evaluation/predefined-scorers.md).
@@ -13,9 +13,9 @@ If you're using Python, there are various  predefined scorers available for comm
 
 Choosing the right type of custom scorer depends on your evaluation needs:
 
-- [Function-based scorers](#function-based-scorers): Use if your evaluation logic is simple and can be implemented in a single function. Examples include checking if text is uppercase, validating a specific condition, and applying straightforward transformations. Function-based scorers are available in both Python and Typescript.
+- [Function-based scorers](#function-based-scorers): Use if your evaluation logic is simple and can be implemented in a single function. Examples include checking if text is uppercase, validating a specific condition, and applying straightforward transformations. **Function-based scorers are available in both Python and Typescript.**
 
-- [Class-based scorers](#class-based-scorers): Use if your evaluation requires advanced logic, maintaining metadata, or multiple steps. Examples include keeping track of additional scorer metadata, trying different prompts for your LLM-evaluators, and making multiple function calls. Class-based scorers are only available in Python.
+- [Class-based scorers](#class-based-scorers): Use if your evaluation requires advanced logic, maintaining metadata, or multiple steps. Examples include keeping track of additional scorer metadata, trying different prompts for your LLM-evaluators, and making multiple function calls. **Class-based scorers are only available in Python.**
 
 ## Function-based scorers
 
@@ -31,7 +31,7 @@ Function-based scorers are available in both Python and Typescript.
      - Is decorated with `@weave.op`.
      - Returns a dictionary.
 
-     ### Example
+     #### Example
      The following example shows `evaluate_uppercase`, which checks if the text is uppercase:
 
     ```python
@@ -59,7 +59,7 @@ Function-based scorers are available in both Python and Typescript.
 
      Optionally, the function can accept a `datasetRow`.
 
-     ### Example
+     #### Example
      The following example shows `evaluate_uppercase`, which checks if the text is uppercase:
 
     ```typescript
@@ -81,7 +81,7 @@ Function-based scorers are available in both Python and Typescript.
 </Tabs>
 
 
-## Class-based Scorers
+## Class-based scorers
 
 :::note
 This feature is not available in Typescript. All usage instructions and code examples in this section are for Python.
@@ -109,7 +109,6 @@ from weave import Scorer
 
 llm_client = OpenAI()
 
-#highlight-next-line
 class SummarizationScorer(Scorer):
     model_id: str = "gpt-4o"
     system_prompt: str = "Evaluate whether the summary is good."

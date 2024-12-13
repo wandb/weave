@@ -3,11 +3,11 @@ import TabItem from '@theme/TabItem';
 
 # Evaluations
 
-To systematically improve your LLM application, it's helpful to test your changes against a consistent dataset of potential inputs so that you can catch regressions and inspect your applications behaviour under different conditions. In Weave, the `Evaluation` class is designed to assess the performance of a `Model` on a test dataset.
+To systematically improve your LLM application, it's helpful to test your changes against a consistent dataset of potential inputs so that you can catch regressions and inspect your application's behaviour under different conditions. In Weave, the `Evaluation` class is designed to assess the performance of a `Model` on a test dataset.
 
-In a Weave evaluation, a set of examples is passed through your application, and the output is scored according to multiple scoring functions. The result provides you with a overview of your application's performance in a rich UI to summarizing individual outputs and scores.
+In a Weave evaluation, a set of examples is passed through your application, and the output is scored according to multiple scoring functions. The result provides you with an overview of your application's performance in a rich UI to summarizing individual outputs and scores.
 
-This page describes the steps required to [create an evaluation](#create-an-evaluation), a [Python example](#python-example), and provides additional [usage notes and tips](#usage-notes-and-tips).
+This page describes the steps required to [create an evaluation](#create-an-evaluation). A complete [Python example](#python-example) and additional [usage notes and tips](#usage-notes-and-tips) are also included.
 
 ![Evals hero](../../../static/img/evals-hero.png)
 
@@ -21,26 +21,34 @@ To create an evaluation in Weave, follow these steps:
 
 ### Define an evaluation dataset
 
-First, create a test dataset that will be used to evaluate your application. Generally, the dataset should include failure cases that you want to test for, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
+First, create a test dataset to evaluate your application against. Generally, the dataset should include failure cases that you want to test for, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
 
 1. Define a [Dataset](/guides/core-types/datasets).
-2. Define a list of dictionaries with a collection of examples to be evaluated. 
+2. Define a list of dictionaries with a collection of examples to be evaluated. For example:
+   ```python
+   examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+        {"question": "What is the square root of 64?", "expected": "8"},
+    ]
+   ```
+   
 
 Next, [define scoring functions](#define-scoring-functions).
 
 ### Define scoring functions
 
-Next, create a list of _scorers_. Scorers are functions used to score each example. Scorers must have a `model_output` keyword argument. Other arguments are user defined and are taken from the dataset examples. The scorer will only use the necessary keys by using a dictionary key based on the argument name.
-
-:::tip
-Learn more about [how scorers work in evaluations and how to use them](../evaluation/scorers.md). 
-:::
+Next, create a list of scoring functions, also known as _scorers_. Scorers are used to score the performance of an AI system against the evaluation dataset. Scorers must have a `model_output` keyword argument. Other arguments are user defined and are taken from the dataset examples. The scorer will only use the necessary keys by using a dictionary key based on the argument name.
 
 The options available depend on whether you are using Typescript or Python:
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
   There are three types of scorers available for Python:
+
+    :::tip
+    [Predefined scorers](../evaluation/predefined-scorers.md) are available for many common use cases. Before creating a custom scorer, check if one of the predefined scorers can address your use case.
+    :::
 
     1. [Predefined scorer](../evaluation/predefined-scorers.md): Pre-built scorers designed for common use cases.
     2. [Function-based scorers](../evaluation/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
@@ -67,9 +75,13 @@ The options available depend on whether you are using Typescript or Python:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-     Only [function-based scorers](../evaluation/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you must use Python.
+     Only [function-based scorers](../evaluation/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you will need to use Python.
   </TabItem>
 </Tabs>
+
+:::tip
+Learn more about [how scorers work in evaluations and how to use them](../evaluation/scorers.md). 
+:::
 
 Next, [define an evaluation target](#define-an-evaluation-target).
 
@@ -79,7 +91,8 @@ Once your test dataset and scoring functions are defined, you can define the tar
 
 #### Evaluate a `Model` 
 
-To evaluate a `Model`, call `evaluate` on using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in Weave.
+`Models` are used when you have attributes that you want to experiment with and capture in Weave.
+To evaluate a `Model`, use the `evaluate` method from `Evaluation`. 
 
 The following example runs `predict()` on each example and scores the output with each scoring function defined in the `scorers` list using the `examples` dataset.
 
@@ -92,7 +105,7 @@ class MyModel(Model):
 
     @weave.op()
     def predict(self, question: str):
-        # here's where you would add your LLM call and return the output
+        # Here's where you would add your LLM call and return the output
         return {'generated_text': 'Hello, ' + self.prompt}
 
 model = MyModel(prompt='World')
@@ -176,7 +189,7 @@ evaluation = Evaluation(
 )
 ```
 
-You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary. Using the `__weave` dictionary sets the call display name which is distinct from the Evaluation object name. In the UI, you will see the display name if set. Otherwise, the Evaluation object name will be used.
+You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary. Using the `__weave` dictionary sets the call display name which is distinct from the `Evaluation` object name. In the UI, you will see the display name if set. Otherwise, the `Evaluation` object name will be used.
 
 ```python
 evaluation = Evaluation(
