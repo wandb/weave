@@ -78,7 +78,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
           newVal = min;
         }
         if (ticks != null) {
-          newVal = getClosestTick(ticks, newVal);
+          newVal = getClosestTick(ticks, newVal, sliderValue);
         }
         setSliderValue(newVal);
         onChangeDebounced(newVal);
@@ -172,17 +172,38 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
 
 export default SliderInput;
 
-function getClosestTick(ticks: number[], val: number): number {
+export function getClosestTick(
+  ticks: number[],
+  val: number,
+  prev: number
+): number {
   let closest = val;
+  const increasing = val > prev;
   let minDiff = Number.MAX_VALUE;
 
-  for (const tick of ticks) {
+  // Binary search for the closest tick
+  let left = 0;
+  let right = ticks.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const tick = ticks[mid];
     const diff = Math.abs(tick - val);
-    if (diff >= minDiff) {
-      break;
+
+    // Only update closest if the tick is in the right direction
+    if (
+      diff < minDiff &&
+      ((increasing && tick >= val) || (!increasing && tick <= val))
+    ) {
+      closest = tick;
+      minDiff = diff;
     }
-    closest = tick;
-    minDiff = diff;
+
+    if (tick < val) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
   }
 
   return closest;
