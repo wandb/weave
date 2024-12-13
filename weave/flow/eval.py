@@ -466,6 +466,8 @@ class Evaluation(Object):
     async def get_eval_results(
         self, model: Union[Callable, Model]
     ) -> EvaluationResults:
+        from weave.flow.scorer import get_scorer_attributes
+
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
