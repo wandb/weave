@@ -5,7 +5,8 @@ import pytest
 import torch
 from torch import Tensor
 
-from weave.scorers.moderation_scorer import RollingWindowScorer
+from weave.scorers.moderation_scorer import RollingWindowScorer, ToxicityScorer, BiasScorer
+from tests.scorers.test_utils import generate_large_text
 
 
 # Define a concrete subclass for testing since RollingWindowScorer is abstract
@@ -99,3 +100,47 @@ async def test_tokenize_input_without_truncation(scorer):
     scorer._tokenizer.assert_called_with(prompt, return_tensors="pt", truncation=False)
     # Assert the tokenized input is as expected
     assert torch.equal(result, expected_tensor.to(scorer.device))
+
+
+@pytest.fixture
+def toxicity_scorer():
+    return ToxicityScorer()
+
+
+@pytest.fixture
+def bias_scorer():
+    return BiasScorer()
+
+
+@pytest.mark.asyncio
+async def test_toxicity_scorer_large_input(toxicity_scorer):
+    large_text = generate_large_text()
+
+    result = await toxicity_scorer.score(large_text)
+
+    assert "extras" in result
+    assert all(cat in result["extras"] for cat in [
+        "Race/Origin", "Gender/Sex", "Religion", "Ability", "Violence"
+    ])
+
+
+@pytest.mark.asyncio
+async def test_bias_scorer_large_input(bias_scorer):
+    large_text = generate_large_text()
+
+    result = await bias_scorer.score(large_text)
+
+    assert "extras" in result
+    assert all(cat in result["extras"] for cat in ["gender_bias", "racial_bias"])
+
+
+@pytest.mark.asyncio
+async def test_toxicity_scorer_error_handling(toxicity_scorer):
+    with pytest.raises(ValueError):
+        await toxicity_scorer.score("")
+
+
+@pytest.mark.asyncio
+async def test_bias_scorer_error_handling(bias_scorer):
+    with pytest.raises(ValueError):
+        await bias_scorer.score("")

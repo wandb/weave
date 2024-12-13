@@ -2,6 +2,7 @@ import pytest
 
 import weave
 from weave.scorers.coherence_scorer import CoherenceScorer
+from tests.scorers.test_utils import generate_large_text
 
 
 @pytest.fixture
@@ -93,3 +94,23 @@ async def test_coherence_scorer_evaluation(coherence_scorer):
     assert "coherent" in result["CoherenceScorer"]
     assert result["CoherenceScorer"]["coherent"]["true_count"] == 1
     assert result["CoherenceScorer"]["coherent"]["true_fraction"] == pytest.approx(0.5)
+
+
+@pytest.mark.asyncio
+async def test_coherence_scorer_large_input(coherence_scorer):
+    large_text = generate_large_text()
+
+    result = await coherence_scorer.score(
+        input="What is the story about?",
+        output=large_text
+    )
+
+    assert "coherent" in result
+    assert "coherence" in result
+    assert "coherence_score" in result
+
+
+@pytest.mark.asyncio
+async def test_coherence_scorer_error_handling(coherence_scorer):
+    with pytest.raises(ValueError):
+        await coherence_scorer.score(input="", output="")

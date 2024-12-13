@@ -4,11 +4,14 @@ from openai import OpenAI
 import weave
 from weave.scorers import (
     HallucinationFreeScorer,
+    HallucinationScorer,
+    FaithfulnessScorer,
 )
 from weave.scorers.hallucination_scorer import (
     HallucinationReasoning,
     HallucinationResponse,
 )
+from tests.scorers.test_utils import generate_large_text, generate_context_and_output
 
 
 # mock the create function
@@ -40,11 +43,20 @@ def hallucination_scorer(mock_create):
     )
 
 
+@pytest.fixture
+def hallucination_scorer_v2(mock_create):
+    return HallucinationScorer()
+
+
+@pytest.fixture
+def faithfulness_scorer(mock_create):
+    return FaithfulnessScorer()
+
+
 def test_hallucination_scorer_score(hallucination_scorer, mock_create):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
     result = hallucination_scorer.score(output=output, context=context)
-    # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
     assert result["has_hallucination"] == True
@@ -103,3 +115,47 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
     assert (
         result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
     )
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_large_input(hallucination_scorer_v2, mock_create):
+    query = "What is the story about?"
+    context, output = generate_context_and_output(100_000, context_ratio=0.8)
+
+    result = await hallucination_scorer_v2.score(
+        query=query,
+        context=context,
+        output=output
+    )
+
+    assert "flagged" in result
+    assert "extras" in result
+    assert "score" in result["extras"]
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_large_input(faithfulness_scorer, mock_create):
+    query = "What is the story about?"
+    context, output = generate_context_and_output(100_000, context_ratio=0.8)
+
+    result = await faithfulness_scorer.score(
+        query=query,
+        context=context,
+        output=output
+    )
+
+    assert "flagged" in result
+    assert "extras" in result
+    assert "score" in result["extras"]
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_error_handling(hallucination_scorer_v2):
+    with pytest.raises(ValueError):
+        await hallucination_scorer_v2.score(query="", context="", output="")
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_error_handling(faithfulness_scorer):
+    with pytest.raises(ValueError):
+        await faithfulness_scorer.score(query="", context="", output="")
