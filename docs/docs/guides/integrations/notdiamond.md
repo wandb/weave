@@ -68,7 +68,6 @@ preference_id = train_router(
     response_column="actual",
     language="en",
     maximize=True,
-    api_key=api_key,
 )
 ```
 
