@@ -927,7 +927,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> Any:
             conds: list[str] = []
             object_id_conds: list[str] = []
-            parameters: dict[str, str | int] = {}
+            parameters: dict[str, Union[str, int]] = {}
 
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
