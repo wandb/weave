@@ -1,4 +1,4 @@
-# BaseObjectClasses
+# BuiltinObjectClasses
 
 ## Refresher on Objects and object storage
 
@@ -158,13 +158,13 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 2. Make sure to register your schemas in `weave/trace_server/interface/builtin_object_classes/builtin_object_registry.py` by calling `register_base_object`.
 3. Run `make synchronize-base-object-schemas` to generate the frontend types.
     * The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/trace_server/interface/builtin_object_classes/generated/generated_base_object_class_schemas.json`.
-    * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts`.
+    * The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts`.
 4. Now, each use case uses different parts:
     1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
     2. `Python Reading`. Users can `weave.ref().get()` and the weave python SDK will return the instance with the correct type. Note: we do some special handling such that the returned object is not a WeaveObject, but literally the exact pydantic class.
     3. `HTTP Writing`. In cases where the client/user does not want to add the special type information, users can publish builtin objects by setting the `object_class` setting on `POST obj/create` to the name of the class. The weave server will validate the object against the schema, update the metadata fields, and store the object.
     4. `HTTP Reading`. When querying for objects, the server will return the object with the correct type if the `base_object_class` metadata field is set.
-    5. `Frontend`. The frontend will read the zod schema from `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBaseObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBaseObjectInstance`.
+    5. `Frontend`. The frontend will read the zod schema from `weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBaseObjectInstance`.
 * Note: it is critical that all techniques produce the same digest for the same data - which is tested in the tests. This way versions are not thrashed by different clients/users.
 
 ```mermaid
@@ -179,7 +179,7 @@ graph TD
         G --> |runs| S["weave/scripts/<br>generate_base_object_schemas.py"]
         R --> |import registered classes| S
         S --> |generates| J["generated_base_object_class_schemas.json"]
-        M --> |yarn generate-schemas| Z["generatedBaseObjectClasses.zod.ts"]
+        M --> |yarn generate-schemas| Z["generatedBuiltinObjectClasses.zod.ts"]
         J --> Z
     end
 

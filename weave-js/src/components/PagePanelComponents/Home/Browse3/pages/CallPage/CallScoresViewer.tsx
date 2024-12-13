@@ -15,7 +15,7 @@ import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGri
 import {
   TraceObjSchemaForBaseObjectClass,
   useBaseObjectInstances,
-} from '../wfReactInterface/baseObjectClassQuery';
+} from '../wfReactInterface/objectClassQuery';
 import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';

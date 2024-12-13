@@ -26,8 +26,8 @@ import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardCon
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
-  useCreateBaseObjectInstance,
-} from '../wfReactInterface/baseObjectClassQuery';
+  useCreateObjectInstance,
+} from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
@@ -131,7 +131,7 @@ const useUpdateLeaderboard = (
   project: string,
   objectId: string
 ) => {
-  const createLeaderboard = useCreateBaseObjectInstance('Leaderboard');
+  const createLeaderboard = useCreateObjectInstance('Leaderboard');
 
   const updateLeaderboard = async (leaderboardVal: LeaderboardObjectVal) => {
     return await createLeaderboard({

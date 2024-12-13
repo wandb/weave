@@ -2,7 +2,7 @@ import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import {baseObjectClassRegistry} from './generatedBaseObjectClasses.zod';
+import {builtinObjectClassRegistry} from './generatedBuiltinObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
@@ -13,17 +13,17 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-type BaseObjectClassRegistry = typeof baseObjectClassRegistry;
-type BaseObjectClassRegistryKeys = keyof BaseObjectClassRegistry;
-type BaseObjectClassType<C extends BaseObjectClassRegistryKeys> = z.infer<
-  BaseObjectClassRegistry[C]
+type BuiltinObjectClassRegistry = typeof builtinObjectClassRegistry;
+type BuiltinObjectClassRegistryKeys = keyof BuiltinObjectClassRegistry;
+type BaseObjectClassType<C extends BuiltinObjectClassRegistryKeys> = z.infer<
+  BuiltinObjectClassRegistry[C]
 >;
 
 export type TraceObjSchemaForBaseObjectClass<
-  C extends BaseObjectClassRegistryKeys
+  C extends BuiltinObjectClassRegistryKeys
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
-export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
+export const useBaseObjectInstances = <C extends BuiltinObjectClassRegistryKeys>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
@@ -56,12 +56,12 @@ export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
   return {result: objects, loading};
 };
 
-const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
+const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
   client: TraceServerClient,
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
-  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  const knownObjectClass = builtinObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
@@ -92,38 +92,38 @@ const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
     );
 };
 
-export const useCreateBaseObjectInstance = <
-  C extends BaseObjectClassRegistryKeys,
+export const useCreateObjectInstance = <
+  C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
-  baseObjectClassName: C
+  objectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createBaseObjectInstance(client, baseObjectClassName, req);
+    createObjectInstance(client, objectClassName, req);
 };
 
-export const createBaseObjectInstance = async <
-  C extends BaseObjectClassRegistryKeys,
+export const createObjectInstance = async <
+  C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
   client: TraceServerClient,
-  baseObjectClassName: C,
+  objectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
     req.obj.object_class != null &&
-    req.obj.object_class !== baseObjectClassName
+    req.obj.object_class !== objectClassName
   ) {
     throw new Error(
-      `object_class must match baseObjectClassName: ${baseObjectClassName}`
+      `object_class must match objectClassName: ${objectClassName}`
     );
   }
 
-  const knownBaseObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  const knownBaseObjectClass = builtinObjectClassRegistry[objectClassName];
   if (!knownBaseObjectClass) {
-    throw new Error(`Unknown object class: ${baseObjectClassName}`);
+    throw new Error(`Unknown object class: ${objectClassName}`);
   }
 
   const verifiedObject = knownBaseObjectClass.safeParse(req.obj.val);
@@ -138,7 +138,7 @@ export const createBaseObjectInstance = async <
     ...req,
     obj: {
       ...req.obj,
-      object_class: baseObjectClassName,
+      object_class: objectClassName,
     },
   };
 

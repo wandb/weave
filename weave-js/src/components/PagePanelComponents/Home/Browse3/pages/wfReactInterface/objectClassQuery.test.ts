@@ -2,12 +2,12 @@ import {expectType} from 'tsd';
 
 import {
   useBaseObjectInstances,
-  useCreateBaseObjectInstance,
-} from './baseObjectClassQuery';
+  useCreateObjectInstance,
+} from './objectClassQuery';
 import {
   TestOnlyExample,
   TestOnlyExampleSchema,
-} from './generatedBaseObjectClasses.zod';
+} from './generatedBuiltinObjectClasses.zod';
 import {
   TraceObjCreateReq,
   TraceObjCreateRes,
@@ -74,7 +74,7 @@ describe('Type Tests', () => {
 
   it('useCreateCollectionObject return type matches expected structure', () => {
     type CreateCollectionObjectReturn = ReturnType<
-      typeof useCreateBaseObjectInstance<'TestOnlyExample'>
+      typeof useCreateObjectInstance<'TestOnlyExample'>
     >;
 
     // Define the expected type structure
