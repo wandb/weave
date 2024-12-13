@@ -86,8 +86,8 @@ def chat_nvidia_input_handler(
 
 def chat_nvidia_post_processor(call, original_output, exception) -> ChatCompletion:
     if exception is not None:
-        return original_output
-    
+        return call, original_output
+
     llmoutput = original_output.llm_output
     generations = original_output.generations
     usage = llmoutput.get("token_usage", {})
