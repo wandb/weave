@@ -6,7 +6,7 @@ import time
 import traceback
 from collections.abc import Coroutine
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union, cast
 
 from pydantic import PrivateAttr, model_validator
 from rich import print
@@ -18,14 +18,6 @@ from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
 from weave.flow.util import make_memorable_name
-from weave.scorers import (
-    Scorer,
-    _has_oldstyle_scorers,
-    _validate_scorer_signature,
-    auto_summarize,
-    get_scorer_attributes,
-    transpose,
-)
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
@@ -33,6 +25,9 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
+
+if TYPE_CHECKING:
+    from weave.scorers import Scorer
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -120,7 +115,7 @@ class Evaluation(Object):
     """
 
     dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, Op, "Scorer"]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
@@ -140,6 +135,8 @@ class Evaluation(Object):
         return self
 
     def model_post_init(self, __context: Any) -> None:
+        from weave.scorers import _has_oldstyle_scorers, _validate_scorer_signature
+
         scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
@@ -178,6 +175,8 @@ class Evaluation(Object):
     async def predict_and_score(
         self, model: Union[Callable, Model], example: dict
     ) -> dict:
+        from weave.scorers import get_scorer_attributes
+
         if self.preprocess_model_input is None:
             model_input = example
         else:
@@ -443,6 +442,8 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
+        from weave.scorers import auto_summarize, get_scorer_attributes, transpose
+
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)
         summary = {}
@@ -529,7 +530,7 @@ class Evaluation(Object):
 def evaluate(
     dataset: Union[Dataset, list],
     model: Union[Callable, Model],
-    scores: Optional[list[Union[Callable, Scorer]]] = None,
+    scores: Optional[list[Union[Callable, "Scorer"]]] = None,
     preprocess_model_input: Optional[Callable] = None,
 ) -> dict:
     eval = Evaluation(
