@@ -900,14 +900,16 @@ async def test_openai_as_context_manager_async(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_moderation_patching(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_openai_moderation_patching(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
 
     response = openai_client.moderations.create(
-    model="omni-moderation-latest",
-    input="...text to classify goes here...",
+        model="omni-moderation-latest",
+        input="...text to classify goes here...",
     )
 
     calls = list(client.calls())
@@ -928,19 +930,22 @@ def test_openai_moderation_patching(client: weave.trace.weave_client.WeaveClient
     assert inputs["model"] == "omni-moderation-latest"
     assert inputs["input"] == "...text to classify goes here..."
 
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_async_moderation_patching(client: weave.trace.weave_client.WeaveClient) -> None:
+async def test_openai_async_moderation_patching(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
 
     response = await openai_client.moderations.create(
-    model="omni-moderation-latest",
-    input="...text to classify goes here...",
+        model="omni-moderation-latest",
+        input="...text to classify goes here...",
     )
 
     calls = list(client.calls())
@@ -967,14 +972,16 @@ async def test_openai_async_moderation_patching(client: weave.trace.weave_client
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_embeddings_patching(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_openai_embeddings_patching(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
 
     response = openai_client.embeddings.create(
-    model="text-embedding-3-small",
-    input="embed this",
+        model="text-embedding-3-small",
+        input="embed this",
     )
 
     calls = list(client.calls())
@@ -995,19 +1002,22 @@ def test_openai_embeddings_patching(client: weave.trace.weave_client.WeaveClient
     assert inputs["model"] == "omni-moderation-latest"
     assert inputs["input"] == "...text to classify goes here..."
 
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_async_embeddings_patching(client: weave.trace.weave_client.WeaveClient) -> None:
+async def test_openai_async_embeddings_patching(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
 
     response = await openai_client.embeddings.create(
-    model="text-embedding-3-small",
-    input="embed this",
+        model="text-embedding-3-small",
+        input="embed this",
     )
 
     calls = list(client.calls())
