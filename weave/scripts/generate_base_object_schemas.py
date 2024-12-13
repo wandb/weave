@@ -11,17 +11,17 @@ OUTPUT_DIR = (
     Path(__file__).parent.parent
     / "trace_server"
     / "interface"
-    / "base_object_classes"
+    / "builtin_object_classes"
     / "generated"
 )
-OUTPUT_PATH = OUTPUT_DIR / "generated_base_object_class_schemas.json"
+OUTPUT_PATH = OUTPUT_DIR / "generated_builtin_object_class_schemas.json"
 
 
 def generate_schemas() -> None:
     """
     Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
     Creates a top-level schema that includes all registered objects and writes it
-    to 'generated_base_object_class_schemas.json'.
+    to 'generated_builtin_object_class_schemas.json'.
     """
     # Dynamically create a parent model with all registered objects as properties
     CompositeModel = create_model(
