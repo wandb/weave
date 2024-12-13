@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any, Literal, cast
+from typing import Any, Literal, Optional, cast
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
@@ -24,21 +24,21 @@ OBJECT_SELECT_COLUMNS = [
 ]
 
 
-def _make_optional_part(query_keyword: str, part: str | None) -> str:
+def _make_optional_part(query_keyword: str, part: Optional[str]) -> str:
     if part is None or part == "":
         return ""
     return f"{query_keyword} {part}"
 
 
-def _make_limit_part(limit: int | None) -> str:
+def _make_limit_part(limit: Optional[int]) -> str:
     return _make_optional_part("LIMIT", str(limit))
 
 
-def _make_offset_part(offset: int | None) -> str:
+def _make_offset_part(offset: Optional[int]) -> str:
     return _make_optional_part("OFFSET", str(offset))
 
 
-def _make_sort_part(sort_by: list[tsi.SortBy] | None) -> str:
+def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
     if not sort_by:
         return ""
 
@@ -53,14 +53,14 @@ def _make_sort_part(sort_by: list[tsi.SortBy] | None) -> str:
     return _make_optional_part("ORDER BY", ", ".join(sort_clauses))
 
 
-def _make_conditions_part(conditions: list[str] | None) -> str:
+def _make_conditions_part(conditions: Optional[list[str]]) -> str:
     if not conditions:
         return ""
     conditions_str = combine_conditions(conditions, "AND")
     return _make_optional_part("WHERE", conditions_str)
 
 
-def _make_object_id_conditions_part(object_id_conditions: list[str] | None) -> str:
+def _make_object_id_conditions_part(object_id_conditions: Optional[list[str]]) -> str:
     if not object_id_conditions:
         return ""
     conditions_str = combine_conditions(object_id_conditions, "AND")
@@ -84,9 +84,9 @@ class ObjectQueryBuilder:
     def __init__(
         self,
         project_id: str,
-        conditions: list[str] | None = None,
-        object_id_conditions: list[str] | None = None,
-        parameters: dict[str, Any] | None = None,
+        conditions: Optional[list[str]] = None,
+        object_id_conditions: Optional[list[str]] = None,
+        parameters: Optional[dict[str, Any]] = None,
         metadata_only: bool = False,
     ):
         self.project_id = project_id
@@ -97,8 +97,8 @@ class ObjectQueryBuilder:
 
         self._conditions: list[str] = conditions or []
         self._object_id_conditions: list[str] = object_id_conditions or []
-        self._limit: int | None = None
-        self._offset: int | None = None
+        self._limit: Optional[int] = None
+        self._offset: Optional[int] = None
         self._sort_by: list[tsi.SortBy] = []
 
     @property
@@ -121,7 +121,9 @@ class ObjectQueryBuilder:
     def offset_part(self) -> str:
         return _make_offset_part(self._offset)
 
-    def add_digest_condition(self, digest: str, param_key: str | None = None) -> None:
+    def add_digest_condition(
+        self, digest: str, param_key: Optional[str] = None
+    ) -> None:
         if digest == "latest":
             self.add_is_latest_condition()
             return
@@ -134,21 +136,21 @@ class ObjectQueryBuilder:
             self._add_version_digest_condition(digest, param_key)
 
     def _add_version_digest_condition(
-        self, digest: str, param_key: str | None = None
+        self, digest: str, param_key: Optional[str] = None
     ) -> None:
         param_key = param_key or "version_digest"
         self._conditions.append(f"digest = {{{param_key}: String}}")
         self.parameters.update({param_key: digest})
 
     def _add_version_index_condition(
-        self, version_index: int, param_key: str | None = None
+        self, version_index: int, param_key: Optional[str] = None
     ) -> None:
         param_key = param_key or "version_index"
         self._conditions.append(f"version_index = {{{param_key}: UInt64}}")
         self.parameters.update({param_key: version_index})
 
     def add_object_ids_condition(
-        self, object_ids: list[str], param_key: str | None = None
+        self, object_ids: list[str], param_key: Optional[str] = None
     ) -> None:
         param_key = param_key or "object_ids"
         if len(object_ids) == 1:
