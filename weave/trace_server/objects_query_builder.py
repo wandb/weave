@@ -18,7 +18,8 @@ OBJECT_METADATA_COLUMNS = [
     "digest",
     "version_index",
     "is_latest",
-    # columns not used in SelectableCHObjSchema():
+    "deleted_at",
+    # columns not used in SelectableCHObjSchema:
     "version_count",
     "is_op",
 ]
