@@ -45,7 +45,7 @@ def _make_offset_part(offset: Optional[int]) -> str:
 
 def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
     if not sort_by:
-        return ""
+        return "ORDER BY created_at ASC"
 
     sort_clauses = []
     for sort in sort_by:
