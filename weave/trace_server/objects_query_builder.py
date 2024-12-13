@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any, Optional
+from typing import Any, Literal, Optional, cast
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
@@ -267,12 +267,12 @@ class ObjectQueryBuilder:
 def make_objects_val_query_and_parameters(
     project_id: str, object_ids: list[str], digests: list[str]
 ) -> tuple[str, dict[str, Any]]:
-    query = f"""
+    query = """
         SELECT object_id, digest, any(val_dump)
         FROM object_versions
-        WHERE project_id = {{{'project_id': String}}} AND
-            object_id IN {{{'object_ids': Array(String)}}} AND
-            digest IN {{{'digests': Array(String)}}}
+        WHERE project_id = {project_id: String} AND
+            object_id IN {object_ids: Array(String)} AND
+            digest IN {digests: Array(String)}
         GROUP BY object_id, digest
     """
     parameters = {
