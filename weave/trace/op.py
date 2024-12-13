@@ -437,7 +437,9 @@ def _do_call(
                 res = func(*pargs.args, **pargs.kwargs)
                 return res, call
 
-    # Proceed with tracing
+    # Proceed with tracing. Note that we don't check the sample rate here.
+    # Only root calls get sampling applied.
+    # If the parent was traced (sampled in), the child will be too.
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:

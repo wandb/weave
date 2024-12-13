@@ -3023,13 +3023,12 @@ def test_op_sampling(client):
         sometimes_traced_calls += 1
         return x + 1
 
+    weave.publish(never_traced)
     # Never traced should execute but not be traced
     for i in range(10):
         never_traced(i)
     assert never_traced_calls == 10  # Function was called
-    # NOTE: We can't assert here that never_traced.calls() is empty because that call requires
-    # the op to be published. If we never trace, we never publish the op.
-    assert "call_start" not in client.server.attribute_access_log
+    assert len(list(never_traced.calls())) == 0  # Not traced
 
     # Always traced should execute and be traced
     for i in range(10):
@@ -3073,11 +3072,12 @@ def test_op_sampling_async(client):
 
     import asyncio
 
+    weave.publish(never_traced)
     # Never traced should execute but not be traced
     for i in range(10):
         asyncio.run(never_traced(i))
     assert never_traced_calls == 10  # Function was called
-    assert "call_start" not in client.server.attribute_access_log
+    assert len(list(never_traced.calls())) == 0  # Not traced
 
     # Always traced should execute and be traced
     for i in range(10):
@@ -3111,13 +3111,14 @@ def test_op_sampling_inheritance(client):
         parent_calls += 1
         return child_op(x)
 
+    weave.publish(parent_op)
     # When parent is sampled out, child should still execute but not be traced
     for i in range(10):
         parent_op(i)
 
     assert parent_calls == 10  # Parent function executed
     assert child_calls == 10  # Child function executed
-    assert "call_start" not in client.server.attribute_access_log
+    assert len(list(parent_op.calls())) == 0  # Parent not traced
 
     # Reset counters
     child_calls = 0
@@ -3149,13 +3150,14 @@ def test_op_sampling_inheritance_async(client):
 
     import asyncio
 
+    weave.publish(parent_op)
     # When parent is sampled out, child should still execute but not be traced
     for i in range(10):
         asyncio.run(parent_op(i))
 
     assert parent_calls == 10  # Parent function executed
     assert child_calls == 10  # Child function executed
-    assert "call_start" not in client.server.attribute_access_log
+    assert len(list(parent_op.calls())) == 0  # Parent not traced
 
     # Reset counters
     child_calls = 0
@@ -3187,3 +3189,33 @@ def test_op_sampling_invalid_rates(client):
         @weave.op(tracing_sample_rate="invalid")  # type: ignore
         def invalid_type():
             pass
+
+
+def test_op_sampling_child_follows_parent(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op(tracing_sample_rate=0.0)  # Never traced
+    def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)  # Always traced
+    def parent_op(x: int) -> int:
+        nonlocal parent_calls
+        parent_calls += 1
+        return child_op(x)
+
+    num_runs = 100
+    for i in range(num_runs):
+        parent_op(i)
+
+    assert parent_calls == num_runs  # Parent was always executed
+    assert child_calls == num_runs  # Child was always executed
+
+    parent_traces = len(list(parent_op.calls()))
+    child_traces = len(list(child_op.calls()))
+
+    assert parent_traces == num_runs  # Parent was always traced
+    assert child_traces == num_runs  # Child was traced whenever parent was

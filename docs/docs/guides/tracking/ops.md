@@ -122,6 +122,8 @@ A Weave op is a versioned function that automatically logs all calls.
   <TabItem value="python" label="Python" default>
     You can control how frequently an op's calls are traced by setting the `tracing_sample_rate` parameter in the `@weave.op` decorator. This is useful for high-frequency ops where you only need to trace a subset of calls.
 
+     Note that sampling rates are only applied to root calls. If an op has a sample rate, but is called by another op first, then that sampling rate will be ignored.
+
     ```python
     @weave.op(tracing_sample_rate=0.1)  # Only trace ~10% of calls
     def high_frequency_op(x: int) -> int:
