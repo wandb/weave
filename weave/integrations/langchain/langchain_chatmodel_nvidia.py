@@ -40,13 +40,13 @@ def chat_nvidia_input_handler(
     ]
 
     # Extract parameters from `self` object
-    model = self_object.get("model", "unknown-model")
-    base_url = self_object.get("base_url", "https://integrate.api.nvidia.com/v1")
-    temperature = self_object.get("temperature")
-    max_tokens = self_object.get("max_tokens", 1024)
-    top_p = self_object.get("top_p")
-    seed = self_object.get("seed")
-    stop = kwargs.get("stop", None)
+    model = self_object.model
+    base_url = self_object.base_url
+    temperature = self_object.temperature
+    max_tokens = self_object.max_tokens
+    top_p = self_object.top_p
+    seed = self_object.seed
+    stop = self_object.seed
 
     # Construct the payload
     payload = {
