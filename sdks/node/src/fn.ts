@@ -9,10 +9,18 @@ export type Row = {[key: string]: any};
 export interface Callable<I, O> {
   run: (input: I) => Promise<O>;
 }
-export type FnInputs<T extends Callable<any, any>> =
-  T extends Callable<infer I, any> ? I : never;
-export type FnOutput<T extends Callable<any, any>> =
-  T extends Callable<any, infer O> ? O : never;
+export type FnInputs<T extends Callable<any, any>> = T extends Callable<
+  infer I,
+  any
+>
+  ? I
+  : never;
+export type FnOutput<T extends Callable<any, any>> = T extends Callable<
+  any,
+  infer O
+>
+  ? O
+  : never;
 
 export abstract class CallableObject<I, O>
   extends WeaveObject
