@@ -8,11 +8,12 @@ import React, {forwardRef} from 'react';
 type TextAreaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   autoGrow?: boolean;
   maxHeight?: string | number;
+  startHeight?: string | number;
   reset?: boolean;
 };
 
 export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
-  ({className, autoGrow, maxHeight, reset, ...props}, ref) => {
+  ({className, autoGrow, maxHeight, startHeight, reset, ...props}, ref) => {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
@@ -26,11 +27,22 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           return;
         }
 
-        // Disable resize when autoGrow is true
-        textareaElement.style.resize = 'none';
+        // Only disable resize when autoGrow is true
+        textareaElement.style.resize = autoGrow ? 'none' : 'vertical';
+
+        // Set initial height if provided
+        if (startHeight && textareaElement.value === '') {
+          textareaElement.style.height =
+            typeof startHeight === 'number' ? `${startHeight}px` : startHeight;
+          return;
+        }
 
         if (reset || textareaElement.value === '') {
-          textareaElement.style.height = 'auto';
+          textareaElement.style.height = startHeight
+            ? typeof startHeight === 'number'
+              ? `${startHeight}px`
+              : startHeight
+            : 'auto';
           return;
         }
 
@@ -63,7 +75,7 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 
       return () =>
         textareaRefElement.removeEventListener('input', adjustHeight);
-    }, [autoGrow, maxHeight, reset]);
+    }, [autoGrow, maxHeight, reset, startHeight]);
 
     return (
       <Tailwind style={{display: 'contents'}}>
@@ -86,6 +98,7 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
             'focus:outline-none',
             'relative bottom-0 top-0 items-center rounded-sm',
             'outline outline-1 outline-moon-250',
+            !autoGrow && 'resize-y',
             props.disabled
               ? 'opacity-50'
               : 'hover:outline hover:outline-2 hover:outline-teal-500/40 focus:outline-2',
@@ -94,6 +107,14 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
             'placeholder-moon-500 dark:placeholder-moon-600',
             className
           )}
+          style={{
+            height: startHeight
+              ? typeof startHeight === 'number'
+                ? `${startHeight}px`
+                : startHeight
+              : undefined,
+            ...props.style,
+          }}
           {...props}
         />
       </Tailwind>
