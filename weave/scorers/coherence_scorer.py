@@ -5,7 +5,7 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, scorer_model_paths, set_device
+from weave.scorers.llm_utils import download_model, MODEL_PATHS, set_device
 
 try:
     from transformers import pipeline
@@ -43,7 +43,7 @@ class CoherenceScorer(Scorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["coherence_scorer"]
+                MODEL_PATHS["coherence_scorer"]
             )
 
         self._classifier = pipeline(

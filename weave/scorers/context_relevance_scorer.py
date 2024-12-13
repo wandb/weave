@@ -6,7 +6,7 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, scorer_model_paths, set_device
+from weave.scorers.llm_utils import download_model, MODEL_PATHS, set_device
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
@@ -97,7 +97,7 @@ class OldRelevanceScorer(Scorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["relevance_scorer"]
+                MODEL_PATHS["relevance_scorer"]
             )
 
         self._classifier = pipeline(
@@ -278,7 +278,7 @@ class ContextRelevanceScorer(Scorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["relevance_scorer"]
+                MODEL_PATHS["relevance_scorer"]
             )
         assert self._local_model_path, "Model path not found"
         self._model = AutoModelForTokenClassification.from_pretrained(

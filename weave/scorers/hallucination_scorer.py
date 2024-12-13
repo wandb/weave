@@ -10,7 +10,7 @@ from weave.scorers.llm_utils import (
     OPENAI_DEFAULT_MODEL,
     create,
     download_model,
-    scorer_model_paths,
+    MODEL_PATHS,
 )
 from weave.scorers.utils import stringify
 
@@ -294,11 +294,11 @@ class HallucinationScorer(Scorer):
             else:
                 if self.use_hhem:
                     self._local_model_path = download_model(
-                        scorer_model_paths["hallucination_hhem_scorer"]
+                        MODEL_PATHS["hallucination_hhem_scorer"]
                     )
                 else:
                     self._local_model_path = download_model(
-                        scorer_model_paths["hallucination_scorer"]
+                        MODEL_PATHS["hallucination_scorer"]
                     )
 
             if self.use_hhem:

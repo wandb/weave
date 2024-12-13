@@ -13,6 +13,12 @@ def context_relevance_scorer(monkeypatch):
     mock_project = MagicMock()
     monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
 
+    # Mock model loading functions
+    monkeypatch.setattr("weave.scorers.llm_utils.download_model", lambda *args, **kwargs: None)
+    monkeypatch.setattr("weave.scorers.llm_utils.scorer_model_paths", lambda *args: {"relevance": "mock_path"})
+    monkeypatch.setattr("weave.scorers.llm_utils.set_device", lambda *args: "cpu")
+    monkeypatch.setattr("weave.scorers.llm_utils.get_model_path", lambda *args: "mock_path")
+
     scorer = ContextRelevanceScorer(
         model_name_or_path="wandb/relevance_scorer",
         device="cpu",
@@ -23,11 +29,14 @@ def context_relevance_scorer(monkeypatch):
 
     def mock_pipeline(*args, **kwargs):
         def inner(text, **kwargs):
-            return [{"generated_text": '{"relevance": 4, "relevant": true}'}]
+            if "irrelevant" in text.lower() or "moon" in text.lower():
+                return [{"generated_text": '{"relevance": 0.5, "relevant": false, "flagged": true, "relevance_label": "irrelevant"}'}]
+            return [{"generated_text": '{"relevance": 0.9, "relevant": true, "flagged": false, "relevance_label": "relevant"}'}]
         return inner
 
     monkeypatch.setattr("transformers.pipeline", mock_pipeline)
     monkeypatch.setattr(scorer, "_classifier", mock_pipeline())
+    monkeypatch.setattr(scorer, "model_post_init", lambda *args: None)
     return scorer
 
 
@@ -80,3 +89,41 @@ async def test_context_relevance_scorer_error_handling(context_relevance_scorer)
             output="",
             verbose=True
         )
+
+
+@pytest.mark.asyncio
+async def test_context_relevance_flags_irrelevant(context_relevance_scorer):
+    """Test that irrelevant content is properly flagged."""
+    query = "What is the capital of France?"
+    context = "Paris is the capital of France."
+    output = "The moon is made of cheese."
+
+    result = await context_relevance_scorer.score(
+        query=query,
+        context=context,
+        output=output,
+        verbose=True
+    )
+
+    assert result["flagged"] == True
+    assert result["extras"]["score"] < context_relevance_scorer.threshold
+    assert not result["extras"]["relevant"]
+
+
+@pytest.mark.asyncio
+async def test_context_relevance_passes_relevant(context_relevance_scorer):
+    """Test that relevant content is not flagged."""
+    query = "What is the capital of France?"
+    context = "Paris is the capital of France."
+    output = "The capital of France is Paris."
+
+    result = await context_relevance_scorer.score(
+        query=query,
+        context=context,
+        output=output,
+        verbose=True
+    )
+
+    assert result["flagged"] == False
+    assert result["extras"]["score"] >= context_relevance_scorer.threshold
+    assert result["extras"]["relevant"]

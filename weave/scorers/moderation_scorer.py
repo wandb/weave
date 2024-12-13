@@ -10,7 +10,7 @@ from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
     OPENAI_DEFAULT_MODERATION_MODEL,
     download_model,
-    scorer_model_paths,
+    MODEL_PATHS,
     set_device,
 )
 
@@ -275,7 +275,7 @@ class ToxicityScorer(RollingWindowScorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["toxicity_scorer"]
+                MODEL_PATHS["toxicity_scorer"]
             )
 
         self._model = AutoModelForSequenceClassification.from_pretrained(
@@ -439,7 +439,7 @@ class BiasScorer(RollingWindowScorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(scorer_model_paths["bias_scorer"])
+            self._local_model_path = download_model(MODEL_PATHS["bias_scorer"])
 
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True

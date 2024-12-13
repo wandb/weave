@@ -1,11 +1,16 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+import os
 
 from weave.scorers.llm_utils import (
     embed,
     instructor_client,
     is_async,
     is_sync_client,
+    get_model_path,
+    LOCAL_MODEL_DIR,
+    MODEL_PATHS,
+    download_model,
 )
 from weave.trace.autopatch import autopatch
 
@@ -84,28 +89,32 @@ def test_is_sync_client(sync_client, async_client):
 
 # Test to ensure instructor_client returns a valid instructor client for synchronous clients
 def test_instructor_client_sync(sync_client, monkeypatch):
-    # Mock instructor client
+    # Mock instructor module
     mock_instructor = MagicMock()
     mock_instructor_client = MagicMock()
-    mock_instructor.from_openai.return_value = mock_instructor_client
-    monkeypatch.setattr("instructor.patch", mock_instructor)
+    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
+    mock_instructor.patch = MagicMock()
+    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
 
     client = instructor_client(sync_client)
     assert client is not None, "Instructor client should not be None for sync_client."
     assert client == mock_instructor_client
+    mock_instructor.from_openai.assert_called_once_with(sync_client)
 
 
 # Test to ensure instructor_client returns a valid instructor client for asynchronous clients
 def test_instructor_client_async(async_client, monkeypatch):
-    # Mock instructor client
+    # Mock instructor module
     mock_instructor = MagicMock()
     mock_instructor_client = MagicMock()
-    mock_instructor.from_openai.return_value = mock_instructor_client
-    monkeypatch.setattr("instructor.patch", mock_instructor)
+    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
+    mock_instructor.patch = MagicMock()
+    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
 
     client = instructor_client(async_client)
     assert client is not None, "Instructor client should not be None for async_client."
     assert client == mock_instructor_client
+    mock_instructor.from_openai.assert_called_once_with(async_client)
 
 
 # Test the embed function with a synchronous client

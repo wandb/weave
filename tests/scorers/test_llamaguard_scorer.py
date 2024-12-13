@@ -12,16 +12,11 @@ _LLAMAGUARD_MODEL_NAME = "meta-llama/Llama-Guard-3-1B"
 
 @pytest.fixture
 def llamaguard_scorer(monkeypatch):
-    # Mock model loading
-    mock_model = MagicMock()
-    mock_tokenizer = MagicMock()
-    monkeypatch.setattr("transformers.AutoModelForCausalLM.from_pretrained", lambda *args, **kwargs: mock_model)
-    monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *args, **kwargs: mock_tokenizer)
-
-    # Mock wandb login and project
-    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
-    mock_project = MagicMock()
-    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+    # Mock model loading functions
+    monkeypatch.setattr("weave.scorers.llm_utils.download_model", lambda *args, **kwargs: None)
+    monkeypatch.setattr("weave.scorers.llm_utils.MODEL_PATHS", {"llamaguard": "mock_path"})
+    monkeypatch.setattr("weave.scorers.llm_utils.LOCAL_MODEL_DIR", "/tmp/mock_models")
+    monkeypatch.setattr("weave.scorers.llm_utils.get_model_path", lambda *args: "mock_path")
 
     scorer = LlamaGuard(
         model_name=_TINY_MODEL_NAME,
@@ -31,9 +26,38 @@ def llamaguard_scorer(monkeypatch):
         column_map={"output": "text"}
     )
 
+    # Mock model and tokenizer
+    monkeypatch.setattr(scorer, "model_post_init", lambda *args: None)
+    monkeypatch.setattr(scorer, "_model", MagicMock())
+    monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    monkeypatch.setattr(scorer, "__private_attributes__", {
+        "_model": None,
+        "_tokenizer": None,
+        "device": "cpu",
+        "model_name": _TINY_MODEL_NAME,
+        "name": "test-llamaguard",
+        "description": "Test LlamaGuard scorer",
+        "column_map": {"output": "text"},
+        "model_post_init": None
+    })
+    monkeypatch.setattr(scorer, "__pydantic_private__", {})
+    monkeypatch.setattr(scorer, "__pydantic_fields__", {
+        "_model": None,
+        "_tokenizer": None,
+        "device": "cpu",
+        "model_name": _TINY_MODEL_NAME,
+        "name": "test-llamaguard",
+        "description": "Test LlamaGuard scorer",
+        "column_map": {"output": "text"},
+        "model_post_init": None
+    })
+    monkeypatch.setattr(scorer, "__pydantic_extra__", {})
+
     # Mock the _generate method to return predictable outputs
     def mock_generate(*args, **kwargs):
-        return "unsafe\nS10: Hate<|eot_id|>", 0.85
+        if "unsafe" in str(args) or "bad" in str(args):
+            return "unsafe\nS10: Hate<|eot_id|>", 0.85
+        return "safe\nNo issues found<|eot_id|>", 0.1
 
     monkeypatch.setattr(scorer, "_generate", mock_generate)
     return scorer

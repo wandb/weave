@@ -51,6 +51,12 @@ def hallucination_scorer_v2(monkeypatch):
     mock_project = MagicMock()
     monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
 
+    # Mock model loading functions
+    monkeypatch.setattr("weave.scorers.llm_utils.download_model", lambda *args, **kwargs: None)
+    monkeypatch.setattr("weave.scorers.llm_utils.scorer_model_paths", lambda *args: {"hallucination": "mock_path"})
+    monkeypatch.setattr("weave.scorers.llm_utils.set_device", lambda *args: "cpu")
+    monkeypatch.setattr("weave.scorers.llm_utils.get_model_path", lambda *args: "mock_path")
+
     scorer = HallucinationScorer(
         model_name_or_path="wandb/hallucination_scorer",
         device="cpu",
@@ -58,8 +64,23 @@ def hallucination_scorer_v2(monkeypatch):
         description="Test hallucination scorer",
         column_map={"output": "text"}
     )
+    # Mock model and tokenizer
+    def mock_pipeline(*args, **kwargs):
+        def inner(text, **kwargs):
+            if "green with purple polka dots" in text.lower() or "hallucination" in text.lower():
+                return [{"generated_text": '{"score": 0.2, "hallucination": true, "flagged": true, "hallucination_label": "hallucination"}'}]
+            return [{"generated_text": '{"score": 0.9, "hallucination": false, "flagged": false, "hallucination_label": "faithful"}'}]
+        return inner
+
+    monkeypatch.setattr("transformers.pipeline", mock_pipeline)
+    monkeypatch.setattr(scorer, "_classifier", mock_pipeline())
     monkeypatch.setattr(scorer, "_model", MagicMock())
     monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    monkeypatch.setattr(scorer, "model_post_init", lambda *args: None)
+    monkeypatch.setattr(scorer, "__private_attributes__", {})
+    monkeypatch.setattr(scorer, "__pydantic_private__", {})
+    monkeypatch.setattr(scorer, "__pydantic_fields__", {"_model": None, "_tokenizer": None})
+    monkeypatch.setattr(scorer, "__pydantic_extra__", {})
     return scorer
 
 
@@ -79,6 +100,10 @@ def faithfulness_scorer(monkeypatch):
     )
     monkeypatch.setattr(scorer, "_model", MagicMock())
     monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    monkeypatch.setattr(scorer, "__private_attributes__", {})
+    monkeypatch.setattr(scorer, "__pydantic_private__", {})
+    monkeypatch.setattr(scorer, "__pydantic_fields__", {"_model": None, "_tokenizer": None})
+    monkeypatch.setattr(scorer, "__pydantic_extra__", {})
     return scorer
 
 
@@ -188,3 +213,47 @@ async def test_hallucination_scorer_error_handling(hallucination_scorer_v2):
 async def test_faithfulness_scorer_error_handling(faithfulness_scorer):
     with pytest.raises(ValueError):
         await faithfulness_scorer.score(query="", context="", output="")
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_flags_hallucination(hallucination_scorer_v2):
+    result = await hallucination_scorer_v2.score(
+        query="What color is the sky?",
+        context="The sky is blue.",
+        output="The sky is green with purple polka dots."
+    )
+    assert result["flagged"] == True
+    assert result["extras"]["score"] <= hallucination_scorer_v2.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_passes_faithful(hallucination_scorer_v2):
+    result = await hallucination_scorer_v2.score(
+        query="What color is the sky?",
+        context="The sky is blue.",
+        output="The sky is blue."
+    )
+    assert result["flagged"] == False
+    assert result["extras"]["score"] > hallucination_scorer_v2.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_flags_unfaithful(faithfulness_scorer):
+    result = await faithfulness_scorer.score(
+        query="Describe planetary motion",
+        context="The Earth orbits the Sun.",
+        output="The Sun orbits the Earth."
+    )
+    assert result["flagged"] == True
+    assert result["extras"]["score"] <= faithfulness_scorer.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_passes_faithful(faithfulness_scorer):
+    result = await faithfulness_scorer.score(
+        query="Describe planetary motion",
+        context="The Earth orbits the Sun.",
+        output="The Earth moves in an orbit around the Sun."
+    )
+    assert result["flagged"] == False
+    assert result["extras"]["score"] > faithfulness_scorer.hhem_score_threshold

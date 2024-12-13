@@ -217,7 +217,7 @@ def test_openai_perplexity_scorer_with_list_logprobs(openai_perplexity_scorer):
 
 
 def test_openai_perplexity_scorer_invalid_input(openai_perplexity_scorer):
-    with pytest.raises(ValueError, match="Invalid input type!"):
+    with pytest.raises(TypeError, match="Invalid input type!"):
         openai_perplexity_scorer.score(output={"invalid": "data"})
 
 
