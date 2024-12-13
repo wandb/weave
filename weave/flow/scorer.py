@@ -10,3 +10,5 @@ warnings.warn(
     DeprecationWarning,
     stacklevel=2,
 )
+
+__docspec__ = [Scorer]

@@ -24,7 +24,8 @@ from weave.trace.util import (
 def __getattr__(name: str) -> Any:
     """This function defines module-level lazy imports.
 
-    The scorer module is particularly heavy, so we defer to speed up weave import."""
+    The scorer module is particularly heavy, so we defer to speed up weave import.
+    This allows `Scorer` to stay at top-level without incurring import overhead."""
     if name == "Scorer":
         from weave.flow.scorer import Scorer
 
