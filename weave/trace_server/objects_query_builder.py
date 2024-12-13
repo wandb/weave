@@ -8,19 +8,19 @@ from weave.trace_server.trace_server_common import digest_is_version_like
 
 VALID_OBJECT_SORT_FIELDS = {"created_at", "object_id"}
 VALID_SORT_DIRECTIONS = {"asc", "desc"}
-OBJECT_SELECT_COLUMNS = [
+OBJECT_METADATA_COLUMNS = [
     "project_id",
     "object_id",
     "created_at",
+    "refs",
     "kind",
     "base_object_class",
-    "refs",
     "digest",
-    "is_op",
     "version_index",
-    "version_count",
     "is_latest",
-    "val_dump",
+    # columns not used in SelectableCHObjSchema():
+    "version_count",
+    "is_op",
 ]
 
 
@@ -78,7 +78,8 @@ def format_metadata_objects_from_query_result(
     for row in query_result:
         # Add an empty val_dump to the end of the row
         row_with_val_dump = row + ("{}",)
-        row_dict = dict(zip(OBJECT_SELECT_COLUMNS, row_with_val_dump))
+        columns_with_val_dump = OBJECT_METADATA_COLUMNS + ["val_dump"]
+        row_dict = dict(zip(columns_with_val_dump, row_with_val_dump))
         row_model = SelectableCHObjSchema.model_validate(row_dict)
         result.append(row_model)
     return result
@@ -205,19 +206,10 @@ class ObjectQueryBuilder:
         self.metadata_only = metadata_only
 
     def make_metadata_query(self) -> str:
+        columns = ",\n".join(OBJECT_METADATA_COLUMNS) + "\n"
         return f"""
             SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                digest,
-                is_op,
-                version_index,
-                version_count,
-                is_latest
+                {columns}
             FROM (
                 SELECT project_id,
                     object_id,
