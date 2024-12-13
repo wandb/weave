@@ -60,7 +60,7 @@ wandb_token=""
 ## Simple trace
 The following sections walk you through creating a simple trace.
 
-1. [Start a complex trace](#start-a-complex-trace)
+1. [Start a complex trace](#start-a-simple-trace)
 2. [End a simple trace](#end-a-simple-trace)
 
 ### Start a simple trace 
