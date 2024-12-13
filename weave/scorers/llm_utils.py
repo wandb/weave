@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+import inspect
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union, List
 
 from weave.trace.autopatch import autopatch
 
@@ -92,11 +93,13 @@ def create(
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: str | list[str], **kwargs: Any
-) -> list[list[float]]:
+    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
+) -> List[List[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
+        if inspect.iscoroutine(response):
+            raise ValueError("Async client used with sync function. Use await with async clients.")
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
         response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
@@ -139,3 +142,20 @@ scorer_model_paths = {
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/context-relevance-scorer/relevance_scorer:v0",
 }
+
+
+def is_async(func: Callable) -> bool:
+    return inspect.iscoroutinefunction(func)
+
+
+def is_sync_client(client: _LLM_CLIENTS) -> bool:
+    client_type = type(client).__name__
+    return not any(
+        is_async(getattr(obj, "create", None))
+        for obj in [
+            getattr(client, "chat", None),
+            getattr(client, "embeddings", None),
+            getattr(getattr(client, "chat", None), "completions", None),
+        ]
+        if obj is not None
+    )

@@ -1,5 +1,6 @@
 import pytest
 from openai import OpenAI
+from unittest.mock import MagicMock, patch
 
 import weave
 from weave.scorers import (
@@ -44,13 +45,41 @@ def hallucination_scorer(mock_create):
 
 
 @pytest.fixture
-def hallucination_scorer_v2(mock_create):
-    return HallucinationScorer()
+def hallucination_scorer_v2(monkeypatch):
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
+    scorer = HallucinationScorer(
+        model_name_or_path="wandb/hallucination_scorer",
+        device="cpu",
+        name="test-hallucination",
+        description="Test hallucination scorer",
+        column_map={"output": "text"}
+    )
+    monkeypatch.setattr(scorer, "_model", MagicMock())
+    monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    return scorer
 
 
 @pytest.fixture
-def faithfulness_scorer(mock_create):
-    return FaithfulnessScorer()
+def faithfulness_scorer(monkeypatch):
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
+    scorer = FaithfulnessScorer(
+        model_name_or_path="wandb/faithfulness_scorer",
+        device="cpu",
+        name="test-faithfulness",
+        description="Test faithfulness scorer",
+        column_map={"output": "text"}
+    )
+    monkeypatch.setattr(scorer, "_model", MagicMock())
+    monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    return scorer
 
 
 def test_hallucination_scorer_score(hallucination_scorer, mock_create):

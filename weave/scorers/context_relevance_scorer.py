@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Optional
+from typing import Any, List, Optional, Union, Dict, Tuple
 import numpy as np
 from pydantic import PrivateAttr
 
@@ -350,12 +350,12 @@ class ContextRelevanceScorer(Scorer):
         
     @weave.op
     def score(
-        self, 
+        self,
         output: str,
-        query: str, 
-        context: str | list[str],
+        query: str,
+        context: Union[str, List[str]],
         verbose: bool = False
-        ) -> tuple[list[dict[str, Any]], float]:
+    ) -> Dict[str, Any]:
         """Score multiple documents and compute weighted average relevance."""
         all_spans = []
         total_weighted_score = 0.0

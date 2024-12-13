@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import MagicMock
 
 import weave
 from weave.scorers.coherence_scorer import CoherenceScorer
@@ -7,26 +8,33 @@ from tests.scorers.test_utils import generate_large_text
 
 @pytest.fixture
 def coherence_scorer(monkeypatch):
+    # Mock model loading
+    mock_model = MagicMock()
+    mock_tokenizer = MagicMock()
+    monkeypatch.setattr("transformers.AutoModelForSequenceClassification.from_pretrained", lambda *args, **kwargs: mock_model)
+    monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *args, **kwargs: mock_tokenizer)
+
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
     scorer = CoherenceScorer(
-        model_name="wandb/coherence_scorer",
+        model_name_or_path="wandb/coherence_scorer",
         device="cpu",
+        name="test-coherence",
+        description="Test coherence scorer",
+        column_map={"output": "text"}
     )
 
     def mock_pipeline(*args, **kwargs):
         def inner(inputs):
-            if "incoherent" in inputs["text_pair"] or "incoherent" in inputs["text"]:
-                return {
-                    "label": "incoherent",
-                    "score": 0.2,
-                }
-            return {
-                "label": "coherent",
-                "score": 0.95,
-            }
-
+            if "incoherent" in str(inputs.get("text_pair", "")) or "incoherent" in str(inputs.get("text", "")):
+                return {"label": "Completely Incoherent", "score": 0.2}
+            return {"label": "Perfectly Coherent", "score": 0.95}
         return inner
 
-    monkeypatch.setattr(scorer, "_classifier", mock_pipeline())
+    monkeypatch.setattr("transformers.pipeline", mock_pipeline)
     return scorer
 
 

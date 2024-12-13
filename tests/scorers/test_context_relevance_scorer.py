@@ -1,13 +1,34 @@
 """Tests for the Context Relevance Scorer."""
 import pytest
+from unittest.mock import MagicMock
 from weave.scorers.context_relevance_scorer import ContextRelevanceScorer
 from tests.scorers.test_utils import generate_large_text, generate_context_and_output
 
 
 @pytest.fixture
-def context_relevance_scorer():
+def context_relevance_scorer(monkeypatch):
     """Create a context relevance scorer for testing."""
-    return ContextRelevanceScorer()
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
+    scorer = ContextRelevanceScorer(
+        model_name_or_path="wandb/relevance_scorer",
+        device="cpu",
+        name="test-context-relevance",
+        description="Test context relevance scorer",
+        column_map={"output": "text", "context": "context"}
+    )
+
+    def mock_pipeline(*args, **kwargs):
+        def inner(text, **kwargs):
+            return [{"generated_text": '{"relevance": 4, "relevant": true}'}]
+        return inner
+
+    monkeypatch.setattr("transformers.pipeline", mock_pipeline)
+    monkeypatch.setattr(scorer, "_classifier", mock_pipeline())
+    return scorer
 
 
 @pytest.mark.asyncio

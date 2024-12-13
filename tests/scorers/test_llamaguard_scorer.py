@@ -1,5 +1,7 @@
 import pytest
 from transformers import AutoTokenizer
+from unittest.mock import MagicMock
+import wandb
 
 import weave
 from weave.scorers import LlamaGuard
@@ -10,15 +12,28 @@ _LLAMAGUARD_MODEL_NAME = "meta-llama/Llama-Guard-3-1B"
 
 @pytest.fixture
 def llamaguard_scorer(monkeypatch):
+    # Mock model loading
+    mock_model = MagicMock()
+    mock_tokenizer = MagicMock()
+    monkeypatch.setattr("transformers.AutoModelForCausalLM.from_pretrained", lambda *args, **kwargs: mock_model)
+    monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *args, **kwargs: mock_tokenizer)
+
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
     scorer = LlamaGuard(
         model_name=_TINY_MODEL_NAME,
         device="cpu",
+        name="test-llamaguard",
+        description="Test LlamaGuard scorer",
+        column_map={"output": "text"}
     )
-    scorer._tokenizer = AutoTokenizer.from_pretrained(_LLAMAGUARD_MODEL_NAME)
 
-    # Mock the _generate method to return predictable outputs with unsafe_score
+    # Mock the _generate method to return predictable outputs
     def mock_generate(*args, **kwargs):
-        return "unsafe\nS10: Hate<|eot_id|>", 0.85  # Added mock unsafe_score
+        return "unsafe\nS10: Hate<|eot_id|>", 0.85
 
     monkeypatch.setattr(scorer, "_generate", mock_generate)
     return scorer
@@ -26,18 +41,18 @@ def llamaguard_scorer(monkeypatch):
 
 def test_llamaguard_postprocess(llamaguard_scorer):
     # Test safe content
-    safe_output = ("safe", 0.1)  # Added mock unsafe_score
+    safe_output = ("safe", 0.1)
     result = llamaguard_scorer.postprocess(*safe_output)
     assert result["safe"]
     assert result["category"] is None
-    assert result["unsafe_score"] == 0.1  # Test unsafe_score
+    assert result["unsafe_score"] == 0.1
 
     # Test unsafe content with category
-    unsafe_output = ("unsafe\nS5<|eot_id|>", 0.9)  # Added mock unsafe_score
+    unsafe_output = ("unsafe\nS5<|eot_id|>", 0.9)
     result = llamaguard_scorer.postprocess(*unsafe_output)
     assert not result["safe"]
     assert result["category"] == "S5: Defamation"
-    assert result["unsafe_score"] == 0.9  # Test unsafe_score
+    assert result["unsafe_score"] == 0.9
 
 
 @pytest.mark.asyncio
@@ -47,10 +62,10 @@ async def test_llamaguard_score(llamaguard_scorer):
     assert isinstance(result, dict)
     assert "safe" in result
     assert "category" in result
-    assert "unsafe_score" in result  # Test presence of unsafe_score
+    assert "unsafe_score" in result
     assert result["safe"] is False
     assert result["category"] == "S10: Hate"
-    assert result["unsafe_score"] == 0.85  # Test unsafe_score matches mock value
+    assert result["unsafe_score"] == 0.85
 
 
 @pytest.mark.asyncio
