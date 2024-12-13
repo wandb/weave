@@ -83,7 +83,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         setSliderValue(newVal);
         onChangeDebounced(newVal);
       },
-      [ticks, min, max, allowGreaterThanMax, onChangeDebounced]
+      [ticks, min, max, allowGreaterThanMax, sliderValue, onChangeDebounced]
     );
 
     React.useEffect(() => {
