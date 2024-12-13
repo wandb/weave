@@ -38,13 +38,13 @@ def create_wrapper_async(
 langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("langchain.Llm"),
-            "ChatNVIDIA.invoke",
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints._common"),
+            "_NVIDIAClient._post",
             create_wrapper_sync(name="langchain.Llm.ChatNVIDIA.invoke"),
         ),
         SymbolPatcher(
-            lambda: importlib.import_module("langchain.Llm"),
-            "ChatNVIDIA.invoke",
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints._common"),
+            "_NVIDIAClient._post",
             create_wrapper_async(name="langchain.Llm.ChatNVIDIA.invoke"),
         ),
     ]
