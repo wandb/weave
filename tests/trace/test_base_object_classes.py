@@ -139,7 +139,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
-                    "object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
                 }
             }
         )
@@ -164,7 +164,7 @@ def test_interface_creation(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
-                    "object_class": "TestOnlyExample",
+                    "builtin_object_class": "TestOnlyExample",
                 }
             }
         )
@@ -271,7 +271,7 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(),
-                    "object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
                 }
             }
         )
@@ -300,7 +300,7 @@ def test_digest_equality(client):
                     "project_id": client._project_id(),
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(),
-                    "object_class": "TestOnlyExample",
+                    "builtin_object_class": "TestOnlyExample",
                 }
             }
         )
@@ -322,7 +322,7 @@ def test_schema_validation(client):
                         "object_id": "nested_obj",
                         # Incorrect schema, should raise!
                         "val": {"a": 2},
-                        "object_class": "TestOnlyNestedBaseObject",
+                        "builtin_object_class": "TestOnlyNestedBaseObject",
                     }
                 }
             )
@@ -340,7 +340,7 @@ def test_schema_validation(client):
                         "_class_name": "TestOnlyNestedBaseObject",
                         "_bases": ["BaseObject", "BaseModel"],
                     },
-                    "object_class": "TestOnlyNestedBaseObject",
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
                 }
             }
         )
@@ -359,7 +359,7 @@ def test_schema_validation(client):
                             "_class_name": "TestOnlyNestedBaseObject",
                             "_bases": ["BaseObject", "BaseModel"],
                         },
-                        "object_class": "TestOnlyExample",
+                        "builtin_object_class": "TestOnlyExample",
                     }
                 }
             )
