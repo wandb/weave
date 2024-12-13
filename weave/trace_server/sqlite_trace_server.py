@@ -612,7 +612,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
 
         processed_result = process_incoming_object_val(
-            req.obj.val, req.obj.object_class
+            req.obj.val, req.obj.builtin_object_class
         )
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)

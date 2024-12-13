@@ -46,7 +46,7 @@ class ProcessIncomingObjectResult(TypedDict):
 
 
 def process_incoming_object_val(
-    val: Any, req_object_class: Optional[str] = None
+    val: Any, req_builtin_object_class: Optional[str] = None
 ) -> ProcessIncomingObjectResult:
     """
     This method is responsible for accepting an incoming object from the user and validating it
@@ -57,7 +57,7 @@ def process_incoming_object_val(
     # First, we ensure the object is a dict before processing it.
     # If the object is not a dict, we return it as is and set the base_object_class to None.
     if not isinstance(val, dict):
-        if req_object_class is not None:
+        if req_builtin_object_class is not None:
             raise ValueError("object_class cannot be provided for non-dict objects")
         return ProcessIncomingObjectResult(val=val, base_object_class=None)
 
@@ -73,10 +73,10 @@ def process_incoming_object_val(
     # In the event that we successfully extracted the object classes, we need to check if the
     # requested object class matches the object class of the object. If it does not, we raise an error.
     if val_object_classes:
-        if req_object_class:
-            if val_object_classes["object_class"] != req_object_class:
+        if req_builtin_object_class:
+            if val_object_classes["object_class"] != req_builtin_object_class:
                 raise ValueError(
-                    f"object_class must match val's defined object class: {val_object_classes['object_class']} != {req_object_class}"
+                    f"object_class must match val's defined object class: {val_object_classes['object_class']} != {req_builtin_object_class}"
                 )
             else:
                 # Note: instead of passing here, it is reasonable to conclude that we should instead raise an error -
@@ -91,8 +91,10 @@ def process_incoming_object_val(
     # Next, we check if the user provided an object class. If they did, we need to validate the object
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
-    if req_object_class is not None:
-        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(req_object_class):
+    if req_builtin_object_class is not None:
+        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(
+            req_builtin_object_class
+        ):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object
             # using the weave publish API instead of just dumping it.
             dict_val = dump_object(builtin_object_class.model_validate(val))
@@ -101,16 +103,16 @@ def process_incoming_object_val(
                 raise ValueError(
                     f"Unexpected error: could not get object classes for {dict_val}"
                 )
-            if new_val_object_classes["object_class"] != req_object_class:
+            if new_val_object_classes["object_class"] != req_builtin_object_class:
                 raise ValueError(
-                    f"Unexpected error: base object class does not match requested object class: {new_val_object_classes['object_class']} != {req_object_class}"
+                    f"Unexpected error: base object class does not match requested object class: {new_val_object_classes['object_class']} != {req_builtin_object_class}"
                 )
             return ProcessIncomingObjectResult(
                 val=dict_val,
                 base_object_class=new_val_object_classes["base_object_class"],
             )
         else:
-            raise ValueError(f"Unknown object class: {req_object_class}")
+            raise ValueError(f"Unknown object class: {req_builtin_object_class}")
 
     # Finally, if there is no requested object class, just return the object as is.
     return ProcessIncomingObjectResult(val=val, base_object_class=None)
