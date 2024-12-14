@@ -97,7 +97,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
 
 # Define the patcher
-nvidia_patcher = MultiPatcher(
+lc_nvidia_patcher = MultiPatcher(
     [
         # Patch synchronous invoke method
         SymbolPatcher(
