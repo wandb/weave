@@ -7,7 +7,11 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
+import {
+  DEFAULT_SYSTEM_MESSAGE,
+  parseTraceCall,
+  usePlaygroundState,
+} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
@@ -56,12 +60,28 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
             callId: props.callId,
           }
         : null;
-    }, [props.entity, props.project, props.callId])
+    }, [props.entity, props.project, props.callId]),
+    {
+      includeCosts: true,
+    }
   );
 
-  const {result: calls} = useCalls(props.entity, props.project, {
-    callIds: playgroundStates.map(state => state.traceCall.id || ''),
-  });
+  const {result: calls} = useCalls(
+    props.entity,
+    props.project,
+    {
+      callIds: playgroundStates.map(state => state.traceCall.id || ''),
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      includeCosts: true,
+    }
+  );
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -89,7 +109,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       for (const [idx, state] of newStates.entries()) {
         for (const c of calls || []) {
           if (state.traceCall.id === c.callId) {
-            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            newStates[idx] = {
+              ...state,
+              traceCall: parseTraceCall(c.traceCall || {}),
+            };
             break;
           }
         }

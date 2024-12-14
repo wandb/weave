@@ -1,4 +1,5 @@
 import inspect
+import textwrap
 from collections.abc import Sequence
 from numbers import Number
 from typing import Any, Callable, Optional, Union
@@ -45,7 +46,13 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
         params = inspect.signature(scorer).parameters
     if "output" in params and "model_output" in params:
         raise ValueError(
-            "Both 'output' and 'model_output' cannot be in the scorer signature; prefer just using `output`."
+            textwrap.dedent(
+                """
+                The scorer signature cannot include both `output` and `model_output` at the same time.
+
+                To resolve, rename one of the arguments to avoid conflict. Prefer using `output` as the model's output.
+                """
+            )
         )
     return True
 
