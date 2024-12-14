@@ -47,6 +47,13 @@ export const MessagePanel = ({
     }
   }, [message.content, contentRef?.current?.scrollHeight]);
 
+  // Set isShowingMore to true when editor is opened
+  useEffect(() => {
+    if (editorHeight !== null) {
+      setIsShowingMore(true);
+    }
+  }, [editorHeight]);
+
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
   const isTool = message.role === 'tool';
