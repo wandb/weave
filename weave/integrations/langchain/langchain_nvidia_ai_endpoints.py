@@ -4,10 +4,11 @@ from functools import wraps
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from langchain_core.messages import BaseMessageChunk
 
 
 # NVIDIA-specific accumulator for parsing the response object
-def nvidia_accumulator(acc: Optional[dict], value: dict) -> dict:
+def nvidia_accumulator(acc: Optional[BaseMessageChunk], value: BaseMessageChunk) -> dict:
     """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
         acc = {"responses": [], "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}}
@@ -68,7 +69,6 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         @wraps(fn)
         def stream_fn(*args: Any, **kwargs: Any) -> Iterator[Any]:
             for chunk in fn(*args, **kwargs):  # Yield chunks from the original stream method
-                if isinstance(chunk, dict):
                     yield chunk  # Ensure original output is preserved for downstream usage
 
         op = weave.op()(stream_fn)
@@ -88,7 +88,6 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         @wraps(fn)
         async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             async for chunk in fn(*args, **kwargs):  # Yield chunks from the original async stream method
-                if isinstance(chunk, dict):
                     yield chunk  # Ensure original output is preserved for downstream usage
 
         op = weave.op()(async_stream_fn)
