@@ -7,7 +7,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
-nova_models = ["nova-pro-v1", "nova-lite-v1", "nova-micro-v1"]
+NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
 def lite_llm_completion(
@@ -21,7 +21,7 @@ def lite_llm_completion(
             get_bedrock_credentials(inputs.model)
         )
         # Nova models need the region in the model name
-        if any(x in inputs.model for x in nova_models) and aws_region_name:
+        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
             aws_inference_region = aws_region_name.split("-")[0]
             inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
     # XAI models don't support response_format
