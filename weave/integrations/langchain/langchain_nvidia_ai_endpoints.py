@@ -1,5 +1,6 @@
 import importlib
-from typing import Callable, Optional
+from functools import wraps
+from typing import Callable, Optional, Any
 
 import weave
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
@@ -40,86 +41,70 @@ def lc_nvidia_accumulator(
     acc.content += value.content
     return acc
 
+def lc_nvidia_stream_accumulator(
+    acc: Optional["BaseMessageChunk"],
+    value: "BaseMessageChunk",
+) -> "BaseMessage":
 
-def lc_nvidia_stream_wrapper(name: str) -> Callable:
-    def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
-        acc_op = add_accumulator(op, lambda inputs: lc_nvidia_accumulator)  # type: ignore
-        acc_op.name = name  # type: ignore
-        acc_op._set_on_input_handler(lc_nvidia_input_handler)
-        acc_op._set_on_finish_handler(lc_nvidia_post_processor)
-        return acc_op
-
-    return wrapper
-
+    if acc is None:
+        acc = ""
+    if value.response_metadata != {}:
+        acc = value.message
+    return acc
 
 def lc_nvidia_wrapper(name: str) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        op._set_on_input_handler(lc_nvidia_input_handler)
-        op._set_on_finish_handler(lc_nvidia_post_processor)
         return op
 
     return wrapper
 
+def lc_nvidia_wrapper_async(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
+            @wraps(fn)
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await fn(*args, **kwargs)
 
-def lc_nvidia_input_handler(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
-    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
-        original_args = args
-        original_kwargs = kwargs
-        prompt = args[1]
-        args = args[:-1]
-        kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
+            return _async_wrapper
+
+        "We need to do this so we can check if `stream` is used"
+        op = weave.op()(_fn_wrapper(fn))
+        op.name = name  # type: ignore
+        return op
+
+    return wrapper
+
+def lc_nvidia_wrapper_stream_async(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
+            @wraps(fn)
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await fn(*args, **kwargs)
+
+            return _async_wrapper
+
+
+        op = weave.op()(_fn_wrapper(fn))
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lc_nvidia_accumulator
         )
-    return None
 
-def lc_nvidia_post_processor(call, original_output, exception) -> ChatCompletion:
-    if exception is not None:
-        return call, original_output
+    return wrapper
 
-    llm_response = original_output.response_metadata
-    usage = llm_response.get("token_usage", {})
+def lc_nvidia_wrapper_stream_sync(name: str) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda _: lc_nvidia_accumulator
+        )
 
-    # Prepare choices
-    choices = [
-        {
-            "index": 0,
-            "message": {
-                "role": llm_response.get("role", "assistant"),
-                "content": llm_response.get("content", ""),
-            },
-            "finish_reason": llm_response.get("finish_reason", "stop"),
-        }
-    ]
-
-    # Construct ChatCompletion
-    chat_completion = ChatCompletion(
-        id=original_output.get("id", "unique-id"),
-        object=original_output.model_dump().type,
-        created=llm_response.get("created", 0),
-        model=llm_response.get("model_name", "unknown-model"),
-        choices=choices,
-        usage={
-            "prompt_tokens": usage.get("prompt_tokens", 0),
-            "completion_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0),
-        },
-    )
-
-    return chat_completion.model_dump(exclude_unset=True, exclude_none=True)
-
+    return wrapper
 
 langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
@@ -131,17 +116,17 @@ langchain_chatmodel_nvidia_patcher = MultiPatcher(
 SymbolPatcher(
             lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.ainvoke",
-            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.ainvoke"),
+            lc_nvidia_wrapper_async(name="Langchain.NVIDIA.ChatNVIDIA.ainvoke"),
         ),
 SymbolPatcher(
             lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.stream",
-            lc_nvidia_stream_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.stream"),
+            lc_nvidia_wrapper_stream_sync(name="Langchain.NVIDIA.ChatNVIDIA.stream"),
         ),
 SymbolPatcher(
             lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.astream",
-            lc_nvidia_stream_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.astream"),
+            lc_nvidia_wrapper_stream_async(name="Langchain.NVIDIA.ChatNVIDIA.astream"),
         ),
 SymbolPatcher(
             lambda: importlib.import_module("Langchain.NVIDIA"),
@@ -151,7 +136,7 @@ SymbolPatcher(
 SymbolPatcher(
             lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.abatch",
-            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.abatch"),
+            lc_nvidia_wrapper_async(name="Langchain.NVIDIA.ChatNVIDIA.abatch"),
         ),
     ]
 )
