@@ -29,6 +29,27 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -
 
     return acc
 
+def on_input_handler(
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
+    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
+        original_args = args
+        original_kwargs = kwargs
+        prompt = args[1]
+        args = args[:-1]
+        kwargs.update(prompt.as_dict())
+        inputs = {
+            "prompt": prompt,
+        }
+        return ProcessedInputs(
+            original_args=original_args,
+            original_kwargs=original_kwargs,
+            args=args,
+            kwargs=kwargs,
+            inputs=inputs,
+        )
+    return None
+
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
@@ -66,11 +87,12 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(invoke_fn)
         op.name = name
+        op._set_on_input_handler(on_input_handler)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -85,11 +107,12 @@ def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(ainvoke_fn)
         op.name = name
+        op._set_on_input_handler(on_input_handler)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for ainvoke directly
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -104,11 +127,12 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(stream_fn)
         op.name = name
+        op._set_on_input_handler(on_input_handler)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -124,11 +148,12 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(async_stream_fn)
         op.name = name
+        op._set_on_input_handler(on_input_handler)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
