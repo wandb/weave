@@ -55,10 +55,10 @@ def test_make_conditions_part():
 def test_make_object_id_conditions_part():
     assert _make_object_id_conditions_part(None) == ""
     assert _make_object_id_conditions_part([]) == ""
-    assert _make_object_id_conditions_part(["id = 1"]) == "AND id = 1"
+    assert _make_object_id_conditions_part(["id = 1"]) == " AND id = 1"
     assert (
         _make_object_id_conditions_part(["id = 1", "id = 2"])
-        == "AND ((id = 1) AND (id = 2))"
+        == " AND ((id = 1) AND (id = 2))"
     )
 
 

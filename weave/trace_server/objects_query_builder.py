@@ -68,7 +68,7 @@ def _make_object_id_conditions_part(object_id_conditions: Optional[list[str]]) -
     if not object_id_conditions:
         return ""
     conditions_str = combine_conditions(object_id_conditions, "AND")
-    return _make_optional_part("AND", conditions_str)
+    return " " + _make_optional_part("AND", conditions_str)
 
 
 def format_metadata_objects_from_query_result(
@@ -236,7 +236,7 @@ FROM (
                 ORDER BY created_at ASC
             ) AS rn
         FROM object_versions
-        WHERE project_id = {{project_id: String}} {self.object_id_conditions_part}
+        WHERE project_id = {{project_id: String}}{self.object_id_conditions_part}
     )
     WHERE rn = 1
 )"""
