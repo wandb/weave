@@ -22,9 +22,9 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -
     # Accumulate token usage from usage_metadata if present
     if hasattr(value, "usage_metadata"):
         usage_metadata = value.usage_metadata
-        acc.usage_metadata["input_tokens"] += usage_metadata.get("input_tokens", 0)
-        acc.usage_metadata["output_tokens"] += usage_metadata.get("output_tokens", 0)
-        acc.usage_metadata["total_tokens"] += usage_metadata.get("total_tokens", 0)
+        acc.usage_metadata["input_tokens"] = usage_metadata.get("input_tokens", 0)
+        acc.usage_metadata["output_tokens"] = usage_metadata.get("output_tokens", 0)
+        acc.usage_metadata["total_tokens"] = usage_metadata.get("total_tokens", 0)
 
     return acc
 
