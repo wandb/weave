@@ -13,7 +13,7 @@ NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 def lite_llm_completion(
     api_key: str,
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: str | None = None,
+    provider: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
     if provider == "bedrock" or provider == "bedrock_converse":
