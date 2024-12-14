@@ -1,5 +1,7 @@
 """The top-level functions and classes for working with Weave."""
 
+from typing import Any
+
 from weave import version
 from weave.trace.api import *
 
@@ -9,12 +11,27 @@ __version__ = version.VERSION
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
 from weave.flow.dataset import Dataset
-from weave.flow.eval import Evaluation, Scorer
+from weave.flow.eval import Evaluation
 from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
-from weave.trace.util import Thread as Thread
-from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+from weave.trace.util import (
+    Thread,  # noqa: F401
+    ThreadPoolExecutor,  # noqa: F401
+)
+
+
+def __getattr__(name: str) -> Any:
+    """This function defines module-level lazy imports.
+
+    The scorer module is particularly heavy, so we defer to speed up weave import.
+    This allows `Scorer` to stay at top-level without incurring import overhead."""
+    if name == "Scorer":
+        from weave.flow.scorer import Scorer
+
+        return Scorer
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 # Alias for succinct code
 P = EasyPrompt
@@ -39,5 +56,4 @@ __docspec__ = [
     StringPrompt,
     MessagesPrompt,
     Evaluation,
-    Scorer,
 ]
