@@ -95,7 +95,7 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
-            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -115,7 +115,7 @@ def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for ainvoke directly
-            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -135,7 +135,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -156,7 +156,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
