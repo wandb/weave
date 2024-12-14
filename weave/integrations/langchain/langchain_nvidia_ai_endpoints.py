@@ -97,8 +97,8 @@ def lc_nvidia_post_processor(call, original_output, exception) -> ChatCompletion
         {
             "index": 0,
             "message": {
-                "role": original_output.role,
-                "content": llm_response.content,
+                "role": llm_response.get("role", "assistant"),
+                "content": llm_response.get("content", ""),
             },
             "finish_reason": llm_response.get("finish_reason", "stop"),
         }
@@ -124,34 +124,34 @@ def lc_nvidia_post_processor(call, original_output, exception) -> ChatCompletion
 langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.invoke",
-            lc_nvidia_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.invoke"),
+            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.invoke"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.ainvoke",
-            lc_nvidia_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.ainvoke"),
+            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.ainvoke"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.stream",
-            lc_nvidia_stream_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.stream"),
+            lc_nvidia_stream_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.stream"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.astream",
-            lc_nvidia_stream_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.astream"),
+            lc_nvidia_stream_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.astream"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.batch",
-            lc_nvidia_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.batch"),
+            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.batch"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            lambda: importlib.import_module("Langchain.NVIDIA"),
             "ChatNVIDIA.abatch",
-            lc_nvidia_wrapper(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.abatch"),
+            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.abatch"),
         ),
     ]
 )
