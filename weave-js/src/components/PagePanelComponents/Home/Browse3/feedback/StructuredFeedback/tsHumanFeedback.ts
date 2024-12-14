@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 
-import {useBaseObjectInstances} from '../../pages/wfReactInterface/objectClassQuery';
+import {useBaseObjectInstances} from '../../pages/wfReactInterface/baseObjectClassQuery';
 import {
   TraceObjQueryReq,
   TraceObjSchema,

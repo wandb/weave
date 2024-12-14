@@ -12,8 +12,8 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {
   useBaseObjectInstances,
-  useCreateBuiltinObjectInstance,
-} from '../wfReactInterface/objectClassQuery';
+  useCreateBaseObjectInstance,
+} from '../wfReactInterface/baseObjectClassQuery';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {
   convertTraceServerObjectVersionToSchema,
@@ -162,8 +162,7 @@ const generateLeaderboardId = () => {
 };
 
 const useCreateLeaderboard = (entity: string, project: string) => {
-  const createLeaderboardInstance =
-    useCreateBuiltinObjectInstance('Leaderboard');
+  const createLeaderboardInstance = useCreateBaseObjectInstance('Leaderboard');
 
   const createLeaderboard = async () => {
     const objectId = sanitizeObjectId(generateLeaderboardId());
