@@ -10,6 +10,11 @@ name: test
 
 on:
   push:
+    paths-ignore:
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
 
 jobs:
   check-which-tests-to-run:
@@ -195,6 +200,7 @@ jobs:
     name: Trace docs
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && (github.event.before == 'docs/**' || github.event.commits | contains('docs')) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
