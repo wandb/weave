@@ -101,6 +101,27 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         )
     return wrapper
 
+# Post processor to transform output into OpenAI's ChatCompletion format
+def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
+    """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
+    return {
+        "id": getattr(output, "id", None),
+        "object": "chat.completion",
+        "created": None,  # Populate with timestamp if available
+        "model": getattr(output, "response_metadata", {}).get("model_name", None),
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": getattr(output, "role", "assistant"),
+                    "content": output.content,
+                },
+                "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
+            }
+        ],
+        "usage": getattr(output, "usage_metadata", {}),
+    }
+
 
 # Define the patcher
 lc_nvidia_patcher = MultiPatcher(

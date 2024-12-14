@@ -1,437 +1,153 @@
-from __future__ import annotations
-
 import importlib
+from typing import Any, Callable, Iterator, AsyncIterator, Optional
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
-
 import weave
-from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionChunk
-
-_openai_patcher: MultiPatcher | None = None
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from langchain.schema import BaseMessageChunk, AIMessageChunk
 
 
-def maybe_unwrap_api_response(value: Any) -> Any:
-    """If the caller requests a raw response, we unwrap the APIResponse object.
-    We take a very conservative approach to only unwrap the types we know about.
-    """
-    maybe_value: Any = None
-    try:
-        from openai._legacy_response import LegacyAPIResponse
-
-        if isinstance(value, LegacyAPIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
-
-    try:
-        from openai._response import APIResponse
-
-        if isinstance(value, APIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
-
-    try:
-        from openai.types.chat import ChatCompletion, ChatCompletionChunk
-
-        if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
-            return maybe_value
-    except:
-        pass
-
-    return value
-
-
-def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-    )
-    from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-        Function,
-    )
-
-    value = maybe_unwrap_api_response(value)
-
-    def _get_function_call(
-        function_call: ChoiceDeltaFunctionCall | None,
-    ) -> FunctionCall | None:
-        if function_call is None:
-            return function_call
-        if isinstance(function_call, ChoiceDeltaFunctionCall):
-            return FunctionCall(
-                arguments=function_call.arguments,
-                name=function_call.name,
-            )
-        else:
-            return None
-
-    def _get_tool_calls(
-        tool_calls: list[ChoiceDeltaToolCall] | None,
-    ) -> list[ChatCompletionMessageToolCall] | None:
-        if tool_calls is None:
-            return tool_calls
-
-        _tool_calls = []
-        if isinstance(tool_calls, list):
-            for tool_call in tool_calls:
-                assert isinstance(tool_call, ChoiceDeltaToolCall)
-                _tool_calls.append(
-                    ChatCompletionMessageToolCall(
-                        id=tool_call.id,
-                        type=tool_call.type,
-                        function=Function(
-                            name=tool_call.function.name,
-                            arguments=tool_call.function.arguments,
-                        ),
-                    )
-                )
-        return _tool_calls
-
-    dump = None
-    if isinstance(value, ChatCompletionChunk):
-        dump = ChatCompletion(
-            id=value.id,
-            choices=[
-                {
-                    "index": choice.index,
-                    "message": {
-                        "content": choice.delta.content,
-                        "role": choice.delta.role,
-                        "function_call": _get_function_call(choice.delta.function_call),
-                        "tool_calls": _get_tool_calls(choice.delta.tool_calls),
-                    },
-                    "logprobs": choice.logprobs,
-                    "finish_reason": choice.finish_reason,
-                }
-                for choice in value.choices
-            ],
-            created=value.created,
-            model=value.model,
-            object="chat.completion",
-            system_fingerprint=value.system_fingerprint,
-            usage=value.usage if hasattr(value, "usage") else None,
-        ).model_dump(exclude_unset=True, exclude_none=True)
-    elif not hasattr(value, "model_dump"):
-        return value
-    else:
-        dump = value.model_dump(exclude_unset=True, exclude_none=True)
-    if hasattr(value, "_request_id"):
-        dump["request_id"] = value._request_id
-    return dump
-
-
-def openai_accumulator(
-    acc: ChatCompletionChunk | None,
-    value: ChatCompletionChunk,
-    skip_last: bool = False,
-) -> ChatCompletionChunk:
-    from openai.types.chat import ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-        ChoiceDeltaToolCallFunction,
-    )
-
-    def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] = []
-    ) -> list[dict]:
-        """Once the first_chunk is set (acc), take the next chunk and append the message content
-        to the message content of acc or first_chunk.
-        """
-        for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(acc_choices)):
-                acc_choices.append(
-                    {
-                        "index": len(acc_choices),
-                        "delta": {
-                            "content": None,
-                            "function_call": None,
-                            "tool_calls": None,
-                        },
-                        "logprobs": None,
-                        "finish_reason": None,
-                    }
-                )
-            # choice fields
-            choice = acc_choices[chunk_choice.index]
-            if chunk_choice.finish_reason:
-                choice["finish_reason"] = chunk_choice.finish_reason
-            if chunk_choice.logprobs:
-                choice["logprobs"] = chunk_choice.logprobs
-
-            # message
-            if chunk_choice.delta.content:
-                if choice["delta"]["content"] is None:
-                    choice["delta"]["content"] = ""
-                choice["delta"]["content"] += chunk_choice.delta.content  # type: ignore
-            if chunk_choice.delta.role:
-                choice["delta"]["role"] = chunk_choice.delta.role
-
-            # function calling
-            if chunk_choice.delta.function_call:
-                if choice["delta"]["function_call"] is None:
-                    choice["delta"]["function_call"] = ChoiceDeltaFunctionCall(
-                        arguments=chunk_choice.delta.function_call.arguments,
-                        name=chunk_choice.delta.function_call.name,
-                    )
-                else:
-                    choice["delta"]["function_call"]["arguments"] += (
-                        chunk_choice.delta.function_call.arguments
-                    )
-
-            # tool calls
-            if chunk_choice.delta.tool_calls:
-                if choice["delta"]["tool_calls"] is None:
-                    choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[
-                        0
-                    ]  # when streaming, we get one
-                    choice["delta"]["tool_calls"].append(  # type: ignore
-                        ChoiceDeltaToolCall(
-                            id=tool_call_delta.id,
-                            index=tool_call_delta.index,
-                            function=ChoiceDeltaToolCallFunction(
-                                name=tool_call_delta.function.name,  # type: ignore
-                                arguments="",
-                            ),
-                            type=tool_call_delta.type,
-                        )
-                    )
-                else:
-                    tool_call_delta = chunk_choice.delta.tool_calls[0]
-                    if tool_call_delta.index > len(choice["delta"]["tool_calls"]) - 1:
-                        choice["delta"]["tool_calls"].append(
-                            ChoiceDeltaToolCall(
-                                index=tool_call_delta.index,
-                                function=ChoiceDeltaToolCallFunction(
-                                    name=None,
-                                    arguments="",
-                                ),
-                            ).model_dump()
-                        )
-                    tool_call = choice["delta"]["tool_calls"][tool_call_delta.index]
-                    if tool_call_delta.id is not None:
-                        tool_call["id"] = tool_call_delta.id
-                    if tool_call_delta.type is not None:
-                        tool_call["type"] = tool_call_delta.type
-                    if tool_call_delta.function is not None:
-                        if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = (
-                                tool_call_delta.function.name
-                            )
-                        if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += (
-                                tool_call_delta.function.arguments
-                            )
-
-        return acc_choices
-
+# NVIDIA-specific accumulator for parsing the response object
+def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -> AIMessageChunk:
+    """Accumulates responses and updates token usage with the latest value for NVIDIA Chat methods."""
     if acc is None:
-        if hasattr(value, "choices"):
-            output_choices = _process_chunk(value)
-            acc = ChatCompletionChunk(
-                id=value.id,  # Each chunk has the same ID
-                choices=output_choices,
-                created=value.created,  # Each chunk has the same timestamp
-                model=value.model,
-                object=value.object,
-                system_fingerprint=value.system_fingerprint,
-            )
-            return acc
-        else:
-            raise ValueError("Initial event must contain choices")
+        acc = AIMessageChunk(content="", usage_metadata={})
 
-    output_choices = _process_chunk(
-        value, [choice.model_dump() for choice in acc.choices]
-    )
+    # Combine content
+    acc.content += value.content or ""
 
-    acc = ChatCompletionChunk(
-        id=acc.id,
-        choices=output_choices,
-        created=acc.created,
-        model=acc.model,
-        object=acc.object,
-        system_fingerprint=acc.system_fingerprint,
-    )
-
-    # add usage info
-    if len(value.choices) == 0 and value.usage:
-        acc.usage = value.usage
-        if skip_last:
-            raise StopIteration(acc)
+    # Set the latest usage_metadata
+    if hasattr(value, "usage_metadata"):
+        acc.usage_metadata = value.usage_metadata
 
     return acc
 
 
-# Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: dict) -> bool:
-    return (
-        isinstance(inputs, dict)
-        and bool(inputs.get("stream"))
-        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
-        # is an APIResponse object. This is very hard to mock/patch for the streaming use
-        # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
-    )
+# Post processor to transform output into OpenAI's ChatCompletion format
+def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
+    """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
+    return {
+        "id": getattr(output, "id", None),
+        "object": "chat.completion",
+        "created": None,  # Populate with timestamp if available
+        "model": getattr(output, "response_metadata", {}).get("model_name", None),
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": getattr(output, "role", "assistant"),
+                    "content": output.content,
+                },
+                "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
+            }
+        ],
+        "usage": getattr(output, "usage_metadata", {}),
+    }
 
 
-def openai_on_input_handler(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
-    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
-        original_args = args
-        original_kwargs = kwargs
-        prompt = args[1]
-        args = args[:-1]
-        kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
-        )
-    return None
-
-
-def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
+# Wrap synchronous invoke method
+def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap the invoke method."""
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        @wraps(fn)
+        def invoke_fn(*args: Any, **kwargs: Any) -> Any:
+            return fn(*args, **kwargs)
 
-        def _add_stream_options(fn: Callable) -> Callable:
-            @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
-
-            return _wrapper
-
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
-
-        op_kwargs = settings.model_dump()
-        op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op = weave.op()(invoke_fn)
+        op.name = name
         return add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
+            op,
+            make_accumulator=lambda _: nvidia_accumulator,
+            should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
-
     return wrapper
 
 
-# Surprisingly, the async `client.chat.completions.create` does not pass
-# `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
-# it manually here...
-def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+# Wrap asynchronous invoke method
+def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap the ainvoke method."""
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        @wraps(fn)
+        async def ainvoke_fn(*args: Any, **kwargs: Any) -> Any:
+            return await fn(*args, **kwargs)
 
-        def _add_stream_options(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
-
-            return _wrapper
-
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
-
-        op_kwargs = settings.model_dump()
-        op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op = weave.op()(ainvoke_fn)
+        op.name = name
         return add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
+            op,
+            make_accumulator=lambda _: nvidia_accumulator,
+            should_accumulate=lambda kwargs: False,  # No accumulation for ainvoke directly
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
-
     return wrapper
 
 
-def get_openai_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
-    if settings is None:
-        settings = IntegrationSettings()
+# Wrap streaming methods (synchronous)
+def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap a synchronous streaming method for ChatNVIDIA."""
+    def wrapper(fn: Callable) -> Callable:
+        @wraps(fn)
+        def stream_fn(*args: Any, **kwargs: Any) -> Iterator[BaseMessageChunk]:
+            yield from fn(*args, **kwargs)  # Directly yield chunks
 
-    if not settings.enabled:
-        return NoOpPatcher()
+        op = weave.op()(stream_fn)
+        op.name = name
+        return add_accumulator(
+            op,
+            make_accumulator=lambda _: nvidia_accumulator,
+            should_accumulate=lambda _: True,  # Always accumulate for streaming
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+        )
+    return wrapper
 
-    global _openai_patcher
-    if _openai_patcher is not None:
-        return _openai_patcher
 
-    base = settings.op_settings
+# Wrap streaming methods (asynchronous)
+def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap an asynchronous streaming method for ChatNVIDIA."""
+    def wrapper(fn: Callable) -> Callable:
+        @wraps(fn)
+        async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[BaseMessageChunk]:
+            async for chunk in fn(*args, **kwargs):  # Directly yield chunks
+                yield chunk
 
-    completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
-    )
-    async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
-    )
-    completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
-    )
-    async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
-    )
+        op = weave.op()(async_stream_fn)
+        op.name = name
+        return add_accumulator(
+            op,
+            make_accumulator=lambda _: nvidia_accumulator,
+            should_accumulate=lambda _: True,  # Always accumulate for streaming
+            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+        )
+    return wrapper
 
-    _openai_patcher = MultiPatcher(
-        [
-            SymbolPatcher(
-                lambda: importlib.import_module("openai.resources.chat.completions"),
-                "Completions.create",
-                create_wrapper_sync(settings=completions_create_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("openai.resources.chat.completions"),
-                "AsyncCompletions.create",
-                create_wrapper_async(settings=async_completions_create_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
-                "Completions.parse",
-                create_wrapper_sync(settings=completions_parse_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
-                "AsyncCompletions.parse",
-                create_wrapper_async(settings=async_completions_parse_settings),
-            ),
-        ]
-    )
 
-    return _openai_patcher
+# Define the patcher
+lc_nvidia_patcher = MultiPatcher(
+    [
+        # Patch synchronous invoke method
+        SymbolPatcher(
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            "ChatNVIDIA.invoke",
+            create_invoke_wrapper("langchain.Llm.ChatNVIDIA.invoke"),
+        ),
+        # Patch asynchronous invoke method
+        SymbolPatcher(
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            "ChatNVIDIA.ainvoke",
+            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA.ainvoke"),
+        ),
+        # Patch synchronous stream method
+        SymbolPatcher(
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            "ChatNVIDIA.stream",
+            create_stream_wrapper("langchain.Llm.ChatNVIDIA.stream"),
+        ),
+        # Patch asynchronous stream method
+        SymbolPatcher(
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+            "ChatNVIDIA.astream",
+            create_async_stream_wrapper("langchain.Llm.ChatNVIDIA.astream"),
+        ),
+    ]
+)
