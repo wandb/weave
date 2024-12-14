@@ -69,10 +69,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         def stream_fn(*args: Any, **kwargs: Any) -> Iterator[Any]:
             for chunk in fn(*args, **kwargs):  # Yield chunks from the original stream method
                 if isinstance(chunk, dict):
-                    yield {
-                        "content": chunk.get("content", ""),
-                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
-                    }
+                    yield chunk  # Ensure original output is preserved for downstream usage
 
         op = weave.op()(stream_fn)
         op.name = name
@@ -92,10 +89,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             async for chunk in fn(*args, **kwargs):  # Yield chunks from the original async stream method
                 if isinstance(chunk, dict):
-                    yield {
-                        "content": chunk.get("content", ""),
-                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
-                    }
+                    yield chunk  # Ensure original output is preserved for downstream usage
 
         op = weave.op()(async_stream_fn)
         op.name = name
