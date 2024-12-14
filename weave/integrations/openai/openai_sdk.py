@@ -4,7 +4,7 @@ from functools import wraps
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from langchain.schema import BaseMessageChunk, AIMessageChunk
+from langchain_core.messages import BaseMessageChunk, AIMessageChunk
 
 
 # NVIDIA-specific accumulator for parsing the response object
