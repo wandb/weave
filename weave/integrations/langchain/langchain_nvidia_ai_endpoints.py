@@ -29,31 +29,38 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -
 
     return acc
 
-def on_input_handler(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
-    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
-        original_args = args
-        original_kwargs = kwargs
-        prompt = args[1]
-        args = args[:-1]
-        kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
-        )
-    return None
+def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | dict |  None:
+    # Extract key components from kwargs
+    original_args = args
+    original_kwargs = kwargs
+    self_obj = kwargs.get("self", {})
+    user_input = kwargs.get("input", "")
+    if not user_input:
+        return None  # Return None if there is no input content
+
+    # User message constructed from input
+    user_message = {
+        "content": user_input,
+        "role": "user",
+    }
+
+    # Construct the transformed object
+    processed_input = {
+        "self": self_obj,
+        "messages": [user_message],
+        "model": self_obj.get("model", "nvidia/nemotron-4-340b-instruct"),
+        "max_tokens": self_obj.get("max_tokens", 0),
+        "n": 0,
+        "stream": self_obj.get("disable_streaming", False),
+        "temperature": self_obj.get("temperature", 0),
+        "top_p": self_obj.get("top_p", 0),
+    }
+
+    return processed_input
 
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
-    usage_metadata = getattr(output, "usage_metadata", {})
     return {
         "id": getattr(output, "id", None),
         "object": "chat.completion",
@@ -69,11 +76,7 @@ def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
                 "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
             }
         ],
-        "usage": {
-            "input_tokens": usage_metadata.get("input_tokens", 0),
-            "output_tokens": usage_metadata.get("output_tokens", 0),
-            "total_tokens": usage_metadata.get("total_tokens", 0),
-        },
+        "usage": getattr(output, "usage_metadata", {}),
     }
 
 
@@ -87,7 +90,7 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(invoke_fn)
         op.name = name
-        op._set_on_input_handler(on_input_handler)
+        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -107,7 +110,7 @@ def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(ainvoke_fn)
         op.name = name
-        op._set_on_input_handler(on_input_handler)
+        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -127,7 +130,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(stream_fn)
         op.name = name
-        op._set_on_input_handler(on_input_handler)
+        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -148,7 +151,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(async_stream_fn)
         op.name = name
-        op._set_on_input_handler(on_input_handler)
+        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
