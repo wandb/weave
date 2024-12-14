@@ -109,32 +109,32 @@ def lc_nvidia_wrapper_stream_sync(name: str) -> Callable:
 langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.invoke",
             lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.invoke"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.ainvoke",
             lc_nvidia_wrapper_async(name="Langchain.NVIDIA.ChatNVIDIA.ainvoke"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.stream",
             lc_nvidia_wrapper_stream_sync(name="Langchain.NVIDIA.ChatNVIDIA.stream"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.astream",
             lc_nvidia_wrapper_stream_async(name="Langchain.NVIDIA.ChatNVIDIA.astream"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.batch",
             lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.batch"),
         ),
 SymbolPatcher(
-            lambda: importlib.import_module("Langchain.NVIDIA"),
+            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.abatch",
             lc_nvidia_wrapper_async(name="Langchain.NVIDIA.ChatNVIDIA.abatch"),
         ),
