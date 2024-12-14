@@ -62,7 +62,7 @@ def chat_nvidia_post_processor(call, original_output, exception) -> ChatCompleti
 
     # Construct ChatCompletion
     chat_completion = ChatCompletion(
-        id=response.get("id", "unique-id"),
+        id=original_output.get("id", "unique-id"),
         object="invoke",
         created=llmoutput.get("created", 0),
         model=llmoutput.get("model_name", "unknown-model"),
