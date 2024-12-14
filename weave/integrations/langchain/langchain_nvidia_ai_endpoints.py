@@ -6,20 +6,21 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
-# NVIDIA-specific accumulator for streaming
+# NVIDIA-specific accumulator for parsing the response object
 def nvidia_accumulator(acc: Optional[dict], value: dict) -> dict:
     """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
-        acc = {"responses": [], "usage": {"input_tokens": 0, "output_tokens": 0}}
+        acc = {"responses": [], "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}}
 
-    # Collect the response message
-    if "message" in value:
-        acc["responses"].append(value["message"])
+    # Accumulate the response content
+    if "content" in value:
+        acc["responses"].append(value["content"])
 
-    # Collect token usage stats if available
-    if "usage" in value:
-        acc["usage"]["input_tokens"] += value["usage"].get("input_tokens", 0)
-        acc["usage"]["output_tokens"] += value["usage"].get("output_tokens", 0)
+    # Accumulate token usage if present
+    usage_metadata = value.get("usage_metadata", {})
+    acc["usage"]["input_tokens"] += usage_metadata.get("input_tokens", 0)
+    acc["usage"]["output_tokens"] += usage_metadata.get("output_tokens", 0)
+    acc["usage"]["total_tokens"] += usage_metadata.get("total_tokens", 0)
 
     return acc
 
@@ -63,8 +64,12 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         @wraps(fn)
         def stream_fn(*args: Any, **kwargs: Any) -> Iterator[Any]:
             for chunk in fn(*args, **kwargs):  # Yield chunks from the original stream method
-                if isinstance(chunk, dict) and "message" in chunk:
-                    yield chunk  # Only yield valid chunks for streaming
+                if isinstance(chunk, dict):
+                    parsed_chunk = {
+                        "content": chunk.get("content", ""),
+                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
+                    }
+                    yield parsed_chunk
 
         op = weave.op()(stream_fn)
         op.name = name
@@ -83,8 +88,12 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
         @wraps(fn)
         async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             async for chunk in fn(*args, **kwargs):  # Yield chunks from the original async stream method
-                if isinstance(chunk, dict) and "message" in chunk:
-                    yield chunk  # Only yield valid chunks for streaming
+                if isinstance(chunk, dict):
+                    parsed_chunk = {
+                        "content": chunk.get("content", ""),
+                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
+                    }
+                    yield parsed_chunk
 
         op = weave.op()(async_stream_fn)
         op.name = name
