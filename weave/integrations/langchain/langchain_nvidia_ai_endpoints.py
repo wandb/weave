@@ -32,6 +32,7 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
+    usage_metadata = getattr(output, "usage_metadata", {})
     return {
         "id": getattr(output, "id", None),
         "object": "chat.completion",
@@ -47,7 +48,11 @@ def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
                 "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
             }
         ],
-        "usage": getattr(output, "usage_metadata", {}),
+        "usage": {
+            "prompt_tokens": usage_metadata.get("input_tokens", 0),
+            "completion_tokens": usage_metadata.get("output_tokens", 0),
+            "total_tokens": usage_metadata.get("total_tokens", 0),
+        },
     }
 
 
