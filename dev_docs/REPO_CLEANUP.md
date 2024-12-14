@@ -20,13 +20,21 @@ If we start getting north of 200MB, we should likely clean the repo.
 brew install java
 ```
 
-### Clean the repo
+### Clone the repo
 
 Checkout a bare version of the repo with the following command:
 
 ```bash
 git clone --mirror https://github.com/wandb/weave.git weave-cleanup.git
 ```
+
+### Backup the repo
+
+```bash
+git bundle create weave-$(date +%Y-%m-%d).bundle --all
+```
+
+### Clean the repo
 
 The below command will remove all files larger than 500K and delete the files with the following extensions:
 
@@ -41,3 +49,8 @@ git reflog expire --expire=now --all && git gc --prune=now --aggressive
 git count-objects -vH
 ```
 
+### YOLO
+
+```bash
+git push --force --all
+```
