@@ -24,7 +24,6 @@ def lc_nvidia_accumulator(
     value: "BaseMessageChunk",
 ) -> "BaseMessage":
 
-    value = value.data
     if acc is None:
         acc = BaseMessageChunk(
             content="",
@@ -127,16 +126,6 @@ SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.astream",
             lc_nvidia_wrapper_stream_async(name="Langchain.NVIDIA.ChatNVIDIA.astream"),
-        ),
-SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.batch",
-            lc_nvidia_wrapper(name="Langchain.NVIDIA.ChatNVIDIA.batch"),
-        ),
-SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.abatch",
-            lc_nvidia_wrapper_async(name="Langchain.NVIDIA.ChatNVIDIA.abatch"),
         ),
     ]
 )
