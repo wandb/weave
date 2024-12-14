@@ -10,16 +10,24 @@ from langchain_core.messages import BaseMessageChunk, AIMessageChunk
 
 # NVIDIA-specific accumulator for parsing the response object
 def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -> AIMessageChunk:
-    """Accumulates responses and updates token usage with the latest value for NVIDIA Chat methods."""
+    """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
-        acc = AIMessageChunk(content="", usage_metadata={})
+        acc = AIMessageChunk(
+            content="",
+            usage_metadata={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        )
 
     # Combine content
     acc.content += value.content or ""
 
-    # Set the latest usage_metadata
+    # Accumulate token usage from usage_metadata if present
     if hasattr(value, "usage_metadata"):
-        acc.usage_metadata = value.usage_metadata
+        usage_metadata = value.usage_metadata
+        acc.usage_metadata["input_tokens"] = usage_metadata.get("input_tokens", 0)
+        acc.usage_metadata["output_tokens"] = usage_metadata.get("output_tokens", 0)
+        acc.usage_metadata["total_tokens"] = usage_metadata.get("total_tokens", 0)
+
+    return acc
 
     return acc
 
