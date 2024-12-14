@@ -121,7 +121,8 @@ class MessagesPrompt(Prompt):
         return prompt
 
 
-class EasyPrompt(UserList, Prompt):
+# TODO: error: Definition of "copy" in base class "UserList" is incompatible with definition in base class "BaseModel"
+class EasyPrompt(UserList, Prompt):  # type: ignore
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
     requirements: dict = Field(default_factory=dict)
@@ -153,7 +154,7 @@ class EasyPrompt(UserList, Prompt):
             for item in content:
                 self.append(item, role=role, dedent=dedent)
 
-    def __add__(self, other: Any) -> "Prompt":
+    def __add__(self, other: Any) -> "EasyPrompt":
         new_prompt = self.copy()
         new_prompt += other
         return new_prompt
@@ -180,7 +181,7 @@ class EasyPrompt(UserList, Prompt):
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
-    def __iadd__(self, item: Any) -> "Prompt":
+    def __iadd__(self, item: Any) -> "EasyPrompt":
         self.append(item)
         return self
 
@@ -195,9 +196,9 @@ class EasyPrompt(UserList, Prompt):
         return {"role": "system", "content": self.as_str}
 
     @property
-    def system_prompt(self) -> "Prompt":
+    def system_prompt(self) -> "EasyPrompt":
         """Join all messages into a system prompt object."""
-        return Prompt(self.as_str, role="system")
+        return EasyPrompt(self.as_str, role="system")
 
     @property
     def messages(self) -> list[Message]:
@@ -249,7 +250,7 @@ class EasyPrompt(UserList, Prompt):
             problems += self.validate_requirement(key, value)
         return problems
 
-    def bind(self, *args: Any, **kwargs: Any) -> "Prompt":
+    def bind(self, *args: Any, **kwargs: Any) -> "EasyPrompt":
         is_dict = len(args) == 1 and isinstance(args[0], dict)
         problems = []
         if is_dict:
@@ -283,7 +284,7 @@ class EasyPrompt(UserList, Prompt):
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
 
     def __getitem__(self, key: Union[SupportsIndex, slice]) -> Any:
-        """Override getitem to return a Message, Prompt object, or config value."""
+        """Override getitem to return a Message, EasyPrompt object, or config value."""
         if isinstance(key, SupportsIndex):
             int_index = key.__index__()
             message = self.data[int_index].copy()
@@ -302,7 +303,7 @@ class EasyPrompt(UserList, Prompt):
             message["content"] = message["content"].format(**values)
             return message
         elif isinstance(key, slice):
-            new_prompt = Prompt()
+            new_prompt = EasyPrompt()
             new_prompt.name = self.name
             new_prompt.description = self.description
             new_prompt.data = self.data[key]
@@ -319,7 +320,7 @@ class EasyPrompt(UserList, Prompt):
         else:
             raise TypeError(f"Invalid argument type: {type(key)}")
 
-    def __deepcopy__(self, memo: dict) -> "Prompt":
+    def __deepcopy__(self, memo: dict) -> "EasyPrompt":  # type: ignore[override]
         # I'm sure this isn't right, but hacking in to avoid
         # TypeError: cannot pickle '_thread.lock' object.
         # Basically, as part of logging our message objects are
@@ -327,7 +328,8 @@ class EasyPrompt(UserList, Prompt):
         # in turn can't be copied
         c = copy.deepcopy(dict(self.config), memo)
         r = copy.deepcopy(dict(self.requirements), memo)
-        p = Prompt(
+        # TODO: Unexpected keyword argument "config" for "Prompt"
+        p = EasyPrompt(
             name=self.name, description=self.description, config=c, requirements=r
         )
         p._values = dict(self._values)
@@ -398,7 +400,7 @@ class EasyPrompt(UserList, Prompt):
         tables = [pydantic_util.table_to_str(t) for t in tables]
         return "\n".join(tables)
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # type: ignore[override]
         """Return a single prompt string when str() is called on the object."""
         return self.as_str
 

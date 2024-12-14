@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -126,11 +126,12 @@ def universal_int_to_ext_ref_converter(
     return _map_values(obj, mapper)
 
 
-E = TypeVar("E")
-F = TypeVar("F")
+T = TypeVar("T")
+
+JsonValue = Any
 
 
-def _map_values(obj: E, func: Callable[[E], E]) -> E:
+def _map_values(obj: T, func: Callable[[JsonValue], JsonValue]) -> T:
     if isinstance(obj, BaseModel):
         # `by_alias` is required since we have Mongo-style properties in the
         # query models that are aliased to conform to start with `$`. Without
@@ -138,13 +139,13 @@ def _map_values(obj: E, func: Callable[[E], E]) -> E:
         # not valid for the `model_validate` step.
         orig = obj.model_dump(by_alias=True)
         new = _map_values(orig, func)
-        return obj.model_validate(new)
+        return cast(T, obj.model_validate(new))
     if isinstance(obj, dict):
-        return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
+        return cast(T, {k: _map_values(v, func) for k, v in obj.items()})
     if isinstance(obj, list):
-        return cast(E, [_map_values(v, func) for v in obj])
+        return cast(T, [_map_values(v, func) for v in obj])
     if isinstance(obj, tuple):
-        return cast(E, tuple(_map_values(v, func) for v in obj))
+        return cast(T, tuple(_map_values(v, func) for v in obj))
     if isinstance(obj, set):
-        return cast(E, {_map_values(v, func) for v in obj})
+        return cast(T, {_map_values(v, func) for v in obj})
     return func(obj)
