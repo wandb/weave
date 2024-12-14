@@ -18,71 +18,25 @@ except ImportError:
     import_failed = True
 
 def chat_nvidia_input_handler(
-    func: Any,  # The operation function
-    args: tuple,  # Positional arguments
-    kwargs: dict,  # Keyword arguments
-) -> weave.trace.op.ProcessedInputs:
-
-    # Ensure args contain "self" and "messages"
-    if len(args) < 2:
-        raise ValueError("Expected at least two arguments: `self` and `messages`.")
-    self_object = args[0]
-    messages = args[1]
-
-    # Process messages into a format compatible with NVIDIA's API
-    if not isinstance(messages, list):
-        raise ValueError("Messages must be provided as a list.")
-    processed_messages = [
-        {"role": "user", "content": msg.get("content", "")}
-        if isinstance(msg, dict)
-        else {"role": getattr(msg, "type", "user"), "content": getattr(msg, "content", "")}
-        for msg in messages
-    ]
-
-    # Extract parameters from `self` object
-    model = self_object.model
-    base_url = self_object.base_url
-    temperature = self_object.temperature
-    max_tokens = self_object.max_tokens
-    top_p = self_object.top_p
-    seed = self_object.seed
-    stop = self_object.seed
-
-    # Construct the payload
-    payload = {
-        "model": model,
-        "messages": processed_messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "top_p": top_p,
-        "seed": seed,
-        "stop": stop,
-    }
-
-    # Include additional arguments passed via kwargs
-    payload.update(kwargs)
-
-    # Preserve the original arguments for debugging or traceability
-    original_args = args
-    original_kwargs = kwargs
-    updated_args = ()  # No positional arguments are changed
-    updated_kwargs = {"payload": payload, "base_url": base_url}
-
-    # Create the ProcessedInputs object
-    inputs = {
-        "self": self_object,
-        "messages": messages,
-        "stop": stop,
-        **kwargs,
-    }
-
-    return ProcessedInputs(
-        original_args=original_args,
-        original_kwargs=original_kwargs,
-        args=updated_args,
-        kwargs=updated_kwargs,
-        inputs=inputs,
-    )
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
+    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
+        original_args = args
+        original_kwargs = kwargs
+        prompt = args[1]
+        args = args[:-1]
+        kwargs.update(prompt.as_dict())
+        inputs = {
+            "prompt": prompt,
+        }
+        return ProcessedInputs(
+            original_args=original_args,
+            original_kwargs=original_kwargs,
+            args=args,
+            kwargs=kwargs,
+            inputs=inputs,
+        )
+    return None
 
 def chat_nvidia_post_processor(call, original_output, exception) -> ChatCompletion:
     if exception is not None:
@@ -139,7 +93,7 @@ langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.invoke",
+            "ChatNVIDIA._generate",
             create_wrapper_sync(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.invoke"),
         )
     ]
