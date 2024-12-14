@@ -68,7 +68,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import langchain_chatmodel_nvidia_patcher
+    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import lc_nvidia_patcher
 
     if settings is None:
         settings = AutopatchSettings()
@@ -87,7 +87,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     google_genai_patcher.attempt_patch()
     notdiamond_patcher.attempt_patch()
     vertexai_patcher.attempt_patch()
-    langchain_chatmodel_nvidia_patcher.attempt_patch()
+    lc_nvidia_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -107,7 +107,7 @@ def reset_autopatch() -> None:
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import langchain_chatmodel_nvidia_patcher
+    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import lc_nvidia_patcher
 
     get_openai_patcher().undo_patch()
     mistral_patcher.undo_patch()
@@ -123,4 +123,4 @@ def reset_autopatch() -> None:
     google_genai_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
     vertexai_patcher.undo_patch()
-    langchain_chatmodel_nvidia_patcher.undo_patch()
+    lc_nvidia_patcher.undo_patch()
