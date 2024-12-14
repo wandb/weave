@@ -139,7 +139,7 @@ langchain_chatmodel_nvidia_patcher = MultiPatcher(
     [
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA._generate",
+            "ChatNVIDIA.invoke",
             create_wrapper_sync(name="langchain_nvidia_ai_endpoints.ChatNVIDIA.invoke"),
         )
     ]
