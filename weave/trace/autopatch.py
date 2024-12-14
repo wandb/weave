@@ -60,6 +60,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.huggingface.huggingface_sdk import huggingface_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import litellm_patcher
@@ -84,6 +85,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     cerebras_patcher.attempt_patch()
     cohere_patcher.attempt_patch()
     google_genai_patcher.attempt_patch()
+    huggingface_patcher.attempt_patch()
     notdiamond_patcher.attempt_patch()
     vertexai_patcher.attempt_patch()
 
@@ -97,6 +99,7 @@ def reset_autopatch() -> None:
         google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import groq_patcher
+    from weave.integrations.huggingface.huggingface_sdk import huggingface_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.litellm.litellm import litellm_patcher
@@ -118,5 +121,6 @@ def reset_autopatch() -> None:
     cerebras_patcher.undo_patch()
     cohere_patcher.undo_patch()
     google_genai_patcher.undo_patch()
+    huggingface_patcher.undo_patch()
     notdiamond_patcher.undo_patch()
     vertexai_patcher.undo_patch()

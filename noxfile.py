@@ -50,6 +50,7 @@ def lint(session):
         "vertexai",
         "scorers_tests",
         "pandas-test",
+        "huggingface",
     ],
 )
 def tests(session, shard):
