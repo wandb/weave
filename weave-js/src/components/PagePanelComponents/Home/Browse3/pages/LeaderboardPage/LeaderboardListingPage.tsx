@@ -12,7 +12,7 @@ import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectVersionsPage';
 import {
   useBaseObjectInstances,
-  useCreateBaseObjectInstance,
+  useCreateLeafObjectInstance,
 } from '../wfReactInterface/baseObjectClassQuery';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {
@@ -162,7 +162,7 @@ const generateLeaderboardId = () => {
 };
 
 const useCreateLeaderboard = (entity: string, project: string) => {
-  const createLeaderboardInstance = useCreateBaseObjectInstance('Leaderboard');
+  const createLeaderboardInstance = useCreateLeafObjectInstance('Leaderboard');
 
   const createLeaderboard = async () => {
     const objectId = sanitizeObjectId(generateLeaderboardId());

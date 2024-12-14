@@ -9,6 +9,7 @@ from weave.trace_server.interface.base_object_classes.test_only_example import (
     TestOnlyNestedBaseObject,
 )
 
+# TODO: Migrate everything to normal Objects!
 BASE_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
 

@@ -70,7 +70,7 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  return false;
+  return true;
   // Uncomment to re-enable
   // const viewerInfo = useViewerInfo();
   // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
