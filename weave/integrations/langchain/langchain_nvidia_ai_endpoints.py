@@ -109,25 +109,25 @@ lc_nvidia_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.invoke",
-            create_invoke_wrapper("nvidia.ChatNVIDIA.invoke"),
+            create_invoke_wrapper("langchain.Llm.ChatNVIDIA.invoke"),
         ),
         # Patch asynchronous invoke method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.ainvoke",
-            create_ainvoke_wrapper("nvidia.ChatNVIDIA.ainvoke"),
+            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA.ainvoke"),
         ),
         # Patch synchronous stream method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.stream",
-            create_stream_wrapper("nvidia.ChatNVIDIA.stream"),
+            create_stream_wrapper("langchain.Llm.ChatNVIDIA.stream"),
         ),
         # Patch asynchronous stream method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.astream",
-            create_async_stream_wrapper("nvidia.ChatNVIDIA.astream"),
+            create_async_stream_wrapper("langchain.Llm.ChatNVIDIA.astream"),
         ),
     ]
 )
