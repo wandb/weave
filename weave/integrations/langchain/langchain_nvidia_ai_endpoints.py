@@ -25,82 +25,68 @@ def nvidia_accumulator(acc: Optional[dict], value: dict) -> dict:
     return acc
 
 
-# Wrap synchronous methods
-def create_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
-    """Wrap a synchronous ChatNVIDIA method."""
+# Wrap synchronous invoke method
+def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap the invoke method."""
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
+        @wraps(fn)
+        def invoke_fn(*args: Any, **kwargs: Any) -> Any:
+            stream = kwargs.get("stream", False)
+            response = fn(*args, **kwargs)
+
+            if stream:
+                # Convert response to an iterator for streaming
+                def stream_generator():
+                    for chunk in response:
+                        if isinstance(chunk, dict):
+                            yield {
+                                "content": chunk.get("content", ""),
+                                "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
+                            }
+
+                return stream_generator()
+
+            return response
+
+        op = weave.op()(invoke_fn)
         op.name = name
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda _: "stream" in name,  # Accumulator only for streams
+            should_accumulate=lambda kwargs: kwargs.get("stream", False),  # Accumulate only when streaming
         )
     return wrapper
 
 
-# Wrap asynchronous methods
-def create_wrapper_async(name: str) -> Callable[[Callable], Callable]:
-    """Wrap an asynchronous ChatNVIDIA method."""
+# Wrap asynchronous invoke method
+def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
+    """Wrap the ainvoke method."""
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
-        async def async_fn(*args: Any, **kwargs: Any) -> Any:
-            return await fn(*args, **kwargs)
+        async def ainvoke_fn(*args: Any, **kwargs: Any) -> Any:
+            stream = kwargs.get("stream", False)
+            response = await fn(*args, **kwargs)
 
-        op = weave.op()(async_fn)
+            if stream:
+                # Convert response to an async iterator for streaming
+                async def async_stream_generator():
+                    async for chunk in response:
+                        if isinstance(chunk, dict):
+                            yield {
+                                "content": chunk.get("content", ""),
+                                "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
+                            }
+
+                return async_stream_generator()
+
+            return response
+
+        op = weave.op()(ainvoke_fn)
         op.name = name
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda _: "stream" in name,  # Accumulator only for streams
-        )
-    return wrapper
-
-
-# Wrap streaming methods (synchronous)
-def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
-    """Wrap a synchronous streaming method for ChatNVIDIA."""
-    def wrapper(fn: Callable) -> Callable:
-        @wraps(fn)
-        def stream_fn(*args: Any, **kwargs: Any) -> Iterator[Any]:
-            for chunk in fn(*args, **kwargs):  # Yield chunks from the original stream method
-                if isinstance(chunk, dict):
-                    parsed_chunk = {
-                        "content": chunk.get("content", ""),
-                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
-                    }
-                    yield parsed_chunk
-
-        op = weave.op()(stream_fn)
-        op.name = name
-        return add_accumulator(
-            op,
-            make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda _: True,  # Always accumulate for streaming
-        )
-    return wrapper
-
-
-# Wrap streaming methods (asynchronous)
-def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
-    """Wrap an asynchronous streaming method for ChatNVIDIA."""
-    def wrapper(fn: Callable) -> Callable:
-        @wraps(fn)
-        async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
-            async for chunk in fn(*args, **kwargs):  # Yield chunks from the original async stream method
-                if isinstance(chunk, dict):
-                    parsed_chunk = {
-                        "content": chunk.get("content", ""),
-                        "usage_metadata": chunk.get("response_metadata", {}).get("token_usage", {})
-                    }
-                    yield parsed_chunk
-
-        op = weave.op()(async_stream_fn)
-        op.name = name
-        return add_accumulator(
-            op,
-            make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda _: True,  # Always accumulate for streaming
+            should_accumulate=lambda kwargs: kwargs.get("stream", False),  # Accumulate only when streaming
         )
     return wrapper
 
@@ -112,25 +98,13 @@ lc_nvidia_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.invoke",
-            create_wrapper_sync("nvidia.ChatNVIDIA.invoke"),
-        ),
-        # Patch synchronous stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.stream",
-            create_stream_wrapper("nvidia.ChatNVIDIA.stream"),
+            create_invoke_wrapper("nvidia.ChatNVIDIA.invoke"),
         ),
         # Patch asynchronous invoke method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA.ainvoke",
-            create_wrapper_async("nvidia.ChatNVIDIA.ainvoke"),
-        ),
-        # Patch asynchronous stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.astream",
-            create_async_stream_wrapper("nvidia.ChatNVIDIA.astream"),
+            create_ainvoke_wrapper("nvidia.ChatNVIDIA.ainvoke"),
         ),
     ]
 )
