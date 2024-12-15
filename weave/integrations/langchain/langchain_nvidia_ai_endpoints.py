@@ -6,7 +6,7 @@ import time
 from weave.trace.op import ProcessedInputs, Op
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from langchain_core.messages import ChatGenerationChunk
+from langchain_core.outputs import ChatGenerationChunk
 from openai.types.chat import ChatCompletion
 
 
