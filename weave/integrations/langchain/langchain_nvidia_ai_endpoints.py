@@ -80,7 +80,7 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -99,7 +99,7 @@ def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda kwargs: False,  # No accumulation for ainvoke directly
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -118,7 +118,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -138,7 +138,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             op,
             make_accumulator=lambda _: nvidia_accumulator,
             should_accumulate=lambda _: True,  # Always accumulate for streaming
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            #on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
     return wrapper
 
@@ -150,25 +150,25 @@ lc_nvidia_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA._generate",
-            create_invoke_wrapper("langchain.Llm.ChatNVIDIA.generate"),
+            create_invoke_wrapper("langchain.Llm.ChatNVIDIA._generate"),
         ),
         # Patch asynchronous invoke method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA._agenerate",
-            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA.agenerate"),
+            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA._agenerate"),
         ),
         # Patch synchronous stream method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA._stream",
-            create_stream_wrapper("langchain.Llm.ChatNVIDIA.stream"),
+            create_stream_wrapper("langchain.Llm.ChatNVIDIA._stream"),
         ),
         # Patch asynchronous stream method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA._astream",
-            create_async_stream_wrapper("langchain.Llm.ChatNVIDIA.astream"),
+            create_async_stream_wrapper("langchain.Llm.ChatNVIDIA._astream"),
         ),
     ]
 )
