@@ -17,14 +17,8 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
 
     if acc is None:
         acc = ChatGenerationChunk(
-            message=AIMessageChunk(content="", type="AIMessageChunk")
+            message=AIMessageChunk(content="")
         )
-
-    print(type(acc).__name__)
-    print(type(value).__name__)
-    print(type(acc.message).__name__)
-    print(type(value.message).__name__)
-
     acc = acc + value
 
     return acc
@@ -148,23 +142,11 @@ lc_nvidia_patcher = MultiPatcher(
             "ChatNVIDIA._generate",
             create_invoke_wrapper("langchain.Llm.ChatNVIDIA._generate"),
         ),
-        # Patch asynchronous invoke method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA._agenerate",
-            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA._agenerate"),
-        ),
         # Patch synchronous stream method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
             "ChatNVIDIA._stream",
             create_stream_wrapper("langchain.Llm.ChatNVIDIA._stream"),
-        ),
-        # Patch asynchronous stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA._astream",
-            create_async_stream_wrapper("langchain.Llm.ChatNVIDIA._astream"),
         ),
     ]
 )
