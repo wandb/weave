@@ -7,6 +7,7 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 from langchain_core.messages import BaseMessageChunk, AIMessageChunk
 from langchain_core.messages.ai import add_ai_message_chunks
+from openai.types.chat import ChatCompletion
 
 
 # NVIDIA-specific accumulator for parsing the response object
@@ -20,6 +21,7 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> 
     # Combine content
     new_acc = add_ai_message_chunks(acc, value)
 
+    # We have to do this because langchain's own method adds usage wrongly for streaming chunks.
     new_acc.usage_metadata = {
         "total_tokens": value.usage_metadata["total_tokens"],
         "input_tokens": value.usage_metadata["input_tokens"],
@@ -60,23 +62,29 @@ def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | di
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: AIMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
-    return {
-        "id": getattr(output, "id", None),
-        "object": "AIMessageChunk",
-        "created": None,  # Populate with timestamp if available
-        "model": getattr(output, "response_metadata", {}).get("model_name", None),
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": getattr(output, "role", "assistant"),
-                    "content": output.content,
-                },
-                "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
-            }
-        ],
-        "usage": getattr(output, "usage_metadata", {}),
-    }
+    returnable = ChatCompletion(
+            id=getattr(output, "id", None),
+            choices=[
+                {
+                    "index": 0,
+                    "message": {
+                        "content": output.content,
+                        "role": getattr(output, "role", "assistant"),
+                        "function_call": None,
+                        "tool_calls": getattr(output, "tool_calls", {}),
+                    },
+                    "logprobs": None,
+                    "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
+                }
+            ],
+            created=None,
+            model=getattr(output, "response_metadata", {}).get("model_name", None),
+            object="chat.completion",
+            system_fingerprint= None,
+            usage=getattr(output, "usage_metadata", {}),
+        )
+
+    return returnable.model_dump(exclude_unset=True, exclude_none=True)
 
 
 # Wrap synchronous invoke method
