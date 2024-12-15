@@ -33,35 +33,6 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> 
 
     return new_acc
 
-def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | dict |  None:
-    # Extract key components from kwargs
-    original_args = args
-    original_kwargs = kwargs
-    self_obj = kwargs.get("self", {})
-    user_input = kwargs.get("input", "")
-    if not user_input:
-        return None  # Return None if there is no input content
-
-    # User message constructed from input
-    user_message = {
-        "content": user_input,
-        "role": "user",
-    }
-
-    # Construct the transformed object
-    processed_input = {
-        "self": self_obj,
-        "messages": [user_message],
-        "model": self_obj.get("model", "nvidia/nemotron-4-340b-instruct"),
-        "max_tokens": self_obj.get("max_tokens", 0),
-        "n": 0,
-        "stream": self_obj.get("disable_streaming", False),
-        "temperature": self_obj.get("temperature", 0),
-        "top_p": self_obj.get("top_p", 0),
-    }
-
-    return processed_input
-
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: AIMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
@@ -105,7 +76,6 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(invoke_fn)
         op.name = name
-        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -125,7 +95,6 @@ def create_ainvoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(ainvoke_fn)
         op.name = name
-        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -145,7 +114,6 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(stream_fn)
         op.name = name
-        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -166,7 +134,6 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(async_stream_fn)
         op.name = name
-        op._set_on_input_handler(transform_input)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -182,14 +149,14 @@ lc_nvidia_patcher = MultiPatcher(
         # Patch synchronous invoke method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.invoke",
-            create_invoke_wrapper("langchain.Llm.ChatNVIDIA.invoke"),
+            "ChatNVIDIA.generate",
+            create_invoke_wrapper("langchain.Llm.ChatNVIDIA.generate"),
         ),
         # Patch asynchronous invoke method
         SymbolPatcher(
             lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA.ainvoke",
-            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA.ainvoke"),
+            "ChatNVIDIA.agenerate",
+            create_ainvoke_wrapper("langchain.Llm.ChatNVIDIA.agenerate"),
         ),
         # Patch synchronous stream method
         SymbolPatcher(
