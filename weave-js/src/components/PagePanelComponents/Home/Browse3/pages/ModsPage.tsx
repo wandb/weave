@@ -307,7 +307,16 @@ export const ModsPage: React.FC<{
         {
           label: '',
           content: (
-            <div style={{paddingTop: '1em'}}>
+            <Box
+              sx={{
+                flex: '1 1 auto',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                overflow: 'scroll',
+                paddingTop: '1em',
+                flexDirection: 'column',
+              }}>
               <ModCategory
                 entity={entity}
                 project={project}
@@ -335,7 +344,7 @@ export const ModsPage: React.FC<{
                   secretNames={secrets}
                 />
               )}
-            </div>
+            </Box>
           ),
         },
       ]}
