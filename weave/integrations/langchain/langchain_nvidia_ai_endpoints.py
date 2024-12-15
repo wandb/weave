@@ -22,7 +22,7 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
 
     ## Need to do this since the __add__ impl for the streaming response is wrong
     ## We will get the actual usage in the final chunk so this will be eventually consistent
-    acc.usage_metadata = value.usage_metadata
+    acc.message.usage_metadata = value.message.usage_metadata
 
     return acc
 
