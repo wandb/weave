@@ -65,8 +65,13 @@ def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | di
 # Post processor to transform output into OpenAI's ChatCompletion format
 def post_process_to_openai_format(output: AIMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
+
+    enhanced_usage = getattr(output, "usage_metadata", {})
+    enhanced_usage["completion_tokens"] = output.usage_metadata.get("completion_tokens", 0)
+    enhanced_usage["prompt_tokens"] = output.usage_metadata.get("prompt_tokens", 0)
+
     returnable = ChatCompletion(
-            id=getattr(output, "id", "None"),
+            id=getattr(output, "id", "test"),
             choices=[
                 {
                     "index": 0,
@@ -84,7 +89,7 @@ def post_process_to_openai_format(output: AIMessageChunk) -> dict:
             model=getattr(output, "response_metadata", {}).get("model_name", None),
             object="chat.completion",
             system_fingerprint= None,
-            usage=getattr(output, "usage_metadata", {}),
+            usage=enhanced_usage,
         )
 
     return returnable.model_dump(exclude_unset=True, exclude_none=True)
