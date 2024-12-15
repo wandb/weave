@@ -36,7 +36,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
         enhanced_usage["prompt_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
 
         returnable = ChatCompletion(
-            id=getattr(message, "id", "test"),
+            id="None",
             choices=[
                 {
                     "index": 0,
@@ -66,7 +66,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
         enhanced_usage["prompt_tokens"] = message.usage_metadata.get("prompt_tokens", 0)
 
         returnable = ChatCompletion(
-                id=getattr(message, "id", "test"),
+                id="None",
                 choices=[
                     {
                         "index": 0,
