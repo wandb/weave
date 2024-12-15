@@ -6,7 +6,7 @@ import time
 from weave.trace.op import ProcessedInputs, Op
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from langchain_core.messages import BaseMessageChunk
+from langchain_core.messages import AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
 from openai.types.chat import ChatCompletion
 
@@ -17,7 +17,7 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
 
     if acc is None:
         acc = ChatGenerationChunk(
-            message=BaseMessageChunk(content="", type="BaseMessageChunk")
+            message=AIMessageChunk(content="", type="AIMessageChunk")
         )
 
     print(type(acc).__name__)
