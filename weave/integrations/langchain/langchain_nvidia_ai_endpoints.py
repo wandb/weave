@@ -14,12 +14,16 @@ from openai.types.chat import ChatCompletion
 # NVIDIA-specific accumulator for parsing the response object
 def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk) -> ChatGenerationChunk:
     """Accumulates responses and token usage for NVIDIA Chat methods."""
+
     if acc is None:
         acc = ChatGenerationChunk(
             message=BaseMessageChunk(content="", type="BaseMessageChunk")
         )
 
-    acc += value
+    print(type(acc.message.type).__name__)
+    print(type(value.message.type).__name__)
+
+    acc = acc + value
 
     return acc
 
