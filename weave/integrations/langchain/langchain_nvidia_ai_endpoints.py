@@ -93,8 +93,21 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
     original_args = args
     original_kwargs = kwargs
 
+    #weave_report = ChatCompletion.create(
+    #    model=args.self.model,
+    #    messages=args.self.,
+    #    max_tokens=max_tokens,
+    #    temperature=temperature,
+    #    top_p=top_p,
+    #    n=n,
+    #    stream=stream
+    #)
+
     print(f"args: {original_args}")
     print(f"kwargs: {original_kwargs}")
+    print(original_args.self)
+    print(original_args.ChatNVIDIA)
+    print(type(original_args))
 
     return ProcessedInputs(
         original_args=original_args,
