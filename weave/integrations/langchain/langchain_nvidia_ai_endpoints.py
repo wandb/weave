@@ -20,6 +20,12 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> 
     # Combine content
     new_acc = add_ai_message_chunks(acc, value)
 
+    new_acc.usage_metadata = {
+        "total_tokens": value.usage_metadata["total_tokens"],
+        "input_tokens": value.usage_metadata["input_tokens"],
+        "output_tokens": value.usage_metadata["output_tokens"]
+    }
+
     return new_acc
 
 def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | dict |  None:
