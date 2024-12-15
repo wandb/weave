@@ -60,12 +60,28 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
             callId: props.callId,
           }
         : null;
-    }, [props.entity, props.project, props.callId])
+    }, [props.entity, props.project, props.callId]),
+    {
+      includeCosts: true,
+    }
   );
 
-  const {result: calls} = useCalls(props.entity, props.project, {
-    callIds: playgroundStates.map(state => state.traceCall.id || ''),
-  });
+  const {result: calls} = useCalls(
+    props.entity,
+    props.project,
+    {
+      callIds: playgroundStates.map(state => state.traceCall.id || ''),
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      includeCosts: true,
+    }
+  );
 
   useEffect(() => {
     if (!call.loading && call.result) {
