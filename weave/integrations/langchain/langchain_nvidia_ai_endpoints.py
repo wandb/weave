@@ -6,35 +6,24 @@ import time
 from weave.trace.op import ProcessedInputs, Op
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from langchain_core.messages import BaseMessageChunk, AIMessageChunk
-from langchain_core.messages.ai import add_ai_message_chunks
+from langchain_core.messages import ChatGenerationChunk
 from openai.types.chat import ChatCompletion
 
 
 # NVIDIA-specific accumulator for parsing the response object
-def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> AIMessageChunk:
+def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk) -> ChatGenerationChunk:
     """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
-        acc = AIMessageChunk(
-            content=""
+        acc = ChatGenerationChunk(
+            message=""
         )
 
-    # Combine content
-    new_acc = add_ai_message_chunks(acc, value)
+    acc += value
 
-    # We have to do this because langchain's own method adds usage wrongly for streaming chunks.
-    new_acc.usage_metadata = {
-        "total_tokens": value.usage_metadata.get("total_tokens",0),
-        "input_tokens": value.usage_metadata.get("input_tokens",0),
-        "output_tokens": value.usage_metadata.get("output_tokens",0),
-        "completion_tokens": value.usage_metadata.get("completion_tokens",0),
-        "prompt_tokens": value.usage_metadata.get("prompt_tokens",0)
-    }
-
-    return new_acc
+    return acc
 
 # Post processor to transform output into OpenAI's ChatCompletion format
-def post_process_to_openai_format(output: AIMessageChunk) -> dict:
+def post_process_to_openai_format(output: ChatGenerationChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
 
     enhanced_usage = getattr(output, "usage_metadata", {})
@@ -109,7 +98,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
     """Wrap a synchronous streaming method for ChatNVIDIA."""
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
-        def stream_fn(*args: Any, **kwargs: Any) -> Iterator[BaseMessageChunk]:
+        def stream_fn(*args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
             yield from fn(*args, **kwargs)  # Directly yield chunks
 
         op = weave.op()(stream_fn)
@@ -128,7 +117,7 @@ def create_async_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
     """Wrap an asynchronous streaming method for ChatNVIDIA."""
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
-        async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[BaseMessageChunk]:
+        async def async_stream_fn(*args: Any, **kwargs: Any) -> AsyncIterator[ChatGenerationChunk]:
             async for chunk in fn(*args, **kwargs):  # Directly yield chunks
                 yield chunk
 
