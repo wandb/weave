@@ -89,6 +89,20 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
 
+def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
+    original_args = args
+    original_kwargs = kwargs
+
+    print(f"args: {original_args}")
+    print(f"kwargs: {original_kwargs}")
+
+    return ProcessedInputs(
+        original_args=original_args,
+        original_kwargs=original_kwargs,
+        args=original_args,
+        kwargs=original_kwargs,
+        inputs=original_kwargs,
+    )
 
 # Wrap synchronous invoke method
 def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
@@ -100,6 +114,7 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(invoke_fn)
         op.name = name
+        op._set_on_input_handler(process_inputs_to_openai_format)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
@@ -118,6 +133,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(stream_fn)
         op.name = name
+        op._set_on_input_handler(process_inputs_to_openai_format)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,
