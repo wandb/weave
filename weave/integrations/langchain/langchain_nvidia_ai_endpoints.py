@@ -5,29 +5,22 @@ import weave
 from weave.trace.op import ProcessedInputs, Op
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
-from langchain_core.messages import BaseMessageChunk, AIMessageChunk
+from langchain_core.messages import AIMessageChunk
+from langchain_core.messages.ai import add_ai_message_chunks
 
 
 # NVIDIA-specific accumulator for parsing the response object
-def nvidia_accumulator(acc: Optional[AIMessageChunk], value: BaseMessageChunk) -> AIMessageChunk:
+def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> AIMessageChunk:
     """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
         acc = AIMessageChunk(
-            content="",
-            usage_metadata={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+            content=""
         )
 
     # Combine content
-    acc.content += value.content or ""
+    new_acc = add_ai_message_chunks(acc, value)
 
-    # Accumulate token usage from usage_metadata if present
-    if hasattr(value, "usage_metadata"):
-        usage_metadata = value.usage_metadata
-        acc.usage_metadata["input_tokens"] = usage_metadata.get("input_tokens", 0)
-        acc.usage_metadata["output_tokens"] = usage_metadata.get("output_tokens", 0)
-        acc.usage_metadata["total_tokens"] = usage_metadata.get("total_tokens", 0)
-
-    return acc
+    return new_acc
 
 def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | dict |  None:
     # Extract key components from kwargs
@@ -59,11 +52,11 @@ def transform_input(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | di
     return processed_input
 
 # Post processor to transform output into OpenAI's ChatCompletion format
-def post_process_to_openai_format(output: BaseMessageChunk) -> dict:
+def post_process_to_openai_format(output: AIMessageChunk) -> dict:
     """Transforms a BaseMessageChunk output into OpenAI's ChatCompletion format."""
     return {
         "id": getattr(output, "id", None),
-        "object": "chat.completion",
+        "object": "AIMessageChunk",
         "created": None,  # Populate with timestamp if available
         "model": getattr(output, "response_metadata", {}).get("model_name", None),
         "choices": [
