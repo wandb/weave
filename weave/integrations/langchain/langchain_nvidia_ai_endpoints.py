@@ -2,6 +2,7 @@ import importlib
 from typing import Any, Callable, Iterator, AsyncIterator, Optional
 from functools import wraps
 import weave
+import time
 from weave.trace.op import ProcessedInputs, Op
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
@@ -23,9 +24,11 @@ def nvidia_accumulator(acc: Optional[AIMessageChunk], value: AIMessageChunk) -> 
 
     # We have to do this because langchain's own method adds usage wrongly for streaming chunks.
     new_acc.usage_metadata = {
-        "total_tokens": value.usage_metadata["total_tokens"],
-        "input_tokens": value.usage_metadata["input_tokens"],
-        "output_tokens": value.usage_metadata["output_tokens"]
+        "total_tokens": value.usage_metadata.get("total_tokens",0),
+        "input_tokens": value.usage_metadata.get("input_tokens",0),
+        "output_tokens": value.usage_metadata.get("output_tokens",0),
+        "completion_tokens": value.usage_metadata.get("completion_tokens",0),
+        "prompt_tokens": value.usage_metadata.get("prompt_tokens",0)
     }
 
     return new_acc
@@ -77,7 +80,7 @@ def post_process_to_openai_format(output: AIMessageChunk) -> dict:
                     "finish_reason": getattr(output, "response_metadata", {}).get("finish_reason", None),
                 }
             ],
-            created=None,
+            created=int(time.time()),
             model=getattr(output, "response_metadata", {}).get("model_name", None),
             object="chat.completion",
             system_fingerprint= None,
