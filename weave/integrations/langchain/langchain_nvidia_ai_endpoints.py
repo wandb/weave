@@ -16,7 +16,7 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
     """Accumulates responses and token usage for NVIDIA Chat methods."""
     if acc is None:
         acc = ChatGenerationChunk(
-            message=BaseMessageChunk(content="", type="ChatGenerationChunk")
+            message=BaseMessageChunk(content="", type="BaseMessageChunk")
         )
 
     acc += value
