@@ -20,8 +20,8 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
             message=BaseMessageChunk(content="", type="BaseMessageChunk")
         )
 
-    print(type(acc.message.type).__name__)
-    print(type(value.message.type).__name__)
+    print(type(acc.message).__name__)
+    print(type(value.message).__name__)
 
     acc = acc + value
 
