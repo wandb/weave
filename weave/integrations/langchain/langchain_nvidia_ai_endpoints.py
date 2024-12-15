@@ -31,7 +31,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
 
     if isinstance(output, ChatResult): ## its ChatResult
         message = output.llm_output
-        enhanced_usage = getattr(message, "token_usage", {})
+        enhanced_usage = message.get("token_usage", {})
         enhanced_usage["completion_tokens"] = message.get("token_usage").get("completion_tokens", 0)
         enhanced_usage["prompt_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
 
@@ -44,7 +44,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
                         "content": message.get("content", ""),
                         "role": message.get("role", ""),
                         "function_call": None,
-                        "tool_calls": message.get("tool_calls", ""),
+                        "tool_calls": message.get("tool_calls", []),
                     },
                     "logprobs": None,
                     "finish_reason": message.get("finish_reason", ""),
@@ -52,7 +52,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
             ],
             created=int(time.time()),
             model=message.get("model_name", ""),
-            object="ChatResult",
+            object="chat.completion",
             system_fingerprint=None,
             usage=enhanced_usage,
         )
@@ -82,7 +82,7 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
                 ],
                 created=int(time.time()),
                 model=getattr(message, "response_metadata", {}).get("model_name", None),
-                object="ChatGeneration",
+                object="chat.completion",
                 system_fingerprint= None,
                 usage=enhanced_usage,
             )
