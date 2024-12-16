@@ -293,7 +293,7 @@ def test_simple_chain_batch_inside_op(
 
 def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
     flattened = flatten_calls(calls)
-    assert len(flattened) == 10
+    assert len(flattened) == 12
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]

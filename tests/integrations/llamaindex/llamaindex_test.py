@@ -24,7 +24,7 @@ def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    assert len(flattened_calls) == 9
+    assert len(flattened_calls) == 11
 
     exp = [
         ("llama_index.query", 0),
