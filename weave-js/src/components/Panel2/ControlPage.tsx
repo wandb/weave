@@ -3,13 +3,16 @@ import React, {useCallback, useEffect, useMemo} from 'react';
 
 import * as LLReact from '../../react';
 import * as S from './ControlPage.styles';
+import SliderInput from '../../common/components/elements/SliderInput';
+import clamp from '../../common/util/clamp';
 
 const PageControls: React.FC<{
   rowsNode: Node;
   pageSize: number;
   page: number;
   setPage: (page: number) => void;
-}> = ({rowsNode, pageSize, page, setPage}) => {
+  shouldUseSlider: boolean;
+}> = ({rowsNode, pageSize, page, setPage, shouldUseSlider}) => {
   const countNode = useMemo(() => opCount({arr: rowsNode as any}), [rowsNode]);
 
   const countValue = LLReact.useNodeValue(countNode);
@@ -46,10 +49,29 @@ const PageControls: React.FC<{
       setPage(page + 1);
     }
   }, [page, setPage, onLastPage]);
-  return countValue.loading || countValue.result < 2 ? (
-    <></>
+  const onSliderChange = useCallback(
+    value => setPage(clamp(value - 1, {min: 0, max: totalItems - 1})),
+    [page, setPage, totalItems]
+  );
+
+  const controls = shouldUseSlider ? (
+    <span
+      style={{
+        flex: '1 1 auto',
+        textAlign: 'center',
+      }}>
+      <SliderInput
+        min={1}
+        max={totalItems}
+        onChange={onSliderChange}
+        step={1}
+        value={page + 1}
+        hasInput={true}
+        debounceTime={100}
+      />
+    </span>
   ) : (
-    <S.ControlBar>
+    <>
       <S.ArrowIcon name="previous" onClick={prevPage} />
       <span
         style={{
@@ -60,7 +82,13 @@ const PageControls: React.FC<{
         {!singleItem && `-${endIndex}`} of {totalItems}{' '}
       </span>
       <S.ArrowIcon name="next" onClick={nextPage} />
-    </S.ControlBar>
+    </>
+  );
+
+  return countValue.loading || countValue.result < 2 ? (
+    <></>
+  ) : (
+    <S.ControlBar>{controls}</S.ControlBar>
   );
 };
 
