@@ -93,33 +93,31 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
     original_args = args
     original_kwargs = kwargs
 
-    if len(args) >= 3: # This indicates a successful ChatNVIDIA input
-        chat_nvidia_obj = args[0]
-        model_string = args[1]
-        messages_array = args[2]
+    chat_nvidia_obj = args[0]
+    model_string = args[1]
+    messages_array = args[2]
 
-        messages_array = convert_to_openai_messages(messages_array)
-        n = len(messages_array)
-        print(chat_nvidia_obj.model_dumps())
+    messages_array = convert_to_openai_messages(messages_array)
+    n = len(messages_array)
+    print(chat_nvidia_obj.model_dumps())
 
-        weave_report = ChatCompletion.create(
-            model=model_string,
-            messages=messages_array,
-            max_tokens=chat_nvidia_obj.max_tokens,
-            temperature=chat_nvidia_obj.temperature,
-            top_p=chat_nvidia_obj.top_p,
-            n=n,
-            stream=False
-        )
+    weave_report = ChatCompletion.create(
+        model=model_string,
+        messages=messages_array,
+        max_tokens=chat_nvidia_obj.max_tokens,
+        temperature=chat_nvidia_obj.temperature,
+        top_p=chat_nvidia_obj.top_p,
+        n=n,
+        stream=False
+    )
 
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=original_args,
-            kwargs=original_kwargs,
-            inputs=weave_report,
-        )
-    return None
+    return ProcessedInputs(
+        original_args=original_args,
+        original_kwargs=original_kwargs,
+        args=original_args,
+        kwargs=original_kwargs,
+        inputs=weave_report,
+    )
 
 # Wrap synchronous invoke method
 def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
