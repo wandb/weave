@@ -53,8 +53,14 @@ export function getAsValidRegex(s: string): RegExp | null {
   }
 }
 
-export const simpleSearch = (options: DropdownItemProps[], query: string) => {
-  let regex = getAsValidRegex(query);
+export const simpleSearch = (
+  options: DropdownItemProps[],
+  query: string,
+  config: {
+    allowRegexSearch?: boolean;
+  } = {}
+) => {
+  let regex = config.allowRegexSearch ? getAsValidRegex(query) : null;
 
   return _.chain(options)
     .filter(o => {
@@ -85,15 +91,14 @@ const getOptionProps = (opt: Option, hideText: boolean) => {
 export interface ModifiedDropdownExtraProps {
   debounceTime?: number;
   enableReordering?: boolean;
+  hideText?: boolean;
   itemLimit?: number;
   options: Option[];
+  optionTransform?(option: Option): Option;
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
-  hideText?: boolean;
   useIcon?: boolean;
-
-  optionTransform?(option: Option): Option;
 }
 
 type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
@@ -112,10 +117,11 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     } = props;
 
     const {
+      allowAdditions,
+      allowRegexSearch,
+      enableReordering,
       itemLimit,
       optionTransform,
-      enableReordering,
-      allowAdditions,
       resultLimit = 100,
       resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
       ...passProps
@@ -145,7 +151,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             );
           } else {
             const updatedOptions = currentOptions.concat(
-              simpleSearch(propsOptions, query) as Option[]
+              simpleSearch(propsOptions, query, {allowRegexSearch}) as Option[]
             );
             setOptions(updatedOptions);
           }

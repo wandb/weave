@@ -137,17 +137,15 @@ describe('testing simple search', () => {
     expect(results.every(r => (r.value as string).includes('loss'))).toBe(true);
   });
 
-  it('simpleSearch matches regex patterns', () => {
-    const results = simpleSearch(options, '/loss_\\d{3,4}/');
-    expect(results.every(r => /loss_\d{3,4}/.test(r.value as string))).toBe(
-      true
-    );
+  it('simpleSearch can disallow matching regex patterns', () => {
+    const results = simpleSearch(options, '.*s.*s.*');
+    expect(results.length).toBe(0);
   });
 
-  it('simpleSearch matches regex with specific run number', () => {
-    const results = simpleSearch(options, 'run\\/2\\//');
-    expect(results.every(r => (r.value as string).includes('run/2/'))).toBe(
-      true
-    );
+  it('simpleSearch can support matching regex patterns', () => {
+    const results = simpleSearch(options, '.*s.*s.*', {
+      allowRegexSearch: true,
+    });
+    expect(results.length).toBeGreaterThan(0);
   });
 });
