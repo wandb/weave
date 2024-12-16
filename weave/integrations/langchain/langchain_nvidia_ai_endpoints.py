@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from langchain_core.messages import AIMessageChunk, convert_to_openai_messages
-    from langchain_core.outputs import ChatGenerationChunk, ChatResult
     from openai.types.chat import ChatCompletion
 
 import weave
@@ -16,9 +15,7 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 # NVIDIA-specific accumulator for parsing the objects of streaming interactions
-def nvidia_accumulator(
-    acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk
-) -> ChatGenerationChunk:
+def nvidia_accumulator(acc: Optional[Any], value: Any) -> Any:
     from langchain_core.outputs import ChatGenerationChunk
 
     if acc is None:
@@ -33,7 +30,7 @@ def nvidia_accumulator(
 
 
 # Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
-def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult) -> dict:
+def post_process_to_openai_format(output: Any) -> dict:
     from langchain_core.outputs import ChatGenerationChunk, ChatResult
 
     if isinstance(output, ChatResult):  ## its ChatResult
