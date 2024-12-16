@@ -100,11 +100,14 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
     n = len(messages_array)
 
     weave_report = ChatCompletion(
+        id="None",
         model=chat_nvidia_obj.model,
-        messages=messages_array,
+        choices=messages_array,
         max_tokens=chat_nvidia_obj.max_tokens,
         temperature=chat_nvidia_obj.temperature,
         top_p=chat_nvidia_obj.top_p,
+        created=int(time.time()),
+        object="chat.completion",
         n=n,
         stream=False
     )
