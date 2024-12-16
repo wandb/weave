@@ -2,7 +2,7 @@ import importlib
 import time
 from collections.abc import Iterator
 from functools import wraps
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from langchain_core.messages import AIMessageChunk, convert_to_openai_messages
@@ -19,6 +19,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 def nvidia_accumulator(
     acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk
 ) -> ChatGenerationChunk:
+    from langchain_core.outputs import ChatGenerationChunk
+
     if acc is None:
         acc = ChatGenerationChunk(message=AIMessageChunk(content=""))
     acc = acc + value
@@ -32,6 +34,8 @@ def nvidia_accumulator(
 
 # Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
 def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult) -> dict:
+    from langchain_core.outputs import ChatGenerationChunk, ChatResult
+
     if isinstance(output, ChatResult):  ## its ChatResult
         message = output.llm_output  ## List of ChatGeneration
         enhanced_usage = message.get("token_usage", {})
@@ -195,6 +199,7 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
 # Wrap streaming methods (synchronous)
 def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
     """Wrap a synchronous streaming method for ChatNVIDIA."""
+    from langchain_core.outputs import ChatGenerationChunk
 
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
