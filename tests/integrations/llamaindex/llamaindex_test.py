@@ -27,10 +27,10 @@ def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
     assert len(flattened_calls) == 11
 
     exp = [
+        ("openai.embeddings.create", 0),
         ("llama_index.query", 0),
         ("llama_index.retrieve", 1),
         ("llama_index.embedding", 2),
-        ("openai.embeddings.create", 3),
         ("llama_index.synthesize", 1),
         ("llama_index.chunking", 2),
         ("llama_index.chunking", 2),
