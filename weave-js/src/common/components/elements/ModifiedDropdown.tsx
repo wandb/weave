@@ -45,11 +45,25 @@ type LabelCoord = {
 
 const ITEM_LIMIT_VALUE = '__item_limit';
 
-const simpleSearch = (options: DropdownItemProps[], query: string) => {
+export function getAsValidRegex(s: string): RegExp | null {
+  try {
+    return new RegExp(s);
+  } catch (e) {
+    return null;
+  }
+}
+
+export const simpleSearch = (options: DropdownItemProps[], query: string) => {
+  let regex = getAsValidRegex(query);
+
   return _.chain(options)
-    .filter(o =>
-      _.includes(JSON.stringify(o.text).toLowerCase(), query.toLowerCase())
-    )
+    .filter(o => {
+      const text = JSON.stringify(o.text).toLowerCase();
+      if (regex) {
+        return regex.test(text);
+      }
+      return _.includes(text, query.toLowerCase());
+    })
     .sortBy(o => {
       const valJSON = typeof o.text === 'string' ? `"${query}"` : query;
       return JSON.stringify(o.text).toLowerCase() === valJSON.toLowerCase()
@@ -130,12 +144,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
               _.concat(currentOptions, search(propsOptions, query) as Option[])
             );
           } else {
-            setOptions(
-              _.concat(
-                currentOptions,
-                simpleSearch(propsOptions, query) as Option[]
-              )
+            const updatedOptions = currentOptions.concat(
+              simpleSearch(propsOptions, query) as Option[]
             );
+            setOptions(updatedOptions);
           }
         }, debounceTime || 400),
       [multiple, propsOptions, search, value, debounceTime]
