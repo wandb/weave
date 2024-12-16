@@ -103,18 +103,18 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
 
     print(messages_array)
 
-    weave_report = ChatCompletion(
-        id="None",
-        model=chat_nvidia_obj.model,
-        choices=messages_array,
-        max_tokens=chat_nvidia_obj.max_tokens,
-        temperature=chat_nvidia_obj.temperature,
-        top_p=chat_nvidia_obj.top_p,
-        created=int(time.time()),
-        object="chat.completion",
-        n=n,
-        stream=False
-    )
+    weave_report = {
+        "id": "None",
+        "model": chat_nvidia_obj.model,
+        "choices": messages_array,
+        "max_tokens": chat_nvidia_obj.max_tokens,
+        "temperature": chat_nvidia_obj.temperature,
+        "top_p": chat_nvidia_obj.top_p,
+        "created": int(time.time()),
+        "object": "chat.completion",
+        "n": n,
+        "stream": False
+    }
 
     return ProcessedInputs(
         original_args=original_args,
