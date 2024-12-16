@@ -96,8 +96,12 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
     chat_nvidia_obj = args[0]
     messages_array = args[1]
 
+    print(messages_array)
+
     messages_array = convert_to_openai_messages(messages_array)
     n = len(messages_array)
+
+    print(messages_array)
 
     weave_report = ChatCompletion(
         id="None",
