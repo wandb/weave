@@ -706,16 +706,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             return 0
         return return_row[0]
 
+    @staticmethod
+    def _make_digest_condition(digest: str) -> str:
+        if digest == "latest":
+            return "is_latest = 1"
+        else:
+            (is_version, version_index) = digest_is_version_like(digest)
+            if is_version:
+                return f"version_index = '{version_index}'"
+            else:
+                return f"digest = '{digest}'"
+
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [f"object_id = '{req.object_id}'"]
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
-            if is_version:
-                conds.append(f"version_index = '{version_index}'")
-            else:
-                conds.append(f"digest = '{req.digest}'")
+        digest_condition = self._make_digest_condition(req.digest)
+        conds.append(digest_condition)
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
@@ -762,6 +767,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
         # First, select the objects that match the query
         select_query = """
             SELECT digest FROM objects
@@ -771,10 +782,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         """
         parameters = [req.project_id, req.object_id]
         if req.digests:
-            num_digests = len(req.digests)
-            select_query += "AND digest IN ({})".format(", ".join("?" * num_digests))
-
-            parameters.extend(req.digests)
+            digest_conditions = [
+                self._make_digest_condition(digest) for digest in req.digests
+            ]
+            digest_conditions_str = " AND ".join(digest_conditions)
+            select_query += f"AND ({digest_conditions_str})"
 
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(select_query, parameters)
