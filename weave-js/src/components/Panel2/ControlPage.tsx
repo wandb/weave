@@ -1,10 +1,10 @@
 import {Node, opCount} from '@wandb/weave/core';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
-import * as LLReact from '../../react';
-import * as S from './ControlPage.styles';
 import SliderInput from '../../common/components/elements/SliderInput';
 import clamp from '../../common/util/clamp';
+import * as LLReact from '../../react';
+import * as S from './ControlPage.styles';
 
 const PageControls: React.FC<{
   rowsNode: Node;
@@ -51,7 +51,7 @@ const PageControls: React.FC<{
   }, [page, setPage, onLastPage]);
   const onSliderChange = useCallback(
     value => setPage(clamp(value - 1, {min: 0, max: totalItems - 1})),
-    [page, setPage, totalItems]
+    [setPage, totalItems]
   );
 
   const controls = shouldUseSlider ? (
