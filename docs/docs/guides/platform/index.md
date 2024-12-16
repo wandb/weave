@@ -10,7 +10,7 @@ Weave is available on the following deployment options:
 
 Use the identity and access management capabilities for secure authentication and effective authorization in your [W&B Organization](https://docs.wandb.ai/guides/hosting/iam/org_team_struct#organization). The following capabilities are available for Weave users depending on your deployment option and [pricing plan](https://wandb.ai/site/pricing/):
 
-- **Authenticate using Single-Sign On (SSO):** Options include public identity providers like Google and Github, as well as enterprise providers such as Okta, Azure Active Directory, and other [OIDC providers](https://docs.wandb.ai/guides/technical-faq/general#does-wb-support-sso-for-saas).
+- **Authenticate using Single-Sign On (SSO):** Options include public identity providers like Google and Github, as well as enterprise providers such as Okta, Azure Active Directory, and others, [using OIDC](https://docs.wandb.ai/guides/technical-faq/general#does-wb-support-sso-for-saas).
 - **[Team-based logical separation](https://docs.wandb.ai/guides/hosting/iam/manage-organization/#add-and-manage-teams):** Each team may correspond to a business unit, department, or project team within your organization.
 - **Use W&B projects to organize initiatives:** Organize initiatives within teams and configure the required [visibility scope](https://docs.wandb.ai/guides/hosting/restricted-projects), including the `restricted` scope for sensitive collaborations.
 - **Role-based access control:** Configure access at the [team](https://docs.wandb.ai/guides/hosting/iam/manage-organization#assign-or-update-a-team-members-role) or [project](https://docs.wandb.ai/guides/hosting/iam/restricted-projects#project-level-roles) level to ensure users access data on a need-to-know basis.
@@ -22,13 +22,13 @@ Use the identity and access management capabilities for secure authentication an
 - **SaaS Cloud:** Data for all Weave users is stored in a shared Clickhouse Cloud cluster, encrypted using cloud-native encryption. Shared compute services process the data, ensuring isolation through a security context comprising your W&B organization, team, and project.
 
 - **Dedicated Cloud:** Data is stored in a unique Clickhouse Cloud cluster in the cloud and region of your choice. A unique compute environment processes the data, with the following additional protections:
-  - **IP allowlisting:** Authorize access to your instance from specific IP addresses.
-  - **Private connectivity:** Route data securely through the cloud provider's private network.
-  - **Data encryption:** Encrypt data at rest using a unique W&B-managed encryption key.
-  - **Strong encryption mechanisms:** File-based encryption using Clickhouse Cloud's capabilities.
+  - **[IP allowlisting](https://docs.wandb.ai/guides/hosting/data-security/ip-allowlisting):** Authorize access to your instance from specific IP addresses. This is an optional capability.
+  - **[Private connectivity](https://docs.wandb.ai/guides/hosting/data-security/private-connectivity):** Route data securely through the cloud provider's private network. This is an optional capability.
+  - **[Data encryption](https://docs.wandb.ai/guides/hosting/data-security/data-encryption):** W&B encrypts data at rest using a unique W&B-managed encryption key.
+  - **Clickhouse cluster security:** W&B connects to the unique Clickhouse Cloud cluster for your Dedicated Cloud instance over the cloud provider's private network. W&B also encrypts the cluster using a unique W&B-managed encryption key, while leveraging Clickhouse's file level encryption.
 
 :::important
-[The W&B Platform secure storage connector](https://docs.wandb.ai/guides/hosting/data-security/secure-storage-connector/?_gl=1*jzcfye*_gcl_au*OTI3ODM1OTcyLjE3MzE0MzU1NjUuMTYxOTQ4Mzk1LjE3MzMyNTYwMTYuMTczMzI1NjAxNQ..*_ga*ODEyMjQ4MjkyLjE3MzE0MzU1NjU.*_ga_JH1SJHJQXJ*MTczNDEyNjAxNy45Ny4xLjE3MzQxMjg5NDEuNjAuMC4w*_ga_GMYDGNGKDT*MTczNDEyNzgzMy44MS4xLjE3MzQxMjg1MTAuMC4wLjA.) is not available in Weave.
+[The W&B Platform secure storage connector or BYOB](https://docs.wandb.ai/guides/hosting/data-security/secure-storage-connector) is not available for Weave.
 :::
 
 ## Maintenance 
