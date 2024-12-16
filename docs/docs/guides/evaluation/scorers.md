@@ -226,7 +226,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     ### Mapping Column Names with `columnMapping`
     :::important
 
-    In TypeScript, this feature is currently on the `Evaluation` object, not individual scorers!
+    In TypeScript, this feature is currently on the `Evaluation` object, not individual scorers.
 
     :::
 
