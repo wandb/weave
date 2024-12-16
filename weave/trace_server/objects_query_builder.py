@@ -93,6 +93,7 @@ class ObjectMetadataQueryBuilder:
         conditions: Optional[list[str]] = None,
         object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[dict[str, Any]] = None,
+        include_deleted: bool = False,
     ):
         self.project_id = project_id
         self.parameters: dict[str, Any] = parameters or {}
@@ -103,10 +104,14 @@ class ObjectMetadataQueryBuilder:
         self._limit: Optional[int] = None
         self._offset: Optional[int] = None
         self._sort_by: list[tsi.SortBy] = []
+        self._include_deleted: bool = include_deleted
 
     @property
     def conditions_part(self) -> str:
-        return _make_conditions_part(self._conditions)
+        _conditions = list(self._conditions)
+        if not self._include_deleted:
+            _conditions.append("deleted_at IS NULL")
+        return _make_conditions_part(_conditions)
 
     @property
     def object_id_conditions_part(self) -> str:
@@ -124,27 +129,35 @@ class ObjectMetadataQueryBuilder:
     def offset_part(self) -> str:
         return _make_offset_part(self._offset)
 
-    def add_digest_condition(
+    def _make_digest_condition(
         self, digest: str, param_key: Optional[str] = None
-    ) -> None:
+    ) -> str:
         if digest == "latest":
-            self.add_is_latest_condition()
-            return
+            return "is_latest = 1"
 
         param_key = param_key or "version_digest"
         (is_version, version_index) = digest_is_version_like(digest)
         if is_version:
-            self._add_version_index_condition(version_index, param_key)
+            self.parameters.update({param_key: version_index})
+            return self._make_version_index_condition(version_index, param_key)
         else:
-            self._add_version_digest_condition(digest, param_key)
+            self.parameters.update({param_key: digest})
+            return self._make_version_digest_condition(digest, param_key)
 
-    def _add_version_digest_condition(self, digest: str, param_key: str) -> None:
-        self._conditions.append(f"digest = {{{param_key}: String}}")
-        self.parameters.update({param_key: digest})
+    def _make_version_digest_condition(self, digest: str, param_key: str) -> str:
+        return f"digest = {{{param_key}: String}}"
 
-    def _add_version_index_condition(self, version_index: int, param_key: str) -> None:
-        self._conditions.append(f"version_index = {{{param_key}: Int64}}")
-        self.parameters.update({param_key: version_index})
+    def _make_version_index_condition(self, version_index: int, param_key: str) -> str:
+        return f"version_index = {{{param_key}: Int64}}"
+
+    def add_digests_conditions(self, digests: list[str]) -> None:
+        digest_conditions = []
+        for i, digest in enumerate(digests):
+            condition = self._make_digest_condition(digest, f"version_digest_{i}")
+            digest_conditions.append(condition)
+
+        digests_condition = combine_conditions(digest_conditions, "OR")
+        self._conditions.append(digests_condition)
 
     def add_object_ids_condition(
         self, object_ids: list[str], param_key: Optional[str] = None
@@ -196,9 +209,7 @@ class ObjectMetadataQueryBuilder:
         self._offset = offset
 
     def set_include_deleted(self, include_deleted: bool) -> None:
-        if include_deleted:
-            return
-        self._conditions.append("deleted_at IS NULL")
+        self._include_deleted = include_deleted
 
     def make_metadata_query(self) -> str:
         columns = ",\n    ".join(OBJECT_METADATA_COLUMNS)
@@ -210,6 +221,7 @@ FROM (
         project_id,
         object_id,
         created_at,
+        deleted_at,
         kind,
         base_object_class,
         refs,
@@ -222,12 +234,17 @@ FROM (
             ORDER BY created_at ASC
         ) - 1 AS version_index,
         count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-        if(version_index + 1 = version_count, 1, 0) AS is_latest
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+        ) AS row_num,
+        if (row_num = 1, 1, 0) AS is_latest
     FROM (
         SELECT
             project_id,
             object_id,
             created_at,
+            deleted_at,
             kind,
             base_object_class,
             refs,

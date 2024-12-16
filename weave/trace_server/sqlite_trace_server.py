@@ -762,27 +762,51 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        delete_query = """
-            UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+        # First, select the objects that match the query
+        select_query = """
+            SELECT digest FROM objects
             WHERE project_id = ? AND
-                object_id = ?
+                object_id = ? AND
+                deleted_at IS NULL
         """
         parameters = [req.project_id, req.object_id]
-
         if req.digests:
             num_digests = len(req.digests)
-            delete_query += "AND digest IN ({})".format(", ".join("?" * num_digests))
+            select_query += "AND digest IN ({})".format(", ".join("?" * num_digests))
+
             parameters.extend(req.digests)
 
         conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(select_query, parameters)
+        matching_objects = cursor.fetchall()
+
+        if len(matching_objects) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+        found_digests = {obj[0] for obj in matching_objects}
+        if req.digests:
+            given_digests = set(req.digests)
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        # Create a delete query that will set the deleted_at field to now
+        delete_query = """
+            UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+            WHERE project_id = ? AND
+                object_id = ? AND
+                digest IN ({})
+        """.format(", ".join("?" * len(found_digests)))
+        delete_parameters = [req.project_id, req.object_id] + list(found_digests)
+
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            cursor.execute(delete_query, parameters)
-            # get the number of objects deleted
-            cursor.execute("SELECT changes()")
-            num_deleted = cursor.fetchone()[0]
+            cursor.execute(delete_query, delete_parameters)
             conn.commit()
-        return tsi.ObjDeleteRes(num_deleted=num_deleted)
+
+        return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

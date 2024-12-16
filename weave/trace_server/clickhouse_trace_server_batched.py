@@ -83,12 +83,12 @@ from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -530,9 +530,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_digest_condition(req.digest)
+        object_query_builder.add_digests_conditions([req.digest])
         object_query_builder.add_object_ids_condition([req.name], "op_name")
-        object_query_builder.set_deleted_at_condition(include_deleted=True)
+        object_query_builder.set_include_deleted(include_deleted=True)
 
         objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
@@ -588,9 +588,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digest_condition(req.digest)
+        object_query_builder.add_digests_conditions([req.digest])
         object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.set_deleted_at_condition(include_deleted=True)
+        object_query_builder.set_include_deleted(include_deleted=True)
 
         objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
@@ -630,7 +630,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for sort in req.sort_by:
                 object_query_builder.add_order(sort.field, sort.direction)
         metadata_only = req.metadata_only or False
-        object_query_builder.set_deleted_at_condition(include_deleted=False)
+        object_query_builder.set_include_deleted(include_deleted=False)
         objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -649,16 +649,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         MAX_OBJECTS_TO_DELETE = 100
         if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete fewer than {MAX_OBJECTS_TO_DELETE} objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
             )
 
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_object_ids_condition([req.object_id])
         metadata_only = True
         if req.digests:
-            object_query_builder.add_digests_or_condition(req.digests)
+            object_query_builder.add_digests_conditions(req.digests)
             metadata_only = False
-        object_query_builder.set_deleted_at_condition(include_deleted=False)
 
         object_versions = self._select_objs_query(object_query_builder, metadata_only)
 
@@ -684,6 +683,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(
                 f"Object {req.object_id} ({req.digests}) not found when deleting."
             )
+
+        if req.digests:
+            given_digests = set(req.digests)
+            found_digests = {obj.digest for obj in delete_insertables}
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
 
         data = [list(obj.model_dump().values()) for obj in delete_insertables]
         column_names = list(delete_insertables[0].model_fields.keys())
