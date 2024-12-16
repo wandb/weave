@@ -12,12 +12,10 @@ import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
   isWeaveObjectRef,
-  ObjectRef,
   parseRef,
   refUri,
   WeaveObjectRef,
 } from '../../../../../../react';
-import {makeObjRefUri} from '../../../Browse2/CommonLib';
 import {
   callCache,
   objectVersionCache,

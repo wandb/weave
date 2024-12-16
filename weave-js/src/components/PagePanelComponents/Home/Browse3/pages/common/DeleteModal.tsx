@@ -133,8 +133,10 @@ export const DeleteObjectButtonWithModal: React.FC<{
   const doDelete = () => {
     if (versionSchemaIsOp(objVersionSchema)) {
       return opVersionDelete(objVersionSchema);
+    } else if (versionSchemaIsObject(objVersionSchema)) {
+      return objectVersionDelete(objVersionSchema);
     }
-    return objectVersionDelete(objVersionSchema);
+    throw new Error('Invalid version schema');
   };
 
   const deleteStr =
@@ -160,8 +162,14 @@ export const DeleteObjectButtonWithModal: React.FC<{
 
 function versionSchemaIsOp(
   objVersionSchema: OpVersionSchema | ObjectVersionSchema
-) {
+): objVersionSchema is OpVersionSchema {
   return 'opId' in objVersionSchema;
+}
+
+function versionSchemaIsObject(
+  objVersionSchema: OpVersionSchema | ObjectVersionSchema
+): objVersionSchema is ObjectVersionSchema {
+  return 'objectId' in objVersionSchema;
 }
 
 function makeDefaultObjectDeleteStr(
@@ -169,6 +177,8 @@ function makeDefaultObjectDeleteStr(
 ) {
   if (versionSchemaIsOp(objVersionSchema)) {
     return `${objVersionSchema.opId}:v${objVersionSchema.versionIndex}`;
+  } else if (versionSchemaIsObject(objVersionSchema)) {
+    return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
   }
-  return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+  return '';
 }
