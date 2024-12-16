@@ -26,7 +26,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace_server.interface.base_object_classes import leaderboard
+from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 
 def init(
