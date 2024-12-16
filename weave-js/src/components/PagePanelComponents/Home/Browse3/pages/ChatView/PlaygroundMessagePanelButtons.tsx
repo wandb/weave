@@ -1,3 +1,4 @@
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import React from 'react';
 
@@ -26,8 +27,28 @@ export const PlaygroundMessagePanelButtons: React.FC<
 }) => {
   const {deleteMessage, deleteChoice, retry} = usePlaygroundContext();
 
+  const handleCopy = async () => {
+    if (contentRef.current?.textContent) {
+      try {
+        await navigator.clipboard.writeText(contentRef.current.textContent);
+        toast('Message copied to clipboard');
+      } catch (error) {
+        toast('Failed to copy message');
+      }
+    }
+  };
+
   return (
     <div className="ml-auto flex gap-4 rounded-lg pt-[8px]">
+      <Button
+        variant="quiet"
+        size="small"
+        startIcon="copy"
+        onClick={handleCopy}
+        tooltip={!hasContent ? 'No content to copy' : 'Copy message'}
+        disabled={!hasContent}>
+        Copy
+      </Button>
       <Button
         variant="quiet"
         size="small"
