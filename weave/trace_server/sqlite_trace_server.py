@@ -1110,36 +1110,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
-        return tsi.CostCreateRes()
+        return tsi.CostCreateRes(ids=[])
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         print("COST QUERY is not implemented for local sqlite", req)
-        return tsi.CostQueryRes()
+        return tsi.CostQueryRes(result=[])
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
-        return tsi.CostPurgeRes()
+        return tsi.CostPurgeRes(ids=[])
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         print("COMPLETIONS CREATE is not implemented for local sqlite", req)
-        return tsi.CompletionsCreateRes()
+        return tsi.CompletionsCreateRes(response={})
 
     def permanently_delete_project(
         self, req: tsi.PermanentlyDeleteProjectReq
     ) -> tsi.PermanentlyDeleteProjectRes:
         conn, cursor = get_conn_cursor(self.db_path)
+        tables_to_purge = [
+            "calls",
+            "objects",
+            "tables",
+            "table_rows",
+            "files",
+            "feedback",
+        ]
         with self.lock:
-            tables_to_purge = [
-                "call_parts",
-                "object_versions",
-                "tables",
-                "table_rows",
-                "files",
-                "feedback",
-                "cost",
-            ]
             conn.execute("BEGIN TRANSACTION")
             for table in tables_to_purge:
                 cursor.execute(

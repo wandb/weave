@@ -1504,7 +1504,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def _make_purge_query(self, project_id: str, table_name: str) -> str:
-        return f"DELETE FROM {table_name} WHERE project_id = '{project_id}'"
+        return f"DELETE FROM {table_name} WHERE project_id = {{{project_id: String}}}"
 
     def permanently_delete_project(
         self, req: tsi.PermanentlyDeleteProjectReq
@@ -1518,6 +1518,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         5. Delete all feedback data
         6. Delete all cost data (?)
         """
+        if not req.project_id.strip():
+            raise InvalidRequest("Project ID is required")
         tables_to_purge = [
             "call_parts",
             "object_versions",
@@ -1530,7 +1532,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for table in tables_to_purge:
             query = self._make_purge_query(req.project_id, table)
-            self.ch_client.query(query)
+            parameters = {"project_id": req.project_id}
+            self.ch_client.query(query, parameters)
 
         return tsi.PermanentlyDeleteProjectRes()
 
