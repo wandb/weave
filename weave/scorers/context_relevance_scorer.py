@@ -264,6 +264,7 @@ class ContextRelevanceScorer(Scorer):
     model_max_length: int = 2048
     _max_num_sentences: int = 20
     _classifier: Any = PrivateAttr()
+    _sent_tokenize: Any = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
         try:
@@ -274,7 +275,7 @@ class ContextRelevanceScorer(Scorer):
             nltk.download("punkt_tab")
             from nltk.tokenize import sent_tokenize
 
-            self.sent_tokenize = sent_tokenize
+            self._sent_tokenize = sent_tokenize
         except ImportError:
             print(
                 "The `transformers`, `torch` and `nltk` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch nltk`"
@@ -299,7 +300,7 @@ class ContextRelevanceScorer(Scorer):
     ) -> list[dict[str, Any]]:
         """Score a single document."""
         document_sentences = document.split("\n")
-        document_sentences = [self.sent_tokenize(doc) for doc in document_sentences]
+        document_sentences = [self._sent_tokenize(doc) for doc in document_sentences]
         document_sentences = [s for doc in document_sentences for s in doc]
         context_scores = []
         for batch in range(0, len(document_sentences), self._max_num_sentences):
