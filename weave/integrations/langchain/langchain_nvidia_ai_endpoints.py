@@ -113,7 +113,7 @@ def post_process_to_openai_format(output: Any) -> dict:
 ## Need a separate stream variant as the passed objects don't provide an indication
 def process_inputs_to_openai_format_stream(
     func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
+) -> ProcessedInputs:
     from langchain_core.messages import convert_to_openai_messages
 
     original_args = args
@@ -146,7 +146,7 @@ def process_inputs_to_openai_format_stream(
 
 def process_inputs_to_openai_format(
     func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
+) -> ProcessedInputs:
     from langchain_core.messages import convert_to_openai_messages
 
     original_args = args
