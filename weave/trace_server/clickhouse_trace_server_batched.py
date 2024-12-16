@@ -59,6 +59,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
+    ObjDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -68,6 +69,8 @@ from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
+    ObjectDeletedError,
     RequestTooLarge,
 )
 from weave.trace_server.feedback import (
@@ -123,10 +126,6 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 100
 INITIAL_CALLS_STREAM_BATCH_SIZE = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-
-class NotFoundError(Exception):
-    pass
 
 
 CallCHInsertable = Union[
@@ -538,7 +537,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
+            raise ObjectDeletedError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -587,30 +586,75 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.ObjCreateRes(digest=digest)
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    @staticmethod
+    def _make_conds_from_digest(
+        digest: str,
+    ) -> tuple[list[str], dict[str, Union[str, int]]]:
+        (is_version, version_index) = digest_is_version_like(digest)
         conds: list[str] = []
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
+        parameters: dict[str, Union[str, int]] = {}
+        if digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
+            (is_version, version_index) = digest_is_version_like(digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
                 conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
+                parameters["version_digest"] = digest
+        return conds, parameters
+
+    def _obj_read(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+        include_deleted: bool = False,
+        metadata_only: bool = False,
+    ) -> SelectableCHObjSchema:
+        (is_version, version_index) = digest_is_version_like(digest)
+        conds: list[str] = []
+        parameters: dict[str, Union[str, int]] = {"object_id": object_id}
+        if digest == "latest":
+            conds.append("is_latest = 1")
+        else:
+            (is_version, version_index) = digest_is_version_like(digest)
+            if is_version:
+                conds.append("version_index = {version_index: UInt64}")
+                parameters["version_index"] = version_index
+            else:
+                conds.append("digest = {version_digest: String}")
+                parameters["version_digest"] = digest
+
+        object_id_conditions = ["object_id = {object_id: String}"]
         objs = self._select_objs_query(
-            req.project_id,
+            project_id,
             conditions=conds,
             object_id_conditions=object_id_conditions,
             parameters=parameters,
+            include_deleted=include_deleted,
+            metadata_only=metadata_only,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            raise NotFoundError(f"Obj {object_id}:{digest} not found")
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Obj {object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
+            )
+
+        return objs[0]
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        ch_obj = self._obj_read(
+            req.project_id,
+            req.object_id,
+            req.digest,
+            include_deleted=True,
+            metadata_only=False,
+        )
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(ch_obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
@@ -645,6 +689,84 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def _make_soft_delete_insertables(
+        self,
+        objs: list[SelectableCHObjSchema],
+    ) -> list[ObjDeleteCHInsertable]:
+        delete_insertables = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for obj in objs:
+            original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
+            delete_insertables.append(
+                ObjDeleteCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    digest=obj.digest,
+                    kind=obj.kind,
+                    val_dump=obj.val_dump,
+                    refs=obj.refs,
+                    base_object_class=obj.base_object_class,
+                    deleted_at=now,
+                    created_at=original_created_at,
+                )
+            )
+        return delete_insertables
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        """
+        Delete object versions by digest, belonging to given object_id.
+
+        All deletion in this method is "soft". Deletion occurs by inserting
+        a new row into the object_versions table with the deleted_at field set.
+        Inserted rows share identical primary keys (order by) with original rows,
+        and will be combined by the ReplacingMergeTree engine at database merge
+        time.
+
+        If no digests are provided, we only retain the value from the latest version
+        of the object, all other versions will have their data overwritten with an
+        empty val_dump.
+
+        Otherwise, all specified versions are soft deleted.
+        """
+        if req.digests:
+            object_versions = self._select_objs_query(
+                req.project_id,
+                object_id_conditions=["object_id = {object_id: String}"],
+                conditions=["digest IN {digests: Array(String)}"],
+                parameters={"object_id": req.object_id, "digests": req.digests},
+                metadata_only=False,
+            )
+            insertables = self._make_soft_delete_insertables(object_versions)
+            # TODO: push down to CH to lift this limit
+            MAX_OBJECTS_TO_DELETE = 100
+            if len(insertables) > MAX_OBJECTS_TO_DELETE:
+                raise ValueError(
+                    f"Object delete request contains {len(insertables)} objects. Please delete fewer than {MAX_OBJECTS_TO_DELETE} objects at a time."
+                )
+        else:
+            latest_obj_version = self._obj_read(req.project_id, req.object_id, "latest")
+            other_obj_versions = self._select_objs_query(
+                req.project_id,
+                conditions=["is_latest = 0"],
+                object_id_conditions=["object_id = {object_id: String}"],
+                parameters={"object_id": req.object_id},
+                # only get metadata, we are going to hard delete
+                metadata_only=True,
+            )
+            all_versions = [latest_obj_version] + other_obj_versions
+            insertables = self._make_soft_delete_insertables(all_versions)
+
+        if len(insertables) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+
+        data = [list(obj.model_dump().values()) for obj in insertables]
+        column_names = list(insertables[0].model_fields.keys())
+        self._insert("object_versions", data=data, column_names=column_names)
+
+        return tsi.ObjDeleteRes(num_deleted=len(insertables))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -1570,6 +1692,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
+        include_deleted: bool = False,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1586,6 +1709,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         metadata_only:
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
+        include_deleted:
+            if include_deleted is True, then we include deleted objects in the results
+            with the expectation that the caller will filter out deleted objects. By
+            default this is false, automatically filter out deleted object versions.
         """
         if not conditions:
             conditions = ["1 = 1"]
@@ -1594,6 +1721,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = combine_conditions(conditions, "AND")
         object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
+        deleted_at_condition_part = (
+            "deleted_at IS NULL" if not include_deleted else "1 = 1"
+        )
 
         limit_part = ""
         offset_part = ""
@@ -1614,6 +1744,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
                 sort_part = f"ORDER BY {', '.join(sort_clauses)}"
+        else:
+            sort_part = "ORDER BY created_at ASC"
 
         if parameters is None:
             parameters = {}
@@ -1623,6 +1755,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 project_id,
                 object_id,
                 created_at,
+                deleted_at,
                 kind,
                 base_object_class,
                 refs,
@@ -1630,16 +1763,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 is_op,
                 version_index,
                 version_count,
-                is_latest
+                is_latest,
+                deleted_at
             FROM (
                 SELECT project_id,
                     object_id,
                     created_at,
+                    deleted_at,
                     kind,
                     base_object_class,
                     refs,
                     digest,
                     is_op,
+                    deleted_at,
                     row_number() OVER (
                         PARTITION BY project_id,
                         kind,
@@ -1647,30 +1783,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ORDER BY created_at ASC
                     ) - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(version_index + 1 = version_count, 1, 0) AS is_latest
+                    row_number() OVER (
+                        PARTITION BY project_id, kind, object_id
+                        ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+                    ) AS row_num,
+                    if (row_num = 1, 1, 0) AS is_latest
                 FROM (
                     SELECT project_id,
                         object_id,
-                        created_at,
+                        MIN(created_at) AS created_at,
+                        MIN(deleted_at) AS deleted_at,
                         kind,
-                        base_object_class,
-                        refs,
+                        MIN(base_object_class) AS base_object_class,
+                        MIN(refs) AS refs,
                         digest,
-                        if (kind = 'op', 1, 0) AS is_op,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
+                        IF(kind = 'op', 1, 0) AS is_op
                     FROM object_versions
                     WHERE project_id = {{project_id: String}} AND
                         {object_id_conditions_part}
+                    GROUP BY project_id, kind, object_id, digest
                 )
-                WHERE rn = 1
             )
-            WHERE {conditions_part}
+            WHERE {conditions_part} AND
+            {deleted_at_condition_part}
             {sort_part}
             {limit_part}
             {offset_part}
@@ -1689,6 +1824,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "project_id",
                                 "object_id",
                                 "created_at",
+                                "deleted_at",
                                 "kind",
                                 "base_object_class",
                                 "refs",
@@ -1697,6 +1833,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "deleted_at",
                                 "val_dump",
                             ],
                             # Add an empty val_dump to the end of the row
@@ -1706,8 +1843,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
-        # -- Don't make second query for object values if metadata_only --
-        if metadata_only:
+        # -- skip query for object values if metadata_only or empty result --
+        if metadata_only or len(result) == 0:
             return result
 
         # now get the val_dump for each object
@@ -1736,6 +1873,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # update the val_dump for each object
         for obj in result:
             obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+
         return result
 
     def _run_migrations(self) -> None:
@@ -1929,6 +2067,15 @@ def _ensure_datetimes_have_tz(
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
+
+def _ensure_datetimes_have_tz_strict(
+    dt: datetime.datetime,
+) -> datetime.datetime:
+    res = _ensure_datetimes_have_tz(dt)
+    if res is None:
+        raise ValueError(f"Datetime is None: {dt}")
+    return res
 
 
 def _nullable_dict_dump_to_dict(
