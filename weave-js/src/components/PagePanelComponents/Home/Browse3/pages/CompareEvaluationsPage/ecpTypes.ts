@@ -18,6 +18,7 @@ export type EvaluationComparisonData = {
   };
 
   // EvaluationCalls are the specific calls of an evaluation.
+  // The visual order of the evaluation calls is determined by the order of the keys.
   evaluationCalls: {
     [callId: string]: EvaluationCall;
   };

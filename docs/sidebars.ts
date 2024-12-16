@@ -67,6 +67,7 @@ const sidebars: SidebarsConfig = {
         "guides/core-types/datasets",
         "guides/tracking/feedback",
         "guides/tracking/costs",
+        "guides/tools/comparison",
         "guides/tools/playground",
         "guides/core-types/media",
         {
