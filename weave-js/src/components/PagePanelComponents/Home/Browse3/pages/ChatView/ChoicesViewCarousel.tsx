@@ -57,7 +57,7 @@ export const ChoicesViewCarousel = ({
             variant="quiet"
             icon="visible"
             onClick={() => setIsDrawerOpen(true)}
-            tooltip="Switch to linear view">
+            tooltip="View all choices">
             Review
           </Button>
         </div>
