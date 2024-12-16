@@ -62,13 +62,15 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
+    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import (
+        lc_nvidia_patcher,
+    )
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import lc_nvidia_patcher
 
     if settings is None:
         settings = AutopatchSettings()
@@ -101,13 +103,15 @@ def reset_autopatch() -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
+    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import (
+        lc_nvidia_patcher,
+    )
     from weave.integrations.litellm.litellm import litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mistral import mistral_patcher
     from weave.integrations.notdiamond.tracing import notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import vertexai_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import lc_nvidia_patcher
 
     get_openai_patcher().undo_patch()
     mistral_patcher.undo_patch()

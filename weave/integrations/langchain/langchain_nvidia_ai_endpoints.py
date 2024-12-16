@@ -1,23 +1,25 @@
 import importlib
-from typing import Any, Callable, Iterator, AsyncIterator, Optional
-from functools import wraps
-import weave
 import time
-from weave.trace.op import ProcessedInputs, Op
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from collections.abc import Iterator
+from functools import wraps
+from typing import Any, Callable, Optional
+
 from langchain_core.messages import AIMessageChunk, convert_to_openai_messages
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from openai.types.chat import ChatCompletion
 
+import weave
+from weave.trace.op import Op, ProcessedInputs
+from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
 
 # NVIDIA-specific accumulator for parsing the objects of streaming interactions
-def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk) -> ChatGenerationChunk:
-
+def nvidia_accumulator(
+    acc: Optional[ChatGenerationChunk], value: ChatGenerationChunk
+) -> ChatGenerationChunk:
     if acc is None:
-        acc = ChatGenerationChunk(
-            message=AIMessageChunk(content="")
-        )
+        acc = ChatGenerationChunk(message=AIMessageChunk(content=""))
     acc = acc + value
 
     ## Need to do this since the __add__ impl for the streaming response is wrong
@@ -26,14 +28,18 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
 
     return acc
 
-# Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
-def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> dict:
 
-    if isinstance(output, ChatResult): ## its ChatResult
-        message = output.llm_output ## List of ChatGeneration
+# Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
+def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult) -> dict:
+    if isinstance(output, ChatResult):  ## its ChatResult
+        message = output.llm_output  ## List of ChatGeneration
         enhanced_usage = message.get("token_usage", {})
-        enhanced_usage["output_tokens"] = message.get("token_usage").get("completion_tokens", 0)
-        enhanced_usage["input_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
+        enhanced_usage["output_tokens"] = message.get("token_usage").get(
+            "completion_tokens", 0
+        )
+        enhanced_usage["input_tokens"] = message.get("token_usage").get(
+            "prompt_tokens", 0
+        )
 
         returnable = ChatCompletion(
             id="None",
@@ -59,40 +65,51 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
 
-
-    elif isinstance(output, ChatGenerationChunk): ## its ChatGenerationChunk
+    elif isinstance(output, ChatGenerationChunk):  ## its ChatGenerationChunk
         orig_message = output.message
         openai_message = convert_to_openai_messages(output.message)
         enhanced_usage = getattr(orig_message, "usage_metadata", {})
-        enhanced_usage["completion_tokens"] = orig_message.usage_metadata.get("output_tokens", 0)
-        enhanced_usage["prompt_tokens"] = orig_message.usage_metadata.get("input_tokens", 0)
+        enhanced_usage["completion_tokens"] = orig_message.usage_metadata.get(
+            "output_tokens", 0
+        )
+        enhanced_usage["prompt_tokens"] = orig_message.usage_metadata.get(
+            "input_tokens", 0
+        )
 
         returnable = ChatCompletion(
-                id="None",
-                choices = [
+            id="None",
+            choices=[
                 {
                     "index": 0,
                     "message": {
                         "content": orig_message.content,
                         "role": getattr(orig_message, "role", "assistant"),
-                        "tool_calls": openai_message.get('tool_calls', []),
+                        "tool_calls": openai_message.get("tool_calls", []),
                     },
                     "logprobs": None,
-                    "finish_reason": getattr(orig_message, "response_metadata", {}).get("finish_reason", None),
+                    "finish_reason": getattr(orig_message, "response_metadata", {}).get(
+                        "finish_reason", None
+                    ),
                 }
             ],
-                created=int(time.time()),
-                model=getattr(orig_message, "response_metadata", {}).get("model_name", None),
-                tool_calls=openai_message.get('tool_calls', []),
-                object="chat.completion",
-                system_fingerprint= None,
-                usage=enhanced_usage,
-            )
+            created=int(time.time()),
+            model=getattr(orig_message, "response_metadata", {}).get(
+                "model_name", None
+            ),
+            tool_calls=openai_message.get("tool_calls", []),
+            object="chat.completion",
+            system_fingerprint=None,
+            usage=enhanced_usage,
+        )
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
+    return output
+
 
 ## Need a separate stream variant as the passed objects don't provide an indication
-def process_inputs_to_openai_format_stream(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
+def process_inputs_to_openai_format_stream(
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
     original_args = args
     original_kwargs = kwargs
 
@@ -109,7 +126,7 @@ def process_inputs_to_openai_format_stream(func: Op, args: tuple, kwargs: dict) 
         "top_p": chat_nvidia_obj.top_p,
         "object": "ChatNVIDIA._stream",
         "n": n,
-        "stream": True
+        "stream": True,
     }
 
     return ProcessedInputs(
@@ -120,7 +137,10 @@ def process_inputs_to_openai_format_stream(func: Op, args: tuple, kwargs: dict) 
         inputs=weave_report,
     )
 
-def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
+
+def process_inputs_to_openai_format(
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
     original_args = args
     original_kwargs = kwargs
 
@@ -137,7 +157,7 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
         "top_p": chat_nvidia_obj.top_p,
         "object": "ChatNVIDIA._generate",
         "n": n,
-        "stream": False
+        "stream": False,
     }
 
     return ProcessedInputs(
@@ -148,9 +168,11 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
         inputs=weave_report,
     )
 
+
 # Wrap synchronous invoke method
 def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
     """Wrap the invoke method."""
+
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
         def invoke_fn(*args: Any, **kwargs: Any) -> Any:
@@ -165,11 +187,14 @@ def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
             should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
             on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
+
     return wrapper
+
 
 # Wrap streaming methods (synchronous)
 def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
     """Wrap a synchronous streaming method for ChatNVIDIA."""
+
     def wrapper(fn: Callable) -> Callable:
         @wraps(fn)
         def stream_fn(*args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
@@ -184,7 +209,9 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
             should_accumulate=lambda _: True,  # Always accumulate for streaming
             on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
         )
+
     return wrapper
+
 
 # Define the patcher
 lc_nvidia_patcher = MultiPatcher(
