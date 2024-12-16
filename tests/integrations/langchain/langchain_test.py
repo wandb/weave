@@ -303,6 +303,7 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
         ("langchain.Chain.RunnableParallel_context_question", 1),
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.VectorStoreRetriever", 3),
+        ("openai.embeddings.create", 4),
         ("langchain.Chain.format_docs", 3),
         ("langchain.Chain.RunnablePassthrough", 2),  # Potential position
         ("langchain.Prompt.ChatPromptTemplate", 1),
@@ -320,6 +321,7 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
         ("langchain.Chain.RunnablePassthrough", 2),  # Potential position
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.VectorStoreRetriever", 3),
+        ("openai.embeddings.create", 4),
         ("langchain.Chain.format_docs", 3),
         ("langchain.Prompt.ChatPromptTemplate", 1),
         ("langchain.Llm.ChatOpenAI", 1),
