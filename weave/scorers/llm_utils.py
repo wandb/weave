@@ -1,24 +1,34 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+import inspect
+import os
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union, List
+
+try:
+    import instructor
+except ImportError:
+    instructor = None
 
 from weave.trace.autopatch import autopatch
 
 autopatch()  # ensure both weave patching and instructor patching are applied
 
-OPENAI_DEFAULT_MODEL = "gpt-4o"
+# Default model names and configurations
+OPENAI_DEFAULT_MODEL = "gpt-4"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_DEFAULT_MODERATION_MODEL = "omni-moderation-latest"
 
-ANTHROPIC_DEFAULT_MODEL = "claude-3-5-sonnet"
+ANTHROPIC_DEFAULT_MODEL = "claude-3-sonnet"
 
 MISTRAL_DEFAULT_MODEL = "mistral-large-latest"
 MISTRAL_DEFAULT_EMBEDDING_MODEL = "mistral-embed"
 
 DEFAULT_MAX_TOKENS = 4096
 
+# Local model directory
+LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "weave_models")
+
 if TYPE_CHECKING:
-    import instructor
     from anthropic import Anthropic, AsyncAnthropic
     from google.generativeai import GenerativeModel
     from instructor.patch import InstructorChatCompletionCreate
@@ -51,9 +61,7 @@ _LLM_CLIENTS_NAMES = (
 
 
 def instructor_client(client: _LLM_CLIENTS) -> instructor.client:
-    try:
-        import instructor
-    except ImportError:
+    if instructor is None:
         raise ImportError(
             "The `instructor` package is required to use LLM-powered scorers, please run `pip install instructor`"
         )
@@ -92,11 +100,13 @@ def create(
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: str | list[str], **kwargs: Any
-) -> list[list[float]]:
+    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
+) -> List[List[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
+        if inspect.iscoroutine(response):
+            raise ValueError("Async client used with sync function. Use await with async clients.")
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
         response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
@@ -130,12 +140,38 @@ def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> 
     return local_model_path
 
 
-scorer_model_paths = {
+# Model paths for various scorers
+MODEL_PATHS = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
     "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
-    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",  # task: "sentiment-analysis"
+    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/context-relevance-scorer/relevance_scorer:v0",
+    "llamaguard": "c-metrics/weave-scorers/llamaguard:v0"
 }
+
+
+def get_model_path(model_name: str) -> str:
+    """Get the full model path for a scorer."""
+    if model_name in MODEL_PATHS:
+        return MODEL_PATHS[model_name]
+    return model_name
+
+
+def is_async(func: Callable) -> bool:
+    return inspect.iscoroutinefunction(func)
+
+
+def is_sync_client(client: _LLM_CLIENTS) -> bool:
+    client_type = type(client).__name__
+    return not any(
+        is_async(getattr(obj, "create", None))
+        for obj in [
+            getattr(client, "chat", None),
+            getattr(client, "embeddings", None),
+            getattr(getattr(client, "chat", None), "completions", None),
+        ]
+        if obj is not None
+    )

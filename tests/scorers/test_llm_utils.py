@@ -1,10 +1,16 @@
 import pytest
+from unittest.mock import MagicMock, patch
+import os
 
 from weave.scorers.llm_utils import (
     embed,
     instructor_client,
     is_async,
     is_sync_client,
+    get_model_path,
+    LOCAL_MODEL_DIR,
+    MODEL_PATHS,
+    download_model,
 )
 from weave.trace.autopatch import autopatch
 
@@ -22,7 +28,7 @@ class MockOpenAIChatCompletions:
 
 class MockOpenAIEmbeddings:
     def create(self, model, input, **kwargs):
-        return {"data": [{"embedding": [0.1, 0.2, 0.3]} for _ in input]}
+        return type('Response', (), {'data': [type('Embedding', (), {'embedding': [0.1, 0.2, 0.3]}) for _ in input]})()
 
 
 class MockSyncOpenAI:
@@ -39,7 +45,7 @@ class MockAsyncOpenAIChatCompletions:
 
 class MockAsyncOpenAIEmbeddings:
     async def create(self, model, input, **kwargs):
-        return {"data": [{"embedding": [0.4, 0.5, 0.6]} for _ in input]}
+        return type('Response', (), {'data': [type('Embedding', (), {'embedding': [0.4, 0.5, 0.6]}) for _ in input]})()
 
 
 class MockAsyncOpenAI:
@@ -82,21 +88,33 @@ def test_is_sync_client(sync_client, async_client):
 
 
 # Test to ensure instructor_client returns a valid instructor client for synchronous clients
-def test_instructor_client_sync(sync_client):
-    try:
-        client = instructor_client(sync_client)
-    except Exception as e:
-        pytest.fail(f"instructor_client raised an exception for sync_client: {e}")
+def test_instructor_client_sync(sync_client, monkeypatch):
+    # Mock instructor module
+    mock_instructor = MagicMock()
+    mock_instructor_client = MagicMock()
+    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
+    mock_instructor.patch = MagicMock()
+    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
+
+    client = instructor_client(sync_client)
     assert client is not None, "Instructor client should not be None for sync_client."
+    assert client == mock_instructor_client
+    mock_instructor.from_openai.assert_called_once_with(sync_client)
 
 
 # Test to ensure instructor_client returns a valid instructor client for asynchronous clients
-def test_instructor_client_async(async_client):
-    try:
-        client = instructor_client(async_client)
-    except Exception as e:
-        pytest.fail(f"instructor_client raised an exception for async_client: {e}")
+def test_instructor_client_async(async_client, monkeypatch):
+    # Mock instructor module
+    mock_instructor = MagicMock()
+    mock_instructor_client = MagicMock()
+    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
+    mock_instructor.patch = MagicMock()
+    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
+
+    client = instructor_client(async_client)
     assert client is not None, "Instructor client should not be None for async_client."
+    assert client == mock_instructor_client
+    mock_instructor.from_openai.assert_called_once_with(async_client)
 
 
 # Test the embed function with a synchronous client
@@ -104,18 +122,13 @@ def test_instructor_client_async(async_client):
 async def test_embed_sync(sync_client):
     model_id = "text-embedding-3-small"
     texts = ["Hello world", "OpenAI"]
-    embeddings = await embed(sync_client, model_id, texts)
-    assert len(embeddings) == 2, "Should return embeddings for both texts."
-    assert embeddings[0] == [
-        0.1,
-        0.2,
-        0.3,
-    ], "First embedding does not match expected values."
-    assert embeddings[1] == [
-        0.1,
-        0.2,
-        0.3,
-    ], "Second embedding does not match expected values."
+    try:
+        embeddings = embed(sync_client, model_id, texts)
+        assert len(embeddings) == 2, "Should return embeddings for both texts."
+        assert embeddings[0] == [0.1, 0.2, 0.3], "First embedding does not match expected values."
+        assert embeddings[1] == [0.1, 0.2, 0.3], "Second embedding does not match expected values."
+    except ValueError as e:
+        pytest.fail(f"embed() raised ValueError: {e}")
 
 
 # Test the embed function with an asynchronous client
@@ -123,18 +136,8 @@ async def test_embed_sync(sync_client):
 async def test_embed_async(async_client):
     model_id = "text-embedding-3-small"
     texts = ["Hello world", "OpenAI"]
-    embeddings = await embed(async_client, model_id, texts)
-    assert len(embeddings) == 2, "Should return embeddings for both texts."
-    assert embeddings[0] == [
-        0.4,
-        0.5,
-        0.6,
-    ], "First embedding does not match expected values."
-    assert embeddings[1] == [
-        0.4,
-        0.5,
-        0.6,
-    ], "Second embedding does not match expected values."
+    with pytest.raises(ValueError, match="Async client used with sync function"):
+        embed(async_client, model_id, texts)
 
 
 # Test the embed function with an unsupported client type

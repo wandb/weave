@@ -1,12 +1,12 @@
 import json
 import os
-from typing import Any, Optional
+from typing import Any, List, Optional, Union, Dict, Tuple
 import numpy as np
 from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, scorer_model_paths, set_device
+from weave.scorers.llm_utils import download_model, MODEL_PATHS, set_device
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
@@ -97,7 +97,7 @@ class OldRelevanceScorer(Scorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["relevance_scorer"]
+                MODEL_PATHS["relevance_scorer"]
             )
 
         self._classifier = pipeline(
@@ -261,6 +261,7 @@ class ContextRelevanceScorer(Scorer):
     base_url: Optional[str] = None
     device: str = "cpu"
     threshold: float = 0.7
+    model_max_length: int = 1280
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
 
@@ -277,13 +278,16 @@ class ContextRelevanceScorer(Scorer):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(
-                scorer_model_paths["relevance_scorer"]
+                MODEL_PATHS["relevance_scorer"]
             )
         assert self._local_model_path, "Model path not found"
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
             )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._local_model_path,
+            model_max_length=self.model_max_length,
+        )
         self._model.eval()
         self.device = set_device(self.device)
 
@@ -298,7 +302,8 @@ class ContextRelevanceScorer(Scorer):
             input_text = query + f" {self._tokenizer.sep_token} " + document
             model_inputs = self._tokenizer(
                 input_text, 
-                truncation=True, 
+                truncation=True,
+                max_length=self.model_max_length,
                 padding=False, 
                 return_tensors="pt", 
                 return_special_tokens_mask=True
@@ -345,12 +350,12 @@ class ContextRelevanceScorer(Scorer):
         
     @weave.op
     def score(
-        self, 
+        self,
         output: str,
-        query: str, 
-        context: str | list[str],
+        query: str,
+        context: Union[str, List[str]],
         verbose: bool = False
-        ) -> tuple[list[dict[str, Any]], float]:
+    ) -> Dict[str, Any]:
         """Score multiple documents and compute weighted average relevance."""
         all_spans = []
         total_weighted_score = 0.0

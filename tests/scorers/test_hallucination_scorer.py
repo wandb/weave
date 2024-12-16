@@ -1,14 +1,18 @@
 import pytest
 from openai import OpenAI
+from unittest.mock import MagicMock, patch
 
 import weave
 from weave.scorers import (
     HallucinationFreeScorer,
+    HallucinationScorer,
+    FaithfulnessScorer,
 )
 from weave.scorers.hallucination_scorer import (
     HallucinationReasoning,
     HallucinationResponse,
 )
+from tests.scorers.test_utils import generate_large_text, generate_context_and_output
 
 
 # mock the create function
@@ -40,11 +44,73 @@ def hallucination_scorer(mock_create):
     )
 
 
+@pytest.fixture
+def hallucination_scorer_v2(monkeypatch):
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
+    # Mock model loading functions
+    monkeypatch.setattr("weave.scorers.llm_utils.download_model", lambda *args, **kwargs: None)
+    monkeypatch.setattr("weave.scorers.llm_utils.scorer_model_paths", lambda *args: {"hallucination": "mock_path"})
+    monkeypatch.setattr("weave.scorers.llm_utils.set_device", lambda *args: "cpu")
+    monkeypatch.setattr("weave.scorers.llm_utils.get_model_path", lambda *args: "mock_path")
+
+    scorer = HallucinationScorer(
+        model_name_or_path="wandb/hallucination_scorer",
+        device="cpu",
+        name="test-hallucination",
+        description="Test hallucination scorer",
+        column_map={"output": "text"}
+    )
+    # Mock model and tokenizer
+    def mock_pipeline(*args, **kwargs):
+        def inner(text, **kwargs):
+            if "green with purple polka dots" in text.lower() or "hallucination" in text.lower():
+                return [{"generated_text": '{"score": 0.2, "hallucination": true, "flagged": true, "hallucination_label": "hallucination"}'}]
+            return [{"generated_text": '{"score": 0.9, "hallucination": false, "flagged": false, "hallucination_label": "faithful"}'}]
+        return inner
+
+    monkeypatch.setattr("transformers.pipeline", mock_pipeline)
+    monkeypatch.setattr(scorer, "_classifier", mock_pipeline())
+    monkeypatch.setattr(scorer, "_model", MagicMock())
+    monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    monkeypatch.setattr(scorer, "model_post_init", lambda *args: None)
+    monkeypatch.setattr(scorer, "__private_attributes__", {})
+    monkeypatch.setattr(scorer, "__pydantic_private__", {})
+    monkeypatch.setattr(scorer, "__pydantic_fields__", {"_model": None, "_tokenizer": None})
+    monkeypatch.setattr(scorer, "__pydantic_extra__", {})
+    return scorer
+
+
+@pytest.fixture
+def faithfulness_scorer(monkeypatch):
+    # Mock wandb login and project
+    monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
+    mock_project = MagicMock()
+    monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+
+    scorer = FaithfulnessScorer(
+        model_name_or_path="wandb/faithfulness_scorer",
+        device="cpu",
+        name="test-faithfulness",
+        description="Test faithfulness scorer",
+        column_map={"output": "text"}
+    )
+    monkeypatch.setattr(scorer, "_model", MagicMock())
+    monkeypatch.setattr(scorer, "_tokenizer", MagicMock())
+    monkeypatch.setattr(scorer, "__private_attributes__", {})
+    monkeypatch.setattr(scorer, "__pydantic_private__", {})
+    monkeypatch.setattr(scorer, "__pydantic_fields__", {"_model": None, "_tokenizer": None})
+    monkeypatch.setattr(scorer, "__pydantic_extra__", {})
+    return scorer
+
+
 def test_hallucination_scorer_score(hallucination_scorer, mock_create):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
     result = hallucination_scorer.score(output=output, context=context)
-    # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
     assert result["has_hallucination"] == True
@@ -103,3 +169,91 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
     assert (
         result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
     )
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_large_input(hallucination_scorer_v2, mock_create):
+    query = "What is the story about?"
+    context, output = generate_context_and_output(100_000, context_ratio=0.8)
+
+    result = await hallucination_scorer_v2.score(
+        query=query,
+        context=context,
+        output=output
+    )
+
+    assert "flagged" in result
+    assert "extras" in result
+    assert "score" in result["extras"]
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_large_input(faithfulness_scorer, mock_create):
+    query = "What is the story about?"
+    context, output = generate_context_and_output(100_000, context_ratio=0.8)
+
+    result = await faithfulness_scorer.score(
+        query=query,
+        context=context,
+        output=output
+    )
+
+    assert "flagged" in result
+    assert "extras" in result
+    assert "score" in result["extras"]
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_error_handling(hallucination_scorer_v2):
+    with pytest.raises(ValueError):
+        await hallucination_scorer_v2.score(query="", context="", output="")
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_error_handling(faithfulness_scorer):
+    with pytest.raises(ValueError):
+        await faithfulness_scorer.score(query="", context="", output="")
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_flags_hallucination(hallucination_scorer_v2):
+    result = await hallucination_scorer_v2.score(
+        query="What color is the sky?",
+        context="The sky is blue.",
+        output="The sky is green with purple polka dots."
+    )
+    assert result["flagged"] == True
+    assert result["extras"]["score"] <= hallucination_scorer_v2.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_hallucination_scorer_passes_faithful(hallucination_scorer_v2):
+    result = await hallucination_scorer_v2.score(
+        query="What color is the sky?",
+        context="The sky is blue.",
+        output="The sky is blue."
+    )
+    assert result["flagged"] == False
+    assert result["extras"]["score"] > hallucination_scorer_v2.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_flags_unfaithful(faithfulness_scorer):
+    result = await faithfulness_scorer.score(
+        query="Describe planetary motion",
+        context="The Earth orbits the Sun.",
+        output="The Sun orbits the Earth."
+    )
+    assert result["flagged"] == True
+    assert result["extras"]["score"] <= faithfulness_scorer.hhem_score_threshold
+
+
+@pytest.mark.asyncio
+async def test_faithfulness_scorer_passes_faithful(faithfulness_scorer):
+    result = await faithfulness_scorer.score(
+        query="Describe planetary motion",
+        context="The Earth orbits the Sun.",
+        output="The Earth moves in an orbit around the Sun."
+    )
+    assert result["flagged"] == False
+    assert result["extras"]["score"] > faithfulness_scorer.hhem_score_threshold
