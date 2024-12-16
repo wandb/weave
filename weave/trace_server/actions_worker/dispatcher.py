@@ -6,7 +6,7 @@ from weave.trace_server.actions_worker.actions.contains_words import (
     do_contains_words_action,
 )
 from weave.trace_server.actions_worker.actions.llm_judge import do_llm_judge_action
-from weave.trace_server.interface.base_object_classes.actions import (
+from weave.trace_server.interface.builtin_object_classes.actions import (
     ActionConfigType,
     ActionSpec,
     ContainsWordsActionConfig,
