@@ -26,14 +26,14 @@ def nvidia_accumulator(acc: Optional[ChatGenerationChunk], value: ChatGeneration
 
     return acc
 
-# Post processor to transform output into OpenAI's ChatCompletion format
+# Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
 def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> dict:
 
     if isinstance(output, ChatResult): ## its ChatResult
-        message = output.llm_output
+        message = output.llm_output ## List of ChatGeneration
         enhanced_usage = message.get("token_usage", {})
-        enhanced_usage["completion_tokens"] = message.get("token_usage").get("completion_tokens", 0)
-        enhanced_usage["prompt_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
+        enhanced_usage["output_tokens"] = message.get("token_usage").get("completion_tokens", 0)
+        enhanced_usage["input_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
 
         returnable = ChatCompletion(
             id="None",
@@ -43,7 +43,6 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
                     "message": {
                         "content": message.get("content", ""),
                         "role": message.get("role", ""),
-                        "function_call": None,
                         "tool_calls": message.get("tool_calls", []),
                     },
                     "logprobs": None,
@@ -53,41 +52,73 @@ def post_process_to_openai_format(output: ChatGenerationChunk | ChatResult ) -> 
             created=int(time.time()),
             model=message.get("model_name", ""),
             object="chat.completion",
+            tool_calls=message.get("tool_calls", []),
             system_fingerprint=None,
             usage=enhanced_usage,
         )
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
 
-    else: ## its ChatGenerationChunk
-        message = output.message
-        enhanced_usage = getattr(message, "usage_metadata", {})
-        enhanced_usage["completion_tokens"] = message.usage_metadata.get("completion_tokens", 0)
-        enhanced_usage["prompt_tokens"] = message.usage_metadata.get("prompt_tokens", 0)
+
+    elif isinstance(output, ChatGenerationChunk): ## its ChatGenerationChunk
+        orig_message = output.message
+        openai_message = convert_to_openai_messages(output.message)
+        enhanced_usage = getattr(orig_message, "usage_metadata", {})
+        enhanced_usage["completion_tokens"] = orig_message.usage_metadata.get("output_tokens", 0)
+        enhanced_usage["prompt_tokens"] = orig_message.usage_metadata.get("input_tokens", 0)
 
         returnable = ChatCompletion(
                 id="None",
-                choices=[
-                    {
-                        "index": 0,
-                        "message": {
-                            "content": message.content,
-                            "role": getattr(message, "role", "assistant"),
-                            "function_call": None,
-                            "tool_calls": getattr(message, "tool_calls", {}),
-                        },
-                        "logprobs": None,
-                        "finish_reason": getattr(message, "response_metadata", {}).get("finish_reason", None),
-                    }
-                ],
+                choices = [
+                {
+                    "index": 0,
+                    "message": {
+                        "content": orig_message.content,
+                        "role": getattr(orig_message, "role", "assistant"),
+                        "tool_calls": openai_message.get('tool_calls', []),
+                    },
+                    "logprobs": None,
+                    "finish_reason": getattr(orig_message, "response_metadata", {}).get("finish_reason", None),
+                }
+            ],
                 created=int(time.time()),
-                model=getattr(message, "response_metadata", {}).get("model_name", None),
+                model=getattr(orig_message, "response_metadata", {}).get("model_name", None),
+                tool_calls=openai_message.get('tool_calls', []),
                 object="chat.completion",
                 system_fingerprint= None,
                 usage=enhanced_usage,
             )
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
+
+## Need a separate stream variant as the passed objects don't provide an indication
+def process_inputs_to_openai_format_stream(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
+    original_args = args
+    original_kwargs = kwargs
+
+    chat_nvidia_obj = args[0]
+    messages_array = args[1]
+    messages_array = convert_to_openai_messages(messages_array)
+    n = len(messages_array)
+
+    weave_report = {
+        "model": chat_nvidia_obj.model,
+        "messages": messages_array,
+        "max_tokens": chat_nvidia_obj.max_tokens,
+        "temperature": chat_nvidia_obj.temperature,
+        "top_p": chat_nvidia_obj.top_p,
+        "object": "ChatNVIDIA._stream",
+        "n": n,
+        "stream": True
+    }
+
+    return ProcessedInputs(
+        original_args=original_args,
+        original_kwargs=original_kwargs,
+        args=original_args,
+        kwargs=original_kwargs,
+        inputs=weave_report,
+    )
 
 def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
     original_args = args
@@ -104,8 +135,7 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
         "max_tokens": chat_nvidia_obj.max_tokens,
         "temperature": chat_nvidia_obj.temperature,
         "top_p": chat_nvidia_obj.top_p,
-        "created": int(time.time()),
-        "object": "chat.completion",
+        "object": "ChatNVIDIA._generate",
         "n": n,
         "stream": False
     }
@@ -147,7 +177,7 @@ def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
 
         op = weave.op()(stream_fn)
         op.name = name
-        op._set_on_input_handler(process_inputs_to_openai_format)
+        op._set_on_input_handler(process_inputs_to_openai_format_stream)
         return add_accumulator(
             op,
             make_accumulator=lambda _: nvidia_accumulator,

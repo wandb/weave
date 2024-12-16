@@ -1,0 +1,56 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Can you name a cricket player
+      along with team name and highest score?"}], "model": "meta/llama-3.1-8b-instruct",
+      "temperature": 0.0, "max_tokens": 64, "top_p": 1.0, "stream": false, "tools":
+      [{"type": "function", "function": {"name": "cricket_player_names", "description":
+      "store the name of players", "parameters": {"type": "object", "properties":
+      {"name": {"type": "string", "description": "The name of the player"}, "team:":
+      {"type": "string", "description": "The team of the player"}, "highest_score":
+      {"type": "number", "description": "The highest score of the player"}}, "required":
+      ["name", "team", "highest_score"]}}}]}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '670'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - langchain-nvidia-ai-endpoints
+    method: POST
+    uri: https://integrate.api.nvidia.com/v1/chat/completions
+  response:
+    body:
+      string: '{"id":"chat-5e8bc6d11a764e8e8687abf0f9423139","object":"chat.completion","created":1734386576,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"chatcmpl-tool-a76550487a90458e8bacbec48668595a","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
+        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 183}"}}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30},"prompt_logprobs":null}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Expose-Headers:
+      - nvcf-reqid
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '580'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 16 Dec 2024 22:02:56 GMT
+      Nvcf-Reqid:
+      - 6d32fdd9-3e1c-4454-b2f8-e6a2ceace4cf
+      Nvcf-Status:
+      - fulfilled
+      Server:
+      - uvicorn
+      Vary:
+      - Origin
+      - origin, access-control-request-method, access-control-request-headers
+    status:
+      code: 200
+      message: OK
+version: 1
