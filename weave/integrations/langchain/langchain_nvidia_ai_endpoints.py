@@ -93,6 +93,10 @@ def process_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> Proc
     original_args = args
     original_kwargs = kwargs
 
+    print(func)
+    print(args)
+    print(kwargs)
+
     if len(args) == 3: # This indicates a successful ChatNVIDIA input
         chat_nvidia_obj = args[0]
         model_string = args[1]
