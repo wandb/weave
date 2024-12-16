@@ -19,7 +19,7 @@ interactions:
     uri: https://integrate.api.nvidia.com/v1/chat/completions
   response:
     body:
-      string: '{"id":"chat-01392aa16c3743819bc11a8146f9a53b","object":"chat.completion","created":1734386571,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":"Hello!
+      string: '{"id":"chat-0ef6597f94b04af389a7222a414b49c8","object":"chat.completion","created":1734389621,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":"Hello!
         It''s nice to meet you. Is there something I can help you with or would you
         like to chat?"},"logprobs":null,"finish_reason":"stop","stop_reason":null}],"usage":{"prompt_tokens":12,"total_tokens":36,"completion_tokens":24},"prompt_logprobs":null}'
     headers:
@@ -34,9 +34,9 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 16 Dec 2024 22:02:52 GMT
+      - Mon, 16 Dec 2024 22:53:42 GMT
       Nvcf-Reqid:
-      - 63e37b91-19a2-4795-8898-8d531f65d670
+      - 5b2791dd-6dfc-49ae-bda6-b27e0a16b59b
       Nvcf-Status:
       - fulfilled
       Server:

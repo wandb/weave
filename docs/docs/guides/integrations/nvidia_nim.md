@@ -18,7 +18,7 @@ It’s important to store traces of LLM applications in a central database, both
     ```python
     from langchain_nvidia_ai_endpoints import ChatNVIDIA
     import weave
-    llm = ChatNVIDIA(model="mistralai/mixtral-8x7b-instruct-v0.1", temperature=0.8, max_tokens=64, top_p=1)
+    client = ChatNVIDIA(model="mistralai/mixtral-8x7b-instruct-v0.1", temperature=0.8, max_tokens=64, top_p=1)
     # highlight-next-line
     weave.init('emoji-bot')
 
@@ -26,15 +26,20 @@ It’s important to store traces of LLM applications in a central database, both
         {
           "role": "system",
           "content": "You are AGI. You will be provided with a message, and your task is to respond using emojis only."
-        }
+        }]
 
-    response = llm.invoke(messages)
+    response = client.invoke(messages)
     ```
 
   </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+      ```plaintext
+      This feature is not available in TypeScript yet since this library is only in Python.
+      ```
+  </TabItem>
 </Tabs>
 
-[![openai.png](imgs/openai.png)](https://wandb.ai/_scott/emoji-bot/weave/calls)
+[![chatnvidia_trace.png](imgs/chatnvidia_trace.png)]
 
 ## Track your own ops
 
@@ -42,19 +47,19 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="python" label="Python" default>
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
-Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [openai python library](https://platform.openai.com/docs/reference/python-sdk?lang=python).
+Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [ChatNVIDIA python library](https://python.langchain.com/docs/integrations/chat/nvidia_ai_endpoints/).
 
 In the example below, we have 2 functions wrapped with op. This helps us see how intermediate steps, like the retrieval step in a RAG app, are affecting how our app behaves.
 
     ```python
     # highlight-next-line
     import weave
-    from openai import OpenAI
+    from langchain_nvidia_ai_endpoints import ChatNVIDIA
     import requests, random
     PROMPT="""Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
             Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences. """
     POKEMON = ['pikachu', 'charmander', 'squirtle', 'bulbasaur', 'jigglypuff', 'meowth', 'eevee']
-    client = OpenAI()
+    client = ChatNVIDIA(model="mistralai/mixtral-8x7b-instruct-v0.1", temperature=0.7, max_tokens=100, top_p=1)
 
     # highlight-next-line
     @weave.op
@@ -86,20 +91,17 @@ In the example below, we have 2 functions wrapped with op. This helps us see how
         # highlight-next-line
         data = get_pokemon_data(name)
         if not data: return "Error: Unable to fetch data"
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
+
+        messages=[
                 {"role": "system","content": prompt},
                 {"role": "user", "content": str(data)}
-            ],
-            temperature=0.7,
-            max_tokens=100,
-            top_p=1
-        )
-        return response.choices[0].message.content
+            ]
+
+        response = client.invoke(messages)
+        return response.content
 
     # highlight-next-line
-    weave.init('pokedex-openai')
+    weave.init('pokedex-nvidia')
     # Get data for a specific Pokémon
     pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
     ```
@@ -107,104 +109,13 @@ In the example below, we have 2 functions wrapped with op. This helps us see how
 Navigate to Weave and you can click `get_pokemon_data` in the UI to see the inputs & outputs of that step.
 </TabItem>
 <TabItem value="typescript" label="TypeScript">
-Wrapping a function with `weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
-
-    Simply create a function wrapped with [`weave.op`](/guides/tracking/ops) that calls into [openai typescript library](https://platform.openai.com/docs/libraries/node-js-library).
-
-    In the example below, we have 2 functions wrapped with op. This helps us see how intermediate steps, like the retrieval step within a RAG app, are affecting how our app behaves.
-
-    ```typescript
-    import OpenAI from 'openai';
-    // highlight-next-line
-    import * as weave from 'weave';
-
-    const PROMPT = `Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
-            Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences.`;
-    const POKEMON = [
-      'pikachu',
-      'charmander',
-      'squirtle',
-      'bulbasaur',
-      'jigglypuff',
-      'meowth',
-      'eevee',
-    ];
-
-    const openai = weave.wrapOpenAI(new OpenAI());
-
-    interface PokemonData {
-      name: string;
-      types: string[];
-      evolved_from: string;
-    }
-
-    // highlight-next-line
-    const getPokemonData = weave.op(async function getPokemonData(
-      pokemonName: string
-    ): Promise<PokemonData | null> {
-      try {
-        const url = `https://pokeapi.co/api/v2/pokemon/${pokemonName}`;
-        const response = await fetch(url);
-
-        if (response.ok) {
-          const data = await response.json();
-          const name = data.name;
-          const types = data.types.map((t: any) => t.type.name);
-
-          const speciesResponse = await fetch(data.species.url);
-          let evolved_from = 'Unknown';
-
-          if (speciesResponse.ok) {
-            const speciesData = await speciesResponse.json();
-            if (speciesData.evolves_from_species) {
-              evolved_from = speciesData.evolves_from_species.name;
-            }
-          }
-
-          return {name, types, evolved_from};
-        }
-        return null;
-      } catch (error) {
-        return null;
-      }
-    });
-
-    // highlight-next-line
-    const pokedex = weave.op(async function pokedex(
-      name: string,
-      prompt: string
-    ): Promise<string> {
-      const data = await getPokemonData(name);
-      if (!data) return 'Error: Unable to fetch data';
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {role: 'system', content: prompt},
-          {role: 'user', content: JSON.stringify(data)},
-        ],
-        temperature: 0.7,
-        max_tokens: 100,
-        top_p: 1,
-      });
-
-      return response.choices[0].message.content || '';
-    });
-
-    async function main() {
-      await weave.init('pokedex-openai');
-      const randomPokemon = POKEMON[Math.floor(Math.random() * POKEMON.length)];
-      const pokemonData = await pokedex(randomPokemon, PROMPT);
-      console.log(pokemonData);
-    }
-
-    main();
+    ```plaintext
+    This feature is not available in TypeScript yet since this library is only in Python.
     ```
-
-  </TabItem>
+</TabItem>
 </Tabs>
 
-[![openai-pokedex.png](imgs/openai-pokedex.png)](https://wandb.ai/_scott/pokedex-openai/weave)
+[![nvidia_pokedex.png](imgs/nvidia_pokedex.png)]
 
 ## Create a `Model` for easier experimentation
 
@@ -218,20 +129,18 @@ Wrapping a function with `weave.op` starts capturing inputs, outputs and app log
 
     ```python
     import weave
-    from openai import OpenAI
+    from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
-    weave.init('grammar-openai')
+    weave.init('grammar-nvidia')
 
     class GrammarCorrectorModel(weave.Model): # Change to `weave.Model`
-      model: str
       system_message: str
 
       @weave.op()
       def predict(self, user_input): # Change to `predict`
-        client = OpenAI()
-        response = client.chat.completions.create(
-          model=self.model,
-          messages=[
+        client = ChatNVIDIA(model="mistralai/mixtral-8x7b-instruct-v0.1", temperature=0, max_tokens=100, top_p=1)
+
+        messages=[
               {
                   "role": "system",
                   "content": self.system_message
@@ -240,37 +149,28 @@ Wrapping a function with `weave.op` starts capturing inputs, outputs and app log
                   "role": "user",
                   "content": user_input
               }
-              ],
-              temperature=0,
-        )
-        return response.choices[0].message.content
+              ]
+
+        response = client.invoke(messages)
+        return response.content
 
 
     corrector = GrammarCorrectorModel(
-        model="gpt-3.5-turbo-1106",
         system_message = "You are a grammar checker, correct the following user input.")
     result = corrector.predict("That was so easy, it was a piece of pie!")
     print(result)
     ```
-
-    [![openai-model.png](imgs/openai-model.png)](https://wandb.ai/_scott/grammar-openai/weave/calls)
-
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+    This feature is not available in TypeScript yet since this library is only in Python.
     ```
   </TabItem>
 </Tabs>
 
+[![chatnvidia_model.png](imgs/chatnvidia_model.png)](https://wandb.ai/_scott/grammar-openai/weave/calls)
+
 ## Usage Info
 
-The OpenAI calls return usage info as a default when `stream=False`. Weave will track this usage info and log it to weave to render token counts and cost of the call.
-
-In case you set `stream=True`, we will automatically patch the call execution with `stream_options={"include_usage": True}` argument. This will return the usage info in the last chunk to be rendered in the UI. As a user, the stream iterator will not contain this info.
-
-If you explicitly set `stream=True` and `stream_options={"include_usage": True}`, the returned stream object will contain the usage info. If you don't want to track the usage info you need to explicitly set `stream_options={"include_usage": False}`.
-
-## Support for deprecated function calling
-
-OpenAI deprecated the `functions` argument in favor of `tool_calls`. Since frameworks like Langchain, LlamaIndex, etc., still support this argument our OpenAI weave integration will trace if you pass list of function schemas to `functions` argument.
+The ChatNVIDIA integration supports `invoke`, `stream` and their async variants. It also supports tool use. 
+As ChatNVIDIA is meant to be used with many types of models, it does not have function calling support.
