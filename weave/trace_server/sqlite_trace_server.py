@@ -785,7 +785,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             digest_conditions = [
                 self._make_digest_condition(digest) for digest in req.digests
             ]
-            digest_conditions_str = " AND ".join(digest_conditions)
+            digest_conditions_str = " OR ".join(digest_conditions)
             select_query += f"AND ({digest_conditions_str})"
 
         conn, cursor = get_conn_cursor(self.db_path)
