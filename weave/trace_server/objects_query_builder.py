@@ -45,7 +45,7 @@ def _make_offset_part(offset: Optional[int]) -> str:
 
 def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
     if not sort_by:
-        return "ORDER BY created_at ASC"
+        return ""
 
     sort_clauses = []
     for sort in sort_by:
@@ -119,6 +119,8 @@ class ObjectMetadataQueryBuilder:
 
     @property
     def sort_part(self) -> str:
+        if not self._sort_by:
+            return "ORDER BY created_at ASC"
         return _make_sort_part(self._sort_by)
 
     @property
@@ -153,7 +155,7 @@ class ObjectMetadataQueryBuilder:
     def add_digests_conditions(self, digests: list[str]) -> None:
         digest_conditions = []
         for i, digest in enumerate(digests):
-            condition = self._make_digest_condition(digest, f"version_digest_{i}")
+            condition = self._make_digest_condition(digest, f"version_{i}")
             digest_conditions.append(condition)
 
         digests_condition = combine_conditions(digest_conditions, "OR")
