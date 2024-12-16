@@ -2,11 +2,12 @@ import importlib
 import time
 from collections.abc import Iterator
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from langchain_core.messages import AIMessageChunk, convert_to_openai_messages
-from langchain_core.outputs import ChatGenerationChunk, ChatResult
-from openai.types.chat import ChatCompletion
+if TYPE_CHECKING:
+    from langchain_core.messages import AIMessageChunk, convert_to_openai_messages
+    from langchain_core.outputs import ChatGenerationChunk, ChatResult
+    from openai.types.chat import ChatCompletion
 
 import weave
 from weave.trace.op import Op, ProcessedInputs
