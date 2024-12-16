@@ -24,6 +24,10 @@ export type TraceObjSchemaForBaseObjectClass<
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
 // Notice: this is still `base` object class, not `builtin` object class.
+// This means we can search by base object class, but not builtin object class today.
+// See https://github.com/wandb/weave/pull/3229 for more details.
+// base_object_class: this is the name of the first subclass of any subclass of a weave Object class.
+// object_class: the string of the actual class.
 export const useBaseObjectInstances = <
   C extends BuiltinObjectClassRegistryKeys
 >(
