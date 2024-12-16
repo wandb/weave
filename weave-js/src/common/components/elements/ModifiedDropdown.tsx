@@ -60,15 +60,12 @@ export const simpleSearch = (
     allowRegexSearch?: boolean;
   } = {}
 ) => {
-  let regex = config.allowRegexSearch ? getAsValidRegex(query) : null;
+  const regex = config.allowRegexSearch ? getAsValidRegex(query) : null;
 
   return _.chain(options)
     .filter(o => {
       const text = JSON.stringify(o.text).toLowerCase();
-      if (regex) {
-        return regex.test(text);
-      }
-      return _.includes(text, query.toLowerCase());
+      return regex ? regex.test(text) : _.includes(text, query.toLowerCase());
     })
     .sortBy(o => {
       const valJSON = typeof o.text === 'string' ? `"${query}"` : query;
@@ -156,7 +153,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             setOptions(updatedOptions);
           }
         }, debounceTime || 400),
-      [multiple, propsOptions, search, value, debounceTime]
+      [allowRegexSearch, debounceTime, multiple, propsOptions, search, value]
     );
 
     const firstRenderRef = useRef(true);
