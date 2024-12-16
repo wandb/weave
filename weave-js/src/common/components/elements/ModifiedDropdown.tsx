@@ -86,6 +86,7 @@ const getOptionProps = (opt: Option, hideText: boolean) => {
 };
 
 export interface ModifiedDropdownExtraProps {
+  allowRegexSearch?: boolean;
   debounceTime?: number;
   enableReordering?: boolean;
   hideText?: boolean;
