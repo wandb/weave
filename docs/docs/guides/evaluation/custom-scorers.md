@@ -1,0 +1,147 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Custom scorers
+
+In Weave, you can create your own custom [scorers](../evaluation/scorers.md). The scorers can either be class-based or function-based. 
+
+:::tip
+If you're using Python, there are various  predefined scorers available for common use cases. For more information, see [Select a predefined scorer](../evaluation/predefined-scorers.md#select-a-predefined-scorer) on the [Predefined scorers page](../evaluation/predefined-scorers.md).
+:::
+
+## Select the right type of custom scorer
+
+Choosing the right type of custom scorer depends on your evaluation needs:
+
+- [Function-based scorers](#function-based-scorers): Use if your evaluation logic is simple and can be implemented in a single function. Examples include checking if text is uppercase, validating a specific condition, and applying straightforward transformations. **Function-based scorers are available in both Python and Typescript.**
+
+- [Class-based scorers](#class-based-scorers): Use if your evaluation requires advanced logic, maintaining metadata, or multiple steps. Examples include keeping track of additional scorer metadata, trying different prompts for your LLM-evaluators, and making multiple function calls. **Class-based scorers are only available in Python.**
+
+## Function-based scorers
+
+Function-based scorers are available in both Python and Typescript.
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+     Function-based scorers in Python are functions decorated with `@weave.op` that return a dictionary. 
+     
+     ### How to create a function-based scorer
+     
+     To create a function-based scorer, define a function that:
+     - Is decorated with `@weave.op`.
+     - Returns a dictionary.
+
+     #### Example
+     The following example shows `evaluate_uppercase`, which checks if the text is uppercase:
+
+    ```python
+    import weave
+
+    @weave.op
+    def evaluate_uppercase(text: str) -> dict:
+        return {"text_is_uppercase": text.isupper()}
+
+    my_eval = weave.Evaluation(
+        dataset=[{"text": "HELLO WORLD"}],
+        scorers=[evaluate_uppercase]
+    )
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    Function-based scorers in Typescript are functions wrapped with `weave.op` that accept an object with `modelOutput` and optionally `datasetRow`. 
+    
+    ### How to create a function-based scorer
+     
+     To create a function-based scorer, define a function that:
+     - Is decorated with `@weave.op`.
+     - Accepts `modelOutput`
+
+     Optionally, the function can accept a `datasetRow`.
+
+     #### Example
+     The following example shows `evaluate_uppercase`, which checks if the text is uppercase:
+
+    ```typescript
+    import * as weave from 'weave'
+
+    const evaluateUppercase = weave.op(
+        ({modelOutput}) => modelOutput.toUpperCase() === modelOutput,
+        {name: 'textIsUppercase'}
+    );
+
+
+    const myEval = new weave.Evaluation({
+        dataset: [{text: 'HELLO WORLD'}],
+        scorers: [evaluateUppercase],
+    })
+    ```
+
+  </TabItem>
+</Tabs>
+
+
+## Class-based scorers
+
+:::note
+This feature is not available in Typescript. All usage instructions and code examples in this section are for Python.
+:::
+
+Class-based scorers are useful for more advanced evaluations. Classs-based scorers inherit from  the `Scorer` class. 
+
+#### How to create a class-based scorer
+
+To create a class-based scorer, create a Python class that:
+
+1. Inherits from `weave.Scorer`.
+2. Defines a `score` method that:
+   - Is decorated with `@weave.op`.
+   - Returns a dictionary.
+
+#### Example
+
+The following example shows a class-based scorer called `SummarizationScorer`. This class-based scorer uses `gpt-4o` to evaluate how good a summary is by comparing it to the original text.
+
+```python
+import weave
+from openai import OpenAI
+from weave import Scorer
+
+llm_client = OpenAI()
+
+class SummarizationScorer(Scorer):
+    model_id: str = "gpt-4o"
+    system_prompt: str = "Evaluate whether the summary is good."
+
+    @weave.op
+    def some_complicated_preprocessing(self, text: str) -> str:
+        processed_text = "Original text: \n" + text + "\n"
+        return processed_text
+
+    @weave.op
+    def call_llm(self, summary: str, processed_text: str) -> dict:
+        res = llm_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": (
+                    f"Analyse how good the summary is compared to the original text."
+                    f"Summary: {summary}\n{processed_text}"
+                )}])
+        return {"summary_quality": res}
+
+    @weave.op
+    def score(self, output: str, text: str) -> dict:
+        """Score the summary quality.
+
+        Args:
+            output: The summary generated by an AI system
+            text: The original text being summarized
+        """
+        processed_text = self.some_complicated_preprocessing(text)
+        eval_result = self.call_llm(summary=output, processed_text=processed_text)
+        return {"summary_quality": eval_result}
+
+evaluation = weave.Evaluation(
+    dataset=[{"text": "The quick brown fox jumps over the lazy dog."}],
+    scorers=[summarization_scorer])
+```
