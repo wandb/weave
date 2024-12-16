@@ -233,21 +233,6 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8191,
     supports_function_calling: false,
   },
-  'amazon.nova-micro-v1:0': {
-    provider: 'bedrock',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'amazon.nova-lite-v1:0': {
-    provider: 'bedrock',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'amazon.nova-pro-v1:0': {
-    provider: 'bedrock',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
   'amazon.titan-text-lite-v1': {
     provider: 'bedrock',
     max_tokens: 4000,
@@ -368,12 +353,6 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 4096,
     supports_function_calling: true,
   },
-
-  'xai/grok-beta': {
-    max_tokens: 131072,
-    provider: 'xai',
-    supports_function_calling: true,
-  },
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
@@ -388,7 +367,6 @@ export const LLM_PROVIDERS = [
   'gemini',
   'groq',
   'bedrock',
-  'xai',
 ];
 
 export const LLM_PROVIDER_LABELS: Record<
@@ -400,5 +378,4 @@ export const LLM_PROVIDER_LABELS: Record<
   gemini: 'Gemini',
   groq: 'Groq',
   bedrock: 'Bedrock',
-  xai: 'xAI',
 };

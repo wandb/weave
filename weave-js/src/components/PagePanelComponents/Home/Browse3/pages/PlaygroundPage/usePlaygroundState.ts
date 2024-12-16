@@ -150,17 +150,14 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
-    stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,
+    stop: state.stopSequences,
     top_p: state.topP,
     frequency_penalty: state.frequencyPenalty,
     presence_penalty: state.presencePenalty,
     n: state.nTimes,
-    response_format:
-      state.responseFormat === PlaygroundResponseFormats.Text
-        ? undefined
-        : {
-            type: state.responseFormat,
-          },
+    response_format: {
+      type: state.responseFormat,
+    },
     tools: tools.length > 0 ? tools : undefined,
   };
 };

@@ -32,7 +32,9 @@ export const ObjectViewerGroupingCell: FC<
     event.stopPropagation();
   };
 
+  const deletedRef = row.value?._weave_is_deleted_ref;
   const tooltipContent = row.path.toString();
+  const textContent = deletedRef ?? props.value;
   const box = (
     <CursorBox
       $isClickable={isGroup || isExpandableRef}
@@ -109,8 +111,9 @@ export const ObjectViewerGroupingCell: FC<
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               flex: '1 1 auto',
+              textDecoration: deletedRef ? 'line-through' : 'none',
             }}>
-            {props.value}
+            {textContent}
           </Box>
         }
       />

@@ -251,6 +251,16 @@ export type TraceObjCreateRes = {
   digest: string;
 };
 
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digests: string[];
+};
+
+export type TraceObjDeleteRes = {
+  num_deleted: number;
+};
+
 export type TraceRefsReadBatchReq = {
   refs: string[];
 };
