@@ -14,72 +14,17 @@ from tests.scorers.test_utils import generate_large_text, generate_context_and_o
 @pytest.fixture
 def mock_model_setup(monkeypatch):
     """Mock model setup and dependencies"""
-    # Create temporary model files
-    temp_dir = tempfile.mkdtemp()
-    model_dir = os.path.join(temp_dir, "model")
-    os.makedirs(model_dir, exist_ok=True)
-    
-    # Create config.json with model_type
-    config = {
-        "model_type": "gpt2",  # Using a known model type
-        "architectures": ["GPT2ForSequenceClassification"],
-        "vocab_size": 50257,
-        "n_positions": 1024,
-        "n_ctx": 1024,
-        "n_embd": 768,
-        "n_layer": 12,
-        "n_head": 12,
-        "activation_function": "gelu_new",
-        "resid_pdrop": 0.1,
-        "embd_pdrop": 0.1,
-        "attn_pdrop": 0.1,
-        "layer_norm_epsilon": 1e-5,
-        "initializer_range": 0.02,
-        "scale_attn_weights": True,
-        "use_cache": True,
-        "bos_token_id": 50256,
-        "eos_token_id": 50256,
-        "num_labels": 2  # For sequence classification
-    }
-    import json
-    with open(os.path.join(model_dir, "config.json"), "w") as f:
-        json.dump(config, f)
-    
-    # Create a dummy pytorch_model.bin file
-    import torch
-    state_dict = {
-        "transformer.wte.weight": torch.randn(50257, 768),
-        "transformer.wpe.weight": torch.randn(1024, 768),
-        "transformer.h.0.ln_1.weight": torch.randn(768),
-        "transformer.h.0.ln_1.bias": torch.randn(768),
-        "transformer.h.0.attn.c_attn.weight": torch.randn(768, 2304),
-        "transformer.h.0.attn.c_attn.bias": torch.randn(2304),
-        "transformer.h.0.attn.c_proj.weight": torch.randn(768, 768),
-        "transformer.h.0.attn.c_proj.bias": torch.randn(768),
-        "transformer.h.0.ln_2.weight": torch.randn(768),
-        "transformer.h.0.ln_2.bias": torch.randn(768),
-        "transformer.h.0.mlp.c_fc.weight": torch.randn(768, 3072),
-        "transformer.h.0.mlp.c_fc.bias": torch.randn(3072),
-        "transformer.h.0.mlp.c_proj.weight": torch.randn(3072, 768),
-        "transformer.h.0.mlp.c_proj.bias": torch.randn(768),
-        "transformer.ln_f.weight": torch.randn(768),
-        "transformer.ln_f.bias": torch.randn(768),
-        "score.weight": torch.randn(2, 768),  # For sequence classification
-        "score.bias": torch.randn(2)  # For sequence classification
-    }
-    torch.save(state_dict, os.path.join(model_dir, "pytorch_model.bin"))
-    
-    # Mock model loading functions
-    monkeypatch.setattr("weave.scorers.llm_utils.download_model", lambda *args: model_dir)
-    monkeypatch.setattr("weave.scorers.llm_utils.MODEL_PATHS", 
-                       {"hallucination_hhem_scorer": model_dir})
-    monkeypatch.setattr("weave.scorers.llm_utils.set_device", lambda *args: "cpu")
-    monkeypatch.setattr("weave.scorers.llm_utils.get_model_path", lambda *args: model_dir)
-    
     # Mock wandb login and project
     monkeypatch.setattr("wandb.login", lambda *args, **kwargs: True)
     mock_project = MagicMock()
     monkeypatch.setattr("wandb.Api", lambda: MagicMock(project=lambda *args: mock_project))
+    
+    # Download the HHEM model
+    from weave.scorers.llm_utils import download_model, MODEL_PATHS
+    model_dir = download_model(MODEL_PATHS["hallucination_hhem_scorer"])
+    
+    # Mock device to always use CPU
+    monkeypatch.setattr("weave.scorers.llm_utils.set_device", lambda *args: "cpu")
     
     return model_dir
 
