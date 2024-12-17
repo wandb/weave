@@ -235,7 +235,9 @@ FROM (
             object_id
             ORDER BY created_at ASC
         ) - 1 AS version_index,
-        count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+        count(*) OVER (
+            PARTITION BY project_id, kind, object_id
+        ) as version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
             ORDER BY (deleted_at IS NULL) DESC, created_at DESC
