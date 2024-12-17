@@ -1005,6 +1005,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds: list[str] = []
             object_id_conds: list[str] = []
             parameters: dict[str, Union[str, int]] = {}
+            ref_digests: set[str] = set()
 
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
@@ -1029,7 +1030,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_id_conds.append(f"object_id = {{{object_id_param_key}: String}}")
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
-
+                ref_digests.add(ref.version)
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
@@ -1040,6 +1041,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     parameters=parameters,
                 )
                 objs = self._select_objs_query(object_query_builder)
+                found_digests = {obj.digest for obj in objs}
+                if len(ref_digests) != len(found_digests):
+                    raise NotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    )
                 for obj in objs:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
