@@ -23,7 +23,6 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     ObjectRef,
-    OpRef,
     RefWithExtra,
     TableRef,
 )
@@ -31,7 +30,6 @@ from weave.trace.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
-    ObjDeleteReq,
     ObjReadReq,
     TableQueryReq,
     TableRowFilter,
@@ -127,22 +125,6 @@ class Traceable:
         self.mutations = None
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
-
-    def delete(self) -> None:
-        if self.ref is None:
-            raise ValueError(
-                "Cannot delete object that is not saved. Call save() first."
-            )
-        if not isinstance(self.ref, (ObjectRef, OpRef)):
-            raise TypeError("Deleting non-object refs is not yet supported.")
-        ref: ObjectRef = typing.cast(ObjectRef, self.ref)
-        self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=f"{ref.entity}/{ref.project}",
-                object_id=ref.name,
-                digests=[ref.digest],
-            )
-        )
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
