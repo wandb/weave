@@ -62,7 +62,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import (
+    from weave.integrations.langchain.langchain_nv_ai_endpoints import (
         lc_nvidia_patcher,
     )
     from weave.integrations.litellm.litellm import litellm_patcher
@@ -103,7 +103,7 @@ def reset_autopatch() -> None:
     from weave.integrations.groq.groq_sdk import groq_patcher
     from weave.integrations.instructor.instructor_sdk import instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.langchain.langchain_nvidia_ai_endpoints import (
+    from weave.integrations.langchain.langchain_nv_ai_endpoints import (
         lc_nvidia_patcher,
     )
     from weave.integrations.litellm.litellm import litellm_patcher
