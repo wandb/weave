@@ -26,7 +26,7 @@ jobs:
           cd weave-js
           yarn install --frozen-lockfile
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version
-          npm publish
+          yarn run pub
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
   notify-wandb-core:
