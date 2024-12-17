@@ -1,16 +1,11 @@
 # This is an experimental client api used to make requests to the
 # Weave Trace Server
-import contextlib
-import contextvars
 import typing
-import json
 
 import aiohttp
-import requests
 
-from weave_query import errors
 from weave_query import environment as weave_env
-from weave_query import wandb_client_api, engine_trace, weave_http
+from weave_query import engine_trace, weave_http
 
 from weave_query.context_state import WandbApiContext, _wandb_api_context
 
@@ -64,6 +59,8 @@ class WandbTraceApiAsync:
             return await self.http.query_traces(url, payload, headers=headers, cookies=cookies, auth=auth)
 
 class WandbTraceApiSync:
+    def __init__(self, http: weave_http.Http) -> None:
+        self.http = http
     def query_calls_stream(
         self,
         project_id: str,
@@ -87,12 +84,6 @@ class WandbTraceApiSync:
                 headers["authorization"] = "Basic Og==" # base64 encoding of ":"
 
         url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
-
-        api_key_override = kwargs.pop("api_key", None)
-        if api_key_override:
-            auth = ("api", api_key_override)
-
-        url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
         
         payload = {
             "project_id": project_id,
@@ -109,17 +100,4 @@ class WandbTraceApiSync:
         if query:
             payload["query"] = query
         
-        payload.update(kwargs)
-
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers,
-            auth=auth if auth else None,
-            stream=True
-        )
-        response.raise_for_status()
-
-        for line in response.iter_lines():
-            if line:
-                yield json.loads(line.decode('utf-8'))
+        return self.http.query_traces(url, payload, headers=headers, cookies=cookies, auth=auth)

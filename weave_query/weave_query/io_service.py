@@ -432,11 +432,11 @@ class Server:
     ) -> list[dict]:
         return await self.wandb_trace_server_api.query_calls_stream(
             project_id,
-            filter,
-            limit,
-            offset,
-            sort_by,
-            query,
+            filter=filter,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            query=query,
         )
 
     async def handle_ensure_file_downloaded(
@@ -611,7 +611,7 @@ class AsyncConnection:
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
         query: typing.Optional[dict] = None,
-    ):
+    ) -> typing.Optional[list[dict]]:
         res = await self.request(
             "query_traces",
             project_id,
@@ -718,6 +718,24 @@ class SyncClient:
     def sleep(self, seconds: float) -> None:
         return self.request("sleep", seconds)
 
+    def query_traces(
+        self,
+        project_id: str,
+        filter: typing.Optional[dict] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        sort_by: typing.Optional[list] = None,
+        query: typing.Optional[dict] = None,
+    ) -> typing.Optional[list[dict]]:
+        return self.request(
+            "query_traces",
+            project_id,
+            filter,
+            limit,
+            offset,
+            sort_by,
+            query,
+        )
 
 class ServerlessClient:
     def __init__(self, fs: filesystem.Filesystem) -> None:
@@ -727,6 +745,7 @@ class ServerlessClient:
         self.wandb_file_manager = wandb_file_manager.WandbFileManager(
             self.fs, self.http, self.wandb_api
         )
+        self.wandb_trace_server_api = wandb_trace_server_api.WandbTraceApiSync(self.http)
 
     def manifest(
         self,
@@ -757,6 +776,25 @@ class ServerlessClient:
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
+
+    def query_traces(
+        self,
+        project_id: str,
+        filter: typing.Optional[dict] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        sort_by: typing.Optional[list] = None,
+        query: typing.Optional[dict] = None,
+    ) -> typing.Optional[list[dict]]:
+        res = self.wandb_trace_server_api.query_calls_stream(
+            project_id,
+            filter=filter,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            query=query,
+        )
+        return res
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:

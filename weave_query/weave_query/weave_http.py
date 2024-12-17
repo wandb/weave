@@ -149,7 +149,7 @@ class HttpAsync:
                     return results
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
-                        response.status_code,
+                        response.status,
                         "Traces query failed",
                     )
 

@@ -331,8 +331,10 @@ traces_input_types = {
 )
 def traces_type(project, payload):
     res = asyncio.run(_get_project_traces(project, payload))
-    ttype = types.TypeRegistry.type_of(res)
-    return ttype
+    if res:
+        return types.TypeRegistry.type_of(res)
+    else:
+        return types.TypeRegistry.type_of([])
 
 @op(
     name="project-traces",
