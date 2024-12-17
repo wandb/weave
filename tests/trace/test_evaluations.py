@@ -1009,6 +1009,86 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     assert feedback["runnable_ref"] == get_ref(scorer).uri()
 
 
+@pytest.mark.asyncio
+async def test_sync_model_parallelism():
+    import asyncio
+    import threading
+    import time
+
+    # Create barrier for 2 model threads
+    barrier = threading.Barrier(2)
+
+    @weave.op()
+    def slow_sync_model(input: str) -> dict:
+        # Wait at barrier - this will only complete if both threads are running
+        try:
+            barrier.wait(timeout=1)
+        except threading.BrokenBarrierError:
+            pytest.fail("Threads did not execute concurrently")
+
+        time.sleep(0.01)  # Small sleep to simulate work
+        return {"result": input}
+
+    dataset = [{"input": f"test{i}"} for i in range(2)]
+
+    @weave.op()
+    def simple_score(input: str, output: dict) -> bool:
+        return output["result"] == input
+
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[simple_score])
+
+    try:
+        await asyncio.wait_for(evaluation.evaluate(slow_sync_model), timeout=1)
+    except asyncio.TimeoutError:
+        pytest.fail(
+            "The task did not complete within the timeout period. This likely means the evaluation did not actually run in parallel."
+        )
+
+    # If we get here without timeout assertions failing, threads ran concurrently
+
+
+@pytest.mark.asyncio
+async def test_async_model_parallelism():
+    import asyncio
+
+    # Use condition to coordinate coroutines
+    condition = asyncio.Condition()
+    threads_at_barrier = 0
+
+    @weave.op()
+    async def slow_async_model(input: str) -> dict:
+        nonlocal threads_at_barrier
+        async with condition:
+            threads_at_barrier += 1
+            if threads_at_barrier == 2:
+                condition.notify_all()
+            else:
+                try:
+                    await asyncio.wait_for(condition.wait(), timeout=1)
+                except asyncio.TimeoutError:
+                    assert False, "Coroutines did not execute concurrently"
+
+        await asyncio.sleep(0.01)  # Small sleep to simulate work
+        return {"result": input}
+
+    dataset = [{"input": f"test{i}"} for i in range(2)]
+
+    @weave.op()
+    def simple_score(input: str, output: dict) -> bool:
+        return output["result"] == input
+
+    evaluation = Evaluation(dataset=dataset, scorers=[simple_score])
+
+    try:
+        await asyncio.wait_for(evaluation.evaluate(slow_async_model), timeout=1)
+    except asyncio.TimeoutError:
+        pytest.fail(
+            "The task did not complete within the timeout period. This likely means the evaluation did not actually run in parallel."
+        )
+
+    # If we get here without timeout assertions failing, coroutines ran concurrently
+
+
 def test_scorers_with_output_and_model_output_raise_error():
     class MyScorer(Scorer):
         @weave.op
