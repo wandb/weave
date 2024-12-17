@@ -22,6 +22,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
     ObjectRef,
     RefWithExtra,
     TableRef,
@@ -648,9 +649,7 @@ def make_trace_obj(
             val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
             prepare_obj(val)
         except ObjectDeletedError:
-            # Catch error case where an object has been deleted. Val here is likely
-            # part of a nested object, return None to indicate a deleted object.
-            val = None
+            val = DeletedRef(ref=new_ref)
 
     if isinstance(val, Table):
         val_ref = val.ref

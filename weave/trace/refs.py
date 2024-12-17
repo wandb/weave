@@ -277,6 +277,17 @@ class CallRef(RefWithExtra):
         return u
 
 
+@dataclass(frozen=True)
+class DeletedRef(Ref):
+    ref: Ref
+
+    def __repr__(self) -> str:
+        return f"<DeletedRef {self.uri()}>"
+
+    def uri(self) -> str:
+        return self.ref.uri()
+
+
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 

@@ -25,6 +25,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
@@ -1618,10 +1619,9 @@ def test_recursive_object_deletion(client):
     # Make sure we can't get obj1
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         out = client.get(obj1_ref)
-        print(out)
 
     # Make sure we can get obj2, but the ref to object 1 should return None
-    assert client.get(obj2_ref) == {"b": None}
+    assert client.get(obj2_ref) == {"b": DeletedRef(ref=obj1_ref)}
     # Object2 should store the ref to object2, as instantiated
     assert client.get(obj3_ref) == {"c": obj2}
 
