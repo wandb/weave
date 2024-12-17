@@ -47,6 +47,7 @@ export const ChoicesDrawer = ({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          backgroundColor: 'white',
         }}>
         <Box
           sx={{
