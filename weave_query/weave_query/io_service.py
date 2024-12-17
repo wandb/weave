@@ -471,7 +471,7 @@ def get_server() -> Server:
             SERVER.start()
         return SERVER
 
-
+SENTINEL_ID = -1
 class AsyncConnection:
     def __init__(
         self,
@@ -502,8 +502,8 @@ class AsyncConnection:
 
     async def close(self) -> None:
         self.connected = False
-        sentinel = ServerResponse(http_error_code=200, error=False, client_id=self.client_id, id=-1, value=None)
-        await self.response_queue.async_put(sentinel)
+        sentinel_response = ServerResponse(http_error_code=200, error=False, client_id=self.client_id, id=SENTINEL_ID, value=None)
+        await self.response_queue.async_put(sentinel_response)
         await self.response_task
 
     async def handle_responses(self) -> None:
@@ -511,12 +511,14 @@ class AsyncConnection:
             while self.connected:
                 resp = await self.response_queue.async_get()
 
-                if resp.id == -1:
+                if resp.id == SENTINEL_ID:
                     break
 
                 self.response_queue.task_done()
                 self.requests[resp.id].set_result(resp)
         finally:
+            # Clean up all pending futures to prevent hanging requests and
+            # asyncio.exceptions.CancelledError exceptions
             for future in self.requests.values():
                 if not future.done():
                     future.cancel()
