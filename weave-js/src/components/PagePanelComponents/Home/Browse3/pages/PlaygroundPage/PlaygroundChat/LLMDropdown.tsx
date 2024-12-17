@@ -25,10 +25,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
           if (LLM_MAX_TOKENS[llm as LLMMaxTokensKey].provider === provider) {
             acc.push({
               group: provider,
-              label:
-                llm.includes(provider) || provider === 'openai'
-                  ? llm
-                  : provider + '/' + llm,
+              // add provider to the label if the LLM is not already prefixed with it
+              label: llm.includes(provider) ? llm : provider + '/' + llm,
               value: llm,
             });
           }
@@ -46,11 +44,11 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
         maxWidth: '100%',
         '& .MuiOutlinedInput-root': {
           width: 'max-content',
-          maxWidth: '200px',
+          maxWidth: '300px',
         },
         '& > div': {
           width: 'max-content',
-          maxWidth: '200px',
+          maxWidth: '300px',
         },
         '& .MuiAutocomplete-popper, & [class*="-menu"]': {
           width: '300px !important',
