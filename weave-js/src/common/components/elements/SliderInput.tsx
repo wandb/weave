@@ -25,7 +25,7 @@ export interface SliderInputProps {
   disabled?: boolean;
   strideLength?: number;
   // if true, the slider will be restricted to props.max, but the input will be unbounded (https://wandb.atlassian.net/browse/WB-5666)
-  allowGreaterThanMax?: boolean;
+  // allowGreaterThanMax?: boolean;
   onChange(value: number): void;
 }
 
@@ -47,7 +47,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     ticks,
     disabled,
     strideLength,
-    allowGreaterThanMax,
+    // allowGreaterThanMax,
     onChange,
   }) => {
     const [sliderValue, setSliderValue] = React.useState(value ?? 0);
@@ -71,19 +71,11 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         if (newVal == null || !_.isFinite(newVal)) {
           return;
         }
-        if (newVal > max && !allowGreaterThanMax) {
-          newVal = max;
-        }
-        if (newVal < min) {
-          newVal = min;
-        }
-        if (ticks != null) {
-          newVal = getClosestTick(ticks, newVal, sliderValue);
-        }
+        newVal = getClosestTick(newVal, sliderValue, min, max, ticks);
         setSliderValue(newVal);
         onChangeDebounced(newVal);
       },
-      [ticks, min, max, allowGreaterThanMax, sliderValue, onChangeDebounced]
+      [ticks, min, max, sliderValue, onChangeDebounced]
     );
 
     React.useEffect(() => {
@@ -138,7 +130,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
           strideLength={strideLength}
           disabled={disabled ?? false}
           min={min}
-          max={allowGreaterThanMax ? undefined : max}
+          max={max}
           value={value}
           ticks={ticks}
           onChange={update}
@@ -173,10 +165,27 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
 export default SliderInput;
 
 export function getClosestTick(
-  ticks: number[],
   val: number,
-  prev: number
+  prev: number,
+  min: number,
+  max: number,
+  ticks?: number[]
 ): number {
+  // if min/max not in ticks, allow coercion to nearest value
+  if (val > max) {
+    return max;
+  }
+  if (val < min) {
+    return min;
+  }
+  if (ticks === null || ticks === undefined) {
+    return val;
+  }
+  if (ticks.includes(val)) {
+    // happy path, avoid computation
+    return val;
+  }
+
   let closest = val;
   const increasing = val > prev;
   let minDiff = Number.MAX_VALUE;
