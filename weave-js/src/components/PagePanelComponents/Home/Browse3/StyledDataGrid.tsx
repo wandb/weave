@@ -38,11 +38,7 @@ type StyledDataGridProps = DataGridProProps & {
 
 // Update the styled component to accept pinnedColumnsWidth
 export const StyledDataGrid = styled(
-  ({
-    keepBorders,
-    pinnedColumnsWidth,
-    ...otherProps
-  }: StyledDataGridProps) => {
+  ({keepBorders, pinnedColumnsWidth, ...otherProps}: StyledDataGridProps) => {
     const slots = otherProps.slots ?? {};
     if (!slots.loadingOverlay) {
       slots.loadingOverlay = LoadingOverlay;
