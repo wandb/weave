@@ -971,31 +971,12 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_object_all_versions(self, object_id: str) -> None:
-        self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self._project_id(),
-                object_id=object_id,
-                digests=[],
-            )
-        )
-
-    @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=op.name,
                 digests=[op.digest],
-            )
-        )
-
-    def delete_op_all_versions(self, op_id: str) -> None:
-        self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self._project_id(),
-                object_id=op_id,
-                digests=[],
             )
         )
 
