@@ -1,7 +1,7 @@
+import React, { useEffect, useState } from 'react';
 import {styled} from '@mui/material/styles';
 import {DataGridPro, DataGridProProps} from '@mui/x-data-grid-pro';
 import {gridClasses} from '@mui/x-data-grid-pro';
-import React from 'react';
 
 import {
   Color,
@@ -41,47 +41,66 @@ export const StyledDataGrid = styled(
     }
     return <DataGridPro slots={slots} {...otherProps} />;
   }
-)(({keepBorders}) => ({
-  ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
+)(({keepBorders}) => {
+  const [leftOffset, setLeftOffset] = useState(290);
 
-  fontFamily: 'Source Sans Pro',
+  useEffect(() => {
+    const pinnedLeftHeader = document.querySelector('.MuiDataGrid-columnHeader--pinnedLeft');
+    if (pinnedLeftHeader) {
+      const width = pinnedLeftHeader.clientWidth;
+      setLeftOffset(width + 10);
+    }
+  }, []);
 
-  '& .MuiDataGrid-columnHeader': {
-    backgroundColor: MOON_50,
-    color: MOON_500,
-  },
+  return {
+    ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
-  '& .MuiDataGrid-columnHeaderTitle': {
-    fontWeight: 400,
-  },
+    fontFamily: 'Source Sans Pro',
 
-  '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
-    outline: 'none',
-  },
-
-  '& .MuiTablePagination-displayedRows': {
-    margin: 0,
-  },
-
-  '& .MuiTablePagination-actions': {
-    marginRight: '16px',
-  },
-
-  [`& .${gridClasses.row}`]: {
-    '&.Mui-hovered': {
-      backgroundColor: backgroundColorHovered,
+    '& .MuiDataGrid-columnHeader': {
+      backgroundColor: MOON_50,
+      color: MOON_500,
+      position: 'sticky',
+      left: leftOffset,
+      zIndex: 1,
     },
-    '&.Mui-selected': {
-      backgroundColor: backgroundColorSelected,
+
+    '& .MuiDataGrid-columnHeader--pinnedLeft': {
+      zIndex: 2,
+    },
+
+    '& .MuiDataGrid-columnHeaderTitle': {
+      fontWeight: 400,
+    },
+
+    '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
+      outline: 'none',
+    },
+
+    '& .MuiTablePagination-displayedRows': {
+      margin: 0,
+    },
+
+    '& .MuiTablePagination-actions': {
+      marginRight: '16px',
+    },
+
+    [`& .${gridClasses.row}`]: {
       '&.Mui-hovered': {
-        backgroundColor: backgroundColorHoveredSelected,
+        backgroundColor: backgroundColorHovered,
       },
-    },
-    [`&.${SELECTED_FOR_DELETION}`]: {
-      backgroundColor: backgroundColorSelectedForDeletion,
-      '&.Mui-hovered': {
+      '&.Mui-selected': {
+        backgroundColor: backgroundColorSelected,
+        '&.Mui-hovered': {
+          backgroundColor: backgroundColorHoveredSelected,
+        },
+      },
+      [`&.${SELECTED_FOR_DELETION}`]: {
         backgroundColor: backgroundColorSelectedForDeletion,
+        '&.Mui-hovered': {
+          backgroundColor: backgroundColorSelectedForDeletion,
+        },
       },
     },
-  },
-}));
+  };
+});
