@@ -214,7 +214,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     builder.set_offset(offset)
     builder.add_order("created_at", "desc")
     builder.add_object_ids_condition(["object_1"])
-    builder.add_digests_conditions(["digestttttttttttttttt"])
+    builder.add_digests_conditions(["digestttttttttttttttt", "another-one", "v2"])
     builder.add_base_object_classes_condition(["Model", "Model2"])
 
     query = builder.make_metadata_query()
@@ -225,7 +225,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     )
     WHERE rn = 1
 )
-WHERE ((digest = {{version_digest_0: String}}) AND (base_object_class IN {{base_object_classes: Array(String)}}))
+WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}))
 ORDER BY created_at DESC
 LIMIT 10
 OFFSET 5"""
@@ -235,6 +235,8 @@ OFFSET 5"""
         "project_id": "test_project",
         "object_id": "object_1",
         "version_digest_0": "digestttttttttttttttt",
+        "version_digest_1": "another-one",
+        "version_index_2": 2,
         "base_object_classes": ["Model", "Model2"],
     }
 
