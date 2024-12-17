@@ -12,9 +12,9 @@ In this tutorial you'll learn:
 
 ## Using `weave.Model`
 
-:::warning
+:::important
 
-The `weave.Model` class is currently only supported in Python!
+The `weave.Model` class is currently only supported in Python.
 
 :::
 
