@@ -1260,9 +1260,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
-        conditions = conditions or ["1 = 1"]
+        conditions = conditions or []
         if not include_deleted:
             conditions.append("deleted_at IS NULL")
+        if not conditions:
+            conditions.append("1 = 1")
         pred = " AND ".join(conditions)
         val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
         query = f"""
