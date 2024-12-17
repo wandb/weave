@@ -119,6 +119,13 @@ export const usePlaygroundState = () => {
           if (LLM_MAX_TOKENS_KEYS.includes(inputs.model as LLMMaxTokensKey)) {
             newState.model = inputs.model as LLMMaxTokensKey;
           } else {
+            // Allows for bedrock/us.amazon.nova-micro-v1:0 to map to amazon.nova-micro-v1:0
+            // Allows for gpt-4o-mini to map to gpt-4o-mini-2024-07-18
+            newState.model = LLM_MAX_TOKENS_KEYS.find(
+              key => key.includes(inputs.model) || inputs.model.includes(key)
+            ) as LLMMaxTokensKey;
+          }
+          if (newState.model === undefined) {
             newState.model = DEFAULT_MODEL;
           }
         }
@@ -150,14 +157,17 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
-    stop: state.stopSequences,
+    stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,
     top_p: state.topP,
     frequency_penalty: state.frequencyPenalty,
     presence_penalty: state.presencePenalty,
     n: state.nTimes,
-    response_format: {
-      type: state.responseFormat,
-    },
+    response_format:
+      state.responseFormat === PlaygroundResponseFormats.Text
+        ? undefined
+        : {
+            type: state.responseFormat,
+          },
     tools: tools.length > 0 ? tools : undefined,
   };
 };
