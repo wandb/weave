@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# NVIDIA NIM Inference Microservices
+# NVIDIA NeMo Inference Microservices
 
 Weave automatically tracks and logs LLM calls made via the [ChatNVIDIA](https://python.langchain.com/docs/integrations/chat/nvidia_ai_endpoints/) library, after `weave.init()` is called.
 
@@ -39,7 +39,7 @@ It’s important to store traces of LLM applications in a central database, both
   </TabItem>
 </Tabs>
 
-[![chatnvidia_trace.png](imgs/chatnvidia_trace.png)]
+![chatnvidia_trace.png](imgs/chatnvidia_trace.png)
 
 ## Track your own ops
 
@@ -115,7 +115,7 @@ Navigate to Weave and you can click `get_pokemon_data` in the UI to see the inpu
 </TabItem>
 </Tabs>
 
-[![nvidia_pokedex.png](imgs/nvidia_pokedex.png)]
+![nvidia_pokedex.png](imgs/nvidia_pokedex.png)
 
 ## Create a `Model` for easier experimentation
 
@@ -168,7 +168,7 @@ Navigate to Weave and you can click `get_pokemon_data` in the UI to see the inpu
   </TabItem>
 </Tabs>
 
-[![chatnvidia_model.png](imgs/chatnvidia_model.png)](https://wandb.ai/_scott/grammar-openai/weave/calls)
+![chatnvidia_model.png](imgs/chatnvidia_model.png)
 
 ## Usage Info
 
