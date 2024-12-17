@@ -284,7 +284,7 @@ class DeletedRef(Ref):
     error: ObjectDeletedError
 
     def __repr__(self) -> str:
-        return f"<DeletedRef {self.error}>"
+        return f"<DeletedRef {self.uri()}>"
 
     def uri(self) -> str:
         return self.ref.uri()
