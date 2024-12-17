@@ -1,5 +1,11 @@
+import {cloneDeep} from 'lodash';
 import {SetStateAction, useCallback, useState} from 'react';
 
+import {
+  anthropicContentBlocksToChoices,
+  hasStringProp,
+  isAnthropicCompletionFormat,
+} from '../ChatView/hooks';
 import {LLM_MAX_TOKENS_KEYS, LLMMaxTokensKey} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
@@ -34,9 +40,10 @@ const DEFAULT_PLAYGROUND_STATE = {
   topP: 1,
   frequencyPenalty: 0,
   presencePenalty: 0,
-  //   nTimes: 1,
+  nTimes: 1,
   maxTokensLimit: 16384,
   model: DEFAULT_MODEL,
+  selectedChoiceIndex: 0,
 };
 
 export const usePlaygroundState = () => {
@@ -76,7 +83,7 @@ export const usePlaygroundState = () => {
       setPlaygroundStates(prevState => {
         const newState = {...prevState[0]};
 
-        newState.traceCall = traceCall;
+        newState.traceCall = parseTraceCall(traceCall);
 
         if (!inputs) {
           return [newState];
@@ -90,9 +97,9 @@ export const usePlaygroundState = () => {
             }
           }
         }
-        // if (inputs.n) {
-        //   newState.nTimes = parseInt(inputs.n, 10);
-        // }
+        if (inputs.n) {
+          newState.nTimes = parseInt(inputs.n, 10);
+        }
         if (inputs.temperature) {
           newState.temperature = parseFloat(inputs.temperature);
         }
@@ -143,14 +150,49 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
-    stop: state.stopSequences,
+    stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,
     top_p: state.topP,
     frequency_penalty: state.frequencyPenalty,
     presence_penalty: state.presencePenalty,
-    // n: state.nTimes,
-    response_format: {
-      type: state.responseFormat,
-    },
+    n: state.nTimes,
+    response_format:
+      state.responseFormat === PlaygroundResponseFormats.Text
+        ? undefined
+        : {
+            type: state.responseFormat,
+          },
     tools: tools.length > 0 ? tools : undefined,
   };
+};
+
+// This is a helper function to parse the trace call output for anthropic
+// so that the playground can display the choices
+export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
+  const parsedTraceCall = cloneDeep(traceCall);
+
+  // Handles anthropic outputs
+  // Anthropic has content and stop_reason as top-level fields
+  if (isAnthropicCompletionFormat(parsedTraceCall.output)) {
+    const {content, stop_reason, ...outputs} = parsedTraceCall.output as any;
+    parsedTraceCall.output = {
+      ...outputs,
+      choices: anthropicContentBlocksToChoices(content, stop_reason),
+    };
+  }
+  // Handles anthropic inputs
+  // Anthropic has system message as a top-level request field
+  if (hasStringProp(parsedTraceCall.inputs, 'system')) {
+    const {messages, system, ...inputs} = parsedTraceCall.inputs as any;
+    parsedTraceCall.inputs = {
+      ...inputs,
+      messages: [
+        {
+          role: 'system',
+          content: system,
+        },
+        ...messages,
+      ],
+    };
+  }
+  return parsedTraceCall;
 };

@@ -14,7 +14,6 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import process_incoming_object_val
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -24,6 +23,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
     digest_is_version_like,
@@ -611,10 +611,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
-        val, base_object_class = process_incoming_object_val(
-            req.obj.val, req.obj.set_base_object_class
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
         )
-        json_val = json.dumps(val)
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
 
         # Validate
@@ -652,8 +653,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.obj.project_id,
                     req.obj.object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(val),
-                    base_object_class,
+                    get_kind(processed_val),
+                    processed_result["base_object_class"],
                     json.dumps([]),
                     json_val,
                     digest,

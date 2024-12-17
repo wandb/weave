@@ -37,6 +37,7 @@ type TextFieldProps = {
   dataTest?: string;
   step?: number;
   variant?: 'default' | 'ghost';
+  isContainerNightAware?: boolean;
 };
 
 export const TextField = ({
@@ -59,6 +60,7 @@ export const TextField = ({
   autoComplete,
   dataTest,
   step,
+  isContainerNightAware,
 }: TextFieldProps) => {
   const textFieldSize = size ?? 'medium';
   const leftPaddingForIcon = textFieldSize === 'medium' ? 'pl-34' : 'pl-36';
@@ -83,7 +85,6 @@ export const TextField = ({
     <Tailwind style={{width: '100%'}}>
       <div
         className={classNames(
-          'night-aware',
           'relative rounded-sm',
           textFieldSize === 'medium' ? 'h-32' : 'h-40',
           'bg-white dark:bg-moon-900',
@@ -93,6 +94,9 @@ export const TextField = ({
           variant === 'ghost' &&
             'outline outline-1 outline-transparent dark:outline-transparent',
           {
+            // must not add "night-aware" class if already in a night-aware
+            // container, otherwise they'll cancel each other out
+            'night-aware': !isContainerNightAware,
             'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB] dark:[&:hover:not(:focus-within)]:outline-teal-650':
               !errorState && variant === 'default',
             'focus-within:outline-2 focus-within:outline-teal-400 dark:focus-within:outline-teal-600':

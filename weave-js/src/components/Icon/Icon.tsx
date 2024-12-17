@@ -139,6 +139,7 @@ import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-mini
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
 import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
 import {ReactComponent as ImportMolecule} from '../../assets/icons/icon-molecule.svg';
+import {ReactComponent as ImportMoon} from '../../assets/icons/icon-moon.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-new-section-above.svg';
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
@@ -210,12 +211,14 @@ import {ReactComponent as ImportSmoothing} from '../../assets/icons/icon-smoothi
 import {ReactComponent as ImportSort} from '../../assets/icons/icon-sort.svg';
 import {ReactComponent as ImportSortAscending} from '../../assets/icons/icon-sort-ascending.svg';
 import {ReactComponent as ImportSortDescending} from '../../assets/icons/icon-sort-descending.svg';
+import {ReactComponent as ImportSpiral} from '../../assets/icons/icon-spiral.svg';
 import {ReactComponent as ImportSplit} from '../../assets/icons/icon-split.svg';
 import {ReactComponent as ImportSquare} from '../../assets/icons/icon-square.svg';
 import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
 import {ReactComponent as ImportSweepGrid} from '../../assets/icons/icon-sweep-grid.svg';
@@ -254,6 +257,7 @@ import {ReactComponent as ImportVersionsLayers} from '../../assets/icons/icon-ve
 import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-gcp.svg';
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
 import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-glasses.svg';
+import {ReactComponent as ImportVisible} from '../../assets/icons/icon-visible.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
@@ -695,6 +699,9 @@ export const IconModelOnDark = (props: SVGIconProps) => (
 export const IconMolecule = (props: SVGIconProps) => (
   <ImportMolecule {...updateIconProps(props)} />
 );
+export const IconMoon = (props: SVGIconProps) => (
+  <ImportMoon {...updateIconProps(props)} />
+);
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
@@ -908,6 +915,9 @@ export const IconSortAscending = (props: SVGIconProps) => (
 export const IconSortDescending = (props: SVGIconProps) => (
   <ImportSortDescending {...updateIconProps(props)} />
 );
+export const IconSpiral = (props: SVGIconProps) => (
+  <ImportSpiral {...updateIconProps(props)} />
+);
 export const IconSplit = (props: SVGIconProps) => (
   <ImportSplit {...updateIconProps(props)} />
 );
@@ -925,6 +935,9 @@ export const IconStop = (props: SVGIconProps) => (
 );
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
+);
+export const IconSun = (props: SVGIconProps) => (
+  <ImportSun {...updateIconProps(props)} />
 );
 export const IconSwap = (props: SVGIconProps) => (
   <ImportSwap {...updateIconProps(props)} />
@@ -1039,6 +1052,9 @@ export const IconVideoPlay = (props: SVGIconProps) => (
 );
 export const IconViewGlasses = (props: SVGIconProps) => (
   <ImportViewGlasses {...updateIconProps(props)} />
+);
+export const IconVisible = (props: SVGIconProps) => (
+  <ImportVisible {...updateIconProps(props)} />
 );
 export const IconWandb = (props: SVGIconProps) => (
   <ImportWandb {...updateIconProps(props)} />
@@ -1211,6 +1227,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   model: IconModel,
   'model-on-dark': IconModelOnDark,
   molecule: IconMolecule,
+  moon: IconMoon,
   'music-audio': IconMusicAudio,
   'new-section-above': IconNewSectionAbove,
   'new-section-below': IconNewSectionBelow,
@@ -1282,12 +1299,14 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   sort: IconSort,
   'sort-ascending': IconSortAscending,
   'sort-descending': IconSortDescending,
+  spiral: IconSpiral,
   split: IconSplit,
   square: IconSquare,
   star: IconStar,
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
   'sweep-grid': IconSweepGrid,
@@ -1326,6 +1345,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'vertex-gcp': IconVertexGCP,
   'video-play': IconVideoPlay,
   'view-glasses': IconViewGlasses,
+  visible: IconVisible,
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
