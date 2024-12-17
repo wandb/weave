@@ -10,7 +10,7 @@ type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: PlaygroundMessageRole) => void;
+  onSend: (role: PlaygroundMessageRole, text: string) => void;
   onAdd: (role: PlaygroundMessageRole, text: string) => void;
   settingsTab: number | null;
 };
@@ -43,7 +43,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   };
 
   const handleSend = (role: PlaygroundMessageRole) => {
-    onSend(role);
+    onSend(role, chatText);
     handleReset();
   };
 
