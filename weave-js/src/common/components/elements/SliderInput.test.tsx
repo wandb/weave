@@ -111,13 +111,13 @@ describe('getClosestTick', () => {
 
     const min = ticks[0];
     const max = ticks[ticks.length - 1];
-    const previous = 500000;
-    const val = 500001;
-    const start = Date.now();
+    const previous = 123456;
+    const val = 123457;
+    const start = global.window.performance.now();
     const actual = getClosestTick(val, previous, min, max, ticks);
-    const end = Date.now();
+    const end = global.window.performance.now();
     const duration = end - start;
-    expect(actual).toBe(500002);
-    expect(duration).toBeLessThanOrEqual(1);
+    expect(actual).toBe(123458);
+    expect(duration).toBeLessThanOrEqual(1.0);
   });
 });

@@ -181,10 +181,6 @@ export function getClosestTick(
   if (ticks === null || ticks === undefined) {
     return val;
   }
-  if (ticks.includes(val)) {
-    // happy path, avoid computation
-    return val;
-  }
 
   let closest = val;
   const increasing = val > prev;
@@ -205,6 +201,9 @@ export function getClosestTick(
       ((increasing && tick >= val) || (!increasing && tick <= val))
     ) {
       closest = tick;
+      if (closest == val) {
+        break;
+      }
       minDiff = diff;
     }
 
