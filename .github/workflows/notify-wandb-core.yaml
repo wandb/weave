@@ -18,9 +18,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Configure npm for GitHub Packages
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> weave-js/.npmrc
       - name: Publish package
         run: |
           cd weave-js
@@ -28,6 +25,7 @@ jobs:
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version
           yarn generate
           cp package.json README.md src/
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> weave-js/src/.npmrc
           cd src
           if [ "${{ github.ref }}" = "refs/heads/master" ]; then
             npm publish
