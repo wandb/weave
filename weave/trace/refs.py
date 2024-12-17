@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
+from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -280,9 +281,10 @@ class CallRef(RefWithExtra):
 @dataclass(frozen=True)
 class DeletedRef(Ref):
     ref: Ref
+    error: ObjectDeletedError
 
     def __repr__(self) -> str:
-        return f"<DeletedRef {self.uri()}>"
+        return f"<DeletedRef {self.error}>"
 
     def uri(self) -> str:
         return self.ref.uri()

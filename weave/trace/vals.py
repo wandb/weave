@@ -648,8 +648,8 @@ def make_trace_obj(
             )
             val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
             prepare_obj(val)
-        except ObjectDeletedError:
-            val = DeletedRef(ref=new_ref)
+        except ObjectDeletedError as e:
+            val = DeletedRef(ref=new_ref, error=e)
 
     if isinstance(val, Table):
         val_ref = val.ref
