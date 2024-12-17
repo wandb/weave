@@ -172,3 +172,86 @@ def test_delete_and_recreate_object(client: WeaveClient):
     assert len(objs) == 1
     assert objs[0].digest == v1.digest
     assert objs[0].val == {"i": 2}
+
+
+def test_read_deleted_object(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    obj1_v2 = weave.publish({"i": 3}, name="obj_1")
+
+    _obj_delete(client, "obj_1", [obj1_v2.digest])
+
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id="obj_1",
+                digest=obj1_v2.digest,
+            )
+        )
+
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        client.server.refs_read_batch(
+            tsi.RefsReadBatchReq(
+                project_id=client._project_id(),
+                object_ids=["obj_1"],
+                refs=[obj1_v2.uri()],
+            )
+        )
+
+
+def test_op_versions(client: WeaveClient):
+    @weave.op
+    def my_op(x: int) -> int:
+        return x + 1
+
+    my_op(1)
+    my_op(2)
+
+    @weave.op()
+    def my_op(x: int, y: int) -> int:
+        return x + y
+
+    my_op(1, 2)
+
+    objs = _objs_query(client, "my_op")
+    assert len(objs) == 2
+
+    _obj_delete(client, "my_op", [objs[0].digest])
+
+    objs2 = _objs_query(client, "my_op")
+    assert len(objs2) == 1
+    assert objs2[0].version_index == 1
+
+    _obj_delete(client, "my_op", ["latest"])
+
+    objs3 = _objs_query(client, "my_op")
+    assert len(objs3) == 0
+
+
+def test_read_deleted_op(client: WeaveClient):
+    @weave.op
+    def my_op(x: int) -> int:
+        return x + 1
+
+    op_ref = weave.publish(my_op, name="my_op")
+
+    _obj_delete(client, "my_op", [op_ref.digest])
+
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id="my_op",
+                digest=op_ref.digest,
+            )
+        )
+
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        client.server.refs_read_batch(
+            tsi.RefsReadBatchReq(
+                project_id=client._project_id(),
+                object_ids=["my_op"],
+                refs=[op_ref.uri()],
+            )
+        )
