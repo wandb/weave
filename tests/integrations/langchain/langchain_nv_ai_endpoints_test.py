@@ -368,8 +368,7 @@ async def test_chatnvidia_tool_call_async(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-@pytest.mark.asyncio
-async def test_chatnvidia_tool_call_stream(
+def test_chatnvidia_tool_call_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
