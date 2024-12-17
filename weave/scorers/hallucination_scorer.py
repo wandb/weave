@@ -1,16 +1,16 @@
 import os
-from typing import Any, Dict, List, Optional, Union
-
+from typing import Any, Dict, List, Optional
+import warnings
 from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import InstructorLLMScorer
 from weave.scorers.llm_utils import (
+    MODEL_PATHS,
     OPENAI_DEFAULT_MODEL,
     create,
     download_model,
-    MODEL_PATHS,
 )
 from weave.scorers.utils import stringify
 
@@ -284,7 +284,8 @@ class HallucinationScorer(Scorer):
 
         # torch.cuda.is_available()
         if not torch.cuda.is_available() and "cuda" in self.device:
-            raise ValueError("CUDA is not available")
+            warnings.warn("CUDA is not available, using CPU instead")
+            self.device = "cpu"
 
         if self.llm_model is None:
             # Check if the model is already downloaded
@@ -350,10 +351,10 @@ class HallucinationScorer(Scorer):
             if self.use_hhem:
                 inps = query + "\n\n" + context
                 outs = output
-                
+
                 inps_toks = self.tokenizer(inps, truncation=False)
                 outs_toks = self.tokenizer(outs, truncation=False)
-                
+
                 len_inps = len(inps_toks.input_ids)
                 len_outs = len(outs_toks.input_ids)
                 if len_inps + len_outs > self.model_max_length:
@@ -364,7 +365,9 @@ class HallucinationScorer(Scorer):
                         out_input_ids = outs_toks.input_ids
                     else:
                         inps_input_ids = inps_toks.input_ids[:975]
-                        out_input_ids = outs_toks.input_ids[:self.model_max_length - 1025]
+                        out_input_ids = outs_toks.input_ids[
+                            : self.model_max_length - 1025
+                        ]
 
                     inps = self.tokenizer.decode(inps_input_ids)
                     outs = self.tokenizer.decode(out_input_ids)
