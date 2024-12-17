@@ -66,4 +66,4 @@ export const traceSortByType = union([
   'none',
   list(typedDict({field: 'string', direction: 'string'})),
 ]);
-export const traceQueryType = union(['none', dict('any')])
+export const traceQueryType = union(['none', dict('any')]);
