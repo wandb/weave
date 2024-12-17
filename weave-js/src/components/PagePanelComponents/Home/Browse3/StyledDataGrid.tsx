@@ -62,6 +62,7 @@ export const StyledDataGrid = styled(
       color: MOON_500,
       position: 'sticky',
       left: leftOffset,
+      maxWidth: '100vw',
       zIndex: 1,
     },
 
