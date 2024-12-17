@@ -50,33 +50,20 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
 
   const {useCall, useCalls} = useWFHooks();
   const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const callKey = useMemo(() => {
+    return props.callId
+      ? {
+          entity: props.entity,
+          project: props.project,
+          callId: props.callId,
+        }
+      : null;
+  }, [props.entity, props.project, props.callId]);
 
-  const call = useCall(
-    useMemo(() => {
-      return props.callId
-        ? {
-            entity: props.entity,
-            project: props.project,
-            callId: props.callId,
-          }
-        : null;
-    }, [props.entity, props.project, props.callId])
-  );
-
-  const callWithCosts = useCall(
-    useMemo(() => {
-      return props.callId
-        ? {
-            entity: props.entity,
-            project: props.project,
-            callId: props.callId,
-          }
-        : null;
-    }, [props.entity, props.project, props.callId]),
-    {
-      includeCosts: true,
-    }
-  );
+  const call = useCall(callKey);
+  const callWithCosts = useCall(callKey, {
+    includeCosts: true,
+  });
 
   const {result: calls} = useCalls(
     props.entity,
@@ -121,9 +108,11 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         setPlaygroundStateFromTraceCall(callWithCosts.result.traceCall);
       }
     }
-    // Only set the call the first time the page loads, and we get the call
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callWithCosts.loading]);
+  }, [
+    callWithCosts.loading,
+    setPlaygroundStateFromTraceCall,
+    callWithCosts.result,
+  ]);
 
   useEffect(() => {
     setPlaygroundStates(prev => {
