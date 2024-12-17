@@ -12,6 +12,7 @@ import aiohttp
 import requests
 import requests.auth
 import yarl
+import json
 
 from weave_query import engine_trace, filesystem, server_error_handling
 
@@ -128,6 +129,29 @@ class HttpAsync:
                         r.status, "Download failed"
                     )
 
+    async def query_traces(
+        self,
+        url: str,
+        payload: typing.Optional[dict],
+        headers: typing.Optional[dict[str, str]] = None,
+        cookies: typing.Optional[dict[str, str]] = None,
+        auth: typing.Optional[aiohttp.BasicAuth] = None,
+    ) -> list[dict]:
+        with tracer.trace("query_traces"):
+            results = []
+            async with self.session.post(url, json=payload, headers=headers, cookies=cookies, auth=auth) as response:
+                if response.status == 200:
+                    async for line in response.content:
+                        if line:
+                            decoded_line = line.decode('utf-8').strip()
+                            if decoded_line:
+                                results.append(json.loads(decoded_line))
+                    return results
+                else:
+                    raise server_error_handling.WeaveInternalHttpException.from_code(
+                        response.status,
+                        "Traces query failed",
+                    )
 
 class Http:
     def __init__(self, fs: filesystem.Filesystem) -> None:
@@ -169,3 +193,25 @@ class Http:
                         r.status_code,
                         "Download failed",  # type: ignore
                     )
+                
+    def query_traces(
+        self,
+        url: str,
+        payload: typing.Optional[dict],
+        headers: typing.Optional[dict[str, str]] = None,
+        cookies: typing.Optional[dict[str, str]] = None,
+        auth: typing.Optional[aiohttp.BasicAuth] = None,
+    ) -> list[dict]:
+        with tracer.trace("query_traces"):
+            results = []
+            with self.session.post(url, json=payload, headers=headers, cookies=cookies, auth=auth) as response:
+                if response.status_code == 200:
+                    for line in response.iter_lines():
+                        if line:
+                            results.append(json.loads(line))
+                else:
+                    raise server_error_handling.WeaveInternalHttpException.from_code(
+                        response.status_code,
+                        "Traces query failed",
+                    )
+            return results

@@ -1,8 +1,11 @@
+import asyncio
 import json
 import typing
 
 from weave_query import errors
 from weave_query import weave_types as types
+from weave_query import ops_arrow
+from weave_query import io_service
 from weave_query.api import op
 from weave_query import input_provider
 from weave_query.gql_op_plugin import wb_gql_op_plugin
@@ -259,3 +262,32 @@ def artifacts(
         for typeEdge in project["artifactTypes_100"]["edges"]
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]
+
+async def _get_project_traces(project, payload):
+    client = io_service.get_async_client()
+    project_id = f'{project["entity"]["name"]}/{project["name"]}'
+    filter = None
+    limit = None 
+    offset = None
+    sort_by = None
+    query = None
+    if payload is not None:
+        filter = payload.get("filter")
+        limit = payload.get("limit") 
+        offset = payload.get("offset")
+        sort_by = payload.get("sort_by")
+        query = payload.get("query")
+
+    loop = asyncio.get_running_loop()
+    tasks = set()
+    async with client.connect() as conn:
+        task = loop.create_task(conn.query_traces(
+            project_id,
+            filter=filter,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            query=query))
+        tasks.add(task)
+        await asyncio.wait(tasks)
+        return task.result()
