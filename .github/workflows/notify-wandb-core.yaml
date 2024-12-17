@@ -6,10 +6,19 @@ name: Notify wandb/core
 on:
   push:
     branches:
-      - '**'
+      - "**"
   workflow_dispatch:
 
 jobs:
+  publish-package:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Publish package
+        run: |
+          yarn install --frozen-lockfile
+          npm version 0.0.0-${{ github.sha }} --no-git-tag-version
+          npm publish
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
   notify-wandb-core:
