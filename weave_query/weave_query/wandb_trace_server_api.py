@@ -31,8 +31,6 @@ class WandbTraceApiAsync:
             offset: typing.Optional[int] = None,
             sort_by: typing.Optional[list] = None,
             query: typing.Optional[dict] = None,
-            include_costs: bool = False,
-            include_feedback: bool = False,
         ) -> typing.List[dict]:
             wandb_api_context = get_wandb_api_context()
             headers = {'content-type': 'application/json'}
@@ -44,14 +42,12 @@ class WandbTraceApiAsync:
                 if wandb_api_context.api_key is not None:
                     auth = aiohttp.BasicAuth("api", wandb_api_context.api_key)
                 if cookies:
-                    headers["authorization"] = "Basic Og=="
+                    headers["authorization"] = "Basic Og==" # base64 encoding of ":"
 
             url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
 
             payload = {
                 "project_id": project_id,
-                "include_costs": include_costs,
-                "include_feedback": include_feedback,
             }
             
             if filter:
@@ -76,21 +72,21 @@ class WandbTraceApiSync:
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
         query: typing.Optional[dict] = None,
-        include_costs: bool = False,
-        include_feedback: bool = False,
         **kwargs: typing.Any
     ) -> typing.Any:
-        wandb_context = get_wandb_api_context()
+        wandb_api_context = get_wandb_api_context()
         headers = {'content-type': 'application/json'}
         auth = None
-        
-        if wandb_context is not None:
-            if wandb_context.headers:
-                headers.update(wandb_context.headers)
-            if wandb_context.api_key is not None:
-                auth = ("api", wandb_context.api_key)
-            else:
-                headers["authorization"] = "Basic Og=="
+        cookies = None
+        if wandb_api_context is not None:
+            headers = wandb_api_context.headers
+            cookies = wandb_api_context.cookies
+            if wandb_api_context.api_key is not None:
+                auth = aiohttp.BasicAuth("api", wandb_api_context.api_key)
+            if cookies:
+                headers["authorization"] = "Basic Og==" # base64 encoding of ":"
+
+        url = f"{weave_env.weave_trace_server_url()}/calls/stream_query"
 
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
@@ -100,8 +96,6 @@ class WandbTraceApiSync:
         
         payload = {
             "project_id": project_id,
-            "include_costs": include_costs,
-            "include_feedback": include_feedback,
         }
         
         if filter:

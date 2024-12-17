@@ -429,8 +429,6 @@ class Server:
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
         query: typing.Optional[dict] = None,
-        include_costs: bool = False,
-        include_feedback: bool = False,
     ) -> list[dict]:
         return await self.wandb_trace_server_api.query_calls_stream(
             project_id,
@@ -439,8 +437,6 @@ class Server:
             offset,
             sort_by,
             query,
-            include_costs,
-            include_feedback
         )
 
     async def handle_ensure_file_downloaded(
@@ -615,8 +611,6 @@ class AsyncConnection:
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
         query: typing.Optional[dict] = None,
-        include_costs: bool = False,
-        include_feedback: bool = False
     ):
         res = await self.request(
             "query_traces",
@@ -626,8 +620,6 @@ class AsyncConnection:
             offset,
             sort_by,
             query,
-            include_costs,
-            include_feedback
         )
         return res
 
