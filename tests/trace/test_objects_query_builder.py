@@ -72,12 +72,12 @@ def test_object_query_builder_add_digest_condition():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
 
     # Test latest digest
-    builder.add_digests_conditions(["latest"])
+    builder.add_digests_conditions("latest")
     assert "is_latest = 1" in builder.conditions_part
 
     # Test specific digest
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_digests_conditions(["abc123"])
+    builder.add_digests_conditions("abc123")
     assert "digest = {version_digest_0: String}" in builder.conditions_part
     assert builder.parameters["version_digest_0"] == "abc123"
 
@@ -188,7 +188,7 @@ FROM (
 
 def test_object_query_builder_metadata_query_basic():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_digests_conditions(["latest"])
+    builder.add_digests_conditions("latest")
 
     query = builder.make_metadata_query()
     parameters = builder.parameters
@@ -214,7 +214,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     builder.set_offset(offset)
     builder.add_order("created_at", "desc")
     builder.add_object_ids_condition(["object_1"])
-    builder.add_digests_conditions(["digestttttttttttttttt", "another-one", "v2"])
+    builder.add_digests_conditions("digestttttttttttttttt", "another-one", "v2")
     builder.add_base_object_classes_condition(["Model", "Model2"])
 
     query = builder.make_metadata_query()
@@ -245,7 +245,7 @@ def test_objects_query_metadata_op():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
     builder.add_object_ids_condition(["my_op"])
-    builder.add_digests_conditions(["v3"])
+    builder.add_digests_conditions("v3")
 
     query = builder.make_metadata_query()
     parameters = builder.parameters

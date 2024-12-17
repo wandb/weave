@@ -531,7 +531,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_digests_conditions([req.digest])
+        object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.name], "op_name")
 
         objs = self._select_objs_query(object_query_builder)
@@ -582,7 +582,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digests_conditions([req.digest])
+        object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
 
         objs = self._select_objs_query(object_query_builder)

@@ -162,7 +162,7 @@ class ObjectMetadataQueryBuilder:
         self.parameters.update({param_key: version_index})
         return f"version_index = {{{param_key}: Int64}}"
 
-    def add_digests_conditions(self, digests: list[str]) -> None:
+    def add_digests_conditions(self, *digests: str) -> None:
         digest_conditions = []
         for i, digest in enumerate(digests):
             condition = self._make_digest_condition(digest, None, i)
