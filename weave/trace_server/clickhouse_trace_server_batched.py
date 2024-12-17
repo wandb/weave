@@ -599,7 +599,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         obj = objs[0]
         if obj.deleted_at is not None:
             raise ObjectDeletedError(
-                f"Obj {req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}"
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}"
             )
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))

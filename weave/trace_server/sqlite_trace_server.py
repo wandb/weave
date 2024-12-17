@@ -730,7 +730,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
-                f"Obj {req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
+                f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
             )
         return tsi.ObjReadRes(obj=objs[0])
 
