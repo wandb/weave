@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import inspect
+import json
 import logging
 import platform
 import re
@@ -68,6 +69,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -646,6 +648,12 @@ class WeaveClient:
         except HTTPError as e:
             if e.response is not None and e.response.status_code == 404:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            elif e.response is not None and e.response.content:
+                try:
+                    reason = json.loads(e.response.content).get("reason")
+                    raise ValueError(reason)
+                except json.JSONDecodeError:
+                    raise ValueError(e.response.content)
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -949,6 +957,45 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_version(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digests=[object.digest],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_all_versions(self, object_id: str) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_id,
+                digests=[],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op_version(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op.name,
+                digests=[op.digest],
+            )
+        )
+
+    def delete_op_all_versions(self, op_id: str) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op_id,
+                digests=[],
             )
         )
 
