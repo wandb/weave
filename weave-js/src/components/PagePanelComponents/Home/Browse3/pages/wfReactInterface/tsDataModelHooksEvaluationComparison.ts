@@ -69,7 +69,6 @@
  *  across different datasets.
  */
 
-import _ from 'lodash';
 import {sum} from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
@@ -177,11 +176,35 @@ const fetchEvaluationComparisonData = async (
   });
 
   // Kick off the trace query to get the actual trace data
+  // Note: we split this into 2 steps to ensure we only get level 2 children
+  // of the evaluations. This avoids massive overhead of fetching gigantic traces
+  // for every evaluation.
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceResProm = traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
-  });
+  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
+  const evalTraceResProm = traceServerClient
+    .callsStreamQuery({
+      project_id: projectId,
+      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
+    })
+    .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
+      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+        call => call.id
+      );
+      return traceServerClient
+        .callsStreamQuery({
+          project_id: projectId,
+          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+        })
+        .then(predictionsAndScoresCallsRes => {
+          return {
+            calls: [
+              ...predictAndScoreCallRes.calls,
+              ...predictionsAndScoresCallsRes.calls,
+            ],
+          };
+        });
+    });
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
@@ -479,17 +502,8 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const possiblePredictNames = [
-              'predict',
-              'infer',
-              'forward',
-              'invoke',
-            ];
             const isProbablyPredictCall =
-              (_.some(possiblePredictNames, name =>
-                traceCall.op_name.includes(`.${name}:`)
-              ) &&
-                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.inputs.self) ||
               modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);

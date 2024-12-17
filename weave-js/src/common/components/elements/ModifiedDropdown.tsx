@@ -17,10 +17,11 @@ import {
   DropdownItemProps,
   Icon,
   Label,
+  LabelProps,
   StrictDropdownProps,
 } from 'semantic-ui-react';
-import {LabelProps} from 'semantic-ui-react';
 
+import {IconChevronDown, IconChevronUp} from '../../../components/Icon';
 import {
   DragDropProvider,
   DragDropState,
@@ -44,11 +45,28 @@ type LabelCoord = {
 
 const ITEM_LIMIT_VALUE = '__item_limit';
 
-const simpleSearch = (options: DropdownItemProps[], query: string) => {
+export function getAsValidRegex(s: string): RegExp | null {
+  try {
+    return new RegExp(s);
+  } catch (e) {
+    return null;
+  }
+}
+
+export const simpleSearch = (
+  options: DropdownItemProps[],
+  query: string,
+  config: {
+    allowRegexSearch?: boolean;
+  } = {}
+) => {
+  const regex = config.allowRegexSearch ? getAsValidRegex(query) : null;
+
   return _.chain(options)
-    .filter(o =>
-      _.includes(JSON.stringify(o.text).toLowerCase(), query.toLowerCase())
-    )
+    .filter(o => {
+      const text = JSON.stringify(o.text).toLowerCase();
+      return regex ? regex.test(text) : _.includes(text, query.toLowerCase());
+    })
     .sortBy(o => {
       const valJSON = typeof o.text === 'string' ? `"${query}"` : query;
       return JSON.stringify(o.text).toLowerCase() === valJSON.toLowerCase()
@@ -68,16 +86,17 @@ const getOptionProps = (opt: Option, hideText: boolean) => {
 };
 
 export interface ModifiedDropdownExtraProps {
+  allowRegexSearch?: boolean;
   debounceTime?: number;
   enableReordering?: boolean;
+  hideText?: boolean;
   itemLimit?: number;
   options: Option[];
+  optionTransform?(option: Option): Option;
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
-  hideText?: boolean;
-
-  optionTransform?(option: Option): Option;
+  useIcon?: boolean;
 }
 
 type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
@@ -96,10 +115,11 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     } = props;
 
     const {
+      allowAdditions,
+      allowRegexSearch,
+      enableReordering,
       itemLimit,
       optionTransform,
-      enableReordering,
-      allowAdditions,
       resultLimit = 100,
       resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
       ...passProps
@@ -128,15 +148,13 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
               _.concat(currentOptions, search(propsOptions, query) as Option[])
             );
           } else {
-            setOptions(
-              _.concat(
-                currentOptions,
-                simpleSearch(propsOptions, query) as Option[]
-              )
+            const updatedOptions = currentOptions.concat(
+              simpleSearch(propsOptions, query, {allowRegexSearch}) as Option[]
             );
+            setOptions(updatedOptions);
           }
         }, debounceTime || 400),
-      [multiple, propsOptions, search, value, debounceTime]
+      [allowRegexSearch, debounceTime, multiple, propsOptions, search, value]
     );
 
     const firstRenderRef = useRef(true);
@@ -470,6 +488,15 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         trigger={renderTrigger()}
+        icon={
+          passProps.useIcon ? (
+            passProps.open ? (
+              <IconChevronUp />
+            ) : (
+              <IconChevronDown />
+            )
+          ) : undefined
+        }
       />
     );
   },

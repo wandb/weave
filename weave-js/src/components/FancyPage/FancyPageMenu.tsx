@@ -44,7 +44,9 @@ export const FancyPageMenu = ({
             <ItemIcon color={colorIconBg}>
               <IconOverflowHorizontal />
             </ItemIcon>
-            <ItemLabel color={colorText}>More</ItemLabel>
+            <ItemLabel className="night-aware" color={colorText}>
+              More
+            </ItemLabel>
           </MenuButton>
         </div>
       </DropdownMenu.Trigger>
@@ -58,7 +60,6 @@ export const FancyPageMenu = ({
               return null;
             }
             const linkProps = {
-              key: menuItem.slug,
               to: menuItem.isDisabled
                 ? {}
                 : {
@@ -74,7 +75,7 @@ export const FancyPageMenu = ({
               },
             };
             return (
-              <Link {...linkProps}>
+              <Link key={menuItem.slug} {...linkProps}>
                 <DropdownMenu.Item {...menuItemProps}>
                   <Icon name={menuItem.iconName} />
                   {menuItem.nameTooltip || menuItem.name}

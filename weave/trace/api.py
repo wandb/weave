@@ -1,16 +1,19 @@
 """The top-level functions for Weave Trace API."""
 
+from __future__ import annotations
+
 import contextlib
 import os
 import threading
 import time
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any
 
-# TODO: type_serializers is imported here to trigger registration of the image serializer.
+# TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from weave import type_serializers  # noqa: F401
+from weave import type_handlers  # noqa: F401
 from weave.trace import urls, util, weave_client, weave_init
+from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -23,13 +26,14 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace_server.interface.base_object_classes import leaderboard
+from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 
 def init(
     project_name: str,
     *,
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -50,7 +54,12 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
 
-    return weave_init.init_weave(project_name).client
+    initialized_client = weave_init.init_weave(
+        project_name,
+        autopatch_settings=autopatch_settings,
+    )
+
+    return initialized_client.client
 
 
 @contextlib.contextmanager
@@ -76,7 +85,7 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -161,11 +170,11 @@ def ref(location: str) -> weave_client.ObjectRef:
     return uri
 
 
-def obj_ref(obj: Any) -> Optional[weave_client.ObjectRef]:
+def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
     return weave_client.get_ref(obj)
 
 
-def output_of(obj: Any) -> Optional[weave_client.Call]:
+def output_of(obj: Any) -> weave_client.Call | None:
     client = weave_client_context.require_weave_client()
 
     ref = obj_ref(obj)
@@ -199,8 +208,8 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
 
 def serve(
     model_ref: ObjectRef,
-    method_name: Optional[str] = None,
-    auth_entity: Optional[str] = None,
+    method_name: str | None = None,
+    auth_entity: str | None = None,
     port: int = 9996,
     thread: bool = False,
 ) -> str:

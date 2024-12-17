@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import dataclasses
 import datetime
+import inspect
+import logging
 import platform
 import re
 import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
 
 import pydantic
 from requests import HTTPError
@@ -39,8 +43,9 @@ from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
-from weave.trace.util import deprecated
+from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.trace_server_interface import (
@@ -83,17 +88,133 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
 
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+R = TypeVar("R", covariant=True)
+
+
+class FetchFunc(Protocol[T]):
+    def __call__(self, offset: int, limit: int) -> list[T]: ...
+
+
+TransformFunc = Callable[[T], R]
+
+
+class PaginatedIterator(Generic[T, R]):
+    """An iterator that fetches pages of items from a server and optionally transforms them
+    into a more user-friendly type."""
+
+    def __init__(
+        self,
+        fetch_func: FetchFunc[T],
+        page_size: int = 1000,
+        transform_func: TransformFunc[T, R] | None = None,
+    ) -> None:
+        self.fetch_func = fetch_func
+        self.page_size = page_size
+        self.transform_func = transform_func
+
+        if page_size <= 0:
+            raise ValueError("page_size must be greater than 0")
+
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[T]:
+        return self.fetch_func(index * self.page_size, self.page_size)
+
+    @overload
+    def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
+    @overload
+    def _get_one(self: PaginatedIterator[T, R], index: int) -> R: ...
+    def _get_one(self, index: int) -> T | R:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
+
+        page_index = index // self.page_size
+        page_offset = index % self.page_size
+
+        page = self._fetch_page(page_index)
+        if page_offset >= len(page):
+            raise IndexError(f"Index {index} out of range")
+
+        res = page[page_offset]
+        if transform := self.transform_func:
+            return transform(res)
+        return res
+
+    @overload
+    def _get_slice(self: PaginatedIterator[T, T], key: slice) -> Iterator[T]: ...
+    @overload
+    def _get_slice(self: PaginatedIterator[T, R], key: slice) -> Iterator[R]: ...
+    def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) is not None and stop < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        i = start
+        while stop is None or i < stop:
+            try:
+                yield self._get_one(i)
+            except IndexError:
+                break
+            i += step
+
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: int) -> T: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: int) -> R: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: slice) -> list[T]: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: slice) -> list[R]: ...
+    def __getitem__(self, key: slice | int) -> T | R | list[T] | list[R]:
+        if isinstance(key, slice):
+            return list(self._get_slice(key))
+        return self._get_one(key)
+
+    @overload
+    def __iter__(self: PaginatedIterator[T, T]) -> Iterator[T]: ...
+    @overload
+    def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
+    def __iter__(self) -> Iterator[T] | Iterator[R]:
+        return self._get_slice(slice(0, None, 1))
+
+
+# TODO: should be Call, not WeaveObject
+CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+
+
+def _make_calls_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    filter: CallsFilter,
+    include_costs: bool = False,
+) -> CallsIter:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        response = server.calls_query(
+            CallsQueryReq(
+                project_id=project_id,
+                filter=filter,
+                offset=offset,
+                limit=limit,
+                include_costs=include_costs,
+            )
+        )
+        return response.calls
+
+    # TODO: Should be Call, not WeaveObject
+    def transform_func(call: CallSchema) -> WeaveObject:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(fetch_func, transform_func=transform_func)
+
 
 class OpNameError(ValueError):
     """Raised when an op name is invalid."""
-
-
-def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
-    # dataclasses.asdict is recursive. We don't want that when json encoding
-    return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
-
-
-# TODO: unused
 
 
 def get_obj_name(val: Any) -> str:
@@ -108,7 +229,7 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> Optional[ObjectRef]:
+def get_ref(obj: Any) -> ObjectRef | None:
     return getattr(obj, "ref", None)
 
 
@@ -120,7 +241,7 @@ def remove_ref(obj: Any) -> None:
             obj.ref = None
 
 
-def set_ref(obj: Any, ref: Optional[Ref]) -> None:
+def set_ref(obj: Any, ref: Ref | None) -> None:
     """Try to set the ref on "any" object.
 
     We use increasingly complex methods to try to set the ref
@@ -139,7 +260,7 @@ def set_ref(obj: Any, ref: Optional[Ref]) -> None:
                 raise ValueError(f"Failed to set ref on object of type {type(obj)}")
 
 
-def _get_direct_ref(obj: Any) -> Optional[Ref]:
+def _get_direct_ref(obj: Any) -> Ref | None:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
         # which is the direct ref to the table. But .ref on WeaveTable is
@@ -185,24 +306,34 @@ def map_to_refs(obj: Any) -> Any:
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
 
-    _op_name: Union[str, Future[str]]
+    _op_name: str | Future[str]
     trace_id: str
     project_id: str
-    parent_id: Optional[str]
+    parent_id: str | None
     inputs: dict
-    id: Optional[str] = None
+    id: str | None = None
     output: Any = None
-    exception: Optional[str] = None
-    summary: Optional[dict] = None
-    display_name: Optional[Union[str, Callable[["Call"], str]]] = None
-    attributes: Optional[dict] = None
-    started_at: Optional[datetime.datetime] = None
-    ended_at: Optional[datetime.datetime] = None
-    deleted_at: Optional[datetime.datetime] = None
-    # These are the live children during logging
-    _children: list["Call"] = dataclasses.field(default_factory=list)
+    exception: str | None = None
+    summary: dict | None = None
+    _display_name: str | Callable[[Call], str] | None = None
+    attributes: dict | None = None
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    deleted_at: datetime.datetime | None = None
 
-    _feedback: Optional[RefFeedbackQuery] = None
+    # These are the live children during logging
+    _children: list[Call] = dataclasses.field(default_factory=list)
+    _feedback: RefFeedbackQuery | None = None
+
+    @property
+    def display_name(self) -> str | Callable[[Call], str] | None:
+        return self._display_name
+
+    @display_name.setter
+    def display_name(self, name: str | Callable[[Call], str] | None) -> None:
+        if isinstance(name, str):
+            name = elide_display_name(name)
+        self._display_name = name
 
     @property
     def op_name(self) -> str:
@@ -230,39 +361,52 @@ class Call:
     @property
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
-            raise ValueError("Can't get feedback for call without ID")
+            raise ValueError(
+                "Can't get feedback for call without ID, was `weave.init` called?"
+            )
+
         if self._feedback is None:
-            project_parts = self.project_id.split("/")
-            if len(project_parts) != 2:
+            try:
+                entity, project = self.project_id.split("/")
+            except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}")
-            entity, project = project_parts
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
 
     @property
     def ui_url(self) -> str:
-        project_parts = self.project_id.split("/")
-        if len(project_parts) != 2:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
-        entity, project = project_parts
         if not self.id:
-            raise ValueError("Can't get URL for call without ID")
+            raise ValueError(
+                "Can't get URL for call without ID, was `weave.init` called?"
+            )
+
+        try:
+            entity, project = self.project_id.split("/")
+        except ValueError:
+            raise ValueError(f"Invalid project_id: {self.project_id}")
         return urls.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:
         entity, project = self.project_id.split("/")
         if not self.id:
-            raise ValueError("Can't get ref for call without ID")
+            raise ValueError(
+                "Can't get ref for call without ID, was `weave.init` called?"
+            )
+
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> "CallsIter":
+    def children(self) -> CallsIter:
         client = weave_client_context.require_weave_client()
         if not self.id:
-            raise ValueError("Can't get children of call without ID")
-        return CallsIter(
+            raise ValueError(
+                "Can't get children of call without ID, was `weave.init` called?"
+            )
+
+        client = weave_client_context.require_weave_client()
+        return _make_calls_iterator(
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
@@ -274,7 +418,7 @@ class Call:
         client.delete_call(call=self)
         return True
 
-    def set_display_name(self, name: Optional[str]) -> None:
+    def set_display_name(self, name: str | None) -> None:
         """
         Set the display name for the call.
 
@@ -316,7 +460,7 @@ class Call:
         - no context yet (ie. ground truth)
         """
         client = weave_client_context.require_weave_client()
-        scorer_signature = scorer_op.signature
+        scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
         score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
         if "output" in scorer_arg_names:
@@ -328,7 +472,6 @@ class Call:
         self_ref = get_ref(self)
         if self_ref is None:
             raise ValueError("Call has no ref")
-        score_name = scorer_op_ref.name
         score_results = score_call.output
         score_call_ref = get_ref(score_call)
         if score_call_ref is None:
@@ -341,104 +484,29 @@ class Call:
         )
 
 
-class CallsIter:
-    server: TraceServerInterface
-    filter: CallsFilter
-    include_costs: bool
-
-    def __init__(
-        self,
-        server: TraceServerInterface,
-        project_id: str,
-        filter: CallsFilter,
-        include_costs: bool = False,
-    ) -> None:
-        self.server = server
-        self.project_id = project_id
-        self.filter = filter
-        self._page_size = 1000
-        self.include_costs = include_costs
-
-    # seems like this caching should be on the server, but it's here for now...
-    @lru_cache
-    def _fetch_page(self, index: int) -> list[CallSchema]:
-        # caching in here means that any other CallsIter objects would also
-        # benefit from the cache
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self.project_id,
-                filter=self.filter,
-                offset=index * self._page_size,
-                limit=self._page_size,
-                include_costs=self.include_costs,
-            )
-        )
-        return response.calls
-
-    def _get_one(self, index: int) -> WeaveObject:
-        if index < 0:
-            raise IndexError("Negative indexing not supported")
-
-        page_index = index // self._page_size
-        page_offset = index % self._page_size
-
-        calls = self._fetch_page(page_index)
-        if page_offset >= len(calls):
-            raise IndexError(f"Index {index} out of range")
-
-        call = calls[page_offset]
-        entity, project = self.project_id.split("/")
-        return make_client_call(entity, project, call, self.server)
-
-    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
-        if (start := key.start or 0) < 0:
-            raise ValueError("Negative start not supported")
-        if (stop := key.stop) is not None and stop < 0:
-            raise ValueError("Negative stop not supported")
-        if (step := key.step or 1) < 0:
-            raise ValueError("Negative step not supported")
-
-        i = start
-        while stop is None or i < stop:
-            try:
-                yield self._get_one(i)
-            except IndexError:
-                break
-            i += step
-
-    def __getitem__(
-        self, key: Union[slice, int]
-    ) -> Union[WeaveObject, list[WeaveObject]]:
-        if isinstance(key, slice):
-            return list(self._get_slice(key))
-        return self._get_one(key)
-
-    def __iter__(self) -> Iterator[WeaveObject]:
-        return self._get_slice(slice(0, None, 1))
-
-
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
-    output = server_call.output
+    if (call_id := server_call.id) is None:
+        raise ValueError("Call ID is None")
+
     call = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
-        id=server_call.id,
+        id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(output, server_call.project_id, server),
+        output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
-        display_name=server_call.display_name,
+        _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
-    if call.id is None:
-        raise ValueError("Call ID is None")
-    return WeaveObject(call, CallRef(entity, project, call.id), server, None)
+    ref = CallRef(entity, project, call_id)
+    return WeaveObject(call, ref, server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -589,8 +657,6 @@ class WeaveClient:
         # here, we just directly assign the digest.
         ref = dataclasses.replace(ref, _digest=read_res.obj.digest)
 
-        data = read_res.obj.val
-
         # If there is a ref-extra, we should resolve it. Rather than walking
         # the object, it is more efficient to directly query for the data and
         # let the server resolve it.
@@ -606,6 +672,8 @@ class WeaveClient:
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             data = ref_read_res.vals[0]
+        else:
+            data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
 
@@ -616,27 +684,32 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
         self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        filter: CallsFilter | None = None,
+        include_costs: bool = False,
     ) -> CallsIter:
         if filter is None:
             filter = CallsFilter()
 
-        return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
+        return _make_calls_iterator(
+            self.server,
+            self._project_id(),
+            filter,
+            include_costs,
         )
 
     @deprecated(new_name="get_calls")
     def calls(
         self,
-        filter: Optional[CallsFilter] = None,
-        include_costs: Optional[bool] = False,
+        filter: CallsFilter | None = None,
+        include_costs: bool = False,
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def get_call(
-        self, call_id: str, include_costs: Optional[bool] = False
+        self,
+        call_id: str,
+        include_costs: bool = False,
     ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
@@ -651,17 +724,21 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(
+        self,
+        call_id: str,
+        include_costs: bool = False,
+    ) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
-        op: Union[str, Op],
+        op: str | Op,
         inputs: dict,
-        parent: Optional[Call] = None,
-        attributes: Optional[dict] = None,
-        display_name: Optional[Union[str, Callable[[Call], str]]] = None,
+        parent: Call | None = None,
+        attributes: dict | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
         *,
         use_stack: bool = True,
     ) -> Call:
@@ -694,7 +771,6 @@ class WeaveClient:
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
-        call_id = generate_id()
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -719,6 +795,7 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        call_id = generate_id()
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -733,6 +810,7 @@ class WeaveClient:
         if callable(name_func := display_name):
             display_name = name_func(call)
         call.display_name = display_name
+
         if parent is not None:
             parent._children.append(call)
 
@@ -750,7 +828,7 @@ class WeaveClient:
                         project_id=project_id,
                         id=call_id,
                         op_name=op_def_ref.uri(),
-                        display_name=display_name,
+                        display_name=call.display_name,
                         trace_id=trace_id,
                         started_at=started_at,
                         parent_id=parent_id,
@@ -773,9 +851,9 @@ class WeaveClient:
         self,
         call: Call,
         output: Any = None,
-        exception: Optional[BaseException] = None,
+        exception: BaseException | None = None,
         *,
-        op: Optional[Op] = None,
+        op: Op | None = None,
     ) -> None:
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
@@ -829,7 +907,7 @@ class WeaveClient:
         call.summary = summary
 
         # Exception Handling
-        exception_str: Optional[str] = None
+        exception_str: str | None = None
         if exception:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
@@ -876,9 +954,9 @@ class WeaveClient:
 
     def get_feedback(
         self,
-        query: Optional[Union[Query, str]] = None,
+        query: Query | str | None = None,
         *,
-        reaction: Optional[str] = None,
+        reaction: str | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> FeedbackQuery:
@@ -952,9 +1030,9 @@ class WeaveClient:
     @deprecated(new_name="get_feedback")
     def feedback(
         self,
-        query: Optional[Union[Query, str]] = None,
+        query: Query | str | None = None,
         *,
-        reaction: Optional[str] = None,
+        reaction: str | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> FeedbackQuery:
@@ -967,12 +1045,12 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: Optional[datetime.datetime] = datetime.datetime.now(
+        effective_date: datetime.datetime | None = datetime.datetime.now(
             datetime.timezone.utc
         ),
-        prompt_token_cost_unit: Optional[str] = "USD",
-        completion_token_cost_unit: Optional[str] = "USD",
-        provider_id: Optional[str] = "default",
+        prompt_token_cost_unit: str | None = "USD",
+        completion_token_cost_unit: str | None = "USD",
+        provider_id: str | None = "default",
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
@@ -1009,7 +1087,7 @@ class WeaveClient:
             CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
         )
 
-    def purge_costs(self, ids: Union[list[str], str]) -> None:
+    def purge_costs(self, ids: list[str] | str) -> None:
         """Purge costs from the current project.
 
         Examples:
@@ -1036,8 +1114,8 @@ class WeaveClient:
 
     def query_costs(
         self,
-        query: Optional[Union[Query, str]] = None,
-        llm_ids: Optional[list[str]] = None,
+        query: Query | str | None = None,
+        llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[CostQueryOutput]:
@@ -1109,7 +1187,7 @@ class WeaveClient:
         self,
         predict_call: Call,
         score_call: Call,
-        scorer_object_ref_uri: Optional[str] = None,
+        scorer_object_ref_uri: str | None = None,
     ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
@@ -1230,7 +1308,7 @@ class WeaveClient:
         return self._save_object_basic(val, name, branch)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+    def _save_nested_objects(self, obj: Any, name: str | None = None) -> Any:
         """Recursively visits all values, ensuring that any "Refable" objects are
         saved and reffed.
         As of this writing, the only "Refable" objects are instances of:
@@ -1326,18 +1404,18 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
-        self, val: Any, name: Optional[str] = None, branch: str = "latest"
+        self, val: Any, name: str | None = None, branch: str = "latest"
     ) -> ObjectRef:
         """Directly saves an object to the weave server and attach
         the ref to the object. This is the lowest level object saving logic.
         """
+        orig_val = val
+
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
-        is_opdef = is_op(val)
-        orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             if ALLOW_MIXED_PROJECT_REFS:
@@ -1347,9 +1425,6 @@ class WeaveClient:
             if val.project == self.project:
                 return val
             val = orig_val
-
-        # `to_json` is mostly fast, except for CustomWeaveTypes
-        # which incur network costs to serialize the payload
 
         if name is None:
             serializer = get_serializer_for_obj(val)
@@ -1362,6 +1437,8 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         def send_obj_create() -> ObjCreateRes:
+            # `to_json` is mostly fast, except for CustomWeaveTypes
+            # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1373,13 +1450,12 @@ class WeaveClient:
             return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
 
         ref: Ref
-        if is_opdef:
+        if is_op(orig_val):
             ref = OpRef(self.entity, self.project, name, digest_future)
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
@@ -1387,7 +1463,7 @@ class WeaveClient:
         # Attach the ref to the object
         try:
             set_ref(orig_val, ref)
-        except:
+        except Exception:
             # Don't worry if we can't set the ref.
             # This can happen for primitive types that don't have __dict__
             pass
@@ -1395,7 +1471,7 @@ class WeaveClient:
         return ref
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_op(self, op: Op, name: Optional[str] = None) -> ObjectRef:
+    def _save_op(self, op: Op, name: str | None = None) -> ObjectRef:
         """
         Saves an Op to the weave server and returns the Ref. This is the sister
         function to _save_object_basic, but for Ops
@@ -1456,7 +1532,7 @@ class WeaveClient:
         return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:
+    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
         if not filter:
             filter = ObjectVersionFilter()
         else:
@@ -1474,7 +1550,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
-        self, call: Call, display_name: Optional[str] = None
+        self, call: Call, display_name: str | None = None
     ) -> None:
         # Removing call display name, use "" for db representation
         if display_name is None:
@@ -1483,14 +1559,14 @@ class WeaveClient:
             CallUpdateReq(
                 project_id=self._project_id(),
                 call_id=call.id,
-                display_name=display_name,
+                display_name=elide_display_name(display_name),
             )
         )
 
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def _ref_output_of(self, ref: ObjectRef) -> Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> Call | None:
         raise NotImplementedError()
 
     def _op_runs(self, op_def: Op) -> Sequence[Call]:
@@ -1515,7 +1591,7 @@ class WeaveClient:
         return self.future_executor.defer(self.server.file_create, req)
 
 
-def safe_current_wb_run_id() -> Optional[str]:
+def safe_current_wb_run_id() -> str | None:
     try:
         import wandb
 
@@ -1529,7 +1605,7 @@ def safe_current_wb_run_id() -> Optional[str]:
 
 
 def check_wandb_run_matches(
-    wandb_run_id: Optional[str], weave_entity: str, weave_project: str
+    wandb_run_id: str | None, weave_entity: str, weave_project: str
 ) -> None:
     if wandb_run_id:
         # ex: "entity/project/run_id"
@@ -1540,7 +1616,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[dict] = None) -> Op:
+def _build_anonymous_op(name: str, config: dict | None = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -1600,9 +1676,19 @@ def sanitize_object_name(name: str) -> str:
     res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
     if not res:
         raise ValueError(f"Invalid object name: {name}")
-    if len(res) > 128:
-        res = res[:128]
+    if len(res) > MAX_OBJECT_NAME_LENGTH:
+        res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def elide_display_name(name: str) -> str:
+    if len(name) > MAX_DISPLAY_NAME_LENGTH:
+        log_once(
+            logger.warning,
+            f"Display name {name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
+        )
+        return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
+    return name
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

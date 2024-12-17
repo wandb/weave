@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Sequence
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
@@ -13,6 +15,14 @@ class Patcher:
 
     def undo_patch(self) -> bool:
         raise NotImplementedError()
+
+
+class NoOpPatcher(Patcher):
+    def attempt_patch(self) -> bool:
+        return True
+
+    def undo_patch(self) -> bool:
+        return True
 
 
 class MultiPatcher(Patcher):
@@ -63,7 +73,7 @@ class SymbolPatcher(Patcher):
         self._attribute_name = attribute_name
         self._make_new_value = make_new_value
 
-    def _get_symbol_target(self) -> Optional[_SymbolTarget]:
+    def _get_symbol_target(self) -> _SymbolTarget | None:
         try:
             base_symbol = self._get_base_symbol()
         except Exception:

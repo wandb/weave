@@ -31,12 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -49,9 +44,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.base_object_class_util import (
-    process_incoming_object,
-)
+from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -87,6 +80,7 @@ from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -101,6 +95,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    DynamicBatchProcessor,
     LRUCache,
     digest_is_version_like,
     empty_str_to_none,
@@ -126,6 +121,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
@@ -173,7 +169,7 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 10 * 1024 * 1024 * 1024,  # 10 GiB
+    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
 }
 
 
@@ -314,6 +310,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
 
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             summary_columns = ["summary", "summary_dump"]
@@ -346,68 +345,47 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
 
-        if not req.expand_columns and not req.include_feedback:
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+
+        if not expand_columns and not include_feedback:
             for row in raw_res:
-                yield tsi.CallSchema.model_validate(
-                    _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            return
+
+        ref_cache = LRUCache(max_size=1000)
+        batch_processor = DynamicBatchProcessor(
+            initial_size=INITIAL_CALLS_STREAM_BATCH_SIZE,
+            max_size=MAX_CALLS_STREAM_BATCH_SIZE,
+            growth_factor=10,
+        )
+
+        for batch in batch_processor.make_batches(raw_res):
+            call_dicts = [row_to_call_schema_dict(row) for row in batch]
+            if expand_columns:
+                self._expand_call_refs(
+                    req.project_id, call_dicts, expand_columns, ref_cache
                 )
 
-        else:
-            expand_columns = req.expand_columns or []
-            ref_cache = LRUCache(max_size=1000)
+            if include_feedback:
+                self._add_feedback_to_calls(req.project_id, call_dicts)
 
-            batch_size = 10
-            batch = []
-            for row in raw_res:
-                call_dict = _ch_call_dict_to_call_schema_dict(
-                    dict(zip(select_columns, row))
-                )
-                batch.append(call_dict)
-
-                if len(batch) >= batch_size:
-                    hydrated_batch = self._hydrate_calls(
-                        req.project_id,
-                        batch,
-                        expand_columns,
-                        req.include_feedback or False,
-                        ref_cache,
-                    )
-                    for call in hydrated_batch:
-                        yield tsi.CallSchema.model_validate(call)
-
-                    # *** Dynamic increase from 10 to 500 ***
-                    batch_size = min(MAX_CALLS_STREAM_BATCH_SIZE, batch_size * 10)
-                    batch = []
-
-            hydrated_batch = self._hydrate_calls(
-                req.project_id,
-                batch,
-                expand_columns,
-                req.include_feedback or False,
-                ref_cache,
-            )
-            for call in hydrated_batch:
+            for call in call_dicts:
                 yield tsi.CallSchema.model_validate(call)
 
-    def _hydrate_calls(
-        self,
-        project_id: str,
-        calls: list[dict[str, Any]],
-        expand_columns: list[str],
-        include_feedback: bool,
-        ref_cache: LRUCache,
-    ) -> list[dict[str, Any]]:
+    def _add_feedback_to_calls(
+        self, project_id: str, calls: list[dict[str, Any]]
+    ) -> None:
         if len(calls) == 0:
-            return calls
+            return
 
-        self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
-        if include_feedback:
-            feedback_query_req = make_feedback_query_req(project_id, calls)
+        feedback_query_req = make_feedback_query_req(project_id, calls)
+        with self.with_new_client():
             feedback = self.feedback_query(feedback_query_req)
-            hydrate_calls_with_feedback(calls, feedback)
-
-        return calls
+        hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
@@ -439,6 +417,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         expand_columns: list[str],
         ref_cache: LRUCache,
     ) -> None:
+        if len(calls) == 0:
+            return
+
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)
         for col in expand_columns:
@@ -451,9 +432,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            vals = self._refs_read_batch_within_project(
-                project_id, list(refs_to_resolve.values()), ref_cache
-            )
+            with self.with_new_client():
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(refs_to_resolve.values()), ref_cache
+                )
             for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
@@ -581,19 +563,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        val, base_object_class = process_incoming_object(
-            req.obj.val, req.obj.set_base_object_class
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
         )
-
-        json_val = json.dumps(val)
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
-            kind=get_kind(val),
-            base_object_class=base_object_class,
-            refs=extract_refs_from_values(val),
+            kind=get_kind(processed_val),
+            base_object_class=processed_result["base_object_class"],
+            refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
         )
@@ -1333,7 +1315,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
@@ -1406,6 +1388,49 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # To replace, first purge, then if successful, create.
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            }
+        )
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query=query,
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        if len(req.call_ids) == 0:
+            return tsi.ActionsExecuteBatchRes()
+        if len(req.call_ids) > 1:
+            # This is temporary until we setup our batching infrastructure
+            raise NotImplementedError("Batching actions is not yet supported")
+
+        # For now, we just execute in-process if it is a single action
+        execute_batch(
+            batch_req=req,
+            trace_server=self,
+        )
+
+        return tsi.ActionsExecuteBatchRes()
+
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -1422,14 +1447,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        if not api_key:
+        provider = model_info.get("litellm_provider")
+        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
 
         start_time = datetime.datetime.now()
-        res = lite_llm_completion(api_key, req.inputs)
+        res = lite_llm_completion(
+            api_key,
+            req.inputs,
+            provider,
+        )
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
@@ -1476,6 +1506,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the clickhouse client"""
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
@@ -1492,6 +1523,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
+
+    @contextmanager
+    def with_new_client(self) -> Iterator[None]:
+        """Context manager to use a new client for operations.
+        Each call gets a fresh client with its own clickhouse session ID.
+
+        Usage:
+        ```
+        with self.with_new_client():
+            self.feedback_query(req)
+        ```
+        """
+        client = self._mint_client()
+        original_client = self.ch_client
+        self._thread_local.ch_client = client
+        try:
+            yield
+        finally:
+            self._thread_local.ch_client = original_client
+            client.close()
 
     # def __del__(self) -> None:
     #     self.ch_client.close()

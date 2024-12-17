@@ -1,3 +1,4 @@
+from concurrent.futures import Future
 from copy import deepcopy
 
 import numpy as np
@@ -13,6 +14,7 @@ from weave.trace.box import (
     BoxedTimedelta,
 )
 from weave.trace.object_record import ObjectRecord
+from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveDict, WeaveList, WeaveObject
 
 
@@ -127,6 +129,17 @@ def test_deepcopy_boxed_model_e2e(client):
     model = Model()
     res = model.predict("hmm")
     assert res == "hmm, You are a helpful assistant."
+
+
+def test_deepcopy_ref_with_future(client):
+    future = Future()
+    future.set_result("digest")
+
+    ref = ObjectRef("entity", "project", "name", future)
+    res = deepcopy(ref)  # previously this would error
+
+    assert res == ref
+    assert id(res) != id(ref)
 
 
 # # Not sure about the implications here yet

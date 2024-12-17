@@ -69,7 +69,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$and`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$and`: `list['Operand']`
 
 ---
 
@@ -142,7 +142,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$eq`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$eq`: `tuple['Operand', 'Operand']`
 
 ---
 
@@ -170,7 +170,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$gt`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$gt`: `tuple['Operand', 'Operand']`
 
 ---
 
@@ -184,7 +184,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$gte`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$gte`: `tuple['Operand', 'Operand']`
 
 ---
 
@@ -198,7 +198,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$in`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation], list['Operand']]`
+- `$in`: `tuple['Operand', list['Operand']]`
 
 ---
 
@@ -226,7 +226,7 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$not`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$not`: `tuple['Operand']`
 
 ---
 
@@ -240,11 +240,11 @@ simplifications:
 
 **Pydantic Fields:**
 
-- `$or`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]]`
+- `$or`: `list['Operand']`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L162"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L159"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Query`
 

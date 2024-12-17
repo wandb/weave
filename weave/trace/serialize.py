@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import logging
-import typing
 from collections.abc import Sequence
 from types import CoroutineType
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
-from weave.trace_server.interface.base_object_classes.base_object_registry import (
-    BASE_OBJECT_REGISTRY,
+from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+    BUILTIN_OBJECT_REGISTRY,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -18,12 +19,12 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.trace_server.trace_server_interface_util import bytes_digest
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
 
 def to_json(
-    obj: Any, project_id: str, client: "WeaveClient", use_dictify: bool = False
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
@@ -63,7 +64,7 @@ def to_json(
 
 
 def _build_result_from_encoded(
-    encoded: dict, project_id: str, client: "WeaveClient"
+    encoded: dict, project_id: str, client: WeaveClient
 ) -> Any:
     file_digests = {}
     for name, val in encoded["files"].items():
@@ -121,7 +122,7 @@ def has_custom_repr(obj: Any) -> bool:
 
 
 def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: Optional[set[int]] = None
+    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
 ) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
@@ -261,9 +262,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         elif (
             isinstance(val_type, str)
             and obj.get("_class_name") == val_type
-            and (baseObject := BASE_OBJECT_REGISTRY.get(val_type))
+            and (builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(val_type))
         ):
-            return baseObject.model_validate(obj)
+            return builtin_object_class.model_validate(obj)
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}

@@ -55,14 +55,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         if code_class == 4 and e.response.status_code != 429:
             return False
 
-        # Unknown server error
-        # TODO(np): We need to fix the server to return proper status codes
-        # for downstream 401, 403, 404, etc... Those should propagate back to
-        # the client.
-        if e.response.status_code == 500:
-            return False
-
-    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
+    # Otherwise, retry: 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
@@ -525,6 +518,23 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.FeedbackPurgeRes:
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        )
+
+    def feedback_replace(
+        self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
+    ) -> tsi.FeedbackReplaceRes:
+        return self._generic_request(
+            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+        )
+
+    def actions_execute_batch(
+        self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
+    ) -> tsi.ActionsExecuteBatchRes:
+        return self._generic_request(
+            "/actions/execute_batch",
+            req,
+            tsi.ActionsExecuteBatchReq,
+            tsi.ActionsExecuteBatchRes,
         )
 
     # Cost API

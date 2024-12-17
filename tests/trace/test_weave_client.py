@@ -28,6 +28,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -1520,3 +1521,26 @@ async def test_op_calltime_display_name(client):
     assert len(calls) == 1
     call = calls[0]
     assert call.display_name == "custom_display_name"
+
+
+def test_long_display_names_are_elided(client):
+    @weave.op(call_display_name="a" * 2048)
+    def func():
+        pass
+
+    # The display name is correct client side
+    _, call = func.call()
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    # The display name is correct server side
+    calls = list(func.calls())
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    # Calling set_display_name is correct
+    call.set_display_name("b" * 2048)
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+    calls = list(func.calls())
+    call = calls[0]
+    assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH

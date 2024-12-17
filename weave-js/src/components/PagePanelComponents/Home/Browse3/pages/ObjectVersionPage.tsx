@@ -3,7 +3,6 @@ import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEve
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {BytesStoredInfoIcon} from '../../../../BytesStoredInfoIcon';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
@@ -53,6 +52,9 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Dataset: 'table',
   Evaluation: 'baseline-alt',
   Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
+  ActionSpec: 'rocket-launch',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -192,11 +194,6 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
-  const bytesStored = useMemo(
-    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
-    [data.result]
-  );
-
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -214,59 +211,50 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <>
-                    [
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{
-                        objectName,
-                      }}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
+        <Tailwind>
+          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="block">
+              <p className="text-moon-500">Name</p>
+              <div className="flex items-center">
+                <ObjectVersionsLink
+                  entity={entityName}
+                  project={projectName}
+                  filter={{objectName}}
+                  versionCount={objectVersionCount}
+                  neverPeek
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
+                    <span>{objectName}</span>
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <span className="ml-[4px]">
+                        ({objectVersionCount} version
+                        {objectVersionCount !== 1 ? 's' : ''})
+                      </span>
+                    )}
+                    <Icon
+                      name="forward-next"
+                      width={16}
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            'Bytes stored': (
-              <>
-                {data.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <BytesStoredInfoIcon
-                    bytesStored={bytesStored}
-                    weaveKind="object"
-                  />
-                )}
-              </>
-            ),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+                  </div>
+                </ObjectVersionsLink>
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version</p>
+              <p>{objectVersionIndex}</p>
+            </div>
+            {refExtra && (
+              <div className="block">
+                <p className="text-moon-500">Subpath</p>
+                <p>{refExtra}</p>
+              </div>
+            )}
+          </div>
+        </Tailwind>
       }
       // menuItems={[
       //   {

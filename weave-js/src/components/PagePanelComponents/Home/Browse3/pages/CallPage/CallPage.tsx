@@ -1,20 +1,31 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
+import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
+  FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
+import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {isCallChat} from '../ChatView/hooks';
 import {isEvaluateOp} from '../common/heuristics';
@@ -31,8 +42,11 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
+import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
+import {PaginationControls} from './PaginationControls';
+
 export const CallPage: FC<{
   entity: string;
   project: string;
@@ -55,10 +69,30 @@ export const CallPage: FC<{
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
+export const useShowRunnableUI = () => {
+  return false;
+  // Uncomment to re-enable
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+};
+
 const useCallTabs = (call: CallSchema) => {
+  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showTryInPlayground =
+    !isPeeking || !window.location.toString().includes('/weave/playground');
+
+  const handleOpenInPlayground = () => {
+    window.open(
+      urlPrefixed(`/${entity}/${project}/weave/playground/${callId}`),
+      '_blank'
+    );
+  };
+
   return [
     // Disabling Evaluation tab until it's better for single evaluation
     ...(false && isEvaluateOp(call.spanName)
@@ -85,11 +119,29 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Chat',
             content: (
-              <ScrollableTabContent>
-                <Tailwind>
-                  <CallChat call={call.traceCall!} />
-                </Tailwind>
-              </ScrollableTabContent>
+              <>
+                {showTryInPlayground && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      width: '100%',
+                      padding: '8px 16px',
+                    }}>
+                    <Button
+                      variant="ghost"
+                      startIcon="robot-service-member"
+                      onClick={handleOpenInPlayground}>
+                      Try in playground
+                    </Button>
+                  </Box>
+                )}
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <CallChat call={call.traceCall!} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
             ),
           },
         ]
@@ -127,6 +179,21 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
+    // For now, we are only showing this tab for W&B admins since the
+    // feature is in active development. We want to be able to get
+    // feedback without enabling for all users.
+    ...(showScores
+      ? [
+          {
+            label: 'Scores',
+            content: (
+              <Tailwind>
+                <CallScoresViewer call={call} />
+              </Tailwind>
+            ),
+          },
+        ]
+      : []),
     {
       label: 'Use',
       content: (
@@ -155,6 +222,10 @@ const CallPageInnerVertical: FC<{
     TRACETREE_PARAM in query
       ? query[TRACETREE_PARAM] === '1'
       : !isEvaluateOp(call.spanName);
+  const showFeedbackExpand =
+    FEEDBACK_EXPAND_PARAM in query
+      ? query[FEEDBACK_EXPAND_PARAM] === '1'
+      : false;
 
   const onToggleTraceTree = useCallback(() => {
     history.replace(
@@ -164,7 +235,8 @@ const CallPageInnerVertical: FC<{
         call.traceId,
         call.callId,
         path,
-        !showTraceTree
+        !showTraceTree,
+        showFeedbackExpand ? true : undefined
       )
     );
   }, [
@@ -176,7 +248,25 @@ const CallPageInnerVertical: FC<{
     history,
     path,
     showTraceTree,
+    showFeedbackExpand,
   ]);
+  const onToggleFeedbackExpand = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        showTraceTree,
+        !showFeedbackExpand ? true : undefined
+      )
+    );
+  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
+    call.entity,
+    call.project
+  );
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
@@ -185,6 +275,26 @@ const CallPageInnerVertical: FC<{
     project: selectedCall.project,
     callId: selectedCall.callId,
   });
+  const callCompleteWithCosts = useMemo(() => {
+    if (callComplete.result?.traceCall == null) {
+      return callComplete.result;
+    }
+    return {
+      ...callComplete.result,
+      traceCall: {
+        ...callComplete.result?.traceCall,
+        summary: {
+          ...callComplete.result?.traceCall?.summary,
+          weave: {
+            ...callComplete.result?.traceCall?.summary?.weave,
+            // Only selectedCall has costs, injected when creating
+            // the trace tree
+            costs: selectedCall.traceCall?.summary?.weave?.costs,
+          },
+        },
+      },
+    };
+  }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -196,70 +306,14 @@ const CallPageInnerVertical: FC<{
   }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
-    if (!callComplete.loading && callComplete.result) {
-      setCurrentCall(callComplete.result);
+    if (callCompleteWithCosts != null) {
+      setCurrentCall(callCompleteWithCosts);
     }
-  }, [callComplete]);
+  }, [callCompleteWithCosts]);
 
-  // Call navigation by arrow keys and buttons
-  const {getNextRowId, getPreviousRowId, rowIdsConfigured} = useContext(
-    TableRowSelectionContext
-  );
+  const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const showPaginationContols = isPeeking && rowIdsConfigured;
-  const onNextCall = useCallback(() => {
-    const nextCallId = getNextRowId?.(currentCall.callId);
-    if (nextCallId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          currentCall.entity,
-          currentCall.project,
-          currentCall.traceId,
-          nextCallId,
-          path,
-          showTraceTree
-        )
-      );
-    }
-  }, [currentCall, currentRouter, history, path, showTraceTree, getNextRowId]);
-  const onPreviousCall = useCallback(() => {
-    const previousRowId = getPreviousRowId?.(currentCall.callId);
-    if (previousRowId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          currentCall.entity,
-          currentCall.project,
-          currentCall.traceId,
-          previousRowId,
-          path,
-          showTraceTree
-        )
-      );
-    }
-  }, [
-    currentCall,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getPreviousRowId,
-  ]);
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown' && event.shiftKey) {
-        onNextCall();
-      } else if (event.key === 'ArrowUp' && event.shiftKey) {
-        onPreviousCall();
-      }
-    },
-    [onNextCall, onPreviousCall]
-  );
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleKeyDown]);
+  const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
 
@@ -277,24 +331,10 @@ const CallPageInnerVertical: FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationContols && (
-            <Box>
-              <Button
-                icon="sort-ascending"
-                tooltip="Previous call. (Shift + Arrow Up)"
-                variant="ghost"
-                onClick={onPreviousCall}
-                className="mr-2"
-              />
-              <Button
-                icon="sort-descending"
-                tooltip="Next call. (Shift + Arrow Down)"
-                variant="ghost"
-                onClick={onNextCall}
-              />
-            </Box>
+          {showPaginationControls && (
+            <PaginationControls call={call} path={path} />
           )}
-          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+          <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
@@ -302,12 +342,34 @@ const CallPageInnerVertical: FC<{
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
             />
+            <Button
+              icon="marker"
+              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              variant="ghost"
+              active={showFeedbackExpand ?? false}
+              onClick={onToggleFeedbackExpand}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
-      isSidebarOpen={showTraceTree}
+      isRightSidebarOpen={showFeedbackExpand}
+      rightSidebarContent={
+        <Tailwind style={{display: 'contents'}}>
+          <div className="flex h-full flex-col">
+            <FeedbackSidebar
+              humanAnnotationSpecs={humanAnnotationSpecs}
+              specsLoading={specsLoading}
+              callID={currentCall.callId}
+              entity={currentCall.entity}
+              project={currentCall.project}
+            />
+          </div>
+        </Tailwind>
+      }
       headerContent={<CallOverview call={currentCall} />}
-      leftSidebar={
+      isLeftSidebarOpen={showTraceTree}
+      leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
             {loading ? (

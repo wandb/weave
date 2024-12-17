@@ -15,6 +15,9 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "openai": "OPENAI_API_KEY",
     "fireworks": "FIREWORKS_API_KEY",
     "groq": "GEMMA_API_KEY",
+    "bedrock": "BEDROCK_API_KEY",
+    "bedrock_converse": "BEDROCK_API_KEY",
+    "xai": "XAI_API_KEY",
 }
 
 

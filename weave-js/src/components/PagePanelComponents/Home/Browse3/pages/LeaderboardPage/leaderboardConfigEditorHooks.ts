@@ -1,8 +1,7 @@
-import {refUri} from '@wandb/weave/react';
+import {parseRefMaybe, refUri} from '@wandb/weave/react';
 import {useEffect, useState} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
