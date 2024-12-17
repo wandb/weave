@@ -181,21 +181,30 @@ const fetchEvaluationComparisonData = async (
   // for every evaluation.
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
   // First, get all the children of the evaluations (predictAndScoreCalls + summary)
-  const evalTraceResProm = traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
-  }).then(predictAndScoreCallRes => {
-    // Then, get all the children of those calls (predictions + scores)
-    const predictAndScoreIds = predictAndScoreCallRes.calls.map(call => call.id);
-    return traceServerClient.callsStreamQuery({
+  const evalTraceResProm = traceServerClient
+    .callsStreamQuery({
       project_id: projectId,
-      filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
-    }).then(predictionsAndScoresCallsRes => {
-      return {
-        calls: [...predictAndScoreCallRes.calls, ...predictionsAndScoresCallsRes.calls],
-      }
+      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
     })
-  });
+    .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
+      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+        call => call.id
+      );
+      return traceServerClient
+        .callsStreamQuery({
+          project_id: projectId,
+          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+        })
+        .then(predictionsAndScoresCallsRes => {
+          return {
+            calls: [
+              ...predictAndScoreCallRes.calls,
+              ...predictionsAndScoresCallsRes.calls,
+            ],
+          };
+        });
+    });
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
