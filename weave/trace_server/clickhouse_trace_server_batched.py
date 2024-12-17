@@ -675,6 +675,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     refs=obj.refs,
                     base_object_class=obj.base_object_class,
                     deleted_at=now,
+                    # Keep the original created_at timestamp
                     created_at=original_created_at,
                 )
             )

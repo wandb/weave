@@ -130,7 +130,10 @@ def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
     v1 = weave.publish({"i": 2}, name="obj_1")
 
     invalid_digests = [v0.digest, "invalid-digest", v1.digest]
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(
+        weave.trace_server.errors.NotFoundError,
+        match="Delete request contains 3 digests, but found 2 objects to delete. Diff digests: {'invalid-digest'}",
+    ):
         _obj_delete(client, "obj_1", invalid_digests)
 
 
