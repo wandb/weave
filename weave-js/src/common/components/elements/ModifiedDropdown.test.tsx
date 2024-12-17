@@ -171,7 +171,7 @@ describe('testing simple search', () => {
       allowRegexSearch: true,
     });
     expect(results.length).toBe(1);
-    results.every(r => {
+    results.forEach(r => {
       expect(r.value).toEqual(99);
     });
   });
