@@ -179,7 +179,7 @@ const fetchEvaluationComparisonData = async (
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
   const evalTraceResProm = traceServerClient.callsStreamQuery({
     project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
+    filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
   });
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
