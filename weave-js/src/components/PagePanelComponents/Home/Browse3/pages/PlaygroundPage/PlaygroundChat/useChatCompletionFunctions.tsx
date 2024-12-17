@@ -72,6 +72,7 @@ export const useChatCompletionFunctions = (
           return state;
         }
         const updatedState = appendChoiceToMessages(state);
+        // If the new message is not empty, add it to the messages
         if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
           updatedState.traceCall.inputs.messages.push(newMessage);
         }

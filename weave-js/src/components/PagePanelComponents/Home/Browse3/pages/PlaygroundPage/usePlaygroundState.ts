@@ -153,9 +153,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     // eg running the same call in parallel
     key: Math.random() * 1000,
 
-    messages: state.traceCall?.inputs?.messages.filter(
-      (message: any) => message.content
-    ),
+    messages: state.traceCall?.inputs?.messages,
     model: state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,

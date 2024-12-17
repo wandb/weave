@@ -10,8 +10,8 @@ type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: PlaygroundMessageRole, text: string) => void;
-  onAdd: (role: PlaygroundMessageRole, text: string) => void;
+  onSend: (role: PlaygroundMessageRole, chatText: string) => void;
+  onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
   settingsTab: number | null;
 };
 
