@@ -80,12 +80,12 @@ from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (

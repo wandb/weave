@@ -64,11 +64,21 @@ def _make_conditions_part(conditions: Optional[list[str]]) -> str:
     return _make_optional_part("WHERE", conditions_str)
 
 
-def _make_object_id_conditions_part(object_id_conditions: Optional[list[str]]) -> str:
+def _make_object_id_conditions_part(
+    object_id_conditions: Optional[list[str]], add_where_clause: bool = False
+) -> str:
+    """
+    Formats object_id_conditions into a query string. In this file is it only
+    used after the WHERE project_id... clause, but passing add_where_clause=True
+    adds a WHERE clause to the query string.
+    """
     if not object_id_conditions:
         return ""
     conditions_str = combine_conditions(object_id_conditions, "AND")
-    return " " + _make_optional_part("AND", conditions_str)
+    conditions_str_with_and = " " + _make_optional_part("AND", conditions_str)
+    if add_where_clause:
+        return "WHERE " + conditions_str_with_and
+    return conditions_str_with_and
 
 
 def format_metadata_objects_from_query_result(
