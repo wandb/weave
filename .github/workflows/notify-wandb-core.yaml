@@ -9,6 +9,9 @@ on:
       - "**"
   workflow_dispatch:
 
+permissions:
+  packages: write
+
 jobs:
   publish-package:
     runs-on: ubuntu-latest
