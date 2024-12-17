@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
 import {styled} from '@mui/material/styles';
 import {DataGridPro, DataGridProProps} from '@mui/x-data-grid-pro';
 import {gridClasses} from '@mui/x-data-grid-pro';
+import React from 'react';
 
 import {
   Color,
@@ -41,67 +41,55 @@ export const StyledDataGrid = styled(
     }
     return <DataGridPro slots={slots} {...otherProps} />;
   }
-)(({keepBorders}) => {
-  const [leftOffset, setLeftOffset] = useState(290);
+)(({keepBorders}) => ({
+  ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
-  useEffect(() => {
-    const pinnedLeftHeader = document.querySelector('.MuiDataGrid-columnHeader--pinnedLeft');
-    if (pinnedLeftHeader) {
-      const width = pinnedLeftHeader.clientWidth;
-      setLeftOffset(width + 10);
-    }
-  }, []);
+  fontFamily: 'Source Sans Pro',
 
-  return {
-    ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
+  '& .MuiDataGrid-columnHeader': {
+    backgroundColor: MOON_50,
+    color: MOON_500,
+    position: 'sticky',
+    left: 290,
+    maxWidth: '100vw',
+    zIndex: 1,
+  },
 
-    fontFamily: 'Source Sans Pro',
+  '& .MuiDataGrid-columnHeader--pinnedLeft': {
+    zIndex: 2,
+  },
 
-    '& .MuiDataGrid-columnHeader': {
-      backgroundColor: MOON_50,
-      color: MOON_500,
-      position: 'sticky',
-      left: leftOffset,
-      maxWidth: '100vw',
-      zIndex: 1,
+  '& .MuiDataGrid-columnHeaderTitle': {
+    fontWeight: 400,
+  },
+
+  '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
+    outline: 'none',
+  },
+
+  '& .MuiTablePagination-displayedRows': {
+    margin: 0,
+  },
+
+  '& .MuiTablePagination-actions': {
+    marginRight: '16px',
+  },
+
+  [`& .${gridClasses.row}`]: {
+    '&.Mui-hovered': {
+      backgroundColor: backgroundColorHovered,
     },
-
-    '& .MuiDataGrid-columnHeader--pinnedLeft': {
-      zIndex: 2,
-    },
-
-    '& .MuiDataGrid-columnHeaderTitle': {
-      fontWeight: 400,
-    },
-
-    '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
-      outline: 'none',
-    },
-
-    '& .MuiTablePagination-displayedRows': {
-      margin: 0,
-    },
-
-    '& .MuiTablePagination-actions': {
-      marginRight: '16px',
-    },
-
-    [`& .${gridClasses.row}`]: {
+    '&.Mui-selected': {
+      backgroundColor: backgroundColorSelected,
       '&.Mui-hovered': {
-        backgroundColor: backgroundColorHovered,
-      },
-      '&.Mui-selected': {
-        backgroundColor: backgroundColorSelected,
-        '&.Mui-hovered': {
-          backgroundColor: backgroundColorHoveredSelected,
-        },
-      },
-      [`&.${SELECTED_FOR_DELETION}`]: {
-        backgroundColor: backgroundColorSelectedForDeletion,
-        '&.Mui-hovered': {
-          backgroundColor: backgroundColorSelectedForDeletion,
-        },
+        backgroundColor: backgroundColorHoveredSelected,
       },
     },
-  };
-});
+    [`&.${SELECTED_FOR_DELETION}`]: {
+      backgroundColor: backgroundColorSelectedForDeletion,
+      '&.Mui-hovered': {
+        backgroundColor: backgroundColorSelectedForDeletion,
+      },
+    },
+  },
+}));
