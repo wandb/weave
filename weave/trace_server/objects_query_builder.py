@@ -124,27 +124,52 @@ class ObjectMetadataQueryBuilder:
     def offset_part(self) -> str:
         return _make_offset_part(self._offset)
 
-    def add_digest_condition(
-        self, digest: str, param_key: Optional[str] = None
-    ) -> None:
+    def _make_digest_condition(
+        self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None
+    ) -> str:
+        """
+        If digest is "latest", return the condition for the latest version.
+        Otherwise, return the condition for the version with the given digest.
+        If digest is a version like "v123", return the condition for the version
+        with the given version index.
+        If digest is a hash like "sha256" return the hash
+        Use index to make the param_key unique if there are multiple digests.
+        """
         if digest == "latest":
-            self.add_is_latest_condition()
-            return
+            return "is_latest = 1"
 
-        param_key = param_key or "version_digest"
         (is_version, version_index) = digest_is_version_like(digest)
         if is_version:
-            self._add_version_index_condition(version_index, param_key)
+            param_key = param_key or "version_index"
+            return self._make_version_index_condition(version_index, param_key, index)
         else:
-            self._add_version_digest_condition(digest, param_key)
+            param_key = param_key or "version_digest"
+            return self._make_version_digest_condition(digest, param_key, index)
 
-    def _add_version_digest_condition(self, digest: str, param_key: str) -> None:
-        self._conditions.append(f"digest = {{{param_key}: String}}")
+    def _make_version_digest_condition(
+        self, digest: str, param_key: str, index: Optional[int] = None
+    ) -> str:
+        if index is not None:
+            param_key = f"{param_key}_{index}"
         self.parameters.update({param_key: digest})
+        return f"digest = {{{param_key}: String}}"
 
-    def _add_version_index_condition(self, version_index: int, param_key: str) -> None:
-        self._conditions.append(f"version_index = {{{param_key}: Int64}}")
+    def _make_version_index_condition(
+        self, version_index: int, param_key: str, index: Optional[int] = None
+    ) -> str:
+        if index is not None:
+            param_key = f"{param_key}_{index}"
         self.parameters.update({param_key: version_index})
+        return f"version_index = {{{param_key}: Int64}}"
+
+    def add_digests_conditions(self, digests: list[str]) -> None:
+        digest_conditions = []
+        for i, digest in enumerate(digests):
+            condition = self._make_digest_condition(digest, None, i)
+            digest_conditions.append(condition)
+
+        digests_condition = combine_conditions(digest_conditions, "OR")
+        self._conditions.append(digests_condition)
 
     def add_object_ids_condition(
         self, object_ids: list[str], param_key: Optional[str] = None

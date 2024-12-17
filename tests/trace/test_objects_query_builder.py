@@ -72,14 +72,14 @@ def test_object_query_builder_add_digest_condition():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
 
     # Test latest digest
-    builder.add_digest_condition("latest")
+    builder.add_digests_conditions(["latest"])
     assert "is_latest = 1" in builder.conditions_part
 
     # Test specific digest
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_digest_condition("abc123")
-    assert "digest = {version_digest: String}" in builder.conditions_part
-    assert builder.parameters["version_digest"] == "abc123"
+    builder.add_digests_conditions(["abc123"])
+    assert "digest = {version_digest_0: String}" in builder.conditions_part
+    assert builder.parameters["version_digest_0"] == "abc123"
 
 
 def test_object_query_builder_add_object_ids_condition():
@@ -188,7 +188,7 @@ FROM (
 
 def test_object_query_builder_metadata_query_basic():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_digest_condition("latest")
+    builder.add_digests_conditions(["latest"])
 
     query = builder.make_metadata_query()
     parameters = builder.parameters
@@ -214,7 +214,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     builder.set_offset(offset)
     builder.add_order("created_at", "desc")
     builder.add_object_ids_condition(["object_1"])
-    builder.add_digest_condition("digestttttttttttttttt")
+    builder.add_digests_conditions(["digestttttttttttttttt"])
     builder.add_base_object_classes_condition(["Model", "Model2"])
 
     query = builder.make_metadata_query()
@@ -225,7 +225,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     )
     WHERE rn = 1
 )
-WHERE ((digest = {{version_digest: String}}) AND (base_object_class IN {{base_object_classes: Array(String)}}))
+WHERE ((digest = {{version_digest_0: String}}) AND (base_object_class IN {{base_object_classes: Array(String)}}))
 ORDER BY created_at DESC
 LIMIT 10
 OFFSET 5"""
@@ -234,7 +234,7 @@ OFFSET 5"""
     assert parameters == {
         "project_id": "test_project",
         "object_id": "object_1",
-        "version_digest": "digestttttttttttttttt",
+        "version_digest_0": "digestttttttttttttttt",
         "base_object_classes": ["Model", "Model2"],
     }
 
@@ -243,7 +243,7 @@ def test_objects_query_metadata_op():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
     builder.add_object_ids_condition(["my_op"])
-    builder.add_digest_condition("v3", "vvvvvversion")
+    builder.add_digests_conditions(["v3"])
 
     query = builder.make_metadata_query()
     parameters = builder.parameters
@@ -253,13 +253,13 @@ def test_objects_query_metadata_op():
     )
     WHERE rn = 1
 )
-WHERE ((is_op = 1) AND (version_index = {{vvvvvversion: Int64}}))"""
+WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}))"""
 
     assert query == expected_query
     assert parameters == {
         "project_id": "test_project",
         "object_id": "my_op",
-        "vvvvvversion": 3,
+        "version_index_0": 3,
     }
 
 
