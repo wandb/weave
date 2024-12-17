@@ -684,15 +684,77 @@ export const CallsTable: FC<{
       }
     : undefined;
 
+  const [pinnedColumnsWidth, setPinnedColumnsWidth] = useState(0);
+
+  const calculatePinnedColumnsWidth = useCallback((pinnedFields: string[]) => {
+    // If columns aren't fully loaded yet, return 0
+    if (apiRef.current.getAllColumns().length < muiColumns.length) {
+      return 0;
+    }
+    let totalWidth = 0;
+    pinnedFields.forEach(field => {
+      const width = apiRef.current.getColumn(field)?.computedWidth || 100;
+      // console.log('calculatePinnedColumnsWidth(pinnedWidth)', field, width);
+      totalWidth += width;
+    });
+    return totalWidth;
+  }, [apiRef, muiColumns.length]);
+
+  // Add this effect to recalculate width when columns are ready
+  useEffect(() => {
+    const handleColumnsChange = () => {
+      if (apiRef.current.getAllColumns().length === muiColumns.length) {
+        const newWidth = calculatePinnedColumnsWidth(pinModelResolved.left || []);
+        setPinnedColumnsWidth(newWidth);
+      }
+    };
+
+    const unsubscribe = apiRef.current.subscribeEvent('columnsChange', handleColumnsChange);
+    return () => {
+      unsubscribe();
+    };
+  }, [apiRef, calculatePinnedColumnsWidth, muiColumns.length, pinModelResolved.left]);
+
+  const handleColumnWidthChange = useCallback((newCol: any) => {
+    setUserDefinedColumnWidths(curr => {
+      const newWidths = {
+        ...curr,
+        [newCol.colDef.field]: newCol.colDef.computedWidth,
+      };
+      // console.log('setUserDefinedColumnWidths(widthChange)', newWidths);
+      return newWidths;
+    });
+
+    // Recalculate pinned columns width if the changed column is pinned
+    if (pinModelResolved.left?.includes(newCol.colDef.field)) {
+      const newWidth = calculatePinnedColumnsWidth(pinModelResolved.left);
+      // console.log('setPinnedColumnsWidth(widthChange)', newWidth);
+      setPinnedColumnsWidth(newWidth);
+    }
+  }, [calculatePinnedColumnsWidth, pinModelResolved.left]);
+
   const onPinnedColumnsChange = useCallback(
     (newModel: GridPinnedColumnFields) => {
       if (!setPinModel || callsLoading) {
         return;
       }
       setPinModel(newModel);
+      
+      // Use requestAnimationFrame to ensure the DOM has updated
+      requestAnimationFrame(() => {
+        const newWidth = calculatePinnedColumnsWidth(newModel.left || []);
+        // console.log('setPinnedColumnsWidth(colChange)', newWidth);
+        setPinnedColumnsWidth(newWidth);
+      });
     },
-    [callsLoading, setPinModel]
+    [callsLoading, setPinModel, calculatePinnedColumnsWidth]
   );
+
+  // Update the initial pinned columns width when the component mounts
+  useEffect(() => {
+    const initialWidth = calculatePinnedColumnsWidth(pinModelResolved.left || []);
+    setPinnedColumnsWidth(initialWidth);
+  }, [calculatePinnedColumnsWidth, pinModelResolved.left]);
 
   const onSortModelChange = useCallback(
     (newModel: GridSortModel) => {
@@ -950,16 +1012,10 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
+        onColumnWidthChange={handleColumnWidthChange}
         pinnedColumns={pinModelResolved}
         onPinnedColumnsChange={onPinnedColumnsChange}
+        pinnedColumnsWidth={pinnedColumnsWidth}
         sx={{
           borderRadius: 0,
           // This moves the pagination controls to the left
