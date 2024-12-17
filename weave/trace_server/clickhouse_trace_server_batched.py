@@ -45,7 +45,6 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import process_incoming_object_val
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -86,6 +85,7 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -556,19 +556,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        val, base_object_class = process_incoming_object_val(
-            req.obj.val, req.obj.set_base_object_class
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
         )
-
-        json_val = json.dumps(val)
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
-            kind=get_kind(val),
-            base_object_class=base_object_class,
-            refs=extract_refs_from_values(val),
+            kind=get_kind(processed_val),
+            base_object_class=processed_result["base_object_class"],
+            refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
         )
@@ -1424,8 +1424,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        isBedrock = model_info.get("litellm_provider") == "bedrock"
-        if not api_key and not isBedrock:
+        provider = model_info.get("litellm_provider")
+        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
@@ -1435,7 +1435,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = lite_llm_completion(
             api_key,
             req.inputs,
-            isBedrock,
+            provider,
         )
         end_time = datetime.datetime.now()
 
