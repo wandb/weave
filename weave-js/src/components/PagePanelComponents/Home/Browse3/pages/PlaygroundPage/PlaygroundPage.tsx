@@ -60,10 +60,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
             callId: props.callId,
           }
         : null;
-    }, [props.entity, props.project, props.callId]),
-    {
-      includeCosts: true,
-    }
+    }, [props.entity, props.project, props.callId])
   );
 
   const callWithCosts = useCall(
@@ -75,7 +72,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
             callId: props.callId,
           }
         : null;
-    }, [props.entity, props.project, props.callId])
+    }, [props.entity, props.project, props.callId]),
+    {
+      includeCosts: true,
+    }
   );
 
   const {result: calls} = useCalls(
