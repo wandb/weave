@@ -530,7 +530,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_digests_conditions([req.digest])
+        object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.name], "op_name")
         object_query_builder.set_include_deleted(include_deleted=True)
 
@@ -588,7 +588,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digests_conditions([req.digest])
+        object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
         object_query_builder.set_include_deleted(include_deleted=True)
 
@@ -656,7 +656,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder.add_object_ids_condition([req.object_id])
         metadata_only = True
         if req.digests:
-            object_query_builder.add_digests_conditions(req.digests)
+            object_query_builder.add_digests_conditions(*req.digests)
             metadata_only = False
 
         object_versions = self._select_objs_query(object_query_builder, metadata_only)

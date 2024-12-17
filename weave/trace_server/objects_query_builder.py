@@ -65,11 +65,21 @@ def _make_conditions_part(conditions: Optional[list[str]]) -> str:
     return _make_optional_part("WHERE", conditions_str)
 
 
-def _make_object_id_conditions_part(object_id_conditions: Optional[list[str]]) -> str:
+def _make_object_id_conditions_part(
+    object_id_conditions: Optional[list[str]], add_where_clause: bool = False
+) -> str:
+    """
+    Formats object_id_conditions into a query string. In this file is it only
+    used after the WHERE project_id... clause, but passing add_where_clause=True
+    adds a WHERE clause to the query string.
+    """
     if not object_id_conditions:
         return ""
     conditions_str = combine_conditions(object_id_conditions, "AND")
-    return " " + _make_optional_part("AND", conditions_str)
+    conditions_str_with_and = " " + _make_optional_part("AND", conditions_str)
+    if add_where_clause:
+        return "WHERE " + conditions_str_with_and
+    return conditions_str_with_and
 
 
 def format_metadata_objects_from_query_result(
@@ -132,30 +142,47 @@ class ObjectMetadataQueryBuilder:
         return _make_offset_part(self._offset)
 
     def _make_digest_condition(
-        self, digest: str, param_key: Optional[str] = None
+        self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None
     ) -> str:
+        """
+        If digest is "latest", return the condition for the latest version.
+        Otherwise, return the condition for the version with the given digest.
+        If digest is a version like "v123", return the condition for the version
+        with the given version index.
+        If digest is a hash like "sha256" return the hash
+        Use index to make the param_key unique if there are multiple digests.
+        """
         if digest == "latest":
             return "is_latest = 1"
 
-        param_key = param_key or "version_digest"
         (is_version, version_index) = digest_is_version_like(digest)
         if is_version:
-            self.parameters.update({param_key: version_index})
-            return self._make_version_index_condition(version_index, param_key)
+            param_key = param_key or "version_index"
+            return self._make_version_index_condition(version_index, param_key, index)
         else:
-            self.parameters.update({param_key: digest})
-            return self._make_version_digest_condition(digest, param_key)
+            param_key = param_key or "version_digest"
+            return self._make_version_digest_condition(digest, param_key, index)
 
-    def _make_version_digest_condition(self, digest: str, param_key: str) -> str:
+    def _make_version_digest_condition(
+        self, digest: str, param_key: str, index: Optional[int] = None
+    ) -> str:
+        if index is not None:
+            param_key = f"{param_key}_{index}"
+        self.parameters.update({param_key: digest})
         return f"digest = {{{param_key}: String}}"
 
-    def _make_version_index_condition(self, version_index: int, param_key: str) -> str:
+    def _make_version_index_condition(
+        self, version_index: int, param_key: str, index: Optional[int] = None
+    ) -> str:
+        if index is not None:
+            param_key = f"{param_key}_{index}"
+        self.parameters.update({param_key: version_index})
         return f"version_index = {{{param_key}: Int64}}"
 
-    def add_digests_conditions(self, digests: list[str]) -> None:
+    def add_digests_conditions(self, *digests: str) -> None:
         digest_conditions = []
         for i, digest in enumerate(digests):
-            condition = self._make_digest_condition(digest, f"version_{i}")
+            condition = self._make_digest_condition(digest, None, i)
             digest_conditions.append(condition)
 
         digests_condition = combine_conditions(digest_conditions, "OR")

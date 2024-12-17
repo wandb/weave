@@ -397,8 +397,8 @@ export const LLM_PROVIDER_LABELS: Record<
 > = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
-  gemini: 'Gemini',
+  gemini: 'Google Gemini',
   groq: 'Groq',
-  bedrock: 'Bedrock',
+  bedrock: 'AWS Bedrock',
   xai: 'xAI',
 };
