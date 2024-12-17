@@ -201,7 +201,7 @@ export function getClosestTick(
       ((increasing && tick >= val) || (!increasing && tick <= val))
     ) {
       closest = tick;
-      if (closest == val) {
+      if (closest === val) {
         break;
       }
       minDiff = diff;
