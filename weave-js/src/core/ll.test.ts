@@ -340,6 +340,7 @@ describe('ll', () => {
       'project-artifactTypes',
       'project-artifact',
       'project-artifactVersion',
+      'project-traces',
     ]);
   });
 
