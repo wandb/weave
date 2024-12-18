@@ -343,6 +343,7 @@ class Server:
             self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
                 fs, net, await wandb_api.get_wandb_api()
             )
+
             self._request_handler_ready_event.set()
             while True:
                 try:
@@ -448,6 +449,7 @@ def get_server() -> Server:
             SERVER = Server(process=False)
             SERVER.start()
         return SERVER
+
 
 class AsyncConnection:
     def __init__(
@@ -567,7 +569,6 @@ class AsyncConnection:
 
     async def sleep(self, seconds: float) -> float:
         return await self.request("sleep", seconds)
-    
 
 
 class AsyncClient:
@@ -703,7 +704,6 @@ class ServerlessClient:
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
-
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
