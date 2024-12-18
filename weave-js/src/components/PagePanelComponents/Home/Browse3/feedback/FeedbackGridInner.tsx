@@ -147,17 +147,16 @@ export const FeedbackGridInner = ({
       }}
       columnHeaderHeight={40}
       getRowHeight={(params: GridRowHeightParams) => {
-        if (
-          params.model.feedback_type !== 'wandb.reaction.1' &&
-          params.model.feedback_type !== 'wandb.note.1' &&
-          !isHumanAnnotationType(params.model.feedback_type)
-        ) {
-          return 'auto';
+        if (isWandbFeedbackType(params.model.feedback_type)) {
+          return 38;
         }
-        return 38;
+        return 'auto';
       }}
       columns={columns}
       disableRowSelectionOnClick
     />
   );
 };
+
+const isWandbFeedbackType = (feedbackType: string) =>
+  feedbackType.startsWith('wandb.');
