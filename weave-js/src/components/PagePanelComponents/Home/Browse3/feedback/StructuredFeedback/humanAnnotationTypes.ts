@@ -23,3 +23,6 @@ export type HumanAnnotationPayload = {
 };
 
 export type HumanAnnotation = Feedback & {};
+
+export const isHumanAnnotationType = (feedbackType: string) =>
+  feedbackType.startsWith(HUMAN_ANNOTATION_BASE_TYPE);
