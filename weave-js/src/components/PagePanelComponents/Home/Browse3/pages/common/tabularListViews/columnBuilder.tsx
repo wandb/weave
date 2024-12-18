@@ -14,12 +14,12 @@ import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../Browse2/SmallRef';
 import {
   CellFilterWrapper,
   OnAddFilter,
 } from '../../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../../filters/common';
+import {SmallRef} from '../../../SmallRef';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
