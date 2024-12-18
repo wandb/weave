@@ -217,7 +217,6 @@ class Server:
         self.register_handler_fn("ensure_file", self.handle_ensure_file)
         self.register_handler_fn("direct_url", self.handle_direct_url)
         self.register_handler_fn("sleep", self.handle_sleep)
-        self.register_handler_fn("query_traces", self.handle_query_traces)
 
         if process:
             self.request_handler = aioprocessing.AioProcess(
