@@ -569,6 +569,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateRes,
         )
 
+    ### Delete All Project Data ###
+    def permanently_delete_project(
+        self, req: tsi.PermanentlyDeleteProjectReq
+    ) -> tsi.PermanentlyDeleteProjectRes:
+        return self._generic_request(
+            "/project/permanently_delete",
+            req,
+            tsi.PermanentlyDeleteProjectReq,
+            tsi.PermanentlyDeleteProjectRes,
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
