@@ -20,7 +20,12 @@ import {blankifyLinks, shiftHeadings} from './html';
 
 // exported only for tests
 export const DEFAULT_SANITIZATION_SCHEMA = _.merge(gh, {
-  attributes: {'*': ['className', 'style']},
+  attributes: {
+    '*': ['className', 'style'],
+  },
+  protocols: {
+    src: ['http', 'https', 'data'],
+  },
 });
 
 const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
