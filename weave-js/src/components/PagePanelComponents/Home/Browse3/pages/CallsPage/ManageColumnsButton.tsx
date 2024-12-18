@@ -89,7 +89,6 @@ export const ManageColumnsButton = ({
         <Button
           variant="ghost"
           icon="column"
-          tooltip="Manage columns"
           onClick={onClick}>
           Columns
         </Button>
