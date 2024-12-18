@@ -12,7 +12,7 @@ from weave_query.context_state import WandbApiContext, _wandb_api_context
 
 tracer = engine_trace.tracer()  # type: ignore
 
-def get_wandb_api_context() -> typing.Optional[WandbApiContext]:
+def _get_wandb_api_context() -> typing.Optional[WandbApiContext]:
     return _wandb_api_context.get()
 
 class WandbTraceApi:
@@ -29,7 +29,7 @@ class WandbTraceApi:
         query: typing.Optional[dict] = None,
     ) -> typing.Any:
         with tracer.trace("query_calls_stream"):
-            wandb_api_context = get_wandb_api_context()
+            wandb_api_context = _get_wandb_api_context()
             headers = {'content-type': 'application/json'}
             auth = None
             cookies = None
