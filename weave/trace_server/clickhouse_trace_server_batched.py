@@ -1312,7 +1312,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1024
+        MAX_PAYLOAD = 1 << 20  # 1 MiB
         if len(payload) > MAX_PAYLOAD:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
