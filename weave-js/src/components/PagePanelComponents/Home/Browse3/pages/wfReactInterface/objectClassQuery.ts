@@ -2,7 +2,7 @@ import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import {baseObjectClassRegistry} from './generatedBaseObjectClasses.zod';
+import {builtinObjectClassRegistry} from './generatedBuiltinObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
@@ -13,17 +13,24 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-type BaseObjectClassRegistry = typeof baseObjectClassRegistry;
-type BaseObjectClassRegistryKeys = keyof BaseObjectClassRegistry;
-type BaseObjectClassType<C extends BaseObjectClassRegistryKeys> = z.infer<
-  BaseObjectClassRegistry[C]
+type BuiltinObjectClassRegistry = typeof builtinObjectClassRegistry;
+type BuiltinObjectClassRegistryKeys = keyof BuiltinObjectClassRegistry;
+type BaseObjectClassType<C extends BuiltinObjectClassRegistryKeys> = z.infer<
+  BuiltinObjectClassRegistry[C]
 >;
 
 export type TraceObjSchemaForBaseObjectClass<
-  C extends BaseObjectClassRegistryKeys
+  C extends BuiltinObjectClassRegistryKeys
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
-export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
+// Notice: this is still `base` object class, not `builtin` object class.
+// This means we can search by base object class, but not builtin object class today.
+// See https://github.com/wandb/weave/pull/3229 for more details.
+// base_object_class: this is the name of the first subclass of any subclass of a weave Object class.
+// object_class: the string of the actual class.
+export const useBaseObjectInstances = <
+  C extends BuiltinObjectClassRegistryKeys
+>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
@@ -56,12 +63,12 @@ export const useBaseObjectInstances = <C extends BaseObjectClassRegistryKeys>(
   return {result: objects, loading};
 };
 
-const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
+const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
   client: TraceServerClient,
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
-  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
+  const knownObjectClass = builtinObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
@@ -92,41 +99,42 @@ const getBaseObjectInstances = async <C extends BaseObjectClassRegistryKeys>(
     );
 };
 
-export const useCreateBaseObjectInstance = <
-  C extends BaseObjectClassRegistryKeys,
+export const useCreateBuiltinObjectInstance = <
+  C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
-  baseObjectClassName: C
+  objectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createBaseObjectInstance(client, baseObjectClassName, req);
+    createBuiltinObjectInstance(client, objectClassName, req);
 };
 
-export const createBaseObjectInstance = async <
-  C extends BaseObjectClassRegistryKeys,
+export const createBuiltinObjectInstance = async <
+  C extends BuiltinObjectClassRegistryKeys,
   T = BaseObjectClassType<C>
 >(
   client: TraceServerClient,
-  baseObjectClassName: C,
+  builtinObjectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
-    req.obj.set_base_object_class != null &&
-    req.obj.set_base_object_class !== baseObjectClassName
+    req.obj.builtin_object_class != null &&
+    req.obj.builtin_object_class !== builtinObjectClassName
   ) {
     throw new Error(
-      `set_base_object_class must match baseObjectClassName: ${baseObjectClassName}`
+      `object_class must match objectClassName: ${builtinObjectClassName}`
     );
   }
 
-  const knownBaseObjectClass = baseObjectClassRegistry[baseObjectClassName];
-  if (!knownBaseObjectClass) {
-    throw new Error(`Unknown object class: ${baseObjectClassName}`);
+  const knownBuiltinObjectClass =
+    builtinObjectClassRegistry[builtinObjectClassName];
+  if (!knownBuiltinObjectClass) {
+    throw new Error(`Unknown object class: ${builtinObjectClassName}`);
   }
 
-  const verifiedObject = knownBaseObjectClass.safeParse(req.obj.val);
+  const verifiedObject = knownBuiltinObjectClass.safeParse(req.obj.val);
 
   if (!verifiedObject.success) {
     throw new Error(
@@ -138,7 +146,7 @@ export const createBaseObjectInstance = async <
     ...req,
     obj: {
       ...req.obj,
-      set_base_object_class: baseObjectClassName,
+      builtin_object_class: builtinObjectClassName,
     },
   };
 

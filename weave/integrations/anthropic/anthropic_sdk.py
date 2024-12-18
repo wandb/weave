@@ -1,27 +1,26 @@
+from __future__ import annotations
+
 import importlib
 from collections.abc import AsyncIterator, Iterator
 from functools import wraps
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Optional,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
     from anthropic.types import Message, MessageStreamEvent
 
+_anthropic_patcher: MultiPatcher | None = None
+
 
 def anthropic_accumulator(
-    acc: Optional["Message"],
-    value: "MessageStreamEvent",
-) -> "Message":
+    acc: Message | None,
+    value: MessageStreamEvent,
+) -> Message:
     from anthropic.types import (
         ContentBlockDeltaEvent,
         Message,
@@ -73,13 +72,11 @@ def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def create_wrapper_sync(
-    name: str,
-) -> Callable[[Callable], Callable]:
+def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -92,9 +89,7 @@ def create_wrapper_sync(
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
-def create_wrapper_async(
-    name: str,
-) -> Callable[[Callable], Callable]:
+def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -104,8 +99,8 @@ def create_wrapper_async(
             return _async_wrapper
 
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(_fn_wrapper(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -123,9 +118,9 @@ def create_wrapper_async(
 
 
 def anthropic_stream_accumulator(
-    acc: Optional["Message"],
-    value: "MessageStream",
-) -> "Message":
+    acc: Message | None,
+    value: MessageStream,
+) -> Message:
     from anthropic.lib.streaming._types import MessageStopEvent
 
     if acc is None:
@@ -150,7 +145,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
+    def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
             return self.__async_stream_text__()
         else:
@@ -167,16 +162,14 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
                 yield chunk.delta.text  # type: ignore
 
     @property
-    def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
+    def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
         return self.__stream_text__()
 
 
-def create_stream_wrapper(
-    name: str,
-) -> Callable[[Callable], Callable]:
+def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op()(fn)
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,
@@ -187,28 +180,58 @@ def create_stream_wrapper(
     return wrapper
 
 
-anthropic_patcher = MultiPatcher(
-    [
-        # Patch the sync messages.create method for all messages.create methods
-        SymbolPatcher(
-            lambda: importlib.import_module("anthropic.resources.messages"),
-            "Messages.create",
-            create_wrapper_sync(name="anthropic.Messages.create"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("anthropic.resources.messages"),
-            "AsyncMessages.create",
-            create_wrapper_async(name="anthropic.AsyncMessages.create"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("anthropic.resources.messages"),
-            "Messages.stream",
-            create_stream_wrapper(name="anthropic.Messages.stream"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("anthropic.resources.messages"),
-            "AsyncMessages.stream",
-            create_stream_wrapper(name="anthropic.AsyncMessages.stream"),
-        ),
-    ]
-)
+def get_anthropic_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _anthropic_patcher
+    if _anthropic_patcher is not None:
+        return _anthropic_patcher
+
+    base = settings.op_settings
+
+    messages_create_settings = base.model_copy(
+        update={"name": base.name or "anthropic.Messages.create"}
+    )
+    async_messages_create_settings = base.model_copy(
+        update={"name": base.name or "anthropic.AsyncMessages.create"}
+    )
+    stream_settings = base.model_copy(
+        update={"name": base.name or "anthropic.Messages.stream"}
+    )
+    async_stream_settings = base.model_copy(
+        update={"name": base.name or "anthropic.AsyncMessages.stream"}
+    )
+
+    _anthropic_patcher = MultiPatcher(
+        [
+            # Patch the sync messages.create method for all messages.create methods
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.messages"),
+                "Messages.create",
+                create_wrapper_sync(messages_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.messages"),
+                "AsyncMessages.create",
+                create_wrapper_async(async_messages_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.messages"),
+                "Messages.stream",
+                create_stream_wrapper(stream_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.messages"),
+                "AsyncMessages.stream",
+                create_stream_wrapper(async_stream_settings),
+            ),
+        ]
+    )
+
+    return _anthropic_patcher
