@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
@@ -278,10 +279,22 @@ class CallRef(RefWithExtra):
         return u
 
 
+def make_deleted_ref_with_error(ref: Ref, error: ObjectDeletedError) -> DeletedRef:
+    """
+    Create a DeletedRef from an ObjectRef and an ObjectDeletedError.
+
+    Use the error message to extract the deleted_at timestamp.
+    """
+    deleted_at_str = str(error).split("was deleted at ")[1]
+    deleted_at = datetime.strptime(deleted_at_str, "%Y-%m-%d %H:%M:%S")
+    return DeletedRef(ref=ref, deleted_at=deleted_at, _error=error)
+
+
 @dataclass(frozen=True)
 class DeletedRef(Ref):
     ref: Ref
-    error: ObjectDeletedError
+    deleted_at: datetime
+    _error: ObjectDeletedError
 
     def __repr__(self) -> str:
         return f"<DeletedRef {self.uri()}>"

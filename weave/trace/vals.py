@@ -1,4 +1,5 @@
 import dataclasses
+from datetime import datetime
 import inspect
 import logging
 import operator
@@ -26,6 +27,7 @@ from weave.trace.refs import (
     ObjectRef,
     RefWithExtra,
     TableRef,
+    make_deleted_ref_with_error,
 )
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
@@ -649,7 +651,9 @@ def make_trace_obj(
             val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
             prepare_obj(val)
         except ObjectDeletedError as e:
-            return DeletedRef(ref=new_ref, error=e)
+            val = make_deleted_ref_with_error(new_ref, e)
+            logger.warning(f"Could not read deleted object: {new_ref}")
+
     if isinstance(val, Table):
         val_ref = val.ref
         if not isinstance(val_ref, TableRef):
