@@ -9,6 +9,7 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
+import {isHumanAnnotationType} from './StructuredFeedback/humanAnnotationTypes';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -44,7 +45,10 @@ export const FeedbackGridInner = ({
             <span className="night-aware">{params.row.payload.emoji}</span>
           );
         }
-        if (params.row.feedback_type.startsWith('wandb.annotation.')) {
+        if (isHumanAnnotationType(params.row.feedback_type)) {
+          if (typeof params.row.payload.value === 'string') {
+            return <CellValueString value={params.row.payload.value} />;
+          }
           return (
             <CellValueString
               value={JSON.stringify(params.row.payload.value ?? null)}
@@ -143,16 +147,16 @@ export const FeedbackGridInner = ({
       }}
       columnHeaderHeight={40}
       getRowHeight={(params: GridRowHeightParams) => {
-        if (
-          params.model.feedback_type !== 'wandb.reaction.1' &&
-          params.model.feedback_type !== 'wandb.note.1'
-        ) {
-          return 'auto';
+        if (isWandbFeedbackType(params.model.feedback_type)) {
+          return 38;
         }
-        return 38;
+        return 'auto';
       }}
       columns={columns}
       disableRowSelectionOnClick
     />
   );
 };
+
+const isWandbFeedbackType = (feedbackType: string) =>
+  feedbackType.startsWith('wandb.');
