@@ -1,12 +1,17 @@
+import {Modal, Typography} from '@mui/material';
 import Box from '@mui/material/Box';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {Button} from '../../../../Button';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
+import {useWeaveflowCurrentRouteContext} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -25,6 +30,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
+import {DatasetEditContext} from './DatasetEditContext';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
@@ -33,6 +39,11 @@ import {TabUseObject} from './TabUseObject';
 import {TabUsePrompt} from './TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
+import {
+  TableInsertSpec,
+  TablePopSpec,
+  TableUpdateSpec,
+} from './wfReactInterface/traceServerClientTypes';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
@@ -107,8 +118,15 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
   useObjectViewEvent(objectVersion);
+  const history = useHistory();
 
-  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
+  const {
+    useRootObjectVersions,
+    useCalls,
+    useRefsData,
+    useTableUpdate,
+    useObjCreate,
+  } = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
@@ -184,12 +202,159 @@ const ObjectVersionPageInner: React.FC<{
     if (dataIsPrimitive) {
       // _result is a special key that is automatically removed by the
       // ObjectViewerSection component.
-      return {_result: viewerData};
+      return {
+        _result: viewerData,
+      };
     }
     return viewerData;
   }, [viewerData]);
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
+  const [isEditing, setIsEditing] = useState(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+
+  const [editedCellsMap, setEditedCellsMap] = useState<Map<string, any>>(
+    new Map()
+  );
+  const [editedRows, setEditedRows] = useState<Map<string, any>>(new Map());
+  const [deletedRows, setDeletedRows] = useState<number[]>([]);
+
+  const router = useWeaveflowCurrentRouteContext();
+
+  const handleEditClick = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  const handleCancelClick = useCallback(() => {
+    setIsEditing(false);
+    setEditedCellsMap(new Map());
+    setEditedRows(new Map());
+    setDeletedRows([]);
+  }, []);
+
+  const handlePublishClick = useCallback(() => {
+    if (editedCellsMap.size > 0 || deletedRows.length > 0) {
+      setIsPublishModalOpen(true);
+    }
+  }, [editedCellsMap, deletedRows]);
+
+  const processRowUpdate = useCallback((newRow: any, oldRow: any) => {
+    const changedField = Object.keys(newRow).find(
+      key => newRow[key] !== oldRow[key] && key !== 'id'
+    );
+
+    if (changedField) {
+      const rowKey = `${newRow.id}`;
+      setEditedCellsMap(prev => {
+        const existingEdits = prev.get(rowKey) || {};
+        const updatedMap = new Map(prev);
+        updatedMap.set(rowKey, {
+          ...existingEdits,
+          [changedField]: newRow[changedField],
+        });
+        return updatedMap;
+      });
+      setEditedRows(prev => {
+        const updatedMap = new Map(prev);
+        updatedMap.set(rowKey, newRow);
+        return updatedMap;
+      });
+    }
+    return newRow;
+  }, []);
+
+  // Function to convert edited cells to TableUpdateSpec
+  const convertEditsToTableUpdateSpec = useCallback(() => {
+    const updates: TableUpdateSpec[] = [];
+    editedRows.forEach((editedRow, rowKey) => {
+      const rowIndex = editedRow._index;
+      if (rowIndex !== undefined) {
+        const popSpec: TablePopSpec = {
+          pop: {
+            index: rowIndex,
+          },
+        };
+        // Create clean row without metadata fields
+        const cleanRow = Object.fromEntries(
+          Object.entries(editedRow).filter(
+            ([key]) => !['id', '_index'].includes(key)
+          )
+        );
+        const insertSpec: TableInsertSpec = {
+          insert: {
+            index: rowIndex,
+            row: cleanRow,
+          },
+        };
+        updates.push(popSpec);
+        updates.push(insertSpec);
+      }
+    });
+    // sort the indices of deleted rows in descending order
+    // and then add updates to remove the deleted rows
+    deletedRows.sort((a, b) => b - a);
+    deletedRows.forEach(rowIndex => {
+      const popSpec: TablePopSpec = {
+        pop: {
+          index: rowIndex,
+        },
+      };
+      updates.push(popSpec);
+    });
+    return updates;
+  }, [editedRows, deletedRows]);
+
+  const tableUpdate = useTableUpdate();
+  const objCreate = useObjCreate();
+
+  const projectId = `${entityName}/${projectName}`;
+  const originalTableDigest = viewerDataAsObject?.rows?.split('/').pop() ?? '';
+
+  const handlePublish = useCallback(async () => {
+    setIsEditing(false);
+    setIsPublishModalOpen(false);
+    const tableUpdateSpecs = convertEditsToTableUpdateSpec();
+    const tableUpdateResp = await tableUpdate(
+      projectId,
+      originalTableDigest,
+      tableUpdateSpecs
+    );
+    const tableRef = `weave:///${projectId}/table/${tableUpdateResp.digest}`;
+    const newObjVersion = await objCreate(projectId, objectName, {
+      ...objectVersion.val,
+      rows: tableRef,
+    });
+
+    // Show success toast
+    toast({
+      message: 'Changes published successfully',
+      severity: 'success',
+      duration: 3000,
+    });
+
+    const url = router.objectVersionUIUrl(
+      entityName,
+      projectName,
+      objectName,
+      newObjVersion,
+      undefined,
+      refExtra
+    );
+    history.push(url);
+  }, [
+    refExtra,
+    router,
+    objectName,
+    objectVersion.val,
+    convertEditsToTableUpdateSpec,
+    projectId,
+    objCreate,
+    tableUpdate,
+    originalTableDigest,
+    entityName,
+    projectName,
+    history,
+  ]);
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
@@ -199,279 +364,373 @@ const ObjectVersionPageInner: React.FC<{
   }
 
   return (
-    <SimplePageLayoutWithHeader
-      title={
-        <Tailwind>
-          <div className="flex items-center gap-8">
-            {baseObjectClass && (
-              <ObjectIcon baseObjectClass={baseObjectClass} />
-            )}
-            {objectVersionText(objectName, objectVersionIndex)}
-          </div>
-        </Tailwind>
-      }
-      headerContent={
-        <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
-            <div className="block">
-              <p className="text-moon-500">Name</p>
-              <div className="flex items-center">
-                <ObjectVersionsLink
-                  entity={entityName}
-                  project={projectName}
-                  filter={{objectName}}
-                  versionCount={objectVersionCount}
-                  neverPeek
-                  variant="secondary">
-                  <div className="group flex items-center font-semibold">
-                    <span>{objectName}</span>
-                    {objectVersions.loading ? (
-                      <LoadingDots />
-                    ) : (
-                      <span className="ml-[4px]">
-                        ({objectVersionCount} version
-                        {objectVersionCount !== 1 ? 's' : ''})
-                      </span>
-                    )}
-                    <Icon
-                      name="forward-next"
-                      width={16}
-                      height={16}
-                      className="ml-[2px] opacity-0 group-hover:opacity-100"
-                    />
+    <DatasetEditContext.Provider
+      value={{
+        editedCellsMap,
+        setEditedCellsMap,
+        editedRows,
+        setEditedRows,
+        processRowUpdate,
+        deletedRows,
+        setDeletedRows,
+      }}>
+      <SimplePageLayoutWithHeader
+        title={
+          <Tailwind>
+            <div className="flex items-center gap-8">
+              {baseObjectClass && (
+                <ObjectIcon baseObjectClass={baseObjectClass} />
+              )}
+              {objectVersionText(objectName, objectVersionIndex)}
+            </div>
+          </Tailwind>
+        }
+        headerContent={
+          <Tailwind>
+            <div className="flex w-full items-start justify-between">
+              <div className="grid auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+                <div className="block">
+                  <p className="text-moon-500">Name</p>
+                  <div className="flex items-center">
+                    <ObjectVersionsLink
+                      entity={entityName}
+                      project={projectName}
+                      filter={{objectName}}
+                      versionCount={objectVersionCount}
+                      neverPeek
+                      variant="secondary">
+                      <div className="group flex items-center font-semibold">
+                        <span>{objectName}</span>
+                        {objectVersions.loading ? (
+                          <LoadingDots />
+                        ) : (
+                          <span className="ml-[4px]">
+                            ({objectVersionCount} version
+                            {objectVersionCount !== 1 ? 's' : ''})
+                          </span>
+                        )}
+                        <Icon
+                          name="forward-next"
+                          width={16}
+                          height={16}
+                          className="ml-[2px] opacity-0 group-hover:opacity-100"
+                        />
+                      </div>
+                    </ObjectVersionsLink>
                   </div>
-                </ObjectVersionsLink>
-              </div>
-            </div>
-            <div className="block">
-              <p className="text-moon-500">Version</p>
-              <p>{objectVersionIndex}</p>
-            </div>
-            {refExtra && (
-              <div className="block">
-                <p className="text-moon-500">Subpath</p>
-                <p>{refExtra}</p>
-              </div>
-            )}
-          </div>
-        </Tailwind>
-      }
-      // menuItems={[
-      //   {
-      //     label: 'Open in Board',
-      //     onClick: () => {
-      //       onMakeBoard();
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Compare',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Compare');
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Process with Function',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Process with Function');
-      //     },
-      //   },
-      //   {
-      //     label: '(Coming Soon) Add to Hub',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Add to Hub');
-      //     },
-      //   },
-      // ]}
-      tabs={[
-        ...(showPromptTab
-          ? [
-              {
-                label: 'Prompt',
-                content: (
-                  <ScrollableTabContent>
-                    {data.loading ? (
-                      <CenteredAnimatedLoader />
-                    ) : (
-                      <TabPrompt
-                        entity={entityName}
-                        project={projectName}
-                        data={viewerDataAsObject}
-                      />
-                    )}
-                  </ScrollableTabContent>
-                ),
-              },
-            ]
-          : []),
-        ...(isEvaluation && evalHasCalls
-          ? [
-              {
-                label: 'Leaderboard',
-                content: (
-                  <EvaluationLeaderboardTab
-                    entity={entityName}
-                    project={projectName}
-                    evaluationObjectName={objectName}
-                    evaluationObjectVersion={objectVersion.versionHash}
-                  />
-                ),
-              },
-            ]
-          : []),
-        {
-          label: isDataset ? 'Rows' : 'Values',
-          content: (
-            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
-              <Box
-                sx={{
-                  flex: '0 0 auto',
-                  height: '100%',
-                }}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <ObjectViewerSection
-                        title=""
-                        data={viewerDataAsObject}
-                        noHide
-                        isExpanded
-                      />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
+                </div>
+                <div className="block">
+                  <p className="text-moon-500">Version</p>
+                  <p>{objectVersionIndex}</p>
+                </div>
+                {refExtra && (
+                  <div className="block">
+                    <p className="text-moon-500">Subpath</p>
+                    <p>{refExtra}</p>
+                  </div>
                 )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Use',
-          content: (
-            <ScrollableTabContent>
-              <Tailwind>
-                {baseObjectClass === 'Prompt' ? (
-                  <TabUsePrompt
-                    name={objectName}
-                    uri={refUri}
-                    entityName={entityName}
-                    projectName={projectName}
-                    data={viewerDataAsObject}
-                  />
-                ) : baseObjectClass === 'Dataset' ? (
-                  <TabUseDataset
-                    name={objectName}
-                    uri={refUri}
-                    versionIndex={objectVersionIndex}
-                  />
-                ) : baseObjectClass === 'Model' ? (
-                  <TabUseModel
-                    name={objectName}
-                    uri={refUri}
-                    projectName={projectName}
-                  />
-                ) : (
-                  <TabUseObject name={objectName} uri={refUri} />
-                )}
-              </Tailwind>
-            </ScrollableTabContent>
-          ),
-        },
-
-        // {
-        //   label: 'Metadata',
-        //   content: (
-        //     <ScrollableTabContent>
-        //       <SimpleKeyValueTable
-        //         data={{
-        //           Object: (
-        //             <ObjectLink
-        //               entityName={entityName}
-        //               projectName={projectName}
-        //               objectName={objectName}
-        //             />
-        //           ),
-        //           'Type Version': (
-        //             <>
-        //               <TypeVersionCategoryChip
-        //                 typeCategory={objectTypeCategory}
-        //               />
-
-        //               <TypeVersionLink
-        //                 entityName={entityName}
-        //                 projectName={projectName}
-        //                 typeName={typeName}
-        //                 version={typeVersionHash}
-        //               />
-        //             </>
-        //           ),
-        //           Ref: fullUri,
-        //           'Producing Calls': (
-        //             <ObjectVersionProducingCallsItem
-        //               objectVersion={objectVersion}
-        //             />
-        //           ),
-        //         }}
-        //       />
-        //     </ScrollableTabContent>
-        //   ),
-        // },
-        // {
-        //   label: 'Consuming Calls',
-        //   content: (
-        //     <CallsTable
-        //       entity={entityName}
-        //       project={projectName}
-        //       frozenFilter={{
-        //         inputObjectVersions: [objectName + ':' + objectVersionHash],
-        //       }}
-        //     />
-        //   ),
-        // },
-        ...(showCallsTab
-          ? [
-              {
-                label: 'Calls',
-                content: (
-                  <Box sx={{p: 2}}>
-                    <SimpleKeyValueTable
-                      data={{
-                        ...(producingCalls.result!.length > 0
-                          ? {
-                              [maybePluralizeWord(
-                                producingCalls.result!.length,
-                                'Producing Call'
-                              )]: (
-                                <ObjectVersionProducingCallsItem
-                                  producingCalls={producingCalls.result ?? []}
-                                  refUri={refUri}
-                                />
-                              ),
-                            }
-                          : {}),
-                        ...(consumingCalls.result!.length
-                          ? {
-                              [maybePluralizeWord(
-                                consumingCalls.result!.length,
-                                'Consuming Call'
-                              )]: (
-                                <ObjectVersionConsumingCallsItem
-                                  consumingCalls={consumingCalls.result ?? []}
-                                  refUri={refUri}
-                                />
-                              ),
-                            }
-                          : {}),
-                      }}
+              </div>
+              {isDataset && (
+                <>
+                  {isEditing ? (
+                    <div className="flex gap-8">
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: 'text.secondary',
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontSize: '14px',
+                          fontFamily: 'Source Sans Pro',
+                        }}>
+                        Editing dataset
+                        <Icon name="pencil-edit" width={14} height={14} />
+                      </Typography>
+                      <Button
+                        title="Cancel"
+                        variant="ghost"
+                        size="medium"
+                        icon="close"
+                        onClick={handleCancelClick}>
+                        Cancel
+                      </Button>
+                      <Button
+                        title="Publish"
+                        size="medium"
+                        variant="primary"
+                        icon="checkmark"
+                        onClick={handlePublishClick}
+                        disabled={
+                          editedCellsMap.size === 0 && deletedRows.length === 0
+                        }>
+                        Publish
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      title="Edit"
+                      variant="secondary"
+                      size="medium"
+                      icon="pencil-edit"
+                      onClick={handleEditClick}>
+                      Edit
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </Tailwind>
+        }
+        // menuItems={[
+        //   {
+        //     label: 'Open in Board',
+        //     onClick: () => {
+        //       onMakeBoard();
+        //     },
+        //   },
+        //   {
+        //     label: '(Under Construction) Compare',
+        //     onClick: () => {
+        //       console.log('(Under Construction) Compare');
+        //     },
+        //   },
+        //   {
+        //     label: '(Under Construction) Process with Function',
+        //     onClick: () => {
+        //       console.log('(Under Construction) Process with Function');
+        //     },
+        //   },
+        //   {
+        //     label: '(Coming Soon) Add to Hub',
+        //     onClick: () => {
+        //       console.log('(Under Construction) Add to Hub');
+        //     },
+        //   },
+        // ]}
+        tabs={[
+          ...(showPromptTab
+            ? [
+                {
+                  label: 'Prompt',
+                  content: (
+                    <ScrollableTabContent>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <TabPrompt
+                          entity={entityName}
+                          project={projectName}
+                          data={viewerDataAsObject}
+                        />
+                      )}
+                    </ScrollableTabContent>
+                  ),
+                },
+              ]
+            : []),
+          ...(isEvaluation && evalHasCalls
+            ? [
+                {
+                  label: 'Leaderboard',
+                  content: (
+                    <EvaluationLeaderboardTab
+                      entity={entityName}
+                      project={projectName}
+                      evaluationObjectName={objectName}
+                      evaluationObjectVersion={objectVersion.versionHash}
                     />
-                  </Box>
-                ),
-              },
-            ]
-          : []),
-      ]}
-    />
+                  ),
+                },
+              ]
+            : []),
+          {
+            label: isDataset ? 'Rows' : 'Values',
+            content: (
+              <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
+                <Box
+                  sx={{
+                    flex: '0 0 auto',
+                    height: '100%',
+                  }}>
+                  {data.loading ? (
+                    <CenteredAnimatedLoader />
+                  ) : (
+                    <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                      <CustomWeaveTypeProjectContext.Provider
+                        value={{entity: entityName, project: projectName}}>
+                        <ObjectViewerSection
+                          title=""
+                          objectId={objectName}
+                          data={viewerDataAsObject}
+                          noHide
+                          isExpanded
+                          isEditing={isEditing}
+                        />
+                      </CustomWeaveTypeProjectContext.Provider>
+                    </WeaveCHTableSourceRefContext.Provider>
+                  )}
+                </Box>
+              </ScrollableTabContent>
+            ),
+          },
+          {
+            label: 'Use',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  {baseObjectClass === 'Prompt' ? (
+                    <TabUsePrompt
+                      name={objectName}
+                      uri={refUri}
+                      entityName={entityName}
+                      projectName={projectName}
+                      data={viewerDataAsObject}
+                    />
+                  ) : baseObjectClass === 'Dataset' ? (
+                    <TabUseDataset
+                      name={objectName}
+                      uri={refUri}
+                      versionIndex={objectVersionIndex}
+                    />
+                  ) : baseObjectClass === 'Model' ? (
+                    <TabUseModel
+                      name={objectName}
+                      uri={refUri}
+                      projectName={projectName}
+                    />
+                  ) : (
+                    <TabUseObject name={objectName} uri={refUri} />
+                  )}
+                </Tailwind>
+              </ScrollableTabContent>
+            ),
+          },
+
+          // {
+          //   label: 'Metadata',
+          //   content: (
+          //     <ScrollableTabContent>
+          //       <SimpleKeyValueTable
+          //         data={{
+          //           Object: (
+          //             <ObjectLink
+          //               entityName={entityName}
+          //               projectName={projectName}
+          //               objectName={objectName}
+          //             />
+          //           ),
+          //           'Type Version': (
+          //             <>
+          //               <TypeVersionCategoryChip
+          //                 typeCategory={objectTypeCategory}
+          //               />
+
+          //               <TypeVersionLink
+          //                 entityName={entityName}
+          //                 projectName={projectName}
+          //                 typeName={typeName}
+          //                 version={typeVersionHash}
+          //               />
+          //             </>
+          //           ),
+          //           Ref: fullUri,
+          //           'Producing Calls': (
+          //             <ObjectVersionProducingCallsItem
+          //               objectVersion={objectVersion}
+          //             />
+          //           ),
+          //         }}
+          //       />
+          //     </ScrollableTabContent>
+          //   ),
+          // },
+          // {
+          //   label: 'Consuming Calls',
+          //   content: (
+          //     <CallsTable
+          //       entity={entityName}
+          //       project={projectName}
+          //       frozenFilter={{
+          //         inputObjectVersions: [objectName + ':' + objectVersionHash],
+          //       }}
+          //     />
+          //   ),
+          // },
+          ...(showCallsTab
+            ? [
+                {
+                  label: 'Calls',
+                  content: (
+                    <Box sx={{p: 2}}>
+                      <SimpleKeyValueTable
+                        data={{
+                          ...(producingCalls.result!.length > 0
+                            ? {
+                                [maybePluralizeWord(
+                                  producingCalls.result!.length,
+                                  'Producing Call'
+                                )]: (
+                                  <ObjectVersionProducingCallsItem
+                                    producingCalls={producingCalls.result ?? []}
+                                    refUri={refUri}
+                                  />
+                                ),
+                              }
+                            : {}),
+                          ...(consumingCalls.result!.length
+                            ? {
+                                [maybePluralizeWord(
+                                  consumingCalls.result!.length,
+                                  'Consuming Call'
+                                )]: (
+                                  <ObjectVersionConsumingCallsItem
+                                    consumingCalls={consumingCalls.result ?? []}
+                                    refUri={refUri}
+                                  />
+                                ),
+                              }
+                            : {}),
+                        }}
+                      />
+                    </Box>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
+      <Modal
+        open={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        aria-labelledby="publish-modal-title"
+        aria-describedby="publish-modal-description">
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+          }}>
+          <Typography id="publish-modal-title" variant="h6" component="h2">
+            Confirm Publish
+          </Typography>
+          <Typography id="publish-modal-description" sx={{mt: 2}}>
+            Are you sure you want to publish the changes?
+          </Typography>
+          <Box
+            sx={{mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2}}>
+            <Button onClick={() => setIsPublishModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handlePublish}>
+              Publish
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+    </DatasetEditContext.Provider>
   );
 };
 
