@@ -679,6 +679,7 @@ const CodePreview: FC<CodePreviewProps> = memo(
           background: 'white',
           border: '1px solid #eee',
           padding: 16,
+          // The page craps out when we use the normal scroll bar in large files so having this preview scroll on its own prevents that
           height: 'calc(100vh - 150px)',
           overflowY: 'auto',
           maxWidth: '100%',
