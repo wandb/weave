@@ -11,7 +11,8 @@ export const useProjectSidebar = (
   hasWeaveData: boolean,
   hasTraceBackend: boolean = true,
   hasModelsAccess: boolean = true,
-  isLaunchActive: boolean = false
+  isLaunchActive: boolean = false,
+  isWandbAdmin: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
   let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
@@ -32,6 +33,14 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+  let weaveOnlyMenu = [
+    'weave/leaderboards',
+    'weave/operations',
+    'weave/objects',
+  ];
+  if (isWandbAdmin) {
+    weaveOnlyMenu.push('weave/mods');
+  }
 
   return useMemo(() => {
     const allItems = isLoading
@@ -182,13 +191,14 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Mods',
             slug: 'weave/mods',
-            isShown: showWeaveSidebarItems || isShowAll,
+            isShown: false, // Only shown in overflow menu
+            isDisabled: !isWandbAdmin,
             iconName: IconNames.LayoutGrid,
           },
           {
             type: 'divider' as const,
             key: 'dividerWithinWeave-3',
-            isShown: isWeaveOnly,
+            isShown: false, // Only shown in overflow menu
             name: 'Leaders',
             slug: 'weave/leaderboards',
             iconName: IconNames.BenchmarkSquare,
@@ -213,7 +223,7 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             key: 'moreWeaveOnly',
             isShown: isWeaveOnly,
-            menu: ['weave/leaderboards', 'weave/operations', 'weave/objects'],
+            menu: weaveOnlyMenu,
           },
           {
             type: 'menuPlaceholder' as const,
@@ -224,10 +234,7 @@ export const useProjectSidebar = (
               'weave/models',
               'weave/datasets',
               'weave/scorers',
-              'weave/leaderboards',
-              'weave/operations',
-              'weave/objects',
-            ],
+            ].concat(weaveOnlyMenu),
           },
         ];
 
