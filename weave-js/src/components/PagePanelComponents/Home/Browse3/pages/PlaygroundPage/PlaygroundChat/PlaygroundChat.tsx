@@ -41,7 +41,6 @@ export const PlaygroundChat = ({
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setIsLoading,
-    chatText,
     playgroundStates,
     entity,
     project,
@@ -168,7 +167,13 @@ export const PlaygroundChat = ({
                             content: string,
                             toolCallId?: string
                           ) => {
-                            handleSend(role, idx, content, toolCallId);
+                            handleSend(
+                              role,
+                              chatText,
+                              idx,
+                              content,
+                              toolCallId
+                            );
                           },
                           setSelectedChoiceIndex: (choiceIndex: number) =>
                             setPlaygroundStateField(
