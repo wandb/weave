@@ -24,8 +24,6 @@ export interface SliderInputProps {
   ticks?: number[];
   disabled?: boolean;
   strideLength?: number;
-  // if true, the slider will be restricted to props.max, but the input will be unbounded (https://wandb.atlassian.net/browse/WB-5666)
-  // allowGreaterThanMax?: boolean;
   onChange(value: number): void;
 }
 
@@ -47,7 +45,6 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     ticks,
     disabled,
     strideLength,
-    // allowGreaterThanMax,
     onChange,
   }) => {
     const [sliderValue, setSliderValue] = React.useState(value ?? 0);
