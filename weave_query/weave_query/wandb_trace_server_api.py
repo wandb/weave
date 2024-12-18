@@ -1,7 +1,6 @@
 # This is an experimental client api used to make requests to the
 # Weave Trace Server
 import typing
-import aiohttp
 import requests
 import json
 from requests.auth import HTTPBasicAuth
