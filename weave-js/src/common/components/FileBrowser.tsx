@@ -697,6 +697,8 @@ const CodePreview: FC<CodePreviewProps> = memo(
             </code>
           </pre>
         ) : (
+          // Use a div here because Prism seems to have global access and can apply highlighting
+          // whenever it wants which we don't want here.
           <div style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
             {data}
           </div>
