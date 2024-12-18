@@ -1,4 +1,7 @@
 
+---
+title: Monitor Prompt Routing with Weave
+---
 
 :::tip[This is a notebook]
 
