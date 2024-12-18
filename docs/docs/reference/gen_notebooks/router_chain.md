@@ -34,7 +34,7 @@ To get started, install & import the required dependencies:
 
 
 ```python
-! pip install -q langchain_community langchain_openai langchain_core weave rouge-score
+! pip install -q langchain_community langchain_openai langchain_core weave rouge-score "weave[scorers]"
 ```
 
 
@@ -92,42 +92,7 @@ We'll explore how to build a prompt routing system using LangChain and Weave. We
 
 ## Define Physics & Math Prompt Templates
 
-
-```python
-class PhysicsPromptTemplate(weave.Model):
-    system_prompt: str
-    category: str = "Physics"
-
-    @weave.op()
-    def format(system_prompt_arg: str) -> str:
-      # Remove extra spaces and strip leading/trailing whitespace
-      text = ' '.join(system_prompt_arg.split())
-
-      # Capitalize the first letter of each sentence
-      text = '. '.join(sentence.capitalize() for sentence in text.split('. '))
-
-      # Ensure space after punctuation marks (., !, ?)
-      text = re.sub(r'([.,!?])(\w)', r'\1 \2', text)
-
-      return text
-
-class MathPromptTemplate(weave.Model):
-    system_prompt: str
-    category: str = "Math"
-
-    @weave.op()
-    def format(system_prompt_arg: str) -> str:
-      # Remove extra spaces and strip leading/trailing whitespace
-      text = ' '.join(system_prompt_arg.split())
-
-      # Capitalize the first letter of each sentence
-      text = '. '.join(sentence.capitalize() for sentence in text.split('. '))
-
-      # Ensure space after punctuation marks (., !, ?)
-      text = re.sub(r'([.,!?])(\w)', r'\1 \2', text)
-
-      return text
-```
+You can version, track, and compare prompts in Weave by publishing them to the "Prompts" page of your project.
 
 
 ```python
@@ -145,12 +110,10 @@ answer the component parts, and then put them together to answer the broader que
 Here is a question:
 {query}"""
 
-physics_prompt = PhysicsPromptTemplate(
-            system_prompt=physics_template,
-        )
-math_prompt = MathPromptTemplate(
-            system_prompt=math_template,
-        )
+weave.publish(weave.StringPrompt(physics_template), name="physics_prompt")
+
+weave.publish(weave.StringPrompt(math_template), name="math_prompt")
+
 ```
 
 ## Embedd Prompt Templates using OpenAI
@@ -173,6 +136,7 @@ We define our `ChainModel` class, which inherits from `weave.Model`. This enable
 class ChainModel(weave.Model):
     model_name: str
     prompt_router: Any
+    return_prompt: bool = True
 
     @weave.op()
     async def predict(self, query: str) -> dict:
@@ -195,8 +159,11 @@ class ChainModel(weave.Model):
           response_text = response.content
       else:
           response_text = str(response)
+
+      if self.return_prompt == False:
+        return response_text
+
       return {
-          "selected_prompt": result.get("selected_prompt"),
           "formatted_prompt": result.get("formatted_prompt"),
           "response": response_text
       }
@@ -259,14 +226,14 @@ We can also view the query, output, as well as the prompt template as a whole
 
 ## Evaluating our Output
 
-We define a few scoring functions to evaluate the performance of a prompt router chain by comparing model outputs with expected responses. The `evaluate_response` function checks for correctness by matching text, while the `evaluate_bleu` and `evaluate_rouge` functions provide `BLEU` and `ROUGE-L` metrics to measure text similarity and quality. We decorate these with `@weave.op()` for tracking
+We define a few scoring functions, as well as use one of our predefined classes, to evaluate the performance of a prompt router chain by comparing model outputs with expected responses. The `evaluate_response` function checks for correctness by matching text, while the `evaluate_bleu` and `evaluate_rouge` functions provide `BLEU` and `ROUGE-L` metrics to measure text similarity and quality. We decorate these with `@weave.op()` for tracking
 
 
 ```python
 # Define the scorer
 @weave.op()
 def evaluate_response(expected: str, output: dict) -> dict:
-    response_text = output['response']
+    response_text = output
     is_correct = expected.strip().lower() in response_text.strip().lower()
     return {'is_correct': is_correct}
 
@@ -274,7 +241,7 @@ def evaluate_response(expected: str, output: dict) -> dict:
 @weave.op()
 def evaluate_bleu(expected: str, output: dict) -> dict:
     reference = [nltk.word_tokenize(expected.strip().lower())]
-    candidate = nltk.word_tokenize(output['response'].strip().lower())
+    candidate = nltk.word_tokenize(output.strip().lower())
     smoothing = SmoothingFunction().method1
     score = sentence_bleu(reference, candidate, smoothing_function=smoothing)
     return {'bleu_score': score}
@@ -283,12 +250,29 @@ def evaluate_bleu(expected: str, output: dict) -> dict:
 @weave.op()
 def evaluate_rouge(expected: str, output: dict) -> dict:
     scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
-    scores = scorer.score(expected.strip().lower(), output['response'].strip().lower())
+    scores = scorer.score(expected.strip().lower(), output.strip().lower())
     rouge_l_fmeasure = scores['rougeL'].fmeasure
     return {'rougeL_fmeasure': rouge_l_fmeasure}
 ```
 
-We prepare a dataset of example queries and expected responses to evaluate the performance of our prompt router chain using BLEU & ROUGE scoring metrics.
+We use Weave's built-in `EmbeddingSimilarityScorer` to evaluate outputs by comparing their embeddings to our target text, helping quantify output similarity with a customizable cosine similarity threshold.
+
+
+```python
+from openai import OpenAI
+from weave.scorers import EmbeddingSimilarityScorer
+
+llm_client = OpenAI()
+
+similarity_scorer = EmbeddingSimilarityScorer(
+    client=llm_client,
+    threshold=0.4,  # the cosine similarity threshold to use
+    column_map={"target": "expected"},  # the dataset column to compare the output against
+
+)
+```
+
+We prepare a dataset of example queries and expected responses to evaluate the performance of our prompt router chain using the above scoring metrics.
 
 
 ```python
@@ -303,12 +287,12 @@ example_queries = [
 # Create Weave Evaluation
 evaluation = weave.Evaluation(
     dataset=example_queries,
-    scorers=[evaluate_response, evaluate_bleu, evaluate_rouge],
+    scorers=[evaluate_response, evaluate_bleu, evaluate_rouge, similarity_scorer],
     name = "Prompt Router Evaluation"
 )
 
 # Instantiate the chain
-model = ChainModel(model_name='gpt-4', prompt_router=prompt_router)
+model = ChainModel(model_name='gpt-4', prompt_router=prompt_router, return_prompt=False)
 
 # Run the evaluation
 results = await evaluation.evaluate(model)
