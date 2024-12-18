@@ -228,7 +228,7 @@ def test_feedback_payload(client):
 def test_feedback_create_too_large(client):
     project_id = client._project_id()
 
-    value = "a" * 10000
+    value = "a" * (1 << 21)  # > 1 MiB, past the limit
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
