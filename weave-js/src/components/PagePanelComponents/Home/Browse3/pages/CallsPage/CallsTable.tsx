@@ -963,16 +963,16 @@ export const CallsTable: FC<{
                 {!hideOpSelector && (
                   <div className="flex items-center gap-8">
                     <ButtonDivider />
-                      <div className="flex items-center gap-6">
-                        <div className="flex-none">
-                          <Button
-                            icon="chart-vertical-bars"
-                            variant="ghost"
-                            active={isMetricsChecked}
-                            onClick={() => setMetricsChecked(!isMetricsChecked)}
-                          />
-                        </div>
+                    <div className="flex items-center gap-6">
+                      <div className="flex-none">
+                        <Button
+                          icon="chart-vertical-bars"
+                          variant="ghost"
+                          active={isMetricsChecked}
+                          onClick={() => setMetricsChecked(!isMetricsChecked)}
+                        />
                       </div>
+                    </div>
                   </div>
                 )}
               </div>

@@ -409,15 +409,15 @@ export const CompareEvaluationsTableButton: FC<{
   tooltipText?: string;
   selectedCount: number;
 }> = ({onClick, disabled, tooltipText, selectedCount}) => {
-  const buttonText = selectedCount === 0 
-    ? 'Compare evals'
-    : selectedCount === 1 
-      ? 'Compare evals' 
+  const buttonText =
+    selectedCount === 0
+      ? 'Compare evals'
+      : selectedCount === 1
+      ? 'Compare evals'
       : `Compare ${selectedCount} evals`;
 
-  const defaultTooltip = selectedCount === 1 
-    ? 'Select more than one eval to compare'
-    : undefined;
+  const defaultTooltip =
+    selectedCount === 1 ? 'Select more than one eval to compare' : undefined;
 
   return (
     <Box
@@ -445,15 +445,15 @@ export const CompareTracesTableButton: FC<{
   tooltipText?: string;
   selectedCount: number;
 }> = ({onClick, disabled, tooltipText, selectedCount}) => {
-  const buttonText = selectedCount === 0
-    ? 'Compare traces'
-    : selectedCount === 1
+  const buttonText =
+    selectedCount === 0
+      ? 'Compare traces'
+      : selectedCount === 1
       ? 'Compare traces'
       : `Compare ${selectedCount} traces`;
 
-  const defaultTooltip = selectedCount === 1
-    ? 'Select more than one trace to compare'
-    : undefined;
+  const defaultTooltip =
+    selectedCount === 1 ? 'Select more than one trace to compare' : undefined;
 
   return (
     <Box
