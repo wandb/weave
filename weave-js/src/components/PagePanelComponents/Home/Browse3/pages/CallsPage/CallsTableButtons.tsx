@@ -407,47 +407,73 @@ export const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      size="medium"
-      variant="ghost"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare evals
-    </Button>
-  </Box>
-);
+  selectedCount: number;
+}> = ({onClick, disabled, tooltipText, selectedCount}) => {
+  const buttonText = selectedCount === 0 
+    ? 'Compare evals'
+    : selectedCount === 1 
+      ? 'Compare evals' 
+      : `Compare ${selectedCount} evals`;
+
+  const defaultTooltip = selectedCount === 1 
+    ? 'Select more than one eval to compare'
+    : undefined;
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        size="medium"
+        variant="ghost"
+        disabled={disabled || selectedCount === 1}
+        onClick={onClick}
+        icon="chart-scatterplot"
+        tooltip={tooltipText ?? defaultTooltip}>
+        {buttonText}
+      </Button>
+    </Box>
+  );
+};
 
 export const CompareTracesTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      size="medium"
-      variant="ghost"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare traces
-    </Button>
-  </Box>
-);
+  selectedCount: number;
+}> = ({onClick, disabled, tooltipText, selectedCount}) => {
+  const buttonText = selectedCount === 0
+    ? 'Compare traces'
+    : selectedCount === 1
+      ? 'Compare traces'
+      : `Compare ${selectedCount} traces`;
+
+  const defaultTooltip = selectedCount === 1
+    ? 'Select more than one trace to compare'
+    : undefined;
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        size="medium"
+        variant="ghost"
+        disabled={disabled || selectedCount === 1}
+        onClick={onClick}
+        icon="chart-scatterplot"
+        tooltip={tooltipText ?? defaultTooltip}>
+        {buttonText}
+      </Button>
+    </Box>
+  );
+};
 
 export const BulkDeleteButton: FC<{
   disabled?: boolean;

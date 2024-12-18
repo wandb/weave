@@ -185,62 +185,61 @@ const SelectionHeader: FC<{
   );
 
   return (
-    <div className="flex w-full items-center justify-between">
-      <div className="flex items-center gap-[8px]">
-        <Typography>
-          {selectedCount} items selected
-          <span
-            className="ml-[8px] cursor-pointer font-semibold text-teal-600 hover:text-teal-700"
-            onClick={onClearSelection}>
-            Clear selection
-          </span>
-        </Typography>
-      </div>
-      <div className="flex items-center gap-[8px]">
+    <div className="flex w-full items-center gap-[8px]">
+      {/* Left side group */}
+      {isEvaluateTable ? (
+        <CompareEvaluationsTableButton
+          onClick={onCompareClick}
+          disabled={selectedCount === 0}
+          selectedCount={selectedCount}
+        />
+      ) : (
+        <CompareTracesTableButton
+          onClick={onCompareClick}
+          disabled={selectedCount < 2}
+          selectedCount={selectedCount}
+        />
+      )}
+      {!isReadonly && (
         <div className="flex-none">
-          <ExportSelector
-            selectedCalls={selectedCalls}
-            numTotalCalls={callsTotal}
-            disabled={callsTotal === 0}
-            visibleColumns={visibleColumns}
-            refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
-              visibleColumns.includes(col)
-            )}
-            callQueryParams={{
-              entity,
-              project,
-              filter: effectiveFilter,
-              gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-              gridSort: sortModel,
-            }}
-            defaultToSelected={true}
+          <BulkDeleteButton
+            onClick={() => setDeleteConfirmModalOpen(true)}
+            disabled={selectedCalls.length === 0}
+          />
+          <ConfirmDeleteModal
+            calls={selectedCallObjects}
+            confirmDelete={deleteConfirmModalOpen}
+            setConfirmDelete={setDeleteConfirmModalOpen}
+            onDeleteCallback={onClearSelection}
           />
         </div>
-        {!isReadonly && (
-          <div className="flex-none">
-            <BulkDeleteButton
-              onClick={() => setDeleteConfirmModalOpen(true)}
-              disabled={selectedCalls.length === 0}
-            />
-            <ConfirmDeleteModal
-              calls={selectedCallObjects}
-              confirmDelete={deleteConfirmModalOpen}
-              setConfirmDelete={setDeleteConfirmModalOpen}
-              onDeleteCallback={onClearSelection}
-            />
-          </div>
-        )}
-        {isEvaluateTable ? (
-          <CompareEvaluationsTableButton
-            onClick={onCompareClick}
-            disabled={selectedCount === 0}
-          />
-        ) : (
-          <CompareTracesTableButton
-            onClick={onCompareClick}
-            disabled={selectedCount < 2}
-          />
-        )}
+      )}
+      <ButtonDivider />
+      <span
+        className="ml-[8px] cursor-pointer font-semibold text-teal-600 hover:text-teal-700"
+        onClick={onClearSelection}>
+        Clear selection
+      </span>
+
+      {/* Right side group */}
+      <div className="ml-auto flex-none">
+        <ExportSelector
+          selectedCalls={selectedCalls}
+          numTotalCalls={callsTotal}
+          disabled={callsTotal === 0}
+          visibleColumns={visibleColumns}
+          refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+            visibleColumns.includes(col)
+          )}
+          callQueryParams={{
+            entity,
+            project,
+            filter: effectiveFilter,
+            gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+            gridSort: sortModel,
+          }}
+          defaultToSelected={true}
+        />
       </div>
     </div>
   );
@@ -700,15 +699,14 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                const maxForTable = isEvaluateTable
-                  ? MAX_EVAL_COMPARISONS
-                  : MAX_SELECT;
-                if (
-                  selectedCalls.length ===
-                  Math.min(tableData.length, maxForTable)
-                ) {
+                if (selectedCalls.length > 0) {
+                  // If any rows are selected, deselect all
                   setSelectedCalls([]);
                 } else {
+                  // If no rows are selected, select up to the max allowed
+                  const maxForTable = isEvaluateTable
+                    ? MAX_EVAL_COMPARISONS
+                    : MAX_SELECT;
                   setSelectedCalls(
                     tableData.map(row => row.id).slice(0, maxForTable)
                   );
@@ -888,7 +886,7 @@ export const CallsTable: FC<{
           </TailwindContents>
         ) : (
           <TailwindContents>
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full items-center">
               {/* Left side group */}
               <div className="flex items-center gap-[8px]">
                 <RefreshButton
@@ -951,7 +949,6 @@ export const CallsTable: FC<{
                     }}
                   />
                 )}
-                <ButtonDivider />
                 {/* Column Visibility Button */}
                 {columnVisibilityModel && setColumnVisibilityModel && (
                   <div className="flex-none">
@@ -964,20 +961,24 @@ export const CallsTable: FC<{
                 )}
                 {/* Metrics Button */}
                 {!hideOpSelector && (
-                  <div className="flex items-center gap-6">
-                    <div className="flex-none">
-                      <Button
-                        icon="chart-vertical-bars"
-                        variant={isMetricsChecked ? 'secondary' : 'ghost'}
-                        onClick={() => setMetricsChecked(!isMetricsChecked)}
-                      />
-                    </div>
+                  <div className="flex items-center gap-8">
+                    <ButtonDivider />
+                      <div className="flex items-center gap-6">
+                        <div className="flex-none">
+                          <Button
+                            icon="chart-vertical-bars"
+                            variant="ghost"
+                            active={isMetricsChecked}
+                            onClick={() => setMetricsChecked(!isMetricsChecked)}
+                          />
+                        </div>
+                      </div>
                   </div>
                 )}
               </div>
 
               {/* Right side group */}
-              <div className="flex items-center gap-[8px]">
+              <div className="ml-auto flex items-center gap-[8px]">
                 <div className="flex-none">
                   <ExportSelector
                     selectedCalls={selectedCalls}
