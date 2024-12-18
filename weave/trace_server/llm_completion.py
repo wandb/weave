@@ -33,7 +33,7 @@ def lite_llm_completion(
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
 
-    if "o1" not in inputs.model or inputs.n == 1:
+    if supports_n_times(inputs.model) or inputs.n == 1:
         try:
             res = litellm.completion(
                 **inputs.model_dump(exclude_none=True),
@@ -122,6 +122,14 @@ def get_bedrock_credentials(
         )
 
     return aws_access_key_id, aws_secret_access_key, aws_region_name
+
+
+NO_N_TIMES_MODEL_NAMES = ("o1-mini", "o1-preview", "o1")
+
+
+# if the model name contains any of these strings, we don't support n > 1
+def supports_n_times(model_name: str) -> bool:
+    return not any(x in model_name for x in NO_N_TIMES_MODEL_NAMES)
 
 
 # copied from weave/trace/weave_client.py
