@@ -658,10 +658,8 @@ const CodePreview: FC<CodePreviewProps> = memo(
       onFailure: setError,
     });
 
-    const isSmallFile = file.sizeBytes / 1024 < 1024;
-
     useEffect(() => {
-      if (ref.current != null && isSmallFile) {
+      if (ref.current != null) {
         Prism.highlightElement(ref.current);
       }
     });
@@ -684,7 +682,8 @@ const CodePreview: FC<CodePreviewProps> = memo(
           overflowY: 'auto',
           maxWidth: '100%',
         }}>
-        {isSmallFile ? (
+        {file.sizeBytes / 1024 < 1024 ? (
+          // When the file is under 1MB we use the normal code viewer with highlighting
           <pre
             style={{
               maxWidth: '100%',
