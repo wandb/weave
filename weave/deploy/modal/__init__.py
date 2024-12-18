@@ -30,7 +30,7 @@ def compile(
 ) -> Path:
     """Generates a modal py file and secret env vars to run the weave op"""
     dir = Path(tempfile.mkdtemp())
-    with open(Path(__file__).parent / "stub.py", "r") as f:
+    with open(Path(__file__).parent / "stub.py") as f:
         template = string.Template(f.read())
         src = template.substitute(
             {

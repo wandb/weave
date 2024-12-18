@@ -27,7 +27,7 @@ def make_header(notebook_path):
 
 
 def remove_outputs(notebook_path):
-    with open(notebook_path, "r", encoding="utf-8") as f:
+    with open(notebook_path, encoding="utf-8") as f:
         nb = nbformat.read(f, as_version=4)
 
     for cell in nb.cells:

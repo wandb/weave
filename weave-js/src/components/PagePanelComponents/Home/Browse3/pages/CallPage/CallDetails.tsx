@@ -1,4 +1,3 @@
-import {Typography} from '@mui/material';
 import Box from '@mui/material/Box';
 import _ from 'lodash';
 import React, {FC, useContext, useMemo} from 'react';
@@ -10,15 +9,15 @@ import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
-import {KeyValueTable} from '../common/KeyValueTable';
-import {CallLink, opNiceName} from '../common/Links';
-import {CenteredAnimatedLoader} from '../common/Loader';
+import {CallLink} from '../common/Links';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
 import {ExceptionDetails, getExceptionInfo} from './Exceptions';
 import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
+
+const HEADER_HEIGHT_BUFFER = 60;
 
 const Heading = styled.div`
   color: ${MOON_800};
@@ -104,7 +103,7 @@ export const CallDetails: FC<{
     columns
   );
 
-  const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
+  const {multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
   );
@@ -133,6 +132,7 @@ export const CallDetails: FC<{
         <Box
           sx={{
             flex: '0 0 auto',
+            maxHeight: `calc(100% - ${HEADER_HEIGHT_BUFFER}px)`,
             p: 2,
           }}>
           <CustomWeaveTypeProjectContext.Provider
@@ -143,15 +143,19 @@ export const CallDetails: FC<{
         <Box
           sx={{
             flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
             p: 2,
           }}>
           {'traceback' in excInfo ? (
-            <>
-              <TitleRow>
+            <div style={{overflow: 'auto', height: '100%'}}>
+              <TitleRow
+                style={{position: 'sticky', top: 0, backgroundColor: 'white'}}>
                 <Title>Error</Title>
               </TitleRow>
               <ExceptionDetails exceptionInfo={excInfo} />
-            </>
+            </div>
           ) : (
             <CustomWeaveTypeProjectContext.Provider
               value={{entity: call.entity, project: call.project}}>
@@ -201,7 +205,6 @@ export const CallDetails: FC<{
               sx={{
                 flex: '0 0 auto',
                 height: '500px',
-                maxHeight: '95%',
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -240,33 +243,6 @@ export const CallDetails: FC<{
             </Box>
           );
         })}
-        {childCalls.loading && <CenteredAnimatedLoader />}
-        {/* Disabling display of singular children while we decide if we want them here. */}
-        {false && singularChildCalls.length > 0 && (
-          <Box
-            sx={{
-              flex: '0 0 auto',
-            }}>
-            {multipleChildCallOpRefs.length === 0 ? (
-              <Typography pl={1}>Child calls</Typography>
-            ) : (
-              <Typography pl={1}>Singular child calls</Typography>
-            )}
-            {singularChildCalls.map(c => (
-              <Box
-                key={c.callId}
-                sx={{
-                  flex: '0 0 auto',
-                  p: 2,
-                }}>
-                <KeyValueTable
-                  headerTitle={opNiceName(c.spanName)}
-                  data={getDisplayInputsAndOutput(c)}
-                />
-              </Box>
-            ))}
-          </Box>
-        )}
       </Box>
     </Box>
   );

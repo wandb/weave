@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import numeral from 'numeral';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
@@ -27,9 +26,11 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
+import {TabPrompt} from './TabPrompt';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
@@ -49,7 +50,11 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Prompt: 'forum-chat-bubble',
   Model: 'model',
   Dataset: 'table',
-  Evaluation: 'benchmark-square',
+  Evaluation: 'baseline-alt',
+  Leaderboard: 'benchmark-square',
+  Scorer: 'type-number-alt',
+  ActionSpec: 'rocket-launch',
+  AnnotationSpec: 'forum-chat-bubble',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -127,6 +132,8 @@ const ObjectVersionPageInner: React.FC<{
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
+  const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
+
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
   }, []);
@@ -187,11 +194,6 @@ const ObjectVersionPageInner: React.FC<{
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
-  const bytesStored = useMemo(
-    () => (data.result?.[0] ? JSON.stringify(data.result?.[0]).length : 0),
-    [data.result]
-  );
-
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
   }
@@ -209,56 +211,50 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
-                  <>
-                    [
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{
-                        objectName,
-                      }}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
+        <Tailwind>
+          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="block">
+              <p className="text-moon-500">Name</p>
+              <div className="flex items-center">
+                <ObjectVersionsLink
+                  entity={entityName}
+                  project={projectName}
+                  filter={{objectName}}
+                  versionCount={objectVersionCount}
+                  neverPeek
+                  variant="secondary">
+                  <div className="group flex items-center font-semibold">
+                    <span>{objectName}</span>
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <span className="ml-[4px]">
+                        ({objectVersionCount} version
+                        {objectVersionCount !== 1 ? 's' : ''})
+                      </span>
+                    )}
+                    <Icon
+                      name="forward-next"
+                      width={16}
+                      height={16}
+                      className="ml-[2px] opacity-0 group-hover:opacity-100"
                     />
-                    ]
-                  </>
-                )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            'Bytes stored': (
-              <>
-                {data.loading ? (
-                  <LoadingDots />
-                ) : (
-                  numeral(bytesStored).format('0.0b')
-                )}
-              </>
-            ),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+                  </div>
+                </ObjectVersionsLink>
+              </div>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Version</p>
+              <p>{objectVersionIndex}</p>
+            </div>
+            {refExtra && (
+              <div className="block">
+                <p className="text-moon-500">Subpath</p>
+                <p>{refExtra}</p>
+              </div>
+            )}
+          </div>
+        </Tailwind>
       }
       // menuItems={[
       //   {
@@ -287,6 +283,26 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <ScrollableTabContent>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <TabPrompt
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         ...(isEvaluation && evalHasCalls
           ? [
               {
@@ -333,23 +349,33 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content: (
-            <Tailwind>
-              {baseObjectClass === 'Dataset' ? (
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              ) : baseObjectClass === 'Model' ? (
-                <TabUseModel
-                  name={objectName}
-                  uri={refUri}
-                  projectName={projectName}
-                />
-              ) : (
-                <TabUseObject name={objectName} uri={refUri} />
-              )}
-            </Tailwind>
+            <ScrollableTabContent>
+              <Tailwind>
+                {baseObjectClass === 'Prompt' ? (
+                  <TabUsePrompt
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
+                  />
+                ) : baseObjectClass === 'Dataset' ? (
+                  <TabUseDataset
+                    name={objectName}
+                    uri={refUri}
+                    versionIndex={objectVersionIndex}
+                  />
+                ) : baseObjectClass === 'Model' ? (
+                  <TabUseModel
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                  />
+                ) : (
+                  <TabUseObject name={objectName} uri={refUri} />
+                )}
+              </Tailwind>
+            </ScrollableTabContent>
           ),
         },
 

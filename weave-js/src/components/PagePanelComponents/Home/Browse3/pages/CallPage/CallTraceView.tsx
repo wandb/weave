@@ -399,6 +399,7 @@ export const useCallFlattenedTraceTree = (
     [traceCallsResult, call.traceId]
   );
 
+  const costCols = useMemo(() => ['id'], []);
   const costs = useCalls(
     call.entity,
     call.project,
@@ -407,7 +408,7 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
-    columns,
+    costCols,
     undefined,
     {
       skip: traceCalls.loading,
@@ -416,14 +417,11 @@ export const useCallFlattenedTraceTree = (
   );
 
   const costResult = useMemo(() => {
-    return costs.result ?? [];
-  }, [costs.result]);
+    return addCostsToCallResults(traceCallsResult, costs.result ?? []);
+  }, [costs.result, traceCallsResult]);
 
   const traceCallMap = useMemo(() => {
-    const result =
-      costResult.length > 0
-        ? addCostsToCallResults(traceCallsResult, costResult)
-        : traceCallsResult;
+    const result = costResult.length > 0 ? costResult : traceCallsResult;
     return _.keyBy(result, 'callId');
   }, [costResult, traceCallsResult]);
 
@@ -469,9 +467,16 @@ export const useCallFlattenedTraceTree = (
         childCallLookup
       );
       pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
-      currentCall = currentCall.parentId
-        ? traceCallMap[currentCall.parentId]
-        : null;
+      if (currentCall.parentId) {
+        if (!traceCallMap[currentCall.parentId]) {
+          // Cant find parent, assume it doesn't exist
+          currentCall.parentId = null;
+        } else {
+          currentCall = traceCallMap[currentCall.parentId];
+        }
+      } else {
+        currentCall = null;
+      }
     }
 
     // Add a parent row

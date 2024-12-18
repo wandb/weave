@@ -179,6 +179,58 @@ export const opArtifactVersionFileCount = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.fileCount,
 });
 
+export const opArtifactVersionFilesType = makeArtifactVersionOp({
+  name: 'artifactVersion-_files_refine_output_type',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the type of a ${docType('list')} of ${docType('file', {
+    plural: true,
+  })} of the ${docType('artifactVersion')}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  hidden: true,
+  returnValueDescription: `The type of a ${docType('list')} of ${docType(
+    'file',
+    {
+      plural: true,
+    }
+  )} of the ${docType('artifactVersion')}`,
+  returnType: inputTypes => 'type',
+  resolver: async (
+    {artifactVersion},
+    rawInputs,
+    inputTypes,
+    forwardGraph,
+    forwardOp,
+    context
+  ) => {
+    try {
+      // This errors if the sequence has been deleted (or a race case in which
+      // the artifact is not created before the history step referencing it comes in)
+      // Note these awaits happen serially!
+      const result = await context.backend.getArtifactFileMetadata(
+        artifactVersion.id,
+        ''
+      );
+      if (result == null || result.type !== 'dir') {
+        throw new Error('opArtifactVersionFiles: not a directory');
+      }
+      // See comment in opArtifactFiles for info about how this currently works.
+      const types = [];
+      for (const fileName of Object.keys(result.files)) {
+        const type = TypeHelpers.filePathToType(
+          result.files[fileName].fullPath
+        );
+        types.push(type);
+      }
+      return list(union(types));
+    } catch (e) {
+      console.warn('Error loading artifact', {err: e, artifactVersion});
+      return list(union([]));
+    }
+  },
+});
+
 export const opArtifactVersionFiles = makeArtifactVersionOp({
   name: 'artifactVersion-files',
   argTypes: artifactVersionArgTypes,
@@ -222,6 +274,26 @@ export const opArtifactVersionFiles = makeArtifactVersionOp({
       console.warn('Error loading artifact', {err: e, artifactVersion});
       return [];
     }
+  },
+  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+    const artifactVersionNode = replaceInputVariables(
+      executableNode.fromOp.inputs.artifactVersion,
+      client.opStore
+    );
+    const refineOp = opArtifactVersionFilesType({
+      artifactVersion: artifactVersionNode,
+    });
+    let result = await client.query(refineOp);
+
+    // This is a Weave1 hack. Weave1's type refinement ops return
+    // tagged/mapped results. But the Weave0 opKinds framework is going to do
+    // the same wrapping to the result we return here. So we unwrap the Weave1
+    // result and let it be rewrapped.
+    if (TypeHelpers.isTaggedValue(result)) {
+      result = TypeHelpers.taggedValueValueType(result);
+    }
+
+    return result ?? 'none';
   },
 });
 

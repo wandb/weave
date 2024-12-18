@@ -1,3 +1,5 @@
+import {Leaderboard} from '../../../pages/wfReactInterface/generatedBuiltinObjectClasses.zod';
+
 export const ALL_VALUE = '*';
 
 export type LeaderboardConfigType = {
@@ -43,3 +45,6 @@ export type FilterAndGroupModelSpec = {
   version: string; // "*" means all
   groupAllVersions?: boolean;
 };
+
+// This alias could go away, just here to make refactoring easier
+export type LeaderboardObjectVal = Leaderboard;

@@ -8,7 +8,7 @@ import {
   TraceCallSchema,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {ChatCompletion, ChatRequest, Choice} from './types';
+import {Chat, ChatCompletion, ChatRequest, Choice} from './types';
 
 export enum ChatFormat {
   None = 'None',
@@ -59,6 +59,12 @@ export const isToolCall = (toolCall: any): boolean => {
 };
 
 export const isToolCalls = (toolCalls: any): boolean => {
+  if (toolCalls === null) {
+    // Some llms return null for tool calls
+    // before the chat view was hidden for those calls
+    return true;
+  }
+
   if (!_.isArray(toolCalls)) {
     return false;
   }
@@ -240,6 +246,63 @@ export const isTraceCallChatFormatGemini = (call: TraceCallSchema): boolean => {
   );
 };
 
+export const isAnthropicContentBlock = (block: any): boolean => {
+  if (!_.isPlainObject(block)) {
+    return false;
+  }
+  // TODO: Are there other types?
+  if (block.type !== 'text') {
+    return false;
+  }
+  if (!hasStringProp(block, 'text')) {
+    return false;
+  }
+  return true;
+};
+
+export const isAnthropicCompletionFormat = (output: any): boolean => {
+  if (output !== null) {
+    // TODO: Could have additional checks here on things like usage
+    if (
+      _.isPlainObject(output) &&
+      output.type === 'message' &&
+      output.role === 'assistant' &&
+      hasStringProp(output, 'model') &&
+      _.isArray(output.content) &&
+      output.content.every((c: any) => isAnthropicContentBlock(c))
+    ) {
+      return true;
+    }
+    return false;
+  }
+  return true;
+};
+
+type AnthropicContentBlock = {
+  type: 'text';
+  text: string;
+};
+
+export const anthropicContentBlocksToChoices = (
+  blocks: AnthropicContentBlock[],
+  stopReason: string
+): Choice[] => {
+  const choices: Choice[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    choices.push({
+      index: i,
+      message: {
+        role: 'assistant',
+        content: block.text,
+      },
+      // TODO: What is correct way to map this?
+      finish_reason: stopReason,
+    });
+  }
+  return choices;
+};
+
 export const isTraceCallChatFormatOpenAI = (call: TraceCallSchema): boolean => {
   if (!('messages' in call.inputs)) {
     return false;
@@ -330,6 +393,19 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
       ],
     };
   }
+  // Anthropic has system message as a top-level request field
+  if (hasStringProp(request, 'system')) {
+    return {
+      ...request,
+      messages: [
+        {
+          role: 'system',
+          content: request.system,
+        },
+        ...request.messages,
+      ],
+    };
+  }
   return request as ChatRequest;
 };
 
@@ -354,6 +430,24 @@ export const normalizeChatCompletion = (
       },
     };
   }
+  if (isAnthropicCompletionFormat(completion)) {
+    return {
+      id: completion.id,
+      choices: anthropicContentBlocksToChoices(
+        completion.content,
+        completion.stop_reason
+      ),
+      created: 0,
+      model: completion.model,
+      system_fingerprint: '',
+      usage: {
+        prompt_tokens: completion.usage.input_tokens,
+        completion_tokens: completion.usage.output_tokens,
+        total_tokens:
+          completion.usage.input_tokens + completion.usage.output_tokens,
+      },
+    };
+  }
   return completion as ChatCompletion;
 };
 
@@ -361,10 +455,7 @@ export const useCallAsChat = (
   call: TraceCallSchema
 ): {
   loading: boolean;
-  isStructuredOutput: boolean;
-  request: ChatRequest;
-  result: ChatCompletion | null;
-} => {
+} & Chat => {
   // Traverse the data and find all ref URIs.
   const refs = getRefs(call);
   const {useRefsData} = useWFHooks();

@@ -15,25 +15,40 @@ import {
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import {Checkbox} from '@wandb/weave/components/Checkbox';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {TEAL_600} from '../../../../../common/css/color.styles';
+import {Button} from '../../../../Button';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  useWeaveflowRouteContext,
+} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
+  EMPTY_PROPS_ACTION_SPECS,
+  EMPTY_PROPS_ANNOTATIONS,
   EMPTY_PROPS_DATASETS,
+  EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
+  EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
 } from './common/EmptyContent';
-import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
+import {
+  CustomLink,
+  ObjectVersionLink,
+  ObjectVersionsLink,
+  objectVersionText,
+} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {
@@ -67,10 +82,17 @@ export const ObjectVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
     props.onFilterUpdate
   );
+  const {entity, project} = props;
+  const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+  const onCompare = () => {
+    history.push(router.compareObjectsUri(entity, project, selectedVersions));
+  };
 
   const title = useMemo(() => {
     if (filter.objectName) {
@@ -81,10 +103,21 @@ export const ObjectVersionsPage: React.FC<{
     return 'All Objects';
   }, [filter.objectName, filter.baseObjectClass]);
 
+  const hasComparison = filter.objectName != null;
+  const headerExtra = hasComparison ? (
+    <Button
+      className="mr-16"
+      disabled={selectedVersions.length < 2}
+      onClick={onCompare}>
+      Compare
+    </Button>
+  ) : undefined;
+
   return (
     <SimplePageLayout
       title={title}
       hideTabsIfSingle
+      headerExtra={headerExtra}
       tabs={[
         {
           label: '',
@@ -93,6 +126,10 @@ export const ObjectVersionsPage: React.FC<{
               {...props}
               initialFilter={filter}
               onFilterUpdate={setFilter}
+              selectedVersions={selectedVersions}
+              setSelectedVersions={
+                hasComparison ? setSelectedVersions : undefined
+              }
             />
           ),
         },
@@ -111,9 +148,14 @@ export const FilterableObjectVersionsTable: React.FC<{
   project: string;
   frozenFilter?: WFHighLevelObjectVersionFilter;
   initialFilter?: WFHighLevelObjectVersionFilter;
+  objectTitle?: string;
+  hideCategoryColumn?: boolean;
+  hideCreatedAtColumn?: boolean;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
+  selectedVersions?: string[];
+  setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
   const {useRootObjectVersions} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -159,6 +201,14 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_MODEL;
     } else if (DATASET_BASE_OBJECT_CLASS === base) {
       propsEmpty = EMPTY_PROPS_DATASETS;
+    } else if (base === 'Leaderboard') {
+      propsEmpty = EMPTY_PROPS_LEADERBOARDS;
+    } else if (base === 'Scorer') {
+      propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
+    } else if (base === 'ActionSpec') {
+      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
+    } else if (base === 'AnnotationSpec') {
+      propsEmpty = EMPTY_PROPS_ANNOTATIONS;
     }
     return <Empty {...propsEmpty} />;
   }
@@ -174,18 +224,33 @@ export const FilterableObjectVersionsTable: React.FC<{
       )}>
       <ObjectVersionsTable
         objectVersions={objectVersions}
-        usingLatestFilter={effectivelyLatestOnly}
+        objectTitle={props.objectTitle}
+        hidePropsAsColumns={!!effectivelyLatestOnly}
+        hidePeerVersionsColumn={!effectivelyLatestOnly}
+        hideCategoryColumn={props.hideCategoryColumn}
+        hideCreatedAtColumn={props.hideCreatedAtColumn}
+        selectedVersions={props.selectedVersions}
+        setSelectedVersions={props.setSelectedVersions}
       />
     </FilterLayoutTemplate>
   );
 };
 
-const ObjectVersionsTable: React.FC<{
+export const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
-  usingLatestFilter?: boolean;
+  objectTitle?: string;
+  hidePropsAsColumns?: boolean;
+  hidePeerVersionsColumn?: boolean;
+  hideCategoryColumn?: boolean;
+  hideCreatedAtColumn?: boolean;
+  hideVersionSuffix?: boolean;
+  onRowClick?: (objectVersion: ObjectVersionSchema) => void;
+  selectedVersions?: string[];
+  setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
-  const showPropsAsColumns = !props.usingLatestFilter;
+  const {selectedVersions, setSelectedVersions} = props;
+  const showPropsAsColumns = !props.hidePropsAsColumns;
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
     const flat = prepareFlattenedDataForTable(vals);
@@ -216,14 +281,84 @@ const ObjectVersionsTable: React.FC<{
   // extracted and shared.
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
+    const checkboxColumnArr: GridColDef[] =
+      selectedVersions != null && setSelectedVersions
+        ? [
+            {
+              minWidth: 30,
+              width: 34,
+              field: 'CustomCheckbox',
+              sortable: false,
+              disableColumnMenu: true,
+              resizable: false,
+              disableExport: true,
+              display: 'flex',
+              renderHeader: (params: any) => {
+                // TODO: Adding a select all checkbox here not that useful for compare
+                // but might for be for other bulk actions.
+                return null;
+              },
+              renderCell: (params: any) => {
+                const {objectId, versionIndex} = params.row.obj;
+                const objSpecifier = `${objectId}:v${versionIndex}`;
+                const isSelected = selectedVersions.includes(objSpecifier);
+                return (
+                  <Checkbox
+                    size="small"
+                    checked={isSelected}
+                    onCheckedChange={() => {
+                      if (isSelected) {
+                        setSelectedVersions(
+                          selectedVersions.filter(id => id !== objSpecifier)
+                        );
+                      } else {
+                        // Keep the objects in sorted order, regardless of the order checked.
+                        setSelectedVersions(
+                          [...selectedVersions, objSpecifier].sort((a, b) => {
+                            const [aName, aVer] = a.split(':');
+                            const [bName, bVer] = b.split(':');
+                            if (aName !== bName) {
+                              return aName.localeCompare(bName);
+                            }
+                            const aNum = parseInt(aVer.slice(1), 10);
+                            const bNum = parseInt(bVer.slice(1), 10);
+                            return aNum - bNum;
+                          })
+                        );
+                      }
+                    }}
+                  />
+                );
+              },
+            },
+          ]
+        : [];
     const cols: GridColDef[] = [
+      ...checkboxColumnArr,
+
       // This field name chosen to reduce possibility of conflict
       // with the dynamic fields added below.
-      basicField('weave__object_version_link', 'Object', {
+      basicField('weave__object_version_link', props.objectTitle ?? 'Object', {
         hideable: false,
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
           const obj: ObjectVersionSchema = cellParams.row.obj;
+          if (props.onRowClick) {
+            let text = props.hideVersionSuffix
+              ? obj.objectId
+              : objectVersionText(obj.objectId, obj.versionIndex);
+
+            // This allows us to use the object name as the link text
+            // if it is available. Probably should make this workfor
+            // the object version link as well.
+            if (obj.val.name) {
+              text = obj.val.name;
+            }
+
+            return (
+              <CustomLink text={text} onClick={() => props.onRowClick?.(obj)} />
+            );
+          }
           return (
             <ObjectVersionLink
               entityName={obj.entity}
@@ -233,6 +368,7 @@ const ObjectVersionsTable: React.FC<{
               versionIndex={obj.versionIndex}
               fullWidth={true}
               color={TEAL_600}
+              hideVersionSuffix={props.hideVersionSuffix}
             />
           );
         },
@@ -283,36 +419,41 @@ const ObjectVersionsTable: React.FC<{
       groups = groupingModel;
     }
 
-    cols.push(
-      basicField('baseObjectClass', 'Category', {
-        width: 100,
-        display: 'flex',
-        valueGetter: (unused: any, row: any) => {
-          return row.obj.baseObjectClass;
-        },
-        renderCell: cellParams => {
-          const category = cellParams.value;
-          if (KNOWN_BASE_OBJECT_CLASSES.includes(category)) {
-            return <TypeVersionCategoryChip baseObjectClass={category} />;
-          }
-          return null;
-        },
-      })
-    );
+    if (!props.hideCategoryColumn) {
+      cols.push(
+        basicField('baseObjectClass', 'Category', {
+          width: 120,
+          display: 'flex',
+          valueGetter: (unused: any, row: any) => {
+            return row.obj.baseObjectClass;
+          },
+          renderCell: cellParams => {
+            const category = cellParams.value;
+            if (KNOWN_BASE_OBJECT_CLASSES.includes(category)) {
+              return <TypeVersionCategoryChip baseObjectClass={category} />;
+            }
+            return null;
+          },
+        })
+      );
+    }
 
-    cols.push(
-      basicField('createdAtMs', 'Created', {
-        width: 100,
-        valueGetter: (unused: any, row: any) => {
-          return row.obj.createdAtMs;
-        },
-        renderCell: cellParams => {
-          const createdAtMs = cellParams.value;
-          return <Timestamp value={createdAtMs / 1000} format="relative" />;
-        },
-      })
-    );
-    if (props.usingLatestFilter) {
+    if (!props.hideCreatedAtColumn) {
+      cols.push(
+        basicField('createdAtMs', 'Created', {
+          width: 100,
+          valueGetter: (unused: any, row: any) => {
+            return row.obj.createdAtMs;
+          },
+          renderCell: cellParams => {
+            const createdAtMs = cellParams.value;
+            return <Timestamp value={createdAtMs / 1000} format="relative" />;
+          },
+        })
+      );
+    }
+
+    if (!props.hidePeerVersionsColumn) {
       cols.push(
         basicField('peerVersions', 'Versions', {
           width: 100,
@@ -327,7 +468,7 @@ const ObjectVersionsTable: React.FC<{
     }
 
     return {cols, groups};
-  }, [showPropsAsColumns, props.usingLatestFilter, rows]);
+  }, [props, showPropsAsColumns, rows, selectedVersions, setSelectedVersions]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();

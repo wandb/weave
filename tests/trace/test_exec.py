@@ -15,7 +15,7 @@ import pytest
             textwrap.dedent(
                 """
                 import weave
-                
+
 
                 @weave.op()
                 def add(a: int, b: float) -> str:
@@ -29,7 +29,7 @@ import pytest
                 """
                 import weave
 
-                
+
                 @weave.op()
                 def add(a: int, b: float) -> str:
                     ... # Code-capture unavailable for this op
@@ -48,7 +48,7 @@ import pytest
                     e_x = np.exp(x - np.max(x))
                     return e_x / e_x.sum()
 
-                    
+
                 ref = weave.publish(softmax)
                 """
             ),
@@ -75,7 +75,7 @@ import pytest
                 def func(x: np.ndarray, y: int, greeting: str = "Hello friend!") -> dict[str, typing.Union[np.float64, str]]:
                     return {"mean": mean(x + y), "greeting": greeting}
 
-                    
+
                 ref = weave.publish(func)
                 """
             ),
@@ -101,7 +101,7 @@ def test_publish_works_for_code_with_no_source_file(
 
     ref = captured["ref"]
     op = ref.get()
-    actual_captured_code = op.art.path_contents["obj.py"].decode()
+    actual_captured_code = op.get_captured_code()
     expected_captured_code = expected_captured_code[1:]  # ignore first newline
 
     assert actual_captured_code == expected_captured_code

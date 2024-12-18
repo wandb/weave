@@ -69,7 +69,6 @@
  *  across different datasets.
  */
 
-import _ from 'lodash';
 import {sum} from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
@@ -177,11 +176,35 @@ const fetchEvaluationComparisonData = async (
   });
 
   // Kick off the trace query to get the actual trace data
+  // Note: we split this into 2 steps to ensure we only get level 2 children
+  // of the evaluations. This avoids massive overhead of fetching gigantic traces
+  // for every evaluation.
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceResProm = traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
-  });
+  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
+  const evalTraceResProm = traceServerClient
+    .callsStreamQuery({
+      project_id: projectId,
+      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
+    })
+    .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
+      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+        call => call.id
+      );
+      return traceServerClient
+        .callsStreamQuery({
+          project_id: projectId,
+          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+        })
+        .then(predictionsAndScoresCallsRes => {
+          return {
+            calls: [
+              ...predictAndScoreCallRes.calls,
+              ...predictionsAndScoresCallsRes.calls,
+            ],
+          };
+        });
+    });
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
@@ -242,7 +265,20 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = output[scorerKey];
+      // TODO: REMOVE when sanitized scorer names have been released
+      // this is a hack to support previous unsanitized scorer names
+      // that have spaces.
+      let score = output[scorerKey];
+      if (score == null && scorerKey.includes('-')) {
+        // no score found, '-' means we probably sanitized an illegal character
+        const foundScorerNameMaybe = fuzzyMatchScorerName(
+          Object.keys(output),
+          scorerKey
+        );
+        if (foundScorerNameMaybe != null) {
+          score = output[foundScorerNameMaybe];
+        }
+      }
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -466,17 +502,8 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const possiblePredictNames = [
-              'predict',
-              'infer',
-              'forward',
-              'invoke',
-            ];
             const isProbablyPredictCall =
-              (_.some(possiblePredictNames, name =>
-                traceCall.op_name.includes(`.${name}:`)
-              ) &&
-                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.inputs.self) ||
               modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
@@ -726,3 +753,13 @@ type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+
+function fuzzyMatchScorerName(
+  scoreNames: string[],
+  possibleScorerName: string
+) {
+  // anytime we see a '-' in possibleScorerName, it can be any illegal character
+  // in score names. Use a regex to find matches, and return the first match.
+  const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
+  return scoreNames.find(name => regex.test(name));
+}
