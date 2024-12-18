@@ -28,7 +28,6 @@ class WandbTraceApi:
         offset: typing.Optional[int] = None,
         sort_by: typing.Optional[list] = None,
         query: typing.Optional[dict] = None,
-        **kwargs: typing.Any
     ) -> typing.Any:
         with tracer.trace("query_calls_stream"):
             wandb_api_context = get_wandb_api_context()
@@ -61,12 +60,14 @@ class WandbTraceApi:
                 payload["query"] = query
             
             with self.session.post(
-                url=url, headers=headers, auth=auth, cookies=cookies
+                url=url, headers=headers, auth=auth, cookies=cookies, json=payload
             ) as r:
+                results = []
                 if r.status_code == 200:
                     for line in r.iter_lines():
                         if line:
-                            r.append(json.loads(line))
+                            results.append(json.loads(line))
+                    return results
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(r.status_code, "Weave Traces query failed")
                 

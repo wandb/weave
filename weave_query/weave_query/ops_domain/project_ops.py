@@ -278,4 +278,3 @@ async def _get_project_traces(project, payload):
         query = payload.get("query")
     trace_api = get_wandb_trace_api()
     return trace_api.query_calls_stream(project_id, filter=filter, limit=limit, offset=offset, sort_by=sort_by, query=query)
-
