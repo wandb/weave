@@ -3,13 +3,13 @@ import {hash, list, typedDict, union} from '../../model';
 import {docType} from '../../util/docs';
 import * as OpKinds from '../opKinds';
 import {
-  connectionToNodes,
   traceFilterType,
   traceLimitType,
   traceOffsetType,
   traceQueryType,
   traceSortByType,
-} from './util';
+} from '../traceTypes';
+import {connectionToNodes} from './util';
 
 const makeProjectOp = OpKinds.makeTaggingStandardOp;
 
@@ -359,6 +359,7 @@ export const opProjectTraces = makeProjectOp({
   })} for a ${docType('project')}`,
   returnType: inputTypes => list(typedDict({})),
   resolver: ({project}) => project.traces,
+  hidden: true,
   resolveOutputType: async (
     inputTypes,
     node,

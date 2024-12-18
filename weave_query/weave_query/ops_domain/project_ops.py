@@ -301,6 +301,25 @@ traces_input_types = {
     }, not_required_keys=set(['filter', 'limit', 'offset', 'sort_by', 'query'])))
 }
 
+traces_output_type = types.TypedDict(property_types={
+    "id": types.String(),
+    "project_id": types.String(),
+    "op_name": types.String(),
+    "display_name": types.optional(types.String()),
+    "trace_id": types.String(),
+    "parent_id": types.optional(types.String()),
+    "started_at": types.Timestamp(),
+    "attributes": types.Dict(types.String(), types.Any()),
+    "inputs": types.Dict(types.String(), types.Any()),
+    "ended_at": types.optional(types.Timestamp()),
+    "exception": types.optional(types.String()),
+    "output": types.optional(types.Any()),
+    "summary": types.optional(types.Any()),
+    "wb_user_id": types.optional(types.String()),
+    "wb_run_id": types.optional(types.String()),
+    "deleted_at": types.optional(types.Timestamp()) 
+})
+
 @op(
     name="project-tracesType",
     input_type=traces_input_types,
@@ -325,7 +344,7 @@ def traces_type(project, payload):
 @op(
     name="project-traces",
     input_type=traces_input_types,
-    output_type=ops_arrow.ArrowWeaveListType(types.TypedDict({})),
+    output_type=ops_arrow.ArrowWeaveListType(traces_output_type),
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: """
             entity {
@@ -334,7 +353,8 @@ def traces_type(project, payload):
             }
         """
     ),
-    refine_output_type=traces_type
+    refine_output_type=traces_type,
+    hidden=True
 )
 def traces(project, payload):
     res = _get_project_traces(project, payload)
