@@ -235,7 +235,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     )
     WHERE rn = 1
 )
-WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}))
+WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}) AND (deleted_at IS NULL))
 ORDER BY created_at DESC
 LIMIT 10
 OFFSET 5"""
@@ -265,7 +265,8 @@ def test_objects_query_metadata_op():
     )
     WHERE rn = 1
 )
-WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}))"""
+WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}) AND (deleted_at IS NULL))
+ORDER BY created_at ASC"""
 
     assert query == expected_query
     assert parameters == {
