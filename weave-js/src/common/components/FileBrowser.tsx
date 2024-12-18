@@ -657,11 +657,15 @@ const CodePreview: FC<CodePreviewProps> = memo(
       onSuccess: setData,
       onFailure: setError,
     });
+
+    const isSmallFile = file.sizeBytes / 1024 < 1024;
+
     useEffect(() => {
-      if (ref.current != null && file.sizeBytes / 1024 < 1024) {
+      if (ref.current != null && isSmallFile) {
         Prism.highlightElement(ref.current);
       }
     });
+
     if (error != null) {
       return <Segment textAlign="center">{error}</Segment>;
     }
@@ -685,7 +689,11 @@ const CodePreview: FC<CodePreviewProps> = memo(
           <code
             style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}
             ref={ref}
-            className={language != null ? `language-${language}` : undefined}>
+            className={
+              language && isSmallFile != null
+                ? `language-${language}`
+                : undefined
+            }>
             {data}
           </code>
         </pre>
