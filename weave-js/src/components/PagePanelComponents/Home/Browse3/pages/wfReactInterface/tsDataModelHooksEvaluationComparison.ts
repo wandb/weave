@@ -176,11 +176,35 @@ const fetchEvaluationComparisonData = async (
   });
 
   // Kick off the trace query to get the actual trace data
+  // Note: we split this into 2 steps to ensure we only get level 2 children
+  // of the evaluations. This avoids massive overhead of fetching gigantic traces
+  // for every evaluation.
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceResProm = traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
-  });
+  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
+  const evalTraceResProm = traceServerClient
+    .callsStreamQuery({
+      project_id: projectId,
+      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
+    })
+    .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
+      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+        call => call.id
+      );
+      return traceServerClient
+        .callsStreamQuery({
+          project_id: projectId,
+          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+        })
+        .then(predictionsAndScoresCallsRes => {
+          return {
+            calls: [
+              ...predictAndScoreCallRes.calls,
+              ...predictionsAndScoresCallsRes.calls,
+            ],
+          };
+        });
+    });
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(

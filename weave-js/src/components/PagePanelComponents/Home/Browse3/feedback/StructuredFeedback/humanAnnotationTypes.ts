@@ -1,4 +1,4 @@
-import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
 export const HUMAN_ANNOTATION_BASE_TYPE = 'wandb.annotation';

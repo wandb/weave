@@ -56,6 +56,7 @@ export const IconNames = {
   Date: 'date',
   Delete: 'delete',
   Diamond: 'diamond',
+  Diff: 'diff',
   DiscordSocial: 'discord-social',
   DockerWhale: 'docker-whale',
   Document: 'document',
