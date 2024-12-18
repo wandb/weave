@@ -681,22 +681,25 @@ const CodePreview: FC<CodePreviewProps> = memo(
           padding: 16,
           height: 'calc(100vh - 150px)',
           overflowY: 'auto',
+          maxWidth: '100%',
         }}>
-        <pre
-          style={{
-            maxWidth: '100%',
-          }}>
-          <code
-            style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}
-            ref={ref}
-            className={
-              language && isSmallFile != null
-                ? `language-${language}`
-                : undefined
-            }>
+        {isSmallFile ? (
+          <pre
+            style={{
+              maxWidth: '100%',
+            }}>
+            <code
+              style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}
+              ref={ref}
+              className={language != null ? `language-${language}` : undefined}>
+              {data}
+            </code>
+          </pre>
+        ) : (
+          <div style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
             {data}
-          </code>
-        </pre>
+          </div>
+        )}
       </div>
     );
   },
