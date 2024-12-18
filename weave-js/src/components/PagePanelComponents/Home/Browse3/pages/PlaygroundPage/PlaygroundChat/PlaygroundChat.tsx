@@ -35,14 +35,12 @@ export const PlaygroundChat = ({
   setSettingsTab,
   settingsTab,
 }: PlaygroundChatProps) => {
-  console.log('playgroundStates', playgroundStates);
   const [chatText, setChatText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setIsLoading,
-    chatText,
     playgroundStates,
     entity,
     project,
@@ -169,7 +167,13 @@ export const PlaygroundChat = ({
                             content: string,
                             toolCallId?: string
                           ) => {
-                            handleSend(role, idx, content, toolCallId);
+                            handleSend(
+                              role,
+                              chatText,
+                              idx,
+                              content,
+                              toolCallId
+                            );
                           },
                           setSelectedChoiceIndex: (choiceIndex: number) =>
                             setPlaygroundStateField(

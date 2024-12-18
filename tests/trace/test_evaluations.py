@@ -1021,13 +1021,19 @@ def test_scorers_with_output_and_model_output_raise_error():
 
     ds = [{"text": "hello"}]
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         scorer = MyScorer()
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         evaluation = weave.Evaluation(dataset=ds, scorers=[MyScorer()])
 
-    with pytest.raises(ValueError, match="Both 'output' and 'model_output'"):
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
 
 

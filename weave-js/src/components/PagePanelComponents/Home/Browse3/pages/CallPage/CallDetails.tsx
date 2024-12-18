@@ -149,12 +149,13 @@ export const CallDetails: FC<{
             p: 2,
           }}>
           {'traceback' in excInfo ? (
-            <>
-              <TitleRow>
+            <div style={{overflow: 'auto', height: '100%'}}>
+              <TitleRow
+                style={{position: 'sticky', top: 0, backgroundColor: 'white'}}>
                 <Title>Error</Title>
               </TitleRow>
               <ExceptionDetails exceptionInfo={excInfo} />
-            </>
+            </div>
           ) : (
             <CustomWeaveTypeProjectContext.Provider
               value={{entity: call.entity, project: call.project}}>
