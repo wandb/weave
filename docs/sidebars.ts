@@ -101,6 +101,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/groq",
             "guides/integrations/openrouter",
             "guides/integrations/litellm",
+            "guides/integrations/nvidia_nim",
           ],
         },
         "guides/integrations/local_models",
