@@ -81,9 +81,7 @@ export const Tag: FC<TagProps> = ({
       <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
       </span>
-      {endIconName && (
-          <Icon className="ml-4 h-14 w-14" name={endIconName} />
-      )}
+      {endIconName && <Icon className="ml-4 h-14 w-14" name={endIconName} />}
     </div>
   );
   if (Wrapper) {
