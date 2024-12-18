@@ -263,7 +263,7 @@ def artifacts(
         for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
     ]
 
-async def _get_project_traces(project, payload):
+def _get_project_traces(project, payload):
     project_id = f'{project["entity"]["name"]}/{project["name"]}'
     filter = None
     limit = None 
