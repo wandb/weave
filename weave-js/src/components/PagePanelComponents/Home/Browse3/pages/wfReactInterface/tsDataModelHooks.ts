@@ -1150,6 +1150,31 @@ const useObjectDeleteFunc = () => {
     [getTsClient, updateObjectCaches]
   );
 
+  const objectVersionsDelete = useCallback(
+    (entity: string, project: string, objectId: string, digests: string[]) => {
+      digests.forEach(digest => {
+        updateObjectCaches({
+          scheme: 'weave',
+          weaveKind: 'object',
+          entity,
+          project,
+          objectId,
+          versionHash: digest,
+          path: '',
+        });
+      });
+      return getTsClient().objectDelete({
+        project_id: projectIdFromParts({
+          entity: entity,
+          project: project,
+        }),
+        object_id: objectId,
+        digests,
+      });
+    },
+    [getTsClient, updateObjectCaches]
+  );
+
   const objectDeleteAllVersions = useCallback(
     (key: ObjectVersionKey) => {
       updateObjectCaches(key);
@@ -1198,6 +1223,7 @@ const useObjectDeleteFunc = () => {
   return {
     objectVersionDelete,
     objectDeleteAllVersions,
+    objectVersionsDelete,
     opVersionDelete,
     opDeleteAllVersions,
   };

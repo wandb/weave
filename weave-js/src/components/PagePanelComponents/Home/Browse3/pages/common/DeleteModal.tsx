@@ -6,6 +6,10 @@ import {
 } from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {
+  maybePluralize,
+  maybePluralizeWord,
+} from '@wandb/weave/core/util/string';
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
@@ -20,7 +24,8 @@ interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
   onDelete: () => Promise<void>;
-  deleteTargetStr: string;
+  deleteTitleStr: string;
+  deleteBodyStrs?: string[];
   onSuccess?: () => void;
 }
 
@@ -36,7 +41,8 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   open,
   onClose,
   onDelete,
-  deleteTargetStr,
+  deleteTitleStr,
+  deleteBodyStrs,
   onSuccess,
 }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -57,6 +63,8 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
       });
   };
 
+  const deleteBodyStrRes = deleteBodyStrs ? deleteBodyStrs : [deleteTitleStr];
+
   return (
     <Dialog
       open={open}
@@ -65,7 +73,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
         setError(null);
       }}>
       <Tailwind>
-        <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
+        <DialogTitle>Delete {deleteTitleStr}</DialogTitle>
         <DialogContent className="overflow-hidden">
           <div className="mb-16">
             {error != null ? (
@@ -74,14 +82,20 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
               <p>Are you sure you want to delete?</p>
             )}
           </div>
-          <span className="text-md mt-10 font-semibold">{deleteTargetStr}</span>
+          <span className="text-md mt-10 font-semibold">
+            {deleteBodyStrRes.map((str, i) => (
+              <div key={i}>
+                <span>{str}</span>
+              </div>
+            ))}
+          </span>
         </DialogContent>
         <DialogActions $align="left">
           <Button
             variant="destructive"
             disabled={error != null || deleteLoading}
             onClick={handleDelete}>
-            {`Delete ${deleteTargetStr}`}
+            {`Delete ${deleteTitleStr}`}
           </Button>
           <Button
             variant="ghost"
@@ -143,7 +157,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
       <DeleteModal
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        deleteTargetStr={deleteStr}
+        deleteTitleStr={deleteStr}
         onDelete={() => objectVersionDelete(objVersionSchema)}
         onSuccess={closePeek}
       />
@@ -173,9 +187,44 @@ export const DeleteOpButtonWithModal: React.FC<{
       <DeleteModal
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        deleteTargetStr={deleteStr}
+        deleteTitleStr={deleteStr}
         onDelete={() => opVersionDelete(opVersionSchema)}
         onSuccess={closePeek}
+      />
+    </>
+  );
+};
+
+export const DeleteObjectVersionsButtonWithModal: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string;
+  objectDigests: string[];
+  disabled?: boolean;
+}> = ({entity, project, objectName, objectDigests, disabled}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectVersionsDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const numObjects = objectDigests.length;
+  const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+        disabled={disabled}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={`${numObjects} ${objectName} ${versionsStr}`}
+        deleteBodyStrs={objectDigests}
+        onDelete={() =>
+          objectVersionsDelete(entity, project, objectName, objectDigests)
+        }
       />
     </>
   );
