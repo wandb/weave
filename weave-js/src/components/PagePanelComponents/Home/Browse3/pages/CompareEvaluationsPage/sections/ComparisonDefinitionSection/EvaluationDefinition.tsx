@@ -1,5 +1,4 @@
 import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
 import React, {useMemo} from 'react';
 
 import {
@@ -14,7 +13,6 @@ import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
-import {CIRCLE_SIZE} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
 
 export const EvaluationCallLink: React.FC<{
@@ -33,14 +31,7 @@ export const EvaluationCallLink: React.FC<{
       projectName={project}
       opName={evaluationCall.name}
       callId={props.callId}
-      icon={
-        <Circle
-          sx={{
-            color: evaluationCall.color,
-            height: CIRCLE_SIZE,
-          }}
-        />
-      }
+      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
       color={MOON_800}
     />
   );
