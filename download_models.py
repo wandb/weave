@@ -71,7 +71,7 @@ def download_models():
             logger.info(f"Successfully downloaded {model_name} to {full_path}")
 
         except Exception as e:
-            logger.error(f"Error downloading {model_name}: {str(e)}")
+            logger.exception(f"Error downloading {model_name}: {str(e)}")
             # Clean up temporary directory if it exists
             if os.path.exists(temp_path):
                 shutil.rmtree(temp_path)

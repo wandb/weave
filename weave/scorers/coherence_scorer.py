@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import PrivateAttr
 
@@ -30,7 +30,7 @@ class CoherenceScorer(Scorer):
     model_max_length: int = 1024
     base_url: Optional[str] = None
     _classifier: Any = PrivateAttr()
-    _label2id: Dict[str, int] = PrivateAttr()
+    _label2id: dict[str, int] = PrivateAttr()
 
     def model_post_init(self, __context: Any) -> None:
         if self.base_url:
@@ -60,7 +60,7 @@ class CoherenceScorer(Scorer):
         }
 
     @weave.op
-    def score_messages(self, prompt: str, output: str) -> Dict[str, Any]:
+    def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
         """Score a prompt response pair."""
         coherence_output = self._classifier(
             inputs={"text": prompt, "text_pair": output}
@@ -78,7 +78,7 @@ class CoherenceScorer(Scorer):
             },
         }
 
-    def _format_chat_history(self, chat_history: List[Dict[str, str]]) -> str:
+    def _format_chat_history(self, chat_history: list[dict[str, str]]) -> str:
         """Format the chat history for the prompt."""
         formatted_chat_history = ""
         for turn in chat_history:
@@ -92,9 +92,9 @@ class CoherenceScorer(Scorer):
         self,
         input: str,
         output: str,
-        chat_history: Optional[List[Dict[str, str]]] = None,
+        chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         import requests
 
         response = requests.post(
@@ -114,9 +114,9 @@ class CoherenceScorer(Scorer):
         self,
         input: str,
         output: str,
-        chat_history: Optional[List[Dict[str, str]]] = None,
+        chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if self.base_url:
             return self._score_via_api(input, output, chat_history, context)
         prompt = input

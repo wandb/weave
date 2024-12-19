@@ -23,9 +23,7 @@ def toxicity_scorer():
 
 
 def test_toxicity_scorer_simple(toxicity_scorer):
-    """
-    Tests that the scorer can handle a basic string.
-    """
+    """Tests that the scorer can handle a basic string."""
     output = "Just a simple, harmless sentence."
     result = toxicity_scorer.score(output)
 
@@ -41,9 +39,7 @@ def test_toxicity_scorer_simple(toxicity_scorer):
 
 
 def test_toxicity_scorer_large_input(toxicity_scorer):
-    """
-    Tests toxicity scorer with very large input to ensure it doesn't crash.
-    """
+    """Tests toxicity scorer with very large input to ensure it doesn't crash."""
     large_text = generate_large_text(100_000)  # 100k characters
     result = toxicity_scorer.score(large_text)
 

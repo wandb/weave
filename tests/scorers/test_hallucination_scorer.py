@@ -20,9 +20,7 @@ def hallucination_scorer():
 
 
 def test_hallucination_scorer_basic(hallucination_scorer):
-    """
-    Test that a basic matching context/output does not get flagged.
-    """
+    """Test that a basic matching context/output does not get flagged."""
     query = "The moon is a big rock."
     context = "The moon is a big rock."
     output = "The moon is a big rock."
@@ -36,9 +34,7 @@ def test_hallucination_scorer_basic(hallucination_scorer):
 
 
 def test_hallucination_scorer_long_input(hallucination_scorer):
-    """
-    Test that the scorer can handle a longer context/output without errors.
-    """
+    """Test that the scorer can handle a longer context/output without errors."""
     query = "What is the text about?"
     context, output = generate_context_and_output(
         total_tokens=5000  # moderately large for a test

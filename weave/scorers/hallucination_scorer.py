@@ -1,6 +1,6 @@
 import os
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -180,7 +180,7 @@ class HallucinationResponse(BaseModel):
         description="Think step by step about whether the <output> contains hallucinations \
 based on the <input_data>."
     )
-    reasonings: List[HallucinationReasoning] = Field(
+    reasonings: list[HallucinationReasoning] = Field(
         description="A list of reasoning steps that lead to the conclusion about whether or not\
 the <output> contains hallucinations."
     )
@@ -331,7 +331,7 @@ class HallucinationScorer(Scorer):
             self.top_p = None
             self.temperature = None
 
-    def _score_via_api(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _score_via_api(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         import requests
 
         response = requests.post(self.base_url, json={"messages": messages})
@@ -339,7 +339,7 @@ class HallucinationScorer(Scorer):
         return response.json()
 
     @weave.op
-    def score(self, query: str, context: str, output: str) -> Dict[str, Any]:
+    def score(self, query: str, context: str, output: str) -> dict[str, Any]:
         messages = get_chat_template_messages(
             query=query,
             context=context,

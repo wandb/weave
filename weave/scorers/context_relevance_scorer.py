@@ -1,6 +1,7 @@
 import json
 import os
-from typing import Any, Dict, List, Optional, Union
+from importlib.util import find_spec
+from typing import Any, Optional, Union
 
 import numpy as np
 from pydantic import PrivateAttr
@@ -82,7 +83,8 @@ class OldRelevanceScorer(Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         try:
-            import torch
+            if find_spec("torch") is None:
+                raise ImportError("torch is required but not installed")
             from transformers import pipeline
         except ImportError:
             print(
@@ -268,7 +270,8 @@ class ContextRelevanceScorer(Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         try:
-            import torch
+            if find_spec("torch") is None:
+                raise ImportError("torch is required but not installed")
             from transformers import AutoModelForTokenClassification, AutoTokenizer
         except ImportError:
             print(
@@ -354,9 +357,9 @@ class ContextRelevanceScorer(Scorer):
         self,
         output: str,
         query: str,
-        context: Union[str, List[str]],
+        context: Union[str, list[str]],
         verbose: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Score multiple documents and compute weighted average relevance."""
         all_spans = []
         total_weighted_score = 0.0

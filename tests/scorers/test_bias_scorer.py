@@ -7,9 +7,7 @@ from weave.scorers.moderation_scorer import BiasScorer
 
 @pytest.fixture
 def bias_scorer():
-    """
-    Fixture that returns a BiasScorer instance using a tiny downloaded model.
-    """
+    """Fixture that returns a BiasScorer instance using a tiny downloaded model."""
     tiny_model_path = download_model(TINY_MODEL_PATHS["bias_scorer"])
     return BiasScorer(
         model_name_or_path=tiny_model_path,
@@ -21,9 +19,7 @@ def bias_scorer():
 
 
 def test_bias_scorer_simple(bias_scorer):
-    """
-    Tests that the scorer can handle a basic string.
-    """
+    """Tests that the scorer can handle a basic string."""
     output = "This is a balanced statement with no bias."
     result = bias_scorer.score(output)
 
@@ -39,9 +35,7 @@ def test_bias_scorer_simple(bias_scorer):
 
 
 def test_bias_scorer_large_input(bias_scorer):
-    """
-    Tests bias scorer with very large input to ensure it doesn't crash.
-    """
+    """Tests bias scorer with very large input to ensure it doesn't crash."""
     large_text = generate_large_text(100_000)  # 100k characters
     result = bias_scorer.score(large_text)
 
