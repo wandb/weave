@@ -122,22 +122,13 @@ const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
 DialogActions.displayName = 'S.DialogActions';
 
 export const DeleteObjectButtonWithModal: React.FC<{
-  objVersionSchema: OpVersionSchema | ObjectVersionSchema;
+  objVersionSchema: ObjectVersionSchema;
   overrideDisplayStr?: string;
 }> = ({objVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
-  const {opVersionDelete, objectVersionDelete} = useObjectDeleteFunc();
+  const {objectVersionDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const doDelete = () => {
-    if (versionSchemaIsOp(objVersionSchema)) {
-      return opVersionDelete(objVersionSchema);
-    } else if (versionSchemaIsObject(objVersionSchema)) {
-      return objectVersionDelete(objVersionSchema);
-    }
-    throw new Error('Invalid version schema');
-  };
 
   const deleteStr =
     overrideDisplayStr ?? makeDefaultObjectDeleteStr(objVersionSchema);
@@ -153,32 +144,47 @@ export const DeleteObjectButtonWithModal: React.FC<{
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         deleteTargetStr={deleteStr}
-        onDelete={doDelete}
+        onDelete={() => objectVersionDelete(objVersionSchema)}
         onSuccess={closePeek}
       />
     </>
   );
 };
 
-function versionSchemaIsOp(
-  objVersionSchema: OpVersionSchema | ObjectVersionSchema
-): objVersionSchema is OpVersionSchema {
-  return 'opId' in objVersionSchema;
+export const DeleteOpButtonWithModal: React.FC<{
+  opVersionSchema: OpVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({opVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {opVersionDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const deleteStr =
+    overrideDisplayStr ?? makeDefaultOpDeleteStr(opVersionSchema);
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTargetStr={deleteStr}
+        onDelete={() => opVersionDelete(opVersionSchema)}
+        onSuccess={closePeek}
+      />
+    </>
+  );
+};
+
+function makeDefaultObjectDeleteStr(objVersionSchema: ObjectVersionSchema) {
+  return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
 }
 
-function versionSchemaIsObject(
-  objVersionSchema: OpVersionSchema | ObjectVersionSchema
-): objVersionSchema is ObjectVersionSchema {
-  return 'objectId' in objVersionSchema;
-}
-
-function makeDefaultObjectDeleteStr(
-  objVersionSchema: OpVersionSchema | ObjectVersionSchema
-) {
-  if (versionSchemaIsOp(objVersionSchema)) {
-    return `${objVersionSchema.opId}:v${objVersionSchema.versionIndex}`;
-  } else if (versionSchemaIsObject(objVersionSchema)) {
-    return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
-  }
-  return '';
+function makeDefaultOpDeleteStr(opVersionSchema: OpVersionSchema) {
+  return `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
 }

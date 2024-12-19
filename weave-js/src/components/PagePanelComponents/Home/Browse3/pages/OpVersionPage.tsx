@@ -5,7 +5,7 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
-import {DeleteObjectButtonWithModal} from './common/DeleteModal';
+import {DeleteOpButtonWithModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -140,7 +140,7 @@ const OpVersionPageInner: React.FC<{
               )}
             </div>
             <div className="block">
-              <DeleteObjectButtonWithModal objVersionSchema={opVersion} />
+              <DeleteOpButtonWithModal opVersionSchema={opVersion} />
             </div>
           </div>
         </Tailwind>
