@@ -515,8 +515,9 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
     llm_client = ...  # initialise your LlM client
 
     similarity_scorer = EmbeddingSimilarityScorer(
-        client=llm_client
-        threshold=0.4  # the cosine similarity threshold to use
+        client=llm_client,
+        threshold=0.4,  # the cosine similarity threshold to use
+        column_mapping={'target':'other_col'}
     )
     ```
 
