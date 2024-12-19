@@ -247,7 +247,7 @@ jobs:
       fail-fast: false
     services:
       wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:e1481defc00091abeeccec8debbb898b49f8e81c865b23d0e86aa24cfe9e4760
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer@sha256:e1481defc00091abeeccec8debbb898b49f8e81c865b23d0e86aa24cfe9e4760
         credentials:
           username: _json_key
           password: ${{ secrets.gcp_wb_sa_key }}
