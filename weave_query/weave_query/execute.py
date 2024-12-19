@@ -51,7 +51,7 @@ from weave_query.language_features.tagging import (
 TRACE_LOCAL = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
-PRINT_DEBUG = False
+PRINT_DEBUG = True
 
 
 class OpExecuteStats(typing.TypedDict):
@@ -231,6 +231,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                         stats = execute_forward(fg, no_cache=no_cache)
                         summary = stats.op_summary()
                         logging.info("Execution summary\n%s" % pprint.pformat(summary))
+                        print(pprint.pformat(summary))
                         if PRINT_DEBUG:
                             for compile_result, err in compile_results.iter_items():
                                 if err != None:

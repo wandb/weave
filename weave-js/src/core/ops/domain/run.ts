@@ -715,3 +715,19 @@ export const opStrRunlink = OpKinds.makeBasicOp({
     throw new Error('Attempting to use python-only op in js');
   },
 });
+
+export const opRunHistoryOfTableWithSteps = makeRunOp({
+  name: 'run-history_of_table_with_steps',
+  argTypes: runArgTypes,
+  description: '',
+  argDescriptions: {},
+  returnValueDescription: '',
+  returnType: inputTypes => TypeHelpers.list(TypeHelpers.typedDict({})),
+  resolver: ({run}) => {
+    throw new Error();
+  },
+
+  // resolveOutputType: async (inputTypes, node, executableNode, client) => {
+  //   return opRunHistoryResolveOutputType(executableNode, client, 1);
+  // },
+});
