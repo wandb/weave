@@ -1,10 +1,9 @@
 import pytest
-from unittest.mock import MagicMock
 
-import weave
-from weave.scorers.llm_utils import download_model
-from weave.scorers.coherence_scorer import CoherenceScorer
 from tests.scorers.test_utils import TINY_MODEL_PATHS
+from weave.scorers.coherence_scorer import CoherenceScorer
+from weave.scorers.llm_utils import download_model
+
 
 @pytest.fixture
 def coherence_scorer():
@@ -16,6 +15,7 @@ def coherence_scorer():
     )
     return scorer
 
+
 def test_score_messages(coherence_scorer):
     """Test score_messages with a coherent response."""
     prompt = "This is a test prompt."
@@ -23,7 +23,7 @@ def test_score_messages(coherence_scorer):
     result = coherence_scorer.score_messages(prompt, output)
     # Now we check the updated payload structure
     assert result["flagged"] is True
-    assert result["extras"]["coherence_label"] == 'A Little Incoherent'
+    assert result["extras"]["coherence_label"] == "A Little Incoherent"
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,8 @@ async def test_score_with_chat_history(coherence_scorer):
     ]
     result = await coherence_scorer.score(prompt, output, chat_history=chat_history)
     assert result["flagged"]
-    assert result["extras"]["coherence_label"] == 'A Little Incoherent'
+    assert result["extras"]["coherence_label"] == "A Little Incoherent"
+
 
 @pytest.mark.asyncio
 async def test_score_with_context(coherence_scorer):
@@ -47,4 +48,4 @@ async def test_score_with_context(coherence_scorer):
     context = "This is additional context."
     result = await coherence_scorer.score(prompt, output, context=context)
     assert result["flagged"]
-    assert result["extras"]["coherence_label"] == 'A Little Incoherent'
+    assert result["extras"]["coherence_label"] == "A Little Incoherent"

@@ -179,7 +179,7 @@ class RobustnessScorer(Scorer):
             }
             if self.return_interpretation:
                 result["interpretation"] = self.get_cohen_d_interpretation(d)
-                
+
             return result
         else:
             # Compute Cohen's h for use_exact_match scores

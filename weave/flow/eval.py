@@ -463,7 +463,9 @@ class Evaluation(Object):
         return summary
 
     async def get_eval_results(
-        self, model: Union[Callable, Model], verbose: bool = True,
+        self,
+        model: Union[Callable, Model],
+        verbose: bool = True,
     ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
@@ -496,7 +498,12 @@ class Evaluation(Object):
             else:
                 # Print progress at 25%, 50%, 75% and 100%
                 total_rows = len(trial_rows)
-                progress_milestones = [total_rows // 4, total_rows // 2, 3 * total_rows // 4, total_rows]
+                progress_milestones = [
+                    total_rows // 4,
+                    total_rows // 2,
+                    3 * total_rows // 4,
+                    total_rows,
+                ]
                 if n_complete in progress_milestones:
                     percent_complete = int((n_complete / total_rows) * 100)
                     print(f"Evaluated {percent_complete}% of examples")
@@ -515,7 +522,9 @@ class Evaluation(Object):
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Callable, Model], verbose: bool = True) -> dict:
+    async def evaluate(
+        self, model: Union[Callable, Model], verbose: bool = True
+    ) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
         # summarize. Under the hood, Weave should choose the appropriate storage

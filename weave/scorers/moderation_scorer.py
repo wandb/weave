@@ -1,16 +1,15 @@
 import os
 from typing import TYPE_CHECKING, Any, Optional
 
-from pydantic import Field, PrivateAttr, field_validator
+from pydantic import PrivateAttr, field_validator
 
 import weave
-from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import LLMScorer, RollingWindowScorer
 from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
+    MODEL_PATHS,
     OPENAI_DEFAULT_MODERATION_MODEL,
     download_model,
-    MODEL_PATHS,
     set_device,
 )
 
@@ -153,9 +152,7 @@ class ToxicityScorer(RollingWindowScorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(
-                MODEL_PATHS["toxicity_scorer"]
-            )
+            self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
 
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
@@ -279,9 +276,7 @@ class BiasScorer(RollingWindowScorer):
         predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
-    def _score_via_api(
-        self, output: str, verbose: bool = False
-    ) -> dict[str, Any]:
+    def _score_via_api(self, output: str, verbose: bool = False) -> dict[str, Any]:
         import requests
 
         response = requests.post(

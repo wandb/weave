@@ -1,7 +1,9 @@
 import pytest
+
+from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 from weave.scorers.llm_utils import download_model
 from weave.scorers.moderation_scorer import BiasScorer
-from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
+
 
 @pytest.fixture
 def bias_scorer():
@@ -17,6 +19,7 @@ def bias_scorer():
         threshold=0.5,
     )
 
+
 def test_bias_scorer_simple(bias_scorer):
     """
     Tests that the scorer can handle a basic string.
@@ -30,7 +33,10 @@ def test_bias_scorer_simple(bias_scorer):
     assert isinstance(result["flagged"], bool), "'flagged' must be a boolean."
     assert isinstance(result["extras"], dict), "'extras' must be a dictionary."
     for category in bias_scorer._categories:
-        assert category in result["extras"], f"'{category}' should be in 'extras' dictionary."
+        assert (
+            category in result["extras"]
+        ), f"'{category}' should be in 'extras' dictionary."
+
 
 def test_bias_scorer_large_input(bias_scorer):
     """
@@ -45,6 +51,7 @@ def test_bias_scorer_large_input(bias_scorer):
     assert "extras" in result
     for category in bias_scorer._categories:
         assert category in result["extras"], f"'{category}' should be in 'extras'."
+
 
 def test_bias_scorer_threshold(bias_scorer):
     """

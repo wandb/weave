@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union, List
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
 
 try:
     import instructor
@@ -101,7 +101,9 @@ def embed(
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
         if inspect.iscoroutine(response):
-            raise ValueError("Async client used with sync function. Use await with async clients.")
+            raise ValueError(
+                "Async client used with sync function. Use await with async clients."
+            )
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
         response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
@@ -124,6 +126,7 @@ def set_device(device: Optional[str] = None) -> str:
 
 def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:
     from wandb import Api
+
     api = Api()
     art = api.artifact(
         type="model",
@@ -144,7 +147,7 @@ MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/context-relevance-scorer/relevance_scorer:v0",
-    "llamaguard": "c-metrics/weave-scorers/llamaguard:v0"
+    "llamaguard": "c-metrics/weave-scorers/llamaguard:v0",
 }
 
 

@@ -5,7 +5,7 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, MODEL_PATHS, set_device
+from weave.scorers.llm_utils import MODEL_PATHS, download_model, set_device
 
 try:
     from transformers import pipeline
@@ -42,16 +42,14 @@ class CoherenceScorer(Scorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(
-                MODEL_PATHS["coherence_scorer"]
-            )
+            self._local_model_path = download_model(MODEL_PATHS["coherence_scorer"])
 
         self._classifier = pipeline(
             task="sentiment-analysis",
             model=self._local_model_path,
             device=self.device,
             max_length=self.model_max_length,
-            truncation=True
+            truncation=True,
         )
         self._label2id = {
             "Completely Incoherent": 0,

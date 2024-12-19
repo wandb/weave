@@ -1,16 +1,12 @@
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-import os
 
 from weave.scorers.llm_utils import (
     embed,
     instructor_client,
     is_async,
     is_sync_client,
-    get_model_path,
-    LOCAL_MODEL_DIR,
-    MODEL_PATHS,
-    download_model,
 )
 from weave.trace.autopatch import autopatch
 
@@ -28,7 +24,15 @@ class MockOpenAIChatCompletions:
 
 class MockOpenAIEmbeddings:
     def create(self, model, input, **kwargs):
-        return type('Response', (), {'data': [type('Embedding', (), {'embedding': [0.1, 0.2, 0.3]}) for _ in input]})()
+        return type(
+            "Response",
+            (),
+            {
+                "data": [
+                    type("Embedding", (), {"embedding": [0.1, 0.2, 0.3]}) for _ in input
+                ]
+            },
+        )()
 
 
 class MockSyncOpenAI:
@@ -45,7 +49,15 @@ class MockAsyncOpenAIChatCompletions:
 
 class MockAsyncOpenAIEmbeddings:
     async def create(self, model, input, **kwargs):
-        return type('Response', (), {'data': [type('Embedding', (), {'embedding': [0.4, 0.5, 0.6]}) for _ in input]})()
+        return type(
+            "Response",
+            (),
+            {
+                "data": [
+                    type("Embedding", (), {"embedding": [0.4, 0.5, 0.6]}) for _ in input
+                ]
+            },
+        )()
 
 
 class MockAsyncOpenAI:
@@ -125,8 +137,16 @@ async def test_embed_sync(sync_client):
     try:
         embeddings = embed(sync_client, model_id, texts)
         assert len(embeddings) == 2, "Should return embeddings for both texts."
-        assert embeddings[0] == [0.1, 0.2, 0.3], "First embedding does not match expected values."
-        assert embeddings[1] == [0.1, 0.2, 0.3], "Second embedding does not match expected values."
+        assert embeddings[0] == [
+            0.1,
+            0.2,
+            0.3,
+        ], "First embedding does not match expected values."
+        assert embeddings[1] == [
+            0.1,
+            0.2,
+            0.3,
+        ], "Second embedding does not match expected values."
     except ValueError as e:
         pytest.fail(f"embed() raised ValueError: {e}")
 

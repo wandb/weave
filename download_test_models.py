@@ -1,12 +1,19 @@
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import os
 import shutil
 
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 # Clean existing directories to ensure fresh start
 dirs_to_clean = [
-    'coherence', 'toxicity', 'bias', 'context_relevance',
-    'hallucination', 'faithfulness', 'test-bias-scorer',
-    'test-toxicity-scorer', 'test-coherence-scorer'
+    "coherence",
+    "toxicity",
+    "bias",
+    "context_relevance",
+    "hallucination",
+    "faithfulness",
+    "test-bias-scorer",
+    "test-toxicity-scorer",
+    "test-coherence-scorer",
 ]
 
 for dir_name in dirs_to_clean:
@@ -23,23 +30,22 @@ models = {
     "context_relevance": "bert-base-uncased",
     "hallucination": "facebook/bart-large-mnli",
     "faithfulness": "facebook/bart-large-mnli",
-
     # Test-specific models with their configurations
     "test-bias-scorer": {
         "base_model": "bert-base-uncased",
         "num_labels": 2,  # Binary classification for bias
-        "problem_type": "multi_label_classification"
+        "problem_type": "multi_label_classification",
     },
     "test-toxicity-scorer": {
         "base_model": "bert-base-uncased",
         "num_labels": 5,  # Five toxicity categories
-        "problem_type": "multi_label_classification"
+        "problem_type": "multi_label_classification",
     },
     "test-coherence-scorer": {
         "base_model": "bert-base-uncased",
         "num_labels": 2,  # Binary classification for coherence
-        "problem_type": "single_label_classification"
-    }
+        "problem_type": "single_label_classification",
+    },
 }
 
 for name, model_info in models.items():
@@ -52,21 +58,18 @@ for name, model_info in models.items():
                 model_info["base_model"],
                 num_labels=model_info["num_labels"],
                 problem_type=model_info["problem_type"],
-                trust_remote_code=True
+                trust_remote_code=True,
             )
             tokenizer = AutoTokenizer.from_pretrained(
-                model_info["base_model"],
-                trust_remote_code=True
+                model_info["base_model"], trust_remote_code=True
             )
         else:
             # Original model loading
             model_obj = AutoModelForSequenceClassification.from_pretrained(
-                model_info,
-                trust_remote_code=True
+                model_info, trust_remote_code=True
             )
             tokenizer = AutoTokenizer.from_pretrained(
-                model_info,
-                trust_remote_code=True
+                model_info, trust_remote_code=True
             )
 
         # Save to test directory

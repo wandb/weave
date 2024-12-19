@@ -12,6 +12,7 @@ from weave.scorers.classification_scorer import (
     transpose,
 )
 from weave.scorers.coherence_scorer import CoherenceScorer
+from weave.scorers.context_relevance_scorer import ContextRelevanceScorer
 from weave.scorers.faithfulness_scorer import FaithfulnessScorer
 from weave.scorers.hallucination_scorer import (
     HallucinationFreeScorer,
@@ -41,7 +42,6 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
-from weave.scorers.context_relevance_scorer import ContextRelevanceScorer
 from weave.scorers.robustness_scorer import (
     RobustnessScorer,
     create_perturbed_dataset,

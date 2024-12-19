@@ -1,8 +1,10 @@
 import random
-from typing import Any, Optional, Union
-from pydantic import BaseModel
+from typing import Optional, Union
+
 import torch
+from pydantic import BaseModel
 from torch import Tensor
+
 from weave.scorers.utils import stringify
 
 # Model paths for various scorers
@@ -12,8 +14,10 @@ TINY_MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:latest",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer_tiny:latest",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:latest",
-    "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest"
+    "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest",
 }
+
+
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     input_ids: Union[list[int], Tensor]
@@ -34,8 +38,6 @@ class RandomTokenizer:
         return TokenizedText(input_ids=tokenized_text, attention_mask=attention_mask)
 
 
-
-
 def generate_large_text(tokens: int = 100_000, pattern: Optional[str] = None) -> str:
     if pattern is None:
         pattern = (
@@ -54,8 +56,7 @@ def generate_large_text(tokens: int = 100_000, pattern: Optional[str] = None) ->
 
 
 def generate_context_and_output(
-    total_tokens: int = 100_000,
-    context_ratio: float = 0.5
+    total_tokens: int = 100_000, context_ratio: float = 0.5
 ) -> tuple[str, str]:
     context_tokens = int(total_tokens * context_ratio)
     output_tokens = total_tokens - context_tokens

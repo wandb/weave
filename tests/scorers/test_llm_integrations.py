@@ -81,7 +81,9 @@ def test_summarization_scorer_evaluate_summary(provider, model, monkeypatch):
     monkeypatch.setattr("openai.OpenAI", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr("anthropic.Anthropic", lambda *args, **kwargs: mock_client)
     monkeypatch.setattr("mistralai.Mistral", lambda *args, **kwargs: mock_client)
-    monkeypatch.setattr("google.generativeai.GenerativeModel", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr(
+        "google.generativeai.GenerativeModel", lambda *args, **kwargs: mock_client
+    )
 
     client, model_id = get_client_and_model(provider, model)
     summarization_scorer = SummarizationScorer(
@@ -91,9 +93,11 @@ def test_summarization_scorer_evaluate_summary(provider, model, monkeypatch):
         max_tokens=1024,
         name="test-summarization",
         description="Test summarization scorer",
-        column_map={"output": "text", "input": "text"}
+        column_map={"output": "text", "input": "text"},
     )
     input_text = "This is the original text."
     summary_text = "This is the summary."
-    result = summarization_scorer.evaluate_summary(input=input_text, summary=summary_text)
+    result = summarization_scorer.evaluate_summary(
+        input=input_text, summary=summary_text
+    )
     assert isinstance(result, SummarizationEvaluationResponse)

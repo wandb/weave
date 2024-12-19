@@ -1,12 +1,13 @@
 import json
 import os
-from typing import Any, List, Optional, Union, Dict, Tuple
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
 from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import download_model, MODEL_PATHS, set_device
+from weave.scorers.llm_utils import MODEL_PATHS, download_model, set_device
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
@@ -96,9 +97,7 @@ class OldRelevanceScorer(Scorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(
-                MODEL_PATHS["relevance_scorer"]
-            )
+            self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
 
         self._classifier = pipeline(
             task="text-generation", model=self._local_model_path, device=self.device
@@ -217,6 +216,7 @@ class OldRelevanceScorer(Scorer):
         )
         return self.score_messages(messages)
 
+
 class ContextRelevanceScorer(Scorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
@@ -237,7 +237,7 @@ class ContextRelevanceScorer(Scorer):
             - flagged (bool): Whether the output was flagged as irrelevant
             - extras (dict): Contains:
                 - score (float): Overall relevance score
-                - all_spans (list, optional): If verbose=True, includes list of relevant 
+                - all_spans (list, optional): If verbose=True, includes list of relevant
                   text spans and their scores
 
     Example:
@@ -257,6 +257,7 @@ class ContextRelevanceScorer(Scorer):
             }
         }
     """
+
     model_name_or_path: str = None
     base_url: Optional[str] = None
     device: str = "cpu"
@@ -277,13 +278,11 @@ class ContextRelevanceScorer(Scorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
-            self._local_model_path = download_model(
-                MODEL_PATHS["relevance_scorer"]
-            )
+            self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
         assert self._local_model_path, "Model path not found"
         self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
-            )
+        )
         self._tokenizer = AutoTokenizer.from_pretrained(
             self._local_model_path,
             model_max_length=self.model_max_length,
@@ -292,28 +291,32 @@ class ContextRelevanceScorer(Scorer):
         self.device = set_device(self.device)
 
     def _score_document(
-            self, 
-            query: str, 
-            document: str, 
-            threshold: float) -> tuple[list[dict[str, Any]], int, int]:
+        self, query: str, document: str, threshold: float
+    ) -> tuple[list[dict[str, Any]], int, int]:
         """Score a single document."""
         import torch
+
         with torch.no_grad():
             input_text = query + f" {self._tokenizer.sep_token} " + document
             model_inputs = self._tokenizer(
-                input_text, 
+                input_text,
                 truncation=True,
                 max_length=self.model_max_length,
-                padding=False, 
-                return_tensors="pt", 
-                return_special_tokens_mask=True
+                padding=False,
+                return_tensors="pt",
+                return_special_tokens_mask=True,
             )
-            
+
             model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
-            
+
             special_tokens_mask = model_inputs.pop("special_tokens_mask")
-            combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool()).cpu().numpy().flatten()
-            # we should mask the query up to the sep token, 
+            combined_mask = (
+                ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
+                .cpu()
+                .numpy()
+                .flatten()
+            )
+            # we should mask the query up to the sep token,
             # on the combined mask we have to search for the first False
             # TODO: Check that this is not wrong
             false_indices = np.where(~combined_mask)[0]
@@ -321,14 +324,15 @@ class ContextRelevanceScorer(Scorer):
             end = false_indices[1]
             combined_mask[start:end] = False
 
-
             results = self._model(**model_inputs)
 
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
-            pred_mask = (probabilities[:,1] > threshold).cpu().numpy().astype(int).flatten()
-            label_mask = (pred_mask & combined_mask)
+            pred_mask = (
+                (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
+            )
+            label_mask = pred_mask & combined_mask
 
             positive_probs = probabilities[:, 1].cpu().numpy()
             transitions = np.diff(np.concatenate([[0], label_mask, [0]]))
@@ -337,24 +341,21 @@ class ContextRelevanceScorer(Scorer):
 
             spans_with_probs = []
             token_ids = model_inputs["input_ids"].cpu().numpy()[0]
-            
+
             for start, end in zip(starts, ends):
                 span_text = self._tokenizer.decode(token_ids[start:end])
                 span_prob = positive_probs[start:end].mean()
-                spans_with_probs.append({
-                    "text": span_text,
-                    "score": float(span_prob)
-                })
+                spans_with_probs.append({"text": span_text, "score": float(span_prob)})
 
             return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
-        
+
     @weave.op
     def score(
         self,
         output: str,
         query: str,
         context: Union[str, List[str]],
-        verbose: bool = False
+        verbose: bool = False,
     ) -> Dict[str, Any]:
         """Score multiple documents and compute weighted average relevance."""
         all_spans = []
@@ -364,10 +365,12 @@ class ContextRelevanceScorer(Scorer):
         if isinstance(context, str):
             context = [context]
         for doc in context:
-            spans, relevant_tokens, total_tokens = self._score_document(query, doc, self.threshold)
-            
+            spans, relevant_tokens, total_tokens = self._score_document(
+                query, doc, self.threshold
+            )
+
             all_spans.extend(spans)
-            
+
             if total_tokens > 0:
                 doc_score = relevant_tokens / total_tokens
                 doc_weight = total_tokens
@@ -376,7 +379,7 @@ class ContextRelevanceScorer(Scorer):
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
         res = {"flagged": final_score > self.threshold}
-        res['extras'] = {'score': final_score}
+        res["extras"] = {"score": final_score}
         if verbose:
-            res['extras']['all_spans'] = all_spans
+            res["extras"]["all_spans"] = all_spans
         return res

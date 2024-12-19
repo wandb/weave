@@ -1,8 +1,8 @@
 import pytest
 
 import weave
-from weave.scorers import LlamaGuardScorer
 from tests.scorers.test_utils import TINY_MODEL_PATHS
+from weave.scorers import LlamaGuardScorer
 from weave.scorers.llm_utils import download_model
 
 
@@ -10,6 +10,7 @@ from weave.scorers.llm_utils import download_model
 def llamaguard_scorer():
     model_path = download_model(TINY_MODEL_PATHS["llamaguard_scorer"])
     return LlamaGuardScorer(model_name_or_path=model_path)
+
 
 def test_llamaguard_postprocess(llamaguard_scorer):
     # Test safe content
@@ -23,7 +24,7 @@ def test_llamaguard_postprocess(llamaguard_scorer):
     unsafe_output = ("unsafe\nS5<|eot_id|>", 0.9)
     result = llamaguard_scorer.postprocess(*unsafe_output)
     assert not result["safe"]
-    assert result["extras"]["categories"] == {'Defamation': True}
+    assert result["extras"]["categories"] == {"Defamation": True}
     assert result["extras"]["unsafe_score"] == 0.9
 
 

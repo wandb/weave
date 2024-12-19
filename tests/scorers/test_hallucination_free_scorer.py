@@ -1,17 +1,18 @@
-import pytest
-import time
-import psutil
 import asyncio
+import time
+from unittest.mock import patch
+
+import psutil
+import pytest
 from openai import OpenAI
-from unittest.mock import MagicMock, patch
 
 import weave
+from tests.scorers.test_utils import generate_large_text
 from weave.scorers import HallucinationFreeScorer
 from weave.scorers.hallucination_scorer import (
     HallucinationReasoning,
     HallucinationResponse,
 )
-from tests.scorers.test_utils import generate_large_text, generate_context_and_output
 
 
 @pytest.fixture
@@ -55,7 +56,7 @@ def test_initialization():
         client=OpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-3.5-turbo",
         temperature=0.5,
-        max_tokens=2048
+        max_tokens=2048,
     )
     assert scorer.model_id == "gpt-3.5-turbo"
     assert scorer.temperature == 0.5
@@ -67,14 +68,14 @@ def test_basic_scoring(hallucination_free_scorer, mock_create):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
     result = hallucination_free_scorer.score(output=output, context=context)
-    
+
     # Validate response structure
     assert isinstance(result, dict)
     assert "chain_of_thought" in result
     assert "reasonings" in result
     assert "conclusion" in result
     assert "has_hallucination" in result
-    
+
     # Validate response content
     assert result["has_hallucination"] is True
     assert len(result["reasonings"]) == 1
@@ -89,18 +90,17 @@ def test_empty_inputs(hallucination_free_scorer):
             chain_of_thought="Empty input detected",
             reasonings=[
                 HallucinationReasoning(
-                    hallucination_type="Empty Input",
-                    observation="Input is empty"
+                    hallucination_type="Empty Input", observation="Input is empty"
                 )
             ],
             conclusion="Cannot analyze empty input",
-            has_hallucination=True
+            has_hallucination=True,
         )
         result = hallucination_free_scorer.score(output="", context="")
         assert isinstance(result, dict)
         assert result["has_hallucination"] is True
         assert result["reasonings"][0]["hallucination_type"] == "Empty Input"
-    
+
     # Test with whitespace-only strings
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
@@ -108,11 +108,11 @@ def test_empty_inputs(hallucination_free_scorer):
             reasonings=[
                 HallucinationReasoning(
                     hallucination_type="Empty Input",
-                    observation="Input contains only whitespace"
+                    observation="Input contains only whitespace",
                 )
             ],
             conclusion="Cannot analyze empty input",
-            has_hallucination=True
+            has_hallucination=True,
         )
         result = hallucination_free_scorer.score(output="   ", context="\n\t")
         assert isinstance(result, dict)
@@ -123,12 +123,12 @@ def test_empty_inputs(hallucination_free_scorer):
 def test_large_inputs(hallucination_free_scorer):
     """Test handling of large inputs"""
     large_context = generate_large_text(50000)  # 50KB text
-    large_output = generate_large_text(10000)   # 10KB text
-    
+    large_output = generate_large_text(10000)  # 10KB text
+
     start_time = time.time()
     result = hallucination_free_scorer.score(output=large_output, context=large_context)
     end_time = time.time()
-    
+
     # Check performance
     assert end_time - start_time < 10  # Should complete within 10 seconds
     assert isinstance(result, dict)
@@ -139,17 +139,17 @@ def test_memory_usage(hallucination_free_scorer):
     """Test memory usage with large inputs"""
     process = psutil.Process()
     initial_memory = process.memory_info().rss
-    
+
     # Test with increasingly large inputs
     for size in [1000, 5000, 10000]:
         context = generate_large_text(size)
         output = generate_large_text(size)
-        
+
         _ = hallucination_free_scorer.score(output=output, context=context)
-        
+
         current_memory = process.memory_info().rss
         memory_increase = current_memory - initial_memory
-        
+
         # Memory usage should not grow exponentially
         assert memory_increase < size * 10  # Rough estimate
 
@@ -171,38 +171,39 @@ async def test_async_evaluation(hallucination_free_scorer):
         dataset=dataset,
         scorers=[hallucination_free_scorer],
     )
-    
+
     start_time = time.time()
     result = await evaluation.evaluate(model)
     end_time = time.time()
-    
+
     # Performance checks
     assert end_time - start_time < len(dataset) * 5  # 5 seconds per item max
-    
+
     # Result validation
     assert "HallucinationFreeScorer" in result
     assert "has_hallucination" in result["HallucinationFreeScorer"]
-    assert isinstance(result["HallucinationFreeScorer"]["has_hallucination"]["true_count"], int)
+    assert isinstance(
+        result["HallucinationFreeScorer"]["has_hallucination"]["true_count"], int
+    )
 
 
 @pytest.mark.asyncio
 async def test_concurrent_scoring(hallucination_free_scorer):
     """Test concurrent scoring performance"""
+
     async def score_item(context, output):
         return await asyncio.to_thread(
-            hallucination_free_scorer.score,
-            output=output,
-            context=context
+            hallucination_free_scorer.score, output=output, context=context
         )
-    
+
     contexts = [f"Context {i}" for i in range(5)]
     outputs = [f"Output {i}" for i in range(5)]
-    
+
     start_time = time.time()
     tasks = [score_item(ctx, out) for ctx, out in zip(contexts, outputs)]
     results = await asyncio.gather(*tasks)
     end_time = time.time()
-    
+
     # Performance validation
     assert end_time - start_time < len(contexts) * 3  # Should be faster than sequential
     assert len(results) == len(contexts)
@@ -217,12 +218,12 @@ def test_error_handling(hallucination_free_scorer):
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
         result = hallucination_free_scorer.score(output=123, context="test")
         assert isinstance(result, dict)
         assert result["has_hallucination"] is False
-    
+
     # Test with very long input
     very_long_text = "a" * 1000000  # 1MB text
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
@@ -230,7 +231,7 @@ def test_error_handling(hallucination_free_scorer):
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
         result = hallucination_free_scorer.score(output=very_long_text, context="test")
         assert isinstance(result, dict)
@@ -243,19 +244,21 @@ def test_prompt_validation(hallucination_free_scorer):
     valid_prompt = "Valid prompt with {input_data} and {output}"
     hallucination_free_scorer.user_prompt = valid_prompt
     assert hallucination_free_scorer.user_prompt == valid_prompt
-    
+
     # Test that prompts are used correctly
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
-        result = hallucination_free_scorer.score(output="test output", context="test context")
+        result = hallucination_free_scorer.score(
+            output="test output", context="test context"
+        )
         assert isinstance(result, dict)
         assert result["has_hallucination"] is False
-        
+
         # Check that the prompts were passed correctly
         call_args = mock_create.call_args[1]
         messages = call_args["messages"]
@@ -271,29 +274,29 @@ def test_custom_prompts(mock_create):
     """Test scorer with custom system and user prompts."""
     custom_system_prompt = "Custom system prompt for testing"
     custom_user_prompt = "Custom user prompt for testing with {input_data} and {output}"
-    
+
     scorer = HallucinationFreeScorer(
         client=OpenAI(api_key="DUMMY_API_KEY"),
         system_prompt=custom_system_prompt,
-        user_prompt=custom_user_prompt
+        user_prompt=custom_user_prompt,
     )
-    
+
     assert scorer.system_prompt == custom_system_prompt
     assert scorer.user_prompt == custom_user_prompt
-    
+
     result = scorer.score(output="test output", context="test context")
     assert isinstance(result, dict)
-    
+
     # Test prompt interpolation
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
         scorer.score(output="test output", context="test context")
-        
+
         # Verify the prompt was properly formatted
         call_args = mock_create.call_args[1]
         messages = call_args["messages"]
@@ -308,20 +311,20 @@ def test_api_error_handling(hallucination_free_scorer):
         mock_create.side_effect = TimeoutError("API timeout")
         with pytest.raises(TimeoutError):
             hallucination_free_scorer.score(output="test", context="test")
-    
+
     # Test API rate limit
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.side_effect = Exception("Rate limit exceeded")
         with pytest.raises(Exception):
             hallucination_free_scorer.score(output="test", context="test")
-    
+
     # Test API invalid response
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
         result = hallucination_free_scorer.score(output="test", context="test")
         assert isinstance(result, dict)
@@ -329,7 +332,7 @@ def test_api_error_handling(hallucination_free_scorer):
         assert "reasonings" in result
         assert "conclusion" in result
         assert "has_hallucination" in result
-    
+
     # Test API authentication error
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.side_effect = Exception("Invalid API key")
@@ -345,7 +348,7 @@ def test_response_validation(hallucination_free_scorer):
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
         result = hallucination_free_scorer.score(output="test", context="test")
         assert isinstance(result, dict)
@@ -353,19 +356,16 @@ def test_response_validation(hallucination_free_scorer):
         assert result["reasonings"] == []
         assert result["conclusion"] == "test"
         assert result["has_hallucination"] is False
-    
+
     # Test with invalid field types
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
             chain_of_thought="test",
             reasonings=[
-                HallucinationReasoning(
-                    hallucination_type="test",
-                    observation="test"
-                )
+                HallucinationReasoning(hallucination_type="test", observation="test")
             ],
             conclusion="test",
-            has_hallucination=True
+            has_hallucination=True,
         )
         result = hallucination_free_scorer.score(output="test", context="test")
         assert isinstance(result, dict)
@@ -379,33 +379,41 @@ def test_column_mapping(hallucination_free_scorer):
     """Test custom column mapping functionality."""
     # Test with default mapping
     dataset = [{"context": "test context", "output": "test output"}]
-    
+
     # Test with custom mapping
-    hallucination_free_scorer.column_map = {"context": "input_text", "output": "response"}
+    hallucination_free_scorer.column_map = {
+        "context": "input_text",
+        "output": "response",
+    }
     dataset = [{"input_text": "test context", "response": "test output"}]
-    
+
     @weave.op
     def model(input_text):
         return "test response"
-    
+
     evaluation = weave.Evaluation(
         dataset=dataset,
         scorers=[hallucination_free_scorer],
     )
-    
+
     assert evaluation is not None  # Basic validation that setup works
-    
+
     # Test that column map is properly set
-    assert hallucination_free_scorer.column_map == {"context": "input_text", "output": "response"}
-    
+    assert hallucination_free_scorer.column_map == {
+        "context": "input_text",
+        "output": "response",
+    }
+
     # Test that column map is used in scoring
     with patch("weave.scorers.hallucination_scorer.create") as mock_create:
         mock_create.return_value = HallucinationResponse(
             chain_of_thought="test",
             reasonings=[],
             conclusion="test",
-            has_hallucination=False
+            has_hallucination=False,
         )
-        result = hallucination_free_scorer.score(output="test output", context="test context")
+        result = hallucination_free_scorer.score(
+            output="test output", context="test context"
+        )
         assert isinstance(result, dict)
         assert result["has_hallucination"] is False

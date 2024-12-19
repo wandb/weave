@@ -1,20 +1,25 @@
 from typing import Any
+
 import pytest
 import torch
 from torch import Tensor
-from weave.scorers.llm_scorer import RollingWindowScorer
+
 from tests.scorers.test_utils import RandomTokenizer
+from weave.scorers.llm_scorer import RollingWindowScorer
 
 torch.manual_seed(42)
+
 
 class MockModel:
     def __call__(self, input_ids: Tensor) -> list[float]:
         total = sum(input_ids[0])
         return [input_ids.shape[1], total.item()]
 
+
 class RollingWindowScorerMock(RollingWindowScorer):
     max_tokens: int = 10
     overlap: int = 0
+
     def model_post_init(self, __context: Any) -> None:
         self._model = MockModel()
         self._tokenizer = RandomTokenizer()
@@ -22,17 +27,20 @@ class RollingWindowScorerMock(RollingWindowScorer):
     def predict_chunk(self, input_ids: Tensor) -> list[float]:
         return self._model(input_ids)
 
+
 @pytest.fixture
 def rolling_window_scorer():
     scorer_instance = RollingWindowScorerMock()
     scorer_instance.model_post_init(None)
     return scorer_instance
 
+
 @pytest.mark.asyncio
 async def test_tokenize_input(rolling_window_scorer):
     prompt = "Test input for tokenizer."
     tokenized_text = rolling_window_scorer.tokenize_input(prompt)
     assert isinstance(tokenized_text, Tensor)
+
 
 @pytest.mark.asyncio
 async def test_aggregate_predictions_max(rolling_window_scorer):
@@ -57,11 +65,17 @@ async def test_predict_long(rolling_window_scorer):
     input_ids = Tensor([list(range(100))])
     rolling_window_scorer.aggregation_method = "average"
     result = rolling_window_scorer.predict_long(input_ids)
-    assert result == [10, 495] # chunks of length 10, average of 99 * 100 / (2 * 10) = 495
+    assert result == [
+        10,
+        495,
+    ]  # chunks of length 10, average of 99 * 100 / (2 * 10) = 495
 
     rolling_window_scorer.aggregation_method = "max"
     result = rolling_window_scorer.predict_long(input_ids)
-    assert result == [10, 945] # chunks of length 10, max = 99 + 98 + ... + 91 + 90 = 955
+    assert result == [
+        10,
+        945,
+    ]  # chunks of length 10, max = 99 + 98 + ... + 91 + 90 = 955
 
 
 @pytest.mark.asyncio

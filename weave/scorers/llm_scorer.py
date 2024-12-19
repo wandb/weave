@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Union
-from pydantic import Field, field_validator, PrivateAttr
+
+from pydantic import Field, PrivateAttr, field_validator
 
 import weave
 from weave.scorers.base_scorer import Scorer
@@ -11,6 +12,7 @@ from weave.scorers.llm_utils import (
 
 if TYPE_CHECKING:
     from torch import Tensor
+
 
 class LLMScorer(Scorer):
     """Score model outputs using a Large Language Model (LLM).
@@ -73,6 +75,7 @@ class InstructorLLMScorer(Scorer):
             )
         return instructor_client(v)
 
+
 class HuggingFacePipelineScorer(Scorer):
     """
     Base class for using Hugging Face pipelines for moderation scoring.
@@ -126,8 +129,10 @@ class HuggingFacePipelineScorer(Scorer):
     def score(self, output: str) -> dict[str, Any]:
         return self.pipe(output)
 
+
 class HuggingFaceScorer(Scorer):
     """Score model outputs using a Hugging Face model."""
+
     device: str = "cpu"
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
@@ -139,6 +144,7 @@ class HuggingFaceScorer(Scorer):
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
+
 
 class RollingWindowScorer(HuggingFaceScorer):
     """

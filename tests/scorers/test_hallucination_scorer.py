@@ -1,7 +1,9 @@
 import pytest
-from weave.scorers.llm_utils import download_model
+
+from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_context_and_output
 from weave.scorers import HallucinationScorer
-from tests.scorers.test_utils import generate_context_and_output, TINY_MODEL_PATHS
+from weave.scorers.llm_utils import download_model
+
 
 @pytest.fixture
 def hallucination_scorer():
@@ -15,6 +17,7 @@ def hallucination_scorer():
         use_hhem=True,
     )
     return scorer
+
 
 def test_hallucination_scorer_basic(hallucination_scorer):
     """
@@ -31,6 +34,7 @@ def test_hallucination_scorer_basic(hallucination_scorer):
     assert result["flagged"] is False, "Matching context/output should not be flagged"
     assert "score" in result["extras"], "Result extras should contain a 'score' field"
 
+
 def test_hallucination_scorer_long_input(hallucination_scorer):
     """
     Test that the scorer can handle a longer context/output without errors.
@@ -41,7 +45,7 @@ def test_hallucination_scorer_long_input(hallucination_scorer):
     )
     result = hallucination_scorer.score(query=query, context=context, output=output)
 
-    # We only check that the result structure is valid; 
+    # We only check that the result structure is valid;
     # the actual flagged/score value depends on how the model scores the content.
     assert isinstance(result, dict), "Result should be a dictionary"
     assert "flagged" in result, "Result should contain 'flagged' key"

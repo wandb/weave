@@ -1,7 +1,9 @@
 import pytest
+
+from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 from weave.scorers.llm_utils import download_model
 from weave.scorers.moderation_scorer import ToxicityScorer
-from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
+
 
 @pytest.fixture
 def toxicity_scorer():
@@ -16,8 +18,9 @@ def toxicity_scorer():
         description="Tiny test toxicity scorer",
         device="cpu",  # Use CPU for testing
         total_threshold=5,
-        category_threshold=2
+        category_threshold=2,
     )
+
 
 def test_toxicity_scorer_simple(toxicity_scorer):
     """
@@ -32,7 +35,10 @@ def test_toxicity_scorer_simple(toxicity_scorer):
     assert isinstance(result["flagged"], bool), "'flagged' must be a boolean."
     assert isinstance(result["extras"], dict), "'extras' must be a dictionary."
     for category in toxicity_scorer._categories:
-        assert category in result["extras"], f"'{category}' should be in 'extras' dictionary."
+        assert (
+            category in result["extras"]
+        ), f"'{category}' should be in 'extras' dictionary."
+
 
 def test_toxicity_scorer_large_input(toxicity_scorer):
     """
@@ -46,6 +52,7 @@ def test_toxicity_scorer_large_input(toxicity_scorer):
     assert isinstance(result["flagged"], bool)
     assert "extras" in result
     assert all(cat in result["extras"] for cat in toxicity_scorer._categories)
+
 
 def test_toxicity_scorer_threshold(toxicity_scorer):
     """
@@ -65,6 +72,7 @@ def test_toxicity_scorer_threshold(toxicity_scorer):
         highest_cat_score >= toxicity_scorer.category_threshold
     )
     assert result["flagged"] == should_flag
+
 
 # def test_toxicity_scorer_clean(toxicity_scorer):
 #     """
