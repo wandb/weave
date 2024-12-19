@@ -1,3 +1,4 @@
+# always use lowercase keys for the redact keys
 REDACT_KEYS = (
     "api_key",
     "auth_headers",
