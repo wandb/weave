@@ -95,7 +95,6 @@ import {
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCallSchema} from './traceServerClientTypes';
 
-
 /**
  * Primary react hook for fetching evaluation comparison data. This could be
  * moved into the Trace Server hooks at some point, hence the location of the file.
@@ -103,7 +102,7 @@ import {TraceCallSchema} from './traceServerClientTypes';
 export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
-  evaluationCallIds: string[],
+  evaluationCallIds: string[]
 ): Loadable<EvaluationComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
@@ -176,7 +175,13 @@ export const useEvaluationComparisonResults = (
     return () => {
       mounted = false;
     };
-  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient, summaryData]);
+  }, [
+    entity,
+    evaluationCallIdsMemo,
+    project,
+    getTraceServerClient,
+    summaryData,
+  ]);
 
   return useMemo(() => {
     if (
@@ -188,8 +193,6 @@ export const useEvaluationComparisonResults = (
     return {loading: false, result: data};
   }, [data, evaluationCallIdsMemo]);
 };
-
-
 
 const fetchEvaluationSummaryData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
@@ -220,7 +223,6 @@ const fetchEvaluationSummaryData = async (
     project_id: projectId,
     filter: {call_ids: evaluationCallIds},
   });
-
 
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
@@ -445,19 +447,21 @@ const fetchEvaluationComparisonResults = async (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary,
+  summaryData: EvaluationComparisonSummary
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
     inputs: {},
     resultRows: {},
   };
-  
+
   // Kick off the trace query to get the actual trace data
   // Note: we split this into 2 steps to ensure we only get level 2 children
   // of the evaluations. This avoids massive overhead of fetching gigantic traces
   // for every evaluation.
-  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(call => call.traceId);
+  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
+    call => call.traceId
+  );
   // First, get all the children of the evaluations (predictAndScoreCalls + summary)
   const evalTraceResProm = traceServerClient
     .callsStreamQuery({
@@ -486,7 +490,8 @@ const fetchEvaluationComparisonResults = async (
 
   // 3.5 Populate the inputs
   // We only ned 1 since we are going to effectively do an inner join on the rowDigest
-  const datasetRef = Object.values(summaryData.evaluations)[0].datasetRef as string;
+  const datasetRef = Object.values(summaryData.evaluations)[0]
+    .datasetRef as string;
   const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
   const rowsRef = datasetObjRes.vals[0].rows;
   const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
@@ -550,7 +555,9 @@ const fetchEvaluationComparisonResults = async (
     );
   });
 
-  const modelRefs = Object.values(summaryData.evaluationCalls).map(evalCall => evalCall.modelRef);
+  const modelRefs = Object.values(summaryData.evaluationCalls).map(
+    evalCall => evalCall.modelRef
+  );
 
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {

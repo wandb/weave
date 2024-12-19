@@ -7,9 +7,15 @@
 
 import {useMemo} from 'react';
 
-import {useEvaluationComparisonResults, useEvaluationComparisonSummary} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
+import {
+  useEvaluationComparisonResults,
+  useEvaluationComparisonSummary,
+} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {EvaluationComparisonResults, EvaluationComparisonSummary} from './ecpTypes';
+import {
+  EvaluationComparisonResults,
+  EvaluationComparisonSummary,
+} from './ecpTypes';
 import {getMetricIds} from './ecpUtil';
 
 /**
@@ -52,8 +58,17 @@ export const useEvaluationComparisonState = (
   const orderedCallIds = useMemo(() => {
     return getCallIdsOrderedForQuery(evaluationCallIds);
   }, [evaluationCallIds]);
-  const summaryData = useEvaluationComparisonSummary(entity, project, orderedCallIds);
-  const resultsData = useEvaluationComparisonResults(entity, project, orderedCallIds, summaryData.result);
+  const summaryData = useEvaluationComparisonSummary(
+    entity,
+    project,
+    orderedCallIds
+  );
+  const resultsData = useEvaluationComparisonResults(
+    entity,
+    project,
+    orderedCallIds,
+    summaryData.result
+  );
 
   const value = useMemo(() => {
     if (summaryData.result == null || summaryData.loading) {
@@ -104,7 +119,15 @@ export const useEvaluationComparisonState = (
         evaluationCallIdsOrdered: evaluationCallIds,
       },
     };
-  }, [summaryData.result, summaryData.loading, comparisonDimensions, resultsData.result, selectedInputDigest, selectedMetrics, evaluationCallIds]);
+  }, [
+    summaryData.result,
+    summaryData.loading,
+    comparisonDimensions,
+    resultsData.result,
+    selectedInputDigest,
+    selectedMetrics,
+    evaluationCallIds,
+  ]);
 
   return value;
 };

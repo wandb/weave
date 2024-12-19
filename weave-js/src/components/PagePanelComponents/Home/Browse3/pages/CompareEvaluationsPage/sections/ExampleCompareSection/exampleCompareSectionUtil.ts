@@ -124,13 +124,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
-    Object.entries(state.summary.resultRows).forEach(
+    Object.entries(state.results?.resultRows ?? {}).forEach(
       ([rowDigest, rowCollection]) => {
         Object.values(rowCollection.evaluations).forEach(modelCollection => {
           Object.values(modelCollection.predictAndScores).forEach(
             predictAndScoreRes => {
               const datasetRow =
-                state.summary.inputs[predictAndScoreRes.rowDigest];
+                state.results?.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
                 const output = predictAndScoreRes._rawPredictTraceData?.output;
                 rows.push({
@@ -169,7 +169,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [state.summary.resultRows, state.summary.inputs, state.summary.scoreMetrics]);
+  }, [
+    state.results?.resultRows,
+    state.results?.inputs,
+    state.summary.scoreMetrics,
+  ]);
 
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -

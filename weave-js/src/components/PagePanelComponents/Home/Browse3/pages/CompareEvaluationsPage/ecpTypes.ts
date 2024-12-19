@@ -7,7 +7,6 @@
  */
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
-
 export type EvaluationComparisonSummary = {
   // Entity and Project are constant across all calls
   entity: string;
@@ -63,8 +62,8 @@ export type EvaluationComparisonResults = {
         };
       };
     };
-  }
-}
+  };
+};
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
  */

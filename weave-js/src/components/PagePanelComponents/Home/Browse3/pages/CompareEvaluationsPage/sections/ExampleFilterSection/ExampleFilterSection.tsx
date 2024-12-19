@@ -141,51 +141,53 @@ const SingleDimensionFilter: React.FC<{
       );
 
       if (baselineTargetDimension != null && compareTargetDimension != null) {
-        Object.entries(props.state.summary.resultRows).forEach(([digest, row]) => {
-          const xVals: number[] = [];
-          const yVals: number[] = [];
-          Object.values(
-            row.evaluations[baselineCallId]?.predictAndScores ?? {}
-          ).forEach(score => {
-            const val = resolveScoreMetricResultForPASCall(
-              baselineTargetDimension,
-              score
-            );
-            if (val == null) {
+        Object.entries(props.state.results?.resultRows ?? {}).forEach(
+          ([digest, row]) => {
+            const xVals: number[] = [];
+            const yVals: number[] = [];
+            Object.values(
+              row.evaluations[baselineCallId]?.predictAndScores ?? {}
+            ).forEach(score => {
+              const val = resolveScoreMetricResultForPASCall(
+                baselineTargetDimension,
+                score
+              );
+              if (val == null) {
+                return;
+              } else if (isBinaryScore(val.value)) {
+                xVals.push(val.value ? 1 : 0);
+              } else if (isContinuousScore(val.value)) {
+                xVals.push(val.value);
+              }
+            });
+            Object.values(
+              row.evaluations[compareCallId]?.predictAndScores ?? {}
+            ).forEach(score => {
+              const val = resolveScoreMetricResultForPASCall(
+                compareTargetDimension,
+                score
+              );
+              if (val == null) {
+                return;
+              } else if (isBinaryScore(val.value)) {
+                yVals.push(val.value ? 1 : 0);
+              } else if (isContinuousScore(val.value)) {
+                yVals.push(val.value);
+              }
+            });
+            if (xVals.length === 0 || yVals.length === 0) {
               return;
-            } else if (isBinaryScore(val.value)) {
-              xVals.push(val.value ? 1 : 0);
-            } else if (isContinuousScore(val.value)) {
-              xVals.push(val.value);
             }
-          });
-          Object.values(
-            row.evaluations[compareCallId]?.predictAndScores ?? {}
-          ).forEach(score => {
-            const val = resolveScoreMetricResultForPASCall(
-              compareTargetDimension,
-              score
-            );
-            if (val == null) {
-              return;
-            } else if (isBinaryScore(val.value)) {
-              yVals.push(val.value ? 1 : 0);
-            } else if (isContinuousScore(val.value)) {
-              yVals.push(val.value);
-            }
-          });
-          if (xVals.length === 0 || yVals.length === 0) {
-            return;
+            series.push({
+              x: mean(xVals),
+              y: mean(yVals),
+              count: xVals.length,
+              size: MIN_PLOT_DOT_SIZE,
+              color: MOON_500,
+              selected: filteredDigest.has(digest),
+            });
           }
-          series.push({
-            x: mean(xVals),
-            y: mean(yVals),
-            count: xVals.length,
-            size: MIN_PLOT_DOT_SIZE,
-            color: MOON_500,
-            selected: filteredDigest.has(digest),
-          });
-        });
+        );
 
         if (targetDimension.scoreType === 'binary') {
           // Here we are going to further group the points by their x and y values
@@ -230,7 +232,7 @@ const SingleDimensionFilter: React.FC<{
     compareCallId,
     compositeMetricsMap,
     filteredDigest,
-    props.state.summary.resultRows,
+    props.state.results?.resultRows,
     targetDimension,
   ]);
 
