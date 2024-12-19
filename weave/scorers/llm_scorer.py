@@ -73,7 +73,7 @@ class InstructorLLMScorer(Scorer):
             )
         return instructor_client(v)
 
-class HFPipelineScorer(Scorer):
+class HuggingFacePipelineScorer(Scorer):
     """
     Base class for using Hugging Face pipelines for moderation scoring.
 
@@ -126,7 +126,7 @@ class HFPipelineScorer(Scorer):
     def score(self, output: str) -> dict[str, Any]:
         return self.pipe(output)
 
-class HFScorer(Scorer):
+class HuggingFaceScorer(Scorer):
     """Score model outputs using a Hugging Face model."""
     device: str = "cpu"
     _model: Any = PrivateAttr()
@@ -140,7 +140,7 @@ class HFScorer(Scorer):
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-class RollingWindowScorer(HFScorer):
+class RollingWindowScorer(HuggingFaceScorer):
     """
     Base Scorer class that handles rolling window processing for long inputs.
 
