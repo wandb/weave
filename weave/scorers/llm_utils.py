@@ -114,13 +114,16 @@ def embed(
 
 def set_device(device: Optional[str] = None) -> str:
     import torch
-
-    assert device in [None, "cpu", "cuda"], "device must be None, 'cpu', or 'cuda'"
     cuda_available = torch.cuda.is_available()
     if not cuda_available and device == "cuda":
         raise ValueError("CUDA is not available")
-    if device is None:
-        device = "cuda" if cuda_available else "cpu"
+    if device is "auto":
+        if cuda_available:
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
     return device
 
 

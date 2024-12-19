@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, Literal
 
 from pydantic import Field, PrivateAttr, field_validator
 
@@ -103,8 +103,8 @@ class HuggingFacePipelineScorer(Scorer):
     """
 
     task: str
-    model_name_or_path: str
-    device: str = "cpu"
+    model_name_or_path: str = ""
+    device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
     pipeline_kwargs: dict[str, Any] = Field(default_factory=dict)
     _pipeline: Any = PrivateAttr()
 
@@ -126,17 +126,17 @@ class HuggingFacePipelineScorer(Scorer):
         return self._pipeline(prompt)[0]
 
     @weave.op
-    def score(self, output: str) -> dict[str, Any]:
-        return self.pipe(output)
+    def score(self, *, output: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError
 
 
 class HuggingFaceScorer(Scorer):
     """Score model outputs using a Hugging Face model."""
-
-    device: str = "cpu"
+    model_name_or_path: str = ""
+    device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
     _model: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
-
+  
     def model_post_init(self, __context: Any) -> None:
         """Initialize the model and tokenizer. To be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement model_post_init method.")

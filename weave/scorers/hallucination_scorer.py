@@ -5,13 +5,13 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_scorer import InstructorLLMScorer
+from weave.scorers.llm_scorer import InstructorLLMScorer, HuggingFaceScorer
 from weave.scorers.llm_utils import (
     MODEL_PATHS,
     OPENAI_DEFAULT_MODEL,
     create,
     download_model,
+    set_device,
 )
 from weave.scorers.utils import stringify
 
@@ -233,7 +233,7 @@ class HallucinationFreeScorer(InstructorLLMScorer):
         return response.model_dump()  # Morgan wants this to be a dict
 
 
-class HallucinationScorer(Scorer):
+class HallucinationScorer(HuggingFaceScorer):
     """
     A scorer that detects hallucinations in the output, given an query and context.
 
@@ -247,12 +247,8 @@ class HallucinationScorer(Scorer):
         debug: Enable debug logging, defaults to False
     """
 
-    model_name_or_path: str = ""
     base_url: Optional[str] = None
-    device: str = "cuda"
     debug: bool = False
-    llm_model: Any = None
-    tokenizer: Any = None
     max_new_tokens: int = 2
     model_max_length: int = 8192
     do_sample: bool = False
@@ -286,11 +282,9 @@ class HallucinationScorer(Scorer):
             )
             return
 
-        if not torch.cuda.is_available() and "cuda" in self.device:
-            warnings.warn("CUDA is not available, using CPU instead")
-            self.device = "cpu"
+        self.device = set_device(self.device)
 
-        if self.llm_model is None:
+        if self._model is None:
             # Check if the model is already downloaded
             if os.path.isdir(self.model_name_or_path):
                 self._local_model_path = self.model_name_or_path
@@ -306,26 +300,26 @@ class HallucinationScorer(Scorer):
                     )
 
             if self.use_hhem:
-                self.llm_model = AutoModelForSequenceClassification.from_pretrained(
+                self._model = AutoModelForSequenceClassification.from_pretrained(
                     self._local_model_path,
                     torch_dtype="bfloat16",
                     trust_remote_code=True,
                 ).to(self.device)
-                self.tokenizer = self.llm_model.tokenzier
-                self.tokenizer.model_max_length = self.model_max_length
+                self._tokenizer = self._model.tokenzier
+                self._tokenizer.model_max_length = self.model_max_length
             else:
-                self.llm_model = AutoModelForCausalLM.from_pretrained(
+                self._model = AutoModelForCausalLM.from_pretrained(
                     self._local_model_path, torch_dtype="bfloat16"
                 ).to(self.device)
 
                 if self.use_torch_compile:
-                    self.llm_model.generation_config.cache_implementation = "static"
-                    self.llm_model = torch.compile(
-                        self.llm_model, backend="inductor", fullgraph=True
+                    self._model.generation_config.cache_implementation = "static"
+                    self._model = torch.compile(
+                        self._model, backend="inductor", fullgraph=True
                     )
 
-        if self.tokenizer is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(
+        if self._tokenizer is None:
+            self._tokenizer = AutoTokenizer.from_pretrained(
                 self._local_model_path, model_max_length=self.model_max_length
             )
         if not self.do_sample:
@@ -364,8 +358,8 @@ class HallucinationScorer(Scorer):
                 inps = query + "\n\n" + context
                 outs = output
 
-                inps_toks = self.tokenizer(inps, truncation=False)
-                outs_toks = self.tokenizer(outs, truncation=False)
+                inps_toks = self._tokenizer(inps, truncation=False)
+                outs_toks = self._tokenizer(outs, truncation=False)
 
                 len_inps = len(inps_toks.input_ids)
                 len_outs = len(outs_toks.input_ids)
@@ -381,33 +375,33 @@ class HallucinationScorer(Scorer):
                             : self.model_max_length - 1025
                         ]
 
-                    inps = self.tokenizer.decode(inps_input_ids)
-                    outs = self.tokenizer.decode(out_input_ids)
+                    inps = self._tokenizer.decode(inps_input_ids)
+                    outs = self._tokenizer.decode(out_input_ids)
 
                 pairs = [(inps, outs)]
-                pred = self.llm_model.predict(pairs)
+                pred = self._model.predict(pairs)
                 score = pred.item()
                 return {
                     "flagged": score <= self.hhem_score_threshold,
                     "extras": {"score": score},
                 }
             else:
-                inp_template = self.tokenizer.apply_chat_template(
+                inp_template = self._tokenizer.apply_chat_template(
                     messages,
                     return_tensors="pt",
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                inp_tokenized = self.tokenizer(inp_template, return_tensors="pt").to(
+                inp_tokenized = self._tokenizer(inp_template, return_tensors="pt").to(
                     self.device
                 )
 
-                pad_token_id = self.tokenizer.eos_token_id
+                pad_token_id = self._tokenizer.eos_token_id
 
                 with torch.no_grad():
-                    self.llm_model.eval()
+                    self._model.eval()
 
-                    res = self.llm_model.generate(
+                    res = self._model.generate(
                         inp_tokenized["input_ids"],
                         max_new_tokens=self.max_new_tokens,
                         attention_mask=inp_tokenized["attention_mask"],
@@ -439,7 +433,7 @@ class HallucinationScorer(Scorer):
                     print(
                         f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n"
                     )
-                    completion = self.tokenizer.decode(completion_tokens)
+                    completion = self._tokenizer.decode(completion_tokens)
                     print(f"COMPLETION:\n{completion}\n----------------------\n")
 
                     result["extras"].update(

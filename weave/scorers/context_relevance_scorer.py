@@ -70,12 +70,12 @@ class OldRelevanceScorer(Scorer):
 
     Args:
         model_name: The name of the relevance scorer model to use. Defaults to `wandb/relevance_scorer`.
-        device: The device to use for inference. Defaults to `None`, which will use `cuda` if available.
+        device: The device to use for inference. Defaults to `auto`, which will use `cuda` if available.
     """
 
     model_name_or_path: str = None
     base_url: Optional[str] = None
-    device: str = None
+    device: str = "auto"
     _classifier: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
     _id2label: dict[int, str] = PrivateAttr()
