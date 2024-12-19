@@ -87,10 +87,10 @@ jobs:
           - '8083:8083'
           - '9015:9015'
         options: >-
-          --health-cmd "curl --fail http://localhost:8080/healthz || exit 1"
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
           --health-interval=5s
           --health-timeout=3s
-          --health-start-period=30s
+          --health-start-period=10s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
@@ -265,11 +265,10 @@ jobs:
           - '8083:8083'
           - '9015:9015'
         options: >-
-          --health-cmd "curl --fail http://localhost:8080/healthz || exit 1"
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
           --health-interval=5s
           --health-timeout=3s
-          --health-retries=5
-          --health-start-period=30s
+          --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
