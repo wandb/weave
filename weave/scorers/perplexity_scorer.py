@@ -1,10 +1,12 @@
-from typing import Union, Any
+from typing import Union, Any, TYPE_CHECKING
 
 import numpy as np
-from openai.types.chat import ChatCompletion
 
 import weave
 from weave.scorers.base_scorer import Scorer
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletion
 
 
 class OpenAIPerplexityScorer(Scorer):
@@ -13,7 +15,7 @@ class OpenAIPerplexityScorer(Scorer):
     """
 
     @weave.op()
-    def score(self, output: Union[ChatCompletion, list]) -> dict:
+    def score(self, output: Union["ChatCompletion", list]) -> dict:
         """
         Computes perplexity for OpenAI outputs using log probabilities.
 
@@ -25,6 +27,8 @@ class OpenAIPerplexityScorer(Scorer):
         Returns:
             dict: A dictionary containing the calculated perplexity.
         """
+        from openai.types.chat import ChatCompletion
+
         if isinstance(output, ChatCompletion):
             assert (
                 output.choices[0].logprobs is not None
@@ -51,20 +55,6 @@ class OpenAIPerplexityScorer(Scorer):
 
 class HuggingFacePerplexityScorer(Scorer):
     """A scorer that computes perplexity for Hugging Face outputs using log probabilities."""
-    def model_post_init(self, __context: Any) -> None:
-        """
-        Initialize the model and tokenizer. Imports are performed here to ensure they're only
-        loaded when an instance of LlamaGuard is created.
-        """
-        try:
-            import torch
-        except ImportError as e:
-            raise ImportError(
-                "The `transformers` and `torch` packages are required to use LlamaGuard. "
-                "Please install them by running `pip install transformers torch`."
-            ) from e
-
-
 
     @weave.op()
     def score(self, output: dict) -> dict:
