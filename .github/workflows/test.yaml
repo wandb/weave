@@ -247,7 +247,7 @@ jobs:
       fail-fast: false
     services:
       wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:e1481defc00091abeeccec8debbb898b49f8e81c865b23d0e86aa24cfe9e4760
         credentials:
           username: _json_key
           password: ${{ secrets.gcp_wb_sa_key }}
@@ -258,7 +258,7 @@ jobs:
           - "8080:8080"
           - "8083:8083"
           - "9015:9015"
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s --health-start-period=60s
+        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
