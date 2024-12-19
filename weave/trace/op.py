@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import random
 import sys
 import traceback
 from collections.abc import Coroutine, Mapping
@@ -26,7 +27,11 @@ from weave.trace import box, settings
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.context.call_context import call_attributes
+from weave.trace.context.call_context import (
+    call_attributes,
+    get_tracing_enabled,
+    tracing_disabled,
+)
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -173,6 +178,8 @@ class Op(Protocol):
     # should consider a more user-friendly API (perhaps a setter/getter) & whether
     # it disables child ops as well.
     _tracing_enabled: bool
+
+    tracing_sample_rate: float
 
 
 def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
@@ -407,37 +414,54 @@ def _do_call(
     if not pargs:
         pargs = _default_on_input_handler(op, args, kwargs)
 
+    # Handle all of the possible cases where we would skip tracing.
     if settings.should_disable_weave():
         res = func(*pargs.args, **pargs.kwargs)
-    elif weave_client_context.get_weave_client() is None:
+        return res, call
+    if weave_client_context.get_weave_client() is None:
         res = func(*pargs.args, **pargs.kwargs)
-    elif not op._tracing_enabled:
+        return res, call
+    if not op._tracing_enabled:
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
+    if not get_tracing_enabled():
+        res = func(*pargs.args, **pargs.kwargs)
+        return res, call
+
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        # Root call: decide whether to trace based on sample rate
+        if random.random() > op.tracing_sample_rate:
+            # Disable tracing for this call and all descendants
+            with tracing_disabled():
+                res = func(*pargs.args, **pargs.kwargs)
+                return res, call
+
+    # Proceed with tracing. Note that we don't check the sample rate here.
+    # Only root calls get sampling applied.
+    # If the parent was traced (sampled in), the child will be too.
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
         res = func(*pargs.args, **pargs.kwargs)
     else:
-        try:
-            # This try/except allows us to fail gracefully and
-            # still let the user code continue to execute
-            call = _create_call(op, *args, __weave=__weave, **kwargs)
-        except OpCallError as e:
-            raise e
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(
-                logger.error,
-                CALL_CREATE_MSG.format(traceback.format_exc()),
+        execute_result = _execute_op(
+            op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
+        )
+        if inspect.iscoroutine(execute_result):
+            raise TypeError(
+                "Internal error: Expected `_execute_call` to return a sync result"
             )
-            res = func(*pargs.args, **pargs.kwargs)
-        else:
-            execute_result = _execute_op(
-                op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
-            )
-            if inspect.iscoroutine(execute_result):
-                raise TypeError(
-                    "Internal error: Expected `_execute_call` to return a sync result"
-                )
-            execute_result = cast(tuple[Any, "Call"], execute_result)
-            res, call = execute_result
+        execute_result = cast(tuple[Any, "Call"], execute_result)
+        res, call = execute_result
     return res, call
 
 
@@ -450,39 +474,52 @@ async def _do_call_async(
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = _placeholder_call()
+
+    # Handle all of the possible cases where we would skip tracing.
     if settings.should_disable_weave():
         res = await func(*args, **kwargs)
-    elif weave_client_context.get_weave_client() is None:
+        return res, call
+    if weave_client_context.get_weave_client() is None:
         res = await func(*args, **kwargs)
-    elif not op._tracing_enabled:
+        return res, call
+    if not op._tracing_enabled:
+        res = await func(*args, **kwargs)
+        return res, call
+    if not get_tracing_enabled():
+        res = await func(*args, **kwargs)
+        return res, call
+
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        # Root call: decide whether to trace based on sample rate
+        if random.random() > op.tracing_sample_rate:
+            # Disable tracing for this call and all descendants
+            with tracing_disabled():
+                res = await func(*args, **kwargs)
+                return res, call
+
+    # Proceed with tracing
+    try:
+        call = _create_call(op, *args, __weave=__weave, **kwargs)
+    except OpCallError as e:
+        raise e
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(
+            logger.error,
+            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        )
         res = await func(*args, **kwargs)
     else:
-        try:
-            # This try/except allows us to fail gracefully and
-            # still let the user code continue to execute
-            call = _create_call(op, *args, __weave=__weave, **kwargs)
-        except OpCallError as e:
-            raise e
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(
-                logger.error,
-                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+        execute_result = _execute_op(
+            op, call, *args, __should_raise=__should_raise, **kwargs
+        )
+        if not inspect.iscoroutine(execute_result):
+            raise TypeError(
+                "Internal error: Expected `_execute_call` to return a coroutine"
             )
-            res = await func(*args, **kwargs)
-        else:
-            execute_result = _execute_op(
-                op, call, *args, __should_raise=__should_raise, **kwargs
-            )
-            if not inspect.iscoroutine(execute_result):
-                raise TypeError(
-                    "Internal error: Expected `_execute_call` to return a coroutine"
-                )
-            execute_result = cast(
-                Coroutine[Any, Any, tuple[Any, "Call"]], execute_result
-            )
-            res, call = await execute_result
+        res, call = await execute_result
     return res, call
 
 
@@ -540,6 +577,7 @@ def op(
     call_display_name: str | CallDisplayNameFunc | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
     postprocess_output: PostprocessOutputFunc | None = None,
+    tracing_sample_rate: float = 1.0,
 ) -> Callable[[Callable], Op] | Op:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -565,6 +603,7 @@ def op(
         postprocess_output (Optional[Callable[..., Any]]): A function to process the output
             after it's been returned from the function but before it's logged.  This does not
             affect the actual output of the function, only the displayed output.
+        tracing_sample_rate (float): The sampling rate for tracing this function. Defaults to 1.0 (always trace).
 
     Returns:
         Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
@@ -591,6 +630,10 @@ def op(
     await extract()  # calls the function and tracks the call in the Weave UI
     ```
     """
+    if not isinstance(tracing_sample_rate, (int, float)):
+        raise TypeError("tracing_sample_rate must be a float")
+    if not 0 <= tracing_sample_rate <= 1:
+        raise ValueError("tracing_sample_rate must be between 0 and 1")
 
     def op_deco(func: Callable) -> Op:
         # Check function type
@@ -647,6 +690,7 @@ def op(
             wrapper._on_finish_handler = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
+            wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
 

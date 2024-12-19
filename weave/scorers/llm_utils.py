@@ -9,12 +9,7 @@ try:
 except ImportError:
     instructor = None
 
-from weave.trace.autopatch import autopatch
-
-autopatch()  # ensure both weave patching and instructor patching are applied
-
-# Default model names and configurations
-OPENAI_DEFAULT_MODEL = "gpt-4"
+OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_DEFAULT_MODERATION_MODEL = "omni-moderation-latest"
 
