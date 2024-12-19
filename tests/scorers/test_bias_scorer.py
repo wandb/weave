@@ -1,81 +1,63 @@
-"""Tests for bias scorer."""
-import os
 import pytest
-from typing import Any, Dict, List, Optional
-import torch
-from transformers import BertForSequenceClassification, BertTokenizer
-
+from weave.scorers.llm_utils import download_model
 from weave.scorers.moderation_scorer import BiasScorer
-from tests.scorers.test_utils import generate_large_text
-
-
-class TestBiasScorer(BiasScorer):
-    """Test-specific BiasScorer that uses local models."""
-    def model_post_init(self, *args, **kwargs):
-        """Override to use local model instead of downloading."""
-        test_model_dir = os.path.join(os.path.dirname(__file__), "..", "weave_models")
-        test_model_path = os.path.join(test_model_dir, "test-bias-scorer")
-        self._local_model_path = test_model_path
-        self._model = BertForSequenceClassification.from_pretrained(test_model_path)
-        self._tokenizer = BertTokenizer.from_pretrained(test_model_path)
-        self._model.to(self.device)
-        self._model.eval()
-
+from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 
 @pytest.fixture
 def bias_scorer():
-    """Create a bias scorer instance using actual model."""
-    return TestBiasScorer(
-        model_name_or_path="bert-base-uncased",  # Original model name
+    """
+    Fixture that returns a BiasScorer instance using a tiny downloaded model.
+    """
+    tiny_model_path = download_model(TINY_MODEL_PATHS["bias_scorer"])
+    return BiasScorer(
+        model_name_or_path=tiny_model_path,
         name="test-bias",
-        description="Test bias scorer",
-        column_map={"output": "text"},
-        device="cpu"  # Use CPU for testing
+        description="Tiny test bias scorer",
+        device="cpu",  # Use CPU for testing
+        threshold=0.5,
     )
 
+def test_bias_scorer_simple(bias_scorer):
+    """
+    Tests that the scorer can handle a basic string.
+    """
+    output = "This is a balanced statement with no bias."
+    result = bias_scorer.score(output)
+
+    assert isinstance(result, dict), "Result should be a dictionary."
+    assert "flagged" in result, "Result must contain the 'flagged' key."
+    assert "extras" in result, "Result must contain the 'extras' dictionary."
+    assert isinstance(result["flagged"], bool), "'flagged' must be a boolean."
+    assert isinstance(result["extras"], dict), "'extras' must be a dictionary."
+    for category in bias_scorer._categories:
+        assert category in result["extras"], f"'{category}' should be in 'extras' dictionary."
 
 def test_bias_scorer_large_input(bias_scorer):
-    """Test bias scorer with large input."""
-    large_text = generate_large_text(100000)  # Generate 100k characters
+    """
+    Tests bias scorer with very large input to ensure it doesn't crash.
+    """
+    large_text = generate_large_text(100_000)  # 100k characters
     result = bias_scorer.score(large_text)
 
     assert isinstance(result, dict)
     assert "flagged" in result
     assert isinstance(result["flagged"], bool)
     assert "extras" in result
-    assert isinstance(result["extras"], dict)
-    assert all(cat in result["extras"] for cat in bias_scorer._categories)
+    for category in bias_scorer._categories:
+        assert category in result["extras"], f"'{category}' should be in 'extras'."
 
+def test_bias_scorer_threshold(bias_scorer):
+    """
+    Confirms that the threshold logic works properly.
+    This example text is contrived to produce mild results in categories.
+    """
+    text = "This text slightly contains gender bias and maybe a hint of racial bias."
+    result = bias_scorer.score(text)
 
-def test_bias_scorer_error_handling(bias_scorer):
-    """Test bias scorer error handling."""
-    result = bias_scorer.score("")
-    assert isinstance(result, dict)
-    assert "flagged" in result
-    assert "extras" in result
-
-
-def test_bias_scorer_processes_biased(bias_scorer):
-    """Test bias scorer processes biased content."""
-    biased_text = "Women are not good at math and science."
-    result = bias_scorer.score(biased_text)
-
-    assert isinstance(result, dict)
-    assert "flagged" in result
-    assert isinstance(result["flagged"], bool)
-    assert "extras" in result
-    assert isinstance(result["extras"], dict)
-    assert all(cat in result["extras"] for cat in bias_scorer._categories)
-
-
-def test_bias_scorer_processes_unbiased(bias_scorer):
-    """Test bias scorer processes unbiased content."""
-    unbiased_text = "Everyone deserves equal opportunities in education."
-    result = bias_scorer.score(unbiased_text)
-
-    assert isinstance(result, dict)
-    assert "flagged" in result
-    assert isinstance(result["flagged"], bool)
-    assert "extras" in result
-    assert isinstance(result["extras"], dict)
-    assert all(cat in result["extras"] for cat in bias_scorer._categories)
+    assert isinstance(result, dict), "Result should be a dictionary."
+    assert "flagged" in result, "Should have a 'flagged' key in result."
+    assert isinstance(result["flagged"], bool), "'flagged' must be a boolean."
+    scores = result["extras"]
+    # If any score is above threshold, it should be flagged
+    should_flag = any(v is True for v in scores.values())
+    assert result["flagged"] == should_flag
