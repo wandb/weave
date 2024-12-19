@@ -85,7 +85,7 @@ jobs:
           - '8080:8080'
           - '8083:8083'
           - '9015:9015'
-        options: >
+        options: >-
           --health-cmd "curl --fail http://localhost:8080/healthz || exit 1"
           --health-interval=5s
           --health-timeout=3s
@@ -262,7 +262,7 @@ jobs:
           - '8080:8080'
           - '8083:8083'
           - '9015:9015'
-        options: >
+        options: >-
           --health-cmd "curl --fail http://localhost:8080/healthz || exit 1"
           --health-interval=5s
           --health-timeout=3s
