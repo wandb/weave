@@ -17,6 +17,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -170,31 +171,28 @@ const ObjectVersionsPageHeaderExtra: React.FC<{
   onCompare,
 }) => {
   const compareButton = showCompareButton ? (
-    <Button
-      className="mr-16"
-      disabled={selectedVersions.length < 2}
-      onClick={onCompare}>
+    <Button disabled={selectedVersions.length < 2} onClick={onCompare}>
       Compare
     </Button>
   ) : undefined;
 
   const deleteButton = showDeleteButton ? (
-    <div className="">
-      <DeleteObjectVersionsButtonWithModal
-        entity={entity}
-        project={project}
-        objectName={objectName ?? ''}
-        objectDigests={selectedVersions}
-        disabled={selectedVersions.length === 0 || !objectName}
-      />
-    </div>
+    <DeleteObjectVersionsButtonWithModal
+      entity={entity}
+      project={project}
+      objectName={objectName ?? ''}
+      objectDigests={selectedVersions}
+      disabled={selectedVersions.length === 0 || !objectName}
+    />
   ) : undefined;
 
   return (
-    <div className="items-center gap-4">
-      {compareButton}
-      {deleteButton}
-    </div>
+    <Tailwind>
+      <div className="mr-16 flex gap-8">
+        {compareButton}
+        {deleteButton}
+      </div>
+    </Tailwind>
   );
 };
 
