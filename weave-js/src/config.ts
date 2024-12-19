@@ -21,7 +21,8 @@ if (!window.WEAVE_CONFIG) {
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
     TRACE_BACKEND_BASE_URL: '',
-    WANDB_BASE_URL: 'https://api.wandb.ai',
+    // @ts-ignore ignoring as window.CONFIG is defined in the main app
+    WANDB_BASE_URL: window.CONFIG?.BACKEND_HOST ?? 'https://api.wandb.ai',
     DD_ENV: '',
     ENV_IS_CI: false,
   };
