@@ -5044,13 +5044,15 @@
     loupe "^2.3.7"
     pretty-format "^29.7.0"
 
-"@wandb/semantic@file:./wandb-semantic-v0.0.1.tgz":
+"@wandb/semantic@^0.0.1":
   version "0.0.1"
-  resolved "file:./wandb-semantic-v0.0.1.tgz#554f3dcff44f09e3d97397456deb7b1998da66f8"
+  resolved "https://npm.pkg.github.com/download/@wandb/semantic/0.0.1/879e6cf3b80ad29b7f3b636b2eb170763ffa79fd#879e6cf3b80ad29b7f3b636b2eb170763ffa79fd"
+  integrity sha512-tt48NPjbz9/2F+T7vpjZQQvanmF780wx7e7U430viZwr+DFn0l+EWz2yDYYzistRZgOSrsnibn8xdgk9O3tfgw==
 
-"@wandb/ui@file:./wandb-ui-0.1.0.tgz":
+"@wandb/ui@^0.1.0":
   version "0.1.0"
-  resolved "file:./wandb-ui-0.1.0.tgz#35a65383ff97eedea3c8324cb914c9c6ab4de748"
+  resolved "https://npm.pkg.github.com/download/@wandb/ui/0.1.0/bc6d881055e2c0614fcd0f967321b511b2bacf63#bc6d881055e2c0614fcd0f967321b511b2bacf63"
+  integrity sha512-WtaCzYUcGIHcq7KIsehg0yD4WFG4DX5/c31wP+yAkyJ8kQIET1qQComgCb52OoLiypHO55lD4MvfNG5HyrB9ww==
   dependencies:
     "@material-ui/lab" "^4.0.0-alpha.60"
     autosuggest-highlight "^3.1.1"
@@ -7182,7 +7184,7 @@ dequal@^2.0.0, dequal@^2.0.3:
   resolved "https://registry.yarnpkg.com/dequal/-/dequal-2.0.3.tgz#2644214f1997d39ed0ee0ece72335490a7ac67be"
   integrity sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==
 
-detect-browser@^5.2.1:
+detect-browser@^5.3.0:
   version "5.3.0"
   resolved "https://registry.yarnpkg.com/detect-browser/-/detect-browser-5.3.0.tgz#9705ef2bddf46072d0f7265a1fe300e36fe7ceca"
   integrity sha512-53rsFbGdwMwlF7qvCt0ypLM5V5/Mbl0szB7GPN8y9NCcbknYOeVVXdrXEq+90IwAfrrzt6Hd+u2E2ntakICU8w==
