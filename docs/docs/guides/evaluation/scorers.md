@@ -516,14 +516,13 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
     similarity_scorer = EmbeddingSimilarityScorer(
         client=llm_client
-        target_column="reference_text",  # the dataset column to compare the output against
         threshold=0.4  # the cosine similarity threshold to use
     )
     ```
 
     **Parameters:**
 
-    - `target`: This scorer expects a `target` column in your dataset, it will calculate the cosine similarity of the embeddings of the `target` column to the AI system output. If your dataset doesn't contain a column called `target` you can use the scorers `column_map` attribute to map `target` to the appropriate column name in your dataset. See the Column Mapping section for more.
+    - This scorer expects a `target` column in your dataset, it will calculate the cosine similarity of the embeddings of the `target` column to the AI system output. If your dataset doesn't contain a column called `target` you can use the scorers `column_map` attribute to map `target` to the appropriate column name in your dataset. See the Column Mapping section for more.
     - `threshold` (float): The minimum cosine similarity score between the embedding of the AI system output and the embdedding of the `target`, above which the 2 samples are considered "similar", (defaults to `0.5`). `threshold` can be in a range from -1 to 1:
     - 1 indicates identical direction.
     - 0 indicates orthogonal vectors.
