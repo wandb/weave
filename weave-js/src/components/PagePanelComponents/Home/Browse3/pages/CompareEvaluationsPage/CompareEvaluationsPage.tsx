@@ -179,8 +179,8 @@ const CompareEvaluationsPageInner: React.FC<{
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter =
-    Object.keys(state.data.evaluationCalls).length === 2;
-  const showExamples = Object.keys(state.data.resultRows).length > 0;
+    Object.keys(state.summary.evaluationCalls).length === 2;
+  const showExamples = Object.keys(state.summary.resultRows).length > 0;
   return (
     <Box
       sx={{
@@ -195,7 +195,7 @@ const CompareEvaluationsPageInner: React.FC<{
           gridGap: STANDARD_PADDING * 2,
         }}>
         <InvalidEvaluationBanner
-          evaluationCalls={Object.values(state.data.evaluationCalls)}
+          evaluationCalls={Object.values(state.summary.evaluationCalls)}
         />
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />

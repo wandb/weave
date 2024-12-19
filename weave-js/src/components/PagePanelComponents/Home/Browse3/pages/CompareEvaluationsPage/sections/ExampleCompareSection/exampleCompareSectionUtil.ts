@@ -99,7 +99,7 @@ const rowIsSelected = (
         const resolvedPeerDim = resolvePeerDimension(
           compositeMetricsMap,
           evalCallId,
-          state.data.scoreMetrics[compareDim.metricId]
+          state.summary.scoreMetrics[compareDim.metricId]
         );
         if (resolvedPeerDim == null) {
           return false;
@@ -118,19 +118,19 @@ const rowIsSelected = (
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
-    () => buildCompositeMetricsMap(state.data, 'score'),
-    [state.data]
+    () => buildCompositeMetricsMap(state.summary, 'score'),
+    [state.summary]
   );
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
-    Object.entries(state.data.resultRows).forEach(
+    Object.entries(state.summary.resultRows).forEach(
       ([rowDigest, rowCollection]) => {
         Object.values(rowCollection.evaluations).forEach(modelCollection => {
           Object.values(modelCollection.predictAndScores).forEach(
             predictAndScoreRes => {
               const datasetRow =
-                state.data.inputs[predictAndScoreRes.rowDigest];
+                state.summary.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
                 const output = predictAndScoreRes._rawPredictTraceData?.output;
                 rows.push({
@@ -143,7 +143,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   }),
                   output: flattenObjectPreservingWeaveTypes({output}),
                   scores: Object.fromEntries(
-                    [...Object.entries(state.data.scoreMetrics)].map(
+                    [...Object.entries(state.summary.scoreMetrics)].map(
                       ([scoreKey, scoreVal]) => {
                         return [
                           scoreKey,
@@ -169,7 +169,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [state.data.resultRows, state.data.inputs, state.data.scoreMetrics]);
+  }, [state.summary.resultRows, state.summary.inputs, state.summary.scoreMetrics]);
 
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
