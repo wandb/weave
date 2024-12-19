@@ -5,7 +5,17 @@ import torch
 from torch import Tensor
 from weave.scorers.utils import stringify
 
-
+# Model paths for various scorers
+TINY_MODEL_PATHS = {
+    "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
+    "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
+    "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
+    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
+    "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
+    "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
+    "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:v0",
+    "llamaguard": "c-metrics/weave-scorers/llamaguard:v0"
+}
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     input_ids: Union[list[int], Tensor]
