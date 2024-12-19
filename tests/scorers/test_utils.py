@@ -1,5 +1,31 @@
-from typing import Any, Optional
+import random
+from typing import Any, Optional, Union
+from pydantic import BaseModel
+import torch
+from torch import Tensor
 from weave.scorers.utils import stringify
+
+
+class TokenizedText(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+    input_ids: Union[list[int], Tensor]
+    attention_mask: Union[list[int], Tensor]
+
+
+class RandomTokenizer:
+    def __init__(self, seed: int = 42, vocab_size: int = 32_000):
+        self.seed = seed
+        self.vocab_size = vocab_size
+
+    def __call__(self, text: str, return_tensors=None, **kwargs) -> list[list[int]]:
+        tokenized_text = [random.randint(0, self.vocab_size - 1) for _ in text]
+        attention_mask = [1] * len(tokenized_text)
+        if return_tensors == "pt":
+            tokenized_text = torch.tensor(tokenized_text).unsqueeze(0)
+            attention_mask = torch.tensor(attention_mask).unsqueeze(0)
+        return TokenizedText(input_ids=tokenized_text, attention_mask=attention_mask)
+
+
 
 
 def generate_large_text(tokens: int = 100_000, pattern: Optional[str] = None) -> str:
