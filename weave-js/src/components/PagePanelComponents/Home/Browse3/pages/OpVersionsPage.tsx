@@ -13,6 +13,7 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
+import {DeleteObjectVersionsButtonWithModal} from './common/DeleteModal';
 import {Empty} from './common/Empty';
 import {EMPTY_PROPS_OPERATIONS} from './common/EmptyContent';
 import {
