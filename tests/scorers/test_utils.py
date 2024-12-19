@@ -10,11 +10,11 @@ TINY_MODEL_PATHS = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
     "hallucination_hhem_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer_tiny:latest",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
-    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
+    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer_tiny:latest",
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:v0",
-    "llamaguard_scorer_tiny": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest"
+    "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest"
 }
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}

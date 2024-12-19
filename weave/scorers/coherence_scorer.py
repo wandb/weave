@@ -112,7 +112,7 @@ class CoherenceScorer(Scorer):
         return response.json()
 
     @weave.op
-    def score(
+    async def score(
         self,
         input: str,
         output: str,
