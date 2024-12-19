@@ -18,7 +18,7 @@ from weave.scorers.hallucination_scorer import (
     HallucinationScorer,
 )
 from weave.scorers.json_scorer import ValidJSONScorer
-from weave.scorers.llamaguard_scorer import LlamaGuard
+from weave.scorers.llamaguard_scorer import LlamaGuardScorer
 from weave.scorers.llm_scorer import (
     InstructorLLMScorer,
     LLMScorer,
@@ -85,7 +85,7 @@ __all__ = [
     "ValidXMLScorer",
     "_validate_scorer_signature",
     "create_perturbed_dataset",
-    "LlamaGuard",
+    "LlamaGuardScorer",
     "CoherenceScorer",
     "BLEUScorer",
     "RougeScorer",

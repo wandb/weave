@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 # https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
 # https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
-class LlamaGuard(Scorer):
+class LlamaGuardScorer(Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
@@ -184,12 +184,14 @@ class LlamaGuard(Scorer):
                         categories[category_name] = True
         return {
             "safe": safe,
-            "categories": categories if not safe else {},
-            "unsafe_score": unsafe_score,
+            "extras": {
+                "categories": categories if not safe else {},
+                "unsafe_score": unsafe_score,
+            },
         }
 
     @weave.op
-    def score(
+    async def score(
         self,
         output: str,
         categories: Optional[dict[str, str]] = None,

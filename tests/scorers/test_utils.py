@@ -14,7 +14,7 @@ TINY_MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:v0",
-    "llamaguard": "c-metrics/weave-scorers/llamaguard:v0"
+    "llamaguard_scorer_tiny": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest"
 }
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
