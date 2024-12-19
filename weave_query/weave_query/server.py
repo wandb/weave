@@ -86,14 +86,24 @@ def handle_request(  # type: ignore
                     with cache.time_interval_cache_prefix():
                         with gql_json_cache.gql_json_cache_context():
                             result = nodes.batch_map(execute.execute_nodes)
+            print("RESULT #1: ", result)
+            
+            def f(t):
+                # print("t: ", t)
+                # print("t[0]: ", t[0])
+                # print("t[1]: ", t[1])
+                # print("isinstance(t[1].type, weave_types.RefType): ", isinstance(t[1].type, weave_types.RefType))
+                return t[0] if isinstance(t[1].type, weave_types.RefType) else storage.deref(t[0])  # type: ignore[no-untyped-call]
 
             with tracer.trace("request:deref"):
                 if deref:
-                    result = result.zip(nodes).safe_map(
-                        lambda t: t[0]
-                        if isinstance(t[1].type, weave_types.RefType)
-                        else storage.deref(t[0])  # type: ignore[no-untyped-call]
-                    )
+                    # result = result.zip(nodes).safe_map(
+                    #     lambda t: t[0]
+                    #     if isinstance(t[1].type, weave_types.RefType)
+                    #     else storage.deref(t[0])  # type: ignore[no-untyped-call]
+                    # )
+                    result = result.zip(nodes).safe_map(f)                
+            print("RESULT #2: ", result)
 
         # print("Server request %s (%0.5fs): %s..." % (start_time,
         #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
@@ -108,6 +118,7 @@ def handle_request(  # type: ignore
 
         logger.info("Server request done in: %ss" % (time.time() - start_time))
         tag_store.clear_tag_store()
+        print("RESULT #3: ", result)
         return HandleRequestResponse(result, nodes)
 
 
