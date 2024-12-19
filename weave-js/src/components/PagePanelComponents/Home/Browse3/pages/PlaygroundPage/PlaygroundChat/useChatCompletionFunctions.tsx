@@ -13,7 +13,6 @@ import {clearTraceCall} from './useChatFunctions';
 export const useChatCompletionFunctions = (
   setPlaygroundStates: (states: PlaygroundState[]) => void,
   setIsLoading: (isLoading: boolean) => void,
-  chatText: string,
   playgroundStates: PlaygroundState[],
   entity: string,
   project: string,
@@ -59,19 +58,22 @@ export const useChatCompletionFunctions = (
 
   const handleSend = async (
     role: PlaygroundMessageRole,
+    chatText: string,
     callIndex?: number,
     content?: string,
     toolCallId?: string
   ) => {
     try {
       setIsLoading(true);
-      const newMessage = createMessage(role, content || chatText, toolCallId);
+      const newMessageContent = content || chatText;
+      const newMessage = createMessage(role, newMessageContent, toolCallId);
       const updatedStates = playgroundStates.map((state, index) => {
         if (callIndex !== undefined && callIndex !== index) {
           return state;
         }
         const updatedState = appendChoiceToMessages(state);
-        if (updatedState.traceCall?.inputs?.messages) {
+        // If the new message is not empty, add it to the messages
+        if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
           updatedState.traceCall.inputs.messages.push(newMessage);
         }
         return updatedState;
@@ -216,7 +218,9 @@ const appendChoiceToMessages = (
       updatedState.traceCall.inputs.messages.push(
         updatedState.traceCall.output.choices[choiceIndex].message
       );
-    } else {
+    } else if (
+      updatedState.traceCall.output.choices[updatedState.selectedChoiceIndex]
+    ) {
       updatedState.traceCall.inputs.messages.push(
         updatedState.traceCall.output.choices[updatedState.selectedChoiceIndex]
           .message
