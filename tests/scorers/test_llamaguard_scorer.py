@@ -8,7 +8,7 @@ from weave.scorers.llm_utils import download_model
 
 @pytest.fixture
 def llamaguard_scorer():
-    model_path = download_model(TINY_MODEL_PATHS["llamaguard_scorer_tiny"])
+    model_path = download_model(TINY_MODEL_PATHS["llamaguard_scorer"])
     return LlamaGuardScorer(model_name_or_path=model_path)
 
 def test_llamaguard_postprocess(llamaguard_scorer):
