@@ -5,8 +5,6 @@ import pytest
 from weave.scorers.llm_utils import (
     embed,
     instructor_client,
-    is_async,
-    is_sync_client,
 )
 from weave.trace.autopatch import autopatch
 
@@ -75,29 +73,6 @@ def sync_client():
 @pytest.fixture
 def async_client():
     return MockAsyncOpenAI()
-
-
-# Test to verify if a function is asynchronous
-def test_is_async():
-    async def dummy_async():
-        pass
-
-    def dummy_sync():
-        pass
-
-    assert is_async(dummy_async) is True
-    assert is_async(dummy_sync) is False
-
-
-# Test to check if clients are correctly identified as synchronous or asynchronous
-def test_is_sync_client(sync_client, async_client):
-    assert (
-        is_sync_client(sync_client) is True
-    ), "Sync client should be identified as synchronous."
-    assert (
-        is_sync_client(async_client) is False
-    ), "Async client should be identified as asynchronous."
-
 
 # Test to ensure instructor_client returns a valid instructor client for synchronous clients
 def test_instructor_client_sync(sync_client, monkeypatch):
