@@ -20,7 +20,35 @@ import {blankifyLinks, shiftHeadings} from './html';
 
 // exported only for tests
 export const DEFAULT_SANITIZATION_SCHEMA = _.merge(gh, {
-  attributes: {'*': ['className', 'style']},
+  attributes: {
+    '*': ['className', 'style'],
+    img: {
+      src: [
+        (value: string) => {
+          // Handle data URLs
+          if (value.startsWith('data:')) {
+            // Only allow data URLs that are base64-encoded images
+            if (value.startsWith('data:image/') && value.includes('base64,')) {
+              return value;
+            }
+            // Block all other data URLs
+            return null;
+          }
+          // For non-data URLs, check if they use allowed protocols
+          if (value.match(/^(https?):\/\//)) {
+            return value;
+          }
+          return null;
+        }
+      ]
+    }
+  },
+  protocols: {
+    src: []  // Handle all URL validation in the attribute validator
+  },
+  allowedClasses: {
+    '*': []
+  }
 });
 
 const SANITIZATION_SCHEMAS_FOR_RULES: Record<keyof SanitizationRules, Schema> =
@@ -70,7 +98,6 @@ export function generateHTML(markdown: string, rules?: SanitizationRules) {
     .use(rehypeRaw)
     .use(sanitize, sanitizationSchema)
     .use(stringify)
-    .use(sanitize, sanitizationSchema)
     .processSync(markdown);
 
   if (typeof vfile.value === 'string') {

@@ -43,6 +43,18 @@ describe('generateHTML', () => {
     const someHTML = '<a href=<script>alert(123)</script>> link </a>';
     expect(generateHTML(someHTML).value.indexOf('script')).toEqual(-1);
   });
+
+  it('allows data protocol for base64 images', () => {
+    const markdown = '![test](data:image/png;base64,ABC123)';
+    const html = generateHTML(markdown).value;
+    expect(html).toContain('src="data:image/png;base64,ABC123"');
+  });
+
+  it('sanitizes non-image data URLs', () => {
+    const markdown = '![test](data:text/html,<script>alert(1)</script>)';
+    const html = generateHTML(markdown).value;
+    expect(html).not.toContain('data:text/html');
+  });
 });
 
 describe('isMarkdown', () => {
