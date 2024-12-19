@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 try:
     import instructor
@@ -95,8 +95,8 @@ def create(
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
-) -> List[List[float]]:
+    client: _LLM_CLIENTS, model_id: str, texts: Union[str, list[str]], **kwargs: Any
+) -> list[list[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
@@ -156,20 +156,3 @@ def get_model_path(model_name: str) -> str:
     if model_name in MODEL_PATHS:
         return MODEL_PATHS[model_name]
     return model_name
-
-
-def is_async(func: Callable) -> bool:
-    return inspect.iscoroutinefunction(func)
-
-
-def is_sync_client(client: _LLM_CLIENTS) -> bool:
-    client_type = type(client).__name__
-    return not any(
-        is_async(getattr(obj, "create", None))
-        for obj in [
-            getattr(client, "chat", None),
-            getattr(client, "embeddings", None),
-            getattr(getattr(client, "chat", None), "completions", None),
-        ]
-        if obj is not None
-    )
