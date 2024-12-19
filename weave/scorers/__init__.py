@@ -30,7 +30,6 @@ from weave.scorers.llm_utils import (
 from weave.scorers.moderation_scorer import (
     BiasScorer,
     OpenAIModerationScorer,
-    RollingWindowScorer,
     ToxicityScorer,
 )
 from weave.scorers.perplexity_scorer import (
@@ -76,7 +75,6 @@ __all__ = [
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "RobustnessScorer",
-    "RollingWindowScorer",
     "ToxicityScorer",
     "BiasScorer",
     "PydanticScorer",
