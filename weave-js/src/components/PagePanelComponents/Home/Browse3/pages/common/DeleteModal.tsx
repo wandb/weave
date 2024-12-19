@@ -20,6 +20,8 @@ import {
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 
+const MAX_DELETE_ROWS_TO_SHOW = 10;
+
 interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
@@ -83,11 +85,18 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
             )}
           </div>
           <span className="text-md mt-10 font-semibold">
-            {deleteBodyStrRes.map((str, i) => (
-              <div key={i}>
-                <span>{str}</span>
-              </div>
-            ))}
+            {deleteBodyStrRes
+              .slice(0, MAX_DELETE_ROWS_TO_SHOW)
+              .map((str, i) => (
+                <div key={i}>
+                  <span>{str}</span>
+                </div>
+              ))}
+            {deleteBodyStrRes.length > MAX_DELETE_ROWS_TO_SHOW && (
+              <p className="mt-2">
+                and {deleteBodyStrRes.length - MAX_DELETE_ROWS_TO_SHOW} more...
+              </p>
+            )}
           </span>
         </DialogContent>
         <DialogActions $align="left">
