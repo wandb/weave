@@ -130,7 +130,8 @@ export const buildCompositeMetricsMap = (
 
     const evals = Object.values(summaryData.evaluationCalls)
       .filter(evaluationCall => {
-        const evaluation = summaryData.evaluations[evaluationCall.evaluationRef];
+        const evaluation =
+          summaryData.evaluations[evaluationCall.evaluationRef];
         return (
           metric.scorerOpOrObjRef == null ||
           evaluation.scorerRefs.includes(metric.scorerOpOrObjRef)

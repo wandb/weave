@@ -83,7 +83,8 @@ export const getMetricIds = (
   type: MetricType,
   source: SourceType
 ): MetricDefinitionMap => {
-  const metrics = type === 'score' ? summaryData.scoreMetrics : summaryData.summaryMetrics;
+  const metrics =
+    type === 'score' ? summaryData.scoreMetrics : summaryData.summaryMetrics;
   return Object.fromEntries(
     Object.entries(metrics).filter(([k, v]) => v.source === source)
   );
