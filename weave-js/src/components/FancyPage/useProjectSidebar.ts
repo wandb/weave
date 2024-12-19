@@ -196,11 +196,10 @@ export const useProjectSidebar = (
             iconName: IconNames.LayoutGrid,
           },
           {
-            type: 'divider' as const,
-            key: 'dividerWithinWeave-3',
-            isShown: false, // Only shown in overflow menu
+            type: 'button' as const,
             name: 'Leaders',
             slug: 'weave/leaderboards',
+            isShown: false, // Only shown in overflow menu
             iconName: IconNames.BenchmarkSquare,
           },
           {
