@@ -7,14 +7,6 @@ import weave
 from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_utils import MODEL_PATHS, download_model, set_device
 
-try:
-    from transformers import pipeline
-except ImportError:
-    import_failed = True
-    print(
-        "The `transformers` package is required to use the CoherenceScorer, please run `pip install transformers`"
-    )
-
 
 class CoherenceScorer(Scorer):
     """
@@ -37,7 +29,16 @@ class CoherenceScorer(Scorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
 
-        """Initialize the coherence model and tokenizer."""
+        # Lazy import of transformers
+        try:
+            from transformers import pipeline
+        except ImportError:
+            import_failed = True
+            print(
+                "The `transformers` package is required to use the CoherenceScorer, please run `pip install transformers`"
+            )
+            return
+
         self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
