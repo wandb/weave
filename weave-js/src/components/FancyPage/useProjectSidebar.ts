@@ -33,16 +33,16 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
-  let weaveOnlyMenu = [
-    'weave/leaderboards',
-    'weave/operations',
-    'weave/objects',
-  ];
-  if (isWandbAdmin) {
-    weaveOnlyMenu.push('weave/mods');
-  }
 
   return useMemo(() => {
+    const weaveOnlyMenu = [
+      'weave/leaderboards',
+      'weave/operations',
+      'weave/objects',
+    ];
+    if (isWandbAdmin) {
+      weaveOnlyMenu.push('weave/mods');
+    }
     const allItems = isLoading
       ? []
       : [
@@ -267,5 +267,6 @@ export const useProjectSidebar = (
     isModelsOnly,
     showWeaveSidebarItems,
     isLaunchActive,
+    isWandbAdmin,
   ]);
 };
