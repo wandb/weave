@@ -124,13 +124,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
-    Object.entries(state.results?.resultRows ?? {}).forEach(
+    Object.entries(state.results.result?.resultRows ?? {}).forEach(
       ([rowDigest, rowCollection]) => {
         Object.values(rowCollection.evaluations).forEach(modelCollection => {
           Object.values(modelCollection.predictAndScores).forEach(
             predictAndScoreRes => {
               const datasetRow =
-                state.results?.inputs[predictAndScoreRes.rowDigest];
+                state.results.result?.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
                 const output = predictAndScoreRes._rawPredictTraceData?.output;
                 rows.push({
@@ -170,8 +170,8 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     );
     return rows;
   }, [
-    state.results?.resultRows,
-    state.results?.inputs,
+    state.results.result?.resultRows,
+    state.results.result?.inputs,
     state.summary.scoreMetrics,
   ]);
 

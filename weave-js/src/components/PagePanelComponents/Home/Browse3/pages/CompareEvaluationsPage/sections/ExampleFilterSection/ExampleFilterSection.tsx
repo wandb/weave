@@ -141,7 +141,7 @@ const SingleDimensionFilter: React.FC<{
       );
 
       if (baselineTargetDimension != null && compareTargetDimension != null) {
-        Object.entries(props.state.results?.resultRows ?? {}).forEach(
+        Object.entries(props.state.results.result?.resultRows ?? {}).forEach(
           ([digest, row]) => {
             const xVals: number[] = [];
             const yVals: number[] = [];
@@ -232,7 +232,7 @@ const SingleDimensionFilter: React.FC<{
     compareCallId,
     compositeMetricsMap,
     filteredDigest,
-    props.state.results?.resultRows,
+    props.state.results.result?.resultRows,
     targetDimension,
   ]);
 

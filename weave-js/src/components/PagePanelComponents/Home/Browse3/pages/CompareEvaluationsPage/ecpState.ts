@@ -25,7 +25,7 @@ export type EvaluationComparisonState = {
   // The normalized data for the evaluations
   summary: EvaluationComparisonSummary;
   // The results of the evaluations
-  results: EvaluationComparisonResults | null;
+  results: Loadable<EvaluationComparisonResults>;
   // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
@@ -112,7 +112,7 @@ export const useEvaluationComparisonState = (
       loading: false,
       result: {
         summary: summaryData.result,
-        results: resultsData.result,
+        results: resultsData,
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
         selectedMetrics,
@@ -123,7 +123,7 @@ export const useEvaluationComparisonState = (
     summaryData.result,
     summaryData.loading,
     comparisonDimensions,
-    resultsData.result,
+    resultsData,
     selectedInputDigest,
     selectedMetrics,
     evaluationCallIds,

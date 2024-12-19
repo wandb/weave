@@ -4,6 +4,7 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
@@ -178,10 +179,11 @@ const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  console.log(state);
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
-  const showExamples = Object.keys(state.results?.resultRows ?? {}).length > 0;
+  const showExamples =
+    Object.keys(state.results.result?.resultRows ?? {}).length > 0;
+  const resultsLoading = state.results.loading;
   return (
     <Box
       sx={{
@@ -201,7 +203,18 @@ const CompareEvaluationsPageInner: React.FC<{
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         <ScorecardSection state={state} />
-        {showExamples ? (
+        {resultsLoading ? (
+          <Box
+            sx={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: '50px',
+            }}>
+            <WaveLoader size="small" />
+          </Box>
+        ) : showExamples ? (
           <>
             {showExampleFilter && <ExampleFilterSection state={state} />}
             <ResultExplorer state={state} height={props.height} />
