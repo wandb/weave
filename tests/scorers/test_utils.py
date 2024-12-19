@@ -8,7 +8,7 @@ from weave.scorers.utils import stringify
 # Model paths for various scorers
 TINY_MODEL_PATHS = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
-    "hallucination_hhem_scorer": "c-metrics/hallucination/hallucination_hhem_scorer:v0",
+    "hallucination_hhem_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer_tiny:latest",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:v0",
