@@ -30,7 +30,7 @@ type ModCategories = {
   [key in ModCategoryType]: Mod[];
 };
 
-const mods: ModCategories = {
+const modCats: ModCategories = {
   Labeling: [
     {
       id: 'labeling/html',
@@ -291,7 +291,7 @@ export const ModsPage: React.FC<{
   const checkSecrets = searchParams.get('checkSecrets');
   const purl = searchParams.get('purl');
   const mod = itemName
-    ? Object.values(mods)
+    ? Object.values(modCats)
         .flat()
         .find(m => m.id === itemName)
     : undefined;
@@ -321,19 +321,19 @@ export const ModsPage: React.FC<{
                 entity={entity}
                 project={project}
                 category="Labeling"
-                mods={mods.Labeling}
+                mods={modCats.Labeling}
               />
               <ModCategory
                 entity={entity}
                 project={project}
                 category="Analysis"
-                mods={mods.Analysis}
+                mods={modCats.Analysis}
               />
               <ModCategory
                 entity={entity}
                 project={project}
                 category="Demos"
-                mods={mods.Demos}
+                mods={modCats.Demos}
               />
               {checkSecrets && (
                 <SecretSettings
