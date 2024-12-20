@@ -74,6 +74,9 @@ class CallStack {
 type CallStartParams = StartedCallSchemaForInsert;
 type CallEndParams = EndedCallSchemaForInsert;
 
+// We count characters item by item, and try to limit batches to about this size.
+const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
+
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
@@ -119,28 +122,27 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    // We count characters item by item, and try to limit batches to about
-    // this size.
-    const maxBatchSizeChars = 10 * 1024 * 1024;
-
     let batchToProcess = [];
     let currentBatchSize = 0;
 
-    while (this.callQueue.length > 0 && currentBatchSize < maxBatchSizeChars) {
+    while (
+      this.callQueue.length > 0 &&
+      currentBatchSize < MAX_BATCH_SIZE_CHARS
+    ) {
       const item = this.callQueue.shift();
       if (item === undefined) {
         throw new Error('Call queue is empty');
       }
 
       const itemSize = JSON.stringify(item).length;
-      if (itemSize > maxBatchSizeChars) {
+      if (itemSize > MAX_BATCH_SIZE_CHARS) {
         fs.appendFileSync(
           WEAVE_ERRORS_LOG_FNAME,
-          `Item size ${itemSize} exceeds max batch size ${maxBatchSizeChars}.  Item: ${JSON.stringify(item)}\n`
+          `Item size ${itemSize} exceeds max batch size ${MAX_BATCH_SIZE_CHARS}.  Item: ${JSON.stringify(item)}\n`
         );
       }
 
-      if (currentBatchSize + itemSize <= maxBatchSizeChars) {
+      if (currentBatchSize + itemSize <= MAX_BATCH_SIZE_CHARS) {
         batchToProcess.push(item);
         currentBatchSize += itemSize;
       } else {
