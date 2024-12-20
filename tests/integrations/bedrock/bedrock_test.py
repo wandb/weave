@@ -2,6 +2,7 @@ import json
 import boto3
 import botocore
 import pytest
+from moto import mock_aws
 from unittest.mock import patch
 
 import weave
@@ -99,6 +100,7 @@ def mock_make_api_call(self, operation_name, kwarg):
 
 
 @pytest.mark.skip_clickhouse_client
+@mock_aws
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime")
     patch_client(bedrock_client)
@@ -148,6 +150,7 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
+@mock_aws
 def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime")
     patch_client(bedrock_client)
