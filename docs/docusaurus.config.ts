@@ -181,6 +181,11 @@ const config: Config = {
           ],
         },
         {
+          position: "right",
+          type: "html",
+          value: '<div id="programming-language-toggle"></div>',
+        },
+        {
           type: "search",
           position: "right",
         },
