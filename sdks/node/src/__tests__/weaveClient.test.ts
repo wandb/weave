@@ -132,6 +132,8 @@ describe('WeaveClient', () => {
       };
       const smallData = {mode: 'start', data: {id: '2', payload: 'small'}};
 
+      (client as any).callQueue.push(largeData, smallData);
+
       await (client as any).processBatch();
 
       expect(
