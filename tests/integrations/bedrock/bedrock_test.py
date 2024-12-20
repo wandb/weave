@@ -1,9 +1,9 @@
-import json
+from unittest.mock import patch
+
 import boto3
 import botocore
 import pytest
 from moto import mock_aws
-from unittest.mock import patch
 
 import weave
 from weave.integrations.bedrock import patch_client
@@ -26,59 +26,68 @@ messages = [
 
 # Mock responses
 MOCK_CONVERSE_RESPONSE = {
-    'ResponseMetadata': {
-        'RequestId': '917ceb8d-3a0a-4649-b3bb-527494c17a69',
-        'HTTPStatusCode': 200,
-        'HTTPHeaders': {
-            'date': 'Fri, 20 Dec 2024 16:44:08 GMT',
-            'content-type': 'application/json',
-            'content-length': '323',
-            'connection': 'keep-alive',
-            'x-amzn-requestid': '917ceb8d-3a0a-4649-b3bb-527494c17a69'
+    "ResponseMetadata": {
+        "RequestId": "917ceb8d-3a0a-4649-b3bb-527494c17a69",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Fri, 20 Dec 2024 16:44:08 GMT",
+            "content-type": "application/json",
+            "content-length": "323",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "917ceb8d-3a0a-4649-b3bb-527494c17a69",
         },
-        'RetryAttempts': 0
+        "RetryAttempts": 0,
     },
-    'output': {
-        'message': {
-            'role': 'assistant',
-            'content': [
+    "output": {
+        "message": {
+            "role": "assistant",
+            "content": [
                 {
-                    'text': 'To list all text files in the current directory (excluding subdirectories) '
-                            'that have been modified in the last month using Bash, you can use'
+                    "text": "To list all text files in the current directory (excluding subdirectories) "
+                    "that have been modified in the last month using Bash, you can use"
                 }
-            ]
+            ],
         }
     },
-    'stopReason': 'max_tokens',
-    'usage': {'inputTokens': 40, 'outputTokens': 30, 'totalTokens': 70},
-    'metrics': {'latencyMs': 838}
+    "stopReason": "max_tokens",
+    "usage": {"inputTokens": 40, "outputTokens": 30, "totalTokens": 70},
+    "metrics": {"latencyMs": 838},
 }
 
 MOCK_STREAM_EVENTS = [
-    {'messageStart': {'role': 'assistant'}},
-    {'contentBlockDelta': {'delta': {'text': 'To'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': ' list all text files'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': ' in the current directory'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': ' modifie'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': 'd in the last month'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': ', use'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': ':'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': '\n\n```bash'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': '\nfind . -max'}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': 'depth '}, 'contentBlockIndex': 0}},
-    {'contentBlockDelta': {'delta': {'text': '1'}, 'contentBlockIndex': 0}},
-    {'contentBlockStop': {'contentBlockIndex': 0}},
-    {'messageStop': {'stopReason': 'max_tokens'}},
+    {"messageStart": {"role": "assistant"}},
+    {"contentBlockDelta": {"delta": {"text": "To"}, "contentBlockIndex": 0}},
     {
-        'metadata': {
-            'usage': {
-                'inputTokens': 55,
-                'outputTokens': 30,
-                'totalTokens': 85
-            },
-            'metrics': {
-                'latencyMs': 926
-            }
+        "contentBlockDelta": {
+            "delta": {"text": " list all text files"},
+            "contentBlockIndex": 0,
+        }
+    },
+    {
+        "contentBlockDelta": {
+            "delta": {"text": " in the current directory"},
+            "contentBlockIndex": 0,
+        }
+    },
+    {"contentBlockDelta": {"delta": {"text": " modifie"}, "contentBlockIndex": 0}},
+    {
+        "contentBlockDelta": {
+            "delta": {"text": "d in the last month"},
+            "contentBlockIndex": 0,
+        }
+    },
+    {"contentBlockDelta": {"delta": {"text": ", use"}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": ":"}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": "\n\n```bash"}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": "\nfind . -max"}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": "depth "}, "contentBlockIndex": 0}},
+    {"contentBlockDelta": {"delta": {"text": "1"}, "contentBlockIndex": 0}},
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {"messageStop": {"stopReason": "max_tokens"}},
+    {
+        "metadata": {
+            "usage": {"inputTokens": 55, "outputTokens": 30, "totalTokens": 85},
+            "metrics": {"latencyMs": 926},
         }
     },
 ]
@@ -86,16 +95,17 @@ MOCK_STREAM_EVENTS = [
 # Original botocore _make_api_call function
 orig = botocore.client.BaseClient._make_api_call
 
+
 def mock_make_api_call(self, operation_name, kwarg):
-    if operation_name == 'Converse':
+    if operation_name == "Converse":
         return MOCK_CONVERSE_RESPONSE
-    elif operation_name == 'ConverseStream':
+    elif operation_name == "ConverseStream":
+
         class MockStream:
             def __iter__(self):
-                for event in MOCK_STREAM_EVENTS:
-                    yield event
+                yield from MOCK_STREAM_EVENTS
 
-        return {'stream': MockStream()}
+        return {"stream": MockStream()}
     return orig(self, operation_name, kwarg)
 
 
@@ -105,7 +115,7 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch('botocore.client.BaseClient._make_api_call', new=mock_make_api_call):
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
         response = bedrock_client.converse(
             modelId=model_id,
             system=[{"text": system_message}],
@@ -155,7 +165,7 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch('botocore.client.BaseClient._make_api_call', new=mock_make_api_call):
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
         response = bedrock_client.converse_stream(
             modelId=model_id,
             system=[{"text": system_message}],
@@ -164,14 +174,14 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
         )
 
         # Existing checks
-        stream = response.get('stream')
+        stream = response.get("stream")
         assert stream is not None, "Stream not found in response"
 
         # Accumulate the streamed response
         final_response = ""
         for event in stream:
-            if 'contentBlockDelta' in event:
-                final_response += event['contentBlockDelta']['delta']['text']
+            if "contentBlockDelta" in event:
+                final_response += event["contentBlockDelta"]["delta"]["text"]
 
         assert final_response is not None
 
@@ -188,9 +198,7 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
     # in the final output or usage data is recorded
     print(output)
 
-    assert (
-        "To list all text files" in output["content"]
-    )
+    assert "To list all text files" in output["content"]
 
     # Check usage in a style similar to mistral tests
     summary = call.summary
