@@ -1,5 +1,4 @@
 import os
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -66,34 +65,14 @@ test_params = [
 
 
 @pytest.mark.parametrize("provider,model", test_params, ids=lambda p: f"{p[0]}:{p[1]}")
-def test_summarization_scorer_evaluate_summary(provider, model, monkeypatch):
-    # Mock instructor client
-    mock_instructor = MagicMock()
-    mock_instructor.from_openai.return_value = MagicMock()
-    monkeypatch.setattr("instructor.patch", mock_instructor)
-
-    # Mock the client creation and response
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock(message=MagicMock(content="Mocked response"))]
-    mock_client.chat.completions.create.return_value = mock_response
-
-    monkeypatch.setattr("openai.OpenAI", lambda *args, **kwargs: mock_client)
-    monkeypatch.setattr("anthropic.Anthropic", lambda *args, **kwargs: mock_client)
-    monkeypatch.setattr("mistralai.Mistral", lambda *args, **kwargs: mock_client)
-    monkeypatch.setattr(
-        "google.generativeai.GenerativeModel", lambda *args, **kwargs: mock_client
-    )
-
+def test_summarization_scorer_evaluate_summary(provider, model):
     client, model_id = get_client_and_model(provider, model)
+
     summarization_scorer = SummarizationScorer(
         client=client,
         model_id=model_id,
         temperature=0.7,
         max_tokens=1024,
-        name="test-summarization",
-        description="Test summarization scorer",
-        column_map={"output": "text", "input": "text"},
     )
     input_text = "This is the original text."
     summary_text = "This is the summary."
