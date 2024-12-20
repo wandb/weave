@@ -102,7 +102,7 @@ def mock_make_api_call(self, operation_name, kwarg):
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
-    bedrock_client = boto3.client("bedrock-runtime")
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
     with patch('botocore.client.BaseClient._make_api_call', new=mock_make_api_call):
@@ -152,7 +152,7 @@ def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -> None:
-    bedrock_client = boto3.client("bedrock-runtime")
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
     with patch('botocore.client.BaseClient._make_api_call', new=mock_make_api_call):
