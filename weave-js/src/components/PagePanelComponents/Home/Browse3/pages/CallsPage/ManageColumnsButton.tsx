@@ -89,9 +89,9 @@ export const ManageColumnsButton = ({
         <Button
           variant="ghost"
           icon="column"
-          tooltip="Manage columns"
-          onClick={onClick}
-        />
+          onClick={onClick}>
+          Columns
+        </Button>
       </span>
       <Popover
         id={id}
