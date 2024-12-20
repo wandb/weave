@@ -11,6 +11,7 @@ from typing import Any, Callable, Literal, Optional, Union, cast
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
+from rich.progress import Progress
 
 import weave
 from weave.flow import util
@@ -123,6 +124,7 @@ class Evaluation(Object):
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
+    streamlit_mode: bool = False
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
@@ -469,8 +471,6 @@ class Evaluation(Object):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
-        start_time = time.time()
-
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(model, example)
@@ -487,23 +487,38 @@ class Evaluation(Object):
         dataset = cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
-            if eval_row is None:
-                eval_row = {self._output_key: None, "scores": {}}
-            else:
-                eval_row["scores"] = eval_row.get("scores", {})
-            for scorer in self.scorers or []:
-                scorer_name, _, _ = get_scorer_attributes(scorer)
-                if scorer_name not in eval_row["scores"]:
-                    eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
+        streamlit_progressbar = None
+        if self.streamlit_mode:
+            import streamlit as st
+            streamlit_progressbar = st.progress(0, text=f"Evaluating")
+        with Progress() as progress:
+            task = progress.add_task("Evaluating", total=len(trial_rows))
+            async for example, eval_row in util.async_foreach(
+                trial_rows, eval_example, get_weave_parallelism()
+            ):
+                n_complete += 1
+                progress.update(task, advance=1)
+                if self.streamlit_mode:
+                    progress_percentage = min(
+                        100, max(0, int((n_complete / len(trial_rows)) * 100))
+                    )
+                    streamlit_progressbar.progress(
+                        progress_percentage,
+                        text=f"Evaluating ({n_complete} / {len(trial_rows)})",
+                    )
+                # status.update(
+                #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
+                # )
+                if eval_row is None:
+                    eval_row = {self._output_key: None, "scores": {}}
+                else:
+                    eval_row["scores"] = eval_row.get("scores", {})
+                for scorer in self.scorers or []:
+                    scorer_name, _, _ = get_scorer_attributes(scorer)
+                    if scorer_name not in eval_row["scores"]:
+                        eval_row["scores"][scorer_name] = {}
+                eval_rows.append(eval_row)
+        
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
