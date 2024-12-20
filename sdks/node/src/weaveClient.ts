@@ -33,6 +33,8 @@ import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 
+const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
+
 export type CallStackEntry = {
   callId: string;
   traceId: string;
@@ -129,7 +131,14 @@ export class WeaveClient {
       if (item === undefined) {
         throw new Error('Call queue is empty');
       }
+
       const itemSize = JSON.stringify(item).length;
+      if (itemSize > maxBatchSizeChars) {
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Item size ${itemSize} exceeds max batch size ${maxBatchSizeChars}.  Item: ${JSON.stringify(item)}\n`
+        );
+      }
 
       if (currentBatchSize + itemSize <= maxBatchSizeChars) {
         batchToProcess.push(item);
@@ -163,7 +172,7 @@ export class WeaveClient {
       console.error('Error processing batch:', error);
       this.errorCount++;
       fs.appendFileSync(
-        '/tmp/weaveRequests.log',
+        WEAVE_ERRORS_LOG_FNAME,
         `Error processing batch: ${error}\n`
       );
 
