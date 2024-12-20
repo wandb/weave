@@ -521,7 +521,7 @@ export const PanelPanel: React.FC<PanelPanelProps> = props => {
   useEffect(() => {
     if (!panelQuery.loading) {
       const doLoad = async () => {
-        // Always ensure vars have correct types first. This is syncrhonoous.
+        // Always ensure vars have correct types first. This is synchronous.
         const loadedPanel = updateExpressionVarTypes(panelQuery.result, stack);
 
         // Immediately render the document
