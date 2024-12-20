@@ -12,6 +12,7 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteObjectButtonWithModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -94,7 +95,9 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (objectVersion.error) {
+    return <NotFoundPanel title={objectVersion.error.message} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
@@ -212,7 +215,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr_auto] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -253,6 +256,9 @@ const ObjectVersionPageInner: React.FC<{
                 <p>{refExtra}</p>
               </div>
             )}
+            <div className="ml-auto">
+              <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+            </div>
           </div>
         </Tailwind>
       }
