@@ -53,6 +53,7 @@ export type TagProps = {
   color?: TagColorName;
   showIcon?: boolean;
   iconName?: IconName;
+  endIconName?: IconName;
   // Wrapping the Tag in Tailwind can be a problem if the Tailwind wrapper is supplied higher up
   // and there is a need to position the Tag as a direct child for something like flexbox
   Wrapper?: React.ComponentType<any> | null;
@@ -64,6 +65,7 @@ export const Tag: FC<TagProps> = ({
   color,
   showIcon = false,
   iconName,
+  endIconName,
   Wrapper = Tailwind,
   isInteractive = false,
 }) => {
@@ -79,6 +81,7 @@ export const Tag: FC<TagProps> = ({
       <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
       </span>
+      {endIconName && <Icon className="ml-4 h-14 w-14" name={endIconName} />}
     </div>
   );
   if (Wrapper) {

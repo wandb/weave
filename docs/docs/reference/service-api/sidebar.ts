@@ -216,6 +216,12 @@ const sidebar: SidebarsConfig = {
           label: "Feedback Purge",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/feedback-replace-feedback-replace-post",
+          label: "Feedback Replace",
+          className: "api-method post",
+        },
       ],
     },
   ],
