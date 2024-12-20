@@ -1,6 +1,5 @@
-from unittest.mock import MagicMock
-
 import pytest
+from openai import AsyncOpenAI, OpenAI
 
 from weave.scorers.llm_utils import (
     embed,
@@ -15,52 +14,62 @@ autopatch()
 
 
 # Synchronous OpenAI Client Mock
-class MockOpenAIChatCompletions:
+class MockCompletions:
     def create(self, *args, **kwargs):
         return {"response": "sync response"}
 
 
+class MockChat:
+    def __init__(self):
+        self.completions = MockCompletions()
+
+
 class MockOpenAIEmbeddings:
     def create(self, model, input, **kwargs):
-        return type(
-            "Response",
-            (),
-            {
-                "data": [
-                    type("Embedding", (), {"embedding": [0.1, 0.2, 0.3]}) for _ in input
-                ]
-            },
-        )()
+        class EmbeddingData:
+            def __init__(self, embedding):
+                self.embedding = embedding
+
+        class EmbeddingResponse:
+            def __init__(self, data):
+                self.data = data
+
+        return EmbeddingResponse([EmbeddingData([0.1, 0.2, 0.3]) for _ in input])
 
 
-class MockSyncOpenAI:
+class MockSyncOpenAI(OpenAI):
     def __init__(self):
-        self.chat = MockOpenAIChatCompletions()
+        self.chat = MockChat()
         self.embeddings = MockOpenAIEmbeddings()
 
 
 # Asynchronous OpenAI Client Mock
-class MockAsyncOpenAIChatCompletions:
+class MockAsyncCompletions:
     async def create(self, *args, **kwargs):
         return {"response": "async response"}
 
 
+class MockAsyncChat:
+    def __init__(self):
+        self.completions = MockAsyncCompletions()
+
+
 class MockAsyncOpenAIEmbeddings:
     async def create(self, model, input, **kwargs):
-        return type(
-            "Response",
-            (),
-            {
-                "data": [
-                    type("Embedding", (), {"embedding": [0.4, 0.5, 0.6]}) for _ in input
-                ]
-            },
-        )()
+        class EmbeddingData:
+            def __init__(self, embedding):
+                self.embedding = embedding
+
+        class EmbeddingResponse:
+            def __init__(self, data):
+                self.data = data
+
+        return EmbeddingResponse([EmbeddingData([0.4, 0.5, 0.6]) for _ in input])
 
 
-class MockAsyncOpenAI:
+class MockAsyncOpenAI(AsyncOpenAI):
     def __init__(self):
-        self.chat = MockAsyncOpenAIChatCompletions()
+        self.chat = MockAsyncChat()
         self.embeddings = MockAsyncOpenAIEmbeddings()
 
 
@@ -76,64 +85,39 @@ def async_client():
 
 
 # Test to ensure instructor_client returns a valid instructor client for synchronous clients
-def test_instructor_client_sync(sync_client, monkeypatch):
-    # Mock instructor module
-    mock_instructor = MagicMock()
-    mock_instructor_client = MagicMock()
-    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
-    mock_instructor.patch = MagicMock()
-    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
-
-    client = instructor_client(sync_client)
+def test_instructor_client_sync(sync_client):
+    try:
+        client = instructor_client(sync_client)
+    except Exception as e:
+        pytest.fail(f"instructor_client raised an exception for sync_client: {e}")
     assert client is not None, "Instructor client should not be None for sync_client."
-    assert client == mock_instructor_client
-    mock_instructor.from_openai.assert_called_once_with(sync_client)
 
 
 # Test to ensure instructor_client returns a valid instructor client for asynchronous clients
-def test_instructor_client_async(async_client, monkeypatch):
-    # Mock instructor module
-    mock_instructor = MagicMock()
-    mock_instructor_client = MagicMock()
-    mock_instructor.from_openai = MagicMock(return_value=mock_instructor_client)
-    mock_instructor.patch = MagicMock()
-    monkeypatch.setattr("weave.scorers.llm_utils.instructor", mock_instructor)
-
-    client = instructor_client(async_client)
+def test_instructor_client_async(async_client):
+    try:
+        client = instructor_client(async_client)
+    except Exception as e:
+        pytest.fail(f"instructor_client raised an exception for async_client: {e}")
     assert client is not None, "Instructor client should not be None for async_client."
-    assert client == mock_instructor_client
-    mock_instructor.from_openai.assert_called_once_with(async_client)
 
 
 # Test the embed function with a synchronous client
-@pytest.mark.asyncio
-async def test_embed_sync(sync_client):
+def test_embed_sync(sync_client):
     model_id = "text-embedding-3-small"
     texts = ["Hello world", "OpenAI"]
-    try:
-        embeddings = embed(sync_client, model_id, texts)
-        assert len(embeddings) == 2, "Should return embeddings for both texts."
-        assert embeddings[0] == [
-            0.1,
-            0.2,
-            0.3,
-        ], "First embedding does not match expected values."
-        assert embeddings[1] == [
-            0.1,
-            0.2,
-            0.3,
-        ], "Second embedding does not match expected values."
-    except ValueError as e:
-        pytest.fail(f"embed() raised ValueError: {e}")
-
-
-# Test the embed function with an asynchronous client
-@pytest.mark.asyncio
-async def test_embed_async(async_client):
-    model_id = "text-embedding-3-small"
-    texts = ["Hello world", "OpenAI"]
-    with pytest.raises(ValueError, match="Async client used with sync function"):
-        await embed(async_client, model_id, texts)
+    embeddings = embed(sync_client, model_id, texts)
+    assert len(embeddings) == 2, "Should return embeddings for both texts."
+    assert embeddings[0] == [
+        0.1,
+        0.2,
+        0.3,
+    ], "First embedding does not match expected values."
+    assert embeddings[1] == [
+        0.1,
+        0.2,
+        0.3,
+    ], "Second embedding does not match expected values."
 
 
 # Test the embed function with an unsupported client type

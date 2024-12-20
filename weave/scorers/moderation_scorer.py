@@ -168,7 +168,7 @@ class ToxicityScorer(RollingWindowScorer):
         self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int,float]]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 

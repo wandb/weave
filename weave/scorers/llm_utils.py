@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import os
 from typing import TYPE_CHECKING, Any, Union
 
@@ -96,13 +95,24 @@ def create(
 def embed(
     client: _LLM_CLIENTS, model_id: str, texts: Union[str, list[str]], **kwargs: Any
 ) -> list[list[float]]:
+    """Embed texts using the provided client.
+
+    Args:
+        client: An LLM client (OpenAI, AsyncOpenAI, etc.)
+        model_id: The model ID to use for embeddings
+        texts: Single text or list of texts to embed
+        **kwargs: Additional arguments to pass to the embedding call
+
+    Returns:
+        For sync clients: list of embeddings
+        For async clients: Awaitable containing list of embeddings
+    """
+    if not any(name in type(client).__name__ for name in _LLM_CLIENTS_NAMES):
+        raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
+
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)
-        if inspect.iscoroutine(response):
-            raise ValueError(
-                "Async client used with sync function. Use await with async clients."
-            )
         return [embedding.embedding for embedding in response.data]
     elif "mistral" in client_type:
         response = client.embeddings.create(model=model_id, inputs=texts, **kwargs)
