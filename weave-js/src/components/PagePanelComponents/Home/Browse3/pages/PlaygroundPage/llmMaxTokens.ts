@@ -7,6 +7,98 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 16384,
     supports_function_calling: true,
   },
+  'gpt-3.5-turbo-0125': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-3.5-turbo-1106': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4-1106-preview': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4-32k-0314': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: false,
+  },
+  'gpt-4-turbo-2024-04-09': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4-turbo-preview': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4-turbo': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4o-2024-05-13': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4o-2024-08-06': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4o-mini-2024-07-18': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'gpt-4o': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'gpt-4o-2024-11-20': {
+    provider: 'openai',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'o1-mini-2024-09-12': {
+    provider: 'openai',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'o1-mini': {
+    provider: 'openai',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'o1-preview-2024-09-12': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'o1-preview': {
+    provider: 'openai',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'o1-2024-12-17': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+
+  // Anthropic models
   'claude-3-5-sonnet-20240620': {
     provider: 'anthropic',
     max_tokens: 8192,
@@ -32,6 +124,8 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 4096,
     supports_function_calling: true,
   },
+
+  // Gemini models
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
     max_tokens: 8192,
@@ -102,71 +196,8 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
-  'gpt-3.5-turbo-0125': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-3.5-turbo-1106': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-1106-preview': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-32k-0314': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: false,
-  },
-  'gpt-4-turbo-2024-04-09': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-turbo-preview': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4-turbo': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4o-2024-05-13': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4o-2024-08-06': {
-    provider: 'openai',
-    max_tokens: 16384,
-    supports_function_calling: true,
-  },
-  'gpt-4o-mini-2024-07-18': {
-    provider: 'openai',
-    max_tokens: 16384,
-    supports_function_calling: true,
-  },
-  'gpt-4o': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
-  'gpt-4o-2024-11-20': {
-    provider: 'openai',
-    max_tokens: 4096,
-    supports_function_calling: true,
-  },
+
+  // Groq models
   'groq/gemma-7b-it': {
     provider: 'groq',
     max_tokens: 8192,
@@ -202,27 +233,8 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 32768,
     supports_function_calling: true,
   },
-  'o1-mini-2024-09-12': {
-    provider: 'openai',
-    max_tokens: 65536,
-    supports_function_calling: true,
-  },
-  'o1-mini': {
-    provider: 'openai',
-    max_tokens: 65536,
-    supports_function_calling: true,
-  },
-  'o1-preview-2024-09-12': {
-    provider: 'openai',
-    max_tokens: 32768,
-    supports_function_calling: true,
-  },
-  'o1-preview': {
-    provider: 'openai',
-    max_tokens: 32768,
-    supports_function_calling: true,
-  },
 
+  // Bedrock models
   'ai21.j2-mid-v1': {
     provider: 'bedrock',
     max_tokens: 8191,
@@ -369,6 +381,7 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
 
+  // xAI models
   'xai/grok-beta': {
     max_tokens: 131072,
     provider: 'xai',
