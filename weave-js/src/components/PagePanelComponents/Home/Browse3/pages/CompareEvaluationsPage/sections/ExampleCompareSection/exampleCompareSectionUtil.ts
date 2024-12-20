@@ -132,7 +132,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               const datasetRow =
                 state.results.result?.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
-                const output = predictAndScoreRes._rawPredictTraceData?.output;
+                const output =
+                // Legacy
+                  (predictAndScoreRes._rawPredictAndScoreTraceData?.output as any)?.model_output ??
+                // New
+                  (predictAndScoreRes._rawPredictAndScoreTraceData?.output as any)?.output ??
+                // Slow
+                  predictAndScoreRes._rawPredictTraceData?.output;
                 rows.push({
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
