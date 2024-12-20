@@ -18,8 +18,8 @@ import {
 import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
+import {SmallRef} from '../../../../SmallRef';
 import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
