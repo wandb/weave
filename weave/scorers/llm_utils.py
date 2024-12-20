@@ -49,7 +49,7 @@ _LLM_CLIENTS_NAMES = (
 )
 
 
-def instructor_client(client: _LLM_CLIENTS) -> instructor.client:
+def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":
     try:
         import instructor
     except ImportError:
