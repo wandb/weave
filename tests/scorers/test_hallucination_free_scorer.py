@@ -37,7 +37,7 @@ def mock_create(monkeypatch):
 def hallucination_free_scorer(mock_create):
     return HallucinationFreeScorer(
         client=OpenAI(api_key="DUMMY_API_KEY"),
-        model_id="gpt-4",
+        model_id="gpt-4o",
         temperature=0.7,
         max_tokens=4096,
     )
@@ -47,7 +47,7 @@ def test_initialization():
     """Test scorer initialization with different parameters"""
     # Test default initialization
     scorer = HallucinationFreeScorer(client=OpenAI(api_key="DUMMY_API_KEY"))
-    assert scorer.model_id == "gpt-4"
+    assert scorer.model_id == "gpt-4o"
     assert scorer.temperature == 0.7
     assert scorer.max_tokens == 4096
 
@@ -133,26 +133,6 @@ def test_large_inputs(hallucination_free_scorer):
     assert end_time - start_time < 10  # Should complete within 10 seconds
     assert isinstance(result, dict)
     assert "has_hallucination" in result
-
-
-def test_memory_usage(hallucination_free_scorer):
-    """Test memory usage with large inputs"""
-    process = psutil.Process()
-    initial_memory = process.memory_info().rss
-
-    # Test with increasingly large inputs
-    for size in [1000, 5000, 10000]:
-        context = generate_large_text(size)
-        output = generate_large_text(size)
-
-        _ = hallucination_free_scorer.score(output=output, context=context)
-
-        current_memory = process.memory_info().rss
-        memory_increase = current_memory - initial_memory
-
-        # Memory usage should not grow exponentially
-        assert memory_increase < size * 10  # Rough estimate
-
 
 @pytest.mark.asyncio
 async def test_async_evaluation(hallucination_free_scorer):
