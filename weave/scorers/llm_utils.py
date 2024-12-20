@@ -75,8 +75,8 @@ def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":
 
 
 def create(
-    client: instructor.client, *args: Any, **kwargs: Any
-) -> InstructorChatCompletionCreate:
+    client: "instructor.client", *args: Any, **kwargs: Any
+) -> "instructor.client.InstructorChatCompletionCreate":
     # gemini has slightly different argument namings...
     # max_tokens -> max_output_tokens
     if "generativemodel" in type(client.client).__name__.lower():
