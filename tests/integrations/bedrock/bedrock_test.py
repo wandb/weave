@@ -1,3 +1,5 @@
+import io
+import json
 from unittest.mock import patch
 
 import boto3
@@ -23,6 +25,11 @@ messages = [
         ],
     }
 ]
+
+invoke_prompt = (
+    "In Bash, how do I list all text files in the current directory "
+    "(excluding subdirectories) that have been modified in the last month?"
+)
 
 # Mock responses
 MOCK_CONVERSE_RESPONSE = {
@@ -92,11 +99,35 @@ MOCK_STREAM_EVENTS = [
     },
 ]
 
+MOCK_INVOKE_RESPONSE = {
+    "body": io.BytesIO(
+        json.dumps(
+            {
+                "id": "msg_bdrk_01WpFc3918C93ZG9ZMKVqzCd",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-3-5-sonnet-20240620",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "To list all text files in the current directory (excluding subdirectories) "
+                        "that have been modified in the last month using Bash, you can use",
+                    }
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 40, "output_tokens": 30, "total_tokens": 70},
+            }
+        ).encode("utf-8")
+    ),
+    "ContentType": "application/json",
+}
+
 # Original botocore _make_api_call function
 orig = botocore.client.BaseClient._make_api_call
 
 
-def mock_make_api_call(self, operation_name, kwarg):
+def mock_converse_make_api_call(self, operation_name, kwarg):
     if operation_name == "Converse":
         return MOCK_CONVERSE_RESPONSE
     elif operation_name == "ConverseStream":
@@ -109,13 +140,21 @@ def mock_make_api_call(self, operation_name, kwarg):
     return orig(self, operation_name, kwarg)
 
 
+def mock_invoke_make_api_call(self, operation_name, kwarg):
+    if operation_name == "InvokeModel":
+        return MOCK_INVOKE_RESPONSE
+    return orig(self, operation_name, kwarg)
+
+
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
+    with patch(
+        "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
+    ):
         response = bedrock_client.converse(
             modelId=model_id,
             system=[{"text": system_message}],
@@ -165,7 +204,9 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch("botocore.client.BaseClient._make_api_call", new=mock_make_api_call):
+    with patch(
+        "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
+    ):
         response = bedrock_client.converse_stream(
             modelId=model_id,
             system=[{"text": system_message}],
@@ -196,7 +237,6 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
     output = call.output
     # For a streaming response, you might confirm final partial text is present
     # in the final output or usage data is recorded
-    print(output)
 
     assert "To list all text files" in output["content"]
 
@@ -208,3 +248,55 @@ def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient) -
     assert output["usage"]["inputTokens"] == model_usage["prompt_tokens"] == 55
     assert output["usage"]["outputTokens"] == model_usage["completion_tokens"] == 30
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 85
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call", new=mock_invoke_make_api_call
+    ):
+        # Call the custom op that wraps the bedrock_client.invoke_model call
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "temperature": 0.7,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+
+        response = bedrock_client.invoke_model(
+            modelId=model_id,
+            body=body,
+            contentType="application/json",
+            accept="application/json",
+        )
+        response = json.loads(response.get("body").read())
+        # Basic assertions on the response
+        assert response is not None
+        assert "type" in response
+        assert response["type"] == "message"
+        assert "content" in response
+        assert response["content"][0]["text"].startswith(
+            "To list all text files in the current directory"
+        )
+
+    # Check that a trace was captured
+    calls = list(client.calls())
+    assert len(calls) == 1, "Expected exactly one trace call for invoke command"
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    output = call.output
+    assert "body" in output
+    # Confirm usage in the summary
+    summary = call.summary
+    print(summary)
+    assert summary is not None, "Summary should not be None"
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
