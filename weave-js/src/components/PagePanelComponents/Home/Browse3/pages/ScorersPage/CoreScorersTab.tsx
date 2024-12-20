@@ -11,6 +11,7 @@ export const ProgrammaticScorersTab: React.FC<{
       entity={entity}
       project={project}
       objectTitle="Scorer"
+      hideCategoryColumn
       initialFilter={{
         baseObjectClass: 'Scorer',
       }}

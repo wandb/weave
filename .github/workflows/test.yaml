@@ -81,11 +81,16 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
           - '8080:8080'
           - '8083:8083'
           - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
@@ -240,6 +245,7 @@ jobs:
             'mistral1',
             'notdiamond',
             'openai',
+            'vertexai',
             'scorers_tests',
             'pandas-test',
           ]
@@ -253,11 +259,16 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
           - '8080:8080'
           - '8083:8083'
           - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
@@ -266,6 +277,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Enable debug logging
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:

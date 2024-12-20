@@ -12,12 +12,12 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid'; // Import the StyledDataGrid component
+import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
   TraceObjSchemaForBaseObjectClass,
   useBaseObjectInstances,
-} from '../wfReactInterface/baseObjectClassQuery';
-import {WEAVE_REF_SCHEME} from '../wfReactInterface/constants';
-import {useWFHooks} from '../wfReactInterface/context';
+} from '../wfReactInterface/objectClassQuery';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Feedback} from '../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
@@ -259,7 +259,7 @@ export const CallScoresViewer: React.FC<{
               lineHeight: '20px',
               alignItems: 'center',
             }}>
-            <CellValue value={value} isExpanded={false} />
+            <CellValue value={value} />
           </Box>
         );
       },

@@ -3,9 +3,9 @@ import TabItem from '@theme/TabItem';
 
 # Tutorial: Model-Based Evaluation of RAG applications
 
-:::warning
+:::important
 
-This tutorial is currently only available for Python!
+This tutorial is currently only available for Python.
 
 :::
 

@@ -1,20 +1,28 @@
 import {Box, Divider} from '@mui/material';
-import {
-  MOON_250,
-  MOON_500,
-  TEAL_500,
-} from '@wandb/weave/common/css/color.styles';
+import {MOON_250, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 
 import {StyledTextArea} from '../StyledTextarea';
+import {PlaygroundMessageRole} from '../types';
 
 type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: 'assistant' | 'user') => void;
-  onAdd: (role: 'assistant' | 'user', text: string) => void;
+  onSend: (role: PlaygroundMessageRole, chatText: string) => void;
+  onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
+  settingsTab: number | null;
+};
+
+const isMac = () => {
+  const platform = navigator.platform || '';
+  const userAgent = navigator.userAgent || '';
+  const appVersion = navigator.appVersion || '';
+  const checkString = (str: string) => /Mac|iPhone|iPod|iPad/i.test(str);
+  return (
+    checkString(platform) || checkString(userAgent) || checkString(appVersion)
+  );
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
@@ -23,96 +31,127 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   isLoading,
   onSend,
   onAdd,
+  settingsTab,
 }) => {
-  const [addMessageRole, setAddMessageRole] = useState<'assistant' | 'user'>(
-    'user'
-  );
+  const [addMessageRole, setAddMessageRole] =
+    useState<PlaygroundMessageRole>('user');
+  const [shouldReset, setShouldReset] = useState(false);
+
+  const handleReset = () => {
+    setShouldReset(true);
+    setTimeout(() => setShouldReset(false), 0);
+  };
+
+  const handleSend = (role: PlaygroundMessageRole) => {
+    onSend(role, chatText);
+    handleReset();
+  };
+
+  const handleAdd = (role: PlaygroundMessageRole, text: string) => {
+    onAdd(role, text);
+    handleReset();
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault(); // Prevent default to avoid newline in textarea
-      onSend(addMessageRole);
+      event.preventDefault();
+      handleSend(addMessageRole);
     }
   };
 
   return (
     <Box
       sx={{
-        width: 'calc(100% - 32px)',
-        maxHeight: '500px',
-        minWidth: '500px',
-        maxWidth: '800px',
-        border: `2px solid ${TEAL_500}`,
-        padding: '8px',
-        paddingLeft: '12px',
-        marginX: '16px',
-        marginBottom: '16px',
-        borderRadius: '4px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        gap: '8px',
-        position: 'relative',
+        position: 'fixed',
+        bottom: '0',
+        left: '58px',
+        paddingBottom: '16px',
+        paddingTop: '8px',
+        backgroundColor: 'white',
+        width:
+          settingsTab !== null
+            ? 'calc(100% - 58px - 320px)'
+            : 'calc(100% - 58px)',
+        zIndex: 1, // WARN: z-index position of navbar overflow menu is `2`, check first if changing
       }}>
       <Box
         sx={{
-          position: 'absolute',
-          top: '-30px',
-          right: '0',
-          fontSize: '12px',
-          color: MOON_500,
+          maxWidth: '800px',
+          marginX: 'auto',
         }}>
-        Press CMD + Enter to send
-      </Box>
-      <StyledTextArea
-        onChange={e => setChatText(e.target.value)}
-        value={chatText}
-        onKeyDown={handleKeyDown}
-      />
-      <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-        <Box sx={{display: 'flex', gap: '8px'}}>
-          {/* TODO: Add image upload */}
-          {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
+        <Box
+          sx={{
+            marginBottom: '4px',
+            textAlign: 'right',
+            fontSize: '12px',
+            color: MOON_500,
+          }}>
+          Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
         </Box>
-        <Box sx={{display: 'flex', gap: '8px'}}>
-          <Box
-            sx={{
-              display: 'flex',
-              color: MOON_500,
-              fontSize: '12px',
-            }}>
-            Add as
+        <StyledTextArea
+          onChange={e => setChatText(e.target.value)}
+          value={chatText}
+          onKeyDown={handleKeyDown}
+          placeholder="Type your message here..."
+          autoGrow
+          maxHeight={160}
+          reset={shouldReset}
+        />
+        <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
+          <Box sx={{display: 'flex', gap: '8px'}}>
+            {/* TODO: Add image upload */}
+            {/* <Button variant="secondary" size="small" startIcon="photo" /> */}
+          </Box>
+          <Box sx={{display: 'flex', gap: '8px'}}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                color: MOON_500,
+                fontSize: '12px',
+              }}>
+              Add as
+              <Button
+                className="ml-4 rounded-r-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'system'}
+                onClick={() => setAddMessageRole('system')}>
+                System
+              </Button>
+              <Button
+                className="rounded-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'assistant'}
+                onClick={() => setAddMessageRole('assistant')}>
+                Assistant
+              </Button>
+              <Button
+                className="rounded-l-none"
+                variant="secondary"
+                size="medium"
+                active={addMessageRole === 'user'}
+                onClick={() => setAddMessageRole('user')}>
+                User
+              </Button>
+            </Box>
             <Button
-              className="ml-4"
               variant="secondary"
-              size="small"
-              active={addMessageRole === 'assistant'}
-              onClick={() => setAddMessageRole('assistant')}>
-              Assistant
+              size="medium"
+              startIcon="add-new"
+              onClick={() => handleAdd(addMessageRole, chatText)}>
+              Add
             </Button>
+            <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
             <Button
-              variant="secondary"
-              size="small"
-              active={addMessageRole === 'user'}
-              onClick={() => setAddMessageRole('user')}>
-              User
+              size="medium"
+              onClick={() => handleSend(addMessageRole)}
+              disabled={isLoading || chatText.trim() === ''}
+              startIcon={isLoading ? 'loading' : undefined}>
+              {isLoading ? 'Sending...' : 'Send'}
             </Button>
           </Box>
-          <Button
-            variant="secondary"
-            size="small"
-            startIcon="add-new"
-            onClick={() => onAdd(addMessageRole, chatText)}>
-            Add
-          </Button>
-          <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
-          <Button
-            size="small"
-            onClick={() => onSend(addMessageRole)}
-            disabled={isLoading || chatText.trim() === ''}
-            startIcon={isLoading ? 'loading' : undefined}>
-            {isLoading ? 'Sending...' : 'Send'}
-          </Button>
         </Box>
       </Box>
     </Box>
