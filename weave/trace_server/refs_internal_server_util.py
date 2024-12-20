@@ -23,7 +23,12 @@ def ensure_ref_is_valid(
 
 def ensure_ref_is_valid(
     ref: str, expected_type: Optional[tuple[type, ...]] = None
-) -> Union[ri.InternalObjectRef, ri.InternalTableRef, ri.InternalCallRef]:
+) -> Union[
+    ri.InternalObjectRef,
+    ri.InternalTableRef,
+    ri.InternalCallRef,
+    ri.InternalArtifactRef,
+]:
     """Validates and parses an internal URI reference.
 
     Args:

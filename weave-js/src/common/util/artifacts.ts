@@ -103,3 +103,31 @@ export function isVersionAlias(alias: {alias: string}): boolean {
 export function getDescriptionSummary(artifactDescription: string) {
   return artifactDescription.split('\n')[0];
 }
+
+// Maintain same as https://github.com/wandb/core/blob/master/frontends/app/src/components/Registries/common/utils.ts
+export const REGISTRY_PROJECT_PREFIX = 'wandb-registry-';
+
+export type registryProject = {
+  isRegistryProject: boolean;
+  registryName?: string;
+};
+
+export const isOrgRegistryProjectName = (projectName: string) => {
+  const {isRegistryProject} = checkRegistryProject(projectName);
+  return isRegistryProject;
+};
+
+export const checkRegistryProject = (
+  projectName: string | undefined
+): registryProject => {
+  if (!projectName) {
+    return {isRegistryProject: false, registryName: undefined};
+  }
+  // Function to check if project is a registry project
+  const isRegistryProject = projectName.startsWith(REGISTRY_PROJECT_PREFIX);
+  const index = REGISTRY_PROJECT_PREFIX.length;
+  const registryName = isRegistryProject
+    ? projectName.substring(index)
+    : undefined;
+  return {isRegistryProject, registryName};
+};
