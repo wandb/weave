@@ -2,12 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Any, Optional, Union
-
-try:
-    import instructor
-except ImportError:
-    instructor = None
+from typing import TYPE_CHECKING, Any, Union
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -24,6 +19,7 @@ DEFAULT_MAX_TOKENS = 4096
 LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "weave_models")
 
 if TYPE_CHECKING:
+    import instructor.client
     from anthropic import Anthropic, AsyncAnthropic
     from google.generativeai import GenerativeModel
     from instructor.patch import InstructorChatCompletionCreate
@@ -57,7 +53,9 @@ _LLM_CLIENTS_NAMES = (
 
 
 def instructor_client(client: _LLM_CLIENTS) -> instructor.client:
-    if instructor is None:
+    try:
+        import instructor
+    except ImportError:
         raise ImportError(
             "The `instructor` package is required to use LLM-powered scorers, please run `pip install instructor`"
         )
@@ -113,7 +111,7 @@ def embed(
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
 
 
-def set_device(device: Optional[str] = None) -> device:
+def set_device(device: str = "auto") -> device:
     """Set the device to use for the model.
 
     Args:
@@ -128,7 +126,7 @@ def set_device(device: Optional[str] = None) -> device:
     if not cuda_available and "cuda" in device:
         # could be `cuda:0`, `cuda:1`, etc.
         raise ValueError("CUDA is not available")
-    if device == "auto" or device is None:
+    if device == "auto":
         if cuda_available:
             device = "cuda"
         elif torch.backends.mps.is_available():

@@ -74,7 +74,7 @@ class OldRelevanceScorer(Scorer):
         device: The device to use for inference. Defaults to `auto`, which will use `cuda` if available.
     """
 
-    model_name_or_path: str = None
+    model_name_or_path: str = ""
     base_url: Optional[str] = None
     device: str = "auto"
     _classifier: Any = PrivateAttr()
@@ -159,24 +159,24 @@ class OldRelevanceScorer(Scorer):
         chat_history = chat_history if isinstance(chat_history, list) else []
         context = context if isinstance(context, list) else []
         if context:
-            context = "\n".join(context).strip()
-            context = f"<documents>\n{context}\n</documents>"
+            joined_context = "\n".join(context).strip()
+            joined_context = f"<documents>\n{joined_context}\n</documents>"
         else:
-            context = ""
-        prompt = f"{context}\n\n{prompt}".strip()
+            joined_context = ""
+        prompt = f"{joined_context}\n\n{prompt}".strip()
 
         messages = chat_history + [{"role": "user", "content": prompt}]
 
         messages = [
-            f"<|msg_start|>{message['role']}\n{message['content']}<|msg_end|>"
+            f"<|msg_start|>{message['role']}\n{message['content']}<|msg_end|>"  # type: ignore
             for message in messages
         ]
-        messages = "\n".join(messages)
+        joined_messages = "\n".join(messages)  # type: ignore
 
-        context = f"<context>{messages}</context>\n"
+        final_context = f"<context>{joined_messages}</context>\n"
         completion = f"<completion>{completion}</completion>\n"
 
-        context_and_completion = context + completion
+        context_and_completion = final_context + completion
 
         return [
             {"role": "system", "content": self._system_prompt},
@@ -192,6 +192,7 @@ class OldRelevanceScorer(Scorer):
     ) -> dict[str, Any]:
         import requests
 
+        assert self.base_url is not None
         response = requests.post(
             self.base_url,
             json={
@@ -386,7 +387,8 @@ class ContextRelevanceScorer(HuggingFaceScorer):
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
         res = {"flagged": final_score > self.threshold}
-        res["extras"] = {"score": final_score}
+        extras = {"score": final_score}
         if verbose:
-            res["extras"]["all_spans"] = all_spans
+            extras["all_spans"] = all_spans  # type: ignore
+        res["extras"] = extras  # type: ignore
         return res

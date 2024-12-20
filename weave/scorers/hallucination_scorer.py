@@ -86,7 +86,9 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 """
 
 
-def get_chat_template_messages(query: str, output: str, context: Optional[str] = None):
+def get_chat_template_messages(
+    query: str, output: str, context: Optional[str] = None
+) -> list[dict[str, str]]:
     system_prompt = """The task is to evaluate whether the <output> contains \
 information not supported by the <query> or <context>, or \
 whether the <output> contradicts the information provided in the <query> or <context>.
@@ -250,14 +252,14 @@ class HallucinationScorer(HuggingFaceScorer):
     max_new_tokens: int = 2
     model_max_length: int = 8192
     do_sample: bool = False
-    temperature: float = 0.0
+    temperature: Optional[float] = 0.0
     num_beams: int = 1
-    top_k: int = 20
-    top_p: float = 0.7
+    top_k: Optional[int] = 20
+    top_p: Optional[float] = 0.7
     use_torch_compile: bool = False
     use_hhem: bool = True
     hhem_score_threshold: float = 0.5
-    _local_model_path: str = None
+    _local_model_path: str = ""
     import_failed: bool = False
 
     def load_model(self) -> None:
@@ -339,6 +341,7 @@ class HallucinationScorer(HuggingFaceScorer):
     def _score_via_api(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         import requests
 
+        assert self.base_url is not None
         response = requests.post(self.base_url, json={"messages": messages})
         response.raise_for_status()
         return response.json()
@@ -423,13 +426,14 @@ class HallucinationScorer(HuggingFaceScorer):
                 true_token = 2787
                 false_token = 4245
 
-                input_length = inp_tokenized["input_ids"].shape[1]
-                completion_tokens = res[0][input_length:].tolist()
+                input_length = inp_tokenized["input_ids"].shape[1]  # type: ignore
+                completion_tokens = res[0][input_length:].tolist()  # type: ignore
 
                 is_hallucination = true_token in completion_tokens
+                extras: dict[str, Any] = {"score": 1 if is_hallucination else 0}
                 result = {
                     "flagged": is_hallucination,
-                    "extras": {"score": 1 if is_hallucination else 0},
+                    "extras": extras,
                 }
 
                 if self.debug:
@@ -443,11 +447,11 @@ class HallucinationScorer(HuggingFaceScorer):
                     completion = self._tokenizer.decode(completion_tokens)
                     print(f"COMPLETION:\n{completion}\n----------------------\n")
 
-                    result["extras"].update(
+                    extras.update(
                         {
                             "completion": completion,
                             "completion_tokens": completion_tokens,
-                            "total_tokens": len(res[0]),
+                            "total_tokens": len(res[0]),  # type: ignore
                             "total_completion_tokens": len(completion_tokens),
                             "scorer_worked": scorer_worked,
                         }

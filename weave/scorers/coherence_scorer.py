@@ -55,6 +55,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
     @weave.op
     def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
         """Score a prompt response pair."""
+        assert self.pipeline is not None
         coherence_output = self.pipeline(inputs={"text": prompt, "text_pair": output})
         flagged = False
         if "incoherent" in coherence_output["label"].lower():
@@ -88,6 +89,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
     ) -> dict[str, Any]:
         import requests
 
+        assert self.base_url is not None
         response = requests.post(
             self.base_url,
             json={

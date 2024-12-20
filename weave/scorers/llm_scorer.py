@@ -131,9 +131,6 @@ class HuggingFacePipelineScorer(Scorer):
             "Subclasses must implement the `load_pipeline` method."
         )
 
-    def pipe(self, prompt: str) -> list[dict[str, Any]]:
-        return self.pipeline(prompt)[0]
-
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
@@ -144,8 +141,8 @@ class HuggingFaceScorer(Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    model: Optional[Any] = None
-    tokenizer: Optional[Any] = None
+    model: Any = None
+    tokenizer: Any = None
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
@@ -198,6 +195,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         Returns:
             A tensor of tokenized input IDs.
         """
+        assert self.tokenizer is not None
         return self.tokenizer(
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)

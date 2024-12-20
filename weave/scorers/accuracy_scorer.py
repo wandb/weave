@@ -24,7 +24,7 @@ class AccuracyScorer(Scorer):
     )
 
     @weave.op
-    def score(self, output: Any, ground_truth: Any) -> float:
+    def score(self, output: Any, ground_truth: Any) -> dict[str, Any]:
         """
         Compare a single prediction to the ground truth and return a binary correctness score.
 
@@ -95,7 +95,7 @@ class AccuracyScorer(Scorer):
 
     def _summarize_multiclass(
         self, scores: list[float], outputs: list[Any], ground_truths: list[Any]
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Summarize accuracy for multiclass tasks.
 
@@ -134,8 +134,6 @@ class AccuracyScorer(Scorer):
             accuracy = sum(
                 acc * weight for acc, weight in zip(per_class_accuracy, weights)
             )
-        elif self.average == "none":
-            accuracy = per_class_accuracy
         else:
             raise ValueError(f"Unsupported average type: {self.average}")
 

@@ -134,7 +134,7 @@ class ToxicityScorer(RollingWindowScorer):
         ]
     )
 
-    def load_model(self):
+    def load_model(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -155,7 +155,7 @@ class ToxicityScorer(RollingWindowScorer):
         )
         self.model.eval()
 
-    def load_tokenizer(self):
+    def load_tokenizer(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -168,7 +168,7 @@ class ToxicityScorer(RollingWindowScorer):
         self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[int]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[int | float]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 
@@ -191,6 +191,7 @@ class ToxicityScorer(RollingWindowScorer):
     def _score_via_api(self, output: str) -> dict[str, Any]:
         import requests
 
+        assert self.base_url is not None
         response = requests.post(self.base_url, json={"output": output})
         response.raise_for_status()
         return response.json()
@@ -253,7 +254,7 @@ class BiasScorer(RollingWindowScorer):
         ]
     )
 
-    def load_model(self):
+    def load_model(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -275,7 +276,7 @@ class BiasScorer(RollingWindowScorer):
         )
         self.model.eval()
 
-    def load_tokenizer(self):
+    def load_tokenizer(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -300,6 +301,7 @@ class BiasScorer(RollingWindowScorer):
     def _score_via_api(self, output: str, verbose: bool = False) -> dict[str, Any]:
         import requests
 
+        assert self.base_url is not None
         response = requests.post(
             self.base_url,
             json={"output": output, "verbose": verbose},
