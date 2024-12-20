@@ -122,6 +122,10 @@ describe('WeaveClient', () => {
     });
 
     it('should handle oversized batch items', async () => {
+      const mockApiCall = mockTraceServerApi.call
+        .callStartBatchCallUpsertBatchPost as jest.Mock;
+      mockApiCall.mockResolvedValue({});
+
       const largeData = {
         mode: 'start',
         data: {id: '1', payload: 'x'.repeat(11 * 1024 * 1024)},
