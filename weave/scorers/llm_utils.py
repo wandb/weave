@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     import instructor.client
     from anthropic import Anthropic, AsyncAnthropic
     from google.generativeai import GenerativeModel
-    from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
     from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
     from torch import device
