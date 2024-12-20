@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Any, Union, Literal
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-from pydantic import Field, PrivateAttr, field_validator
+from pydantic import Field, field_validator
 
 import weave
 from weave.scorers.base_scorer import Scorer
@@ -8,6 +8,7 @@ from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
     _LLM_CLIENTS_NAMES,
     instructor_client,
+    set_device,
 )
 
 if TYPE_CHECKING:
@@ -102,28 +103,32 @@ class HuggingFacePipelineScorer(Scorer):
         [{'label': 'POSITIVE', 'score': 0.9998}]
     """
 
-    task: str
-    model_name_or_path: str = ""
-    device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
+    task: str = Field(
+        description="The task to use for the pipeline, for example 'text-classification'"
+    )
+    model_name_or_path: str = Field(default="", description="The path to the model")
+    device: str = Field(default="auto", description="The device to use for the model")
     pipeline_kwargs: dict[str, Any] = Field(default_factory=dict)
-    _pipeline: Any = PrivateAttr()
+    pipeline: Optional[Any] = None
 
     def model_post_init(self, __context: Any) -> None:
+        self.device = set_device(self.device)
         try:
             from transformers import pipeline
         except ImportError:
             print(
                 "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
             )
-        self._pipeline = pipeline(
-            self.task,
-            model=self.model_name_or_path,
-            device=self.device,
-            **self.pipeline_kwargs,
+        if self.pipeline is None:
+            self.set_pipeline()
+
+    def load_pipeline(self) -> None:
+        raise NotImplementedError(
+            "Subclasses must implement the `load_pipeline` method."
         )
 
     def pipe(self, prompt: str) -> list[dict[str, Any]]:
-        return self._pipeline(prompt)[0]
+        return self.pipeline(prompt)[0]
 
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
@@ -132,14 +137,32 @@ class HuggingFacePipelineScorer(Scorer):
 
 class HuggingFaceScorer(Scorer):
     """Score model outputs using a Hugging Face model."""
-    model_name_or_path: str = ""
-    device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
-    _model: Any = PrivateAttr()
-    _tokenizer: Any = PrivateAttr()
-  
-    def model_post_init(self, __context: Any) -> None:
-        """Initialize the model and tokenizer. To be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement model_post_init method.")
+
+    model_name_or_path: str = Field(default="", description="The path to the model")
+    device: str = Field(default="auto", description="The device to use for the model")
+    model: Optional[Any] = None
+    tokenizer: Optional[Any] = None
+
+    def model_post_init(self, __context: Any = None) -> None:
+        """Template method for post-initialization."""
+        self.device = set_device(self.device)
+        if self.model is None:
+            self.load_model()
+        else:
+            print("Using user-provided model.")
+
+        if self.tokenizer is None:
+            self.load_tokenizer()
+        else:
+            print("Using user-provided tokenizer.")
+
+    def load_model(self) -> None:
+        raise NotImplementedError("Subclasses must implement the `load_model` method.")
+
+    def load_tokenizer(self) -> None:
+        raise NotImplementedError(
+            "Subclasses must implement the `load_tokenizer` method."
+        )
 
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
@@ -171,7 +194,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         Returns:
             A tensor of tokenized input IDs.
         """
-        return self._tokenizer(
+        return self.tokenizer(
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 

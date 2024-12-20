@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
     from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
+    from torch import device
 
     _LLM_CLIENTS = Union[
         OpenAI,
@@ -112,19 +113,29 @@ def embed(
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
 
 
-def set_device(device: Optional[str] = None) -> str:
+def set_device(device: Optional[str] = None) -> device:
+    """Set the device to use for the model.
+
+    Args:
+        device: The device to use for the model.
+
+    Returns:
+        The device to use for the model.
+    """
     import torch
+
     cuda_available = torch.cuda.is_available()
-    if not cuda_available and device == "cuda":
+    if not cuda_available and "cuda" in device:
+        # could be `cuda:0`, `cuda:1`, etc.
         raise ValueError("CUDA is not available")
-    if device is "auto":
+    if device == "auto" or device is None:
         if cuda_available:
             device = "cuda"
         elif torch.backends.mps.is_available():
             device = "mps"
         else:
             device = "cpu"
-    return device
+    return torch.device(device)
 
 
 def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:

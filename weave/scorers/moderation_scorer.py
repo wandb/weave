@@ -10,7 +10,6 @@ from weave.scorers.llm_utils import (
     MODEL_PATHS,
     OPENAI_DEFAULT_MODERATION_MODEL,
     download_model,
-    set_device,
 )
 
 if TYPE_CHECKING:
@@ -120,11 +119,9 @@ class ToxicityScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = ""
     base_url: Optional[str] = None
     total_threshold: int = 5
     category_threshold: int = 2
-    device: str = None  # set to "cpu" or "cuda"
     max_tokens: int = 512
     overlap: int = 50
     _categories: list[str] = PrivateAttr(
@@ -137,7 +134,7 @@ class ToxicityScorer(RollingWindowScorer):
         ]
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def load_model(self):
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -145,21 +142,31 @@ class ToxicityScorer(RollingWindowScorer):
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError:
             print(
-                "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
+                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
             )
         """Initialize the toxicity model and tokenizer."""
-        self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
 
-        self._model = AutoModelForSequenceClassification.from_pretrained(
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self.model.eval()
+
+    def load_tokenizer(self):
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
+        try:
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except ImportError:
+            print(
+                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
+            )
+        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
-        self._model.eval()
 
     def predict_chunk(self, input_ids: "Tensor") -> list[int]:
         """
@@ -171,9 +178,12 @@ class ToxicityScorer(RollingWindowScorer):
         Returns:
             A list of prediction scores for each category.
         """
-        attention_mask = (input_ids != 0).long()
-        outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
-        predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
+        import torch
+
+        with torch.inference_mode():
+            attention_mask = (input_ids != 0).long()
+            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
         if isinstance(predictions, int):
             return [predictions]
         return predictions
@@ -234,9 +244,7 @@ class BiasScorer(RollingWindowScorer):
         }
     """
 
-    model_name_or_path: str = ""
     base_url: Optional[str] = None
-    device: str = None
     threshold: float = 0.5
     _categories: list[str] = PrivateAttr(
         default=[
@@ -245,35 +253,48 @@ class BiasScorer(RollingWindowScorer):
         ]
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def load_model(self):
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            from transformers import AutoModelForSequenceClassification
         except ImportError:
             print(
-                "The `transformers` package is required to use ToxicScorer, please run `pip install transformers`"
+                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
             )
 
         """Initialize the bias model and tokenizer."""
-        self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
             self._local_model_path = download_model(MODEL_PATHS["bias_scorer"])
 
-        self._model = AutoModelForSequenceClassification.from_pretrained(
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self.model.eval()
+
+    def load_tokenizer(self):
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
+        try:
+            from transformers import AutoTokenizer
+        except ImportError:
+            print(
+                f"The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
+            )
+        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
-        self._model.eval()
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
-        attention_mask = (input_ids != 0).long()
-        outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
-        predictions = outputs.logits.sigmoid().tolist()[0]
+        import torch
+
+        with torch.inference_mode():
+            attention_mask = (input_ids != 0).long()
+            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
     def _score_via_api(self, output: str, verbose: bool = False) -> dict[str, Any]:

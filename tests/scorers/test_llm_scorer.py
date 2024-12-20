@@ -1,5 +1,3 @@
-from typing import Any
-
 import pytest
 import torch
 from torch import Tensor
@@ -20,18 +18,19 @@ class RollingWindowScorerMock(RollingWindowScorer):
     max_tokens: int = 10
     overlap: int = 0
 
-    def model_post_init(self, __context: Any) -> None:
-        self._model = MockModel()
-        self._tokenizer = RandomTokenizer()
+    def load_model(self):
+        self.model = MockModel()
+
+    def load_tokenizer(self):
+        self.tokenizer = RandomTokenizer()
 
     def predict_chunk(self, input_ids: Tensor) -> list[float]:
-        return self._model(input_ids)
+        return self.model(input_ids)
 
 
 @pytest.fixture
 def rolling_window_scorer():
     scorer_instance = RollingWindowScorerMock()
-    scorer_instance.model_post_init(None)
     return scorer_instance
 
 

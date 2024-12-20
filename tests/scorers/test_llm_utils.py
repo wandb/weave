@@ -74,6 +74,7 @@ def sync_client():
 def async_client():
     return MockAsyncOpenAI()
 
+
 # Test to ensure instructor_client returns a valid instructor client for synchronous clients
 def test_instructor_client_sync(sync_client, monkeypatch):
     # Mock instructor module
@@ -132,7 +133,7 @@ async def test_embed_async(async_client):
     model_id = "text-embedding-3-small"
     texts = ["Hello world", "OpenAI"]
     with pytest.raises(ValueError, match="Async client used with sync function"):
-        embed(async_client, model_id, texts)
+        await embed(async_client, model_id, texts)
 
 
 # Test the embed function with an unsupported client type

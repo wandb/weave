@@ -8,6 +8,7 @@ from pydantic import PrivateAttr
 
 import weave
 from weave.scorers.base_scorer import Scorer
+from weave.scorers.llm_scorer import HuggingFaceScorer
 from weave.scorers.llm_utils import MODEL_PATHS, download_model, set_device
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
@@ -219,7 +220,7 @@ class OldRelevanceScorer(Scorer):
         return self.score_messages(messages)
 
 
-class ContextRelevanceScorer(Scorer):
+class ContextRelevanceScorer(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
 
@@ -260,19 +261,15 @@ class ContextRelevanceScorer(Scorer):
         }
     """
 
-    model_name_or_path: str = None
     base_url: Optional[str] = None
-    device: str = "cpu"
     threshold: float = 0.7
     model_max_length: int = 1280
-    _model: Any = PrivateAttr()
-    _tokenizer: Any = PrivateAttr()
 
-    def model_post_init(self, __context: Any) -> None:
+    def load_model(self):
         try:
             if find_spec("torch") is None:
                 raise ImportError("torch is required but not installed")
-            from transformers import AutoModelForTokenClassification, AutoTokenizer
+            from transformers import AutoModelForTokenClassification
         except ImportError:
             print(
                 "The `transformers` and `torch` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch`"
@@ -283,15 +280,23 @@ class ContextRelevanceScorer(Scorer):
         else:
             self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
         assert self._local_model_path, "Model path not found"
-        self._model = AutoModelForTokenClassification.from_pretrained(
+        self.model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
         )
-        self._tokenizer = AutoTokenizer.from_pretrained(
+        self.model.eval()
+
+    def load_tokenizer(self):
+        try:
+            from transformers import AutoTokenizer
+        except ImportError:
+            print(
+                f"The `transformers` is required to use the {self.__class__.__name__}, please run `pip install transformers torch`"
+            )
+        self.tokenizer = AutoTokenizer.from_pretrained(
             self._local_model_path,
             model_max_length=self.model_max_length,
         )
-        self._model.eval()
-        self.device = set_device(self.device)
+        print(f"Model and tokenizer loaded on {self.device}")
 
     def _score_document(
         self, query: str, document: str, threshold: float
@@ -299,58 +304,57 @@ class ContextRelevanceScorer(Scorer):
         """Score a single document."""
         import torch
 
-        with torch.no_grad():
-            input_text = query + f" {self._tokenizer.sep_token} " + document
-            model_inputs = self._tokenizer(
-                input_text,
-                truncation=True,
-                max_length=self.model_max_length,
-                padding=False,
-                return_tensors="pt",
-                return_special_tokens_mask=True,
-            )
+        input_text = query + f" {self.tokenizer.sep_token} " + document
+        model_inputs = self.tokenizer(
+            input_text,
+            truncation=True,
+            max_length=self.model_max_length,
+            padding=False,
+            return_tensors="pt",
+            return_special_tokens_mask=True,
+        )
 
-            model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
+        model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
 
-            special_tokens_mask = model_inputs.pop("special_tokens_mask")
-            combined_mask = (
-                ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
-                .cpu()
-                .numpy()
-                .flatten()
-            )
-            # we should mask the query up to the sep token,
-            # on the combined mask we have to search for the first False
-            # TODO: Check that this is not wrong
-            false_indices = np.where(~combined_mask)[0]
-            start = false_indices[0]
-            end = false_indices[1]
-            combined_mask[start:end] = False
+        special_tokens_mask = model_inputs.pop("special_tokens_mask")
+        combined_mask = (
+            ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
+            .cpu()
+            .numpy()
+            .flatten()
+        )
+        # we should mask the query up to the sep token,
+        # on the combined mask we have to search for the first False
+        # TODO: Check that this is not wrong
+        false_indices = np.where(~combined_mask)[0]
+        start = false_indices[0]
+        end = false_indices[1]
+        combined_mask[start:end] = False
 
-            results = self._model(**model_inputs)
-
+        with torch.inference_mode():
+            results = self.model(**model_inputs)
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
-            pred_mask = (
-                (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
-            )
-            label_mask = pred_mask & combined_mask
+        pred_mask = (
+            (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
+        )
+        label_mask = pred_mask & combined_mask
 
-            positive_probs = probabilities[:, 1].cpu().numpy()
-            transitions = np.diff(np.concatenate([[0], label_mask, [0]]))
-            starts = np.where(transitions == 1)[0]
-            ends = np.where(transitions == -1)[0]
+        positive_probs = probabilities[:, 1].cpu().numpy()
+        transitions = np.diff(np.concatenate([[0], label_mask, [0]]))
+        starts = np.where(transitions == 1)[0]
+        ends = np.where(transitions == -1)[0]
 
-            spans_with_probs = []
-            token_ids = model_inputs["input_ids"].cpu().numpy()[0]
+        spans_with_probs = []
+        token_ids = model_inputs["input_ids"].cpu().numpy()[0]
 
-            for start, end in zip(starts, ends):
-                span_text = self._tokenizer.decode(token_ids[start:end])
-                span_prob = positive_probs[start:end].mean()
-                spans_with_probs.append({"text": span_text, "score": float(span_prob)})
+        for start, end in zip(starts, ends):
+            span_text = self.tokenizer.decode(token_ids[start:end])
+            span_prob = positive_probs[start:end].mean()
+            spans_with_probs.append({"text": span_text, "score": float(span_prob)})
 
-            return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
+        return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
 
     @weave.op
     def score(

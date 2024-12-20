@@ -1,11 +1,10 @@
 import os
-import warnings
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import InstructorLLMScorer, HuggingFaceScorer
+from weave.scorers.llm_scorer import HuggingFaceScorer, InstructorLLMScorer
 from weave.scorers.llm_utils import (
     MODEL_PATHS,
     OPENAI_DEFAULT_MODEL,
@@ -284,7 +283,7 @@ class HallucinationScorer(HuggingFaceScorer):
 
         self.device = set_device(self.device)
 
-        if self._model is None:
+        if self.model is None:
             # Check if the model is already downloaded
             if os.path.isdir(self.model_name_or_path):
                 self._local_model_path = self.model_name_or_path
@@ -300,22 +299,22 @@ class HallucinationScorer(HuggingFaceScorer):
                     )
 
             if self.use_hhem:
-                self._model = AutoModelForSequenceClassification.from_pretrained(
+                self.model = AutoModelForSequenceClassification.from_pretrained(
                     self._local_model_path,
                     torch_dtype="bfloat16",
                     trust_remote_code=True,
                 ).to(self.device)
-                self._tokenizer = self._model.tokenzier
+                self._tokenizer = self.model.tokenzier
                 self._tokenizer.model_max_length = self.model_max_length
             else:
-                self._model = AutoModelForCausalLM.from_pretrained(
+                self.model = AutoModelForCausalLM.from_pretrained(
                     self._local_model_path, torch_dtype="bfloat16"
                 ).to(self.device)
 
                 if self.use_torch_compile:
-                    self._model.generation_config.cache_implementation = "static"
-                    self._model = torch.compile(
-                        self._model, backend="inductor", fullgraph=True
+                    self.model.generation_config.cache_implementation = "static"
+                    self.model = torch.compile(
+                        self.model, backend="inductor", fullgraph=True
                     )
 
         if self._tokenizer is None:
@@ -379,7 +378,7 @@ class HallucinationScorer(HuggingFaceScorer):
                     outs = self._tokenizer.decode(out_input_ids)
 
                 pairs = [(inps, outs)]
-                pred = self._model.predict(pairs)
+                pred = self.model.predict(pairs)
                 score = pred.item()
                 return {
                     "flagged": score <= self.hhem_score_threshold,
@@ -399,9 +398,9 @@ class HallucinationScorer(HuggingFaceScorer):
                 pad_token_id = self._tokenizer.eos_token_id
 
                 with torch.no_grad():
-                    self._model.eval()
+                    self.model.eval()
 
-                    res = self._model.generate(
+                    res = self.model.generate(
                         inp_tokenized["input_ids"],
                         max_new_tokens=self.max_new_tokens,
                         attention_mask=inp_tokenized["attention_mask"],

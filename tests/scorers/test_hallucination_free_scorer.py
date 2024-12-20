@@ -2,7 +2,6 @@ import asyncio
 import time
 from unittest.mock import patch
 
-import psutil
 import pytest
 from openai import OpenAI
 
@@ -133,6 +132,7 @@ def test_large_inputs(hallucination_free_scorer):
     assert end_time - start_time < 10  # Should complete within 10 seconds
     assert isinstance(result, dict)
     assert "has_hallucination" in result
+
 
 @pytest.mark.asyncio
 async def test_async_evaluation(hallucination_free_scorer):
