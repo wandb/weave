@@ -441,6 +441,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
@@ -463,6 +465,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
