@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import PrivateAttr, field_validator
 
@@ -168,7 +168,7 @@ class ToxicityScorer(RollingWindowScorer):
         self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[int | float]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int,float]]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 
