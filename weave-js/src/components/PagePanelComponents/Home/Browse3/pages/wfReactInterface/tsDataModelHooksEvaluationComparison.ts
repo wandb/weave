@@ -469,23 +469,24 @@ const fetchEvaluationComparisonResults = async (
       filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
     })
     .then(predictAndScoreCallRes => {
+      return predictAndScoreCallRes;
       // Then, get all the children of those calls (predictions + scores)
-      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
-        call => call.id
-      );
-      return traceServerClient
-        .callsStreamQuery({
-          project_id: projectId,
-          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
-        })
-        .then(predictionsAndScoresCallsRes => {
-          return {
-            calls: [
-              ...predictAndScoreCallRes.calls,
-              ...predictionsAndScoresCallsRes.calls,
-            ],
-          };
-        });
+      // const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+      //   call => call.id
+      // );
+      // return traceServerClient
+      //   .callsStreamQuery({
+      //     project_id: projectId,
+      //     filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+      //   })
+      //   .then(predictionsAndScoresCallsRes => {
+      //     return {
+      //       calls: [
+      //         ...predictAndScoreCallRes.calls,
+      //         ...predictionsAndScoresCallsRes.calls,
+      //       ],
+      //     };
+      //   });
     });
 
   // 3.5 Populate the inputs
@@ -520,7 +521,7 @@ const fetchEvaluationComparisonResults = async (
   );
 
   // Create a map of all the predict_and_score_ops
-  const predictAndScoreOps = Object.fromEntries(
+  const predictAndScoreCalls = Object.fromEntries(
     evalTraceRes.calls
       .filter(call =>
         call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
@@ -559,6 +560,57 @@ const fetchEvaluationComparisonResults = async (
     evalCall => evalCall.modelRef
   );
 
+  Object.values(predictAndScoreCalls).forEach(parentPredictAndScore => {
+    const exampleRef = parentPredictAndScore.inputs.example;
+    const evaluationCallId = parentPredictAndScore.parent_id!;
+    const modelRef = parentPredictAndScore.inputs.model;
+    const split = '/attr/rows/id/';
+    if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
+      const parts = exampleRef.split(split);
+      if (parts.length === 2) {
+        const maybeDigest = parts[1];
+        if (maybeDigest != null && !maybeDigest.includes('/')) {
+          const rowDigest = maybeDigest;
+
+          if (result.resultRows[rowDigest] == null) {
+            result.resultRows[rowDigest] = {
+              evaluations: {},
+            };
+          }
+          const digestCollection = result.resultRows[rowDigest];
+
+          if (digestCollection.evaluations[evaluationCallId] == null) {
+            digestCollection.evaluations[evaluationCallId] = {
+              predictAndScores: {},
+            };
+          }
+
+          const modelForDigestCollection =
+            digestCollection.evaluations[evaluationCallId];
+
+          if (
+            modelForDigestCollection.predictAndScores[
+              parentPredictAndScore.id
+            ] == null
+          ) {
+            modelForDigestCollection.predictAndScores[
+              parentPredictAndScore.id
+            ] = {
+              callId: parentPredictAndScore.id,
+              exampleRef,
+              rowDigest,
+              modelRef,
+              evaluationCallId,
+              scoreMetrics: {},
+              _rawPredictAndScoreTraceData: parentPredictAndScore,
+              _rawPredictTraceData: undefined,
+            };
+          }
+        }
+      }
+    }
+  });
+
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
     // We are looking for 2 types of calls:
@@ -566,9 +618,9 @@ const fetchEvaluationComparisonResults = async (
     // 2. Score calls.
     if (
       traceCall.parent_id != null &&
-      predictAndScoreOps[traceCall.parent_id] != null
+      predictAndScoreCalls[traceCall.parent_id] != null
     ) {
-      const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
+      const parentPredictAndScore = predictAndScoreCalls[traceCall.parent_id];
       const exampleRef = parentPredictAndScore.inputs.example;
       const modelRef = parentPredictAndScore.inputs.model;
       const evaluationCallId = parentPredictAndScore.parent_id!;
