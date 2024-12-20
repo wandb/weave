@@ -1,4 +1,5 @@
 import {AsyncLocalStorage} from 'async_hooks';
+import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
 import {Dataset} from './dataset';
@@ -78,6 +79,8 @@ export class WeaveClient {
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
   private readonly BATCH_INTERVAL: number = 200;
+  private errorCount = 0;
+  private readonly MAX_ERRORS = 10;
 
   constructor(
     public traceServerApi: TraceServerApi<any>,
@@ -116,22 +119,34 @@ export class WeaveClient {
 
     // We count characters item by item, and try to limit batches to about
     // this size.
-    const maxBatchSizeChars = 5 * 1024 * 1024;
+    const maxBatchSizeChars = 10 * 1024 * 1024;
 
     let batchToProcess = [];
     let currentBatchSize = 0;
 
     while (this.callQueue.length > 0 && currentBatchSize < maxBatchSizeChars) {
-      const item = this.callQueue[0];
+      const item = this.callQueue.shift();
+      if (item === undefined) {
+        throw new Error('Call queue is empty');
+      }
       const itemSize = JSON.stringify(item).length;
 
       if (currentBatchSize + itemSize <= maxBatchSizeChars) {
-        batchToProcess.push(this.callQueue.shift()!);
+        batchToProcess.push(item);
         currentBatchSize += itemSize;
       } else {
+        // doesn't fit, put it back
+        this.callQueue.unshift(item);
         break;
       }
     }
+
+    if (batchToProcess.length === 0) {
+      this.batchProcessTimeout = null;
+      return;
+    }
+
+    this.isBatchProcessing = true;
 
     const batchReq = {
       batch: batchToProcess.map(item => ({
@@ -146,8 +161,20 @@ export class WeaveClient {
       );
     } catch (error) {
       console.error('Error processing batch:', error);
+      this.errorCount++;
+      fs.appendFileSync(
+        '/tmp/weaveRequests.log',
+        `Error processing batch: ${error}\n`
+      );
+
       // Put failed items back at the front of the queue
       this.callQueue.unshift(...batchToProcess);
+
+      // Exit if we have too many errors
+      if (this.errorCount > this.MAX_ERRORS) {
+        console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
+        process.exit(1);
+      }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
@@ -734,7 +761,9 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
         result[key] = leftValue + result[key];
       } else if (
+        leftValue != null &&
         typeof leftValue === 'object' &&
+        result[key] != null &&
         typeof result[key] === 'object'
       ) {
         result[key] = mergeSummaries(leftValue, result[key]);
