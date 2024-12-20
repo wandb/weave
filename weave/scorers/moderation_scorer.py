@@ -139,7 +139,7 @@ class ToxicityScorer(RollingWindowScorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            from transformers import AutoModelForSequenceClassification
         except ImportError:
             print(
                 "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
@@ -160,7 +160,7 @@ class ToxicityScorer(RollingWindowScorer):
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            from transformers import AutoTokenizer
         except ImportError:
             print(
                 "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"

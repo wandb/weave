@@ -10,7 +10,6 @@ from weave.scorers.llm_utils import (
     OPENAI_DEFAULT_MODEL,
     create,
     download_model,
-    set_device,
 )
 from weave.scorers.utils import stringify
 
@@ -87,7 +86,7 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 """
 
 
-def get_chat_template_messages(query: str, output: str, context: str = None):
+def get_chat_template_messages(query: str, output: str, context: Optional[str] = None):
     system_prompt = """The task is to evaluate whether the <output> contains \
 information not supported by the <query> or <context>, or \
 whether the <output> contradicts the information provided in the <query> or <context>.
@@ -261,7 +260,7 @@ class HallucinationScorer(HuggingFaceScorer):
     _local_model_path: str = None
     import_failed: bool = False
 
-    def model_post_init(self, __context) -> None:
+    def load_model(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -272,16 +271,13 @@ class HallucinationScorer(HuggingFaceScorer):
             from transformers import (
                 AutoModelForCausalLM,
                 AutoModelForSequenceClassification,
-                AutoTokenizer,
             )
         except ImportError:
             self.import_failed = True
             print(
-                "The `transformers` package is required to use the HallucinationScorer, please run `pip install transformers`"
+                f"The `transformers` package is required to use the {self.__class__.__name__}, please run `pip install transformers`"
             )
             return
-
-        self.device = set_device(self.device)
 
         if self.model is None:
             # Check if the model is already downloaded
@@ -303,28 +299,42 @@ class HallucinationScorer(HuggingFaceScorer):
                     self._local_model_path,
                     torch_dtype="bfloat16",
                     trust_remote_code=True,
-                ).to(self.device)
+                    device_map=self.device,
+                )
                 self._tokenizer = self.model.tokenzier
                 self._tokenizer.model_max_length = self.model_max_length
             else:
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    self._local_model_path, torch_dtype="bfloat16"
-                ).to(self.device)
+                    self._local_model_path,
+                    torch_dtype="bfloat16",
+                    device_map=self.device,
+                )
 
                 if self.use_torch_compile:
                     self.model.generation_config.cache_implementation = "static"
                     self.model = torch.compile(
                         self.model, backend="inductor", fullgraph=True
                     )
-
-        if self._tokenizer is None:
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                self._local_model_path, model_max_length=self.model_max_length
-            )
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
             self.temperature = None
+        self.model.eval()
+
+    def load_tokenizer(self) -> None:
+        try:
+            from transformers import AutoTokenizer
+        except ImportError:
+            self.import_failed = True
+            print(
+                f"The `transformers` package is required to use the {self.__class__.__name__}, please run `pip install transformers`"
+            )
+            return
+        if self._tokenizer is None:
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                self._local_model_path, model_max_length=self.model_max_length
+            )
+        print(f"Tokenizer loaded on {self.device}")
 
     def _score_via_api(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         import requests
@@ -397,9 +407,7 @@ class HallucinationScorer(HuggingFaceScorer):
 
                 pad_token_id = self._tokenizer.eos_token_id
 
-                with torch.no_grad():
-                    self.model.eval()
-
+                with torch.inference_mode():
                     res = self.model.generate(
                         inp_tokenized["input_ids"],
                         max_new_tokens=self.max_new_tokens,

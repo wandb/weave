@@ -265,7 +265,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
     threshold: float = 0.7
     model_max_length: int = 1280
 
-    def load_model(self):
+    def load_model(self) -> None:
         try:
             if find_spec("torch") is None:
                 raise ImportError("torch is required but not installed")
@@ -285,7 +285,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
         )
         self.model.eval()
 
-    def load_tokenizer(self):
+    def load_tokenizer(self) -> None:
         try:
             from transformers import AutoTokenizer
         except ImportError:

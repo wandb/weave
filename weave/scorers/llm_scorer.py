@@ -1,3 +1,4 @@
+from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import Field, field_validator
@@ -114,7 +115,10 @@ class HuggingFacePipelineScorer(Scorer):
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
         try:
-            from transformers import pipeline
+            if find_spec("transformers") is None:
+                print(
+                    "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
+                )
         except ImportError:
             print(
                 "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
@@ -198,7 +202,7 @@ class RollingWindowScorer(HuggingFaceScorer):
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[int]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
     def aggregate_predictions(
