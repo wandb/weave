@@ -119,7 +119,7 @@ def embed(
         raise ValueError(f"Unsupported client type: {type(client).__name__.lower()}")
 
 
-def set_device(device: str = "auto") -> device:
+def set_device(device: str = "auto") -> "device":
     """Set the device to use for the model.
 
     Args:
