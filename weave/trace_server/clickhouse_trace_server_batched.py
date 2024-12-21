@@ -580,7 +580,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             return tsi.ObjCreateRes(digest=digest)
 
-        val, base_object_class = process_incoming_object_val(
+        processed_result = process_incoming_object_val(
             req.obj.val, req.obj.set_leaf_object_class
         )
         processed_val = processed_result["val"]
