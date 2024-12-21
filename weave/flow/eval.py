@@ -64,10 +64,10 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
 def async_call_op(
     func: Op, *args: Any, **kwargs: Any
 ) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
-    call_res = func.call(*args, __should_raise=True, **kwargs)
-    if inspect.iscoroutine(call_res):
-        return call_res
-    return asyncio.to_thread(lambda: call_res)
+    is_async = inspect.iscoroutinefunction(func.resolve_fn)
+    if is_async:
+        return func.call(*args, __should_raise=True, **kwargs)
+    return asyncio.to_thread(lambda: func.call(*args, __should_raise=True, **kwargs))
 
 
 class EvaluationResults(Object):
