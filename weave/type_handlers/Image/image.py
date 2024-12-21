@@ -7,6 +7,7 @@ from typing import Any
 
 from weave.trace import object_preparers, serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.util import InvertableDict
 
 try:
     from PIL import Image
@@ -16,6 +17,14 @@ else:
     dependencies_met = True
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_FORMAT = "PNG"
+PIL_FORMAT_TO_EXT = InvertableDict(
+    {
+        "JPEG": "jpg",
+        "PNG": "png",
+    }
+)
 
 
 class PILImagePreparer:
@@ -35,6 +44,12 @@ class PILImagePreparer:
 
 
 def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
+    fmt = getattr(obj, "format", DEFAULT_FORMAT)
+    ext = PIL_FORMAT_TO_EXT.get(fmt)
+    if ext is None:
+        logger.warning(f"Unknown image format {fmt}, defaulting to {DEFAULT_FORMAT}")
+        ext = PIL_FORMAT_TO_EXT[DEFAULT_FORMAT]
+
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".
     # There is an extensive internal discussion here:
     # https://weightsandbiases.slack.com/archives/C03BSTEBD7F/p1723670081582949
@@ -49,15 +64,22 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # using the same artifact. Moreover, since we package the deserialization logic with the
     # object payload, we can always change the serialization logic later without breaking
     # existing payloads.
-    with artifact.new_file("image.png", binary=True) as f:
-        obj.save(f, format="png")  # type: ignore
+    fname = f"image.{ext}"
+    with artifact.new_file(fname, binary=True) as f:
+        obj.save(f, format=PIL_FORMAT_TO_EXT.inv[ext])  # type: ignore
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
-    # Note: I am purposely ignoring the `name` here and hard-coding the filename. See comment
-    # on save.
-    path = artifact.path("image.png")
-    return Image.open(path)
+    for ext in PIL_FORMAT_TO_EXT.values():
+        # Note: I am purposely ignoring the `name` here and hard-coding the filename.
+        # See comment on save.
+        fname = f"image.{ext}"
+        path = artifact.path(fname)
+        try:
+            return Image.open(path)
+        except FileNotFoundError:
+            continue
+    raise FileNotFoundError(f"No image found in artifact {artifact}")
 
 
 def register() -> None:
