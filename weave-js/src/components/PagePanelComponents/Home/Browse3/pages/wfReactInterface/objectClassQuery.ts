@@ -142,7 +142,7 @@ export const createBuiltinObjectInstance = async <
     );
   }
 
-  const reqWithLeafObjectClass: TraceObjCreateReq = {
+  const reqWithBaseObjectClass: TraceObjCreateReq = {
     ...req,
     obj: {
       ...req.obj,
@@ -150,5 +150,5 @@ export const createBuiltinObjectInstance = async <
     },
   };
 
-  return client.objCreate(reqWithLeafObjectClass);
+  return client.objCreate(reqWithBaseObjectClass);
 };

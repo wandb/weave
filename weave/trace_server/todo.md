@@ -33,3 +33,22 @@
 ---- Decomposition PRs ----
 1. Change/Add the set_object_class instead of base_object_class
 2. Add new methods to the server
+
+
+
+
+
+Desired Features:
+1. Create a model via API
+  * Again, nested refs are a bit confusing here (ex evals... maybe this is an add on?)
+2. Remotely invoke a model via API
+3. Fetch a model as runtime object from API
+  * I may have blown away some work in the earlier merge 
+  * need to validate how recursive reconstruction will work
+4. Locally invoke a model constructed via API
+
+---
+
+Scorer APIs:
+1. Standardize env variable fetching
+2. Standardize provider/client construction

@@ -245,6 +245,8 @@ def _load_custom_obj_files(
 
 
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+    from weave.builtin_objects.builtin_registry import get_builtin
+
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
@@ -265,6 +267,15 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             and (builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(val_type))
         ):
             return builtin_object_class.model_validate(obj)
+        elif (
+            isinstance(val_type, str)
+            and obj.get("_class_name") == val_type
+            and (baseObject := get_builtin(val_type))
+        ):
+            valid_keys = baseObject.model_fields.keys()
+            return baseObject.model_validate(
+                {k: v for k, v in obj.items() if k in valid_keys}
+            )
         else:
             return ObjectRecord(
                 {k: from_json(v, project_id, server) for k, v in obj.items()}

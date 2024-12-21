@@ -1560,8 +1560,6 @@ class WeaveClient:
         return isinstance(ref, Ref)
 
     def _project_id(self) -> str:
-        # if self.entity == "":
-        #     return self.project
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
