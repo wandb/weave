@@ -70,6 +70,7 @@
  */
 
 import {sum} from 'lodash';
+import _ from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
@@ -473,19 +474,26 @@ const fetchEvaluationComparisonResults = async (
       const predictAndScoreIds = predictAndScoreCallRes.calls.map(
         call => call.id
       );
-      return traceServerClient
-        .callsStreamQuery({
-          project_id: projectId,
-          filter: {trace_ids: evalTraceIds, parent_ids: predictAndScoreIds},
+
+      return Promise.all(
+        _.chunk(predictAndScoreIds, 500).map(chunk => {
+          return traceServerClient
+            .callsStreamQuery({
+              project_id: projectId,
+              filter: {trace_ids: evalTraceIds, parent_ids: chunk},
+            })
+            .then(predictionsAndScoresCallsRes => {
+              return predictionsAndScoresCallsRes.calls;
+            });
         })
-        .then(predictionsAndScoresCallsRes => {
-          return {
-            calls: [
-              ...predictAndScoreCallRes.calls,
-              ...predictionsAndScoresCallsRes.calls,
-            ],
-          };
-        });
+      ).then(predictionsAndScoresCallsResMany => {
+        return {
+          calls: [
+            ...predictAndScoreCallRes.calls,
+            ...predictionsAndScoresCallsResMany.flat(),
+          ],
+        };
+      });
     });
 
   // 3.5 Populate the inputs
