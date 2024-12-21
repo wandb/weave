@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
 from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
+from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -227,6 +229,13 @@ class ObjectRef(RefWithExtra):
             for i in range(len(potential_ancestor.extra))
         )
 
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_object_version(self)
+
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
@@ -235,6 +244,13 @@ class OpRef(ObjectRef):
         if self.extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_op_version(self)
 
 
 @dataclass(frozen=True)
@@ -261,6 +277,30 @@ class CallRef(RefWithExtra):
         if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+
+def make_deleted_ref_with_error(ref: Ref, error: ObjectDeletedError) -> DeletedRef:
+    """
+    Create a DeletedRef from an ObjectRef and an ObjectDeletedError.
+
+    Use the error message to extract the deleted_at timestamp.
+    """
+    deleted_at_str = str(error).split("was deleted at ")[1]
+    deleted_at = datetime.strptime(deleted_at_str, "%Y-%m-%d %H:%M:%S")
+    return DeletedRef(ref=ref, deleted_at=deleted_at, _error=error)
+
+
+@dataclass(frozen=True)
+class DeletedRef(Ref):
+    ref: Ref
+    deleted_at: datetime
+    _error: ObjectDeletedError
+
+    def __repr__(self) -> str:
+        return f"<DeletedRef {self.uri()}>"
+
+    def uri(self) -> str:
+        return self.ref.uri()
 
 
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
