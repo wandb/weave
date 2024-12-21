@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {Switch} from '@wandb/weave/components';
 import * as Tabs from '@wandb/weave/components/Tabs';
@@ -46,7 +47,9 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
               onClick={() => setSettingsTab(idx)}
               className="max-w-[120px]">
               {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
-              <span className="truncate">{state.model}</span>
+              <Tooltip title={state.model}>
+                <span className="truncate">{state.model}</span>
+              </Tooltip>
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -85,7 +88,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
               />
 
               {/* TODO: N times to run is not supported for all models */}
-              {/* TODO: rerun if this is not supported in the backend */}
+              {/* TODO: rerun in backend if this is not supported */}
               <PlaygroundSlider
                 min={1}
                 max={100}
@@ -93,7 +96,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 setValue={value =>
                   setPlaygroundStateField(idx, 'nTimes', value)
                 }
-                label="Completion iterations"
+                label="Number of trials"
                 value={playgroundState.nTimes}
               />
 

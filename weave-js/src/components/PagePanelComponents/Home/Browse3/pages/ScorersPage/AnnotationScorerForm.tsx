@@ -2,7 +2,7 @@ import {Box} from '@material-ui/core';
 import React, {FC, useCallback, useEffect, useState} from 'react';
 import {z} from 'zod';
 
-import {createLeafObjectInstance} from '../wfReactInterface/baseObjectClassQuery';
+import {createBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
@@ -86,7 +86,7 @@ export const onAnnotationScorerSave = async (
 ) => {
   const jsonSchemaType = convertTypeToJsonSchemaType(data.Type.type);
   const typeExtras = convertTypeExtrasToJsonSchema(data);
-  return createLeafObjectInstance(client, 'AnnotationSpec', {
+  return createBuiltinObjectInstance(client, 'AnnotationSpec', {
     obj: {
       project_id: projectIdFromParts({entity, project}),
       object_id: sanitizeObjectId(data.Name),

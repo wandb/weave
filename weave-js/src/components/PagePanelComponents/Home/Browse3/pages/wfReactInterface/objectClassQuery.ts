@@ -2,7 +2,7 @@ import {useDeepMemo} from '@wandb/weave/hookUtils';
 import {useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
-import {baseObjectClassRegistry} from './generatedBaseObjectClasses.zod';
+import {builtinObjectClassRegistry} from './generatedBuiltinObjectClasses.zod';
 import {TraceServerClient} from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
@@ -13,17 +13,24 @@ import {
 } from './traceServerClientTypes';
 import {Loadable} from './wfDataModelHooksInterface';
 
-type ObjectClassRegistry = typeof baseObjectClassRegistry;  // TODO: Add more here - not just bases!
-type ObjectClassRegistryKeys = keyof ObjectClassRegistry;
-type ObjectClassType<C extends ObjectClassRegistryKeys> = z.infer<
-  ObjectClassRegistry[C]
+type BuiltinObjectClassRegistry = typeof builtinObjectClassRegistry;
+type BuiltinObjectClassRegistryKeys = keyof BuiltinObjectClassRegistry;
+type BaseObjectClassType<C extends BuiltinObjectClassRegistryKeys> = z.infer<
+  BuiltinObjectClassRegistry[C]
 >;
 
-export type TraceObjSchemaForObjectClass<
-  C extends ObjectClassRegistryKeys
-> = TraceObjSchema<ObjectClassType<C>, C>;
+export type TraceObjSchemaForBaseObjectClass<
+  C extends BuiltinObjectClassRegistryKeys
+> = TraceObjSchema<BaseObjectClassType<C>, C>;
 
-export const useBaseObjectInstances = <C extends ObjectClassRegistryKeys>(
+// Notice: this is still `base` object class, not `builtin` object class.
+// This means we can search by base object class, but not builtin object class today.
+// See https://github.com/wandb/weave/pull/3229 for more details.
+// base_object_class: this is the name of the first subclass of any subclass of a weave Object class.
+// object_class: the string of the actual class.
+export const useBaseObjectInstances = <
+  C extends BuiltinObjectClassRegistryKeys
+>(
   baseObjectClassName: C,
   req: TraceObjQueryReq
 ): Loadable<Array<TraceObjSchemaForObjectClass<C>>> => {
@@ -56,12 +63,12 @@ export const useBaseObjectInstances = <C extends ObjectClassRegistryKeys>(
   return {result: objects, loading};
 };
 
-const getBaseObjectInstances = async <C extends ObjectClassRegistryKeys>(
+const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
   client: TraceServerClient,
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Promise<Array<TraceObjSchema<ObjectClassType<C>, C>>> => {
-  const knownObjectClass = baseObjectClassRegistry[baseObjectClassName];
+): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
+  const knownObjectClass = builtinObjectClassRegistry[baseObjectClassName];
   if (!knownObjectClass) {
     console.warn(`Unknown object class: ${baseObjectClassName}`);
     return [];
@@ -92,41 +99,42 @@ const getBaseObjectInstances = async <C extends ObjectClassRegistryKeys>(
     );
 };
 
-export const useCreateLeafObjectInstance = <
-  C extends ObjectClassRegistryKeys,
-  T = ObjectClassType<C>
+export const useCreateBuiltinObjectInstance = <
+  C extends BuiltinObjectClassRegistryKeys,
+  T = BaseObjectClassType<C>
 >(
-  leafObjectClassName: C
+  objectClassName: C
 ): ((req: TraceObjCreateReq<T>) => Promise<TraceObjCreateRes>) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   return (req: TraceObjCreateReq<T>) =>
-    createLeafObjectInstance(client, leafObjectClassName, req);
+    createBuiltinObjectInstance(client, objectClassName, req);
 };
 
-export const createLeafObjectInstance = async <
-  C extends ObjectClassRegistryKeys, 
-  T = ObjectClassType<C>
+export const createBuiltinObjectInstance = async <
+  C extends BuiltinObjectClassRegistryKeys,
+  T = BaseObjectClassType<C>
 >(
   client: TraceServerClient,
-  leafObjectClassName: C,
+  builtinObjectClassName: C,
   req: TraceObjCreateReq<T>
 ): Promise<TraceObjCreateRes> => {
   if (
-    req.obj.set_leaf_object_class != null &&
-    req.obj.set_leaf_object_class !== leafObjectClassName
+    req.obj.builtin_object_class != null &&
+    req.obj.builtin_object_class !== builtinObjectClassName
   ) {
     throw new Error(
-      `set_leaf_object_class must match leafObjectClassName: ${leafObjectClassName}`
+      `object_class must match objectClassName: ${builtinObjectClassName}`
     );
   }
 
-  const knownObjectClass = baseObjectClassRegistry[leafObjectClassName];
-  if (!knownObjectClass) {
-    throw new Error(`Unknown object class: ${leafObjectClassName}`);
+  const knownBuiltinObjectClass =
+    builtinObjectClassRegistry[builtinObjectClassName];
+  if (!knownBuiltinObjectClass) {
+    throw new Error(`Unknown object class: ${builtinObjectClassName}`);
   }
 
-  const verifiedObject = knownObjectClass.safeParse(req.obj.val);
+  const verifiedObject = knownBuiltinObjectClass.safeParse(req.obj.val);
 
   if (!verifiedObject.success) {
     throw new Error(
@@ -138,7 +146,7 @@ export const createLeafObjectInstance = async <
     ...req,
     obj: {
       ...req.obj,
-      set_leaf_object_class: leafObjectClassName,
+      builtin_object_class: builtinObjectClassName,
     },
   };
 
