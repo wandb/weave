@@ -1,5 +1,5 @@
 /**
- * This file contains a handful of utilities for working with the `EvaluationComparisonData` destructure.
+ * This file contains a handful of utilities for working with the `EvaluationComparisonSummary` destructure.
  * These are mostly convenience functions for extracting and resolving metrics from the data, but also
  * include some helper functions for working with the `MetricDefinition` objects and constructing
  * strings correctly.
@@ -8,7 +8,7 @@
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
   EvaluationCall,
-  EvaluationComparisonData,
+  EvaluationComparisonSummary,
   MetricDefinition,
   MetricDefinitionMap,
   MetricResult,
@@ -79,11 +79,12 @@ export const resolveSummaryMetricValueForEvaluateCall = (
 };
 
 export const getMetricIds = (
-  data: EvaluationComparisonData,
+  summaryData: EvaluationComparisonSummary,
   type: MetricType,
   source: SourceType
 ): MetricDefinitionMap => {
-  const metrics = type === 'score' ? data.scoreMetrics : data.summaryMetrics;
+  const metrics =
+    type === 'score' ? summaryData.scoreMetrics : summaryData.summaryMetrics;
   return Object.fromEntries(
     Object.entries(metrics).filter(([k, v]) => v.source === source)
   );
