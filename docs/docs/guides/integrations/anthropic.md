@@ -170,3 +170,9 @@ print(message)
 We automatically capture the tools you used on the prompt and keep them versioned.
 
 [![anthropic_tool.png](imgs/anthropic_tool.png)](https://wandb.ai/capecape/anthropic_project/weave/calls)
+
+## Use Anthropic on Amazon Bedrock
+
+Weave also supports Anthropic models on Amazon Bedrock via the `AnthropicBedrock` SDK. This SDK provides a stable, native interface for accessing Anthropic models like Claude 2 using Bedrock's infrastructure.
+
+For setup and usage instructions, see the [integration guide](bedrock.md#use-the-anthropic-bedrock-python-sdk).
