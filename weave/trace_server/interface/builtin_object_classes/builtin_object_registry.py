@@ -11,6 +11,7 @@ from weave.trace_server.interface.builtin_object_classes.test_only_example impor
     TestOnlyNestedBaseObject,
 )
 
+# TODO: Move this up and out
 BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
 

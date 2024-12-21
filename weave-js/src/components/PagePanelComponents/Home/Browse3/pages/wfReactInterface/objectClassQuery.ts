@@ -33,9 +33,9 @@ export const useBaseObjectInstances = <
 >(
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Loadable<Array<TraceObjSchemaForObjectClass<C>>> => {
+): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
   const [objects, setObjects] = useState<
-    Array<TraceObjSchemaForObjectClass<C>>
+    Array<TraceObjSchemaForBaseObjectClass<C>>
   >([]);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
@@ -93,7 +93,7 @@ const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
     .map(
       ({obj, parsed}) =>
         ({...obj, val: parsed.data} as TraceObjSchema<
-          ObjectClassType<C>,
+          BaseObjectClassType<C>,
           C
         >)
     );

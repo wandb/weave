@@ -245,7 +245,6 @@ def _load_custom_obj_files(
 
 
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
-
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
