@@ -49,7 +49,7 @@ class FeedbackDict(TypedDict, total=False):
     id: str
     feedback_type: str
     weave_ref: str
-    payload: dict[str, Any]
+    payload: ExtraKeysTypedDict
     creator: Optional[str]
     created_at: Optional[datetime.datetime]
     wb_user_id: Optional[str]
@@ -95,10 +95,10 @@ class CallSchema(BaseModel):
     # Start time is required
     started_at: datetime.datetime
     # Attributes: properties of the call
-    attributes: dict[str, Any]
+    attributes: ExtraKeysTypedDict
 
     # Inputs
-    inputs: dict[str, Any]
+    inputs: ExtraKeysTypedDict
 
     # End time is required if finished
     ended_at: Optional[datetime.datetime] = None
@@ -119,7 +119,7 @@ class CallSchema(BaseModel):
     deleted_at: Optional[datetime.datetime] = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
-    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+    def serialize_typed_dicts(self, v: ExtraKeysTypedDict) -> ExtraKeysTypedDict:
         return dict(v)
 
 
@@ -143,10 +143,10 @@ class StartedCallSchemaForInsert(BaseModel):
     # Start time is required
     started_at: datetime.datetime
     # Attributes: properties of the call
-    attributes: dict[str, Any]
+    attributes: ExtraKeysTypedDict
 
     # Inputs
-    inputs: dict[str, Any]
+    inputs: ExtraKeysTypedDict
 
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -170,7 +170,7 @@ class EndedCallSchemaForInsert(BaseModel):
     summary: SummaryInsertMap
 
     @field_serializer("summary")
-    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+    def serialize_typed_dicts(self, v: ExtraKeysTypedDict) -> ExtraKeysTypedDict:
         return dict(v)
 
 
@@ -205,7 +205,7 @@ class ObjSchemaForInsert(BaseModel):
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: list[dict[str, Any]]
+    rows: list[ExtraKeysTypedDict]
 
 
 class CallStartReq(BaseModel):
@@ -287,7 +287,7 @@ class CompletionsCreateReq(BaseModel):
 
 
 class CompletionsCreateRes(BaseModel):
-    response: dict[str, Any]
+    response: ExtraKeysTypedDict
     weave_call_id: Optional[str] = None
 
 
@@ -536,7 +536,7 @@ to parse.
 
 
 class TableAppendSpecPayload(BaseModel):
-    row: dict[str, Any]
+    row: ExtraKeysTypedDict
 
 
 class TableAppendSpec(BaseModel):
@@ -553,7 +553,7 @@ class TablePopSpec(BaseModel):
 
 class TableInsertSpecPayload(BaseModel):
     index: int
-    row: dict[str, Any]
+    row: ExtraKeysTypedDict
 
 
 class TableInsertSpec(BaseModel):
@@ -685,7 +685,7 @@ class FeedbackCreateReq(BaseModel):
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
     feedback_type: str = Field(examples=["custom"])
-    payload: dict[str, Any] = Field(
+    payload: ExtraKeysTypedDict = Field(
         examples=[
             {
                 "key": "value",
@@ -717,7 +717,7 @@ class FeedbackCreateRes(BaseModel):
     id: str
     created_at: datetime.datetime
     wb_user_id: str
-    payload: dict[str, Any]  # If not empty, replace payload
+    payload: ExtraKeysTypedDict  # If not empty, replace payload
 
 
 class Feedback(FeedbackCreateReq):
@@ -740,7 +740,7 @@ class FeedbackQueryReq(BaseModel):
 
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
-    result: list[dict[str, Any]]
+    result: list[ExtraKeysTypedDict]
 
 
 class FeedbackPurgeReq(BaseModel):
