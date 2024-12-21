@@ -24,7 +24,7 @@ export const FilterPanel = (props: FilterPanelProps) => {
     <div className="min-w-90 flex-auto self-stretch">
       <LocalizationProvider dateAdapter={AdapterMoment}>
         <AutoSizer
-          className="ml-2 flex items-center"
+          className="flex items-center"
           style={{
             width: '100%',
             height: '100%',
