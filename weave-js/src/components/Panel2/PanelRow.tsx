@@ -32,6 +32,7 @@ export interface PanelRowConfig {
 
   vertical?: boolean;
   filterEmpty?: boolean;
+  shouldUseSlider?: boolean;
   childConfig: any;
 }
 type PanelRowProps = Panel2.PanelConverterProps;
@@ -59,7 +60,13 @@ function defaultConfig(
     pageSize = 1;
   }
 
-  return {pageSize, vertical: false, filterEmpty: true, childConfig: undefined};
+  return {
+    pageSize,
+    vertical: false,
+    filterEmpty: true,
+    shouldUseSlider: false,
+    childConfig: undefined,
+  };
 }
 
 const useConfig = (
@@ -80,7 +87,7 @@ const PanelRowConfigComp: React.FC<PanelRowProps> = props => {
   const {updateConfig} = props;
   const {dashboardConfigOptions} = usePanelContext();
   const config = useConfig(props.input.type, props.child, props.config);
-  const {pageSize, vertical, filterEmpty} = config;
+  const {pageSize, vertical, filterEmpty, shouldUseSlider} = config;
   const childConfig = useMemo(
     () => config.childConfig ?? {},
     [config.childConfig]
@@ -133,6 +140,14 @@ const PanelRowConfigComp: React.FC<PanelRowProps> = props => {
         <Checkbox
           checked={filterEmpty ?? true}
           onChange={(e, {checked}) => updateConfig({filterEmpty: !!checked})}
+        />
+      </ConfigPanel.ConfigOption>
+      <ConfigPanel.ConfigOption label={'Use Slider'}>
+        <Checkbox
+          checked={shouldUseSlider ?? false}
+          onChange={(e, {checked}) =>
+            updateConfig({shouldUseSlider: !!checked})
+          }
         />
       </ConfigPanel.ConfigOption>
       <PanelComp2
@@ -228,12 +243,13 @@ const PanelRow: React.FC<PanelRowProps> = props => {
         })}
       </div>
       {(rowsNode.type.length == null || rowsNode.type.length > pageSize) && (
-        <div style={{flex: '0 0 auto', maxHeight: '27px'}}>
+        <div style={{flex: '0 0 auto'}}>
           <PageControls
             rowsNode={rowsNode}
             page={pageNum}
             pageSize={pageSize}
             setPage={setPageNum}
+            shouldUseSlider={config.shouldUseSlider ?? false}
           />
         </div>
       )}
