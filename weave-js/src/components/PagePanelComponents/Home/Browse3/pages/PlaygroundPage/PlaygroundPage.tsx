@@ -7,7 +7,11 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
+import {
+  DEFAULT_SYSTEM_MESSAGE,
+  parseTraceCall,
+  usePlaygroundState,
+} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
@@ -46,22 +50,37 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
 
   const {useCall, useCalls} = useWFHooks();
   const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const callKey = useMemo(() => {
+    return props.callId
+      ? {
+          entity: props.entity,
+          project: props.project,
+          callId: props.callId,
+        }
+      : null;
+  }, [props.entity, props.project, props.callId]);
 
-  const call = useCall(
-    useMemo(() => {
-      return props.callId
-        ? {
-            entity: props.entity,
-            project: props.project,
-            callId: props.callId,
-          }
-        : null;
-    }, [props.entity, props.project, props.callId])
-  );
-
-  const {result: calls} = useCalls(props.entity, props.project, {
-    callIds: playgroundStates.map(state => state.traceCall.id || ''),
+  const call = useCall(callKey);
+  const callWithCosts = useCall(callKey, {
+    includeCosts: true,
   });
+
+  const {result: calls} = useCalls(
+    props.entity,
+    props.project,
+    {
+      callIds: playgroundStates.map(state => state.traceCall.id || ''),
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      includeCosts: true,
+    }
+  );
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -84,12 +103,25 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   }, [call.loading]);
 
   useEffect(() => {
+    if (!callWithCosts.loading && callWithCosts.result) {
+      if (callWithCosts.result.traceCall?.inputs) {
+        setPlaygroundStateFromTraceCall(callWithCosts.result.traceCall);
+      }
+    }
+    // Only set the call the first time the page loads, and we get the call
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callWithCosts.loading]);
+
+  useEffect(() => {
     setPlaygroundStates(prev => {
       const newStates = [...prev];
       for (const [idx, state] of newStates.entries()) {
         for (const c of calls || []) {
           if (state.traceCall.id === c.callId) {
-            newStates[idx] = {...state, traceCall: c.traceCall || {}};
+            newStates[idx] = {
+              ...state,
+              traceCall: parseTraceCall(c.traceCall || {}),
+            };
             break;
           }
         }
