@@ -31,7 +31,7 @@ python-json-logger>=2.0.4
 numpy>=1.21
 
 # required for wandb
-wandb>=0.16.4
+wandb>=0.19.1
 graphql-core>3
 gql[requests]>=3.4.1
 # TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not 
