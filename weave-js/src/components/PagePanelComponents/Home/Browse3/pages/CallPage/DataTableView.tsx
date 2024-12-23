@@ -392,7 +392,7 @@ export const DataTableView: FC<{
   const displayRows = 10;
   const hideFooter = USE_TABLE_FOR_ARRAYS && gridRows.length <= displayRows;
   const headerHeight = 40;
-  const footerHeight = 52;
+  const footerHeight = 40;
   const rowHeight = 36;
   const contentHeight = rowHeight * Math.min(displayRows, gridRows.length);
   const loadingHeight = 100;

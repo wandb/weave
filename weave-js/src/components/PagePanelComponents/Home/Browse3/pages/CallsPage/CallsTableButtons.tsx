@@ -9,7 +9,7 @@ import {
   useGridApiContext,
   useGridSelector,
 } from '@mui/x-data-grid-pro';
-import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {MOON_400, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Radio, Switch} from '@wandb/weave/components';
@@ -35,6 +35,7 @@ import {
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
+import {isMac} from '@wandb/weave/common/util/browser';
 
 const MAX_EXPORT = 10_000;
 
@@ -666,34 +667,44 @@ export const PaginationButtons = () => {
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
   return (
-    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
-      <Button
-        variant="quiet"
-        size="medium"
-        onClick={handlePrevPage}
-        disabled={page === 0}
-        icon="chevron-back"
-      />
-      <Box
-        mx={1}
-        sx={{
-          fontSize: '14px',
-          fontWeight: '400',
-          color: MOON_500,
-          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
-          minWidth: '90px',
-          display: 'flex',
-          justifyContent: 'center',
-        }}>
-        {start}-{end} of {rowCount}
+    <Box display="flex" alignItems="center" justifyContent="center" padding={1} width="100%">
+      <Box display="flex" alignItems="center">
+        <Button
+          variant="quiet"
+          size="small"
+          onClick={handlePrevPage}
+          disabled={page === 0}
+          icon="chevron-back"
+        />
+        <Box
+          mx={1}
+          sx={{
+            fontSize: '14px',
+            fontWeight: '400',
+            color: MOON_500,
+            // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
+            minWidth: '90px',
+            display: 'flex',
+            justifyContent: 'center',
+          }}>
+          {start}-{end} of {rowCount}
+        </Box>
+        <Button
+          variant="quiet"
+          size="small"
+          onClick={handleNextPage}
+          disabled={page >= pageCount - 1}
+          icon="chevron-next"
+        />
       </Box>
-      <Button
-        variant="quiet"
-        size="medium"
-        onClick={handleNextPage}
-        disabled={page >= pageCount - 1}
-        icon="chevron-next"
-      />
+      <Box display="flex" alignItems="center" marginLeft="auto" marginRight={1} sx={{ fontSize: '14px', color: MOON_500 }}>
+        <Box component="span" sx={{ fontSize: '14px', border: `1px solid ${MOON_400}`, fontWeight: '600', padding: '0px 4px', marginRight: '4px', borderRadius: '4px' }}>
+          {isMac ? 'Alt' : 'Option'}
+        </Box>
+        + 
+        <Box component="span" sx={{ fontSize: '14px', border: `1px solid ${MOON_400}`, fontWeight: '600', padding: '0px 4px', marginLeft: '4px', marginRight: '8px', borderRadius: '4px' }}>Click</Box>
+        on a cell to filter by the value
+      </Box>
     </Box>
   );
 };

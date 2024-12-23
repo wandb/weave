@@ -965,6 +965,7 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+            minHeight: 40,
           },
           '& .MuiDataGrid-main:focus-visible': {
             outline: 'none',
