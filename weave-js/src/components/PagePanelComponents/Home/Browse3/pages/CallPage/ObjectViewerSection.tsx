@@ -44,7 +44,7 @@ TitleRow.displayName = 'S.TitleRow';
 const Title = styled.div`
   flex: 1 1 auto;
   font-family: Source Sans Pro;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 32px;
   letter-spacing: 0px;
