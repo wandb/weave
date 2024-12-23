@@ -22,6 +22,7 @@ import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
+import {Icon} from '../../../../../Icon';
 
 const EXPANDED_IDS_LENGTH = 200;
 
@@ -49,6 +50,13 @@ const Title = styled.div`
   line-height: 32px;
   letter-spacing: 0px;
   text-align: left;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  
+  &:hover {
+    opacity: 0.8;
+  }
 `;
 Title.displayName = 'S.Title';
 
@@ -172,6 +180,14 @@ const ObjectViewerSectionNonEmpty = ({
     }
   };
 
+  const onToggleExpansion = () => {
+    if (mode === 'expanded') {
+      onClickCollapsed();
+    } else {
+      onClickExpanded();
+    }
+  };
+
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
     const isSimple = isSimpleData(data);
@@ -187,21 +203,23 @@ const ObjectViewerSectionNonEmpty = ({
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
-        <Title>{title}</Title>
+        <Title onClick={() => setMode(mode === 'hidden' ? 'collapsed' : 'hidden')}>
+          <Icon
+            name={mode === 'hidden' ? 'chevron-next' : 'chevron-down'}
+            width={16}
+            height={16}
+            style={{marginRight: '8px'}}
+          />
+          {title}
+        </Title>
         <Button
           variant="quiet"
-          icon="row-height-small"
-          active={mode === 'collapsed'}
-          onClick={onClickCollapsed}
-          tooltip="View collapsed"
-        />
-        <Button
-          variant="quiet"
-          icon="expand-uncollapse"
-          active={mode === 'expanded'}
-          onClick={onClickExpanded}
+          icon={mode === 'expanded' ? 'collapse' : 'expand-uncollapse'}
+          onClick={onToggleExpansion}
           tooltip={
-            isExpandAllSmall
+            mode === 'expanded'
+              ? 'View collapsed'
+              : isExpandAllSmall
               ? 'Expand all'
               : `Expand next ${EXPANDED_IDS_LENGTH} rows`
           }
@@ -213,15 +231,6 @@ const ObjectViewerSectionNonEmpty = ({
           onClick={() => setMode('json')}
           tooltip="View as JSON"
         />
-        {!noHide && (
-          <Button
-            variant="quiet"
-            icon="hide-hidden"
-            active={mode === 'hidden'}
-            onClick={() => setMode('hidden')}
-            tooltip="Hide"
-          />
-        )}
       </TitleRow>
       {body}
     </Box>
