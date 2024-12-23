@@ -12,6 +12,7 @@ import {
 import {MOON_400, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import {isMac} from '@wandb/weave/common/util/browser';
 import {Radio, Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
@@ -35,7 +36,6 @@ import {
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
-import {isMac} from '@wandb/weave/common/util/browser';
 
 const MAX_EXPORT = 10_000;
 
