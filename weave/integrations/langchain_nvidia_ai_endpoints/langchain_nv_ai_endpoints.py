@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import importlib
 import time
-from collections.abc import Iterator
-from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import_failed = False
 
@@ -13,13 +13,16 @@ except ImportError:
     import_failed = True
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+
+_lc_nvidia_patcher: MultiPatcher | None = None
 
 
 # NVIDIA-specific accumulator for parsing the objects of streaming interactions
-def nvidia_accumulator(acc: Optional[Any], value: Any) -> Any:
+def nvidia_accumulator(acc: Any | None, value: Any) -> Any:
     if acc is None:
         acc = ChatGenerationChunk(message=AIMessageChunk(content=""))
     acc = acc + value
@@ -32,11 +35,15 @@ def nvidia_accumulator(acc: Optional[Any], value: Any) -> Any:
 
 
 # Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
-def post_process_to_openai_format(output: Any) -> dict:
+def postprocess_output_to_openai_format(output: Any) -> dict:
+    """
+    Need to post process the output reported to weave to send it on openai format so that Weave front end renders
+    chat view. This only affects what is sent to weave.
+    """
     from openai.types.chat import ChatCompletion
 
     if isinstance(output, ChatResult):  ## its ChatResult
-        message = output.llm_output  ## List of ChatGeneration
+        message = output.llm_output
         enhanced_usage = message.get("token_usage", {})
         enhanced_usage["output_tokens"] = message.get("token_usage").get(
             "completion_tokens", 0
@@ -110,10 +117,13 @@ def post_process_to_openai_format(output: Any) -> dict:
     return output
 
 
-## Need a separate stream variant as the passed objects don't provide an indication
-def process_inputs_to_openai_format_stream(
+def postprocess_inputs_to_openai_format(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs:
+    """
+    Need to process the input reported to weave to send it on openai format so that Weave front end renders
+    chat view. This only affects what is sent to weave.
+    """
     original_args = args
     original_kwargs = kwargs
 
@@ -122,36 +132,9 @@ def process_inputs_to_openai_format_stream(
     messages_array = convert_to_openai_messages(messages_array)
     n = len(messages_array)
 
-    weave_report = {
-        "model": chat_nvidia_obj.model,
-        "messages": messages_array,
-        "max_tokens": chat_nvidia_obj.max_tokens,
-        "temperature": chat_nvidia_obj.temperature,
-        "top_p": chat_nvidia_obj.top_p,
-        "object": "ChatNVIDIA._stream",
-        "n": n,
-        "stream": True,
-    }
-
-    return ProcessedInputs(
-        original_args=original_args,
-        original_kwargs=original_kwargs,
-        args=original_args,
-        kwargs=original_kwargs,
-        inputs=weave_report,
-    )
-
-
-def process_inputs_to_openai_format(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs:
-    original_args = args
-    original_kwargs = kwargs
-
-    chat_nvidia_obj = args[0]
-    messages_array = args[1]
-    messages_array = convert_to_openai_messages(messages_array)
-    n = len(messages_array)
+    stream = False
+    if "stream" in func.name:
+        stream = True
 
     weave_report = {
         "model": chat_nvidia_obj.model,
@@ -161,7 +144,7 @@ def process_inputs_to_openai_format(
         "top_p": chat_nvidia_obj.top_p,
         "object": "ChatNVIDIA._generate",
         "n": n,
-        "stream": False,
+        "stream": stream,
     }
 
     return ProcessedInputs(
@@ -173,64 +156,66 @@ def process_inputs_to_openai_format(
     )
 
 
-# Wrap synchronous invoke method
-def create_invoke_wrapper(name: str) -> Callable[[Callable], Callable]:
-    """Wrap the invoke method."""
+def should_use_accumulator(inputs: dict) -> bool:
+    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
+
+def nvidia_ai_endpoints_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        @wraps(fn)
-        def invoke_fn(*args: Any, **kwargs: Any) -> Any:
-            return fn(*args, **kwargs)
-
-        op = weave.op()(invoke_fn)
-        op.name = name
-        op._set_on_input_handler(process_inputs_to_openai_format)
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        op._set_on_input_handler(postprocess_inputs_to_openai_format)
         return add_accumulator(
             op,
-            make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda kwargs: False,  # No accumulation for invoke directly
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
+            make_accumulator=lambda inputs: nvidia_accumulator,
+            should_accumulate=should_use_accumulator,
+            on_finish_post_processor=postprocess_output_to_openai_format,
         )
 
     return wrapper
 
 
-# Wrap streaming methods (synchronous)
-def create_stream_wrapper(name: str) -> Callable[[Callable], Callable]:
-    """Wrap a synchronous streaming method for ChatNVIDIA."""
+def get_nvidia_ai_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
 
-    def wrapper(fn: Callable) -> Callable:
-        @wraps(fn)
-        def stream_fn(*args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
-            yield from fn(*args, **kwargs)  # Directly yield chunks
+    if not settings.enabled:
+        return NoOpPatcher()
 
-        op = weave.op()(stream_fn)
-        op.name = name
-        op._set_on_input_handler(process_inputs_to_openai_format_stream)
-        return add_accumulator(
-            op,
-            make_accumulator=lambda _: nvidia_accumulator,
-            should_accumulate=lambda _: True,  # Always accumulate for streaming
-            on_finish_post_processor=post_process_to_openai_format,  # Apply post-processor
-        )
+    global _lc_nvidia_patcher
+    if _lc_nvidia_patcher is not None:
+        return _lc_nvidia_patcher
 
-    return wrapper
+    base = settings.op_settings
 
+    generate_settings: OpSettings = base.model_copy(
+        update={
+            "name": base.name or "langchain_nvidia_ai_endpoints.ChatNVIDIA._generate",
+        }
+    )
+    stream_settings: OpSettings = base.model_copy(
+        update={
+            "name": base.name or "langchain_nvidia_ai_endpoints.ChatNVIDIA._stream",
+        }
+    )
 
-# Define the patcher
-lc_nvidia_patcher = MultiPatcher(
-    [
-        # Patch synchronous invoke method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA._generate",
-            create_invoke_wrapper("langchain.Llm.ChatNVIDIA._generate"),
-        ),
-        # Patch synchronous stream method
-        SymbolPatcher(
-            lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
-            "ChatNVIDIA._stream",
-            create_stream_wrapper("langchain.Llm.ChatNVIDIA._stream"),
-        ),
-    ]
-)
+    _lc_nvidia_patcher = MultiPatcher(
+        [
+            # Patch invoke method
+            SymbolPatcher(
+                lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+                "ChatNVIDIA._generate",
+                nvidia_ai_endpoints_wrapper(generate_settings),
+            ),
+            # Patch stream method
+            SymbolPatcher(
+                lambda: importlib.import_module("langchain_nvidia_ai_endpoints"),
+                "ChatNVIDIA._stream",
+                nvidia_ai_endpoints_wrapper(stream_settings),
+            ),
+        ]
+    )
+
+    return _lc_nvidia_patcher

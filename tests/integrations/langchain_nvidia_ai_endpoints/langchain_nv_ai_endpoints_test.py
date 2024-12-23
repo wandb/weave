@@ -31,7 +31,10 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
 
     assert response.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-generate"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-generate"
+    )
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
@@ -76,15 +79,18 @@ async def test_chatnvidia_async_quickstart(
 
     assert response.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-generate"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-generate"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 12
@@ -125,16 +131,19 @@ def test_chatnvidia_stream_quickstart(
 
     assert answer.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-stream"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-stream"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
     print(call.summary["usage"][output["model"]])
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 12
@@ -174,16 +183,19 @@ async def test_chatnvidia_async_stream_quickstart(
 
     assert answer.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-stream"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-stream"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
     print(call.summary["usage"][output["model"]])
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 12
@@ -252,15 +264,18 @@ def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> N
 
     assert response.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-generate"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-generate"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 30
     assert usage["prompt_tokens"] == 318
@@ -337,15 +352,18 @@ async def test_chatnvidia_tool_call_async(
 
     assert response.content is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-generate"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-generate"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 30
     assert usage["prompt_tokens"] == 318
@@ -426,15 +444,18 @@ def test_chatnvidia_tool_call_stream(
 
     assert answer.tool_calls is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-stream"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-stream"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 30
     assert usage["prompt_tokens"] == 318
@@ -516,15 +537,18 @@ async def test_chatnvidia_tool_call_async_stream(
 
     assert answer.tool_calls is not None
 
-    assert op_name_from_ref(call.op_name) == "langchain.Llm.ChatNVIDIA-stream"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "langchain_nvidia_ai_endpoints.ChatNVIDIA-stream"
+    )
     assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
+    assert call.started_at < call.ended_at
 
     output = call.output
     assert output["model"] == model
     assert output["object"] == "chat.completion"
 
-    usage = call.summary["usage"][output["model"]]  # type: ignore
+    usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
     assert usage["completion_tokens"] == 30
     assert usage["prompt_tokens"] == 318

@@ -65,6 +65,9 @@ langchain = [
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
+]
+langchain_nvidia_ai_endpoints = [
+  "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]

@@ -26,7 +26,7 @@ interactions:
     uri: https://integrate.api.nvidia.com/v1/chat/completions
   response:
     body:
-      string: '{"id":"chat-f7a9f3ef4ea74c0bad266017f338ba2a","object":"chat.completion","created":1734395993,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"chatcmpl-tool-344a27a8c74e4bcc9bccc8f12f9ac62f","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
+      string: '{"id":"chat-c827eb3e9dad425dbde170c946ff7cf7","object":"chat.completion","created":1734992507,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"chatcmpl-tool-3b35163e6a5a4961aa22b93581a0c5b2","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
         \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 183}"}}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30},"prompt_logprobs":null}'
     headers:
       Access-Control-Allow-Credentials:
@@ -40,9 +40,9 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 17 Dec 2024 00:39:54 GMT
+      - Mon, 23 Dec 2024 22:21:48 GMT
       Nvcf-Reqid:
-      - b688e113-be54-457e-8d3c-2f057973821c
+      - 497f5f82-973e-4224-8593-97664a04b39c
       Nvcf-Status:
       - fulfilled
       Server:

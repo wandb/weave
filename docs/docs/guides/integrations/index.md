@@ -20,7 +20,7 @@ LLM providers are the vendors that offer access to large language models for gen
 - **[Groq](/guides/integrations/groq)**
 - **[Open Router](/guides/integrations/openrouter)**
 - **[LiteLLM](/guides/integrations/litellm)**
-- - **[NVIDIA NIM](/guides/integrations/nvidia_nim)**
+- **[NVIDIA NIM](/guides/integrations/nvidia_nim)**
 
 
 
