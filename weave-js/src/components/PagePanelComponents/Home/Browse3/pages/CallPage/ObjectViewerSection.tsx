@@ -14,6 +14,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {Icon} from '../../../../../Icon';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -22,7 +23,6 @@ import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
-import {Icon} from '../../../../../Icon';
 
 const EXPANDED_IDS_LENGTH = 200;
 
