@@ -6,7 +6,12 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../Button';
-import {FilterId, getFieldType, getGroupedOperatorOptions, isWeaveRef} from './common';
+import {
+  FilterId,
+  getFieldType,
+  getGroupedOperatorOptions,
+  isWeaveRef,
+} from './common';
 import {SelectField, SelectFieldOption} from './SelectField';
 import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';

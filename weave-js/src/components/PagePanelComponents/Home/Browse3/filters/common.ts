@@ -307,11 +307,13 @@ export type OperatorGroupedOption = {
   options: SelectOperatorOption[];
 };
 
-/** 
- * Return grouped operators by type (string, number, bool, etc.). 
- * Customize the group labels & operators as needed. 
+/**
+ * Return grouped operators by type (string, number, bool, etc.).
+ * Customize the group labels & operators as needed.
  */
-export function getGroupedOperatorOptions(field: string): OperatorGroupedOption[] {
+export function getGroupedOperatorOptions(
+  field: string
+): OperatorGroupedOption[] {
   const stringOperators: SelectOperatorOption[] = [
     {value: '(string): contains', label: 'contains'},
     {value: '(string): equals', label: 'equals'},

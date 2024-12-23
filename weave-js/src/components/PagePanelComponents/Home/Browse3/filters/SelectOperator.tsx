@@ -3,10 +3,10 @@
  */
 import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
+import {components, GroupHeadingProps} from 'react-select';
 
 import {Tooltip} from '../../../../Tooltip';
 import {OperatorGroupedOption, SelectOperatorOption} from './common';
-import {components, GroupHeadingProps} from 'react-select';
 
 type SelectOperatorProps = {
   options: OperatorGroupedOption[];
