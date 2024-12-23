@@ -301,3 +301,55 @@ export const upsertFilter = (
     items,
   };
 };
+
+export type OperatorGroupedOption = {
+  label: string;
+  options: SelectOperatorOption[];
+};
+
+/** 
+ * Return grouped operators by type (string, number, bool, etc.). 
+ * Customize the group labels & operators as needed. 
+ */
+export function getGroupedOperatorOptions(field: string): OperatorGroupedOption[] {
+  const stringOperators: SelectOperatorOption[] = [
+    {value: '(string): contains', label: 'contains'},
+    {value: '(string): equals', label: 'equals'},
+    {value: '(string): in', label: 'in'},
+  ];
+  const numberOperators: SelectOperatorOption[] = [
+    {value: '(number): =', label: '='},
+    {value: '(number): !=', label: '≠'},
+    {value: '(number): <', label: '<'},
+    {value: '(number): <=', label: '≤'},
+    {value: '(number): >', label: '>'},
+    {value: '(number): >=', label: '≥'},
+  ];
+  const dateOperators: SelectOperatorOption[] = [
+    {value: '(date): after', label: 'after'},
+    {value: '(date): before', label: 'before'},
+  ];
+  const boolOperators: SelectOperatorOption[] = [
+    {value: '(bool): is', label: 'is'},
+  ];
+  const anyOperators: SelectOperatorOption[] = [
+    {value: '(any): isEmpty', label: 'is empty'},
+    {value: '(any): isNotEmpty', label: 'is not empty'},
+  ];
+
+  // Select which groups/ops to show based on the field type
+  const fieldType = getFieldType(field);
+  if (fieldType === 'datetime') {
+    return [{label: 'Date Operators', options: dateOperators}];
+  } else if (fieldType === 'user') {
+    return [{label: 'String Operators', options: stringOperators}];
+  }
+  // Fallback: show all grouped
+  return [
+    {label: 'String', options: stringOperators},
+    {label: 'Number', options: numberOperators},
+    {label: 'Boolean', options: boolOperators},
+    {label: 'Date', options: dateOperators},
+    {label: 'Other', options: anyOperators},
+  ];
+}
