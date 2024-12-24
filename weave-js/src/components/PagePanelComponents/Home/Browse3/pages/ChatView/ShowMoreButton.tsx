@@ -18,13 +18,14 @@ export const ShowMoreButton = ({
         'flex w-full items-center justify-center',
         {
           'pt-[4px]': isShowingMore,
-          [`absolute mt-[-44px] pt-[24px] pb-[4px] from-60% z-[1] rounded-b-xl bg-gradient-to-t ${
+          [`absolute mt-[-32px] pt-[16px] pb-[4px] from-70% z-[1] rounded-b-xl bg-gradient-to-t ${
             isUser ? 'from-[#f4fbe8]' : 'from-white'
           } to-transparent`]: !isShowingMore,
         }
       )}>
       <Button
         variant="ghost"
+        size="small"
         endIcon={isShowingMore ? 'chevron-up' : 'chevron-down'}
         onClick={() => setIsShowingMore(!isShowingMore)}>
         {isShowingMore ? 'Show less' : 'Show more'}
