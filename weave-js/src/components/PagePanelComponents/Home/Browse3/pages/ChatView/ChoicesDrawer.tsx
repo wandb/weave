@@ -94,7 +94,7 @@ export const ChoicesDrawer = ({
         </Box>
       </Box>
       <Tailwind>
-        <div className="flex flex-col p-12 mb-[72px] gap-[16px]">
+        <div className="flex flex-col pt-[8px] pb-[16px] px-[16px] mb-[72px] gap-[16px]">
           {choices.map((c, index) => (
             <div key={index}>
               <div className="sticky top-[44px] flex items-center bg-white py-[8px] z-10">
