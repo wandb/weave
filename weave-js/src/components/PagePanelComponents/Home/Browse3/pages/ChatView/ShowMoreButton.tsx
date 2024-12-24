@@ -15,15 +15,15 @@ export const ShowMoreButton = ({
   return (
     <div
       className={classNames(
-        'mb-[-8px] flex w-full items-center justify-center pb-8',
+        'flex w-full items-center justify-center',
         {
-          [`from-34% rounded-b-xl bg-gradient-to-t ${
-            isUser ? 'from-cactus-300/[0.32]' : 'from-moon-150'
+          'pt-[4px]': isShowingMore,
+          [`absolute mt-[-44px] pt-[24px] pb-[4px] from-60% z-[1] rounded-b-xl bg-gradient-to-t ${
+            isUser ? 'from-[#f4fbe8]' : 'from-white'
           } to-transparent`]: !isShowingMore,
         }
       )}>
       <Button
-        className="z-10"
         variant="ghost"
         endIcon={isShowingMore ? 'chevron-up' : 'chevron-down'}
         onClick={() => setIsShowingMore(!isShowingMore)}>
