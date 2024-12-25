@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import React, {FC, ReactElement, useMemo, useRef, useState, useEffect} from 'react';
+import React, {FC, ReactElement, useEffect,useMemo, useRef, useState} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
