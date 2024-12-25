@@ -15,7 +15,6 @@ export const TagTooltip = React.forwardRef<HTMLElement, TagTooltipProps>(
       <Tooltip
         ref={ref}
         position="top center"
-        open={passThroughProps.disabled ? false : undefined}
         content={
           <span
             style={{

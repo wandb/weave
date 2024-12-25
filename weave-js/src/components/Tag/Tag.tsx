@@ -111,16 +111,7 @@ export const RemovableTag: FC<RemovableTagProps> = ({
         setIsTruncated(isTagLabelTruncated(labelRef));
       }
     };
-
     checkTruncation();
-    window.addEventListener('resize', checkTruncation);
-    
-    const timer = setTimeout(checkTruncation, 100);
-
-    return () => {
-      window.removeEventListener('resize', checkTruncation);
-      clearTimeout(timer);
-    };
   }, [label]);
 
   const classes = useTagClasses({color, isInteractive: true, label});
