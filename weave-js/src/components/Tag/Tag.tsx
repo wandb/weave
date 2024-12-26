@@ -106,12 +106,9 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   const [isTruncated, setIsTruncated] = useState(false);
 
   useEffect(() => {
-    const checkTruncation = () => {
-      if (labelRef.current) {
-        setIsTruncated(isTagLabelTruncated(labelRef));
-      }
-    };
-    checkTruncation();
+    if (labelRef.current) {
+      setIsTruncated(isTagLabelTruncated(labelRef));
+    }
   }, [label]);
 
   const classes = useTagClasses({color, isInteractive: true, label});
