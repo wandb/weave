@@ -118,8 +118,8 @@ export const opDictPick = makeObjectOp({
   hidden: true,
 });
 
-const opNoKeyManipulationPickArgs: Parameters<typeof makeObjectOp>['0'] = {
-  name: 'no-key-manipulation-pick',
+const opArtifactMetadataPickArgs: Parameters<typeof makeObjectOp>['0'] = {
+  name: 'artifactMetadata-pick',
   hidden: true,
   argTypes: objectArgTypes,
   renderInfo: {type: 'brackets'},
@@ -182,8 +182,8 @@ const opNoKeyManipulationPickArgs: Parameters<typeof makeObjectOp>['0'] = {
     return typedDictPathVal(inputs.obj, [inputs.key]);
   },
 };
-export const opNoKeyManipulationPick = makeObjectOp(
-  opNoKeyManipulationPickArgs
+export const opArtifactMetadataPick = makeObjectOp(
+  opArtifactMetadataPickArgs
 );
 
 export const opValues = makeOp({
