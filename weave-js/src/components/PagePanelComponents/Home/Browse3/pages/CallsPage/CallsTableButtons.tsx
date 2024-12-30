@@ -718,7 +718,7 @@ export const PaginationButtons = () => {
             marginRight: '4px',
             borderRadius: '4px',
           }}>
-          {isMac() ? 'Alt' : 'Option'}
+          {isMac ? 'Alt' : 'Option'}
         </Box>
         +
         <Box

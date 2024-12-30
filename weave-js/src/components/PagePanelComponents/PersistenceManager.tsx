@@ -503,7 +503,7 @@ const HeaderFileControls: React.FC<{
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
-      if ((isMac() && !e.metaKey) || (!isMac() && !e.ctrlKey)) {
+      if ((isMac && !e.metaKey) || (!isMac && !e.ctrlKey)) {
         return;
       }
       if (e.key === `z` && canUndo) {
@@ -618,7 +618,7 @@ const HeaderFileControls: React.FC<{
                 <IconUndo />
               </MenuIcon>
               <MenuText>Undo</MenuText>
-              <MenuShortcut keys={[isMac() ? `Cmd` : `Ctrl`, `Z`]} />
+              <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Z`]} />
             </MenuItem>
           )}
           {canRedo && (
@@ -631,7 +631,7 @@ const HeaderFileControls: React.FC<{
                 <IconRedo />
               </MenuIcon>
               <MenuText>Redo</MenuText>
-              <MenuShortcut keys={[isMac() ? `Cmd` : `Ctrl`, `Y`]} />
+              <MenuShortcut keys={[isMac ? `Cmd` : `Ctrl`, `Y`]} />
             </MenuItem>
           )}
 

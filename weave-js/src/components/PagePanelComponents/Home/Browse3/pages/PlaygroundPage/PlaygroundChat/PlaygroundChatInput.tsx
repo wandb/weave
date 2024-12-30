@@ -77,7 +77,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
             fontSize: '12px',
             color: MOON_500,
           }}>
-          Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
+          Press {isMac ? 'CMD' : 'Ctrl'} + Enter to send
         </Box>
         <StyledTextArea
           onChange={e => setChatText(e.target.value)}
