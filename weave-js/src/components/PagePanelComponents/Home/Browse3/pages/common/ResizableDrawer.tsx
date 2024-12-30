@@ -1,7 +1,7 @@
 import {Box, Drawer, DrawerProps} from '@mui/material';
 import React, {useCallback, useEffect, useState} from 'react';
 
-interface ResizableDrawerProps extends Omit<DrawerProps, 'onClose' | 'anchor'> {
+interface ResizableDrawerProps extends Omit<DrawerProps, 'onClose' | 'anchor' | 'title'> {
   onClose: () => void;
   defaultWidth?: number;
   title?: React.ReactNode;
