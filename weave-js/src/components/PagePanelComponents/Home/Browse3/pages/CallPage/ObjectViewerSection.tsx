@@ -53,7 +53,7 @@ const Title = styled.div`
   display: flex;
   align-items: center;
   cursor: pointer;
-  
+
   &:hover {
     opacity: 0.8;
   }
@@ -203,7 +203,8 @@ const ObjectViewerSectionNonEmpty = ({
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
-        <Title onClick={() => setMode(mode === 'hidden' ? 'collapsed' : 'hidden')}>
+        <Title
+          onClick={() => setMode(mode === 'hidden' ? 'collapsed' : 'hidden')}>
           <Icon
             name={mode === 'hidden' ? 'chevron-next' : 'chevron-down'}
             width={16}
