@@ -74,7 +74,13 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
         flexDirection: 'column',
         gap: '4px',
       }}>
-      <Box sx={{display: 'flex', gap: '4px', fontSize: '14px', alignItems: 'center'}}>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: '4px',
+          fontSize: '14px',
+          alignItems: 'center',
+        }}>
         Functions
         {!LLM_MAX_TOKENS[playgroundState.model]?.supports_function_calling && (
           <Tooltip title="This model does not support functions">

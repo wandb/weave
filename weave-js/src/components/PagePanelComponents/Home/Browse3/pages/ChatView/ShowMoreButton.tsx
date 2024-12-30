@@ -14,15 +14,12 @@ export const ShowMoreButton = ({
 }: ShowMoreButtonProps) => {
   return (
     <div
-      className={classNames(
-        'flex w-full items-center justify-center',
-        {
-          'pt-[4px]': isShowingMore,
-          [`absolute mt-[-32px] pt-[16px] pb-[4px] from-70% z-[1] rounded-b-xl bg-gradient-to-t ${
-            isUser ? 'from-[#f4fbe8]' : 'from-white'
-          } to-transparent`]: !isShowingMore,
-        }
-      )}>
+      className={classNames('flex w-full items-center justify-center', {
+        'pt-[4px]': isShowingMore,
+        [`absolute z-[1] mt-[-32px] rounded-b-xl bg-gradient-to-t from-70% pb-[4px] pt-[16px] ${
+          isUser ? 'from-[#f4fbe8]' : 'from-white'
+        } to-transparent`]: !isShowingMore,
+      })}>
       <Button
         variant="ghost"
         size="small"

@@ -34,7 +34,7 @@ export const StopSequenceEditor: React.FC<StopSequenceEditorProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
-        width: '100%'
+        width: '100%',
       }}>
       <span style={{fontSize: '14px'}}>Stop sequences</span>
       <Box

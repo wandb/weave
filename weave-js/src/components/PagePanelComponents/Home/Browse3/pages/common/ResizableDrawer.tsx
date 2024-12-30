@@ -1,5 +1,4 @@
 import {Box, Drawer, DrawerProps} from '@mui/material';
-import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import React, {useCallback, useEffect, useState} from 'react';
 
 interface ResizableDrawerProps extends Omit<DrawerProps, 'onClose' | 'anchor'> {
@@ -22,12 +21,17 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
   const [internalWidth, setInternalWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
   // 73px = 57px sidebar + 16px padding
-  const [maxAllowedWidth, setMaxAllowedWidth] = useState(window.innerWidth - 73);
+  const [maxAllowedWidth, setMaxAllowedWidth] = useState(
+    window.innerWidth - 73
+  );
 
-  const setWidthValue = useCallback((newWidth: number) => {
-    setInternalWidth(newWidth);
-    externalSetWidth?.(newWidth);
-  }, [externalSetWidth]);
+  const setWidthValue = useCallback(
+    (newWidth: number) => {
+      setInternalWidth(newWidth);
+      externalSetWidth?.(newWidth);
+    },
+    [externalSetWidth]
+  );
 
   useEffect(() => {
     if (externalSetWidth) {
@@ -59,7 +63,9 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!isResizing) return;
+      if (!isResizing) {
+        return;
+      }
 
       const newWidth = window.innerWidth - e.clientX;
       if (newWidth >= 120 && newWidth <= maxAllowedWidth) {
@@ -83,33 +89,33 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
 
   return (
     <Drawer
-        {...drawerProps}
-        anchor="right"
-        onClose={onClose}
+      {...drawerProps}
+      anchor="right"
+      onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          mt: '60px',
+          width: `${internalWidth}px`,
+          position: 'fixed',
+          maxWidth: `${maxAllowedWidth}px`,
+          minWidth: '120px',
+        },
+      }}>
+      <Box
         sx={{
-            '& .MuiDrawer-paper': {
-            mt: '60px',
-            width: `${internalWidth}px`,
-            position: 'fixed',
-            maxWidth: `${maxAllowedWidth}px`,
-            minWidth: '120px'
-            },
-        }}>
-        <Box
-            sx={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: -4,
-            width: 8,
-            cursor: 'ew-resize',
-            '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-            },
-            }}
-            onMouseDown={handleMouseDown}
-        />
-            {children}
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: -4,
+          width: 8,
+          cursor: 'ew-resize',
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',
+          },
+        }}
+        onMouseDown={handleMouseDown}
+      />
+      {children}
     </Drawer>
   );
 };

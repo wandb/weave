@@ -1,14 +1,13 @@
-import {Box, Drawer} from '@mui/material';
+import {Box} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
-import {Tag} from '@wandb/weave/components/Tag';
+import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 
 import {Button} from '../../../../../Button';
+import {ResizableDrawer} from '../common/ResizableDrawer';
 import {ChoiceView} from './ChoiceView';
 import {Choice} from './types';
-import {ResizableDrawer} from '../common/ResizableDrawer';
-import {Icon} from '@wandb/weave/components/Icon';
 
 type ChoicesDrawerProps = {
   choices: Choice[];
@@ -28,7 +27,9 @@ export const ChoicesDrawer = ({
   setSelectedChoiceIndex,
 }: ChoicesDrawerProps) => {
   const [width, setWidth] = useState(784);
-  const [maxAllowedWidth, setMaxAllowedWidth] = useState(window.innerWidth - 73);
+  const [maxAllowedWidth, setMaxAllowedWidth] = useState(
+    window.innerWidth - 73
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -55,8 +56,8 @@ export const ChoicesDrawer = ({
           position: 'sticky',
           top: 0,
           zIndex: 20,
-          pl: "16px",
-          pr: "8px",
+          pl: '16px',
+          pr: '8px',
           height: 44,
           width: '100%',
           borderBottom: `1px solid ${MOON_200}`,
@@ -82,7 +83,9 @@ export const ChoicesDrawer = ({
             variant="ghost"
             icon="full-screen-mode-expand"
             onClick={handleFullScreen}
-            tooltip={width === maxAllowedWidth ? "Exit full screen" : "Full screen"}
+            tooltip={
+              width === maxAllowedWidth ? 'Exit full screen' : 'Full screen'
+            }
           />
           <Button
             size="medium"
@@ -94,15 +97,22 @@ export const ChoicesDrawer = ({
         </Box>
       </Box>
       <Tailwind>
-        <div className="flex flex-col pt-[8px] pb-[16px] px-[16px] mb-[72px] gap-[16px]">
+        <div className="mb-[72px] flex flex-col gap-[16px] px-[16px] pb-[16px] pt-[8px]">
           {choices.map((c, index) => (
             <div key={index}>
-              <div className="sticky top-[44px] flex items-center bg-white py-[8px] z-10">
-                <p className="text-[14px] font-semibold mr-auto">Trial {index + 1}</p>
+              <div className="sticky top-[44px] z-10 flex items-center bg-white py-[8px]">
+                <p className="mr-auto text-[14px] font-semibold">
+                  Trial {index + 1}
+                </p>
                 {index === selectedChoiceIndex ? (
                   <div className="flex items-center gap-[2px]">
-                    <Icon name="checkmark" className="ml-[4px] w-[16px] text-green-500" />
-                    <span className="font-semibold text-sm">Response selected</span>
+                    <Icon
+                      name="checkmark"
+                      className="ml-[4px] w-[16px] text-green-500"
+                    />
+                    <span className="text-sm font-semibold">
+                      Response selected
+                    </span>
                   </div>
                 ) : (
                   <Button

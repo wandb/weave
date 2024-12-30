@@ -122,8 +122,10 @@ export const MessagePanel = ({
             <div
               ref={contentRef}
               className={classNames('w-full overflow-y-hidden', {
-                'max-h-[400px]': !isShowingMore && !editorHeight && !isNested && !hasToolCalls,
-                'max-h-full': isShowingMore || editorHeight || isNested || hasToolCalls,
+                'max-h-[400px]':
+                  !isShowingMore && !editorHeight && !isNested && !hasToolCalls,
+                'max-h-full':
+                  isShowingMore || editorHeight || isNested || hasToolCalls,
               })}>
               {messageHeader}
               {isPlayground && editorHeight ? (
