@@ -108,7 +108,7 @@ test = [
   "httpx",
 
   # pins
-  "urllib3 == 2.2.3", # https://github.com/kevin1024/vcrpy/issues/888
+  "urllib3==2.2.3", # https://github.com/kevin1024/vcrpy/issues/888
 ]
 
 [project.scripts]
