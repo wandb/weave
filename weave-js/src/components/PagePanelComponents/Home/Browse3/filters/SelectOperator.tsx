@@ -25,7 +25,9 @@ const OptionLabel = (props: SelectOperatorOption) => {
   );
 };
 
-const GroupHeading = (props: GroupHeadingProps<SelectOperatorOption, false, OperatorGroupedOption>) => {
+const GroupHeading = (
+  props: GroupHeadingProps<SelectOperatorOption, false, OperatorGroupedOption>
+) => {
   return <components.GroupHeading {...props} />;
 };
 
@@ -37,7 +39,8 @@ export const SelectOperator = ({
 }: SelectOperatorProps) => {
   // Find the operator from the grouped selection:
   const flattenedOptions = options.flatMap(group => group.options);
-  const selectedOption = flattenedOptions.find(o => o.value === value) ?? flattenedOptions[0];
+  const selectedOption =
+    flattenedOptions.find(o => o.value === value) ?? flattenedOptions[0];
 
   const onReactSelectChange = (option: SelectOperatorOption | null) => {
     if (option) {
