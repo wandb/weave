@@ -102,7 +102,7 @@ test = [
   # https://github.com/kevin1024/vcrpy/pull/889
   # This resolves test issues until a new pypi release can be made.  Once that release
   # is made, we can remove this and revert to the vcrpy>=6.0.1 dependency.
-  "git+https://github.com/kevin1024/vcrpy.git@48d0a2e453f6635af343000cdaf9794a781e807e",
+  "vcrpy @ git+https://github.com/kevin1024/vcrpy.git@48d0a2e453f6635af343000cdaf9794a781e807e",
 
   # serving tests
   "flask",
@@ -111,6 +111,7 @@ test = [
   "filelock",
   "httpx",
 ]
+
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
@@ -142,6 +143,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 filterwarnings = [
