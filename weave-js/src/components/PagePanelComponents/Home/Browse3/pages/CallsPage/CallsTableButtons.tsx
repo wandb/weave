@@ -667,7 +667,12 @@ export const PaginationButtons = () => {
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
   return (
-    <Box display="flex" alignItems="center" justifyContent="center" padding={1} width="100%">
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      padding={1}
+      width="100%">
       <Box display="flex" alignItems="center">
         <Button
           variant="quiet"
@@ -697,12 +702,38 @@ export const PaginationButtons = () => {
           icon="chevron-next"
         />
       </Box>
-      <Box display="flex" alignItems="center" marginLeft="auto" marginRight={1} sx={{ fontSize: '14px', color: MOON_500 }}>
-        <Box component="span" sx={{ fontSize: '14px', border: `1px solid ${MOON_400}`, fontWeight: '600', padding: '0px 4px', marginRight: '4px', borderRadius: '4px' }}>
+      <Box
+        display="flex"
+        alignItems="center"
+        marginLeft="auto"
+        marginRight={1}
+        sx={{fontSize: '14px', color: MOON_500}}>
+        <Box
+          component="span"
+          sx={{
+            fontSize: '14px',
+            border: `1px solid ${MOON_400}`,
+            fontWeight: '600',
+            padding: '0px 4px',
+            marginRight: '4px',
+            borderRadius: '4px',
+          }}>
           {isMac ? 'Alt' : 'Option'}
         </Box>
-        + 
-        <Box component="span" sx={{ fontSize: '14px', border: `1px solid ${MOON_400}`, fontWeight: '600', padding: '0px 4px', marginLeft: '4px', marginRight: '8px', borderRadius: '4px' }}>Click</Box>
+        +
+        <Box
+          component="span"
+          sx={{
+            fontSize: '14px',
+            border: `1px solid ${MOON_400}`,
+            fontWeight: '600',
+            padding: '0px 4px',
+            marginLeft: '4px',
+            marginRight: '8px',
+            borderRadius: '4px',
+          }}>
+          Click
+        </Box>
         on a cell to filter by the value
       </Box>
     </Box>
