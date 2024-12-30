@@ -711,7 +711,7 @@ export const PaginationButtons = () => {
         <Box
           component="span"
           sx={{
-            fontSize: '14px',
+            fontSize: '12px',
             border: `1px solid ${MOON_400}`,
             fontWeight: '600',
             padding: '0px 4px',
@@ -724,12 +724,12 @@ export const PaginationButtons = () => {
         <Box
           component="span"
           sx={{
-            fontSize: '14px',
+            fontSize: '12px',
             border: `1px solid ${MOON_400}`,
             fontWeight: '600',
             padding: '0px 4px',
             marginLeft: '4px',
-            marginRight: '8px',
+            marginRight: '4px',
             borderRadius: '4px',
           }}>
           Click
