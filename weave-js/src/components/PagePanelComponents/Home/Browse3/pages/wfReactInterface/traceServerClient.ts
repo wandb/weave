@@ -8,6 +8,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  TableUpdateReq,
+  TableUpdateRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceObjCreateReq,
@@ -111,6 +113,14 @@ export class TraceServerClient extends CachingTraceServerClient {
     const res = super.objCreate(req).then(createRes => {
       this.onObjectListeners.forEach(listener => listener());
       return createRes;
+    });
+    return res;
+  }
+
+  public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
+    const res = super.tableUpdate(req).then(updateRes => {
+      this.onObjectListeners.forEach(listener => listener());
+      return updateRes;
     });
     return res;
   }
