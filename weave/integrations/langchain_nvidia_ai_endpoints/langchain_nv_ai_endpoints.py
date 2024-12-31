@@ -27,8 +27,8 @@ def nvidia_accumulator(acc: Any | None, value: Any) -> Any:
         acc = ChatGenerationChunk(message=AIMessageChunk(content=""))
     acc = acc + value
 
-    ## Need to do this since the __add__ impl for the streaming response is wrong
-    ## We will get the actual usage in the final chunk so this will be eventually consistent
+    # Need to do this since the __add__ impl for the streaming response is wrong
+    # We will get the actual usage in the final chunk so this will be eventually consistent
     acc.message.usage_metadata = value.message.usage_metadata
 
     return acc
@@ -42,7 +42,7 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
     """
     from openai.types.chat import ChatCompletion
 
-    if isinstance(output, ChatResult):  ## its ChatResult
+    if isinstance(output, ChatResult):  # its ChatResult
         message = output.llm_output
         enhanced_usage = message.get("token_usage", {})
         enhanced_usage["output_tokens"] = message.get("token_usage").get(
@@ -76,7 +76,7 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
 
         return returnable.model_dump(exclude_unset=True, exclude_none=True)
 
-    elif isinstance(output, ChatGenerationChunk):  ## its ChatGenerationChunk
+    elif isinstance(output, ChatGenerationChunk):  # its ChatGenerationChunk
         orig_message = output.message
         openai_message = convert_to_openai_messages(output.message)
         enhanced_usage = getattr(orig_message, "usage_metadata", {})
