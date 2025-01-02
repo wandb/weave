@@ -114,6 +114,9 @@ test = [
   "pillow",
   "filelock",
   "httpx",
+
+  # Bultins
+  "litellm>=1.49.1",
 ]
 
 
