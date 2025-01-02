@@ -10,7 +10,16 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Protocol,
+    TypeVar,
+    cast,
+    overload,
+)
 
 import pydantic
 from requests import HTTPError
@@ -82,6 +91,9 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+if TYPE_CHECKING:
+    from weave.scorers.base_scorer import Scorer
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -302,6 +314,11 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+class ApplyScorerResult(pydantic.BaseModel):
+    feedback_id: str
+    score_call: Call
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -445,28 +462,37 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    def _apply_scorer(self, scorer_op: Op) -> None:
+    async def apply_scorer(
+        self, scorer_op: Op | Scorer, additional_context: dict | None = None
+    ) -> ApplyScorerResult:
         """
-        This is a private method that applies a scorer to a call and records the feedback.
-        In the near future, this will be made public, but for now it is only used internally
-        for testing.
-
         Before making this public, we should refactor such that the `predict_and_score` method
         inside `eval.py` uses this method inside the scorer block.
-
-        Current limitations:
-        - only works for ops (not Scorer class)
-        - no async support
-        - no context yet (ie. ground truth)
         """
+        from weave.scorers.base_scorer import Scorer
+
+        self_arg = None
+        orig_scorer_op = scorer_op
+        if isinstance(scorer_op, Scorer):
+            self_arg = scorer_op
+            scorer_op = scorer_op.score
+
         client = weave_client_context.require_weave_client()
         scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
-        score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+        # TODO: this is new functionality, so we might want to ignore this for now
+        if "inputs" in scorer_arg_names:
+            score_args = {
+                "inputs": {k: v for k, v in self.inputs.items() if k != "self"}
+            }
+        else:
+            score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+        if self_arg is not None:
+            score_args["self"] = self_arg
         if "output" in scorer_arg_names:
             score_args["output"] = self.output
         _, score_call = scorer_op.call(**score_args)
-        scorer_op_ref = get_ref(scorer_op)
+        scorer_op_ref = get_ref(orig_scorer_op)
         if scorer_op_ref is None:
             raise ValueError("Scorer op has no ref")
         self_ref = get_ref(self)
@@ -476,11 +502,17 @@ class Call:
         score_call_ref = get_ref(score_call)
         if score_call_ref is None:
             raise ValueError("Score call has no ref")
-        client._add_runnable_feedback(
+
+        feedback_id = client._add_runnable_feedback(
             weave_ref_uri=self_ref.uri(),
             output=score_results,
             call_ref_uri=score_call_ref.uri(),
             runnable_ref_uri=scorer_op_ref.uri(),
+        )
+
+        return ApplyScorerResult(
+            feedback_id=feedback_id,
+            score_call=score_call,
         )
 
 
