@@ -101,7 +101,7 @@ export const ChoicesDrawer = ({
           {choices.map((c, index) => (
             <div key={index}>
               <div className="sticky top-[44px] z-10 flex items-center bg-white py-[8px]">
-                <p className="mr-auto text-[14px] font-semibold">
+                <p className="mr-[8px] text-[14px] font-semibold">
                   Trial {index + 1}
                 </p>
                 {index === selectedChoiceIndex ? (
@@ -128,7 +128,6 @@ export const ChoicesDrawer = ({
                 choice={c}
                 isStructuredOutput={isStructuredOutput}
                 choiceIndex={index}
-                isNested
               />
             </div>
           ))}
