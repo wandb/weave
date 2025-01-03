@@ -89,7 +89,7 @@ def vertexai_on_finish(
 
 def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op_kwargs = settings.model_copy()
+        op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
 
