@@ -124,50 +124,52 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
-    Object.entries(state.loadableComparisonResults.result?.resultRows ?? {}).forEach(
-      ([rowDigest, rowCollection]) => {
-        Object.values(rowCollection.evaluations).forEach(modelCollection => {
-          Object.values(modelCollection.predictAndScores).forEach(
-            predictAndScoreRes => {
-              const datasetRow =
-                state.loadableComparisonResults.result?.inputs[predictAndScoreRes.rowDigest];
-              if (datasetRow != null) {
-                const output = predictAndScoreRes._rawPredictTraceData?.output;
-                rows.push({
-                  id: predictAndScoreRes.callId,
-                  evaluationCallId: predictAndScoreRes.evaluationCallId,
-                  inputDigest: datasetRow.digest,
-                  inputRef: predictAndScoreRes.exampleRef,
-                  input: flattenObjectPreservingWeaveTypes({
-                    input: datasetRow.val,
-                  }),
-                  output: flattenObjectPreservingWeaveTypes({output}),
-                  scores: Object.fromEntries(
-                    [...Object.entries(state.summary.scoreMetrics)].map(
-                      ([scoreKey, scoreVal]) => {
-                        return [
-                          scoreKey,
-                          resolveScoreMetricValueForPASCall(
-                            scoreVal,
-                            predictAndScoreRes
-                          ),
-                        ];
-                      }
-                    )
-                  ),
-                  path: [
-                    rowDigest,
-                    predictAndScoreRes.evaluationCallId,
-                    predictAndScoreRes.callId,
-                  ],
-                  predictAndScore: predictAndScoreRes,
-                });
-              }
+    Object.entries(
+      state.loadableComparisonResults.result?.resultRows ?? {}
+    ).forEach(([rowDigest, rowCollection]) => {
+      Object.values(rowCollection.evaluations).forEach(modelCollection => {
+        Object.values(modelCollection.predictAndScores).forEach(
+          predictAndScoreRes => {
+            const datasetRow =
+              state.loadableComparisonResults.result?.inputs[
+                predictAndScoreRes.rowDigest
+              ];
+            if (datasetRow != null) {
+              const output = predictAndScoreRes._rawPredictTraceData?.output;
+              rows.push({
+                id: predictAndScoreRes.callId,
+                evaluationCallId: predictAndScoreRes.evaluationCallId,
+                inputDigest: datasetRow.digest,
+                inputRef: predictAndScoreRes.exampleRef,
+                input: flattenObjectPreservingWeaveTypes({
+                  input: datasetRow.val,
+                }),
+                output: flattenObjectPreservingWeaveTypes({output}),
+                scores: Object.fromEntries(
+                  [...Object.entries(state.summary.scoreMetrics)].map(
+                    ([scoreKey, scoreVal]) => {
+                      return [
+                        scoreKey,
+                        resolveScoreMetricValueForPASCall(
+                          scoreVal,
+                          predictAndScoreRes
+                        ),
+                      ];
+                    }
+                  )
+                ),
+                path: [
+                  rowDigest,
+                  predictAndScoreRes.evaluationCallId,
+                  predictAndScoreRes.callId,
+                ],
+                predictAndScore: predictAndScoreRes,
+              });
             }
-          );
-        });
-      }
-    );
+          }
+        );
+      });
+    });
     return rows;
   }, [
     state.loadableComparisonResults.result?.resultRows,

@@ -182,7 +182,8 @@ const CompareEvaluationsPageInner: React.FC<{
   const showExampleFilter =
     Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
-    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {}).length > 0;
+    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
+      .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
   return (
     <Box

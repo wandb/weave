@@ -112,7 +112,7 @@ export const useEvaluationComparisonState = (
       loading: false,
       result: {
         summary: summaryData.result,
-        results: resultsData,
+        loadableComparisonResults: resultsData,
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
         selectedMetrics,
