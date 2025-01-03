@@ -114,7 +114,7 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
 
             return _async_wrapper
 
-        op_kwargs = settings.model_copy()
+        op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
 
