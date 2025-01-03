@@ -1165,8 +1165,8 @@ const useObjectDeleteFunc = () => {
       });
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
-          entity: entity,
-          project: project,
+          entity,
+          project,
         }),
         object_id: objectId,
         digests,

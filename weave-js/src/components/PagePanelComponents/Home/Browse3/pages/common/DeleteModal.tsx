@@ -6,10 +6,7 @@ import {
 } from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {
-  maybePluralize,
-  maybePluralizeWord,
-} from '@wandb/weave/core/util/string';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
@@ -25,7 +22,7 @@ const MAX_DELETE_ROWS_TO_SHOW = 10;
 interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
-  onDelete: () => Promise<void>;
+  onDelete: () => Promise<{detail: string} | void>;
   deleteTitleStr: string;
   deleteBodyStrs?: string[];
   onSuccess?: () => void;

@@ -34,10 +34,7 @@ import {
 } from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
-import {
-  DeleteObjectButtonWithModal,
-  DeleteObjectVersionsButtonWithModal,
-} from './common/DeleteModal';
+import {DeleteObjectVersionsButtonWithModal} from './common/DeleteModal';
 import {Empty} from './common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
