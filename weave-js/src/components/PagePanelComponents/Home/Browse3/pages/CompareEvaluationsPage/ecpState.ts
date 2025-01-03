@@ -25,7 +25,7 @@ export type EvaluationComparisonState = {
   // The normalized data for the evaluations
   summary: EvaluationComparisonSummary;
   // The results of the evaluations
-  results: Loadable<EvaluationComparisonResults>;
+  loadableComparisonResults: Loadable<EvaluationComparisonResults>;
   // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
