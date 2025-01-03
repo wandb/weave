@@ -1,4 +1,8 @@
-def test_scorer_op_no_context():
+
+
+def test_scorer_op_no_context(client):
+
+
     raise NotImplementedError()
 
 

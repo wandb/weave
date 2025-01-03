@@ -33,7 +33,7 @@ Guardrails are a way to prevent the LLM from generating harmful or inappropriate
 
 ```python
 res, call = op.call(user_input)
-scorer_res = await call.apply_scorer(guardrail)
+scorer_res = call.apply_scorer(guardrail)
 if scorer_res.score < 0.5:
     # Do something 
 else:
