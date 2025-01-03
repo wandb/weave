@@ -1023,7 +1023,9 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
-          pagination: props => <PaginationButtons hideControls={hideControls} />,
+          pagination: props => (
+            <PaginationButtons hideControls={hideControls} />
+          ),
           columnMenuSortDescendingIcon: IconSortDescending,
           columnMenuSortAscendingIcon: IconSortAscending,
           columnMenuHideIcon: IconNotVisible,
