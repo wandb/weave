@@ -965,6 +965,7 @@ export const CallsTable: FC<{
           // This moves the pagination controls to the left
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+            minHeight: 40,
           },
           '& .MuiDataGrid-main:focus-visible': {
             outline: 'none',
@@ -1022,7 +1023,9 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
-          pagination: PaginationButtons,
+          pagination: props => (
+            <PaginationButtons hideControls={hideControls} />
+          ),
           columnMenuSortDescendingIcon: IconSortDescending,
           columnMenuSortAscendingIcon: IconSortAscending,
           columnMenuHideIcon: IconNotVisible,

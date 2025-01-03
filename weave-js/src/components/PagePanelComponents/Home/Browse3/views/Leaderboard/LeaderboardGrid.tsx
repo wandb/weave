@@ -380,6 +380,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+            minHeight: 40,
           },
           '& .MuiDataGrid-cell': {
             cursor: 'pointer',

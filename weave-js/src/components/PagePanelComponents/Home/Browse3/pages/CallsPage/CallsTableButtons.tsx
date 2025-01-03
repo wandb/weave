@@ -9,9 +9,10 @@ import {
   useGridApiContext,
   useGridSelector,
 } from '@mui/x-data-grid-pro';
-import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {MOON_400, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import {isMac} from '@wandb/weave/common/util/browser';
 import {Radio, Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
@@ -26,6 +27,7 @@ import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import {usePeekLocation} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -646,12 +648,95 @@ curl '${baseUrl}/calls/stream_query' \\
   return baseCurl;
 }
 
-export const PaginationButtons = () => {
+const CellFilterCallout: FC = () => (
+  <Box
+    display="flex"
+    alignItems="center"
+    marginLeft="auto"
+    marginRight={1}
+    sx={{fontSize: '14px', color: MOON_500}}>
+    <Box
+      component="span"
+      sx={{
+        fontSize: '12px',
+        border: `1px solid ${MOON_400}`,
+        fontWeight: '600',
+        padding: '0px 4px',
+        marginRight: '4px',
+        borderRadius: '4px',
+      }}>
+      {isMac ? 'Option' : 'Alt'}
+    </Box>
+    +
+    <Box
+      component="span"
+      sx={{
+        fontSize: '12px',
+        border: `1px solid ${MOON_400}`,
+        fontWeight: '600',
+        padding: '0px 4px',
+        marginLeft: '4px',
+        marginRight: '4px',
+        borderRadius: '4px',
+      }}>
+      Click
+    </Box>
+    on a cell to filter by the value
+  </Box>
+);
+
+const PaginationControls: FC<{
+  page: number;
+  pageCount: number;
+  start: number;
+  end: number;
+  rowCount: number;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+}> = ({page, pageCount, start, end, rowCount, onPrevPage, onNextPage}) => (
+  <Box display="flex" alignItems="center">
+    <Button
+      variant="quiet"
+      size="small"
+      onClick={onPrevPage}
+      disabled={page === 0}
+      icon="chevron-back"
+    />
+    <Box
+      mx={1}
+      sx={{
+        fontSize: '14px',
+        fontWeight: '400',
+        color: MOON_500,
+        // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
+        minWidth: '90px',
+        display: 'flex',
+        justifyContent: 'center',
+      }}>
+      {start}-{end} of {rowCount}
+    </Box>
+    <Button
+      variant="quiet"
+      size="small"
+      onClick={onNextPage}
+      disabled={page >= pageCount - 1}
+      icon="chevron-next"
+    />
+  </Box>
+);
+
+export const PaginationButtons = ({
+  hideControls,
+}: {
+  hideControls?: boolean;
+}) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
   const pageSize = useGridSelector(apiRef, gridPageSizeSelector);
   const rowCount = useGridSelector(apiRef, gridRowCountSelector);
+  const peekLocation = usePeekLocation();
+  const isDrawerOpen = peekLocation != null;
 
   const handlePrevPage = () => {
     apiRef.current.setPage(page - 1);
@@ -666,34 +751,21 @@ export const PaginationButtons = () => {
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
   return (
-    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
-      <Button
-        variant="quiet"
-        size="medium"
-        onClick={handlePrevPage}
-        disabled={page === 0}
-        icon="chevron-back"
+    <Box
+      display="flex"
+      alignItems="center"
+      padding={1}
+      width="100%">
+      <PaginationControls
+        page={page}
+        pageCount={pageCount}
+        start={start}
+        end={end}
+        rowCount={rowCount}
+        onPrevPage={handlePrevPage}
+        onNextPage={handleNextPage}
       />
-      <Box
-        mx={1}
-        sx={{
-          fontSize: '14px',
-          fontWeight: '400',
-          color: MOON_500,
-          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
-          minWidth: '90px',
-          display: 'flex',
-          justifyContent: 'center',
-        }}>
-        {start}-{end} of {rowCount}
-      </Box>
-      <Button
-        variant="quiet"
-        size="medium"
-        onClick={handleNextPage}
-        disabled={page >= pageCount - 1}
-        icon="chevron-next"
-      />
+      {!isDrawerOpen && !hideControls && <CellFilterCallout />}
     </Box>
   );
 };
