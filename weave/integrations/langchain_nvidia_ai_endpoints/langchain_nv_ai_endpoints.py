@@ -138,11 +138,11 @@ def postprocess_inputs_to_openai_format(
         "max_tokens": chat_nvidia_obj.max_tokens,
         "temperature": chat_nvidia_obj.temperature,
         "top_p": chat_nvidia_obj.top_p,
-        "object": "ChatNVIDIA._generate",
+        "object": "ChatNVIDIA._stream" if stream else "ChatNVIDIA._generate",
         "n": n,
         "stream": stream,
     }
-    
+
     weave_report.update(chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True))
 
     return ProcessedInputs(
