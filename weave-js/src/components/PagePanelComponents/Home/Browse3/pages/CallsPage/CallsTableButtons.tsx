@@ -36,6 +36,7 @@ import {
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
+import {usePeekLocation} from '../../context';
 
 const MAX_EXPORT = 10_000;
 
@@ -724,12 +725,18 @@ const PaginationControls: FC<{
   </Box>
 );
 
-export const PaginationButtons = () => {
+export const PaginationButtons = ({
+  hideControls,
+}: {
+  hideControls?: boolean;
+}) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
   const pageSize = useGridSelector(apiRef, gridPageSizeSelector);
   const rowCount = useGridSelector(apiRef, gridRowCountSelector);
+  const peekLocation = usePeekLocation();
+  const isDrawerOpen = peekLocation != null;
 
   const handlePrevPage = () => {
     apiRef.current.setPage(page - 1);
@@ -747,7 +754,6 @@ export const PaginationButtons = () => {
     <Box
       display="flex"
       alignItems="center"
-      justifyContent="center"
       padding={1}
       width="100%">
       <PaginationControls
@@ -759,7 +765,7 @@ export const PaginationButtons = () => {
         onPrevPage={handlePrevPage}
         onNextPage={handleNextPage}
       />
-      <CellFilterCallout />
+      {!isDrawerOpen && !hideControls && <CellFilterCallout />}
     </Box>
   );
 };
