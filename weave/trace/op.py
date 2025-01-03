@@ -614,6 +614,7 @@ def op(
 
 
     Example usage:
+
     ```python
     import weave
     weave.init("my-project")
@@ -629,6 +630,7 @@ def op(
 
     await extract()  # calls the function and tracks the call in the Weave UI
     ```
+
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")

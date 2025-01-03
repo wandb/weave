@@ -56,7 +56,11 @@ const PopupDropdownComp: React.FC<PopupDropdownProps> = props => {
     (opts, i: number) => (
       <Dropdown.Item
         key={i}
-        {...opts}
+        // React keys must be passed directly to JSX without using spread.
+        // For backwards compatibility leaving the key prop here as the index though
+        // having opts.key take precedence is probably what was expected.
+        // We should be transitioning away from this semantic-ui based component anyway.
+        {...omit(opts, 'key')}
         onClick={e => {
           opts.onClick?.(e);
           handleClose();

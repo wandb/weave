@@ -191,7 +191,16 @@ class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    set_base_object_class: Optional[str] = None
+    builtin_object_class: Optional[str] = None
+    # Keeping `set_base_object_class` here until it is successfully removed from UI client
+    set_base_object_class: Optional[str] = Field(
+        include=False, default=None, deprecated=True
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
+        if self.set_base_object_class is not None and self.builtin_object_class is None:
+            self.builtin_object_class = self.set_base_object_class
 
 
 class TableSchemaForInsert(BaseModel):
