@@ -1,5 +1,5 @@
 import pytest
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 import weave
 from weave.scorers import (
@@ -30,7 +30,7 @@ def mock_create(monkeypatch):
 @pytest.fixture
 def summarization_scorer(mock_create):
     return SummarizationScorer(
-        client=OpenAI(api_key="DUMMY_API_KEY"),
+        client=AsyncOpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-4o",
         temperature=0.7,
         max_tokens=1024,
