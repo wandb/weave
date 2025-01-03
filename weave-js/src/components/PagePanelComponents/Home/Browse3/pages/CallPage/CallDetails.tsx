@@ -133,7 +133,7 @@ export const CallDetails: FC<{
           sx={{
             flex: '0 0 auto',
             maxHeight: `calc(100% - ${HEADER_HEIGHT_BUFFER}px)`,
-            p: 2,
+            padding: '4px 16px',
           }}>
           <CustomWeaveTypeProjectContext.Provider
             value={{entity: call.entity, project: call.project}}>
@@ -146,7 +146,7 @@ export const CallDetails: FC<{
             maxHeight: `calc(100% - ${
               multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
             }px)`,
-            p: 2,
+            padding: '4px 16px',
           }}>
           {'traceback' in excInfo ? (
             <div style={{overflow: 'auto', height: '100%'}}>
