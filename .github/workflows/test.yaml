@@ -232,6 +232,7 @@ jobs:
             'trace',
             'trace_server',
             'anthropic',
+            'bedrock',
             'cerebras',
             'cohere',
             'dspy',
