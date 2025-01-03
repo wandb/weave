@@ -143,7 +143,9 @@ def postprocess_inputs_to_openai_format(
         "stream": stream,
     }
 
-    weave_report.update(chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True))
+    weave_report.update(
+        chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True)
+    )
 
     return ProcessedInputs(
         original_args=original_args,
