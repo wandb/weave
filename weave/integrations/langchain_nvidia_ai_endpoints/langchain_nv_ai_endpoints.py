@@ -63,7 +63,6 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
                 }
             ],
             "model": message.get("model_name", ""),
-            "object": "ChatNVIDIA._generate",
             "tool_calls": message.get("tool_calls", []),
             "usage": enhanced_usage,
         }
@@ -101,7 +100,6 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
             "model": getattr(orig_message, "response_metadata", {}).get(
                 "model_name", None
             ),
-            "object": "ChatNVIDIA._stream",
             "tool_calls": openai_message.get("tool_calls", []),
             "usage": enhanced_usage,
         }
@@ -138,7 +136,6 @@ def postprocess_inputs_to_openai_format(
         "max_tokens": chat_nvidia_obj.max_tokens,
         "temperature": chat_nvidia_obj.temperature,
         "top_p": chat_nvidia_obj.top_p,
-        "object": "ChatNVIDIA._stream" if stream else "ChatNVIDIA._generate",
         "n": n,
         "stream": stream,
     }
