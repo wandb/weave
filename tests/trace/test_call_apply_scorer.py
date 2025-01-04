@@ -75,7 +75,24 @@ def test_scorer_op_with_context(client: WeaveClient):
 
 
 def test_async_scorer_op(client: WeaveClient):
-    raise NotImplementedError()
+    @weave.op
+    def predict(x):
+        return x + 1
+
+    @weave.op
+    async def score_fn(x, output):
+        return output - x - 1
+
+    _, call = predict.call(1)
+    apply_score_res = call.apply_scorer(score_fn)
+    do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
+
+    @weave.op
+    async def score_fn_with_incorrect_args(y, output):
+        return output - y
+
+    with pytest.raises(OpCallError):
+        apply_score_res = call.apply_scorer(score_fn_with_incorrect_args)
 
 
 def test_scorer_obj_no_context(client: WeaveClient):
