@@ -7,7 +7,10 @@ from weave.trace.weave_client import ApplyScorerResult, Call, Op, WeaveClient
 
 
 def do_assertions_for_scorer_op(
-    apply_score_res: ApplyScorerResult, call: Call, score_fn: Op, client: WeaveClient
+    apply_score_res: ApplyScorerResult,
+    call: Call,
+    score_fn: Op | weave.Scorer,
+    client: WeaveClient,
 ):
     assert apply_score_res.feedback_id is not None
     assert apply_score_res.call_id is not None
@@ -17,7 +20,10 @@ def do_assertions_for_scorer_op(
     assert len(feedbacks) == 1
     target_feedback = feedbacks[0]
     assert target_feedback.id == apply_score_res.feedback_id
-    assert target_feedback.feedback_type == "wandb.runnable.score_fn"
+    scorer_name = (
+        score_fn.name if isinstance(score_fn, Op) else score_fn.__class__.__name__
+    )
+    assert target_feedback.feedback_type == "wandb.runnable." + scorer_name
     assert target_feedback.runnable_ref == score_fn.ref.uri()
     assert (
         target_feedback.call_ref
@@ -96,7 +102,32 @@ def test_async_scorer_op(client: WeaveClient):
 
 
 def test_scorer_obj_no_context(client: WeaveClient):
-    raise NotImplementedError()
+    @weave.op
+    def predict(x):
+        return x + 1
+
+    class MyScorer(weave.Scorer):
+        offset: int
+
+        @weave.op
+        def score(self, x, output):
+            return output - x - self.offset
+
+    scorer = MyScorer(offset=1)
+
+    _, call = predict.call(1)
+    apply_score_res = call.apply_scorer(scorer)
+    do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
+
+    class MyScorerWithIncorrectArgs(weave.Scorer):
+        offset: int
+
+        @weave.op
+        def score(self, y, output):
+            return output - y - self.offset
+
+    with pytest.raises(OpCallError):
+        apply_score_res = call.apply_scorer(MyScorerWithIncorrectArgs(offset=1))
 
 
 def test_scorer_obj_with_context(client: WeaveClient):
