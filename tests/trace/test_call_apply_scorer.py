@@ -1,22 +1,17 @@
+import pytest
+
 import weave
+from weave.trace.op import OpCallError
 from weave.trace.refs import CallRef
-from weave.trace.weave_client import WeaveClient
+from weave.trace.weave_client import ApplyScorerResult, Call, Op, WeaveClient
 
 
-def test_scorer_op_no_context(client: WeaveClient):
-    @weave.op
-    def predict(x):
-        return x + 1
-
-    @weave.op
-    def score_fn(x, output):
-        return output - x
-
-    _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(score_fn)
+def do_assertions_for_scorer_op(
+    apply_score_res: ApplyScorerResult, call: Call, score_fn: Op, client: WeaveClient
+):
     assert apply_score_res.feedback_id is not None
     assert apply_score_res.call_id is not None
-    assert apply_score_res.score == 1
+    assert apply_score_res.score == 0
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
@@ -30,15 +25,53 @@ def test_scorer_op_no_context(client: WeaveClient):
             entity=client.entity, project=client.project, id=apply_score_res.call_id
         ).uri()
     )
-    assert target_feedback.payload == {"output": 1}
+    assert target_feedback.payload == {"output": apply_score_res.score}
+
+
+def test_scorer_op_no_context(client: WeaveClient):
+    @weave.op
+    def predict(x):
+        return x + 1
+
+    @weave.op
+    def score_fn(x, output):
+        return output - x - 1
+
+    _, call = predict.call(1)
+    apply_score_res = call.apply_scorer(score_fn)
+    do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
+
+    @weave.op
+    def score_fn_with_incorrect_args(y, output):
+        return output - y
+
+    with pytest.raises(OpCallError):
+        apply_score_res = call.apply_scorer(score_fn_with_incorrect_args)
 
 
 def test_scorer_op_with_context(client: WeaveClient):
-    raise NotImplementedError()
+    @weave.op
+    def predict(x):
+        return x + 1
 
+    @weave.op
+    def score_fn(x, output, correct_answer):
+        return output - correct_answer
 
-def test_scorer_op_incorrect_args(client: WeaveClient):
-    raise NotImplementedError()
+    _, call = predict.call(1)
+    apply_score_res = call.apply_scorer(
+        score_fn, additional_scorer_kwargs={"correct_answer": 2}
+    )
+    do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
+
+    @weave.op
+    def score_fn_with_incorrect_args(x, output, incorrect_arg):
+        return output - incorrect_arg
+
+    with pytest.raises(OpCallError):
+        apply_score_res = call.apply_scorer(
+            score_fn_with_incorrect_args, additional_scorer_kwargs={"correct_answer": 2}
+        )
 
 
 def test_async_scorer_op(client: WeaveClient):
@@ -50,10 +83,6 @@ def test_scorer_obj_no_context(client: WeaveClient):
 
 
 def test_scorer_obj_with_context(client: WeaveClient):
-    raise NotImplementedError()
-
-
-def test_scorer_obj_incorrect_args(client: WeaveClient):
     raise NotImplementedError()
 
 

@@ -465,7 +465,7 @@ class Call:
         self.set_display_name(None)
 
     async def _apply_scorer_async(
-        self, scorer_op: Op | Scorer, additional_context: dict | None = None
+        self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
         """
         Before making this public, we should refactor such that the `predict_and_score` method
@@ -482,13 +482,11 @@ class Call:
         client = weave_client_context.require_weave_client()
         scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
-        # TODO: this is new functionality, so we might want to ignore this for now
-        if "inputs" in scorer_arg_names:
-            score_args = {
-                "inputs": {k: v for k, v in self.inputs.items() if k != "self"}
-            }
-        else:
-            score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
+
+        model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
+        candidate_args = {**model_inputs, **(additional_scorer_kwargs or {})}
+
+        score_args = {k: v for k, v in candidate_args.items() if k in scorer_arg_names}
         if self_arg is not None:
             score_args["self"] = self_arg
         if "output" in scorer_arg_names:
@@ -519,9 +517,11 @@ class Call:
         )
 
     def apply_scorer(
-        self, scorer_op: Op | Scorer, additional_context: dict | None = None
+        self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
-        return asyncio.run(self._apply_scorer_async(scorer_op, additional_context))
+        return asyncio.run(
+            self._apply_scorer_async(scorer_op, additional_scorer_kwargs)
+        )
 
 
 def make_client_call(
