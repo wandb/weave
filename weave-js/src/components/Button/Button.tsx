@@ -85,6 +85,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ...twWrapperStyles,
     };
 
+    console.log((isSecondary || isGhost) && active);
+
     const button = (
       <button
         ref={ref}
@@ -119,16 +121,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'text-moon-800 dark:text-moon-200': isSecondary,
               'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
                 isSecondary,
-              'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
-                isSecondary && active,
 
               // ghost
               'bg-transparent': isGhost,
               'text-moon-600 dark:text-moon-400': isGhost,
               'hover:bg-oblivion/[0.07] hover:text-moon-800 dark:hover:bg-moonbeam/[0.09] dark:hover:text-moon-200':
                 isGhost,
-              // 'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
-              //   isGhost && active,
+
+              // secondary or ghost
+              'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
+                (isSecondary || isGhost) && active,
 
               // quiet
               'text-moon-500': isQuiet,
