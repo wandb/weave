@@ -316,8 +316,9 @@ def map_to_refs(obj: Any) -> Any:
 
 
 class ApplyScorerResult(pydantic.BaseModel):
+    score: Any
+    call_id: str
     feedback_id: str
-    score_call: Call
 
 
 @dataclasses.dataclass
@@ -492,7 +493,7 @@ class Call:
             score_args["self"] = self_arg
         if "output" in scorer_arg_names:
             score_args["output"] = self.output
-        _, score_call = scorer_op.call(**score_args)
+        results, score_call = scorer_op.call(**score_args)
         scorer_op_ref = get_ref(orig_scorer_op)
         if scorer_op_ref is None:
             raise ValueError("Scorer op has no ref")
@@ -512,8 +513,9 @@ class Call:
         )
 
         return ApplyScorerResult(
+            score=results,
+            call_id=score_call.id,
             feedback_id=feedback_id,
-            score_call=score_call,
         )
 
     def apply_scorer(
