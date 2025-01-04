@@ -85,8 +85,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ...twWrapperStyles,
     };
 
-    console.log((isSecondary || isGhost) && active);
-
     const button = (
       <button
         ref={ref}
