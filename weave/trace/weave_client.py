@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import datetime
-import inspect
 import logging
 import platform
 import re
@@ -471,47 +470,25 @@ class Call:
         Before making this public, we should refactor such that the `predict_and_score` method
         inside `eval.py` uses this method inside the scorer block.
         """
-        from weave.scorers.base_scorer import Scorer
-
-        self_arg = None
-        orig_scorer_op = scorer_op
-        if isinstance(scorer_op, Scorer):
-            self_arg = scorer_op
-            scorer_op = scorer_op.score
-
-        client = weave_client_context.require_weave_client()
-        scorer_signature = inspect.signature(scorer_op)
-        scorer_arg_names = list(scorer_signature.parameters.keys())
+        from weave.trace.scorer_applier import apply_scorer
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
-        candidate_args = {**model_inputs, **(additional_scorer_kwargs or {})}
+        example = {**model_inputs, **(additional_scorer_kwargs or {})}
 
-        score_args = {k: v for k, v in candidate_args.items() if k in scorer_arg_names}
-        if self_arg is not None:
-            score_args["self"] = self_arg
-        if "output" in scorer_arg_names:
-            score_args["output"] = self.output
-        results, score_call = scorer_op.call(**score_args)
-        scorer_op_ref = get_ref(orig_scorer_op)
-        if scorer_op_ref is None:
-            raise ValueError("Scorer op has no ref")
-        self_ref = get_ref(self)
-        if self_ref is None:
-            raise ValueError("Call has no ref")
-        score_results = score_call.output
-        score_call_ref = get_ref(score_call)
-        if score_call_ref is None:
-            raise ValueError("Score call has no ref")
+        # TODO: Unify and cleanup this interface
+        res1 = await apply_scorer(scorer_op, example, self.output, self)
+        score_results = res1["score"]
+        score_call = res1["score_call"]
+        feedback_id_future = res1["feedback_id_future"]
 
-        feedback_id = client._add_runnable_feedback(
-            weave_ref_uri=self_ref.uri(),
-            output=score_results,
-            call_ref_uri=score_call_ref.uri(),
-            runnable_ref_uri=scorer_op_ref.uri(),
-        )
+        # TODO: get rid of this
+        if feedback_id_future is None or score_call is None:
+            raise ValueError("Feedback ID future or score call is None")
+
+        feedback_id = feedback_id_future.result()
 
         return ApplyScorerResult(
-            score=results,
+            score=score_results,
             call_id=score_call.id,
             feedback_id=feedback_id,
         )

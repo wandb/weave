@@ -1,5 +1,6 @@
 import inspect
 import textwrap
+from concurrent.futures import Future
 from typing import Any, TypedDict, Union
 
 from weave.scorers import (
@@ -19,6 +20,8 @@ class ApplyScorerResult(TypedDict):
     score: Any
     # Only non in legacy cases which i think can be removed
     score_call: Call | None
+    # TODO: Get rid of these nones
+    feedback_id_future: Future[str] | None
 
 
 async def apply_scorer(
@@ -157,7 +160,9 @@ async def apply_scorer(
                 # the score_call instead.
                 scorer_ref = get_ref(scorer_self) if scorer_self else None
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-                wc._send_score_call(model_call, score_call, scorer_ref_uri)
+                feedback_id_future = wc._send_score_call(
+                    model_call, score_call, scorer_ref_uri
+                )
 
         else:
             # I would not expect this path to be hit, but keeping it for
@@ -202,4 +207,5 @@ async def apply_scorer(
         scorer_name=scorer_name,
         score=result,
         score_call=score_call,
+        feedback_id_future=feedback_id_future,
     )
