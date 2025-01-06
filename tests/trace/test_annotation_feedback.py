@@ -483,7 +483,7 @@ def test_annotation_feedback_sdk(client):
 
     # Add annotation feedback
     calls[0].feedback.add(
-        "wandb.annotation.number_rating",
+        "wandb.annotation.number-spec",
         {"value": 3},
         annotation_ref=ref.uri(),
     )
