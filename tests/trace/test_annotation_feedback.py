@@ -479,7 +479,7 @@ def test_annotation_feedback_sdk(client):
     do_call()
 
     calls = do_call.calls()
-    assert len(calls) == 2
+    assert len(list(calls)) == 2
 
     # Add annotation feedback
     calls[0].feedback.add(
