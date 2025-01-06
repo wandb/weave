@@ -21,11 +21,11 @@ export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  const evaluationCall = props.state.data.evaluationCalls?.[props.callId];
+  const evaluationCall = props.state.summary.evaluationCalls?.[props.callId];
   if (!evaluationCall) {
     return null;
   }
-  const {entity, project} = props.state.data;
+  const {entity, project} = props.state.summary;
 
   return (
     <CallLink
@@ -51,8 +51,8 @@ export const EvaluationModelLink: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {useObjectVersion} = useWFHooks();
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const modelObj = props.state.data.models[evaluationCall.modelRef];
+  const evaluationCall = props.state.summary.evaluationCalls[props.callId];
+  const modelObj = props.state.summary.models[evaluationCall.modelRef];
   const objRef = useMemo(
     () => parseRef(modelObj.ref) as WeaveObjectRef,
     [modelObj.ref]
@@ -95,9 +95,9 @@ export const EvaluationDatasetLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
+  const evaluationCall = props.state.summary.evaluationCalls[props.callId];
   const evaluationObj =
-    props.state.data.evaluations[evaluationCall.evaluationRef];
+    props.state.summary.evaluations[evaluationCall.evaluationRef];
   const parsed = parseRef(evaluationObj.datasetRef);
   if (!parsed) {
     return null;
