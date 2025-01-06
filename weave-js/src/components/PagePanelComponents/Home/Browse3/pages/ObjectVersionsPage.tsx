@@ -18,6 +18,7 @@ import {
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -34,7 +35,7 @@ import {
 } from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
-import {DeleteObjectVersionsButtonWithModal} from './common/DeleteModal';
+import {DeleteModal} from './common/DeleteModal';
 import {Empty} from './common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
@@ -621,5 +622,40 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       neverPeek
       variant="secondary"
     />
+  );
+};
+
+const DeleteObjectVersionsButtonWithModal: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string;
+  objectDigests: string[];
+  disabled?: boolean;
+}> = ({entity, project, objectName, objectDigests, disabled}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectVersionsDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const numObjects = objectDigests.length;
+  const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+        disabled={disabled}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={`${numObjects} ${objectName} ${versionsStr}`}
+        deleteBodyStrs={objectDigests}
+        onDelete={() =>
+          objectVersionsDelete(entity, project, objectName, objectDigests)
+        }
+      />
+    </>
   );
 };

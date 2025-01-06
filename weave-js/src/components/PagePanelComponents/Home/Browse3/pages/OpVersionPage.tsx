@@ -1,11 +1,13 @@
-import React, {useMemo} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useMemo, useState} from 'react';
 
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
-import {DeleteOpButtonWithModal} from './common/DeleteModal';
+import {DeleteModal} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -174,5 +176,36 @@ const OpVersionPageInner: React.FC<{
           : []),
       ]}
     />
+  );
+};
+
+const DeleteOpButtonWithModal: React.FC<{
+  opVersionSchema: OpVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({opVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {opVersionDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const deleteStr =
+    overrideDisplayStr ??
+    `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteStr}
+        onDelete={() => opVersionDelete(opVersionSchema)}
+        onSuccess={closePeek}
+      />
+    </>
   );
 };

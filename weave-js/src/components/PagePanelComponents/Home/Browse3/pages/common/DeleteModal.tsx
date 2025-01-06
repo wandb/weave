@@ -6,16 +6,8 @@ import {
 } from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {useState} from 'react';
 import styled from 'styled-components';
-
-import {useClosePeek} from '../../context';
-import {useWFHooks} from '../wfReactInterface/context';
-import {
-  ObjectVersionSchema,
-  OpVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const MAX_DELETE_ROWS_TO_SHOW = 10;
 
@@ -27,14 +19,6 @@ interface DeleteModalProps {
   deleteBodyStrs?: string[];
   onSuccess?: () => void;
 }
-
-const Dialog = styled(MaterialDialog)`
-  .MuiDialog-paper {
-    min-width: 400px;
-    max-width: min(800px, 90vw);
-    width: auto !important;
-  }
-`;
 
 export const DeleteModal: React.FC<DeleteModalProps> = ({
   open,
@@ -118,6 +102,15 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   );
 };
 
+const Dialog = styled(MaterialDialog)`
+  .MuiDialog-paper {
+    min-width: 400px;
+    max-width: min(800px, 90vw);
+    width: auto !important;
+  }
+`;
+Dialog.displayName = 'S.Dialog';
+
 const DialogContent = styled(MaterialDialogContent)`
   padding: 0 32px !important;
 `;
@@ -140,106 +133,3 @@ const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
   padding: 32px 32px 32px 32px !important;
 `;
 DialogActions.displayName = 'S.DialogActions';
-
-export const DeleteObjectButtonWithModal: React.FC<{
-  objVersionSchema: ObjectVersionSchema;
-  overrideDisplayStr?: string;
-}> = ({objVersionSchema, overrideDisplayStr}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const closePeek = useClosePeek();
-  const {objectVersionDelete} = useObjectDeleteFunc();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const deleteStr =
-    overrideDisplayStr ?? makeDefaultObjectDeleteStr(objVersionSchema);
-
-  return (
-    <>
-      <Button
-        icon="delete"
-        variant="ghost"
-        onClick={() => setDeleteModalOpen(true)}
-      />
-      <DeleteModal
-        open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={deleteStr}
-        onDelete={() => objectVersionDelete(objVersionSchema)}
-        onSuccess={closePeek}
-      />
-    </>
-  );
-};
-
-export const DeleteOpButtonWithModal: React.FC<{
-  opVersionSchema: OpVersionSchema;
-  overrideDisplayStr?: string;
-}> = ({opVersionSchema, overrideDisplayStr}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const closePeek = useClosePeek();
-  const {opVersionDelete} = useObjectDeleteFunc();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const deleteStr =
-    overrideDisplayStr ?? makeDefaultOpDeleteStr(opVersionSchema);
-
-  return (
-    <>
-      <Button
-        icon="delete"
-        variant="ghost"
-        onClick={() => setDeleteModalOpen(true)}
-      />
-      <DeleteModal
-        open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={deleteStr}
-        onDelete={() => opVersionDelete(opVersionSchema)}
-        onSuccess={closePeek}
-      />
-    </>
-  );
-};
-
-export const DeleteObjectVersionsButtonWithModal: React.FC<{
-  entity: string;
-  project: string;
-  objectName: string;
-  objectDigests: string[];
-  disabled?: boolean;
-}> = ({entity, project, objectName, objectDigests, disabled}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const {objectVersionsDelete} = useObjectDeleteFunc();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const numObjects = objectDigests.length;
-  const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
-
-  return (
-    <>
-      <Button
-        icon="delete"
-        variant="ghost"
-        onClick={() => setDeleteModalOpen(true)}
-        disabled={disabled}
-      />
-      <DeleteModal
-        open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={`${numObjects} ${objectName} ${versionsStr}`}
-        deleteBodyStrs={objectDigests}
-        onDelete={() =>
-          objectVersionsDelete(entity, project, objectName, objectDigests)
-        }
-      />
-    </>
-  );
-};
-
-function makeDefaultObjectDeleteStr(objVersionSchema: ObjectVersionSchema) {
-  return `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
-}
-
-function makeDefaultOpDeleteStr(opVersionSchema: OpVersionSchema) {
-  return `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
-}

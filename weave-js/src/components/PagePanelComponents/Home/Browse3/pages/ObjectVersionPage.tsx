@@ -1,18 +1,20 @@
 import Box from '@mui/material/Box';
+import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
-import {DeleteObjectButtonWithModal} from './common/DeleteModal';
+import {DeleteModal} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -628,6 +630,37 @@ const OpVersionCallsLink: React.FC<{
         variant="secondary"
       />
       ]
+    </>
+  );
+};
+
+const DeleteObjectButtonWithModal: React.FC<{
+  objVersionSchema: ObjectVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({objVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {objectVersionDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const deleteStr =
+    overrideDisplayStr ??
+    `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteStr}
+        onDelete={() => objectVersionDelete(objVersionSchema)}
+        onSuccess={closePeek}
+      />
     </>
   );
 };
