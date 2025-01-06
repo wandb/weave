@@ -181,6 +181,10 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
+    # _post_init_dataset and _post_init_scorers are a more tightly typed property.
+    # This is because the initialization code can accept lists and callables respectively,
+    # but after initialization, they are more tightly typed to the respective weave objects.
+    # Using these reduces casting below and allows us to have less logical branches
     @property
     def _post_init_dataset(self) -> Dataset:
         if not weave_isinstance(self.dataset, Dataset):
