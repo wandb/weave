@@ -373,7 +373,10 @@ function buildCallsTableColumns(
             if (typeof params.value === 'boolean') {
               return <div>{params.value ? 'true' : 'false'}</div>;
             }
-            return <CellValueString value={params.value} />;
+            if (typeof params.value === 'string') {
+              return <CellValueString value={params.value} />;
+            }
+            return <div>{params.value}</div>;
           },
         };
       });
