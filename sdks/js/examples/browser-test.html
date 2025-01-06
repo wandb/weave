@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weave Browser Test</title>
+</head>
+<body>
+    <h1>Weave Browser Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        // Import from the built module
+        import * as weave from '../dist/weave.js';
+
+        async function testWeave() {
+            try {
+                // Log the weave object to see what's available
+                console.log('Weave SDK:', weave);
+
+                // Try to login
+                await weave.login({
+                    // Add your test credentials here
+                    apiKey: 'your-api-key'
+                });
+
+                document.getElementById('output').innerHTML = 'Login successful!';
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        // Run the test
+        testWeave();
+    </script>
+</body>
+</html> 
