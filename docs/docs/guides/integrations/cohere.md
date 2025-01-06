@@ -47,10 +47,10 @@ Weave ops make results *reproducible* by automatically versioning code as you ex
 import cohere
 import os
 import weave
-from weave.integrations.cohere import cohere_patcher
+from weave.integrations.cohere import get_cohere_patcher
 
 # we need to patch before we create the client
-cohere_patcher.attempt_patch()
+get_cohere_patcher().attempt_patch()
 
 co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
 
