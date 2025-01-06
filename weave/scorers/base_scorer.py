@@ -116,27 +116,29 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 
 def get_scorer_attributes(
-    scorer: Union[Callable, Op, Scorer],
-) -> tuple[str, Callable, Callable]:
-    score_fn: Union[Op, Callable[..., Any]]
+    scorer: Union[Op, Scorer],
+) -> tuple[str, Op, Callable]:
+    score_op: Op
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name is None:
             scorer_name = scorer.__class__.__name__
         try:
-            score_fn = scorer.score
+            if not is_op(scorer.score):
+                raise TypeError(
+                    f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
+                )
+            score_op = scorer.score
             summarize_fn = scorer.summarize  # type: ignore
+
         except AttributeError:
             raise ValueError(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
             )
-    elif callable(scorer):
-        if is_op(scorer):
-            scorer = as_op(scorer)
-            scorer_name = scorer.name
-        else:
-            scorer_name = scorer.__name__
-        score_fn = scorer
+    elif is_op(scorer):
+        scorer = as_op(scorer)
+        scorer_name = scorer.name
+        score_op = scorer
         summarize_fn = auto_summarize  # type: ignore
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
@@ -144,10 +146,10 @@ def get_scorer_attributes(
     if scorer_name:
         scorer_name = sanitize_object_name(scorer_name)
 
-    return (scorer_name, score_fn, summarize_fn)  # type: ignore
+    return (scorer_name, score_op, summarize_fn)  # type: ignore
 
 
-def _has_oldstyle_scorers(scorers: list[Union[Callable, Op, Scorer]]) -> bool:
+def _has_oldstyle_scorers(scorers: list[Union[Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
         _, score_fn, _ = get_scorer_attributes(scorer)

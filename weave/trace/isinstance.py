@@ -8,7 +8,9 @@ from weave.trace.vals import WeaveObject
 C = TypeVar("C")
 
 
-def weave_isinstance(obj: Any, cls: type[C]) -> TypeGuard[C]:
+def weave_isinstance(obj: Any, cls: type[C] | tuple[type[C], ...]) -> TypeGuard[C]:
+    if isinstance(cls, tuple):
+        return any(weave_isinstance(obj, c) for c in cls)
     if isinstance(obj, cls):  # type: ignore
         return True
     if isinstance(obj, ObjectRecord):

@@ -119,7 +119,7 @@ class Evaluation(Object):
     ```
     """
 
-    dataset: Union[Dataset, list]
+    dataset: Union[Dataset, list[dict]]
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
@@ -140,7 +140,7 @@ class Evaluation(Object):
         return self
 
     def model_post_init(self, __context: Any) -> None:
-        scorers: list[Union[Callable, Scorer, Op]] = []
+        scorers: list[Union[Op, Scorer]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
@@ -151,7 +151,7 @@ class Evaluation(Object):
             elif callable(scorer) and not is_op(scorer):
                 scorer = weave.op()(scorer)
             elif is_op(scorer):
-                pass
+                scorer = as_op(scorer)
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
 
@@ -166,7 +166,11 @@ class Evaluation(Object):
                 logger,
                 "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
             )
-        self.scorers = scorers
+
+        # I don't understand why we need a type ignore here, error:
+        # Incompatible types in assignment (expression has type "list[Op | Scorer]", variable has type "list[Callable[..., Any] | Op | Scorer] | None")
+        # This seems to be a bug in the type checker as the assignment is a valid subset of the type.
+        self.scorers = scorers  # type: ignore
 
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
@@ -174,62 +178,66 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
+    @property
+    def _post_init_dataset(self) -> Dataset:
+        if not weave_isinstance(self.dataset, Dataset):
+            raise TypeError(
+                "Expected self.dataset to be converted to a Dataset in `model_post_init`. Found "
+                + str(type(self.dataset))
+            )
+        return self.dataset
+
+    @property
+    def _post_init_scorers(self) -> list[Union[Op, Scorer]]:
+        if not isinstance(self.scorers, list):
+            raise TypeError(
+                "Expected self.scorers to be a list in `model_post_init`. Found "
+                + str(type(self.scorers))
+            )
+        for scorer in self.scorers:
+            if not weave_isinstance(scorer, (Op, Scorer)) and not is_op(scorer):
+                raise TypeError(
+                    "Expected all elements in self.scorers to be an instance of Op or Scorer in `model_post_init`. Found "
+                    + str(type(scorer))
+                )
+        return cast(list[Union[Op, Scorer]], self.scorers)
+
     @weave.op()
-    async def predict_and_score(
-        self, model: Union[Callable, Model], example: dict
-    ) -> dict:
+    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
         if self.preprocess_model_input is None:
             model_input = example
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
         model_self = None
-        model_predict: Union[Callable, Model]
-        if callable(model):
-            model_predict = model
-        else:
+        model_predict_op: Op
+        if is_op(model):
+            model_predict_op = as_op(model)
+        elif weave_isinstance(model, Model):
             model_self = model
-            model_predict = get_infer_method(model)
+            model_predict_op = get_infer_method(model)
+        else:
+            raise ValueError(f"Unknown model type: {model}")
 
-        model_predict_fn_name = (
-            as_op(model_predict).name
-            if is_op(model_predict)
-            else model_predict.__name__
-        )
+        model_predict_fn_name = model_predict_op.name
 
-        predict_signature = inspect.signature(model_predict)
+        predict_signature = inspect.signature(model_predict_op)
         model_predict_arg_names = list(predict_signature.parameters.keys())
 
-        if isinstance(model_input, dict):
-            model_predict_args = {
-                k: v for k, v in model_input.items() if k in model_predict_arg_names
-            }
-        else:
-            if len(model_predict_arg_names) == 1:
-                model_predict_args = {model_predict_arg_names[0]: model_input}
-            else:
-                raise ValueError(
-                    f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                )
+        model_predict_args = {
+            k: v for k, v in model_input.items() if k in model_predict_arg_names
+        }
         try:
             model_start_time = time.time()
-            model_call = None
-            if is_op(model_predict):
-                # I would expect this path to always be hit, but keeping the other
-                # path for backwards compatibility / safety
-                model_predict = as_op(model_predict)
-                if model_self is not None:
-                    model_predict_args = {
-                        **model_predict_args,
-                        "self": model_self,
-                    }
-                model_output, model_call = await async_call_op(
-                    model_predict, **model_predict_args
-                )
-            else:
-                # I would not expect this path to be hit, but keeping it for
-                # backwards compatibility / safety
-                model_output = await async_call(model_predict, **model_predict_args)
+            model_predict_op = as_op(model_predict_op)
+            if model_self is not None:
+                model_predict_args = {
+                    **model_predict_args,
+                    "self": model_self,
+                }
+            model_output, model_call = await async_call_op(
+                model_predict_op, **model_predict_args
+            )
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -252,21 +260,21 @@ class Evaluation(Object):
                 """
             )
             raise OpCallError(message)
-        except Exception as e:
+        except Exception:
             print("model_output failed")
             traceback.print_exc()
             model_output = None
         model_latency = time.time() - model_start_time
 
         scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
-        scorers = cast(list[Union[Op, Scorer]], self.scorers or [])
+        scorers = self._post_init_scorers
 
         for scorer in scorers:
             scorer_self = None
             if weave_isinstance(scorer, Scorer):
                 scorer_self = scorer
-            scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            score_signature = inspect.signature(score_fn)
+            scorer_name, score_op, _ = get_scorer_attributes(scorer)
+            score_signature = inspect.signature(score_op)
             score_arg_names = list(score_signature.parameters.keys())
 
             # the actual kwarg name depends on the scorer
@@ -283,122 +291,102 @@ class Evaluation(Object):
                 )
                 raise OpCallError(message)
 
-            if isinstance(example, dict):
-                # The keys of `score_args` must match the argument names of the scorer's `score` method.
-                # If scorer.column_map is set, then user is indicating that the dataset column(s)
-                # being passed to the scorer have different names to the `score` functions' argument names.
-                # So we need to remap the dataset columns to the expected argument names in the scorer,
-                #
-                # column_map k:v pairs must be structured as `scorer param name : dataset column name`
-                #
-                # For instance, if the scorer expects "input" and "ground_truth" and we have a dataset
-                # with columns "question" and "answer", column_map should be defined as follows:
-                # {"input": "question", "ground_truth": "answer"}
-                #
-                # input: is the full row, we have access to it via example
-                # output: is the model output, we have access to it via model_output
-                score_arg_names = [
-                    param for param in score_arg_names if (param != "self")
-                ]
-                score_args = {}
+            # The keys of `score_args` must match the argument names of the scorer's `score` method.
+            # If scorer.column_map is set, then user is indicating that the dataset column(s)
+            # being passed to the scorer have different names to the `score` functions' argument names.
+            # So we need to remap the dataset columns to the expected argument names in the scorer,
+            #
+            # column_map k:v pairs must be structured as `scorer param name : dataset column name`
+            #
+            # For instance, if the scorer expects "input" and "ground_truth" and we have a dataset
+            # with columns "question" and "answer", column_map should be defined as follows:
+            # {"input": "question", "ground_truth": "answer"}
+            #
+            # input: is the full row, we have access to it via example
+            # output: is the model output, we have access to it via model_output
+            score_arg_names = [param for param in score_arg_names if (param != "self")]
+            score_args = {}
 
-                if isinstance(scorer, Scorer) and scorer.column_map is not None:
-                    # Ensure that all keys in column_map are in score_arg_names
-                    for key in scorer.column_map.keys():
-                        if key not in score_arg_names:
-                            message = textwrap.dedent(
-                                f"""
-                                    You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
+            if isinstance(scorer, Scorer) and scorer.column_map is not None:
+                # Ensure that all keys in column_map are in score_arg_names
+                for key in scorer.column_map.keys():
+                    if key not in score_arg_names:
+                        message = textwrap.dedent(
+                            f"""
+                                You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                    The `column_map` contains a key, `{key}`, which is not in the `score` methods' argument names.
-                                    `score` methods' argument names: {score_arg_names}
+                                The `column_map` contains a key, `{key}`, which is not in the `score` methods' argument names.
+                                `score` methods' argument names: {score_arg_names}
 
-                                    Hint:
-                                    - Ensure that the keys in `column_map` match the scorer's argument names.
-                                    """
-                            )
-                            raise ValueError(message)
+                                Hint:
+                                - Ensure that the keys in `column_map` match the scorer's argument names.
+                                """
+                        )
+                        raise ValueError(message)
 
-                    for arg in score_arg_names:
-                        if arg == "output" or arg == "model_output":
-                            continue
-                        if arg in example:
-                            score_args[arg] = example[arg]
-                        elif arg in scorer.column_map:
-                            dataset_column_name = scorer.column_map[arg]
-                            if dataset_column_name in example:
-                                score_args[arg] = example[dataset_column_name]
-                            else:
-                                message = textwrap.dedent(
-                                    f"""
-                                        You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
-
-                                        You are mapping `{arg}` to `{dataset_column_name}`, but `{dataset_column_name}`
-                                        was not found in the dataset columns.
-
-                                        Available dataset columns: {list(example.keys())}
-
-                                        Hint:
-                                        - Ensure that `column_map` maps the `score` methods' argument names to existing dataset column names.
-                                        """
-                                )
-                                raise ValueError(message)
+                for arg in score_arg_names:
+                    if arg == "output" or arg == "model_output":
+                        continue
+                    if arg in example:
+                        score_args[arg] = example[arg]
+                    elif arg in scorer.column_map:
+                        dataset_column_name = scorer.column_map[arg]
+                        if dataset_column_name in example:
+                            score_args[arg] = example[dataset_column_name]
                         else:
                             message = textwrap.dedent(
                                 f"""
                                     You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
-                                    `score` method argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
+                                    You are mapping `{arg}` to `{dataset_column_name}`, but `{dataset_column_name}`
+                                    was not found in the dataset columns.
 
                                     Available dataset columns: {list(example.keys())}
-                                    `column_map`: {scorer.column_map}
 
                                     Hint:
-                                    Either:
-                                    - map the argument name to the dataset column using the scorers `column_map` attribute, in the form {{score_arg_name : dataset_column_name}} or
-                                    - rename a column in the dataset to `{arg}` or
-                                    - re-name the `{arg}` argument in your `score` method to match a dataset column name
+                                    - Ensure that `column_map` maps the `score` methods' argument names to existing dataset column names.
                                     """
                             )
                             raise ValueError(message)
-                else:
-                    score_args = {
-                        k: v for k, v in example.items() if k in score_arg_names
-                    }
+                    else:
+                        message = textwrap.dedent(
+                            f"""
+                                You have created `{scorer_name}(column_map={scorer.column_map}, ...)`.
 
+                                `score` method argument `{arg}` is not found in the dataset columns and is not mapped in `column_map`.
+
+                                Available dataset columns: {list(example.keys())}
+                                `column_map`: {scorer.column_map}
+
+                                Hint:
+                                Either:
+                                - map the argument name to the dataset column using the scorers `column_map` attribute, in the form {{score_arg_name : dataset_column_name}} or
+                                - rename a column in the dataset to `{arg}` or
+                                - re-name the `{arg}` argument in your `score` method to match a dataset column name
+                                """
+                        )
+                        raise ValueError(message)
             else:
-                if len(score_arg_names) == 2:
-                    score_args = {score_arg_names[0]: example}
-                else:
-                    raise ValueError(
-                        f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                    )
+                score_args = {k: v for k, v in example.items() if k in score_arg_names}
+
             score_args[score_output_name] = model_output
 
             try:
-                if is_op(score_fn) and model_call:
-                    # I would expect this path to always be hit, but keeping the other
-                    # path for backwards compatibility / safety
-                    score_fn = as_op(score_fn)
-                    if scorer_self is not None:
-                        score_args = {
-                            **score_args,
-                            "self": scorer_self,
-                        }
-                    result, score_call = await async_call_op(score_fn, **score_args)
-                    wc = get_weave_client()
-                    if wc:
-                        # Very important: if the score is generated from a Scorer subclass,
-                        # then scorer_ref_uri will be None, and we will use the op_name from
-                        # the score_call instead.
-                        scorer_ref = get_ref(scorer_self) if scorer_self else None
-                        scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-                        wc._send_score_call(model_call, score_call, scorer_ref_uri)
-
-                else:
-                    # I would not expect this path to be hit, but keeping it for
-                    # backwards compatibility / safety
-                    result = await async_call(score_fn, **score_args)
+                score_op = as_op(score_op)
+                if scorer_self is not None:
+                    score_args = {
+                        **score_args,
+                        "self": scorer_self,
+                    }
+                result, score_call = await async_call_op(score_op, **score_args)
+                wc = get_weave_client()
+                if wc:
+                    # Very important: if the score is generated from a Scorer subclass,
+                    # then scorer_ref_uri will be None, and we will use the op_name from
+                    # the score_call instead.
+                    scorer_ref = get_ref(scorer_self) if scorer_self else None
+                    scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
+                    wc._send_score_call(model_call, score_call, scorer_ref_uri)
             except OpCallError as e:
                 dataset_column_names = list(example.keys())
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -449,7 +437,7 @@ class Evaluation(Object):
 
         for name, vals in cols.items():
             if name == "scores":
-                scorers = self.scorers or []
+                scorers = self._post_init_scorers
                 for scorer in scorers:
                     scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
                     scorer_stats = transpose(vals)
@@ -462,9 +450,7 @@ class Evaluation(Object):
                     summary[name] = model_output_summary
         return summary
 
-    async def get_eval_results(
-        self, model: Union[Callable, Model]
-    ) -> EvaluationResults:
+    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -476,7 +462,7 @@ class Evaluation(Object):
                 eval_row = await self.predict_and_score(model, example)
             except OpCallError as e:
                 raise e
-            except Exception as e:
+            except Exception:
                 print("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
@@ -484,7 +470,7 @@ class Evaluation(Object):
 
         n_complete = 0
         # with console.status("Evaluating...") as status:
-        dataset = cast(Dataset, self.dataset)
+        dataset = self._post_init_dataset
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
         async for example, eval_row in util.async_foreach(
@@ -499,7 +485,7 @@ class Evaluation(Object):
                 eval_row = {self._output_key: None, "scores": {}}
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
-            for scorer in self.scorers or []:
+            for scorer in self._post_init_scorers:
                 scorer_name, _, _ = get_scorer_attributes(scorer)
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
@@ -507,7 +493,7 @@ class Evaluation(Object):
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def evaluate(self, model: Union[Op, Model]) -> dict:
         # The need for this pattern is quite unfortunate and highlights a gap in our
         # data model. As a user, I just want to pass a list of data `eval_rows` to
         # summarize. Under the hood, Weave should choose the appropriate storage
@@ -528,7 +514,7 @@ class Evaluation(Object):
 
 def evaluate(
     dataset: Union[Dataset, list],
-    model: Union[Callable, Model],
+    model: Union[Op, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
 ) -> dict:

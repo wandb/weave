@@ -1,6 +1,7 @@
 from typing import Callable
 
 from weave.flow.obj import Object
+from weave.trace.op import Op, is_op
 
 INFER_METHOD_NAMES = {"predict", "infer", "forward", "invoke"}
 
@@ -45,9 +46,13 @@ class Model(Object):
         )
 
 
-def get_infer_method(model: Model) -> Callable:
+def get_infer_method(model: Model) -> Op:
     for name in INFER_METHOD_NAMES:
         if (infer_method := getattr(model, name, None)) is not None:
+            if not is_op(infer_method):
+                raise ValueError(
+                    f"Model {model} must implement `{name}` as a weave.op() decorated function."
+                )
             return infer_method
     raise MissingInferenceMethodError(
         f"Missing a method with name in ({INFER_METHOD_NAMES})"
