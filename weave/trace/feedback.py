@@ -205,7 +205,7 @@ class RefFeedbackQuery(FeedbackQuery):
             try:
                 parse_object_uri(annotation_ref)
             except TypeError:
-                raise ValueError(
+                raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
                 )
             freq.annotation_ref = annotation_ref
@@ -226,11 +226,7 @@ class RefFeedbackQuery(FeedbackQuery):
         feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
         creator: The name to display for the originator of the feedback.
         """
-        if feedback_type.startswith("wandb.") and not annotation_ref:
-            raise ValueError(
-                'Feedback type cannot start with "wandb", it is reserved for annotation feedback.'
-                "Provide an annotation_ref <entity/project/object/name:digest> to add annotation feedback."
-            )
+        _validate_feedback_type(feedback_type, annotation_ref)
         feedback = {}
         feedback.update(payload or {})
         feedback.update(kwargs)
@@ -272,6 +268,18 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         self.client.server.feedback_purge(req)
         self.feedbacks = None  # Clear cache
+
+
+def _validate_feedback_type(feedback_type: str, annotation_ref: str | None) -> None:
+    if feedback_type.startswith("wandb.") and not annotation_ref:
+        raise ValueError(
+            'Feedback type cannot start with "wandb", it is reserved for annotation feedback.'
+            "Provide an annotation_ref <entity/project/object/name:digest> to add annotation feedback."
+        )
+    elif not feedback_type.startswith("wandb.annotation.") and annotation_ref:
+        raise ValueError(
+            "To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'."
+        )
 
 
 __docspec__ = [
