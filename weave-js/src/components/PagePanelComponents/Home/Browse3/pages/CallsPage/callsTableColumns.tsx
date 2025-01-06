@@ -18,6 +18,7 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {CellValueString} from '../../../Browse2/CellValueString';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -372,7 +373,7 @@ function buildCallsTableColumns(
             if (typeof params.value === 'boolean') {
               return <div>{params.value ? 'true' : 'false'}</div>;
             }
-            return <div>{params.value}</div>;
+            return <CellValueString value={params.value} />;
           },
         };
       });
