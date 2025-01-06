@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import inspect
 import textwrap
 from concurrent.futures import Future
-from typing import Any, TypedDict, Union
+from typing import Any, TypedDict
 
 from weave.scorers import (
     Scorer,
@@ -25,7 +27,7 @@ class ApplyScorerResult(TypedDict):
 
 
 async def apply_scorer(
-    scorer: Union[Scorer, Op],
+    scorer: Scorer | Op,
     example: dict,
     model_output: Any,
     model_call: Call | None = None,
