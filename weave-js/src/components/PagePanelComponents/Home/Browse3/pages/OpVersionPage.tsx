@@ -7,7 +7,7 @@ import {Tailwind} from '../../../../Tailwind';
 import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
-import {DeleteModal} from './common/DeleteModal';
+import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -73,6 +73,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
+  const showDeleteButton = useShowDeleteButton();
 
   return (
     <SimplePageLayoutWithHeader
@@ -142,7 +143,9 @@ const OpVersionPageInner: React.FC<{
               )}
             </div>
             <div className="block">
-              <DeleteOpButtonWithModal opVersionSchema={opVersion} />
+              {showDeleteButton && (
+                <DeleteOpButtonWithModal opVersionSchema={opVersion} />
+              )}
             </div>
           </div>
         </Tailwind>

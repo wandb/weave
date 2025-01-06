@@ -4,6 +4,7 @@ import {
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
@@ -100,6 +101,11 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
       </Tailwind>
     </Dialog>
   );
+};
+
+export const useShowDeleteButton = () => {
+  const viewerInfo = useViewerInfo();
+  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const Dialog = styled(MaterialDialog)`

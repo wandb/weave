@@ -14,7 +14,7 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
-import {DeleteModal} from './common/DeleteModal';
+import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -181,6 +181,8 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
+  const showDeleteButton = useShowDeleteButton();
+
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
       typeof viewerData !== 'object' ||
@@ -259,7 +261,9 @@ const ObjectVersionPageInner: React.FC<{
               </div>
             )}
             <div className="ml-auto">
-              <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+              {showDeleteButton && (
+                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+              )}
             </div>
           </div>
         </Tailwind>

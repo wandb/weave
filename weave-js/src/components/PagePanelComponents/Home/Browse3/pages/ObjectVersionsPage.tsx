@@ -115,6 +115,7 @@ export const ObjectVersionsPage: React.FC<{
   const hasComparison = filter.objectName != null;
   const viewer = userInfo ? userInfo.id : null;
   const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
+  const isAdmin = userInfo?.admin;
 
   return (
     <SimplePageLayout
@@ -126,7 +127,7 @@ export const ObjectVersionsPage: React.FC<{
           project={project}
           objectName={filter.objectName ?? null}
           selectedVersions={selectedVersions}
-          showDeleteButton={!isReadonly}
+          showDeleteButton={!isReadonly && isAdmin}
           showCompareButton={hasComparison}
           onCompare={onCompare}
         />
