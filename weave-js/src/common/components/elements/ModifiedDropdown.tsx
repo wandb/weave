@@ -45,9 +45,23 @@ type LabelCoord = {
 
 const ITEM_LIMIT_VALUE = '__item_limit';
 
+/**
+ * The functionality here is similar to `searchRegexFromQuery` in `panelbank.ts`
+ */
 export function getAsValidRegex(s: string): RegExp | null {
+  let cleanS = s.trim();
+
+  // if the query is a single '*', match everything (even though * isn't technically a valid regex)
+  if (cleanS === '*') {
+    cleanS = '.*';
+  }
+
+  if (cleanS.length === 0) {
+    return null;
+  }
+
   try {
-    return new RegExp(s);
+    return new RegExp(cleanS, 'i');
   } catch (e) {
     return null;
   }
@@ -64,14 +78,18 @@ export const simpleSearch = (
 
   return _.chain(options)
     .filter(o => {
-      const text = JSON.stringify(o.text).toLowerCase();
-      return regex ? regex.test(text) : _.includes(text, query.toLowerCase());
+      const t = typeof o.text === 'string' ? o.text : JSON.stringify(o.text);
+
+      return regex
+        ? regex.test(t)
+        : _.includes(t.toLowerCase(), query.toLowerCase());
     })
     .sortBy(o => {
-      const valJSON = typeof o.text === 'string' ? `"${query}"` : query;
-      return JSON.stringify(o.text).toLowerCase() === valJSON.toLowerCase()
-        ? 0
-        : 1;
+      const oString =
+        typeof o.text === 'string' ? o.text : JSON.stringify(o.text);
+      const qString = typeof query === 'string' ? query : JSON.stringify(query);
+
+      return oString.toLowerCase() === qString.toLowerCase() ? 0 : 1;
     })
     .value();
 };
@@ -148,10 +166,10 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
               _.concat(currentOptions, search(propsOptions, query) as Option[])
             );
           } else {
-            const updatedOptions = currentOptions.concat(
-              simpleSearch(propsOptions, query, {allowRegexSearch}) as Option[]
-            );
-            setOptions(updatedOptions);
+            const matchedOptions = simpleSearch(propsOptions, query, {
+              allowRegexSearch,
+            }) as Option[];
+            setOptions([...currentOptions, ...matchedOptions]);
           }
         }, debounceTime || 400),
       [allowRegexSearch, debounceTime, multiple, propsOptions, search, value]
@@ -480,9 +498,16 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
-          const valCount = _.isArray(val) ? val.length : 0;
+          const valIsArray = Array.isArray(val);
+          const valCount = valIsArray ? val.length : 0;
+
+          // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
+          const valIsLimit = valIsArray
+            ? val.includes(ITEM_LIMIT_VALUE)
+            : val === ITEM_LIMIT_VALUE;
+
           if (valCount < itemCount() || !atItemLimit()) {
-            if (onChange && val !== ITEM_LIMIT_VALUE) {
+            if (onChange && !valIsLimit) {
               onChange(e, {value: val});
             }
           }
