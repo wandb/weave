@@ -430,7 +430,7 @@ const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
   const compositeMetrics = useMemo(() => {
-    return buildCompositeMetricsMap(state.data, 'summary');
+    return buildCompositeMetricsMap(state.summary, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);
@@ -450,7 +450,7 @@ const usePlotDataFromMetrics = (
           }
           const val = resolveSummaryMetricValueForEvaluateCall(
             metricDimension,
-            state.data.evaluationCalls[callId]
+            state.summary.evaluationCalls[callId]
           );
           if (typeof val === 'boolean') {
             return val ? 1 : 0;
@@ -471,7 +471,7 @@ const usePlotDataFromMetrics = (
       });
     const radarData = Object.fromEntries(
       callIds.map(callId => {
-        const evalCall = state.data.evaluationCalls[callId];
+        const evalCall = state.summary.evaluationCalls[callId];
         return [
           evalCall.callId,
           {
@@ -491,5 +491,5 @@ const usePlotDataFromMetrics = (
     );
     const allMetricNames = new Set(metrics.map(m => m.metricLabel));
     return {radarData, allMetricNames};
-  }, [callIds, compositeMetrics, state.data.evaluationCalls]);
+  }, [callIds, compositeMetrics, state.summary.evaluationCalls]);
 };
