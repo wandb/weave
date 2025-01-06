@@ -10,7 +10,7 @@ from rich.table import Table
 
 from weave.trace import util
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.refs import parse_uri
+from weave.trace.refs import parse_object_uri, parse_uri
 from weave.trace.rich import pydantic_util
 from weave.trace.rich.container import AbstractRichContainer
 from weave.trace.rich.refs import Refs
@@ -188,7 +188,11 @@ class RefFeedbackQuery(FeedbackQuery):
         self.weave_ref = ref
 
     def _add(
-        self, feedback_type: str, payload: dict[str, Any], creator: str | None
+        self,
+        feedback_type: str,
+        payload: dict[str, Any],
+        creator: str | None,
+        annotation_ref: str | None = None,
     ) -> str:
         freq = tsi.FeedbackCreateReq(
             project_id=f"{self.entity}/{self.project}",
@@ -197,6 +201,14 @@ class RefFeedbackQuery(FeedbackQuery):
             payload=payload,
             creator=creator,
         )
+        if annotation_ref:
+            try:
+                parse_object_uri(annotation_ref)
+            except TypeError:
+                raise ValueError(
+                    "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
+                )
+            freq.annotation_ref = annotation_ref
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache
         return response.id
@@ -206,6 +218,7 @@ class RefFeedbackQuery(FeedbackQuery):
         feedback_type: str,
         payload: dict[str, Any] | None = None,
         creator: str | None = None,
+        annotation_ref: str | None = None,
         **kwargs: dict[str, Any],
     ) -> str:
         """Add feedback to the ref.
@@ -213,12 +226,15 @@ class RefFeedbackQuery(FeedbackQuery):
         feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
         creator: The name to display for the originator of the feedback.
         """
-        if feedback_type.startswith("wandb."):
-            raise ValueError('Feedback type cannot start with "wandb."')
+        if feedback_type.startswith("wandb.") and not annotation_ref:
+            raise ValueError(
+                'Feedback type cannot start with "wandb", it is reserved for annotation feedback.'
+                "Provide an annotation_ref <entity/project/object/name:digest> to add annotation feedback."
+            )
         feedback = {}
         feedback.update(payload or {})
         feedback.update(kwargs)
-        return self._add(feedback_type, feedback, creator)
+        return self._add(feedback_type, feedback, creator, annotation_ref)
 
     def add_reaction(self, emoji: str, creator: str | None = None) -> str:
         return self._add(
