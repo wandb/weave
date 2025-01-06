@@ -175,14 +175,37 @@ ApplyScorerResult = ApplyScorerSuccess
 async def apply_scorer_async(
     scorer: Union[Op, Scorer], example: dict, model_output: dict
 ) -> ApplyScorerResult:
+    """Apply a scoring function to model output and example data asynchronously.
+
+    This function handles the application of a scoring function to evaluate model outputs.
+    It supports both function-based scorers (Op) and class-based scorers (Scorer),
+    managing argument mapping and validation.
+
+    Args:
+        scorer: Either an Op (function) or Scorer (class) that implements scoring logic
+        example: Dictionary containing the input example data with features to score against
+        model_output: Dictionary containing the model's output to be scored
+
+    Returns:
+        ApplyScorerResult: Contains the scoring result and the Call object representing
+            the scoring operation
+
+    Raises:
+        OpCallError: If there are issues with argument mapping or scorer execution
+        ValueError: If the column mapping configuration is invalid
+    """
+    # For class-based scorers, we need to keep track of the instance
     scorer_self = None
     if weave_isinstance(scorer, Scorer):
         scorer_self = scorer
+
+    # Extract the core components of the scorer
     scorer_name, score_op, _ = get_scorer_attributes(scorer)
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
 
-    # the actual kwarg name depends on the scorer
+    # Determine which parameter name is used for model output
+    # Scorers must have either 'output' or 'model_output' (deprecated) parameter
     if "output" in score_arg_names:
         score_output_name = "output"
     elif "model_output" in score_arg_names:
@@ -209,11 +232,14 @@ async def apply_scorer_async(
     #
     # input: is the full row, we have access to it via example
     # output: is the model output, we have access to it via model_output
+    # Remove 'self' from argument names if present (for class-based scorers)
     score_arg_names = [param for param in score_arg_names if (param != "self")]
     score_args = {}
 
+    # Handle column mapping if provided
+    # This allows dataset columns to be mapped to scorer argument names
     if isinstance(scorer, Scorer) and scorer.column_map is not None:
-        # Ensure that all keys in column_map are in score_arg_names
+        # Validate that all mapped columns exist in scorer signature
         for key in scorer.column_map.keys():
             if key not in score_arg_names:
                 message = textwrap.dedent(
@@ -229,6 +255,7 @@ async def apply_scorer_async(
                 )
                 raise ValueError(message)
 
+        # Build arguments dictionary using column mapping
         for arg in score_arg_names:
             if arg == "output" or arg == "model_output":
                 continue
@@ -272,11 +299,14 @@ async def apply_scorer_async(
                 )
                 raise ValueError(message)
     else:
+        # Without column mapping, directly match scorer arguments to example keys
         score_args = {k: v for k, v in example.items() if k in score_arg_names}
 
+    # Add the model output to the arguments
     score_args[score_output_name] = model_output
 
     try:
+        # Execute the scoring operation
         score_op = as_op(score_op)
         if scorer_self is not None:
             score_args = {
@@ -285,6 +315,7 @@ async def apply_scorer_async(
             }
         result, score_call = await async_call_op(score_op, **score_args)
     except OpCallError as e:
+        # Provide detailed error message if scoring fails
         dataset_column_names = list(example.keys())
         dataset_column_names_str = ", ".join(dataset_column_names[:3])
         if len(dataset_column_names) > 10:

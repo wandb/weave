@@ -92,6 +92,23 @@ async def apply_model_async(
     example: dict,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> ApplyModelResult:
+    """Asynchronously applies a model (class or operation) to a given example.
+
+    This function handles the execution of a model against input data with proper type checking
+    and client context management. It supports both class-based models and operation-based models.
+
+    Args:
+        model: The model to apply, can be either a class type or a Weave Operation (Op)
+        example: The input data to process through the model
+        preprocess_model_input: A function that preprocesses the example before passing it to the model
+
+    Returns:
+        Any: The result of applying the model to the example
+
+    Raises:
+        TypeError: If the model is neither a class type nor an Op
+        ValueError: If type checking fails between model input requirements and example
+    """
     if preprocess_model_input is None:
         model_input = example
     else:
@@ -116,13 +133,13 @@ async def apply_model_async(
         k: v for k, v in model_input.items() if k in model_predict_arg_names
     }
     try:
-        model_start_time = time.time()
         model_predict_op = as_op(model_predict_op)
         if model_self is not None:
             model_predict_args = {
                 **model_predict_args,
                 "self": model_self,
             }
+        model_start_time = time.time()
         model_output, model_call = await async_call_op(
             model_predict_op, **model_predict_args
         )

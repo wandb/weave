@@ -8,6 +8,17 @@ from weave.trace.weave_client import Call
 
 
 def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
+    """For async functions, calls them directly. For sync functions, runs them in a thread.
+    This provides a common async interface for both sync and async functions.
+
+    Args:
+        func: The callable or Op to wrap
+        *args: Positional arguments to pass to the function
+        **kwargs: Keyword arguments to pass to the function
+
+    Returns:
+        A coroutine that will execute the function
+    """
     is_async = False
     if is_op(func):
         func = as_op(func)
@@ -22,6 +33,17 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
 def async_call_op(
     func: Op, *args: Any, **kwargs: Any
 ) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
+    """Similar to async_call but specifically for Ops, handling the Weave tracing
+    functionality. For sync Ops, runs them in a thread.
+
+    Args:
+        func: The Op to wrap
+        *args: Positional arguments to pass to the Op
+        **kwargs: Keyword arguments to pass to the Op
+
+    Returns:
+        A coroutine that will execute the Op and return a tuple of (result, Call)
+    """
     call_res = func.call(*args, __should_raise=True, **kwargs)
     if inspect.iscoroutine(call_res):
         return call_res
