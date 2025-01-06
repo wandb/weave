@@ -510,6 +510,6 @@ def test_annotation_feedback_sdk(client):
     # no wandb.annotation prefix
     with pytest.raises(
         ValueError,
-        match="Feedback type must conform to the format: 'wandb.annotation.<name>'.",
+        match="To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'.",
     ):
         calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref=ref.uri())
