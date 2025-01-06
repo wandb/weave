@@ -491,8 +491,8 @@ def test_annotation_feedback_sdk(client):
     # Query the feedback
     feedback = calls[0].feedback.refresh()
     assert len(feedback) == 1
-    assert feedback[0].val["value"] == 3
-    assert feedback[0].val["annotation_ref"] == ref.uri()
+    assert feedback[0].payload["value"] == 3
+    assert feedback[0].annotation_ref == ref.uri()
 
     # no annotation_ref
     with pytest.raises(ValueError):
