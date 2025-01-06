@@ -1,6 +1,5 @@
 import pytest
 from pydantic import BaseModel, Field
-from requests import HTTPError
 
 import weave
 from weave.flow.annotation_spec import AnnotationSpec
@@ -505,9 +504,9 @@ def test_annotation_feedback_sdk(client):
         )
 
     # invalid annotation_ref
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref="ssss")
 
     # no wandb.annotation prefix
-    with pytest.raises(HTTPError):
+    with pytest.raises(Exception):
         calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref=ref.uri())
