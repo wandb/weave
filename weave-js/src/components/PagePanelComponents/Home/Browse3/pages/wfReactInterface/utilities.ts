@@ -287,6 +287,15 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
   return result;
 };
 
+export const isObjDeleteError = (e: any): boolean => {
+  if (e == null) {
+    return false;
+  }
+  const errorStr = String(e);
+  const regex = /Obj .* was deleted at .*/;
+  return regex.test(errorStr);
+};
+
 /// Hooks ///
 
 export const useParentCall = (

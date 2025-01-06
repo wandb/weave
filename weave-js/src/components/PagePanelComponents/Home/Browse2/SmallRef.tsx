@@ -13,6 +13,7 @@ import {Icon, IconName, IconNames} from '../../../Icon';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+import {isObjDeleteError} from '../Browse3/pages/wfReactInterface/utilities';
 import {
   ObjectVersionKey,
   OpVersionKey,
@@ -145,6 +146,7 @@ export const SmallRef: FC<{
     rootType = {type: 'OpDef'};
   }
   const {label} = objectRefDisplayName(objRef, versionIndex);
+
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
   if (rootTypeName === 'Dataset') {
@@ -204,13 +206,4 @@ export const SmallRef: FC<{
       {Item}
     </Link>
   );
-};
-
-export const isObjDeleteError = (e: any): boolean => {
-  if (e == null) {
-    return false;
-  }
-  const errorStr = String(e);
-  const regex = /Obj .* was deleted at .*/;
-  return regex.test(errorStr);
 };
