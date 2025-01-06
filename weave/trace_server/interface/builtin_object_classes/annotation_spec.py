@@ -115,3 +115,6 @@ class AnnotationSpec(base_object_def.BaseObject):
         except jsonschema.exceptions.ValidationError:
             return False
         return True
+
+
+__docspec__ = [AnnotationSpec]
