@@ -43,6 +43,9 @@ INVALID_MODEL_ERROR = (
 )
 
 
+PreprocessModelInput = Callable[[dict], dict]
+
+
 def default_evaluation_display_name(call: Call) -> str:
     date = datetime.now().strftime("%Y-%m-%d")
     unique_name = make_memorable_name()
@@ -121,7 +124,7 @@ class Evaluation(Object):
 
     dataset: Union[Dataset, list[dict]]
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
-    preprocess_model_input: Optional[Callable] = None
+    preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
@@ -516,7 +519,7 @@ def evaluate(
     dataset: Union[Dataset, list],
     model: Union[Op, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
-    preprocess_model_input: Optional[Callable] = None,
+    preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
