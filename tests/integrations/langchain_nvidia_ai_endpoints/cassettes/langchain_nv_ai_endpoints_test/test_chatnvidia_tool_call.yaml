@@ -26,8 +26,8 @@ interactions:
     uri: https://integrate.api.nvidia.com/v1/chat/completions
   response:
     body:
-      string: '{"id":"chat-c827eb3e9dad425dbde170c946ff7cf7","object":"chat.completion","created":1734992507,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"chatcmpl-tool-3b35163e6a5a4961aa22b93581a0c5b2","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
-        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 183}"}}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30},"prompt_logprobs":null}'
+      string: '{"id":"chat-47a53c8ab28845b39a0f27712da52bbd","object":"chat.completion","created":1735929359,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"chatcmpl-tool-f6a1750c001246a0a5edeeea8be28e6b","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
+        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 254}"}}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30},"prompt_logprobs":null}'
     headers:
       Access-Control-Allow-Credentials:
       - 'true'
@@ -40,9 +40,9 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 23 Dec 2024 22:21:48 GMT
+      - Fri, 03 Jan 2025 18:36:00 GMT
       Nvcf-Reqid:
-      - 497f5f82-973e-4224-8593-97664a04b39c
+      - 3ae2e86b-10f8-4faf-9b8b-483de1b3efd9
       Nvcf-Status:
       - fulfilled
       Server:
