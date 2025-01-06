@@ -89,8 +89,8 @@ export const FeedbackGridInner = ({
     {
       field: 'created_at',
       headerName: 'Timestamp',
-      minWidth: 120,
-      width: 120,
+      minWidth: 105,
+      width: 105,
       renderCell: params => (
         <Timestamp value={params.row.created_at} format="relative" />
       ),
@@ -98,7 +98,8 @@ export const FeedbackGridInner = ({
     {
       field: 'id',
       headerName: 'ID',
-      width: 50,
+      width: 48,
+      minWidth: 48,
       display: 'flex',
       renderCell: params => <CopyableId id={params.row.id} type="Feedback" />,
     },
@@ -126,7 +127,8 @@ export const FeedbackGridInner = ({
     {
       field: 'actions',
       headerName: '',
-      width: 50,
+      width: 36,
+      minWidth: 36,
       filterable: false,
       sortable: false,
       resizable: false,
