@@ -270,7 +270,11 @@ class Evaluation(Object):
         except Exception:
             print("model_output failed")
             traceback.print_exc()
-            model_output = None
+            return {
+                self._output_key: None,
+                "scores": {},
+                "model_latency": time.time() - model_start_time,
+            }
         model_latency = time.time() - model_start_time
 
         scores = {}  # TODO: Consider moving scorer setup and checks out of `predict_and_score`
