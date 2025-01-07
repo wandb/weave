@@ -986,27 +986,26 @@ export class HttpClient<SecurityDataType = unknown> {
     const payloadFormatter = this.contentFormatters[type || ContentType.Json];
     const responseFormat = format || requestParams.format;
 
-    return this.customFetch(
-      `${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`,
-      {
-        ...requestParams,
-        headers: {
-          ...(requestParams.headers || {}),
-          ...(type && type !== ContentType.FormData
-            ? {'Content-Type': type}
-            : {}),
-        },
-        signal:
-          (cancelToken
-            ? this.createAbortSignal(cancelToken)
-            : requestParams.signal) || null,
-        body:
-          typeof body === 'undefined' || body === null
-            ? null
-            : payloadFormatter(body),
-      }
-    ).then(async response => {
+    const url = `${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`;
+    return this.customFetch(url, {
+      ...requestParams,
+      headers: {
+        ...(requestParams.headers || {}),
+        ...(type && type !== ContentType.FormData
+          ? {'Content-Type': type}
+          : {}),
+      },
+      signal:
+        (cancelToken
+          ? this.createAbortSignal(cancelToken)
+          : requestParams.signal) || null,
+      body:
+        typeof body === 'undefined' || body === null
+          ? null
+          : payloadFormatter(body),
+    }).then(async response => {
       const r = response.clone() as HttpResponse<T, E>;
+      console.log('response', response);
       r.data = null as unknown as T;
       r.error = null as unknown as E;
 
