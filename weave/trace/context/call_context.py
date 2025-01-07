@@ -20,6 +20,8 @@ _call_stack: contextvars.ContextVar[list[Call]] = contextvars.ContextVar(
 
 logger = logging.getLogger(__name__)
 
+_tracing_enabled = contextvars.ContextVar("tracing_enabled", default=True)
+
 
 def push_call(call: Call) -> None:
     new_stack = copy.copy(_call_stack.get())
@@ -136,3 +138,22 @@ def set_call_stack(stack: list[Call]) -> Iterator[list[Call]]:
 call_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
     "call_attributes", default={}
 )
+
+
+def get_tracing_enabled() -> bool:
+    return _tracing_enabled.get()
+
+
+@contextlib.contextmanager
+def set_tracing_enabled(enabled: bool) -> Iterator[None]:
+    token = _tracing_enabled.set(enabled)
+    try:
+        yield
+    finally:
+        _tracing_enabled.reset(token)
+
+
+@contextlib.contextmanager
+def tracing_disabled() -> Iterator[None]:
+    with set_tracing_enabled(False):
+        yield
