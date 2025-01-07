@@ -25,12 +25,14 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.scorers.base_scorer import ApplyScorerResult, apply_scorer_async
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -314,12 +316,6 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
-class ApplyScorerResult(pydantic.BaseModel):
-    score: Any
-    call_id: str
-    feedback_id: str
-
-
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -464,34 +460,29 @@ class Call:
         self.set_display_name(None)
 
     async def _apply_scorer_async(
-        self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
+        self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
         """
         Before making this public, we should refactor such that the `predict_and_score` method
         inside `eval.py` uses this method inside the scorer block.
         """
-        from weave.trace.scorer_applier import apply_scorer
-
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
 
-        # TODO: Unify and cleanup this interface
-        res1 = await apply_scorer(scorer_op, example, self.output, self)
-        score_results = res1["score"]
-        score_call = res1["score_call"]
-        feedback_id_future = res1["feedback_id_future"]
+        apply_scorer_result = await apply_scorer_async(scorer, example, self.output)
+        score_call = apply_scorer_result.score_call
 
-        # TODO: get rid of this
-        if feedback_id_future is None or score_call is None:
-            raise ValueError("Feedback ID future or score call is None")
-
-        feedback_id = feedback_id_future.result()
-
-        return ApplyScorerResult(
-            score=score_results,
-            call_id=score_call.id,
-            feedback_id=feedback_id,
-        )
+        wc = weave_client_context.get_weave_client()
+        if wc:
+            scorer_ref_uri = None
+            if weave_isinstance(scorer, Scorer):
+                # Very important: if the score is generated from a Scorer subclass,
+                # then scorer_ref_uri will be None, and we will use the op_name from
+                # the score_call instead.
+                scorer_ref = get_ref(scorer)
+                scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
+                wc._send_score_call(self, score_call, scorer_ref_uri)
+        return apply_scorer_result
 
     def apply_scorer(
         self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
