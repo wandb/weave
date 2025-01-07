@@ -34,8 +34,8 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
   const codeFeedbackPython = `call.feedback.add("correctness", {"value": 4})`;
 
   const codeFetchJS = `import * as weave from 'weave';
-  const client = await weave.init("${entity}/${project}");
-  const call = await client.getCall("${callId}")`;
+const client = await weave.init("${entity}/${project}");
+const call = await client.getCall("${callId}")`;
   const codeReactionJS = `await call.feedback.addReaction('👍')`;
   const codeNoteJS = `await call.feedback.addNote('This is delightful!')`;
   const codeFeedbackJS = `await call.feedback.add({correctness: {value: 4}})`;

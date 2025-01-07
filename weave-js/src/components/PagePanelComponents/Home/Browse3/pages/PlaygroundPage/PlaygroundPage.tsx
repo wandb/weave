@@ -108,11 +108,9 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         setPlaygroundStateFromTraceCall(callWithCosts.result.traceCall);
       }
     }
-  }, [
-    callWithCosts.loading,
-    setPlaygroundStateFromTraceCall,
-    callWithCosts.result,
-  ]);
+    // Only set the call the first time the page loads, and we get the call
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callWithCosts.loading]);
 
   useEffect(() => {
     setPlaygroundStates(prev => {
