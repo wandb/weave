@@ -15,22 +15,32 @@ title: Handling and Redacting PII
 
 <!--- @wandbcode{cod-notebook} -->
 
-# How to use Weave with PII data:
+# How to use Weave with PII data
 
-In this guide, you'll learn how to use Weave while ensuring your Personally Identifiable Information (PII) data remains private. With Weave, you can remove PII from LLM input and output, prevent PII from being displayed in the Weave UI, and define  
+In this guide, you'll learn how to use W&B Weave while ensuring your Personally Identifiable Information (PII) data remains private. The guide demonstrates the following methods to identify, redact and anonymize PII data:
 
-To detect and protect our PII data, we'll identify and redact PII data and optionally anonymize it with the following methods:
 1. __Regular expressions__ to identify PII data and redact it.
 2. __Microsoft's [Presidio](https://microsoft.github.io/presidio/)__, a python-based data protection SDK. This tool provides redaction and replacement functionalities.
 3. __[Faker](https://faker.readthedocs.io/en/master/)__, a Python library to generate fake data, combined with Presidio to anonymize PII data.
 
 Additionally, you'll learn how to use both _Weave Ops input/output logging customization_ and _`autopatch_settings`_ to integrate PII redaction and anonymization into the workflow. For more information, see [Customize logged inputs and outputs](https://weave-docs.wandb.ai/guides/tracking/ops/#customize-logged-inputs-and-outputs).
 
-In this guide, you'll use Anthropic's Claude Sonnet to perform sentiment analysis while tracing LLM calls using [Traces](https://wandb.github.io/weave/quickstart). Claude Sonnet will receive a block of text and output one of the following sentiment classifications: _positive_, _negative_, or _neutral_.
+To get started, do the following:
 
-## Overview of Weave Ops Input/Output Logging Customization
+1. Review the [Overview](#overview) section.
+2. Complete the [prerequisites](#prerequisites).
+3. Review the [available methods](#redaction-methods-overview) for identifying, redacting and anonymizing PII data.
+4. [Apply the methods to Weave calls](#apply-the-methods-to-weave-calls).
 
-Weave Ops support defining input and output postprocessing functions. These functions allow you to modify the data that is passed to your LLM call or logged to Weave, respectively.
+## Overview 
+
+The following section provides an overview of input and output logging using `weave.op`, as well as best practices for working with PII data in Weave.
+
+### Customize input and output logging using `weave.op`
+
+Weave Ops allow you to define input and output postprocessing functions. Using these functions, you can modify the data that is passed to your LLM call or logged to Weave.
+
+In the following example, two postprocessing functions are defined and passed as arguments to `weave.op()`.
 
 ```python
 from dataclasses import dataclass
@@ -60,7 +70,25 @@ def some_llm_call(a: int, hide_me: str) -> CustomObject:
     return CustomObject(x=a, secret_password=hide_me)
 ```
 
-# Setup
+### Best practices for using Weave with PII data 
+
+Before using Weave with PII data, review the best practices for using Weave with PII data.
+
+#### During testing
+- Log anonymized data to check PII detection
+- Track PII handling processes with Weave Traces
+- Measure anonymization performance without exposing real PII
+
+#### In production
+- Never log raw PII
+- Encrypt sensitive fields before logging
+
+#### Encryption tips
+- Use reversible encryption for data you need to decrypt later
+- Apply one-way hashing for unique IDs you don't need to reverse
+- Consider specialized encryption for data you need to analyze while encrypted
+
+## Prerequisites
 
 1. First, install the required packages. 
 
@@ -78,7 +106,7 @@ def some_llm_call(a: int, hide_me: str) -> CustomObject:
 !pip install cryptography                   # to encrypt our data
 ```
 
-2. Set up your API keys. You can find your API keys at the following the links.
+2. Set up your API keys. You can find your API keys at the following links.
 
    - [W&B](https://wandb.ai/authorize)
    - [Anthropic](https://console.anthropic.com/settings/keys).
@@ -123,10 +151,16 @@ print('PII data first sample: "' + pii_data[0]["text"] + '"')
 
 Once you've completed the [setup](#setup), you can 
 
+To detect and protect our PII data, we'll identify and redact PII data and optionally anonymize it using the following methods:
+
+1. __Regular expressions__ to identify PII data and redact it.
+2. __Microsoft [Presidio](https://microsoft.github.io/presidio/)__, a Python-based data protection SDK that provides redaction and replacement functionality.
+3. __[Faker](https://faker.readthedocs.io/en/master/)__, a Python library for generating fake data.
+
 
 ### Method 1: Filter using regular expressions
 
-The simplest method is to use [regular expressions (regex)](https://docs.python.org/3/library/re.html) to identify PII data and redact it. It allows us to define patterns that can match various formats of sensitive information like phone numbers, email addresses, and social security numbers. By using regex, we can scan through large volumes of text and replace or redact information without the need for more complex NLP techniques. 
+[Regular expressions (regex)](https://docs.python.org/3/library/re.html) are the simplest method to identify and redact PII data. Regex allows you to define patterns that can match various formats of sensitive information like phone numbers, email addresses, and social security numbers. Using regex, you can scan through large volumes of text and replace or redact information without the need for more complex NLP techniques. 
 
 
 ```python
@@ -192,7 +226,7 @@ print(f"Redacted text:\n\t{cleaned_text}")
 ```
 
 ### Method 2: Redact using Microsoft Presidio 
-Our next method involves complete removal of PII data using [Microsoft Presidio](https://microsoft.github.io/presidio/). Presidio redacts PII and replaces it with a placeholder representing the PII type. For example, Presidio replaces `Alex` in `"My name is Alex"` with `<PERSON>`.
+The next method involves complete removal of PII data using [Microsoft Presidio](https://microsoft.github.io/presidio/). Presidio redacts PII and replaces it with a placeholder representing the PII type. For example, Presidio replaces `Alex` in `"My name is Alex"` with `<PERSON>`.
 
 Presidio comes with a built-in support for [common entities](https://microsoft.github.io/presidio/supported_entities/). In the below example, we redact all entities that are a `PHONE_NUMBER`, `PERSON`, `LOCATION`, `EMAIL_ADDRESS` or `US_SSN`. The Presidio process is encapsulated in a function.
 
@@ -236,15 +270,15 @@ print(f"Redacted text:\n\t{anonymized_text}")
 
 ### Method 3: Anonymize with replacement using Faker and Presidio
 
-Instead of redacting text, we can anonymize it by swapping PII like names and phone numbers with fake data generated using the [Faker](https://faker.readthedocs.io/en/master/) Python library. Using Faker, we can process the following data:
+Instead of redacting text, you can anonymize it by using MS Presidio to swap PII like names and phone numbers with fake data generated using the [Faker](https://faker.readthedocs.io/en/master/) Python library. For example, suppose you have the following data:
 
 `"My name is Raphael and I like to fish. My phone number is 212-555-5555"` 
 
-Once processing is complete, the data might look like:
+Once the data has been processed using Presidio and Faker, it might look like:
 
 `"My name is Katherine Dixon and I like to fish. My phone number is 667.431.7379"`
 
-To effectively utilize Presidio, we must supply references to our custom operators. These operators will direct Presidio to the functions responsible for swapping PII with fake data.
+To effectively use Presidio and Faker together, we must supply references to our custom operators. These operators will direct Presidio to the Faker functions responsible for swapping PII with fake data.
 
 
 ```python
@@ -290,7 +324,7 @@ print(f"Raw text:\n\t{text_to_anonymize}")
 print(f"Anonymized text:\n\t{anonymized_results.text}")
 ```
 
-Let's consolidate our code into a single class and expand the list of entities to include the additional ones we identified earlier.
+Let's consolidate our code into a single class and expand the list of entities to include the additional ones identified earlier.
 
 
 ```python
@@ -383,13 +417,13 @@ client = weave.init(
 ```
 
 
-## Applying the methods to Weave calls
+## Apply the methods to Weave calls
 
 In the following examples, we will integrate our PII redaction and anonymization methods into Weave Models and preview the results in Weave Traces.
 
 First, we'll create a [Weave Model](https://wandb.github.io/weave/guides/core-types/models). A Weave Model is a combination of information like configuration settings, model weights, and code that defines how the model operates. 
 
-In our model, we will include our predict function where the Anthropic API will be called. Additionally, we will include our postprocessing functions to ensure that our PII data is redacted or anonymized before it is sent to the LLM.
+In our model, we will include our predict function where the Anthropic API will be called. Anthropic's Claude Sonnet is used to perform sentiment analysis while tracing LLM calls using [Traces](https://wandb.github.io/weave/quickstart). Claude Sonnet will receive a block of text and output one of the following sentiment classifications: _positive_, _negative_, or _neutral_. Additionally, we will include our postprocessing functions to ensure that our PII data is redacted or anonymized before it is sent to the LLM.
 
 Once you run this code, you will receive a links to the Weave project page, as well as the specific trace (LLM calls) you ran.
 
@@ -656,27 +690,11 @@ for entry in pii_data:
     await model.predict(entry["text"])
 ```
 
-### Checklist for Safely Using Weave with PII Data
+### (Optional) Encrypt your data 
 
-#### During Testing
-- Log anonymized data to check PII detection
-- Track PII handling processes with Weave Traces
-- Measure anonymization performance without exposing real PII
-
-#### In production
-- Never log raw PII
-- Encrypt sensitive fields before logging
-
-#### Encryption tips
-- Use reversible encryption for data you need to decrypt later
-- Apply one-way hashing for unique IDs you don't need to reverse
-- Consider specialized encryption for data you need to analyze while encrypted
-
-<details>
-<summary> (Optional) Encrypting our data </summary>
 ![](../../media/pii/encrypt.png)
 
-In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
+In addition to anonymizing PII, you can add an extra layer of security by encrypting your data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
 
 ```python
 import os
@@ -771,4 +789,3 @@ for entry in pii_data:
     encrypted_input = EncryptedSentimentAnalysisInput.encrypt(entry["text"])
     await model.predict(encrypted_input)
 ```
-</details>
