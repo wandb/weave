@@ -3,13 +3,9 @@ from weave.trace import api
 
 
 def redact_keys(d: dict) -> dict:
-    print(f"Start redacting keys {d=}")
     for k in d:
-        print(f"Looking at key {k=}")
         if "key" in k.lower():
-            print(f"Redacting key {k=}")
             d[k] = "REDACTED"
-    print(f"Finished redacting keys {d=}")
     return d
 
 
