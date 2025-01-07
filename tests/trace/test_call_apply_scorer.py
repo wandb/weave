@@ -16,8 +16,8 @@ def do_assertions_for_scorer_op(
     client: WeaveClient,
 ):
     # assert apply_score_res.feedback_id is not None
-    assert apply_score_res.call_id is not None
-    assert apply_score_res.score == 0
+    assert apply_score_res.score_call.id is not None
+    assert apply_score_res.result == 0
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
@@ -31,10 +31,12 @@ def do_assertions_for_scorer_op(
     assert (
         target_feedback.call_ref
         == CallRef(
-            entity=client.entity, project=client.project, id=apply_score_res.call_id
+            entity=client.entity,
+            project=client.project,
+            id=apply_score_res.score_call.id,
         ).uri()
     )
-    assert target_feedback.payload == {"output": apply_score_res.score}
+    assert target_feedback.payload == {"output": apply_score_res.result}
 
 
 @pytest.mark.asyncio
