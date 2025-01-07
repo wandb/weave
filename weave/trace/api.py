@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Callable
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -28,12 +28,17 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
+_global_postprocess_inputs: Callable[[Any], Any] | None = None
+_global_postprocess_output: Callable[[Any], Any] | None = None
+
 
 def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: Callable[[Any], Any] | None = None,
+    global_postprocess_output: Callable[[Any], Any] | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -50,6 +55,12 @@ def init(
         A Weave client.
     """
     parse_and_apply_settings(settings)
+
+    global _global_postprocess_inputs
+    global _global_postprocess_output
+
+    _global_postprocess_inputs = global_postprocess_inputs
+    _global_postprocess_output = global_postprocess_output
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
