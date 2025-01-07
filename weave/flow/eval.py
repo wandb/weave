@@ -207,7 +207,7 @@ class Evaluation(Object):
         scorers = self._post_init_scorers
 
         for scorer in scorers:
-            apply_scorer_result = model_call.apply_scorer(scorer, example)
+            apply_scorer_result = model_call.score(scorer, example)
             result = apply_scorer_result.result
             scorer_attributes = get_scorer_attributes(scorer)
             scorer_name = scorer_attributes.scorer_name

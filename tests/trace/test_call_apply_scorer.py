@@ -44,7 +44,7 @@ def test_scorer_op_no_context(client: WeaveClient):
         return output - x - 1
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(score_fn)
+    apply_score_res = call.score(score_fn)
     do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
 
     @weave.op
@@ -52,7 +52,7 @@ def test_scorer_op_no_context(client: WeaveClient):
         return output - y
 
     with pytest.raises(OpCallError):
-        apply_score_res = call.apply_scorer(score_fn_with_incorrect_args)
+        apply_score_res = call.score(score_fn_with_incorrect_args)
 
 
 def test_scorer_op_with_context(client: WeaveClient):
@@ -65,7 +65,7 @@ def test_scorer_op_with_context(client: WeaveClient):
         return output - correct_answer
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(
+    apply_score_res = call.score(
         score_fn, additional_scorer_kwargs={"correct_answer": 2}
     )
     do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
@@ -75,7 +75,7 @@ def test_scorer_op_with_context(client: WeaveClient):
         return output - incorrect_arg
 
     with pytest.raises(OpCallError):
-        apply_score_res = call.apply_scorer(
+        apply_score_res = call.score(
             score_fn_with_incorrect_args, additional_scorer_kwargs={"correct_answer": 2}
         )
 
@@ -90,7 +90,7 @@ def test_async_scorer_op(client: WeaveClient):
         return output - x - 1
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(score_fn)
+    apply_score_res = call.score(score_fn)
     do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
 
     @weave.op
@@ -98,7 +98,7 @@ def test_async_scorer_op(client: WeaveClient):
         return output - y
 
     with pytest.raises(OpCallError):
-        apply_score_res = call.apply_scorer(score_fn_with_incorrect_args)
+        apply_score_res = call.score(score_fn_with_incorrect_args)
 
 
 def test_scorer_obj_no_context(client: WeaveClient):
@@ -116,7 +116,7 @@ def test_scorer_obj_no_context(client: WeaveClient):
     scorer = MyScorer(offset=1)
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(scorer)
+    apply_score_res = call.score(scorer)
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
     class MyScorerWithIncorrectArgs(weave.Scorer):
@@ -127,7 +127,7 @@ def test_scorer_obj_no_context(client: WeaveClient):
             return output - y - self.offset
 
     with pytest.raises(OpCallError):
-        apply_score_res = call.apply_scorer(MyScorerWithIncorrectArgs(offset=1))
+        apply_score_res = call.score(MyScorerWithIncorrectArgs(offset=1))
 
 
 def test_scorer_obj_with_context(client: WeaveClient):
@@ -145,9 +145,7 @@ def test_scorer_obj_with_context(client: WeaveClient):
     scorer = MyScorer(offset=0)
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = call.score(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
     class MyScorerWithIncorrectArgs(weave.Scorer):
@@ -158,7 +156,7 @@ def test_scorer_obj_with_context(client: WeaveClient):
             return output - incorrect_arg - self.offset
 
     with pytest.raises(OpCallError):
-        apply_score_res = call.apply_scorer(
+        apply_score_res = call.score(
             MyScorerWithIncorrectArgs(offset=0),
             additional_scorer_kwargs={"incorrect_arg": 2},
         )
@@ -175,9 +173,7 @@ def test_scorer_obj_with_context(client: WeaveClient):
     )
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = call.score(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
 
@@ -196,7 +192,5 @@ def test_async_scorer_obj(client: WeaveClient):
     scorer = MyScorer(offset=0)
 
     _, call = predict.call(1)
-    apply_score_res = call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = call.score(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)

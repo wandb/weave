@@ -459,7 +459,7 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    async def _apply_scorer_async(
+    async def _score_async(
         self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
         """
@@ -484,12 +484,10 @@ class Call:
                 wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
 
-    def apply_scorer(
+    def score(
         self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
-        return asyncio.run(
-            self._apply_scorer_async(scorer_op, additional_scorer_kwargs)
-        )
+        return asyncio.run(self._score_async(scorer_op, additional_scorer_kwargs))
 
 
 def make_client_call(
