@@ -54,7 +54,7 @@ export const StyledDataGrid = styled(
     backgroundColor: MOON_50,
     color: MOON_500,
     position: 'sticky',
-    left: pinnedColumnsWidth + 8, // Add 8px padding
+    left: pinnedColumnsWidth + 1, // Add 1px padding for border
     maxWidth: '100vw',
     zIndex: 1,
   },
