@@ -67,7 +67,7 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
 
 
-def test_image_as_dataset_cell(client: WeaveClient) -> None:
+def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_dataset_cell"
     dataset = weave.Dataset(rows=[{"img": test_img}])
     assert dataset.rows[0]["img"] == test_img
