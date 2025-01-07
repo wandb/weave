@@ -23,7 +23,7 @@ In this guide, you'll learn how to use W&B Weave while ensuring your Personally 
 2. __Microsoft's [Presidio](https://microsoft.github.io/presidio/)__, a python-based data protection SDK. This tool provides redaction and replacement functionalities.
 3. __[Faker](https://faker.readthedocs.io/en/master/)__, a Python library to generate fake data, combined with Presidio to anonymize PII data.
 
-Additionally, you'll learn how to use both _Weave Ops input/output logging customization_ and _`autopatch_settings`_ to integrate PII redaction and anonymization into the workflow. For more information, see [Customize logged inputs and outputs](https://weave-docs.wandb.ai/guides/tracking/ops/#customize-logged-inputs-and-outputs).
+Additionally, you'll learn how to use _`weave.op` input/output logging customization_ and _`autopatch_settings`_ to integrate PII redaction and anonymization into the workflow. For more information, see [Customize logged inputs and outputs](https://weave-docs.wandb.ai/guides/tracking/ops/#customize-logged-inputs-and-outputs).
 
 To get started, do the following:
 
@@ -96,6 +96,7 @@ Before using Weave with PII data, review the best practices for using Weave with
 ```python
 %%capture
 # @title required python packages:
+!pip install cryptography 
 !pip install presidio_analyzer
 !pip install presidio_anonymizer
 !python -m spacy download en_core_web_lg    # Presidio uses spacy NLP engine
@@ -397,12 +398,18 @@ You can use `autopatch_settings` to configure PII handling directly during initi
 To use `autopatch_settings` to configure PII handling, define `postprocess_inputs` and/or `postprocess_output` in `op_settings` for any one of the supported LLM integrations. 
 
 ```python 
+
+def postprocess(inputs: dict) -> dict:
+    if "SENSITIVE_KEY" in inputs:
+        inputs["SENSITIVE_KEY"] = "REDACTED"
+    return inputs
+
 client = weave.init(
     ...,
     autopatch_settings={
         "openai": {
             "op_settings": {
-                "postprocess_inputs": ...,
+                "postprocess_inputs": postprocess,
                 "postprocess_output": ...,
             }
         },
