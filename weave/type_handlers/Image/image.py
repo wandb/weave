@@ -19,12 +19,14 @@ else:
 logger = logging.getLogger(__name__)
 
 DEFAULT_FORMAT = "PNG"
-PIL_FORMAT_TO_EXT = InvertableDict(
+
+pil_format_to_ext = InvertableDict(
     {
         "JPEG": "jpg",
         "PNG": "png",
     }
 )
+ext_to_pil_format = pil_format_to_ext.inv
 
 
 class PILImagePreparer:
@@ -45,10 +47,10 @@ class PILImagePreparer:
 
 def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     fmt = getattr(obj, "format", DEFAULT_FORMAT)
-    ext = PIL_FORMAT_TO_EXT.get(fmt)
+    ext = pil_format_to_ext.get(fmt)
     if ext is None:
         logger.warning(f"Unknown image format {fmt}, defaulting to {DEFAULT_FORMAT}")
-        ext = PIL_FORMAT_TO_EXT[DEFAULT_FORMAT]
+        ext = pil_format_to_ext[DEFAULT_FORMAT]
 
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".
     # There is an extensive internal discussion here:
@@ -66,19 +68,25 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # existing payloads.
     fname = f"image.{ext}"
     with artifact.new_file(fname, binary=True) as f:
-        obj.save(f, format=PIL_FORMAT_TO_EXT.inv[ext])  # type: ignore
+        obj.save(f, format=ext_to_pil_format[ext])  # type: ignore
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
-    for ext in PIL_FORMAT_TO_EXT.values():
+    for ext in pil_format_to_ext.values():
         # Note: I am purposely ignoring the `name` here and hard-coding the filename.
         # See comment on save.
         fname = f"image.{ext}"
+        try:
         path = artifact.path(fname)
+        path = artifact.path(fname)
+        try:
+            return Image.open(path)
+            path = artifact.path(fname)
         try:
             return Image.open(path)
         except FileNotFoundError:
             continue
+        return Image.open(path)
     raise FileNotFoundError(f"No image found in artifact {artifact}")
 
 

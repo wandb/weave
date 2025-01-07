@@ -6,8 +6,10 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
-  {'image.png': string}
+  {'image.jpg'?: string; 'image.png'?: string}
 >;
+
+const DEFAULT_IMAGE_FILE_EXT = 'png';
 
 export const isPILImageImageType = (
   data: CustomWeaveTypePayload
@@ -21,10 +23,17 @@ export const PILImageImage: React.FC<{
   data: PILImageImageTypePayload;
 }> = props => {
   const {useFileContent} = useWFHooks();
+
+  const imageFileName = Object.keys(props.data.files)[0] as
+    | 'image.jpg'
+    | 'image.png';
+  const imageFileExt =
+    imageFileName.split('.').pop()?.toLowerCase() || DEFAULT_IMAGE_FILE_EXT;
+
   const imageBinary = useFileContent(
     props.entity,
     props.project,
-    props.data.files['image.png']
+    props.data.files[imageFileName]!
   );
 
   if (imageBinary.loading) {
@@ -34,7 +43,9 @@ export const PILImageImage: React.FC<{
   }
 
   const arrayBuffer = imageBinary.result as any as ArrayBuffer;
-  const blob = new Blob([arrayBuffer], {type: 'image/png'});
+  const blob = new Blob([arrayBuffer], {
+    type: `image/${imageFileExt}`,
+  });
   const url = URL.createObjectURL(blob);
 
   // TODO: It would be nice to have a more general image render - similar to the
