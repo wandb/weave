@@ -19,6 +19,7 @@ import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
+import {EditableDataTableView} from './EditableDataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
@@ -28,10 +29,12 @@ const EXPANDED_IDS_LENGTH = 200;
 type Data = Record<string, any>;
 
 type ObjectViewerSectionProps = {
+  objectId: string;
   title: string;
   data: Data;
   noHide?: boolean;
   isExpanded?: boolean;
+  isEditing?: boolean;
 };
 
 const TitleRow = styled.div`
@@ -90,6 +93,7 @@ const ObjectViewerSectionNonEmptyMemoed = React.memo(
 );
 
 const ObjectViewerSectionNonEmpty = ({
+  objectId,
   title,
   data,
   noHide,
@@ -229,10 +233,12 @@ const ObjectViewerSectionNonEmpty = ({
 };
 
 export const ObjectViewerSection = ({
+  objectId,
   title,
   data,
   noHide,
   isExpanded,
+  isEditing,
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
@@ -261,14 +267,13 @@ export const ObjectViewerSection = ({
   if (numKeys === 1 && '_result' in data) {
     let value = data._result;
     if (isWeaveRef(value)) {
-      // Little hack to make sure that we render refs
-      // inside the expansion table view
       value = {' ': value};
     }
     const valueType = getValueType(value);
     if (valueType === 'object' || (valueType === 'array' && value.length > 0)) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
+          objectId={objectId}
           title={title}
           data={value}
           noHide={noHide}
@@ -291,9 +296,6 @@ export const ObjectViewerSection = ({
     );
   }
 
-  // Here we have a very special case for when the section is viewing a dataset.
-  // Instead of rending the generic renderer, we directly render a full-screen
-  // data table.
   if (
     data._type === 'Dataset' &&
     data._class_name === 'Dataset' &&
@@ -307,9 +309,22 @@ export const ObjectViewerSection = ({
             height: '100%',
             overflow: 'hidden',
           }}>
-          <WeaveCHTable tableRefUri={data.rows} fullHeight />
+          <TitleRow>
+            <Title>{title}</Title>
+          </TitleRow>
+          {isEditing ? (
+            <EditableDataTableView
+              datasetObjectId={objectId}
+              // @ts-expect-error
+              datasetObject={data}
+              fullHeight
+            />
+          ) : (
+            <WeaveCHTable tableRefUri={data.rows} fullHeight />
+          )}
         </Box>
       );
+
       if (currentRef != null) {
         return (
           <WeaveCHTableSourceRefContext.Provider
@@ -327,6 +342,7 @@ export const ObjectViewerSection = ({
       data={data}
       noHide={noHide}
       isExpanded={isExpanded}
+      objectId={objectId}
     />
   );
 };
