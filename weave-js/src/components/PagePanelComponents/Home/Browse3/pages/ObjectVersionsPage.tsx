@@ -127,6 +127,7 @@ export const ObjectVersionsPage: React.FC<{
           project={project}
           objectName={filter.objectName ?? null}
           selectedVersions={selectedVersions}
+          setSelectedVersions={setSelectedVersions}
           showDeleteButton={!isReadonly && isAdmin}
           showCompareButton={hasComparison}
           onCompare={onCompare}
@@ -157,6 +158,7 @@ const ObjectVersionsPageHeaderExtra: React.FC<{
   project: string;
   objectName: string | null;
   selectedVersions: string[];
+  setSelectedVersions: (selected: string[]) => void;
   showDeleteButton?: boolean;
   showCompareButton?: boolean;
   onCompare: () => void;
@@ -165,6 +167,7 @@ const ObjectVersionsPageHeaderExtra: React.FC<{
   project,
   objectName,
   selectedVersions,
+  setSelectedVersions,
   showDeleteButton,
   showCompareButton,
   onCompare,
@@ -174,14 +177,14 @@ const ObjectVersionsPageHeaderExtra: React.FC<{
       Compare
     </Button>
   ) : undefined;
-
   const deleteButton = showDeleteButton ? (
     <DeleteObjectVersionsButtonWithModal
       entity={entity}
       project={project}
       objectName={objectName ?? ''}
-      objectDigests={selectedVersions}
+      objectVersions={selectedVersions}
       disabled={selectedVersions.length === 0 || !objectName}
+      onSuccess={() => setSelectedVersions([])}
     />
   ) : undefined;
 
@@ -630,15 +633,17 @@ const DeleteObjectVersionsButtonWithModal: React.FC<{
   entity: string;
   project: string;
   objectName: string;
-  objectDigests: string[];
+  objectVersions: string[];
   disabled?: boolean;
-}> = ({entity, project, objectName, objectDigests, disabled}) => {
+  onSuccess: () => void;
+}> = ({entity, project, objectName, objectVersions, disabled, onSuccess}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const {objectVersionsDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-  const numObjects = objectDigests.length;
+  const numObjects = objectVersions.length;
   const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
+  const objectDigests = objectVersions.map(v => v.split(':')[1]);
 
   return (
     <>
@@ -652,10 +657,11 @@ const DeleteObjectVersionsButtonWithModal: React.FC<{
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         deleteTitleStr={`${numObjects} ${objectName} ${versionsStr}`}
-        deleteBodyStrs={objectDigests}
+        deleteBodyStrs={objectVersions}
         onDelete={() =>
           objectVersionsDelete(entity, project, objectName, objectDigests)
         }
+        onSuccess={onSuccess}
       />
     </>
   );

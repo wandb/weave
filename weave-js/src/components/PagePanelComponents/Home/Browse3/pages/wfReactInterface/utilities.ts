@@ -292,7 +292,7 @@ export const isObjDeleteError = (e: any): boolean => {
     return false;
   }
   const errorStr = String(e);
-  const regex = /Obj .* was deleted at .*/;
+  const regex = /Obj.* was deleted at .*/;
   return regex.test(errorStr);
 };
 
