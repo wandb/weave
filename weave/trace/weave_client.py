@@ -25,7 +25,6 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.scorers.base_scorer import ApplyScorerResult, apply_scorer_async
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
@@ -95,7 +94,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
-    from weave.scorers.base_scorer import Scorer
+    from weave.scorers.base_scorer import ApplyScorerResult, Scorer
+
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -466,6 +466,8 @@ class Call:
         Before making this public, we should refactor such that the `predict_and_score` method
         inside `eval.py` uses this method inside the scorer block.
         """
+        from weave.scorers.base_scorer import apply_scorer_async
+
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
 
