@@ -55,6 +55,10 @@ class EvaluationResults(Object):
     rows: weave.Table
 
 
+DatasetLike = Union[Dataset, list[dict]]
+ScorerLike = Union[Callable, Op, Scorer]
+
+
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -100,8 +104,8 @@ class Evaluation(Object):
     ```
     """
 
-    dataset: Union[Dataset, list[dict]]
-    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
+    dataset: DatasetLike
+    scorers: Optional[list[ScorerLike]] = None
     preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
 
@@ -130,7 +134,7 @@ class Evaluation(Object):
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
             elif callable(scorer) and not is_op(scorer):
-                scorer = weave.op()(scorer)
+                scorer = weave.op(scorer)
             elif is_op(scorer):
                 scorer = as_op(scorer)
             else:
@@ -167,8 +171,7 @@ class Evaluation(Object):
     def _post_init_dataset(self) -> Dataset:
         if not weave_isinstance(self.dataset, Dataset):
             raise TypeError(
-                "Expected self.dataset to be converted to a Dataset in `model_post_init`. Found "
-                + str(type(self.dataset))
+                f"Expected self.dataset to be converted to a Dataset in `model_post_init`. Found {str(type(self.dataset))}"
             )
         return self.dataset
 
@@ -176,14 +179,12 @@ class Evaluation(Object):
     def _post_init_scorers(self) -> list[Union[Op, Scorer]]:
         if not isinstance(self.scorers, list):
             raise TypeError(
-                "Expected self.scorers to be a list in `model_post_init`. Found "
-                + str(type(self.scorers))
+                f"Expected self.scorers to be a list in `model_post_init`. Found {str(type(self.scorers))}"
             )
         for scorer in self.scorers:
             if not weave_isinstance(scorer, (Op, Scorer)) and not is_op(scorer):
                 raise TypeError(
-                    "Expected all elements in self.scorers to be an instance of Op or Scorer in `model_post_init`. Found "
-                    + str(type(scorer))
+                    f"Expected all elements in self.scorers to be an instance of Op or Scorer in `model_post_init`. Found {str(type(scorer))}"
                 )
         return cast(list[Union[Op, Scorer]], self.scorers)
 
@@ -224,7 +225,8 @@ class Evaluation(Object):
                     scorer_ref = get_ref(scorer)
                     scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
                 wc._send_score_call(model_call, score_call, scorer_ref_uri)
-            scorer_name, _, _ = get_scorer_attributes(scorer)
+            scorer_attributes = get_scorer_attributes(scorer)
+            scorer_name = scorer_attributes.scorer_name
             scores[scorer_name] = result
 
         return {
@@ -243,7 +245,9 @@ class Evaluation(Object):
             if name == "scores":
                 scorers = self._post_init_scorers
                 for scorer in scorers:
-                    scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
+                    scorer_attributes = get_scorer_attributes(scorer)
+                    scorer_name = scorer_attributes.scorer_name
+                    summarize_fn = scorer_attributes.summarize_fn
                     scorer_stats = transpose(vals)
                     score_table = scorer_stats[scorer_name]
                     scored = summarize_fn(score_table)
@@ -288,7 +292,8 @@ class Evaluation(Object):
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self._post_init_scorers:
-                scorer_name, _, _ = get_scorer_attributes(scorer)
+                scorer_attributes = get_scorer_attributes(scorer)
+                scorer_name = scorer_attributes.scorer_name
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
@@ -317,11 +322,11 @@ class Evaluation(Object):
 def evaluate(
     dataset: Union[Dataset, list],
     model: Union[Op, Model],
-    scores: Optional[list[Union[Callable, Scorer]]] = None,
+    scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> dict:
     eval = Evaluation(
-        dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
+        dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
 
