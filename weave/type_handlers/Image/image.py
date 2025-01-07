@@ -75,15 +75,8 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
     for ext in pil_format_to_ext.values():
         # Note: I am purposely ignoring the `name` here and hard-coding the filename.
         # See comment on save.
-        fname = f"image.{ext}"
         try:
-        path = artifact.path(fname)
-        path = artifact.path(fname)
-        try:
-            return Image.open(path)
-            path = artifact.path(fname)
-        try:
-            return Image.open(path)
+            path = artifact.path(f"image.{ext}")
         except FileNotFoundError:
             continue
         return Image.open(path)
