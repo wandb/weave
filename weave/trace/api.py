@@ -50,6 +50,15 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases project to log to.
+        settings: Configuration for the Weave client generally.
+        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
+        global_postprocess_output: A function that will be applied to all outputs of all ops.
+
+    NOTE: Global postprocessing settings are applied to all ops after each op's own
+    postprocessing.  The order is always:
+    1. Op-specific postprocessing
+    2. Global postprocessing
 
     Returns:
         A Weave client.
