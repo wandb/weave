@@ -16,7 +16,7 @@ Now, many times you will want to apply a Scorer directly after calling an Op. Th
 res, call = op.call(user_input)
 # optionally subsample to 25%
 if random.random() < 0.25:
-    call.score(scorer)
+    await call.apply_scorer(scorer)
 ```
 
 This will log the score to Weave which can be viewed and analyzed in the UI.
@@ -33,7 +33,7 @@ Guardrails are a way to prevent the LLM from generating harmful or inappropriate
 
 ```python
 res, call = op.call(user_input)
-scorer_res = call.score(guardrail)
+scorer_res = await call.apply_scorer(guardrail)
 if scorer_res.score < 0.5:
     # Do something 
 else:

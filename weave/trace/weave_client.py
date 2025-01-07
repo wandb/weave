@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import datetime
 import logging
@@ -459,7 +458,7 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    async def _score_async(
+    async def apply_scorer(
         self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
         """
@@ -470,7 +469,6 @@ class Call:
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
-
         apply_scorer_result = await apply_scorer_async(scorer, example, self.output)
         score_call = apply_scorer_result.score_call
 
@@ -483,13 +481,8 @@ class Call:
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-                wc._send_score_call(self, score_call, scorer_ref_uri)
+            wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
-
-    def score(
-        self, scorer_op: Op | Scorer, additional_scorer_kwargs: dict | None = None
-    ) -> ApplyScorerResult:
-        return asyncio.run(self._score_async(scorer_op, additional_scorer_kwargs))
 
 
 def make_client_call(
