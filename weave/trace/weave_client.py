@@ -470,7 +470,7 @@ class Call:
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
         output = self.output
-        if isinstance(output, Ref):
+        if isinstance(output, ObjectRef):
             output = output.get()
         apply_scorer_result = await apply_scorer_async(scorer, example, output)
         score_call = apply_scorer_result.score_call
@@ -869,7 +869,7 @@ class WeaveClient:
             postprocessed_output = original_output
         self._save_nested_objects(postprocessed_output)
 
-        # call.output = map_to_refs(postprocessed_output)
+        output_as_refs = map_to_refs(postprocessed_output)
 
         # Summary handling
         summary = {}
@@ -924,7 +924,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(call.output, project_id, self, use_dictify=False)
+            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
