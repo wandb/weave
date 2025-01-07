@@ -19,6 +19,7 @@ def redact_output(s: str) -> str:
     return s
 
 
+# These globals are directly set here because we don't have a great way to test weave.init
 api._global_postprocess_inputs = redact_keys
 api._global_postprocess_output = redact_output
 
