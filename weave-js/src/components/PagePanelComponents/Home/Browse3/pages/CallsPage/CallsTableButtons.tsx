@@ -725,11 +725,7 @@ const PaginationControls: FC<{
   </Box>
 );
 
-export const PaginationButtons = ({
-  hideControls,
-}: {
-  hideControls?: boolean;
-}) => {
+export const PaginationButtons = ({hideControls}: {hideControls?: boolean}) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
@@ -751,11 +747,7 @@ export const PaginationButtons = ({
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
   return (
-    <Box
-      display="flex"
-      alignItems="center"
-      padding={1}
-      width="100%">
+    <Box display="flex" alignItems="center" padding={1} width="100%">
       <PaginationControls
         page={page}
         pageCount={pageCount}
