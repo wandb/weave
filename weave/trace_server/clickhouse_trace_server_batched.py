@@ -1040,6 +1040,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
                     parameters=parameters,
+                    include_deleted=True,
                 )
                 objs = self._select_objs_query(object_query_builder)
                 found_digests = {obj.digest for obj in objs}
@@ -1047,7 +1048,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise NotFoundError(
                         f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
                     )
-                for obj in objs:
+                # filter out deleted objects
+                valid_objects = [obj for obj in objs if obj.deleted_at is None]
+                for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
             return [
