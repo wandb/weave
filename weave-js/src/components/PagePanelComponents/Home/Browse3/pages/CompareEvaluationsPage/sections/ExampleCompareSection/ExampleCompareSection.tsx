@@ -1,5 +1,5 @@
 import {Box, Tooltip} from '@material-ui/core';
-import {Circle, WarningAmberOutlined} from '@mui/icons-material';
+import {WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -16,6 +16,7 @@ import {
   WeaveObjectRef,
 } from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
+import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../../Browse2/SmallRef';
@@ -31,7 +32,7 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
 import {MetricDefinition, MetricValueType} from '../../ecpTypes';
 import {
@@ -495,14 +496,7 @@ export const ExampleCompareSection: React.FC<{
             projectName={trialProject}
             opName={trialOpName}
             callId={trialCallId}
-            icon={
-              <Circle
-                sx={{
-                  color: evaluationCall.color,
-                  height: CIRCLE_SIZE,
-                }}
-              />
-            }
+            icon={<Icon name="filled-circle" color={evaluationCall.color} />}
             color={MOON_800}
           />
         </Box>
