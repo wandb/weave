@@ -202,14 +202,6 @@ const ObjectViewerSectionNonEmpty = ({
     }
   };
 
-  const onToggleExpansion = () => {
-    if (isModeExpanded(mode)) {
-      onClickCollapsed();
-    } else {
-      onClickExpanded();
-    }
-  };
-
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
     const isSimple = isSimpleData(data);
@@ -237,15 +229,21 @@ const ObjectViewerSectionNonEmpty = ({
         </Title>
         <Button
           variant="quiet"
-          icon={isModeExpanded(mode) ? 'collapse' : 'expand-uncollapse'}
-          onClick={onToggleExpansion}
+          icon="collapse"
+          onClick={onClickCollapsed}
+          tooltip="Collapse all"
+          active={isModeCollapsed(mode)}
+        />
+        <Button
+          variant="quiet"
+          icon="expand-uncollapse"
+          onClick={onClickExpanded}
           tooltip={
-            isModeExpanded(mode)
-              ? 'View collapsed'
-              : isExpandAllSmall
+            isExpandAllSmall
               ? 'Expand all'
               : `Expand next ${EXPANDED_IDS_LENGTH} rows`
           }
+          active={isModeExpanded(mode)}
         />
         <Button
           variant="quiet"
