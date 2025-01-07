@@ -465,7 +465,7 @@ class Call:
         Before making this public, we should refactor such that the `predict_and_score` method
         inside `eval.py` uses this method inside the scorer block.
         """
-        from weave.scorers.base_scorer import apply_scorer_async
+        from weave.scorers.base_scorer import Scorer, apply_scorer_async
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
