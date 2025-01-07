@@ -3,7 +3,7 @@ import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -118,13 +118,22 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     return None
 
 
+@dataclass
+class ScorerAttributes:
+    scorer_name: str
+    score_op: Op
+    summarize_fn: Callable
+
+
 def get_scorer_attributes(
     scorer: Union[Op, Scorer],
-) -> tuple[str, Op, Callable]:
+) -> ScorerAttributes:
     score_op: Op
+    scorer_name: str
     if weave_isinstance(scorer, Scorer):
-        scorer_name = scorer.name
-        if scorer_name is None:
+        if scorer.name:
+            scorer_name = scorer.name
+        else:
             scorer_name = scorer.__class__.__name__
         try:
             if not is_op(scorer.score):
@@ -140,7 +149,7 @@ def get_scorer_attributes(
             )
     elif is_op(scorer):
         scorer = as_op(scorer)
-        scorer_name = scorer.name
+        scorer_name = cast(str, scorer.name)
         score_op = scorer
         summarize_fn = auto_summarize  # type: ignore
     else:
@@ -149,14 +158,17 @@ def get_scorer_attributes(
     if scorer_name:
         scorer_name = sanitize_object_name(scorer_name)
 
-    return (scorer_name, score_op, summarize_fn)  # type: ignore
+    return ScorerAttributes(
+        scorer_name=scorer_name, score_op=score_op, summarize_fn=summarize_fn
+    )
 
 
 def _has_oldstyle_scorers(scorers: list[Union[Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
-        _, score_fn, _ = get_scorer_attributes(scorer)
-        score_signature = inspect.signature(score_fn)
+        scorer_attributes = get_scorer_attributes(scorer)
+        score_op = scorer_attributes.score_op
+        score_signature = inspect.signature(score_op)
         if "model_output" in score_signature.parameters:
             return True
     return False
@@ -200,7 +212,9 @@ async def apply_scorer_async(
         scorer_self = scorer
 
     # Extract the core components of the scorer
-    scorer_name, score_op, _ = get_scorer_attributes(scorer)
+    scorer_attributes = get_scorer_attributes(scorer)
+    scorer_name = scorer_attributes.scorer_name
+    score_op = scorer_attributes.score_op
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
 
