@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FORMAT = "PNG"
 
-pil_format_to_ext = InvertableDict(
+pil_format_to_ext = InvertableDict[str, str](
     {
         "JPEG": "jpg",
         "PNG": "png",
