@@ -174,10 +174,14 @@ const NestedForm: React.FC<{
       updateConfig(currentPath, currentValue, config, setConfig);
     }
   }, [currentValue, currentPath, config, setConfig]);
-  // Handle local changes without updating parent immediately for string fields
   const handleChange = useCallback((value: string) => {
     setCurrentValue(value);
   }, []);
+
+  // set current value for non-string fields
+  useEffect(() => {
+    setCurrentValue(getNestedValue(config, currentPath));
+  }, [config, currentPath]);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
   const isOptional = fieldSchema instanceof z.ZodOptional;
