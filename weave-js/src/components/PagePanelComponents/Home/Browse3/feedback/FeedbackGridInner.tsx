@@ -21,7 +21,7 @@ import {
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
   currentViewerId: string | null;
-  showAnnotationName: boolean | undefined;
+  showAnnotationName?: boolean;
 };
 
 export const FeedbackGridInner = ({
