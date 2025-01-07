@@ -7,9 +7,15 @@
 
 import {useMemo} from 'react';
 
-import {useEvaluationComparisonData} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
+import {
+  useEvaluationComparisonResults,
+  useEvaluationComparisonSummary,
+} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {EvaluationComparisonData} from './ecpTypes';
+import {
+  EvaluationComparisonResults,
+  EvaluationComparisonSummary,
+} from './ecpTypes';
 import {getMetricIds} from './ecpUtil';
 
 /**
@@ -17,15 +23,17 @@ import {getMetricIds} from './ecpUtil';
  */
 export type EvaluationComparisonState = {
   // The normalized data for the evaluations
-  data: EvaluationComparisonData;
-  // The evaluation call id of the baseline model
-  baselineEvaluationCallId: string;
+  summary: EvaluationComparisonSummary;
+  // The results of the evaluations
+  loadableComparisonResults: Loadable<EvaluationComparisonResults>;
   // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
   // The selected metrics to display
   selectedMetrics?: Record<string, boolean>;
+  // Ordered call Ids
+  evaluationCallIdsOrdered: string[];
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -43,23 +51,35 @@ export const useEvaluationComparisonState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  baselineEvaluationCallId?: string,
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string,
   selectedMetrics?: Record<string, boolean>
 ): Loadable<EvaluationComparisonState> => {
-  const data = useEvaluationComparisonData(entity, project, evaluationCallIds);
+  const orderedCallIds = useMemo(() => {
+    return getCallIdsOrderedForQuery(evaluationCallIds);
+  }, [evaluationCallIds]);
+  const summaryData = useEvaluationComparisonSummary(
+    entity,
+    project,
+    orderedCallIds
+  );
+  const resultsData = useEvaluationComparisonResults(
+    entity,
+    project,
+    orderedCallIds,
+    summaryData.result
+  );
 
   const value = useMemo(() => {
-    if (data.result == null || data.loading) {
+    if (summaryData.result == null || summaryData.loading) {
       return {loading: true, result: null};
     }
 
     const scorerDimensions = Object.keys(
-      getMetricIds(data.result, 'score', 'scorer')
+      getMetricIds(summaryData.result, 'score', 'scorer')
     );
     const derivedDimensions = Object.keys(
-      getMetricIds(data.result, 'score', 'derived')
+      getMetricIds(summaryData.result, 'score', 'derived')
     );
 
     let newComparisonDimensions = comparisonDimensions;
@@ -91,44 +111,49 @@ export const useEvaluationComparisonState = (
     return {
       loading: false,
       result: {
-        data: data.result,
-        baselineEvaluationCallId:
-          baselineEvaluationCallId ?? evaluationCallIds[0],
+        summary: summaryData.result,
+        loadableComparisonResults: resultsData,
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
         selectedMetrics,
+        evaluationCallIdsOrdered: evaluationCallIds,
       },
     };
   }, [
-    data.result,
-    data.loading,
-    baselineEvaluationCallId,
-    evaluationCallIds,
+    summaryData.result,
+    summaryData.loading,
     comparisonDimensions,
+    resultsData,
     selectedInputDigest,
     selectedMetrics,
+    evaluationCallIds,
   ]);
 
   return value;
 };
 
-/**
- * Should use this over keys of `state.data.evaluationCalls` because it ensures the baseline
- * evaluation call is first.
- */
 export const getOrderedCallIds = (state: EvaluationComparisonState) => {
-  const initial = Object.keys(state.data.evaluationCalls);
-  moveItemToFront(initial, state.baselineEvaluationCallId);
-  return initial;
+  return Array.from(state.evaluationCallIdsOrdered);
+};
+
+export const getBaselineCallId = (state: EvaluationComparisonState) => {
+  return getOrderedCallIds(state)[0];
+};
+
+/**
+ * Sort call IDs to ensure consistent order for memoized query params
+ */
+const getCallIdsOrderedForQuery = (callIds: string[]) => {
+  return Array.from(callIds).sort();
 };
 
 /**
  * Should use this over keys of `state.data.models` because it ensures the baseline model is first.
  */
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
-  const baselineRef =
-    state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
-  const refs = Object.keys(state.data.models);
+  const baselineCallId = getBaselineCallId(state);
+  const baselineRef = state.summary.evaluationCalls[baselineCallId].modelRef;
+  const refs = Object.keys(state.summary.models);
   // Make sure the baseline model is first
   moveItemToFront(refs, baselineRef);
   return refs;
@@ -144,4 +169,30 @@ const moveItemToFront = <T>(arr: T[], item: T): T[] => {
     arr.unshift(item);
   }
   return arr;
+};
+
+export const getOrderedEvalsWithNewBaseline = (
+  evaluationCallIds: string[],
+  newBaselineCallId: string
+) => {
+  return moveItemToFront(evaluationCallIds, newBaselineCallId);
+};
+
+export const swapEvaluationCalls = (
+  evaluationCallIds: string[],
+  ndx1: number,
+  ndx2: number
+): string[] => {
+  return swapArrayItems(evaluationCallIds, ndx1, ndx2);
+};
+
+const swapArrayItems = <T>(arr: T[], ndx1: number, ndx2: number): T[] => {
+  if (ndx1 < 0 || ndx2 < 0 || ndx1 >= arr.length || ndx2 >= arr.length) {
+    throw new Error('Index out of bounds');
+  }
+  const newArr = [...arr];
+  const from = newArr[ndx1];
+  newArr[ndx1] = newArr[ndx2];
+  newArr[ndx2] = from;
+  return newArr;
 };

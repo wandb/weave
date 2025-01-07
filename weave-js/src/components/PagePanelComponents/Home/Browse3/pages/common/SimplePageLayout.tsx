@@ -313,18 +313,20 @@ const SimpleTabView: FC<{
         height: '100%',
         overflow: 'hidden',
       }}>
-      <Box
-        sx={{
-          maxHeight: '50%',
-          flex: '0 0 auto',
-          width: '100%',
-          overflow: 'auto',
-          pt: 1,
-          px: 2,
-          alignContent: 'center',
-        }}>
-        {props.headerContent}
-      </Box>
+      {props.headerContent && (
+        <Box
+          sx={{
+            maxHeight: '50%',
+            flex: '0 0 auto',
+            width: '100%',
+            overflow: 'auto',
+            pt: 1,
+            px: 2,
+            alignContent: 'center',
+          }}>
+          {props.headerContent}
+        </Box>
+      )}
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
           style={{margin: '12px 16px 0 16px'}}
@@ -375,47 +377,44 @@ export const ScrollableTabContent: FC<{
 
 export const SimpleKeyValueTable: FC<{
   data: {[key: string]: ReactNode};
+  keyColumnWidth?: string | number;
 }> = props => {
   return (
-    <table
-      style={{
-        borderCollapse: 'collapse',
-      }}>
-      <tbody>
-        {Object.entries(props.data).map(([key, val]) => {
-          return (
-            <tr key={key}>
-              <td
-                style={{
-                  fontWeight: 600,
-                  marginRight: 10,
-                  paddingRight: 10,
-
-                  // align text to the top
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-start',
-                  width: 100,
-                }}>
-                {key}
-              </td>
-              <td>
-                {isPrimitive(val) ? (
-                  val
-                ) : _.isArray(val) ? (
-                  <SimpleKeyValueTable
-                    data={_.fromPairs(val.map((v, i) => [i, v]))}
-                  />
-                ) : (
-                  <SimpleKeyValueTable
-                    data={_.fromPairs(Object.entries(val as any))}
-                  />
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="w-full overflow-hidden rounded border border-[#E0E0E0]">
+      <table className="w-full text-[14px]">
+        <tbody className="divide-y divide-[#E0E0E0]">
+          {Object.entries(props.data).map(([key, val]) => {
+            return (
+              <tr key={key}>
+                <td
+                  className="border-r border-[#E0E0E0] bg-moon-50 p-[8px] align-top text-moon-500"
+                  style={
+                    props.keyColumnWidth
+                      ? {width: props.keyColumnWidth}
+                      : undefined
+                  }>
+                  {key}
+                </td>
+                <td className="p-[8px] align-top">
+                  {isPrimitive(val) ? (
+                    val
+                  ) : _.isArray(val) ? (
+                    <SimpleKeyValueTable
+                      data={_.fromPairs(val.map((v, i) => [i, v]))}
+                      keyColumnWidth={props.keyColumnWidth}
+                    />
+                  ) : (
+                    <SimpleKeyValueTable
+                      data={_.fromPairs(Object.entries(val as any))}
+                      keyColumnWidth={props.keyColumnWidth}
+                    />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 };

@@ -5,8 +5,7 @@ from typing import Any, Union
 
 from weave.trace.refs import OpRef, parse_uri
 from weave.trace.weave_client import Call, CallsIter
-
-MAX_RUN_NAME_LENGTH = 128
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
 
 def make_pythonic_function_name(name: str) -> str:
@@ -17,10 +16,10 @@ def make_pythonic_function_name(name: str) -> str:
 
 
 def truncate_op_name(name: str) -> str:
-    if len(name) <= MAX_RUN_NAME_LENGTH:
+    if len(name) <= MAX_OP_NAME_LENGTH:
         return name
 
-    trim_amount_needed = len(name) - MAX_RUN_NAME_LENGTH
+    trim_amount_needed = len(name) - MAX_OP_NAME_LENGTH
     parts = name.split(".")
     last_part = parts[-1]
 

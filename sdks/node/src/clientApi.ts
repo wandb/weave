@@ -24,6 +24,9 @@ export async function login(apiKey: string, host?: string) {
     console.warn('No host provided, using default host:', defaultHost);
     host = defaultHost;
   }
+  if (!apiKey) {
+    throw new Error('API key is required for login. Please provide a valid API key.');
+  }
   const {traceBaseUrl} = getUrls(host);
 
   // Test the connection to the traceServerApi
@@ -45,9 +48,12 @@ export async function login(apiKey: string, host?: string) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry({machine: host, login: 'user', password: apiKey});
-  netrc.save();
-  console.log(`Successfully logged in.  Credentials saved for ${host}`);
+  // Only save to netrc if host and a non-empty apiKey are provided
+  if (host && apiKey.trim()) {
+    netrc.setEntry({machine: host, login: 'user', password: apiKey});
+    netrc.save();
+    console.log(`Successfully logged in. Credentials saved for ${host}`);
+  }
 }
 
 /**

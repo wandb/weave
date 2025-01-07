@@ -3,7 +3,6 @@ import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
@@ -92,23 +91,26 @@ export const FeedbackSidebar = ({
   ]);
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="justify-left flex w-full border-b border-moon-300 p-12">
+    <div className="flex h-full w-full flex-col bg-white">
+      <div className="justify-left flex w-full p-12">
         <div className="text-lg font-semibold">Feedback</div>
         <div className="flex-grow" />
       </div>
+      <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
         <>
-          <div className="mx-6 h-full flex-grow overflow-auto">
-            <HumanAnnotationSection
+          <div className="ml-6 h-full flex-grow overflow-auto">
+            <HumanAnnotationInputs
               entity={entity}
               project={project}
               callID={callID}
-              humanAnnotationSpecs={humanAnnotationSpecs}
+              humanAnnotationSpecs={humanAnnotationSpecs.sort((a, b) =>
+                (a.name ?? '').localeCompare(b.name ?? '')
+              )}
               setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
             />
           </div>
-          <div className="flex w-full border-t border-moon-300 p-12 pr-18">
+          <div className="flex w-full border-t border-moon-300 p-12">
             <Button
               onClick={save}
               variant="primary"
@@ -126,7 +128,7 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mt-12 w-full items-center justify-center">
+        <div className="mr-10 mt-12 items-center justify-center">
           <Empty {...EMPTY_PROPS_ANNOTATIONS} />
           <div className="mt-4 flex w-full justify-center">
             <Button
@@ -139,87 +141,6 @@ export const FeedbackSidebar = ({
         </div>
       )}
     </div>
-  );
-};
-
-type HumanAnnotationSectionProps = {
-  entity: string;
-  project: string;
-  callID: string;
-  humanAnnotationSpecs: tsHumanAnnotationSpec[];
-  setUnsavedFeedbackChanges: React.Dispatch<
-    React.SetStateAction<Record<string, () => Promise<boolean>>>
-  >;
-};
-
-const HumanAnnotationSection = ({
-  entity,
-  project,
-  callID,
-  humanAnnotationSpecs,
-  setUnsavedFeedbackChanges,
-}: HumanAnnotationSectionProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const sortedVisibleColumns = humanAnnotationSpecs.sort((a, b) =>
-    (a.name ?? '').localeCompare(b.name ?? '')
-  );
-
-  return (
-    <div>
-      <HumanAnnotationHeader
-        numHumanAnnotationSpecsVisible={sortedVisibleColumns.length}
-        numHumanAnnotationSpecsHidden={
-          humanAnnotationSpecs.length - sortedVisibleColumns.length
-        }
-        isExpanded={isExpanded}
-        setIsExpanded={setIsExpanded}
-      />
-      {isExpanded && (
-        <HumanAnnotationInputs
-          entity={entity}
-          project={project}
-          callID={callID}
-          humanAnnotationSpecs={sortedVisibleColumns}
-          setUnsavedFeedbackChanges={setUnsavedFeedbackChanges}
-        />
-      )}
-    </div>
-  );
-};
-
-type HumanAnnotationHeaderProps = {
-  numHumanAnnotationSpecsVisible: number;
-  numHumanAnnotationSpecsHidden: number;
-  isExpanded: boolean;
-  setIsExpanded: (isExpanded: boolean) => void;
-};
-
-const HumanAnnotationHeader = ({
-  numHumanAnnotationSpecsVisible,
-  numHumanAnnotationSpecsHidden,
-  isExpanded,
-  setIsExpanded,
-}: HumanAnnotationHeaderProps) => {
-  return (
-    <button
-      className="text-md hover:bg-gray-100 flex w-full items-center justify-between px-6 py-8 font-semibold"
-      onClick={() => setIsExpanded(!isExpanded)}>
-      <div className="mb-8 flex w-full items-center">
-        <div className="text-lg">Human annotations</div>
-        <div className="ml-6 mt-1">
-          <DisplayNumericCounter count={numHumanAnnotationSpecsVisible} />
-        </div>
-        <div className="flex-grow" />
-        {numHumanAnnotationSpecsHidden > 0 && (
-          <div className="mr-4 mt-2 rounded-full px-2 text-xs font-medium">
-            {numHumanAnnotationSpecsHidden} hidden
-          </div>
-        )}
-      </div>
-      <div className="mb-6 flex items-center">
-        <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} />
-      </div>
-    </button>
   );
 };
 
@@ -254,7 +175,7 @@ const HumanAnnotationInputs = ({
         <div key={field.ref} className="px-16">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
-            <div className="bg-gray-50 font-italic mt-4 text-sm text-moon-700 ">
+            <div className="bg-gray-50 font-italic text-sm text-moon-700 ">
               {field.description}
             </div>
           )}
@@ -272,14 +193,6 @@ const HumanAnnotationInputs = ({
           </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-const DisplayNumericCounter = ({count}: {count: number}) => {
-  return (
-    <div className="rounded-sm bg-moon-150 px-2 text-xs font-medium text-moon-500">
-      {count}
     </div>
   );
 };

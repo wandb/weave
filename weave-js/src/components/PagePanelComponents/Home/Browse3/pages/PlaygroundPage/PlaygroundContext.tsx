@@ -1,6 +1,7 @@
 import {createContext, useContext} from 'react';
 
-import {Choice, Message} from '../ChatView/types';
+import {Message} from '../ChatView/types';
+import {PlaygroundMessageRole} from './types';
 
 export type PlaygroundContextType = {
   isPlayground: boolean;
@@ -8,15 +9,17 @@ export type PlaygroundContextType = {
   editMessage: (messageIndex: number, newMessage: Message) => void;
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
 
-  editChoice: (choiceIndex: number, newChoice: Choice) => void;
-  deleteChoice: (choiceIndex: number) => void;
+  editChoice: (choiceIndex: number, newChoice: Message) => void;
+  deleteChoice: (messageIndex: number, choiceIndex: number) => void;
 
-  retry: (messageIndex: number, isChoice?: boolean) => void;
+  retry: (messageIndex: number, choiceIndex?: number) => void;
   sendMessage: (
-    role: 'assistant' | 'user' | 'tool',
+    role: PlaygroundMessageRole,
     content: string,
     toolCallId?: string
   ) => void;
+
+  setSelectedChoiceIndex: (choiceIndex: number) => void;
 };
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
@@ -30,6 +33,7 @@ const DEFAULT_CONTEXT: PlaygroundContextType = {
 
   retry: () => {},
   sendMessage: () => {},
+  setSelectedChoiceIndex: () => {},
 };
 
 // Create context that can be undefined

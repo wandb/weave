@@ -38,17 +38,17 @@ export const MessageList = ({
 const processToolCallMessages = (messages: Messages): Messages => {
   const processedMessages: Message[] = [];
   for (let i = 0; i < messages.length; i++) {
-    const message = messages[i];
+    const message = {
+      ...messages[i],
+      // Store the original index of the message in the message object
+      // so that we can use it to sort the messages later.
+      original_index: i,
+    };
 
     // If there are no tool calls, just add the message to the processed messages
     // and continue to the next iteration.
     if (!message.tool_calls) {
-      processedMessages.push({
-        ...message,
-        // Store the original index of the message in the message object
-        // so that we can use it to sort the messages later.
-        original_index: i,
-      });
+      processedMessages.push(message);
       continue;
     }
 
@@ -58,7 +58,7 @@ const processToolCallMessages = (messages: Messages): Messages => {
     while (i + 1 < messages.length && messages[i + 1].role === 'tool') {
       toolMessages.push({
         ...messages[i + 1],
-        original_index: (messages[i + 1] as any).original_index ?? i + 1,
+        original_index: i + 1,
       });
       i++;
     }

@@ -63,7 +63,7 @@ export const EmojiDetails = ({
   return (
     <Tailwind>
       <div className="max-w-xs">
-        <div className="text-center text-7xl">{emoji}</div>
+        <div className="night-aware text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
           // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
           // change the fallback from `r.wb_user_id` to `null`-like (this means no access)

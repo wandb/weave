@@ -194,7 +194,6 @@ However, often LLM applications have additional logic (such as pre/post processi
 
     ```python showLineNumbers
     # Notice that we pass the `instance` as the first argument.
-    # highlight-next-line
     print(instance.my_method.call(instance, "World"))
     ```
 
@@ -362,16 +361,16 @@ You can also manually create Calls using the API directly.
         import weave
 
         # Initialize Weave Tracing
-        weave.init('intro-example')
+        client = weave.init('intro-example')
 
         def my_function(name: str):
             # Start a call
-            call = weave.create_call(op="my_function", inputs={"name": name})
+            call = client.create_call(op="my_function", inputs={"name": name})
 
             # ... your function code ...
 
             # End a call
-            weave.finish_call(call, output="Hello, World!")
+            client.finish_call(call, output="Hello, World!")
 
         # Call your function
         print(my_function("World"))

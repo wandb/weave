@@ -214,7 +214,11 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
   moreInformation: (
     <>
       More information about creating and using annotation specifications for
-      human labeling coming soon.
+      human labeling can be found in the{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
+        documentation
+      </TargetBlank>
+      .
     </>
   ),
 };

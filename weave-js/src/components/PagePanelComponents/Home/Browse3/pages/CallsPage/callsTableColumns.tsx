@@ -18,6 +18,7 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {CellValueString} from '../../../Browse2/CellValueString';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -29,6 +30,7 @@ import {
   getCostsFromCellParams,
   getTokensFromCellParams,
 } from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -228,6 +230,7 @@ function buildCallsTableColumns(
           rowParams.row.display_name ??
           opVersionRefOpName(rowParams.row.op_name) ??
           rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
@@ -237,6 +240,7 @@ function buildCallsTableColumns(
             fullWidth={true}
             preservePath={preservePath}
             color={TEAL_600}
+            isEval={isEval}
           />
         );
       },
@@ -368,6 +372,9 @@ function buildCallsTableColumns(
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
             if (typeof params.value === 'boolean') {
               return <div>{params.value ? 'true' : 'false'}</div>;
+            }
+            if (typeof params.value === 'string') {
+              return <CellValueString value={params.value} />;
             }
             return <div>{params.value}</div>;
           },

@@ -32,6 +32,7 @@ import {
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
+  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';
@@ -77,7 +78,7 @@ export const ScorecardSection: React.FC<{
     [props.state]
   );
   const datasetRefs = useMemo(
-    () => Object.values(props.state.data.evaluations).map(e => e.datasetRef),
+    () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
     [props.state]
   );
   const evalCallIds = useMemo(
@@ -88,7 +89,7 @@ export const ScorecardSection: React.FC<{
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
+      const model = props.state.summary.models[ref];
       Object.keys(model.properties).forEach(prop => {
         if (!propsRes[prop]) {
           propsRes[prop] = {};
@@ -99,7 +100,7 @@ export const ScorecardSection: React.FC<{
 
     // Make sure predict op is last
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
+      const model = props.state.summary.models[ref];
       if (!propsRes.predict) {
         propsRes.predict = {};
       }
@@ -107,7 +108,7 @@ export const ScorecardSection: React.FC<{
     });
 
     return propsRes;
-  }, [modelRefs, props.state.data.models]);
+  }, [modelRefs, props.state.summary.models]);
   const propsWithDifferences = useMemo(() => {
     return Object.keys(modelProps).filter(prop => {
       const values = Object.values(modelProps[prop]);
@@ -118,15 +119,15 @@ export const ScorecardSection: React.FC<{
 
   const compositeSummaryMetrics = useMemo(() => {
     return buildCompositeMetricsMap(
-      props.state.data,
+      props.state.summary,
       'summary',
       props.state.selectedMetrics
     );
   }, [props.state]);
 
   const onCallClick = usePeekCall(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
@@ -294,7 +295,7 @@ export const ScorecardSection: React.FC<{
               </GridCell>
               {evalCallIds.map((evalCallId, mNdx) => {
                 const model =
-                  props.state.data.evaluationCalls[evalCallId].modelRef;
+                  props.state.summary.evaluationCalls[evalCallId].modelRef;
                 const parsed = parseRefMaybe(
                   modelProps[prop][model]
                 ) as WeaveObjectRef;
@@ -414,7 +415,7 @@ export const ScorecardSection: React.FC<{
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline = resolveSummaryMetricResult(
-                        props.state.baselineEvaluationCallId,
+                        getBaselineCallId(props.state),
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,
@@ -559,7 +560,7 @@ const resolveSummaryMetricResult = (
   const baseline = baselineDimension
     ? resolveSummaryMetricResultForEvaluateCall(
         baselineDimension,
-        state.data.evaluationCalls[evalCallId]
+        state.summary.evaluationCalls[evalCallId]
       )
     : undefined;
   return baseline;

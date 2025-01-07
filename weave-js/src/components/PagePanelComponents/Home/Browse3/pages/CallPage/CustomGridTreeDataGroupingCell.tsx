@@ -7,7 +7,7 @@ import _ from 'lodash';
 import React, {FC, MouseEvent, useMemo} from 'react';
 import styled from 'styled-components';
 
-import {MOON_500} from '../../../../../../common/css/color.styles';
+import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
 import {IconParentBackUp} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
 import {opNiceName} from '../common/Links';
@@ -18,7 +18,7 @@ import {CursorBox} from './CursorBox';
 
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
-const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
+const BORDER_STYLE = `1px solid ${MOON_250}`;
 
 const CallOrCountRow = styled.div`
   width: 100%;
@@ -173,7 +173,7 @@ export const CustomGridTreeDataGroupingCell: FC<
             <Box
               sx={{
                 width: '100%',
-                height: '100%',
+                height: '34px',
                 borderBottom: BORDER_STYLE,
               }}></Box>
             <Box sx={{width: '100%', height: '100%'}}></Box>

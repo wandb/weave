@@ -13,8 +13,13 @@ module.exports = {
      */
     boxShadow: {
       none: 'none',
-      md: '0px 12px 24px 0px #15181F29',
-      lg: '0px 24px 48px 0px #15181F29',
+      flat: '0px 4px 8px 0px #0D0F120a', // oblivion 4%
+      medium: '0px 12px 24px 0px #0D0F1229', // oblivion 16%
+      deep: '0px 24px 48px 0px #0D0F123d', // oblivion 24%
+
+      // deprecated shadow configs
+      md: '0px 12px 24px 0px #15181F29', // use shadow-medium instead
+      lg: '0px 24px 48px 0px #15181F29', // use shadow-deep instead
     },
     spacing: {
       0: '0rem',
@@ -189,17 +194,17 @@ module.exports = {
     },
     extend: {
       animation: {
-        'wave': 'wave 3s linear  infinite'
+        wave: 'wave 3s linear  infinite',
       },
       keyframes: {
-        "wave": {
-          "0%, 30%, 100%": {
-            transform: "initial"
+        wave: {
+          '0%, 30%, 100%': {
+            transform: 'initial',
           },
-          "15%": {
-            transform: "translateY(-10px)"
-          }
-        }
+          '15%': {
+            transform: 'translateY(-10px)',
+          },
+        },
       },
       opacity: {
         35: '.35',
@@ -221,6 +226,6 @@ module.exports = {
      in their parent hierarchy */
   important: '.tw-style',
   experimental: {
-    optimizeUniversalDefaults: true
+    optimizeUniversalDefaults: true,
   },
 };

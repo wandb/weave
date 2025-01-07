@@ -12,9 +12,7 @@ from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
-from weave.flow.prompt.prompt import EasyPrompt, Prompt
-from weave.flow.prompt.prompt import MessagesPrompt as MessagesPrompt
-from weave.flow.prompt.prompt import StringPrompt as StringPrompt
+from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 
@@ -38,6 +36,8 @@ __docspec__ = [
     Dataset,
     Model,
     Prompt,
+    StringPrompt,
+    MessagesPrompt,
     Evaluation,
     Scorer,
 ]

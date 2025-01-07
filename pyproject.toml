@@ -53,8 +53,11 @@ cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
-groq = ["groq>=0.9.0"]
-instructor = ["instructor>=1.4.3"]
+groq = ["groq>=0.13.0"]
+instructor = [
+  "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
+  "instructor>=1.4.3; python_version > '3.9'",
+]
 langchain = [
   "langchain-core>=0.2.1",
   "langchain-openai>=0.1.7",
@@ -62,6 +65,10 @@ langchain = [
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
+]
+langchain_nvidia_ai_endpoints = [
+  "langchain-core>=0.2.1",
+  "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
@@ -80,6 +87,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
 test = [
   "nox",
   "pytest>=8.2.0",
@@ -94,7 +102,7 @@ test = [
 
   # Integration Tests
   "pytest-recording>=0.13.2",
-  "vcrpy>=6.0.1",
+  "vcrpy>=7.0.0",
 
   # serving tests
   "flask",
@@ -133,7 +141,6 @@ exclude = [
   "dev_docs",
   "weave/clear_cache.py",
 ]
-
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -222,7 +229,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.22-dev0"
+current_version = "0.51.28-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

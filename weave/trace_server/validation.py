@@ -2,20 +2,8 @@ import re
 from typing import Any, Literal, Optional
 
 from weave.trace_server import refs_internal, validation_util
-from weave.trace_server.errors import InvalidRequest
-
-# Temporary flag to disable database-side validation of object ids.
-# We want to enable this be default, but we need to wait until >95% of users
-# are on weave>=0.51.1, when we can enforce the charset check on the db
-# side.
-#
-# Actions:
-# 1. (ETA: Sept 30) - Verify that 95% of users are on weave>=0.51.1, or
-#    that 95% of new objects have the valid charset.
-# 2. Remove this flag (thereby setting this to True), and add a check to the
-#    server-side validation code to ensure that the charset is valid.
-# 3. Release and deploy backend.
-SHOULD_ENFORCE_OBJ_ID_CHARSET = False
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 
 
 def project_id_validator(s: str) -> str:
@@ -39,14 +27,14 @@ def parent_id_validator(s: Optional[str]) -> Optional[str]:
 def display_name_validator(s: Optional[str]) -> Optional[str]:
     if s is None:
         return None
-    return validation_util.require_max_str_len(s, 128)
+    return validation_util.require_max_str_len(s, MAX_DISPLAY_NAME_LENGTH)
 
 
 def op_name_validator(s: str) -> str:
     if refs_internal.string_will_be_interpreted_as_ref(s):
         validation_util.require_internal_ref_uri(s, refs_internal.InternalOpRef)
     else:
-        validation_util.require_max_str_len(s, 128)
+        validation_util.require_max_str_len(s, MAX_OP_NAME_LENGTH)
 
     return s
 
@@ -75,17 +63,16 @@ def _validate_object_name_charset(name: str) -> None:
     invalid_chars = re.findall(r"[^\w._-]", name)
     if invalid_chars:
         invalid_char_set = list(set(invalid_chars))
-        raise ValueError(
+        raise InvalidFieldError(
             f"Invalid object name: {name}. Contains invalid characters: {invalid_char_set}. Please upgrade your `weave` package to `>0.51.0` to prevent this error."
         )
 
     if not name:
-        raise ValueError("Object name cannot be empty")
+        raise InvalidFieldError("Object name cannot be empty")
 
 
 def object_id_validator(s: str) -> str:
-    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
-        _validate_object_name_charset(s)
+    _validate_object_name_charset(s)
     return validation_util.require_max_str_len(s, 128)
 
 

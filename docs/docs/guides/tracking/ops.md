@@ -116,6 +116,39 @@ A Weave op is a versioned function that automatically logs all calls.
   </TabItem>
 </Tabs>
 
+## Control sampling rate
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    You can control how frequently an op's calls are traced by setting the `tracing_sample_rate` parameter in the `@weave.op` decorator. This is useful for high-frequency ops where you only need to trace a subset of calls.
+
+     Note that sampling rates are only applied to root calls. If an op has a sample rate, but is called by another op first, then that sampling rate will be ignored.
+
+    ```python
+    @weave.op(tracing_sample_rate=0.1)  # Only trace ~10% of calls
+    def high_frequency_op(x: int) -> int:
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)  # Always trace (default)
+    def always_traced_op(x: int) -> int:
+        return x + 1
+    ```
+
+    When an op's call is not sampled:
+    - The function executes normally
+    - No trace data is sent to Weave
+    - Child ops are also not traced for that call
+
+    The sampling rate must be between 0.0 and 1.0 inclusive.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet. Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
 ### Control call link output 
 
 If you want to suppress the printing of call links during logging, you can use the `WEAVE_PRINT_CALL_LINK` environment variable to `false`. This can be useful if you want to reduce  output verbosity and reduce clutter in your logs.

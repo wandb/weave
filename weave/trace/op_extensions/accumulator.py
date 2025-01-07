@@ -10,7 +10,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
-from weave.trace.op_extensions.log_once import log_once
+from weave.trace.util import log_once
 
 logger = logging.getLogger(__name__)
 

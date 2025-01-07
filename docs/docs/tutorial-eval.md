@@ -17,7 +17,7 @@ Weave automatically captures when they are used and updates the version when the
 
 `Model`s are declared by subclassing `Model` and implementing a `predict` function definition, which takes one example and returns the response.
 
-:::warning
+:::important
 
 **Known Issue**: If you are using Google Colab, remove `async` from the following examples.
 

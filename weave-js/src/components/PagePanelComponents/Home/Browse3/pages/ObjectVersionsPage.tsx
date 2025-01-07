@@ -15,15 +15,21 @@ import {
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import {Checkbox} from '@wandb/weave/components/Checkbox';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {TEAL_600} from '../../../../../common/css/color.styles';
+import {Button} from '../../../../Button';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  useWeaveflowRouteContext,
+} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -76,10 +82,17 @@ export const ObjectVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
     props.onFilterUpdate
   );
+  const {entity, project} = props;
+  const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+  const onCompare = () => {
+    history.push(router.compareObjectsUri(entity, project, selectedVersions));
+  };
 
   const title = useMemo(() => {
     if (filter.objectName) {
@@ -90,10 +103,21 @@ export const ObjectVersionsPage: React.FC<{
     return 'All Objects';
   }, [filter.objectName, filter.baseObjectClass]);
 
+  const hasComparison = filter.objectName != null;
+  const headerExtra = hasComparison ? (
+    <Button
+      className="mr-16"
+      disabled={selectedVersions.length < 2}
+      onClick={onCompare}>
+      Compare
+    </Button>
+  ) : undefined;
+
   return (
     <SimplePageLayout
       title={title}
       hideTabsIfSingle
+      headerExtra={headerExtra}
       tabs={[
         {
           label: '',
@@ -102,6 +126,10 @@ export const ObjectVersionsPage: React.FC<{
               {...props}
               initialFilter={filter}
               onFilterUpdate={setFilter}
+              selectedVersions={selectedVersions}
+              setSelectedVersions={
+                hasComparison ? setSelectedVersions : undefined
+              }
             />
           ),
         },
@@ -126,6 +154,8 @@ export const FilterableObjectVersionsTable: React.FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
+  selectedVersions?: string[];
+  setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
   const {useRootObjectVersions} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -199,6 +229,8 @@ export const FilterableObjectVersionsTable: React.FC<{
         hidePeerVersionsColumn={!effectivelyLatestOnly}
         hideCategoryColumn={props.hideCategoryColumn}
         hideCreatedAtColumn={props.hideCreatedAtColumn}
+        selectedVersions={props.selectedVersions}
+        setSelectedVersions={props.setSelectedVersions}
       />
     </FilterLayoutTemplate>
   );
@@ -213,8 +245,11 @@ export const ObjectVersionsTable: React.FC<{
   hideCreatedAtColumn?: boolean;
   hideVersionSuffix?: boolean;
   onRowClick?: (objectVersion: ObjectVersionSchema) => void;
+  selectedVersions?: string[];
+  setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
   // `showPropsAsColumns` probably needs to be a bit more robust
+  const {selectedVersions, setSelectedVersions} = props;
   const showPropsAsColumns = !props.hidePropsAsColumns;
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
@@ -246,7 +281,61 @@ export const ObjectVersionsTable: React.FC<{
   // extracted and shared.
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
+    const checkboxColumnArr: GridColDef[] =
+      selectedVersions != null && setSelectedVersions
+        ? [
+            {
+              minWidth: 30,
+              width: 34,
+              field: 'CustomCheckbox',
+              sortable: false,
+              disableColumnMenu: true,
+              resizable: false,
+              disableExport: true,
+              display: 'flex',
+              renderHeader: (params: any) => {
+                // TODO: Adding a select all checkbox here not that useful for compare
+                // but might for be for other bulk actions.
+                return null;
+              },
+              renderCell: (params: any) => {
+                const {objectId, versionIndex} = params.row.obj;
+                const objSpecifier = `${objectId}:v${versionIndex}`;
+                const isSelected = selectedVersions.includes(objSpecifier);
+                return (
+                  <Checkbox
+                    size="small"
+                    checked={isSelected}
+                    onCheckedChange={() => {
+                      if (isSelected) {
+                        setSelectedVersions(
+                          selectedVersions.filter(id => id !== objSpecifier)
+                        );
+                      } else {
+                        // Keep the objects in sorted order, regardless of the order checked.
+                        setSelectedVersions(
+                          [...selectedVersions, objSpecifier].sort((a, b) => {
+                            const [aName, aVer] = a.split(':');
+                            const [bName, bVer] = b.split(':');
+                            if (aName !== bName) {
+                              return aName.localeCompare(bName);
+                            }
+                            const aNum = parseInt(aVer.slice(1), 10);
+                            const bNum = parseInt(bVer.slice(1), 10);
+                            return aNum - bNum;
+                          })
+                        );
+                      }
+                    }}
+                  />
+                );
+              },
+            },
+          ]
+        : [];
     const cols: GridColDef[] = [
+      ...checkboxColumnArr,
+
       // This field name chosen to reduce possibility of conflict
       // with the dynamic fields added below.
       basicField('weave__object_version_link', props.objectTitle ?? 'Object', {
@@ -333,7 +422,7 @@ export const ObjectVersionsTable: React.FC<{
     if (!props.hideCategoryColumn) {
       cols.push(
         basicField('baseObjectClass', 'Category', {
-          width: 100,
+          width: 120,
           display: 'flex',
           valueGetter: (unused: any, row: any) => {
             return row.obj.baseObjectClass;
@@ -379,7 +468,7 @@ export const ObjectVersionsTable: React.FC<{
     }
 
     return {cols, groups};
-  }, [props, showPropsAsColumns, rows]);
+  }, [props, showPropsAsColumns, rows, selectedVersions, setSelectedVersions]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();

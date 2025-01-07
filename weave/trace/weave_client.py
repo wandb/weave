@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import inspect
+import logging
 import platform
 import re
 import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, cast
+from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
 
 import pydantic
 from requests import HTTPError
@@ -36,13 +38,14 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
-from weave.trace.util import deprecated
+from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.trace_server_interface import (
@@ -84,6 +87,130 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+R = TypeVar("R", covariant=True)
+
+
+class FetchFunc(Protocol[T]):
+    def __call__(self, offset: int, limit: int) -> list[T]: ...
+
+
+TransformFunc = Callable[[T], R]
+
+
+class PaginatedIterator(Generic[T, R]):
+    """An iterator that fetches pages of items from a server and optionally transforms them
+    into a more user-friendly type."""
+
+    def __init__(
+        self,
+        fetch_func: FetchFunc[T],
+        page_size: int = 1000,
+        transform_func: TransformFunc[T, R] | None = None,
+    ) -> None:
+        self.fetch_func = fetch_func
+        self.page_size = page_size
+        self.transform_func = transform_func
+
+        if page_size <= 0:
+            raise ValueError("page_size must be greater than 0")
+
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[T]:
+        return self.fetch_func(index * self.page_size, self.page_size)
+
+    @overload
+    def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
+    @overload
+    def _get_one(self: PaginatedIterator[T, R], index: int) -> R: ...
+    def _get_one(self, index: int) -> T | R:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
+
+        page_index = index // self.page_size
+        page_offset = index % self.page_size
+
+        page = self._fetch_page(page_index)
+        if page_offset >= len(page):
+            raise IndexError(f"Index {index} out of range")
+
+        res = page[page_offset]
+        if transform := self.transform_func:
+            return transform(res)
+        return res
+
+    @overload
+    def _get_slice(self: PaginatedIterator[T, T], key: slice) -> Iterator[T]: ...
+    @overload
+    def _get_slice(self: PaginatedIterator[T, R], key: slice) -> Iterator[R]: ...
+    def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) is not None and stop < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        i = start
+        while stop is None or i < stop:
+            try:
+                yield self._get_one(i)
+            except IndexError:
+                break
+            i += step
+
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: int) -> T: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: int) -> R: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, T], key: slice) -> list[T]: ...
+    @overload
+    def __getitem__(self: PaginatedIterator[T, R], key: slice) -> list[R]: ...
+    def __getitem__(self, key: slice | int) -> T | R | list[T] | list[R]:
+        if isinstance(key, slice):
+            return list(self._get_slice(key))
+        return self._get_one(key)
+
+    @overload
+    def __iter__(self: PaginatedIterator[T, T]) -> Iterator[T]: ...
+    @overload
+    def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
+    def __iter__(self) -> Iterator[T] | Iterator[R]:
+        return self._get_slice(slice(0, None, 1))
+
+
+# TODO: should be Call, not WeaveObject
+CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+
+
+def _make_calls_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    filter: CallsFilter,
+    include_costs: bool = False,
+) -> CallsIter:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        response = server.calls_query(
+            CallsQueryReq(
+                project_id=project_id,
+                filter=filter,
+                offset=offset,
+                limit=limit,
+                include_costs=include_costs,
+            )
+        )
+        return response.calls
+
+    # TODO: Should be Call, not WeaveObject
+    def transform_func(call: CallSchema) -> WeaveObject:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    return PaginatedIterator(fetch_func, transform_func=transform_func)
 
 
 class OpNameError(ValueError):
@@ -188,7 +315,7 @@ class Call:
     output: Any = None
     exception: str | None = None
     summary: dict | None = None
-    display_name: str | Callable[[Call], str] | None = None
+    _display_name: str | Callable[[Call], str] | None = None
     attributes: dict | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
@@ -197,6 +324,16 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+
+    @property
+    def display_name(self) -> str | Callable[[Call], str] | None:
+        return self._display_name
+
+    @display_name.setter
+    def display_name(self, name: str | Callable[[Call], str] | None) -> None:
+        if isinstance(name, str):
+            name = elide_display_name(name)
+        self._display_name = name
 
     @property
     def op_name(self) -> str:
@@ -224,7 +361,9 @@ class Call:
     @property
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
-            raise ValueError("Can't get feedback for call without ID")
+            raise ValueError(
+                "Can't get feedback for call without ID, was `weave.init` called?"
+            )
 
         if self._feedback is None:
             try:
@@ -238,7 +377,9 @@ class Call:
     @property
     def ui_url(self) -> str:
         if not self.id:
-            raise ValueError("Can't get URL for call without ID")
+            raise ValueError(
+                "Can't get URL for call without ID, was `weave.init` called?"
+            )
 
         try:
             entity, project = self.project_id.split("/")
@@ -250,7 +391,9 @@ class Call:
     def ref(self) -> CallRef:
         entity, project = self.project_id.split("/")
         if not self.id:
-            raise ValueError("Can't get ref for call without ID")
+            raise ValueError(
+                "Can't get ref for call without ID, was `weave.init` called?"
+            )
 
         return CallRef(entity, project, self.id)
 
@@ -258,10 +401,12 @@ class Call:
     def children(self) -> CallsIter:
         client = weave_client_context.require_weave_client()
         if not self.id:
-            raise ValueError("Can't get children of call without ID")
+            raise ValueError(
+                "Can't get children of call without ID, was `weave.init` called?"
+            )
 
         client = weave_client_context.require_weave_client()
-        return CallsIter(
+        return _make_calls_iterator(
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
@@ -315,7 +460,7 @@ class Call:
         - no context yet (ie. ground truth)
         """
         client = weave_client_context.require_weave_client()
-        scorer_signature = scorer_op.signature
+        scorer_signature = inspect.signature(scorer_op)
         scorer_arg_names = list(scorer_signature.parameters.keys())
         score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
         if "output" in scorer_arg_names:
@@ -339,80 +484,6 @@ class Call:
         )
 
 
-class CallsIter:
-    server: TraceServerInterface
-    filter: CallsFilter
-    include_costs: bool
-
-    def __init__(
-        self,
-        server: TraceServerInterface,
-        project_id: str,
-        filter: CallsFilter,
-        include_costs: bool = False,
-    ) -> None:
-        self.server = server
-        self.project_id = project_id
-        self.filter = filter
-        self._page_size = 1000
-        self.include_costs = include_costs
-
-    # seems like this caching should be on the server, but it's here for now...
-    @lru_cache
-    def _fetch_page(self, index: int) -> list[CallSchema]:
-        # caching in here means that any other CallsIter objects would also
-        # benefit from the cache
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self.project_id,
-                filter=self.filter,
-                offset=index * self._page_size,
-                limit=self._page_size,
-                include_costs=self.include_costs,
-            )
-        )
-        return response.calls
-
-    def _get_one(self, index: int) -> WeaveObject:
-        if index < 0:
-            raise IndexError("Negative indexing not supported")
-
-        page_index = index // self._page_size
-        page_offset = index % self._page_size
-
-        calls = self._fetch_page(page_index)
-        if page_offset >= len(calls):
-            raise IndexError(f"Index {index} out of range")
-
-        call = calls[page_offset]
-        entity, project = self.project_id.split("/")
-        return make_client_call(entity, project, call, self.server)
-
-    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
-        if (start := key.start or 0) < 0:
-            raise ValueError("Negative start not supported")
-        if (stop := key.stop) is not None and stop < 0:
-            raise ValueError("Negative stop not supported")
-        if (step := key.step or 1) < 0:
-            raise ValueError("Negative step not supported")
-
-        i = start
-        while stop is None or i < stop:
-            try:
-                yield self._get_one(i)
-            except IndexError:
-                break
-            i += step
-
-    def __getitem__(self, key: slice | int) -> WeaveObject | list[WeaveObject]:
-        if isinstance(key, slice):
-            return list(self._get_slice(key))
-        return self._get_one(key)
-
-    def __iter__(self) -> Iterator[WeaveObject]:
-        return self._get_slice(slice(0, None, 1))
-
-
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
@@ -428,7 +499,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
-        display_name=server_call.display_name,
+        _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
@@ -619,8 +690,11 @@ class WeaveClient:
         if filter is None:
             filter = CallsFilter()
 
-        return CallsIter(
-            self.server, self._project_id(), filter, include_costs or False
+        return _make_calls_iterator(
+            self.server,
+            self._project_id(),
+            filter,
+            include_costs,
         )
 
     @deprecated(new_name="get_calls")
@@ -754,7 +828,7 @@ class WeaveClient:
                         project_id=project_id,
                         id=call_id,
                         op_name=op_def_ref.uri(),
-                        display_name=display_name,
+                        display_name=call.display_name,
                         trace_id=trace_id,
                         started_at=started_at,
                         parent_id=parent_id,
@@ -1335,13 +1409,13 @@ class WeaveClient:
         """Directly saves an object to the weave server and attach
         the ref to the object. This is the lowest level object saving logic.
         """
+        orig_val = val
+
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
-        is_opdef = is_op(val)
-        orig_val = val
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             if ALLOW_MIXED_PROJECT_REFS:
@@ -1351,9 +1425,6 @@ class WeaveClient:
             if val.project == self.project:
                 return val
             val = orig_val
-
-        # `to_json` is mostly fast, except for CustomWeaveTypes
-        # which incur network costs to serialize the payload
 
         if name is None:
             serializer = get_serializer_for_obj(val)
@@ -1366,6 +1437,8 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         def send_obj_create() -> ObjCreateRes:
+            # `to_json` is mostly fast, except for CustomWeaveTypes
+            # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1377,13 +1450,12 @@ class WeaveClient:
             return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
 
         ref: Ref
-        if is_opdef:
+        if is_op(orig_val):
             ref = OpRef(self.entity, self.project, name, digest_future)
         else:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
@@ -1391,7 +1463,7 @@ class WeaveClient:
         # Attach the ref to the object
         try:
             set_ref(orig_val, ref)
-        except:
+        except Exception:
             # Don't worry if we can't set the ref.
             # This can happen for primitive types that don't have __dict__
             pass
@@ -1487,7 +1559,7 @@ class WeaveClient:
             CallUpdateReq(
                 project_id=self._project_id(),
                 call_id=call.id,
-                display_name=display_name,
+                display_name=elide_display_name(display_name),
             )
         )
 
@@ -1576,7 +1648,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if k in REDACT_KEYS:
+            if should_redact(k):
                 dict_res[k] = REDACTED_VALUE
             else:
                 dict_res[k] = redact_sensitive_keys(v)
@@ -1604,9 +1676,19 @@ def sanitize_object_name(name: str) -> str:
     res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
     if not res:
         raise ValueError(f"Invalid object name: {name}")
-    if len(res) > 128:
-        res = res[:128]
+    if len(res) > MAX_OBJECT_NAME_LENGTH:
+        res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def elide_display_name(name: str) -> str:
+    if len(name) > MAX_DISPLAY_NAME_LENGTH:
+        log_once(
+            logger.warning,
+            f"Display name {name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
+        )
+        return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
+    return name
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

@@ -193,7 +193,7 @@ if not import_failed:
             call = self.gc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
                 complete_op_name,
-                inputs=run_dict["inputs"],
+                inputs=run_dict.get("inputs", {}),
                 parent=parent_run,
                 attributes={
                     "lc_id": str(run.id),

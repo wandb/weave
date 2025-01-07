@@ -1,15 +1,5 @@
 import {ApolloProvider} from '@apollo/client';
-import {Home} from '@mui/icons-material';
-import {
-  AppBar,
-  Box,
-  Breadcrumbs,
-  Drawer,
-  IconButton,
-  Link as MaterialLink,
-  Toolbar,
-  Typography,
-} from '@mui/material';
+import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
@@ -21,9 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import _ from 'lodash';
 import React, {
-  ComponentProps,
   FC,
   useCallback,
   useEffect,
@@ -33,7 +21,6 @@ import React, {
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
-  Link as RouterLink,
   Redirect,
   Route,
   Switch,
@@ -47,6 +34,7 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
+import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
   browse2Context,
@@ -83,6 +71,7 @@ import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
+import {ModsPage} from './Browse3/pages/ModsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -103,6 +92,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -157,6 +147,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'mods',
   'scorers',
 ];
 const tabs = tabOptions.join('|');
@@ -197,7 +188,6 @@ export const Browse3: FC<{
               `/${URL_BROWSE3}`,
             ]}>
             <Browse3Mounted
-              hideHeader={props.hideHeader}
               headerOffset={props.headerOffset}
               navigateAwayFromProject={props.navigateAwayFromProject}
             />
@@ -209,7 +199,6 @@ export const Browse3: FC<{
 };
 
 const Browse3Mounted: FC<{
-  hideHeader?: boolean;
   headerOffset?: number;
   navigateAwayFromProject?: () => void;
 }> = props => {
@@ -223,37 +212,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {!props.hideHeader && (
-        <AppBar
-          sx={{
-            zIndex: theme => theme.zIndex.drawer + 1,
-            height: '60px',
-            flex: '0 0 auto',
-            position: 'static',
-          }}>
-          <Toolbar
-            sx={{
-              backgroundColor: '#1976d2',
-              minHeight: '30px',
-            }}>
-            <IconButton
-              component={RouterLink}
-              to={`/`}
-              sx={{
-                color: theme =>
-                  theme.palette.getContrastText(theme.palette.primary.main),
-                '&:hover': {
-                  color: theme =>
-                    theme.palette.getContrastText(theme.palette.primary.dark),
-                },
-                marginRight: theme => theme.spacing(2),
-              }}>
-              <Home />
-            </IconButton>
-            <Browse3Breadcrumbs />
-          </Toolbar>
-        </AppBar>
-      )}
       <Switch>
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
@@ -528,6 +486,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
         </Route>
+        {/* MODS */}
+        <Route
+          path={[`${projectRoot}/mods/:itemName`, `${projectRoot}/:tab(mods)`]}>
+          <ModsPageBinding />
+        </Route>
         {/* PLAYGROUND */}
         <Route
           path={[
@@ -535,6 +498,9 @@ const Browse3ProjectRoot: FC<{
             `${projectRoot}/playground`,
           ]}>
           <PlaygroundPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/compare`}>
+          <ComparePageBinding />
         </Route>
       </Switch>
     </Box>
@@ -1033,25 +999,28 @@ const BoardsPageBinding = () => {
   return <BoardsPage entity={params.entity} project={params.project} />;
 };
 
+const ModsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
+  return (
+    <ModsPage
+      entity={params.entity}
+      project={params.project}
+      itemName={params.itemName}
+    />
+  );
+};
+
 const TablesPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
 };
 
-const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
-  <MaterialLink
-    sx={{
-      color: theme => theme.palette.getContrastText(theme.palette.primary.main),
-      '&:hover': {
-        color: theme =>
-          theme.palette.getContrastText(theme.palette.primary.dark),
-      },
-    }}
-    {...props}
-    component={RouterLink}
-  />
-);
+const ComparePageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return <ComparePage entity={params.entity} project={params.project} />;
+};
 
 const PlaygroundPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
@@ -1061,141 +1030,5 @@ const PlaygroundPageBinding = () => {
       project={params.project}
       callId={params.itemName}
     />
-  );
-};
-
-const Browse3Breadcrumbs: FC = props => {
-  const params = useParamsDecoded<Browse3Params>();
-  const query = useURLSearchParamsDict();
-  const filePathParts = query.path?.split('/') ?? [];
-  const refFields = query.extra?.split('/') ?? [];
-
-  return (
-    <Breadcrumbs>
-      {params.entity && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}`}>
-          {params.entity}
-        </AppBarLink>
-      )}
-      {params.project && (
-        <AppBarLink to={`/${URL_BROWSE3}/${params.entity}/${params.project}`}>
-          {params.project}
-        </AppBarLink>
-      )}
-      {params.tab && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}`}>
-          {params.tab}
-        </AppBarLink>
-      )}
-      {params.itemName && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}`}>
-          {params.itemName}
-        </AppBarLink>
-      )}
-      {params.version && (
-        <AppBarLink
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${params.tab}/${params.itemName}/versions/${params.version}`}>
-          {params.version}
-        </AppBarLink>
-      )}
-      {filePathParts.map((part, idx) => (
-        <AppBarLink
-          key={idx}
-          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-            params.tab
-          }/${params.itemName}/versions/${
-            params.version
-          }?path=${encodeURIComponent(
-            filePathParts.slice(0, idx + 1).join('/')
-          )}`}>
-          {part}
-        </AppBarLink>
-      ))}
-      {_.range(0, refFields.length, 2).map(idx => (
-        <React.Fragment key={idx}>
-          <Typography
-            sx={{
-              color: theme =>
-                theme.palette.getContrastText(theme.palette.primary.main),
-            }}>
-            {refFields[idx]}
-          </Typography>
-          <AppBarLink
-            to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
-              params.tab
-            }/${params.itemName}/versions/${
-              params.version
-            }?path=${encodeURIComponent(
-              filePathParts.join('/')
-            )}&extra=${encodeURIComponent(
-              refFields.slice(0, idx + 2).join('/')
-            )}`}>
-            {refFields[idx + 1]}
-          </AppBarLink>
-        </React.Fragment>
-      ))}
-    </Breadcrumbs>
-  );
-};
-
-export const TableRowSelectionContext = React.createContext<{
-  rowIdsConfigured: boolean;
-  rowIdInTable: (id: string) => boolean;
-  setRowIds?: (rowIds: string[]) => void;
-  getNextRowId?: (currentId: string) => string | null;
-  getPreviousRowId?: (currentId: string) => string | null;
-}>({
-  rowIdsConfigured: false,
-  rowIdInTable: (id: string) => false,
-  setRowIds: () => {},
-  getNextRowId: () => null,
-  getPreviousRowId: () => null,
-});
-
-const TableRowSelectionProvider: FC<{children: React.ReactNode}> = ({
-  children,
-}) => {
-  const [rowIds, setRowIds] = useState<string[]>([]);
-  const rowIdsConfigured = useMemo(() => rowIds.length > 0, [rowIds]);
-  const rowIdInTable = useCallback(
-    (currentId: string) => rowIds.includes(currentId),
-    [rowIds]
-  );
-
-  const getNextRowId = useCallback(
-    (currentId: string) => {
-      const currentIndex = rowIds.indexOf(currentId);
-      if (currentIndex !== -1) {
-        return rowIds[currentIndex + 1];
-      }
-      return null;
-    },
-    [rowIds]
-  );
-
-  const getPreviousRowId = useCallback(
-    (currentId: string) => {
-      const currentIndex = rowIds.indexOf(currentId);
-      if (currentIndex !== -1) {
-        return rowIds[currentIndex - 1];
-      }
-      return null;
-    },
-    [rowIds]
-  );
-
-  return (
-    <TableRowSelectionContext.Provider
-      value={{
-        rowIdsConfigured,
-        rowIdInTable,
-        setRowIds,
-        getNextRowId,
-        getPreviousRowId,
-      }}>
-      {children}
-    </TableRowSelectionContext.Provider>
   );
 };

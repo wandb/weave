@@ -14,6 +14,7 @@ from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
+from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -127,6 +128,12 @@ class Traceable:
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
+
+    # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
+    # infinitely recurse.
+    if name.startswith("__") and name.endswith("__"):
+        return attribute
+
     if name not in object.__getattribute__(self, "model_fields"):
         return attribute
     if name == "ref":
@@ -637,7 +644,7 @@ def make_trace_obj(
             )
         )
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
-
+        prepare_obj(val)
     if isinstance(val, Table):
         val_ref = val.ref
         if not isinstance(val_ref, TableRef):

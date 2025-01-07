@@ -3,6 +3,9 @@ from pydantic import ValidationError
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
+    AnnotationSpec,
+)
 from weave.trace_server.interface.feedback_types import (
     ANNOTATION_FEEDBACK_TYPE_PREFIX,
     FEEDBACK_PAYLOAD_SCHEMAS,
@@ -38,7 +41,9 @@ TABLE_FEEDBACK = Table(
 )
 
 
-def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
+def validate_feedback_create_req(
+    req: tsi.FeedbackCreateReq, trace_server: tsi.TraceServerInterface
+) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
         try:
@@ -104,7 +109,25 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
-        ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
+        parsed = ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
+        if parsed.project_id != req.project_id:
+            raise InvalidRequest(
+                f"Annotation ref {req.annotation_ref} does not match project id {req.project_id}"
+            )
+
+        # 2. Read the annotation spec
+        data = trace_server.refs_read_batch(
+            tsi.RefsReadBatchReq(refs=[req.annotation_ref])
+        )
+        if len(data.vals) == 0:
+            raise InvalidRequest(f"Annotation ref {req.annotation_ref} not found")
+
+        # 3. Validate the payload against the annotation spec
+        value = req.payload["value"]
+        spec = data.vals[0]
+        is_valid = AnnotationSpec.model_validate(spec).value_is_valid(value)
+        if not is_valid:
+            raise InvalidRequest("Feedback payload does not match annotation spec")
     if req.runnable_ref:
         ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))
     if req.call_ref:

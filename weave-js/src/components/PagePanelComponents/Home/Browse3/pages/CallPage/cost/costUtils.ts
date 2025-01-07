@@ -102,7 +102,22 @@ export const addCostsToCallResults = (
 
   return callResults.map(call => {
     if (call.callId && costDict[call.callId]) {
-      return {...call, ...costDict[call.callId]};
+      if (!call.traceCall) {
+        return call;
+      }
+      return {
+        ...call,
+        traceCall: {
+          ...call.traceCall,
+          summary: {
+            ...call.traceCall?.summary,
+            weave: {
+              ...call.traceCall?.summary?.weave,
+              costs: costDict[call.callId].traceCall?.summary?.weave?.costs,
+            },
+          },
+        },
+      };
     }
     return call;
   });
