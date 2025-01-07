@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import time
 from typing import Any, Callable
 
 import_failed = False
@@ -40,8 +39,6 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
     Need to post process the output reported to weave to send it on openai format so that Weave front end renders
     chat view. This only affects what is sent to weave.
     """
-    from openai.types.chat import ChatCompletion
-
     if isinstance(output, ChatResult):  # its ChatResult
         message = output.llm_output
         enhanced_usage = message.get("token_usage", {})
@@ -52,9 +49,8 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
             "prompt_tokens", 0
         )
 
-        returnable = ChatCompletion(
-            id="None",
-            choices=[
+        returnable = {
+            "choices": [
                 {
                     "index": 0,
                     "message": {
@@ -66,15 +62,14 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
                     "finish_reason": message.get("finish_reason", ""),
                 }
             ],
-            created=int(time.time()),
-            model=message.get("model_name", ""),
-            object="chat.completion",
-            tool_calls=message.get("tool_calls", []),
-            system_fingerprint=None,
-            usage=enhanced_usage,
-        )
+            "model": message.get("model_name", ""),
+            "tool_calls": message.get("tool_calls", []),
+            "usage": enhanced_usage,
+        }
 
-        return returnable.model_dump(exclude_unset=True, exclude_none=True)
+        returnable.update(output.model_dump(exclude_unset=True, exclude_none=True))
+
+        return returnable
 
     elif isinstance(output, ChatGenerationChunk):  # its ChatGenerationChunk
         orig_message = output.message
@@ -87,9 +82,8 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
             "input_tokens", 0
         )
 
-        returnable = ChatCompletion(
-            id="None",
-            choices=[
+        returnable = {
+            "choices": [
                 {
                     "index": 0,
                     "message": {
@@ -103,17 +97,17 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
                     ),
                 }
             ],
-            created=int(time.time()),
-            model=getattr(orig_message, "response_metadata", {}).get(
+            "model": getattr(orig_message, "response_metadata", {}).get(
                 "model_name", None
             ),
-            tool_calls=openai_message.get("tool_calls", []),
-            object="chat.completion",
-            system_fingerprint=None,
-            usage=enhanced_usage,
-        )
+            "tool_calls": openai_message.get("tool_calls", []),
+            "usage": enhanced_usage,
+        }
 
-        return returnable.model_dump(exclude_unset=True, exclude_none=True)
+        returnable.update(output.model_dump(exclude_unset=True, exclude_none=True))
+
+        return returnable
+
     return output
 
 
@@ -142,10 +136,13 @@ def postprocess_inputs_to_openai_format(
         "max_tokens": chat_nvidia_obj.max_tokens,
         "temperature": chat_nvidia_obj.temperature,
         "top_p": chat_nvidia_obj.top_p,
-        "object": "ChatNVIDIA._generate",
         "n": n,
         "stream": stream,
     }
+
+    weave_report.update(
+        chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True)
+    )
 
     return ProcessedInputs(
         original_args=original_args,

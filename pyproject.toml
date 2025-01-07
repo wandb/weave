@@ -102,11 +102,7 @@ test = [
 
   # Integration Tests
   "pytest-recording>=0.13.2",
-  # "vcrpy>=6.0.1",
-  # https://github.com/kevin1024/vcrpy/pull/889
-  # This resolves test issues until a new pypi release can be made.  Once that release
-  # is made, we can remove this and revert to the vcrpy>=6.0.1 dependency.
-  "vcrpy @ git+https://github.com/kevin1024/vcrpy.git@48d0a2e453f6635af343000cdaf9794a781e807e",
+  "vcrpy>=7.0.0",
 
   # serving tests
   "flask",
@@ -115,7 +111,6 @@ test = [
   "filelock",
   "httpx",
 ]
-
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
@@ -146,9 +141,6 @@ exclude = [
   "dev_docs",
   "weave/clear_cache.py",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -237,7 +229,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.26-dev0"
+current_version = "0.51.28-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
