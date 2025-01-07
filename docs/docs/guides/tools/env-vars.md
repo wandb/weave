@@ -20,20 +20,19 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 
 Here’s a complete list of available environment variables for Weave, along with their usage:
 
-| Variable name               | Usage      | Default      |
-| --------------------------- | ---------- | ------------ |
-| **WEAVE_PARALLELISM**       | Sets the number of parallel workers for Weave operations. | 20 |
-| **WEAVE_PRINT_CALL_LINK**   | Controls whether call link output is displayed. Set to `true` or `false`. | `true` |
-| **WEAVE_SENTRY_ENV**        |            |              |
-| **WEAVE_SERVER_DISABLE_ECOSYSTEM** |     |              |
-| **WEAVE_TRACE_LANGCHAIN**   |            |              |
-| **WEAVE_PROJECT**           |            |              |
-| **WEAVE_DISABLED**          |            |              |
-| **WEAVE_CAPTURE_CODE**      |            |              |
-| **WEAVE_SKIP_BUILD**        |            |              |
-| **WEAVE_CACHE_CLEAR_INTERVAL** |        |              |
-| **WEAVE_OP_PATTERN**        |            |              |
-| **WEAVE_SLUG**              |            |              |
-| **WEAVE_DEBUG_HTTP**        |            |              |
- 
+| Variable Name            | Default Values                | Description                                                     |
+|--------------------------|------------------------------|-----------------------------------------------------------------|
+| WEAVE_CAPTURE_CODE      | `False`                       | Disable code capture for `weave.op`.                                   |
+| WEAVE_DEBUG_HTTP        | 1                             | If set to `1`, turns on HTTP request and response logging for debugging. |
+| WEAVE_DISABLED          | `True`                        | If set to `True`, `weave.op` will behave like regular functions.      |
+| WEAVE_PARALLELISM       | `20`                          | In evaluations, the number of examples to evaluate in parallel. `1` runs examples sequentially.    |
+| WEAVE_PRINT_CALL_LINK   | `False`                       | Suppress the printing of call URLs.                            |
+| WEAVE_TRACE_LANGCHAIN   | `False`                       |                                                                 |
+| WF_CLICKHOUSE_HOST      |                              |                                                                 |
+| WF_CLICKHOUSE_PORT      |                              |                                                                 |
+| WF_CLICKHOUSE_USER      |                              |                                                                 |
+| WF_CLICKHOUSE_PASS      |                              |                                                                 |
+| WF_CLICKHOUSE_DATABASE  |                              |                                                                 |
+| WF_TRACE_SERVER_URL     | `http://127.0.0.1:6345`        | The default Weave trace server URL. For development purposes, use .`wandb.test` backend.         |
+
 
