@@ -1,6 +1,6 @@
-
-## title: Log Audio With Weave
-
+---
+title: Log Audio With Weave
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{feedback-colab} -->
 
 
@@ -38,6 +38,15 @@ Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as w
 !pip install openai
 !pip install weave
 !pip install set-env-colab-kaggle-dotenv -q # for env var
+```
+
+
+```python
+%%capture
+# Temporary workaround to fix bug in openai:
+# TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+# See https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/15
+!pip install "httpx<0.28"
 ```
 
 Next, load the required API keys for OpenAI and Weave. Here, we use set_env which is compatible with google colab's secret keys manager, and is an alternative to colab's specific `google.colab.userdata`. See: [here](https://pypi.org/project/set-env-colab-kaggle-dotenv/) for usage instructions.
