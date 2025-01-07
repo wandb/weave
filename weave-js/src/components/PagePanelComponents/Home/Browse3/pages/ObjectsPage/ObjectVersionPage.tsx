@@ -9,6 +9,7 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
 import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
+import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -211,10 +212,12 @@ const ObjectVersionPageInner: React.FC<{
 
   if (isDataset) {
     return (
-      <DatasetVersionPage
-        objectVersion={objectVersion}
-        showDeleteButton={showDeleteButton}
-      />
+      <DatasetEditProvider>
+        <DatasetVersionPage
+          objectVersion={objectVersion}
+          showDeleteButton={showDeleteButton}
+        />
+      </DatasetEditProvider>
     );
   }
 
