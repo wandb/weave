@@ -1,0 +1,68 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Can you name a cricket player
+      along with team name and highest score?"}], "model": "meta/llama-3.1-8b-instruct",
+      "temperature": 0.0, "max_tokens": 64, "top_p": 1.0, "stream": true, "stream_options":
+      {"include_usage": true}, "tools": [{"type": "function", "function": {"name":
+      "cricket_player_names", "description": "store the name of players", "parameters":
+      {"type": "object", "properties": {"name": {"type": "string", "description":
+      "The name of the player"}, "team:": {"type": "string", "description": "The team
+      of the player"}, "highest_score": {"type": "number", "description": "The highest
+      score of the player"}}, "required": ["name", "team", "highest_score"]}}}]}'
+    headers:
+      Accept:
+      - text/event-stream
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '712'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - langchain-nvidia-ai-endpoints
+    method: POST
+    uri: https://integrate.api.nvidia.com/v1/chat/completions
+  response:
+    body:
+      string: 'data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":318,"completion_tokens":0}}
+
+
+        data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":null,"tool_calls":[{"id":"chatcmpl-tool-110e54e033b14f4da0cc49b633141568","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
+        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 254}"},"index":0}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
+
+
+        data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
+
+
+        data: [DONE]
+
+
+        '
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Expose-Headers:
+      - nvcf-reqid
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Fri, 03 Jan 2025 18:36:03 GMT
+      Nvcf-Reqid:
+      - c302f2c3-bcf2-452b-89e9-ac7cffaa7f60
+      Nvcf-Status:
+      - fulfilled
+      Server:
+      - uvicorn
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - origin, access-control-request-method, access-control-request-headers
+    status:
+      code: 200
+      message: OK
+version: 1
