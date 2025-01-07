@@ -111,7 +111,10 @@ export const Separator = ({
 }: RadixDropdownMenu.DropdownMenuSeparatorProps) => (
   <RadixDropdownMenu.Separator
     className={twMerge(
-      classNames('my-6 h-px bg-moon-250 dark:bg-moon-750', className)
+      classNames(
+        'my-6 border-t border-moon-250 dark:border-moon-750',
+        className
+      )
     )}
     {...props}
   />

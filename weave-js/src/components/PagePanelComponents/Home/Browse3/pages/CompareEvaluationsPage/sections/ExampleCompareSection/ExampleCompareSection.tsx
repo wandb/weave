@@ -229,15 +229,15 @@ export const ExampleCompareSection: React.FC<{
   }>({});
 
   const onScorerClick = usePeekCall(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
 
   const compositeScoreMetrics = useMemo(
-    () => buildCompositeMetricsMap(props.state.data, 'score'),
-    [props.state.data]
+    () => buildCompositeMetricsMap(props.state.summary, 'score'),
+    [props.state.summary]
   );
 
   if (target == null) {
@@ -261,7 +261,7 @@ export const ExampleCompareSection: React.FC<{
   const numEvals = numTrials.length;
   // Get derived scores, then filter out any not in the selected metrics
   const derivedScores = Object.values(
-    getMetricIds(props.state.data, 'score', 'derived')
+    getMetricIds(props.state.summary, 'score', 'derived')
   ).filter(
     score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
   );
@@ -483,7 +483,7 @@ export const ExampleCompareSection: React.FC<{
       trialPredict?.op_name ?? ''
     )?.artifactName;
     const trialCallId = trialPredict?.id;
-    const evaluationCall = props.state.data.evaluationCalls[currEvalCallId];
+    const evaluationCall = props.state.summary.evaluationCalls[currEvalCallId];
     if (trialEntity && trialProject && trialOpName && trialCallId) {
       return (
         <Box
