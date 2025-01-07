@@ -43,6 +43,9 @@ export const FeedbackGrid = ({
     return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const hasAnnotationFeedback = query.result?.some(f =>
+    f.feedback_type.startsWith(ANNOTATION_PREFIX)
+  );
 
   // Group by feedback on this object vs. descendent objects
   const grouped = useMemo(() => {
@@ -127,6 +130,7 @@ export const FeedbackGrid = ({
             <FeedbackGridInner
               feedback={grouped[path]}
               currentViewerId={currentViewerId}
+              showAnnotationName={hasAnnotationFeedback}
             />
           </div>
         );

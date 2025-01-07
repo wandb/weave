@@ -3,7 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useContext, useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,

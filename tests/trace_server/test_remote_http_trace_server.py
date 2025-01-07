@@ -42,7 +42,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         mock_post.assert_called_once()
 
     @patch("weave.trace_server.requests.post")
-    def test_400_500_no_retry(self, mock_post):
+    def test_400_no_retry(self, mock_post):
         call_id = generate_id()
         resp1 = requests.Response()
         resp1.json = lambda: dict(
@@ -50,18 +50,11 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         )
         resp1.status_code = 400
 
-        resp2 = requests.Response()
-        resp2.status_code = 500
-
         mock_post.side_effect = [
             resp1,
-            resp2,
         ]
 
         start = generate_start(call_id)
-        with self.assertRaises(requests.HTTPError):
-            self.server.call_start(tsi.CallStartReq(start=start))
-
         with self.assertRaises(requests.HTTPError):
             self.server.call_start(tsi.CallStartReq(start=start))
 
@@ -70,8 +63,11 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
             self.server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
     @patch("weave.trace_server.requests.post")
-    def test_502_503_504_429_retry(self, mock_post):
+    def test_500_502_503_504_429_retry(self, mock_post):
         call_id = generate_id()
+
+        resp0 = requests.Response()
+        resp0.status_code = 500
 
         resp1 = requests.Response()
         resp1.status_code = 502
@@ -91,7 +87,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         )
         resp5.status_code = 200
 
-        mock_post.side_effect = [resp1, resp2, resp3, resp4, resp5]
+        mock_post.side_effect = [resp0, resp1, resp2, resp3, resp4, resp5]
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
 

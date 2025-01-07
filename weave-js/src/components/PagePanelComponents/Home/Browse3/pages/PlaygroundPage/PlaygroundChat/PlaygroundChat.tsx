@@ -41,7 +41,6 @@ export const PlaygroundChat = ({
   const {handleRetry, handleSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setIsLoading,
-    chatText,
     playgroundStates,
     entity,
     project,
@@ -115,11 +114,15 @@ export const PlaygroundChat = ({
               }}>
               <Box
                 sx={{
+                  backgroundColor: 'white',
+                  borderBottom: `1px solid ${MOON_200}`,
                   position: 'absolute',
-                  top: '8px',
-                  width: 'calc(100% - 32px)',
-                  left: '16px',
-                  right: '16px',
+                  top: '0',
+                  width: '100%',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
                   zIndex: 10,
                 }}>
                 <PlaygroundChatTopBar
@@ -143,7 +146,7 @@ export const PlaygroundChat = ({
                   flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto h-full min-w-[400px] max-w-[800px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
@@ -152,20 +155,32 @@ export const PlaygroundChat = ({
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>
                             editMessage(idx, messageIndex, newMessage),
-                          deleteChoice: choiceIndex =>
+                          deleteChoice: (messageIndex, choiceIndex) =>
                             deleteChoice(idx, choiceIndex),
                           addMessage: newMessage => addMessage(idx, newMessage),
                           editChoice: (choiceIndex, newChoice) =>
                             editChoice(idx, choiceIndex, newChoice),
-                          retry: (messageIndex: number, isChoice?: boolean) =>
-                            handleRetry(idx, messageIndex, isChoice),
+                          retry: (messageIndex: number, choiceIndex?: number) =>
+                            handleRetry(idx, messageIndex, choiceIndex),
                           sendMessage: (
                             role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
-                            handleSend(role, idx, content, toolCallId);
+                            handleSend(
+                              role,
+                              chatText,
+                              idx,
+                              content,
+                              toolCallId
+                            );
                           },
+                          setSelectedChoiceIndex: (choiceIndex: number) =>
+                            setPlaygroundStateField(
+                              idx,
+                              'selectedChoiceIndex',
+                              choiceIndex
+                            ),
                         }}>
                         <CallChat call={state.traceCall as TraceCallSchema} />
                       </PlaygroundContext.Provider>

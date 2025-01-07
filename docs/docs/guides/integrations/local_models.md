@@ -14,7 +14,6 @@ First and most important, is the `base_url` change during the `openai.OpenAI()` 
 
 ```python
 client = openai.OpenAI(
-    api_key='fake',
     base_url="http://localhost:1234",
 )
 ```

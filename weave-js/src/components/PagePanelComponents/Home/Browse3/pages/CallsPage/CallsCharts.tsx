@@ -149,7 +149,7 @@ export const CallsCharts = ({
         data.errors.push({started_at, isError: false});
       }
 
-      if (ended_at !== undefined) {
+      if (ended_at != null) {
         const startTime = new Date(started_at).getTime();
         const endTime = new Date(ended_at).getTime();
         const latency = endTime - startTime;
@@ -182,7 +182,7 @@ export const CallsCharts = ({
   return (
     <Tailwind>
       {/* setting the width to the width of the screen minus the sidebar width because of overflow: 'hidden' properties in SimplePageLayout causing issues */}
-      <div className="md:w-[calc(100vw-56px)]">
+      <div className="w-full md:max-w-[calc(100vw-56px)]">
         <div className="mb-20 mt-10">{charts}</div>
       </div>
     </Tailwind>

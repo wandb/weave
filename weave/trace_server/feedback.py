@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.interface.base_object_classes.annotation_spec import (
+from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
 )
 from weave.trace_server.interface.feedback_types import (

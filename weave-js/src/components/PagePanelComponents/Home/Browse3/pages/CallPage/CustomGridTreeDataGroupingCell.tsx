@@ -173,7 +173,7 @@ export const CustomGridTreeDataGroupingCell: FC<
             <Box
               sx={{
                 width: '100%',
-                height: '100%',
+                height: '34px',
                 borderBottom: BORDER_STYLE,
               }}></Box>
             <Box sx={{width: '100%', height: '100%'}}></Box>

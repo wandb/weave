@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Union
 
-from weave.trace.autopatch import autopatch
-
-autopatch()  # ensure both weave patching and instructor patching are applied
-
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_DEFAULT_MODERATION_MODEL = "text-moderation-latest"
@@ -23,10 +19,17 @@ if TYPE_CHECKING:
     from google.generativeai import GenerativeModel
     from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
-    from openai import AsyncOpenAI, OpenAI
+    from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 
     _LLM_CLIENTS = Union[
-        OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel
+        OpenAI,
+        AsyncOpenAI,
+        AzureOpenAI,
+        AsyncAzureOpenAI,
+        Anthropic,
+        AsyncAnthropic,
+        Mistral,
+        GenerativeModel,
     ]
 else:
     _LLM_CLIENTS = object
@@ -34,6 +37,8 @@ else:
 _LLM_CLIENTS_NAMES = (
     "OpenAI",
     "AsyncOpenAI",
+    "AzureOpenAI",
+    "AsyncAzureOpenAI",
     "Anthropic",
     "AsyncAnthropic",
     "Mistral",

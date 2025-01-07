@@ -185,7 +185,7 @@ const ObjectViewerSectionNonEmpty = ({
   }, [data, isExpanded]);
 
   return (
-    <>
+    <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
         <Title>{title}</Title>
         <Button
@@ -224,7 +224,7 @@ const ObjectViewerSectionNonEmpty = ({
         )}
       </TitleRow>
       {body}
-    </>
+    </Box>
   );
 };
 

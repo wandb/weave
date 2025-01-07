@@ -86,9 +86,9 @@ class StringPrompt(Prompt):
     def format(self, **kwargs: Any) -> str:
         return self.content.format(**kwargs)
 
-    @staticmethod
-    def from_obj(obj: Any) -> "StringPrompt":
-        prompt = StringPrompt(content=obj.content)
+    @classmethod
+    def from_obj(cls, obj: Any) -> "StringPrompt":
+        prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
         return prompt
@@ -113,9 +113,9 @@ class MessagesPrompt(Prompt):
     def format(self, **kwargs: Any) -> list:
         return [self.format_message(m, **kwargs) for m in self.messages]
 
-    @staticmethod
-    def from_obj(obj: Any) -> "MessagesPrompt":
-        prompt = MessagesPrompt(messages=obj.messages)
+    @classmethod
+    def from_obj(cls, obj: Any) -> "MessagesPrompt":
+        prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
         return prompt
@@ -419,13 +419,13 @@ class EasyPrompt(UserList, Prompt):
             "messages": list(self),
         }
 
-    @staticmethod
-    def from_obj(obj: Any) -> "EasyPrompt":
+    @classmethod
+    def from_obj(cls, obj: Any) -> "EasyPrompt":
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
         requirements = dict(obj.requirements)
-        return EasyPrompt(
+        return cls(
             name=obj.name,
             description=obj.description,
             messages=messages,

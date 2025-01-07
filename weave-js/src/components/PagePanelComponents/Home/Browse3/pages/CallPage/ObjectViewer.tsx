@@ -23,7 +23,11 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {
+  CustomWeaveTypePayload,
+  isCustomWeaveTypePayload,
+} from '../../typeViews/customWeaveType.types';
+import {getCustomWeaveTypePreferredRowHeight} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -47,6 +51,10 @@ import {
   TraverseContext,
 } from './traverse';
 import {ValueView} from './ValueView';
+
+const DEFAULT_ROW_HEIGHT = 38;
+const CODE_ROW_HEIGHT = 350;
+const TABLE_ROW_HEIGHT = 450;
 
 type Data = Record<string, any> | any[];
 
@@ -440,6 +448,47 @@ export const ObjectViewer = ({
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
+  // Per https://mui.com/x/react-data-grid/row-height/#dynamic-row-height, always
+  // memoize the getRowHeight function.
+  const getRowHeight = useCallback((params: GridRowHeightParams) => {
+    const isNonRefString =
+      params.model.valueType === 'string' && !isWeaveRef(params.model.value);
+    const isArray = params.model.valueType === 'array';
+    const isTableRef =
+      isWeaveRef(params.model.value) &&
+      (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+    const {isCode} = params.model;
+    const isCustomWeaveType = isCustomWeaveTypePayload(params.model.value);
+    if (!params.model.isLeaf) {
+      // This is a group header, so we want to use the default height
+      return DEFAULT_ROW_HEIGHT;
+    } else if (isNonRefString) {
+      // This is the only special case where we will allow for dynamic height.
+      // Since strings have special renders that take up different amounts of
+      // space, we will allow for dynamic height.
+      return 'auto';
+    } else if (isCustomWeaveType) {
+      const type = (params.model.value as CustomWeaveTypePayload).weave_type
+        .type;
+      const preferredRowHeight = getCustomWeaveTypePreferredRowHeight(type);
+      if (preferredRowHeight) {
+        return preferredRowHeight;
+      }
+      return DEFAULT_ROW_HEIGHT;
+    } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
+      // Perfectly enough space for 1 page of data rows
+      return TABLE_ROW_HEIGHT;
+    } else if (isCode) {
+      // Probably will get negative feedback here since code that is < 20 lines
+      // will have some whitespace below the code. However, we absolutely need
+      // to have static height for all cells else the MUI data grid will jump around
+      // when cleaning up virtual rows.
+      return CODE_ROW_HEIGHT;
+    } else {
+      return DEFAULT_ROW_HEIGHT;
+    }
+  }, []);
+
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
@@ -473,31 +522,9 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        autoHeight
         columnHeaderHeight={38}
-        getRowHeight={(params: GridRowHeightParams) => {
-          const isNonRefString =
-            params.model.valueType === 'string' &&
-            !isWeaveRef(params.model.value);
-          const isArray = params.model.valueType === 'array';
-          const isTableRef =
-            isWeaveRef(params.model.value) &&
-            (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-          const {isCode} = params.model;
-          const isCustomWeaveType = isCustomWeaveTypePayload(
-            params.model.value
-          );
-          if (
-            isNonRefString ||
-            (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef ||
-            isCode ||
-            isCustomWeaveType
-          ) {
-            return 'auto';
-          }
-          return 38;
-        }}
+        rowHeight={DEFAULT_ROW_HEIGHT}
+        getRowHeight={getRowHeight}
         hideFooter
         rowSelection={false}
         groupingColDef={groupingColDef}
@@ -517,10 +544,10 @@ export const ObjectViewer = ({
         }}
       />
     );
-  }, [apiRef, rows, columns, groupingColDef, expandedIds]);
+  }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden'}}>{inner}</div>;
+  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
 };
 
 // Helper function to build the base ref for a given path. This function is used
