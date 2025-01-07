@@ -1040,10 +1040,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             objs = self._select_objs_query(
                 r.project_id,
                 conditions=conds,
+                include_deleted=True,
             )
             if len(objs) == 0:
                 raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
+            if obj.deleted_at is not None:
+                return None
             val = obj.val
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
