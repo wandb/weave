@@ -27,6 +27,9 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  PermanentlyDeleteProjectReq,
+  PermanentlyDeleteProjectReq,
+  PermanentlyDeleteProjectRes,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -332,6 +335,15 @@ export class DirectTraceServerClient {
       }
       return Promise.reject(error);
     }
+  }
+
+  public permanentlyDeleteProject(
+    req: PermanentlyDeleteProjectReq
+  ): Promise<PermanentlyDeleteProjectRes> {
+    return this.makeRequest<
+      PermanentlyDeleteProjectReq,
+      PermanentlyDeleteProjectRes
+    >('/project/delete', req);
   }
 
   private makeRequest = async <QT, ST>(

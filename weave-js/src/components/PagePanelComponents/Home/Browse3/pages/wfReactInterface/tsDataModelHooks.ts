@@ -1579,6 +1579,14 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
   return finalRes;
 };
 
+const permanentlyDeleteAllDataInProject =
+  (entity: string, project: string) => () => {
+    const getTsClient = useGetTraceServerClientContext();
+    const projectId = projectIdFromParts({entity, project});
+
+    return getTsClient().permanentlyDeleteProject({project_id: projectId});
+  };
+
 /// Converters ///
 type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
 export const traceCallStatusCode = (
@@ -1738,6 +1746,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,
+  permanentlyDeleteAllDataInProject,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

@@ -324,6 +324,12 @@ export type CompletionsCreateRes = {
   weave_call_id?: string;
 };
 
+export type PermanentlyDeleteProjectReq = {
+  project_id: string;
+};
+
+export type PermanentlyDeleteProjectRes = {};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',

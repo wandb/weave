@@ -270,6 +270,10 @@ export type WFDataModelHooksInterface = {
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]
   ) => LoadableWithError<any[] | null> & Refetchable;
+  permanentlyDeleteAllDataInProject: (
+    entity: string,
+    project: string
+  ) => () => Promise<traceServerClientTypes.PermanentlyDeleteProjectRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
