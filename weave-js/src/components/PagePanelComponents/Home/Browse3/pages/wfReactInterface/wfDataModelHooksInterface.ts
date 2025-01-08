@@ -20,6 +20,8 @@ export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
   (typeof KNOWN_BASE_OBJECT_CLASSES)[number];
 
+export type TraceServerError = {reason: string};
+
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
@@ -28,7 +30,7 @@ export type Loadable<T> = {
 export type LoadableWithError<T> = {
   loading: boolean;
   result: T | null;
-  error: Error | null;
+  error: TraceServerError | Error | null;
 };
 
 export type CallKey = {

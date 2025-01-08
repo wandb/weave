@@ -10,11 +10,9 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {CellValueString} from '../../../Browse2/CellValueString';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {maybeGetErrorReasonFromRes} from '../../pages/wfReactInterface/errors';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
-import {
-  FeedbackCreateError,
-  FeedbackCreateSuccess,
-} from '../../pages/wfReactInterface/traceServerClientTypes';
+import {FeedbackCreateSuccess} from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
   FEEDBACK_TYPE_OPTIONS,
   HumanAnnotation,
@@ -78,9 +76,9 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
       };
       const createRequest = generateFeedbackRequestPayload(requestProps);
       const promise = tsClient.feedbackCreate(createRequest).then(res => {
-        if ('detail' in res) {
-          const errorRes = res as FeedbackCreateError;
-          toast(`Feedback create failed: ${errorRes.detail}`, {
+        const error = maybeGetErrorReasonFromRes(res);
+        if (error) {
+          toast(`Feedback create failed: ${error}`, {
             type: 'error',
           });
           return false;

@@ -10,6 +10,7 @@ import {Tailwind} from '../../../../Tailwind';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from '../pages/CallPage/CallScoresViewer';
 import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
+import {getReasonFromError} from '../pages/wfReactInterface/errors';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
@@ -93,9 +94,7 @@ export const FeedbackGrid = ({
   if (query.error) {
     return (
       <div className="m-16 flex flex-col gap-8">
-        <Alert severity="error">
-          Error: {query.error.message ?? JSON.stringify(query.error)}
-        </Alert>
+        <Alert severity="error">Error: {getReasonFromError(query.error)}</Alert>
       </div>
     );
   }

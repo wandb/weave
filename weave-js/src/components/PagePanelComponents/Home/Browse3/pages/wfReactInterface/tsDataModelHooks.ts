@@ -22,6 +22,7 @@ import {
   WEAVE_PRIVATE_PREFIX,
   WEAVE_REF_PREFIX,
 } from './constants';
+import {getReasonFromError} from './errors';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
@@ -289,7 +290,8 @@ const useCallsNoExpansion = (
     };
     const onError = (e: any) => {
       loadingRef.current = false;
-      console.error(e);
+      const reason = getReasonFromError(e);
+      console.error(reason);
       setCallRes({calls: []});
     };
     getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
@@ -973,7 +975,8 @@ const useRootObjectVersions = (
     };
     const onError = (e: any) => {
       loadingRef.current = false;
-      console.error(e);
+      const reason = getReasonFromError(e);
+      console.error(reason);
       setObjectVersionRes({loading: false, error: e, result: null});
     };
     getTsClient().objsQuery(req).then(onSuccess).catch(onError);
@@ -1312,7 +1315,8 @@ const useTableRowsQuery = (
       })
       .catch(err => {
         loadingRef.current = false;
-        console.error('Error fetching table rows:', err);
+        const reason = getReasonFromError(err);
+        console.error('Error fetching table rows:', reason);
         setQueryRes(null);
       });
   }, [
@@ -1374,7 +1378,8 @@ const useTableQueryStats = (
       })
       .catch(err => {
         loadingRef.current = false;
-        console.error('Error fetching table query stats:', err);
+        const reason = getReasonFromError(err);
+        console.error('Error fetching table query stats:', reason);
         setStatsRes(null);
       });
   }, [getTsClient, projectId, digest, opts?.skip]);

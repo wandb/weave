@@ -12,6 +12,7 @@ import {useHistory} from 'react-router-dom';
 import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
+import {getReasonFromError} from '../../pages/wfReactInterface/errors';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
 
@@ -58,9 +59,10 @@ export const FeedbackSidebar = ({
 
       // Clear the unsaved changes after successful save
       setUnsavedFeedbackChanges({});
-    } catch (error) {
-      console.error('Error saving feedback:', error);
-      toast(`Error saving feedback: ${error}`, {
+    } catch (error: any) {
+      const reason = getReasonFromError(error);
+      console.error('Error saving feedback:', reason);
+      toast(`Error saving feedback: ${reason}`, {
         type: 'error',
       });
     } finally {
