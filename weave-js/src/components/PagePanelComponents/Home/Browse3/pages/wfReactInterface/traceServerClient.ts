@@ -8,6 +8,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  TableUpdateReq,
+  TableUpdateRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceObjCreateReq,
@@ -113,6 +115,10 @@ export class TraceServerClient extends CachingTraceServerClient {
       return createRes;
     });
     return res;
+  }
+
+  public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
+    return super.tableUpdate(req);
   }
 
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
