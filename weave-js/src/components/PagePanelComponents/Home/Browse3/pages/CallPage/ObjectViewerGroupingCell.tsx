@@ -6,6 +6,7 @@ import React, {FC, MouseEvent} from 'react';
 import {Button} from '../../../../../Button';
 import {Tooltip} from '../../../../../Tooltip';
 import {CursorBox} from './CursorBox';
+import {maybeGetDeletedRefValuePlaceholderFromRow} from './ObjectViewer';
 
 const INSET_SPACING = 40;
 
@@ -32,7 +33,7 @@ export const ObjectViewerGroupingCell: FC<
     event.stopPropagation();
   };
 
-  const deletedRef = row.value?._weave_is_deleted_ref;
+  const deletedRef = maybeGetDeletedRefValuePlaceholderFromRow(row);
   const tooltipContent = row.path.toString();
   const textContent = deletedRef ?? props.value;
   const box = (

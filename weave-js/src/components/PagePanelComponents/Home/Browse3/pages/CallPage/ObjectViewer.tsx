@@ -168,10 +168,8 @@ export const ObjectViewer = ({
         continue;
       }
       if (!v) {
-        // Value for ref not found, probably deleted
-        refValues[r] = {
-          _weave_is_deleted_ref: objectRefDisplayName(parseRef(r)).label,
-        };
+        // Value for ref not found, must be deleted
+        refValues[r] = deletedRefValuePlaceholder(r);
         continue;
       }
       let val = r;
@@ -733,4 +731,19 @@ const useTruncatedData = (data: Data) => {
   }, [data]);
 
   return {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore};
+};
+
+// Placeholder value for deleted refs
+const DELETED_REF_KEY = '_weave_deleted_ref';
+const deletedRefValuePlaceholder = (
+  ref: string
+): {[DELETED_REF_KEY]: string} => {
+  const parsedRef = parseRef(ref);
+  const refString = objectRefDisplayName(parsedRef).label;
+  return {[DELETED_REF_KEY]: refString};
+};
+export const maybeGetDeletedRefValuePlaceholderFromRow = (
+  row: any
+): string | undefined => {
+  return row.value?.[DELETED_REF_KEY];
 };
