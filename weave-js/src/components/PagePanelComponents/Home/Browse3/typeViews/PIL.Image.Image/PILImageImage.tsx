@@ -6,7 +6,7 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
-  {'image.jpg'?: string; 'image.png'?: string}
+  {'image.jpg': string; 'image.png': string}
 >;
 
 const DEFAULT_IMAGE_FILE_EXT = 'png';
