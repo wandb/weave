@@ -12,7 +12,10 @@ import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
-import {parseScorerFeedbackType} from '../feedback/HumanFeedback/tsScorerFeedback';
+import {
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+} from '../feedback/HumanFeedback/tsScorerFeedback';
 import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
@@ -51,10 +54,8 @@ export const getFieldLabel = (field: string): string => {
     }
     return parsed.displayName;
   }
-  if (field.startsWith('summary.weave.feedback.wandb.runnable.')) {
-    // Here the field is coming from convertScorerFeedbackFieldToBackendFilter
-    // so the field should start with 'feedback.' if feedback
-    const parsed = parseScorerFeedbackType(field);
+  if (field.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX)) {
+    const parsed = parseScorerFeedbackField(field);
     if (parsed === null) {
       return field;
     }

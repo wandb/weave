@@ -26,7 +26,9 @@ import {
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {
   convertScorerFeedbackFieldToBackendFilter,
-  parseScorerFeedbackType,
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+  RUNNABLE_FEEDBACK_OUTPUT_PART,
 } from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
@@ -390,8 +392,8 @@ function buildCallsTableColumns(
 
   const scoreColNames = allDynamicColumnNames.filter(
     c =>
-      c.startsWith('summary.weave.feedback.wandb.runnable') &&
-      c.includes('.payload.output.')
+      c.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX) &&
+      c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
   );
   if (scoreColNames.length > 0) {
     // Add feedback group to grouping model
@@ -405,7 +407,7 @@ function buildCallsTableColumns(
     // Add feedback columns
     const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
       c => {
-        const parsed = parseScorerFeedbackType(c);
+        const parsed = parseScorerFeedbackField(c);
         const field = convertScorerFeedbackFieldToBackendFilter(c);
         scoreGroup.children.push({
           field,

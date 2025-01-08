@@ -1,12 +1,18 @@
+import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from '../StructuredFeedback/runnableFeedbackTypes';
+
+export const RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX =
+  'summary.weave.feedback.' + RUNNABLE_FEEDBACK_TYPE_PREFIX;
+export const RUNNABLE_FEEDBACK_OUTPUT_PART = 'payload.output';
+
 export type ScorerFeedbackTypeParts = {
   scorerName: string;
   scorePath: string;
 };
 
-export const parseScorerFeedbackType = (
+export const parseScorerFeedbackField = (
   inputField: string
 ): ScorerFeedbackTypeParts | null => {
-  const prefix = 'summary.weave.feedback.wandb.runnable.';
+  const prefix = RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX + '.';
   if (!inputField.startsWith(prefix)) {
     return null;
   }
@@ -16,7 +22,7 @@ export const parseScorerFeedbackType = (
   }
   const [scorerName, ...rest] = res.split('.');
   const prefixedScorePath = rest.join('.');
-  const pathPrefix = 'payload.output.';
+  const pathPrefix = RUNNABLE_FEEDBACK_OUTPUT_PART + '.';
   if (!prefixedScorePath.startsWith(pathPrefix)) {
     return null;
   }
@@ -30,10 +36,10 @@ export const parseScorerFeedbackType = (
 export const convertScorerFeedbackFieldToBackendFilter = (
   field: string
 ): string => {
-  const parsed = parseScorerFeedbackType(field);
+  const parsed = parseScorerFeedbackField(field);
   if (parsed === null) {
     return field;
   }
   const {scorerName, scorePath} = parsed;
-  return `feedback.[wandb.runnable.${scorerName}].payload.output.${scorePath}`;
+  return `feedback.[${RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX}.${scorerName}].${RUNNABLE_FEEDBACK_OUTPUT_PART}.${scorePath}`;
 };
