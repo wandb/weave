@@ -123,15 +123,14 @@ def test_sync_method(client, weave_obj, py_obj):
 def test_sync_method_call(client, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
-    assert weave_obj.ref == ObjectRef(
-        entity="shawn",
-        project="test-project",
-        name="A",
-        _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
-        _extra=(),
-    )
     assert call.inputs == {
-        "self": weave_obj,
+        "self": ObjectRef(
+            entity="shawn",
+            project="test-project",
+            name="A",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
+            _extra=(),
+        ),
         "a": 1,
     }
     assert call.output == 2
@@ -159,15 +158,14 @@ async def test_async_method(client, weave_obj, py_obj):
 async def test_async_method_call(client, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)
     assert isinstance(call, Call)
-    assert weave_obj.ref == ObjectRef(
-        entity="shawn",
-        project="test-project",
-        name="A",
-        _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
-        _extra=(),
-    )
     assert call.inputs == {
-        "self": weave_obj,
+        "self": ObjectRef(
+            entity="shawn",
+            project="test-project",
+            name="A",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
+            _extra=(),
+        ),
         "a": 1,
     }
     assert call.output == 2
