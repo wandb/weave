@@ -45,7 +45,7 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export const getFieldLabel = (field: string): string => {
-  if (field.startsWith('summary.weave.feedback.wandb.annotation.')) {
+  if (field.startsWith('feedback.wandb.annotation.')) {
     // Here the field is coming from convertFeedbackFieldToBackendFilter
     // so the field should start with 'feedback.' if feedback
     const parsed = parseFeedbackType(field);
