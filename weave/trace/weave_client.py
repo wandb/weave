@@ -774,6 +774,7 @@ class WeaveClient:
             inputs_postprocessed = inputs_redacted
 
         self._save_nested_objects(inputs_postprocessed)
+        inputs_with_refs = map_to_refs(inputs_postprocessed)
 
         if parent is None and use_stack:
             parent = call_context.get_current_call()
@@ -805,7 +806,8 @@ class WeaveClient:
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
-            inputs=inputs_postprocessed,
+            # It feels like this should be inputs_postprocessed, not the refs.
+            inputs=inputs_with_refs,
             attributes=attributes,
         )
         # feels like this should be in post init, but keping here
@@ -824,8 +826,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         def send_start_call() -> None:
-            inputs_as_refs = map_to_refs(inputs_postprocessed)
-            inputs_json = to_json(inputs_as_refs, project_id, self, use_dictify=False)
+            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
