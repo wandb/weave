@@ -38,16 +38,10 @@ class BlockingTraceServer(tsi.TraceServerInterface):
         if item == "attribute_access_log":
             return getattr(internal_trace_server, item)
 
-        print("REMOVE ME: Getting blocked call " + item)
-
         def wrapper(*args, **kwargs):
-            print("REMOVE ME: Executing blocked call " + item)
             with self.lock:
-                print("REMOVE ME: Getting inner call " + item)
                 inner_attr = getattr(internal_trace_server, item)
-                print("REMOVE ME: Executing inner call " + item)
                 result = inner_attr(*args, **kwargs)
-            print("REMOVE ME: Returning result " + item)
             return result
 
         return wrapper
@@ -55,22 +49,18 @@ class BlockingTraceServer(tsi.TraceServerInterface):
 
 @contextmanager
 def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
-    print("REMOVE ME: BEFORE PAUSE")
     original_server = client.server
     client.set_autoflush(False)
     blocking_server = BlockingTraceServer(original_server)
     client.server = blocking_server
     blocking_server.pause()
-    print("REMOVE ME: AFTER PAUSE")
     try:
         yield client
     finally:
-        print("REMOVE ME: BEFORE RESUME")
         blocking_server.resume()
         client.server = original_server
         client._flush()
         client.set_autoflush(True)
-        print("REMOVE ME: AFTER RESUME")
 
 
 def build_evaluation():
@@ -124,12 +114,9 @@ async def test_evaluation_performance(client: WeaveClient):
     assert log == ["ensure_project_exists"]
 
     with paused_client(client) as client:
-        print("REMOVE ME: BEFORE EVALUATE")
         res = await evaluation.evaluate(predict)
-        print("REMOVE ME: AFTER EVALUATE")
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-        print("REMOVE ME: AFTER LOG")
         print(log)
         assert log == ["ensure_project_exists"]
 

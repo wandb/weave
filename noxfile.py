@@ -59,7 +59,6 @@ def tests(session, shard):
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
     session.install("-e", f".[{shard},test]")
-    session.install("pytest-timeout")
     session.chdir("tests")
 
     env = {
@@ -110,7 +109,6 @@ def tests(session, shard):
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
-        "--timeout=30",
         *session.posargs,
         *test_dirs,
         env=env,
