@@ -130,6 +130,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
                 (isSecondary || isGhost) && active,
 
+              /** @deprecated, use ghost instead */
               // quiet
               'text-moon-500': isQuiet,
               'bg-oblivion/[0.05] text-moon-800 dark:bg-moonbeam/[0.05] dark:text-moon-200':
