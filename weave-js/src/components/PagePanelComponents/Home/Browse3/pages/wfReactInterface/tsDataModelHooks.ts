@@ -1930,13 +1930,66 @@ export const traceCallToUICallSchema = (
   };
 };
 
+export const useObjCreate = (): ((
+  projectId: string,
+  objectId: string,
+  val: any,
+  baseObjectClass?: string
+) => Promise<string>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (
+      projectId: string,
+      objectId: string,
+      val: any,
+      baseObjectClass?: string
+    ) => {
+      return getTsClient()
+        .objCreate({
+          obj: {
+            project_id: projectId,
+            object_id: objectId,
+            val,
+            builtin_object_class: baseObjectClass,
+          },
+        })
+        .then(res => {
+          return res.digest;
+        });
+    },
+    [getTsClient]
+  );
+};
+
+export const useTableUpdate = (): ((
+  projectId: string,
+  digest: string,
+  updates: traceServerTypes.TableUpdateSpec[]
+) => Promise<traceServerTypes.TableUpdateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (
+      projectId: string,
+      baseDigest: string,
+      updates: traceServerTypes.TableUpdateSpec[]
+    ) => {
+      return getTsClient().tableUpdate({
+        project_id: projectId,
+        base_digest: baseDigest,
+        updates,
+      });
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
   return new Date(iso);
 };
-
-// Export //
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
@@ -1945,6 +1998,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCallsDeleteFunc,
   useCallUpdateFunc,
   useCallsExport,
+  useObjCreate,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
@@ -1956,6 +2010,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,
+  useTableUpdate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,
