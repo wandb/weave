@@ -287,11 +287,11 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
   return result;
 };
 
-export const isObjDeleteError = (e: any): boolean => {
-  if (e == null) {
+export const isObjDeleteError = (error: any): boolean => {
+  if (error == null) {
     return false;
   }
-  if ('deleted_at' in e) {
+  if ('deleted_at' in error) {
     return true;
   }
   return false;

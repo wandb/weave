@@ -898,7 +898,7 @@ const useObjectVersion = (
   const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
   const [objectVersionRes, setObjectVersionRes] =
     useState<traceServerTypes.TraceObjReadRes | null>(null);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<any>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
@@ -916,7 +916,7 @@ const useObjectVersion = (
         .then(res => {
           loadingRef.current = false;
           if (res.obj == null) {
-            setError(new Error(JSON.stringify(res)));
+            setError(res);
             // be conservative and unset the cache when there's an error
             if (deepKey) {
               objectVersionCache.del(deepKey);
