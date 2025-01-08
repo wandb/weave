@@ -18,11 +18,16 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {CellValue} from '../../../Browse2/CellValue';
 import {CellValueString} from '../../../Browse2/CellValueString';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  convertScorerFeedbackFieldToBackendFilter,
+  parseScorerFeedbackType,
+} from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
@@ -381,6 +386,73 @@ function buildCallsTableColumns(
         };
       });
     cols.push(...annotationColumns);
+  }
+
+  const scoreColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith('summary.weave.feedback.wandb.runnable') &&
+      c.includes('.payload.output.')
+  );
+  if (scoreColNames.length > 0) {
+    // Add feedback group to grouping model
+    const scoreGroup = {
+      groupId: 'scores',
+      headerName: 'Scores',
+      children: [] as any[],
+    };
+    groupingModel.push(scoreGroup);
+
+    // Add feedback columns
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
+      c => {
+        const parsed = parseScorerFeedbackType(c);
+        const field = convertScorerFeedbackFieldToBackendFilter(c);
+        if (parsed === null) {
+          scoreGroup.children.push({
+            field,
+          });
+          return {
+            field,
+            headerName: c,
+            width: 150,
+            renderHeader: () => {
+              return <div> {c}</div>;
+            },
+            valueGetter: (unused: any, row: any) => {
+              return row[c];
+            },
+            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+              return <CellValue value={params.value} />;
+            },
+          };
+        }
+        const subGroup = {
+          groupId: 'scores.' + parsed.scorerName,
+          headerName: parsed.scorerName,
+          children: [
+            {
+              field,
+            },
+          ],
+        };
+        scoreGroup.children.push(subGroup);
+        return {
+          field,
+          headerName: parsed ? parsed.scorePath : `${c}`,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed.scorePath}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            return <CellValue value={params.value} />;
+          },
+        };
+      }
+    );
+    cols.push(...scoreColumns);
   }
 
   cols.push({
