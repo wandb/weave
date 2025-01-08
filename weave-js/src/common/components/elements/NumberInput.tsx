@@ -9,9 +9,9 @@ interface NumberInputProps {
   containerStyle?: React.CSSProperties;
   disabled?: boolean;
   inputStyle?: React.CSSProperties;
+  label?: string;
   max?: number;
   min?: number;
-  name?: string;
   onChange: (newVal?: number) => void;
   placeholder?: string;
   stepper?: boolean;
@@ -80,12 +80,12 @@ const NumberInput: React.FC<NumberInputProps> = props => {
   return (
     <div className="number-input__container" style={props.containerStyle}>
       <Input
-        aria-label={props.name}
-        style={props.inputStyle}
+        aria-label={props.label}
         className={`number-input__input ${props.className || ''}`}
-        type="number"
         disabled={props.disabled}
         placeholder={props.placeholder}
+        style={props.inputStyle}
+        type="number"
         value={stringValue}
         onFocus={() => {
           focusedRef.current = true;
