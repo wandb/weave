@@ -49,19 +49,22 @@ class BlockingTraceServer(tsi.TraceServerInterface):
 
 @contextmanager
 def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
+    print("REMOVE ME: BEFORE PAUSE")
     original_server = client.server
     client.set_autoflush(False)
     blocking_server = BlockingTraceServer(original_server)
     client.server = blocking_server
     blocking_server.pause()
+    print("REMOVE ME: AFTER PAUSE")
     try:
         yield client
     finally:
+        print("REMOVE ME: BEFORE RESUME")
         blocking_server.resume()
         client.server = original_server
         client._flush()
         client.set_autoflush(True)
-
+        print("REMOVE ME: AFTER RESUME")
 
 def build_evaluation():
     dataset = [
@@ -114,7 +117,9 @@ async def test_evaluation_performance(client: WeaveClient):
     assert log == ["ensure_project_exists"]
 
     with paused_client(client) as client:
+        print("REMOVE ME: BEFORE EVALUATE")
         res = await evaluation.evaluate(predict)
+        print("REMOVE ME: AFTER EVALUATE")
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
         assert log == ["ensure_project_exists"]
