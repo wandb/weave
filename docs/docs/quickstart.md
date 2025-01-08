@@ -1,17 +1,31 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Track LLM inputs & outputs
+# Get started with Weave
 
-<!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
+In this quickstart guide, you’ll integrate Weave with the OpenAI API to analyze a sentence for mentions of dinosaurs and extract structured information about their names, common names, and diets.
 
-Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Before you begin, complete the [prerequisites](#prerequisites).
 
-## 1. Install Weave and create an API Key
+:::tip
+Do you want to test Weave without the setup? Try the Jupyter Notebook.
+<a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+:::
 
-**Install weave**
+## Prerequisites
 
-First install the weave library:
+### Create a W&B account
+
+[Sign up](https://app.wandb.ai/login?signup=true&_gl=1*1km3y5d*_ga*ODEyMjQ4MjkyLjE3MzE0MzU1NjU.*_ga_JH1SJHJQXJ*MTczNjM2ODMwMi4xNDIuMS4xNzM2MzY4NTczLjYwLjAuMA..*_ga_GMYDGNGKDT*MTczNjM2ODMwMi4xMDQuMS4xNzM2MzY4NTczLjAuMC4w*_gcl_au*OTI3ODM1OTcyLjE3MzE0MzU1NjUuMTgyNTg2NDA2LjE3MzYyMDQ5NDUuMTczNjIwNjI3Mw..) for a free W&B account.
+
+### Get your W&B API key
+
+1. Navigate to [https://wandb.ai/authorize](https://wandb.ai/authorize).
+2. Copy your API key.
+
+### Install Weave
+
+Install Weave locally:
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
@@ -26,25 +40,31 @@ First install the weave library:
   </TabItem>
 </Tabs>
 
-**Get your API key**
+## 1. Initialize a Weave project and log calls.
 
-Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your API key from https://wandb.ai/authorize
+Calls are the fundamental construct in Weave, and represent a single execution of a function. Call capture the following information from functions:
 
-## 2. Log a trace to a new project
+- Inputs (arguments)
+Outputs (return value)
+Metadata (duration, exceptions, LLM usage, etc.)
+Calls are similar to spans in the OpenTelemetry data model. A Call can:
 
-To get started with tracking your first project with Weave:
-
-- Import the `weave` library
-- Call `weave.init('project-name')` to start tracking
-  - You will be prompted to log in with your API key if you are not yet logged in on your machine.
-  - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
-  - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
-- Add the `@weave.op()` decorator to the python functions you want to track
-
-_In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
+Belong to a Trace (a collection of calls in the same execution context)
+Have parent and child Calls, forming a tree structure
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
+
+    1. Import the `weave` library.
+    2. Initalize a Weave project using `weave.init()`.
+    3. Decorate functions that you want to track in Weave with the `@weave.op()` decorator. 
+
+    In the following example, the `extract_dinos` function processes a sentence provided by the user and returns a JSON object with extracted dinosaur data. Once you run the function, Weave automatically begins tracking the function’s inputs, outputs, and execution details, and provides a link to visualize the trace in the Weave UI. The traces for this function are tracked in a Weave project called `'jurassic-park`.
+
+    :::important
+    To use the following code sample, add your [OpenAI API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+    :::
+
     ```python
     # highlight-next-line
     import weave
@@ -52,7 +72,7 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
 
     client = OpenAI()
 
-    # Weave will track the inputs, outputs and code of this function
+    # Weave tracks the inputs, outputs and code of this function
     # highlight-next-line
     @weave.op()
     def extract_dinos(sentence: str) -> dict:
@@ -74,7 +94,7 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
         return response.choices[0].message.content
 
 
-    # Initialise the weave project
+    # Initialise the Weave project
     # highlight-next-line
     weave.init('jurassic-park')
 
