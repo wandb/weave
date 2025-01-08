@@ -369,7 +369,7 @@ def populate_feedback(client: WeaveClient) -> None:
     for x in range(4):
         _, c = my_model.call(x)
         ids.append(c.id)
-        c.score(my_scorer)
+        c.apply_scorer(my_scorer)
 
     assert len(list(my_scorer.calls())) == 4
     assert len(list(my_model.calls())) == 4
