@@ -291,9 +291,10 @@ export const isObjDeleteError = (e: any): boolean => {
   if (e == null) {
     return false;
   }
-  const errorStr = String(e);
-  const regex = /Obj.* was deleted at .*/;
-  return regex.test(errorStr);
+  if ('deleted_at' in e) {
+    return true;
+  }
+  return false;
 };
 
 /// Hooks ///
