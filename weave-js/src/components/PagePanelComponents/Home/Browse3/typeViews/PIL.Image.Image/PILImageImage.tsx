@@ -6,10 +6,8 @@ import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
-  {'image.jpg': string; 'image.png': string}
+  {'image.jpg': string} | {'image.png': string}
 >;
-
-const DEFAULT_IMAGE_FILE_EXT = 'png';
 
 export const isPILImageImageType = (
   data: CustomWeaveTypePayload
@@ -24,17 +22,24 @@ export const PILImageImage: React.FC<{
 }> = props => {
   const {useFileContent} = useWFHooks();
 
-  const imageFileName = Object.keys(props.data.files)[0] as
-    | 'image.jpg'
-    | 'image.png';
-  const imageFileExt =
-    imageFileName.split('.').pop()?.toLowerCase() || DEFAULT_IMAGE_FILE_EXT;
+  const imageTypes = {
+    'image.jpg': 'jpg',
+    'image.png': 'png',
+  } as const;
+
+  const imageKey = Object.keys(props.data.files).find(
+    key => key in imageTypes
+  ) as keyof PILImageImageTypePayload['files'];
+  if (!imageKey) {
+    throw new Error('No image file found');
+  }
 
   const imageBinary = useFileContent(
     props.entity,
     props.project,
-    props.data.files[imageFileName]!
+    props.data.files[imageKey]
   );
+  const imageFileExt = imageTypes[imageKey as keyof typeof imageTypes];
 
   if (imageBinary.loading) {
     return <LoadingDots />;
