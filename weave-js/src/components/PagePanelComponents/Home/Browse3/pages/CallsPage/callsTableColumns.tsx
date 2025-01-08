@@ -407,10 +407,10 @@ function buildCallsTableColumns(
       c => {
         const parsed = parseScorerFeedbackType(c);
         const field = convertScorerFeedbackFieldToBackendFilter(c);
+        scoreGroup.children.push({
+          field,
+        });
         if (parsed === null) {
-          scoreGroup.children.push({
-            field,
-          });
           return {
             field,
             headerName: c,
@@ -426,28 +426,27 @@ function buildCallsTableColumns(
             },
           };
         }
-        const subGroup = {
-          groupId: 'scores.' + parsed.scorerName,
-          headerName: parsed.scorerName,
-          children: [
-            {
-              field,
-            },
-          ],
-        };
-        scoreGroup.children.push(subGroup);
         return {
           field,
-          headerName: parsed ? parsed.scorePath : `${c}`,
+          headerName: 'Scores.' + parsed.scorerName + '.' + parsed.scorePath,
           width: 150,
           renderHeader: () => {
-            return <div>{parsed.scorePath}</div>;
+            return <div>{parsed.scorerName + '.' + parsed.scorePath}</div>;
           },
           valueGetter: (unused: any, row: any) => {
             return row[c];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            return <CellValue value={params.value} />;
+            return (
+              <CellFilterWrapper
+                onAddFilter={onAddFilter}
+                field={field}
+                rowId={params.id.toString()}
+                operation={null}
+                value={params.value}>
+                <CellValue value={params.value} />
+              </CellFilterWrapper>
+            );
           },
         };
       }

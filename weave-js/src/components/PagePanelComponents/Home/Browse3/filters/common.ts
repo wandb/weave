@@ -12,6 +12,7 @@ import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseFeedbackType} from '../feedback/HumanFeedback/tsHumanFeedback';
+import {parseScorerFeedbackType} from '../feedback/HumanFeedback/tsScorerFeedback';
 import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
@@ -41,7 +42,7 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export const getFieldLabel = (field: string): string => {
-  if (field.startsWith('feedback.')) {
+  if (field.startsWith('summary.weave.feedback.wandb.annotation.')) {
     // Here the field is coming from convertFeedbackFieldToBackendFilter
     // so the field should start with 'feedback.' if feedback
     const parsed = parseFeedbackType(field);
@@ -49,6 +50,15 @@ export const getFieldLabel = (field: string): string => {
       return field;
     }
     return parsed.displayName;
+  }
+  if (field.startsWith('summary.weave.feedback.wandb.runnable.')) {
+    // Here the field is coming from convertScorerFeedbackFieldToBackendFilter
+    // so the field should start with 'feedback.' if feedback
+    const parsed = parseScorerFeedbackType(field);
+    if (parsed === null) {
+      return field;
+    }
+    return parsed.scorerName + '.' + parsed.scorePath;
   }
   return FIELD_LABELS[field] ?? field;
 };
