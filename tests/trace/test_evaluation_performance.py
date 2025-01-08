@@ -39,6 +39,7 @@ class BlockingTraceServer(tsi.TraceServerInterface):
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):
+            print("REMOVE ME: Executing blocked call " + item)
             with self.lock:
                 inner_attr = getattr(internal_trace_server, item)
                 result = inner_attr(*args, **kwargs)
