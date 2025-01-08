@@ -44,4 +44,4 @@ https://github.com/callowayproject/bump-my-version. Additional configuration can
 
 """
 
-VERSION = "0.51.1205"
+VERSION = "0.51.1206-dev0"
