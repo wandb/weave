@@ -43,6 +43,7 @@ import {
   TraceObjCreateReq,
   TraceObjCreateRes,
   TraceObjDeleteReq,
+  TraceObjDeleteRes,
   TraceObjQueryReq,
   TraceObjQueryRes,
   TraceObjReadReq,
@@ -233,10 +234,11 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
-  public objectDelete(
-    req: TraceObjDeleteReq
-  ): Promise<void | {detail: string}> {
-    return this.makeRequest<TraceObjDeleteReq, void>('/obj/delete', req);
+  public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+    return this.makeRequest<TraceObjDeleteReq, TraceObjDeleteRes>(
+      '/obj/delete',
+      req
+    );
   }
 
   public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {

@@ -15,6 +15,7 @@ import {
   TraceObjCreateReq,
   TraceObjCreateRes,
   TraceObjDeleteReq,
+  TraceObjDeleteRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
@@ -143,12 +144,10 @@ export class TraceServerClient extends CachingTraceServerClient {
     return res;
   }
 
-  public objectDelete(
-    req: TraceObjDeleteReq
-  ): Promise<number | {detail: string}> {
+  public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
     const res = super.objectDelete(req).then(r => {
-      if (r && typeof r !== 'number') {
-        throw new Error(JSON.stringify(r));
+      if ('detail' in r) {
+        throw new Error(r.detail);
       }
       this.onObjectListeners.forEach(listener => listener());
       return r;

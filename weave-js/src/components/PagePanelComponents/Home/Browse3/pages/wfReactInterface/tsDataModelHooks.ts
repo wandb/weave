@@ -1135,21 +1135,6 @@ const useObjectDeleteFunc = () => {
     refDataCache.del(ref);
   }, []);
 
-  const objectVersionDelete = useCallback(
-    (key: ObjectVersionKey) => {
-      updateObjectCaches(key);
-      return getTsClient().objectDelete({
-        project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
-        }),
-        object_id: key.objectId,
-        digests: [key.versionHash],
-      });
-    },
-    [getTsClient, updateObjectCaches]
-  );
-
   const objectVersionsDelete = useCallback(
     (entity: string, project: string, objectId: string, digests: string[]) => {
       digests.forEach(digest => {
@@ -1190,16 +1175,23 @@ const useObjectDeleteFunc = () => {
     [getTsClient, updateObjectCaches]
   );
 
-  const opVersionDelete = useCallback(
-    (key: OpVersionKey) => {
-      updateOpCaches(key);
+  const opVersionsDelete = useCallback(
+    (entity: string, project: string, opId: string, digests: string[]) => {
+      digests.forEach(digest => {
+        updateOpCaches({
+          entity,
+          project,
+          opId,
+          versionHash: digest,
+        });
+      });
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
-          entity: key.entity,
-          project: key.project,
+          entity,
+          project,
         }),
-        object_id: key.opId,
-        digests: [key.versionHash],
+        object_id: opId,
+        digests,
       });
     },
     [getTsClient, updateOpCaches]
@@ -1221,10 +1213,9 @@ const useObjectDeleteFunc = () => {
   );
 
   return {
-    objectVersionDelete,
-    objectDeleteAllVersions,
     objectVersionsDelete,
-    opVersionDelete,
+    objectDeleteAllVersions,
+    opVersionsDelete,
     opDeleteAllVersions,
   };
 };

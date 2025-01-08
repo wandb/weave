@@ -10,12 +10,14 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
+import {TraceObjDeleteRes} from '../wfReactInterface/traceServerClientTypes';
+
 const MAX_DELETE_ROWS_TO_SHOW = 10;
 
 interface DeleteModalProps {
   open: boolean;
   onClose: () => void;
-  onDelete: () => Promise<{detail: string} | void>;
+  onDelete: () => Promise<TraceObjDeleteRes>;
   deleteTitleStr: string;
   deleteBodyStrs?: string[];
   onSuccess?: () => void;

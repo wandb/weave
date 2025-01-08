@@ -258,7 +258,8 @@ export type TraceObjDeleteReq = {
 };
 
 export type TraceObjDeleteRes = {
-  num_deleted: number;
+  num_deleted?: number;
+  detail?: string;
 };
 
 export type TraceRefsReadBatchReq = {
