@@ -7,7 +7,7 @@ from typing import Any
 
 from weave.trace import object_preparers, serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
-from weave.trace.util import InvertableDict
+from weave.utils.invertable_dict import InvertableDict
 
 try:
     from PIL import Image
