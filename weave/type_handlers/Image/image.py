@@ -72,15 +72,13 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
-    for ext in pil_format_to_ext.values():
-        # Note: I am purposely ignoring the `name` here and hard-coding the filename.
-        # See comment on save.
-        try:
-            path = artifact.path(f"image.{ext}")
-        except FileNotFoundError:
-            continue
-        return Image.open(path)
-    raise FileNotFoundError(f"No image found in artifact {artifact}")
+    # Today, we assume there can only be 1 image in the artifact.
+    filename = next(iter(artifact.path_contents))
+    if not filename.startswith("image."):
+        raise ValueError(f"Expected filename to start with 'image.', got {filename}")
+
+    path = artifact.path(filename)
+    return Image.open(path)
 
 
 def register() -> None:
