@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from collections.abc import Iterator
-from typing import Any, Callable
+from typing import Any
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -18,7 +18,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.op import as_op, op
+from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
     UserSettings,
@@ -28,8 +28,8 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
-_global_postprocess_inputs: Callable[[Any], Any] | None = None
-_global_postprocess_output: Callable[[Any], Any] | None = None
+_global_postprocess_inputs: PostprocessInputsFunc | None = None
+_global_postprocess_output: PostprocessOutputFunc | None = None
 
 
 def init(
@@ -37,8 +37,8 @@ def init(
     *,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
-    global_postprocess_inputs: Callable[[Any], Any] | None = None,
-    global_postprocess_output: Callable[[Any], Any] | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
