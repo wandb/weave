@@ -1,4 +1,4 @@
-import {Leaderboard} from '../../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import {Leaderboard} from '../../../pages/wfReactInterface/generatedBuiltinObjectClasses.zod';
 
 export const ALL_VALUE = '*';
 

@@ -57,6 +57,7 @@ import {ReactComponent as ImportDatabaseArtifacts} from '../../assets/icons/icon
 import {ReactComponent as ImportDate} from '../../assets/icons/icon-date.svg';
 import {ReactComponent as ImportDelete} from '../../assets/icons/icon-delete.svg';
 import {ReactComponent as ImportDiamond} from '../../assets/icons/icon-diamond.svg';
+import {ReactComponent as ImportDiff} from '../../assets/icons/icon-diff.svg';
 import {ReactComponent as ImportDiscordSocial} from '../../assets/icons/icon-discord-social.svg';
 import {ReactComponent as ImportDockerWhale} from '../../assets/icons/icon-docker-whale.svg';
 import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document.svg';
@@ -452,6 +453,9 @@ export const IconDelete = (props: SVGIconProps) => (
 );
 export const IconDiamond = (props: SVGIconProps) => (
   <ImportDiamond {...updateIconProps(props)} />
+);
+export const IconDiff = (props: SVGIconProps) => (
+  <ImportDiff {...updateIconProps(props)} />
 );
 export const IconDiscordSocial = (props: SVGIconProps) => (
   <ImportDiscordSocial {...updateIconProps(props)} />
@@ -1145,6 +1149,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
+  diff: IconDiff,
   'discord-social': IconDiscordSocial,
   'docker-whale': IconDockerWhale,
   document: IconDocument,

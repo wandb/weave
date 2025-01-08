@@ -1,9 +1,9 @@
 ---
-title: Use the Service API to Log and Query Traces
+title: Service API
 ---
 
 
-:::note[This is a notebook]
+:::tip[This is a notebook]
 
 <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/weave_via_service_api.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
@@ -11,17 +11,21 @@ title: Use the Service API to Log and Query Traces
 
 :::
 
-<!--- @wandbcode{service-api-colab} -->
 
-In the following notebook, you will learn how to use the Weave Service API to log traces. Specifically, you will use the Service API to:
+
+<!--- @wandbcode{cod-notebook} -->
+
+# Use the Service API to Log and Query Traces
+
+In the following guide, you will learn how to use the Weave Service API to log traces. Specifically, you will use the Service API to:
 
 1. [Create a mock of a simple LLM call and response, and log it to Weave.](#simple-trace)
 2. [Create a mock of a more complex LLM call and response, and log it to Weave.](#complex-trace)
 3. [Run a sample lookup query on the logged traces.](#run-a-lookup-query)
 
-:::tip[View logged traces]
-You can view all of the Weave traces created when you run the code in this guide by going to the **Traces** tab in your Weave project (specified by `team_id\project_id`), and selecting the name of the trace.
-:::
+> **View logged traces**
+>
+> You can view all of the Weave traces created when you run the code in this guide by going to the **Traces** tab in your Weave project (specified by `team_id\project_id`), and selecting the name of the trace.
 
 Before beginning, complete the [prerequisites](#prerequisites-set-variables-and-endpoints)
 
@@ -43,6 +47,7 @@ Additionally, you must set the following variables:
 ```python
 import datetime
 import json
+
 import requests
 
 # Headers and URLs
@@ -52,9 +57,9 @@ url_end = "https://trace.wandb.ai/call/end"
 url_stream_query = "https://trace.wandb.ai/calls/stream_query"
 
 # W&B variables
-team_id=""
-project_id=""
-wandb_token=""
+team_id = ""
+project_id = ""
+wandb_token = ""
 ```
 
 ## Simple trace
@@ -79,30 +84,30 @@ Call started. ID: 01939cdc-38d2-7d61-940d-dcca0a56c575, Trace ID: 01939cdc-38d2-
 ## Start trace
 ## ------------
 payload_start = {
-  "start": {
-    "project_id": f"{team_id}/{project_id}",
-    "op_name": "simple_trace",
-    "started_at": datetime.datetime.now().isoformat(),
-    "inputs": {
-        # Use this "messages" style to generate the chat UI in the expanded trace.
-      "messages": [{"role":"user","content":"Why is the sky blue?"}],
-      "model": "gpt-4o"
-    },
-    "attributes": {},
-  }
+    "start": {
+        "project_id": f"{team_id}/{project_id}",
+        "op_name": "simple_trace",
+        "started_at": datetime.datetime.now().isoformat(),
+        "inputs": {
+            # Use this "messages" style to generate the chat UI in the expanded trace.
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}],
+            "model": "gpt-4o",
+        },
+        "attributes": {},
+    }
 }
 response = requests.post(
-  url_start, headers=headers, json=payload_start, auth=("api", wandb_token)
+    url_start, headers=headers, json=payload_start, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  data = response.json()
-  call_id = data.get("id")
-  trace_id = data.get("trace_id")
-  print(f"Call started. ID: {call_id}, Trace ID: {trace_id}")
+    data = response.json()
+    call_id = data.get("id")
+    trace_id = data.get("trace_id")
+    print(f"Call started. ID: {call_id}, Trace ID: {trace_id}")
 else:
-  print("Start request failed with status:", response.status_code)
-  print(response.text)
-  exit()
+    print("Start request failed with status:", response.status_code)
+    print(response.text)
+    exit()
 ```
 
 ### End a simple trace
@@ -121,37 +126,41 @@ Call ended.
 ## End trace
 ## ------------
 payload_end = {
-  "end": {
-    "project_id": f"{team_id}/{project_id}",
-    "id": call_id,
-    "ended_at": datetime.datetime.now().isoformat(),
-    "output": {
-      # Use this "choices" style to add the completion to the chat UI in the expanded trace.
-      "choices": [
-        {"message": {"content": "It’s due to Rayleigh scattering, where shorter blue wavelengths of sunlight scatter in all directions."}},
-      ]
-    },
-    # Format the summary like this to generate the pricing summary information in the traces table.
-    "summary": {
-      "usage": {
-        "gpt-4o": {
-          "prompt_tokens": 10,
-          "completion_tokens": 20,
-          "total_tokens": 30,
-          "requests": 1,
-        }
-      }
-    },
-  }
+    "end": {
+        "project_id": f"{team_id}/{project_id}",
+        "id": call_id,
+        "ended_at": datetime.datetime.now().isoformat(),
+        "output": {
+            # Use this "choices" style to add the completion to the chat UI in the expanded trace.
+            "choices": [
+                {
+                    "message": {
+                        "content": "It’s due to Rayleigh scattering, where shorter blue wavelengths of sunlight scatter in all directions."
+                    }
+                },
+            ]
+        },
+        # Format the summary like this to generate the pricing summary information in the traces table.
+        "summary": {
+            "usage": {
+                "gpt-4o": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                    "requests": 1,
+                }
+            }
+        },
+    }
 }
 response = requests.post(
-  url_end, headers=headers, json=payload_end, auth=("api", wandb_token)
+    url_end, headers=headers, json=payload_end, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  print("Call ended.")
+    print("Call ended.")
 else:
-  print("End request failed with status:", response.status_code)
-  print(response.text)
+    print("End request failed with status:", response.status_code)
+    print(response.text)
 ```
 
 ## Complex trace
@@ -182,28 +191,26 @@ Parent call started. ID: 01939d26-0844-7c43-94bb-cdc471b6d65f, Trace ID: 01939d2
 
 # Parent call: Start
 payload_parent_start = {
-  "start": {
-    "project_id": f"{team_id}/{project_id}",
-    "op_name": "complex_trace",
-    "started_at": datetime.datetime.now().isoformat(),
-    "inputs": {
-        "question": "Can you summarize the key points of this document?"
-    },
-    "attributes": {},
-  }
+    "start": {
+        "project_id": f"{team_id}/{project_id}",
+        "op_name": "complex_trace",
+        "started_at": datetime.datetime.now().isoformat(),
+        "inputs": {"question": "Can you summarize the key points of this document?"},
+        "attributes": {},
+    }
 }
 response = requests.post(
-  url_start, headers=headers, json=payload_parent_start, auth=("api", wandb_token)
+    url_start, headers=headers, json=payload_parent_start, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  data = response.json()
-  parent_call_id = data.get("id")
-  trace_id = data.get("trace_id")
-  print(f"Parent call started. ID: {parent_call_id}, Trace ID: {trace_id}")
+    data = response.json()
+    parent_call_id = data.get("id")
+    trace_id = data.get("trace_id")
+    print(f"Parent call started. ID: {parent_call_id}, Trace ID: {trace_id}")
 else:
-  print("Parent start request failed with status:", response.status_code)
-  print(response.text)
-  exit()
+    print("Parent start request failed with status:", response.status_code)
+    print(response.text)
+    exit()
 ```
 
 ### Add a child span to a complex trace: RAG document lookup
@@ -232,50 +239,50 @@ Child call ended.
 
 # Child call: Start
 payload_child_start = {
-  "start": {
-    "project_id": f"{team_id}/{project_id}",
-    "op_name": "rag_document_lookup",
-    "trace_id": trace_id,
-    "parent_id": parent_call_id,
-    "started_at": datetime.datetime.now().isoformat(),
-    "inputs": {
-      "document_search": "This is a search query of the documents I'm looking for."
-    },
-    "attributes": {},
-  }
+    "start": {
+        "project_id": f"{team_id}/{project_id}",
+        "op_name": "rag_document_lookup",
+        "trace_id": trace_id,
+        "parent_id": parent_call_id,
+        "started_at": datetime.datetime.now().isoformat(),
+        "inputs": {
+            "document_search": "This is a search query of the documents I'm looking for."
+        },
+        "attributes": {},
+    }
 }
 response = requests.post(
-  url_start, headers=headers, json=payload_child_start, auth=("api", wandb_token)
+    url_start, headers=headers, json=payload_child_start, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  data = response.json()
-  child_call_id = data.get("id")
-  print(f"Child call started. ID: {child_call_id}")
+    data = response.json()
+    child_call_id = data.get("id")
+    print(f"Child call started. ID: {child_call_id}")
 else:
-  print("Child start request failed with status:", response.status_code)
-  print(response.text)
-  exit()
+    print("Child start request failed with status:", response.status_code)
+    print(response.text)
+    exit()
 
 # Child call: End
 payload_child_end = {
-  "end": {
-    "project_id": f"{team_id}/{project_id}",
-    "id": child_call_id,
-    "ended_at": datetime.datetime.now().isoformat(),
-    "output": {
-      "document_results": "This will be the RAG'd document text which will be returned from the search query."
-    },
-    "summary": {},
-  }
+    "end": {
+        "project_id": f"{team_id}/{project_id}",
+        "id": child_call_id,
+        "ended_at": datetime.datetime.now().isoformat(),
+        "output": {
+            "document_results": "This will be the RAG'd document text which will be returned from the search query."
+        },
+        "summary": {},
+    }
 }
 response = requests.post(
-  url_end, headers=headers, json=payload_child_end, auth=("api", wandb_token)
+    url_end, headers=headers, json=payload_child_end, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  print("Child call ended.")
+    print("Child call ended.")
 else:
-  print("Child end request failed with status:", response.status_code)
-  print(response.text)
+    print("Child end request failed with status:", response.status_code)
+    print(response.text)
 ```
 
 ### Add a child span to a complex trace: LLM completion call
@@ -312,62 +319,67 @@ Child call ended.
 
 # Child call: Start
 payload_child_start = {
-  "start": {
-    "project_id": f"{team_id}/{project_id}",
-    "op_name": "llm_completion",
-    "trace_id": trace_id,
-    "parent_id": parent_call_id,
-    "started_at": datetime.datetime.now().isoformat(),
-    "inputs": {
-      "messages": [{"role":"user","content":"With the following document context, could you help me answer:\n Can you summarize the key points of this document?\n [+ appended document context]"}],
-      "model": "gpt-4o"
-    },
-    "attributes": {},
-  }
+    "start": {
+        "project_id": f"{team_id}/{project_id}",
+        "op_name": "llm_completion",
+        "trace_id": trace_id,
+        "parent_id": parent_call_id,
+        "started_at": datetime.datetime.now().isoformat(),
+        "inputs": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "With the following document context, could you help me answer:\n Can you summarize the key points of this document?\n [+ appended document context]",
+                }
+            ],
+            "model": "gpt-4o",
+        },
+        "attributes": {},
+    }
 }
 response = requests.post(
-  url_start, headers=headers, json=payload_child_start, auth=("api", wandb_token)
+    url_start, headers=headers, json=payload_child_start, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  data = response.json()
-  child_call_id = data.get("id")
-  print(f"Child call started. ID: {child_call_id}")
+    data = response.json()
+    child_call_id = data.get("id")
+    print(f"Child call started. ID: {child_call_id}")
 else:
-  print("Child start request failed with status:", response.status_code)
-  print(response.text)
-  exit()
+    print("Child start request failed with status:", response.status_code)
+    print(response.text)
+    exit()
 
 # Child call: End
 payload_child_end = {
-  "end": {
-    "project_id": f"{team_id}/{project_id}",
-    "id": child_call_id,
-    "ended_at": datetime.datetime.now().isoformat(),
-    "output": {
-      "choices": [
-        {"message": {"content": "This is the response generated by the LLM."}},
-      ]
-    },
-    "summary": {
-      "usage": {
-        "gpt-4o": {
-          "prompt_tokens": 10,
-          "completion_tokens": 20,
-          "total_tokens": 30,
-          "requests": 1,
-        }
-      }
-    },
-  }
+    "end": {
+        "project_id": f"{team_id}/{project_id}",
+        "id": child_call_id,
+        "ended_at": datetime.datetime.now().isoformat(),
+        "output": {
+            "choices": [
+                {"message": {"content": "This is the response generated by the LLM."}},
+            ]
+        },
+        "summary": {
+            "usage": {
+                "gpt-4o": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                    "requests": 1,
+                }
+            }
+        },
+    }
 }
 response = requests.post(
-  url_end, headers=headers, json=payload_child_end, auth=("api", wandb_token)
+    url_end, headers=headers, json=payload_child_end, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  print("Child call ended.")
+    print("Child call ended.")
 else:
-  print("Child end request failed with status:", response.status_code)
-  print(response.text)
+    print("Child end request failed with status:", response.status_code)
+    print(response.text)
 ```
 
 ### End a complex trace
@@ -397,35 +409,35 @@ Parent call ended.
 
 # Parent call: End
 payload_parent_end = {
-  "end": {
-    "project_id": f"{team_id}/{project_id}",
-    "id": parent_call_id,
-    "ended_at": datetime.datetime.now().isoformat(),
-    "output": {
-      "choices": [
-        {"message": {"content": "This is the response generated by the LLM."}},
-      ]
-    },
-    "summary": {
-      "usage": {
-        "gpt-4o": {
-          "prompt_tokens": 10,
-          "completion_tokens": 20,
-          "total_tokens": 30,
-          "requests": 1,
-        }
-      }
-    },
-  }
+    "end": {
+        "project_id": f"{team_id}/{project_id}",
+        "id": parent_call_id,
+        "ended_at": datetime.datetime.now().isoformat(),
+        "output": {
+            "choices": [
+                {"message": {"content": "This is the response generated by the LLM."}},
+            ]
+        },
+        "summary": {
+            "usage": {
+                "gpt-4o": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                    "requests": 1,
+                }
+            }
+        },
+    }
 }
 response = requests.post(
-  url_end, headers=headers, json=payload_parent_end, auth=("api", wandb_token)
+    url_end, headers=headers, json=payload_parent_end, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  print("Parent call ended.")
+    print("Parent call ended.")
 else:
-  print("Parent end request failed with status:", response.status_code)
-  print(response.text)
+    print("Parent end request failed with status:", response.status_code)
+    print(response.text)
 ```
 
 ## Run a lookup query
@@ -454,34 +466,29 @@ On a successful query, the response will include trace data matching the query p
 
 ```python
 query_payload = {
-  "project_id": f"{team_id}/{project_id}",
-  "filter": {"trace_roots_only": True},
-  "query": {
-    "$expr": {
-      "$eq": [
-        {"$getField": "inputs.model"},
-        {"$literal": "gpt-4o"}
-      ]
-    }
-  },
-  "limit": 10000,
-  "offset": 0,
-  "sort_by": [{"field": "started_at", "direction": "desc"}],
-  "include_feedback": False
+    "project_id": f"{team_id}/{project_id}",
+    "filter": {"trace_roots_only": True},
+    "query": {
+        "$expr": {"$eq": [{"$getField": "inputs.model"}, {"$literal": "gpt-4o"}]}
+    },
+    "limit": 10000,
+    "offset": 0,
+    "sort_by": [{"field": "started_at", "direction": "desc"}],
+    "include_feedback": False,
 }
 response = requests.post(
-  url_stream_query, headers=headers, json=query_payload, auth=("api", wandb_token)
+    url_stream_query, headers=headers, json=query_payload, auth=("api", wandb_token)
 )
 if response.status_code == 200:
-  print("Query successful!")
-  try:
-    data = response.json()
-    print(data)
-  except json.JSONDecodeError as e:
-    # Alternate decode
-    json_objects = response.text.strip().split("\n")
-    parsed_data = [json.loads(obj) for obj in json_objects]
-    print(parsed_data)
+    print("Query successful!")
+    try:
+        data = response.json()
+        print(data)
+    except json.JSONDecodeError as e:
+        # Alternate decode
+        json_objects = response.text.strip().split("\n")
+        parsed_data = [json.loads(obj) for obj in json_objects]
+        print(parsed_data)
 else:
     print(f"Query failed with status code: {response.status_code}")
     print(response.text)

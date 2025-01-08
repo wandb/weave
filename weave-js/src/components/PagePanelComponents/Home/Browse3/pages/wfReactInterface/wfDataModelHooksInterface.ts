@@ -14,7 +14,7 @@ import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
-import {ContentType} from './traceServerClientTypes';
+import {ContentType, TableUpdateSpec} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -214,6 +214,12 @@ export type WFDataModelHooksInterface = {
     expandedRefCols?: string[],
     includeFeedback?: boolean
   ) => Promise<Blob>;
+  useObjCreate: () => (
+    projectId: string,
+    objectId: string,
+    val: any,
+    baseObjectClass?: string
+  ) => Promise<string>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -270,6 +276,11 @@ export type WFDataModelHooksInterface = {
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]
   ) => LoadableWithError<any[] | null> & Refetchable;
+  useTableUpdate: () => (
+    projectId: string,
+    baseDigest: string,
+    updates: traceServerClientTypes.TableUpdateSpec[]
+  ) => Promise<traceServerClientTypes.TableUpdateRes>;
   usePermanentlyDeleteAllDataInProject: (
     entity: string,
     project: string

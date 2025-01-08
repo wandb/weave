@@ -67,12 +67,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         size="small"
         startIcon="pencil-edit"
         onClick={() => {
-          setEditorHeight(
-            contentRef?.current?.clientHeight
-              ? // Accounts for padding and save buttons
-                contentRef.current.clientHeight - 56
-              : null
-          );
+          setEditorHeight(contentRef?.current?.clientHeight ?? null);
         }}
         tooltip={
           !hasContent ? 'We currently do not support editing functions' : 'Edit'

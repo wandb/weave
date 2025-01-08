@@ -32,6 +32,7 @@ def lite_llm_completion(
 
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
+
     try:
         res = litellm.completion(
             **inputs.model_dump(exclude_none=True),

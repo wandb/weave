@@ -64,7 +64,7 @@ def main(
             )
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     with open(full_path, "w") as f:
-        json.dump(providers, f)
+        json.dump(providers, f, indent=2)
     print(
         f"Updated model to model provider info file at: {full_path}. {len(providers)} models updated."
     )

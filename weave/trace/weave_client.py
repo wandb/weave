@@ -38,7 +38,7 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
@@ -1648,7 +1648,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if k in REDACT_KEYS:
+            if should_redact(k):
                 dict_res[k] = REDACTED_VALUE
             else:
                 dict_res[k] = redact_sensitive_keys(v)

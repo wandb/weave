@@ -476,6 +476,19 @@ class ObjQueryReq(BaseModel):
     )
 
 
+class ObjDeleteReq(BaseModel):
+    project_id: str
+    object_id: str
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the object will be deleted.",
+    )
+
+
+class ObjDeleteRes(BaseModel):
+    num_deleted: int
+
+
 class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
@@ -914,6 +927,7 @@ class TraceServerInterface(Protocol):
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
