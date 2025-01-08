@@ -66,6 +66,7 @@ def paused_client(client: WeaveClient) -> Generator[WeaveClient, None, None]:
         client.set_autoflush(True)
         print("REMOVE ME: AFTER RESUME")
 
+
 def build_evaluation():
     dataset = [
         {
@@ -122,6 +123,8 @@ async def test_evaluation_performance(client: WeaveClient):
         print("REMOVE ME: AFTER EVALUATE")
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+        print("REMOVE ME: AFTER LOG")
+        print(log)
         assert log == ["ensure_project_exists"]
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
