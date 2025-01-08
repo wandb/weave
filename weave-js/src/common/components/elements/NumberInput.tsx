@@ -6,17 +6,18 @@ import clamp from '../../util/clamp';
 
 interface NumberInputProps {
   className?: string;
-  value?: number;
-  placeholder?: string;
-  disabled?: boolean;
-  stepper?: boolean;
-  ticks?: number[];
-  min?: number;
-  max?: number;
   containerStyle?: React.CSSProperties;
+  disabled?: boolean;
   inputStyle?: React.CSSProperties;
-  strideLength?: number;
+  max?: number;
+  min?: number;
+  name?: string;
   onChange: (newVal?: number) => void;
+  placeholder?: string;
+  stepper?: boolean;
+  strideLength?: number;
+  ticks?: number[];
+  value?: number;
 }
 
 const NumberInput: React.FC<NumberInputProps> = props => {
@@ -79,6 +80,7 @@ const NumberInput: React.FC<NumberInputProps> = props => {
   return (
     <div className="number-input__container" style={props.containerStyle}>
       <Input
+        aria-label={props.name}
         style={props.inputStyle}
         className={`number-input__input ${props.className || ''}`}
         type="number"
