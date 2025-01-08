@@ -25,14 +25,14 @@ Here’s a complete list of available environment variables for Weave, along wit
 | WEAVE_CAPTURE_CODE      | `False`                       | Disable code capture for `weave.op`.                                   |
 | WEAVE_DEBUG_HTTP        | 1                             | If set to `1`, turns on HTTP request and response logging for debugging. |
 | WEAVE_DISABLED          | `True`                        | If set to `True`, `weave.op` will behave like regular functions.      |
-| WEAVE_PARALLELISM       | `20`                          | In evaluations, the number of examples to evaluate in parallel. `1` runs examples sequentially.    |
+| WEAVE_PARALLELISM       | `20`                          | In evaluations, the number of examples to evaluate in parallel. `1` runs examples sequentially, while `0` will effectively execute all background operations immediately in the main thread.    |
 | WEAVE_PRINT_CALL_LINK   | `False`                       | Suppress the printing of call URLs.                            |
 | WEAVE_TRACE_LANGCHAIN   | `False`                       |                                                                 |
-| WF_CLICKHOUSE_HOST      |                              |                                                                 |
-| WF_CLICKHOUSE_PORT      |                              |                                                                 |
-| WF_CLICKHOUSE_USER      |                              |                                                                 |
-| WF_CLICKHOUSE_PASS      |                              |                                                                 |
-| WF_CLICKHOUSE_DATABASE  |                              |                                                                 |
+| WF_CLICKHOUSE_HOST      | `localhost`                  | The host of the clickhouse server.                                                                |
+| WF_CLICKHOUSE_PORT      | `8123`                       | The port of the clickhouse server.                                                                |
+| WF_CLICKHOUSE_USER      | `default`                             | The user of the clickhouse server.                                                                |
+| WF_CLICKHOUSE_PASS      | `""`                             | The password for the clickhouse server                                                                |
+| WF_CLICKHOUSE_DATABASE  | `default`                             | The name of the clickhouse database.                                                                |
 | WF_TRACE_SERVER_URL     | `http://127.0.0.1:6345`        | The default Weave trace server URL. For development purposes, use .`wandb.test` backend.         |
 
 
