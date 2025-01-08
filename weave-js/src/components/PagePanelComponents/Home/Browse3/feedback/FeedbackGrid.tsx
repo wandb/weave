@@ -50,10 +50,9 @@ export const FeedbackGrid = ({
   // Group by feedback on this object vs. descendent objects
   const grouped = useMemo(() => {
     // Exclude runnables as they are presented in a different tab
-    const withoutRunnables = (query.result ?? [])
-    // .filter(
-    //   f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
-    // );
+    const withoutRunnables = (query.result ?? []).filter(
+      f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+    );
     // Combine annotation feedback on (feedback_type, creator)
     const combined = _.groupBy(
       withoutRunnables.filter(f =>
