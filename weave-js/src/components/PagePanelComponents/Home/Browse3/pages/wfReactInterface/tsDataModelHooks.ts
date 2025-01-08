@@ -1579,13 +1579,19 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
   return finalRes;
 };
 
-const permanentlyDeleteAllDataInProject =
-  (entity: string, project: string) => () => {
-    const getTsClient = useGetTraceServerClientContext();
-    const projectId = projectIdFromParts({entity, project});
+const usePermanentlyDeleteAllDataInProject = (
+  entity: string,
+  project: string
+): (() => Promise<traceServerTypes.PermanentlyDeleteProjectRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const projectId = projectIdFromParts({entity, project});
 
-    return getTsClient().permanentlyDeleteProject({project_id: projectId});
-  };
+  const permanentlyDeleteProject = useCallback(
+    () => getTsClient().permanentlyDeleteProject({project_id: projectId}),
+    [getTsClient, projectId]
+  );
+  return permanentlyDeleteProject;
+};
 
 /// Converters ///
 type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
@@ -1746,7 +1752,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useFileContent,
   useTableRowsQuery,
   useTableQueryStats,
-  permanentlyDeleteAllDataInProject,
+  usePermanentlyDeleteAllDataInProject,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

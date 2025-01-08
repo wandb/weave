@@ -28,7 +28,6 @@ import {
   FeedbackQueryReq,
   FeedbackQueryRes,
   PermanentlyDeleteProjectReq,
-  PermanentlyDeleteProjectReq,
   PermanentlyDeleteProjectRes,
   TraceCallReadReq,
   TraceCallReadRes,

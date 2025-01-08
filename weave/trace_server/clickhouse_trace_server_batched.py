@@ -1532,6 +1532,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for table in tables_to_purge:
             query = self._make_purge_query(table)
             parameters = {"project_id": req.project_id}
+            logger.info(
+                f"PURGING table: {table}",
+                extra={"query": query, "parameters": parameters},
+            )
             self.ch_client.query(query, parameters)
 
         return tsi.PermanentlyDeleteProjectRes()

@@ -87,5 +87,8 @@ export const usePermanentlyDeleteAllDataInProject = (
   entity: string,
   project: string
 ) => {
-  return tsWFDataModelHooks.permanentlyDeleteAllDataInProject(entity, project);
+  return tsWFDataModelHooks.usePermanentlyDeleteAllDataInProject(
+    entity,
+    project
+  );
 };
