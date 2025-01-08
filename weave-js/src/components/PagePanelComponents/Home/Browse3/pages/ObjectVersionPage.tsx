@@ -9,6 +9,7 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
 import {useClosePeek} from '../context';
+import {DatasetVersionPage} from '../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -30,13 +31,13 @@ import {
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabPrompt} from './TabPrompt';
-import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
 import {TabUsePrompt} from './TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
+  isObjDeleteError,
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
 } from './wfReactInterface/utilities';
@@ -97,8 +98,9 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.error) {
-    return <NotFoundPanel title={objectVersion.error.message} />;
+  if (isObjDeleteError(objectVersion.error)) {
+    const deletedAtMessage = objectVersion.error?.message ?? 'Object deleted';
+    return <NotFoundPanel title={deletedAtMessage} />;
   } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
@@ -203,6 +205,10 @@ const ObjectVersionPageInner: React.FC<{
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
+  }
+
+  if (isDataset) {
+    return <DatasetVersionPage objectVersion={objectVersion} />;
   }
 
   return (
@@ -331,9 +337,9 @@ const ObjectVersionPageInner: React.FC<{
             ]
           : []),
         {
-          label: isDataset ? 'Rows' : 'Values',
+          label: 'Values',
           content: (
-            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
+            <ScrollableTabContent>
               <Box
                 sx={{
                   flex: '0 0 auto',
@@ -370,12 +376,6 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
-                  />
-                ) : baseObjectClass === 'Dataset' ? (
-                  <TabUseDataset
-                    name={objectName}
-                    uri={refUri}
-                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel
