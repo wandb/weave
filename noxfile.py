@@ -105,8 +105,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
-        "--asyncio-mode=auto",
-        "--timeout=30",
+        "--timeout 30",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
