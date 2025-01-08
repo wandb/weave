@@ -869,6 +869,7 @@ class WeaveClient:
         else:
             postprocessed_output = original_output
         self._save_nested_objects(postprocessed_output)
+        output_as_refs = map_to_refs(postprocessed_output)
         call.output = postprocessed_output
 
         # Summary handling
@@ -924,7 +925,6 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_as_refs = map_to_refs(postprocessed_output)
             output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
