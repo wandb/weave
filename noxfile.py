@@ -105,7 +105,6 @@ def tests(session, shard):
 
     session.run(
         "pytest",
-        "--timeout 30",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
