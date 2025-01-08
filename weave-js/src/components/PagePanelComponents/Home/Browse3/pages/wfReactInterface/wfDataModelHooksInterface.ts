@@ -275,7 +275,7 @@ export type WFDataModelHooksInterface = {
   useFeedback: (
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]
-  ) => LoadableWithError<any[] | null> & Refetchable;
+  ) => LoadableWithError<traceServerClientTypes.Feedback[] | null> & Refetchable;
   useTableUpdate: () => (
     projectId: string,
     baseDigest: string,
