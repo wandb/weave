@@ -146,9 +146,6 @@ export class TraceServerClient extends CachingTraceServerClient {
 
   public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
     const res = super.objectDelete(req).then(r => {
-      if ('detail' in r) {
-        throw new Error(r.detail);
-      }
       this.onObjectListeners.forEach(listener => listener());
       return r;
     });
