@@ -24,8 +24,6 @@ export interface SliderInputProps {
   ticks?: number[];
   disabled?: boolean;
   strideLength?: number;
-  // if true, the slider will be restricted to props.max, but the input will be unbounded (https://wandb.atlassian.net/browse/WB-5666)
-  allowGreaterThanMax?: boolean;
   onChange(value: number): void;
 }
 
@@ -47,7 +45,6 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     ticks,
     disabled,
     strideLength,
-    allowGreaterThanMax,
     onChange,
   }) => {
     const [sliderValue, setSliderValue] = React.useState(value ?? 0);
@@ -71,19 +68,11 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         if (newVal == null || !_.isFinite(newVal)) {
           return;
         }
-        if (newVal > max && !allowGreaterThanMax) {
-          newVal = max;
-        }
-        if (newVal < min) {
-          newVal = min;
-        }
-        if (ticks != null) {
-          newVal = getClosestTick(ticks, newVal);
-        }
+        newVal = getClosestTick(newVal, sliderValue, min, max, ticks);
         setSliderValue(newVal);
         onChangeDebounced(newVal);
       },
-      [ticks, min, max, allowGreaterThanMax, onChangeDebounced]
+      [ticks, min, max, sliderValue, onChangeDebounced]
     );
 
     React.useEffect(() => {
@@ -138,7 +127,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
           strideLength={strideLength}
           disabled={disabled ?? false}
           min={min}
-          max={allowGreaterThanMax ? undefined : max}
+          max={max}
           value={value}
           ticks={ticks}
           onChange={update}
@@ -172,17 +161,54 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
 
 export default SliderInput;
 
-function getClosestTick(ticks: number[], val: number): number {
+export function getClosestTick(
+  val: number,
+  prev: number,
+  min: number,
+  max: number,
+  ticks?: number[]
+): number {
+  // if min/max not in ticks, allow coercion to nearest value
+  if (val > max) {
+    return max;
+  }
+  if (val < min) {
+    return min;
+  }
+  if (ticks === null || ticks === undefined) {
+    return val;
+  }
+
   let closest = val;
+  const increasing = val > prev;
   let minDiff = Number.MAX_VALUE;
 
-  for (const tick of ticks) {
+  // Binary search for the closest tick
+  let left = 0;
+  let right = ticks.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const tick = ticks[mid];
     const diff = Math.abs(tick - val);
-    if (diff >= minDiff) {
-      break;
+
+    // Only update closest if the tick is in the right direction
+    if (
+      diff < minDiff &&
+      ((increasing && tick >= val) || (!increasing && tick <= val))
+    ) {
+      closest = tick;
+      if (closest === val) {
+        break;
+      }
+      minDiff = diff;
     }
-    closest = tick;
-    minDiff = diff;
+
+    if (tick < val) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
   }
 
   return closest;
