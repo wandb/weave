@@ -28,7 +28,7 @@ export type Loadable<T> = {
 export type LoadableWithError<T> = {
   loading: boolean;
   result: T | null;
-  error: Error | null;
+  error: Error | {reason: string} | null;
 };
 
 export type CallKey = {
