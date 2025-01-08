@@ -462,8 +462,34 @@ class Call:
         self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
     ) -> ApplyScorerResult:
         """
-        Before making this public, we should refactor such that the `predict_and_score` method
-        inside `eval.py` uses this method inside the scorer block.
+        `apply_scorer` is a method that applies a Scorer to a Call. This is useful
+        for guarding application logic with a scorer and/or monitoring the quality
+        of critical ops. Scorers are automatically logged to Weave as Feedback and
+        can be used in queries & analysis.
+
+        Args:
+            scorer: The Scorer to apply.
+            additional_scorer_kwargs: Additional kwargs to pass to the scorer. This is
+                useful for passing in additional context that is not part of the call
+                inputs.useful for passing in additional context that is not part of the call
+                inputs.
+
+        Returns:
+            The result of the scorer application in the form of an `ApplyScorerResult`.
+
+        ```python
+        class ApplyScorerSuccess:
+            result: Any
+            score_call: Call
+        ```
+
+        Example usage:
+
+        ```python
+        my_scorer = ... # construct a scorer
+        prediction, prediction_call = my_op.call(input_data)
+        result, score_call = prediction.apply_scorer(my_scorer)
+        ```
         """
         from weave.scorers.base_scorer import Scorer, apply_scorer_async
 
