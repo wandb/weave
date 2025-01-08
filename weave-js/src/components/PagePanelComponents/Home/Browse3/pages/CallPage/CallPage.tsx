@@ -24,7 +24,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
-import { ScorerFeedbackGrid } from '../../feedback/ScorerFeedbackGrid';
+import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
 import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';

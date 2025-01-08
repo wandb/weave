@@ -1,19 +1,16 @@
-import {
-  GridColDef,
-  GridRowHeightParams,
-} from '@mui/x-data-grid-pro';
-import { isWeaveObjectRef, parseRefMaybe } from '@wandb/weave/react';
+import {Box} from '@mui/material';
+import {GridColDef, GridRowHeightParams} from '@mui/x-data-grid-pro';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import React from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
-import { CellValue } from '../../Browse2/CellValue';
-import { SmallRef } from '../../Browse2/SmallRef';
-import { CallRefLink } from '../pages/common/Links';
+import {CellValue} from '../../Browse2/CellValue';
+import {SmallRef} from '../../Browse2/SmallRef';
+import {CallRefLink} from '../pages/common/Links';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
-import { Box } from '@mui/material';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -31,26 +28,27 @@ export const ScoresFeedbackGridInner = ({
    * While some of the code is duplicated, it is kept separate to make it easier
    * to modify in the future.
    */
-  const columns: GridColDef<Feedback>[] = [
+  const columns: Array<GridColDef<Feedback>> = [
     {
       field: 'runnable_ref',
       headerName: 'Scorer',
       display: 'flex',
       flex: 1,
-      renderCell: params => 
-        {
-            const runnable_ref = params.row.runnable_ref
+      renderCell: params => {
+        const runnable_ref = params.row.runnable_ref;
         if (!runnable_ref) {
           return null;
         }
-        const objRef = parseRefMaybe(runnable_ref)
+        const objRef = parseRefMaybe(runnable_ref);
         if (!objRef) {
           return null;
         }
-        return <div className="overflow-hidden">
-          <SmallRef objRef={objRef} />
-        </div>}
-      ,
+        return (
+          <div className="overflow-hidden">
+            <SmallRef objRef={objRef} />
+          </div>
+        );
+      },
     },
     {
       field: 'payload',
@@ -58,37 +56,44 @@ export const ScoresFeedbackGridInner = ({
       sortable: false,
       flex: 1,
       renderCell: params => {
-        const value = params.row.payload.output
-        return           <Box
-        sx={{
-          width: '100%',
-          display: 'flex',
-          height: '100%',
-          lineHeight: '20px',
-          alignItems: 'center',
-        }}><CellValue value={value} /></Box>;
+        const value = params.row.payload.output;
+        return (
+          <Box
+            sx={{
+              width: '100%',
+              display: 'flex',
+              height: '100%',
+              lineHeight: '20px',
+              alignItems: 'center',
+            }}>
+            <CellValue value={value} />
+          </Box>
+        );
       },
     },
     {
-        field: 'call_ref',
-        headerName: 'Score Call',
-        display: 'flex',
-        renderCell: params =>  {
-            const call_ref = params.row.call_ref
+      field: 'call_ref',
+      headerName: 'Score Call',
+      display: 'flex',
+      renderCell: params => {
+        const call_ref = params.row.call_ref;
         if (!call_ref) {
           return null;
         }
-        const objRef = parseRefMaybe(call_ref)
+        const objRef = parseRefMaybe(call_ref);
         if (!objRef) {
           return null;
         }
         if (!isWeaveObjectRef(objRef)) {
           return null;
         }
-        return <div className="overflow-hidden">
-          <CallRefLink callRef={objRef} />
-        </div>}
+        return (
+          <div className="overflow-hidden">
+            <CallRefLink callRef={objRef} />
+          </div>
+        );
       },
+    },
     {
       field: 'created_at',
       headerName: 'Timestamp',

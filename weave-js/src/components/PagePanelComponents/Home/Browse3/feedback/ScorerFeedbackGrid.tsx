@@ -10,9 +10,8 @@ import {Tailwind} from '../../../../Tailwind';
 import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
-import { ScoresFeedbackGridInner } from './ScoresFeedbackGridInner';
-import { RUNNABLE_FEEDBACK_TYPE_PREFIX } from './StructuredFeedback/runnableFeedbackTypes';
-
+import {ScoresFeedbackGridInner} from './ScoresFeedbackGridInner';
+import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
 
 type FeedbackGridProps = {
   entity: string;
@@ -50,8 +49,8 @@ export const ScorerFeedbackGrid = ({
   // Group by feedback on this object vs. descendent objects
   const grouped = useMemo(() => {
     // Exclude runnables as they are presented in a different tab
-    const onlyRunnables = (query.result ?? []).filter(
-      f => f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
+    const onlyRunnables = (query.result ?? []).filter(f =>
+      f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
     );
 
     // Group by feedback on this object vs. descendent objects

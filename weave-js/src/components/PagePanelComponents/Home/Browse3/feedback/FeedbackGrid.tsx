@@ -12,8 +12,7 @@ import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
 import {FeedbackGridInner} from './FeedbackGridInner';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
-import { RUNNABLE_FEEDBACK_TYPE_PREFIX } from './StructuredFeedback/runnableFeedbackTypes';
-
+import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
@@ -63,7 +62,11 @@ export const FeedbackGrid = ({
     );
     // only keep the most recent feedback for each (feedback_type, creator)
     const combinedFiltered = Object.values(combined).map(
-      fs => fs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+      fs =>
+        fs.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
     );
     // add the non-annotation feedback to the combined object
     combinedFiltered.push(

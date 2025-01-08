@@ -4,6 +4,7 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
+import {WeaveObjectRef} from '@wandb/weave/react';
 import React from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
@@ -21,7 +22,6 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {Id} from './Id';
-import { WeaveObjectRef } from '@wandb/weave/react';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -273,18 +273,17 @@ export const OpVersionLink: React.FC<{
   );
 };
 
-
 export const CallRefLink: React.FC<{
   callRef: WeaveObjectRef;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
-  const callId = props.callRef.artifactName
+  const callId = props.callRef.artifactName;
   const to = peekingRouter.callUIUrl(
     props.callRef.entityName,
     props.callRef.projectName,
     '',
-    callId,
+    callId
   );
   const onClick = () => {
     history.push(to);
@@ -295,8 +294,7 @@ export const CallRefLink: React.FC<{
   }
 
   return (
-    <LinkWrapper
-      onClick={onClick}>
+    <LinkWrapper onClick={onClick}>
       <LinkTruncater>
         <Link
           to={to}
