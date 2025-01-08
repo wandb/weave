@@ -40,9 +40,12 @@ def require_base64(s: str) -> str:
 
 
 def require_internal_ref_uri(s: str, refClass: Optional[type] = None) -> str:
-    if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
+    if not s.startswith(
+        f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"
+    ) and not s.startswith(f"{refs_internal.ARTIFACT_REF_SCHEME}:///"):
         raise CHValidationError(
-            f"Invalid ref: {s}. Must start with {refs_internal.WEAVE_INTERNAL_SCHEME}:///"
+            f"Invalid ref: {s}. Must start with {refs_internal.WEAVE_INTERNAL_SCHEME}:/// "
+            f"or {refs_internal.ARTIFACT_REF_SCHEME}:///"
         )
 
     parsed = refs_internal.parse_internal_uri(s)
