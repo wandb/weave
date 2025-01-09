@@ -44,7 +44,6 @@ export const EvaluationModelLink: React.FC<{
 }> = props => {
   const {useObjectVersion} = useWFHooks();
   const evaluationCall = props.state.summary.evaluationCalls[props.callId];
-  const modelObj = props.state.summary.models[evaluationCall.modelRef];
   const objRef = useMemo(() => {
     return parseRef(evaluationCall.modelRef) as WeaveObjectRef;
   }, [evaluationCall.modelRef]);
