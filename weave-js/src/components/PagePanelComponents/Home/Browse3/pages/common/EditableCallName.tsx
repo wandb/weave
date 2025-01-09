@@ -4,6 +4,8 @@ import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {opNiceName} from './Links';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Icon} from '@wandb/weave/components/Icon';
 
 export const EditableCallName: React.FC<{
   call: CallSchema;
@@ -25,6 +27,8 @@ export const EditableCallName: React.FC<{
 
   // 1) Create a ref so we can manually call adjustHeight().
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  // Add containerRef to track clicks outside
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setCurrNameToDisplay(nameToDisplay);
@@ -67,37 +71,66 @@ export const EditableCallName: React.FC<{
     [defaultDisplayName, call, displayNameIsEmpty, callRename]
   );
 
+  // Add click outside handler
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        saveName(currNameToDisplay);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditing, saveName, currNameToDisplay]);
+
   if (!isEditing) {
     return (
-      <div
-        className="cursor-pointer hover:bg-moon-100 dark:hover:bg-moon-800 px-2 py-1 rounded"
-        onClick={() => setIsEditing(true)}>
-        {currNameToDisplay}
-      </div>
+      <Tailwind>
+        <div
+          className="group flex cursor-pointer items-center px-[8px] py-[4px] rounded hover:bg-moon-100 dark:hover:bg-moon-800"
+          onClick={() => setIsEditing(true)}>
+          {currNameToDisplay}
+          <Icon 
+            name="pencil-edit" 
+            width={16} 
+            height={16}
+            className="ml-[8px] min-w-[16px] opacity-0 group-hover:opacity-100 text-moon-500"
+          />
+        </div>
+      </Tailwind>
     );
   }
 
   return (
-    <div className='w-full'>
-      <StyledTextArea
-        ref={textAreaRef}
-        value={currNameToDisplay}
-        onChange={e => setCurrNameToDisplay(e.target.value)}
-        onBlur={() => saveName(currNameToDisplay)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            saveName(currNameToDisplay);
-          } else if (e.key === 'Escape') {
-            setIsEditing(false);
-            setCurrNameToDisplay(nameToDisplay);
-          }
-        }}
-        placeholder={defaultDisplayName}
-        autoGrow={true}
-        rows={1}
-        className='w-full'
-      />
-    </div>
+    <Tailwind>
+      <div className='w-full' ref={containerRef}>
+        <StyledTextArea
+          ref={textAreaRef}
+          value={currNameToDisplay}
+          onChange={e => setCurrNameToDisplay(e.target.value)}
+          onBlur={() => saveName(currNameToDisplay)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              saveName(currNameToDisplay);
+            } else if (e.key === 'Escape') {
+              setIsEditing(false);
+              setCurrNameToDisplay(nameToDisplay);
+            }
+          }}
+          placeholder={defaultDisplayName}
+          autoGrow={true}
+          rows={1}
+          className='w-full px-[8px] py-[4px]'
+        />
+      </div>
+    </Tailwind>
   );
 };
