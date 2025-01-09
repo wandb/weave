@@ -22,7 +22,7 @@ Check out the [RAG++ course](https://www.wandb.courses/courses/rag-in-production
 
 First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -69,7 +69,7 @@ First, we compute the embeddings for our articles. You would typically do this o
 
 Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -149,7 +149,7 @@ When there aren't simple ways to evaluate your application, one approach is to u
 
 As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -221,7 +221,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 3. _Optional:_ Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
    - this function has to have a `@weave.op()` decorator.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from weave.scorers import Scorer
@@ -301,7 +301,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 
 To use this as a scorer, you would initialize it and pass it to `scorers` argument in your `Evaluation like this:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
@@ -328,7 +328,7 @@ To get the same result for your RAG apps:
 
 Here, we show the code in it's entirety.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
