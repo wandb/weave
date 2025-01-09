@@ -381,21 +381,20 @@ def test_get_calls_complete(client):
     )
 
     # use all the parameters to get_calls
-    result = list(
+    client_result = list(
         client.get_calls(
             filter=weave_client.CallsFilter(op_names=[call1.op_name]),
             limit=1,
             offset=0,
             query=query,
             sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
-            include_costs=True,
             include_feedback=True,
             columns=["inputs.dataset.rows"],
         )
     )
-    assert len(result) == 1
-    assert result[0].inputs["b"] == 11
-    assert result[0].inputs["dataset"].rows == [{"a": 1}, {"a": 2}, {"a": 3}]
+    assert len(client_result) == 1
+    assert client_result[0].inputs["b"] == 11
+    assert client_result[0].inputs["dataset"].rows == [{"a": 1}, {"a": 2}, {"a": 3}]
 
     # what should be an identical query using the trace_server interface
     server_result = list(
@@ -407,14 +406,13 @@ def test_get_calls_complete(client):
                 offset=0,
                 query=query,
                 sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
-                include_costs=True,
                 include_feedback=True,
                 columns=["inputs.dataset"],
                 expand_columns=["inputs.dataset"],
             )
         ).calls
     )
-    for call1, call2 in zip(result, server_result):
+    for call1, call2 in zip(client_result, server_result):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
@@ -428,7 +426,7 @@ def test_get_calls_complete(client):
         assert call1.inputs["s"] == call2.inputs["s"]
 
     # add a simple query
-    result = list(
+    client_result = list(
         client.get_calls(
             sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
             query=query,
@@ -449,7 +447,7 @@ def test_get_calls_complete(client):
             )
         ).calls
     )
-    for call1, call2 in zip(result, server_result):
+    for call1, call2 in zip(client_result, server_result):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
