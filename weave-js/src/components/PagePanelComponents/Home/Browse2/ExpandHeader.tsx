@@ -39,7 +39,7 @@ export const ExpandHeader = ({
           trigger={
             <Button
               className="ml-4"
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-next"
               onClick={onClick}
