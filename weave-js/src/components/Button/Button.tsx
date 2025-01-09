@@ -124,7 +124,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'bg-transparent': isGhost,
               'text-moon-600 dark:text-moon-400': isGhost,
               'hover:bg-oblivion/[0.07] hover:text-moon-800 dark:hover:bg-moonbeam/[0.09] dark:hover:text-moon-200':
-                isGhost,
+                isGhost && !active,
 
               // secondary or ghost
               'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':

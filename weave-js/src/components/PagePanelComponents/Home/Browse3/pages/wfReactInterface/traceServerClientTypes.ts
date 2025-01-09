@@ -165,6 +165,7 @@ export type FeedbackQueryReq = {
 
 export type Feedback = {
   id: string;
+  project_id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
   creator: string | null; // display name
