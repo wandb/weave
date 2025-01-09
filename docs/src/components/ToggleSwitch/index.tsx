@@ -12,6 +12,13 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
   });
 
   useEffect(() => {
+    // Initial sync with URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const currentLanguage = params.get('programming-language') as 'python' | 'typescript';
+    if (currentLanguage && currentLanguage !== activeButton) {
+      setActiveButton(currentLanguage);
+    }
+
     // Add mutation observer to watch for tab changes
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -23,13 +30,11 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
 
             if (isPython) {
               setActiveButton('python');
-              // Update parameter name to match tabs
               const url = new URL(window.location.href);
               url.searchParams.set('programming-language', 'python');
               window.history.pushState({}, '', url);
             } else if (isTypeScript) {
               setActiveButton('typescript');
-              // Update parameter name to match tabs
               const url = new URL(window.location.href);
               url.searchParams.set('programming-language', 'typescript');
               window.history.pushState({}, '', url);
@@ -45,25 +50,21 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
       observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
     });
 
-    // Initial sync of tabs with toggle state
-    tabElements.forEach((tab) => {
-      if (tab.textContent?.includes('Python') && activeButton === 'python') {
-        tab.setAttribute('aria-selected', 'true');
-        tab.classList.add('tabs__item--active');
-        tab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      } else if (tab.textContent?.includes('TypeScript') && activeButton === 'typescript') {
-        tab.setAttribute('aria-selected', 'true');
-        tab.classList.add('tabs__item--active');
-        tab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      } else {
-        tab.setAttribute('aria-selected', 'false');
-        tab.classList.remove('tabs__item--active');
+    // Find currently selected tab and sync state
+    const selectedTab = Array.from(tabElements).find(
+      tab => tab.getAttribute('aria-selected') === 'true'
+    );
+    if (selectedTab) {
+      if (selectedTab.textContent?.includes('Python')) {
+        setActiveButton('python');
+      } else if (selectedTab.textContent?.includes('TypeScript')) {
+        setActiveButton('typescript');
       }
-    });
+    }
 
     // Cleanup observer on component unmount
     return () => observer.disconnect();
-  }, [activeButton]);
+  }, []); // Remove activeButton from dependencies to prevent circular updates
 
   const buttonStyle = {
     '--button-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-800)' : 'var(--ifm-color-gray-100)',
@@ -75,10 +76,22 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
 
   const handleButtonClick = (language: 'python' | 'typescript') => {
     setActiveButton(language);
-    // Update parameter name to match tabs
+
+    // Update URL parameter
     const url = new URL(window.location.href);
     url.searchParams.set('programming-language', language);
     window.history.pushState({}, '', url);
+
+    // Find and click the corresponding tab
+    const tabElements = document.querySelectorAll('.tabs__item');
+    tabElements.forEach((tab) => {
+      if (
+        (language === 'python' && tab.textContent?.includes('Python')) ||
+        (language === 'typescript' && tab.textContent?.includes('TypeScript'))
+      ) {
+        (tab as HTMLElement).click();
+      }
+    });
   };
 
   return (
