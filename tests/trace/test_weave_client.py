@@ -355,6 +355,114 @@ def test_calls_query(client):
     client.finish_call(call0, None)
 
 
+def test_get_calls_complete(client):
+    obj = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
+    ref = client.save(obj, "my-dataset")
+
+    call0 = client.create_call(
+        "x", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call0"
+    )
+    call1 = client.create_call(
+        "x", {"a": 6, "b": 11, "dataset": ref, "s": "str"}, display_name="call1"
+    )
+    call2 = client.create_call(
+        "y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2"
+    )
+
+    query = weave_client.Query(
+        **{
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "inputs.s"},
+                    "substr": {"$literal": "str"},
+                }
+            }
+        }
+    )
+
+    # use all the parameters to get_calls
+    result = list(
+        client.get_calls(
+            filter=weave_client.CallsFilter(op_names=[call1.op_name]),
+            limit=1,
+            offset=0,
+            query=query,
+            sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+            include_costs=True,
+            include_feedback=True,
+            columns=["inputs.dataset.rows"],
+        )
+    )
+    assert len(result) == 1
+    assert result[0].inputs["b"] == 11
+    assert result[0].inputs["dataset"].rows == [{"a": 1}, {"a": 2}, {"a": 3}]
+
+    # what should be an identical query using the trace_server interface
+    server_result = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id="shawn/test-project",
+                filter=tsi.CallsFilter(op_names=[call1.op_name]),
+                limit=1,
+                offset=0,
+                query=query,
+                sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+                include_costs=True,
+                include_feedback=True,
+                columns=["inputs.dataset"],
+                expand_columns=["inputs.dataset"],
+            )
+        ).calls
+    )
+    for call1, call2 in zip(result, server_result):
+        assert call1.id == call2.id
+        assert call1.op_name == call2.op_name
+        assert call1.project_id == call2.project_id
+        assert call1.trace_id == call2.trace_id
+        assert call1.parent_id == call2.parent_id
+        assert call1.started_at == call2.started_at
+        assert call1.display_name == call2.display_name
+        assert call1.summary == call2.summary
+        assert call1.inputs["a"] == call2.inputs["a"]
+        assert call1.inputs["b"] == call2.inputs["b"]
+        assert call1.inputs["s"] == call2.inputs["s"]
+
+    # add a simple query
+    result = list(
+        client.get_calls(
+            sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+            query=query,
+            include_costs=True,
+            include_feedback=True,
+        )
+    )
+    server_result = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id="shawn/test-project",
+                sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+                query=query,
+                include_costs=True,
+                include_feedback=True,
+                columns=["inputs.dataset", "display_name", "parent_id"],
+                expand_columns=["inputs.dataset"],
+            )
+        ).calls
+    )
+    for call1, call2 in zip(result, server_result):
+        assert call1.id == call2.id
+        assert call1.op_name == call2.op_name
+        assert call1.project_id == call2.project_id
+        assert call1.trace_id == call2.trace_id
+        assert call1.started_at == call2.started_at
+        assert call1.display_name == call2.display_name
+        assert call1.parent_id == call2.parent_id
+        assert call1.summary == call2.summary
+        assert call1.inputs["a"] == call2.inputs["a"]
+        assert call1.inputs["b"] == call2.inputs["b"]
+        assert call1.inputs["s"] == call2.inputs["s"]
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)

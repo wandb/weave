@@ -739,7 +739,6 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
-        expand_columns: list[str] | None = None,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -755,8 +754,6 @@ class WeaveClient:
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
-            expand_columns: A list of columns with refs to nested objects. Example:
-               ["inputs.self.message", "inputs.model.prompt"]
 
         Returns:
             An iterator of calls.
@@ -775,7 +772,6 @@ class WeaveClient:
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
-            expand_columns=expand_columns,
         )
 
     @deprecated(new_name="get_calls")
@@ -793,7 +789,6 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
-        expand_columns: list[str] | None = None,
     ) -> WeaveObject:
         """
         Get a single call by its ID.
@@ -805,8 +800,6 @@ class WeaveClient:
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
-            expand_columns: A list of columns with refs to nested objects. Example:
-               ["inputs.self.message", "inputs.model.prompt"]
 
         Returns:
             A call object.
@@ -818,7 +811,6 @@ class WeaveClient:
                 include_costs=include_costs,
                 include_feedback=include_feedback,
                 columns=columns,
-                expand_columns=expand_columns,
             )
         )
         if not response.calls:
