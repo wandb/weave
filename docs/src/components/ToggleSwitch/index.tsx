@@ -12,12 +12,32 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
   });
 
   useEffect(() => {
+    const syncWithTabs = () => {
+      const tabElements = document.querySelectorAll('.tabs__item');
+      if (tabElements.length === 0) return; // Exit if no tabs found
+
+      // Find currently selected tab and sync state
+      const selectedTab = Array.from(tabElements).find(
+        tab => tab.getAttribute('aria-selected') === 'true'
+      );
+      if (selectedTab) {
+        if (selectedTab.textContent?.includes('Python')) {
+          setActiveButton('python');
+        } else if (selectedTab.textContent?.includes('TypeScript')) {
+          setActiveButton('typescript');
+        }
+      }
+    };
+
     // Initial sync with URL parameter
     const params = new URLSearchParams(window.location.search);
     const currentLanguage = params.get('programming-language') as 'python' | 'typescript';
     if (currentLanguage && currentLanguage !== activeButton) {
       setActiveButton(currentLanguage);
     }
+
+    // Initial sync with tabs
+    syncWithTabs();
 
     // Add mutation observer to watch for tab changes
     const observer = new MutationObserver((mutations) => {
@@ -44,27 +64,32 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
       });
     });
 
-    // Observe all tab elements
-    const tabElements = document.querySelectorAll('.tabs__item');
-    tabElements.forEach((tab) => {
+    // Set up observer for tabs container to detect when tabs become available
+    const tabsObserver = new MutationObserver(() => {
+      const tabElements = document.querySelectorAll('.tabs__item');
+      if (tabElements.length > 0) {
+        tabElements.forEach((tab) => {
+          observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
+        });
+        syncWithTabs();
+      }
+    });
+
+    // Observe the document body for changes
+    tabsObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Observe existing tabs if any
+    const existingTabs = document.querySelectorAll('.tabs__item');
+    existingTabs.forEach((tab) => {
       observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
     });
 
-    // Find currently selected tab and sync state
-    const selectedTab = Array.from(tabElements).find(
-      tab => tab.getAttribute('aria-selected') === 'true'
-    );
-    if (selectedTab) {
-      if (selectedTab.textContent?.includes('Python')) {
-        setActiveButton('python');
-      } else if (selectedTab.textContent?.includes('TypeScript')) {
-        setActiveButton('typescript');
-      }
-    }
-
-    // Cleanup observer on component unmount
-    return () => observer.disconnect();
-  }, []); // Remove activeButton from dependencies to prevent circular updates
+    // Cleanup observers on component unmount
+    return () => {
+      observer.disconnect();
+      tabsObserver.disconnect();
+    };
+  }, []);
 
   const buttonStyle = {
     '--button-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-800)' : 'var(--ifm-color-gray-100)',
@@ -82,16 +107,18 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
     url.searchParams.set('programming-language', language);
     window.history.pushState({}, '', url);
 
-    // Find and click the corresponding tab
+    // Find and click the corresponding tab if available
     const tabElements = document.querySelectorAll('.tabs__item');
-    tabElements.forEach((tab) => {
-      if (
-        (language === 'python' && tab.textContent?.includes('Python')) ||
-        (language === 'typescript' && tab.textContent?.includes('TypeScript'))
-      ) {
-        (tab as HTMLElement).click();
-      }
-    });
+    if (tabElements.length > 0) {
+      tabElements.forEach((tab) => {
+        if (
+          (language === 'python' && tab.textContent?.includes('Python')) ||
+          (language === 'typescript' && tab.textContent?.includes('TypeScript'))
+        ) {
+          (tab as HTMLElement).click();
+        }
+      });
+    }
   };
 
   return (
