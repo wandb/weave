@@ -75,7 +75,7 @@ export const DatasetVersionPage: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr_auto] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <ObjectVersionsLink
@@ -108,11 +108,11 @@ export const DatasetVersionPage: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
-            <div className="ml-auto">
-              {showDeleteButton && (
+            {showDeleteButton && (
+              <div className="ml-auto mr-0">
                 <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </Tailwind>
       }

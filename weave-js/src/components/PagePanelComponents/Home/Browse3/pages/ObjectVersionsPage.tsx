@@ -112,10 +112,12 @@ export const ObjectVersionsPage: React.FC<{
     return <Loading />;
   }
 
-  const hasComparison = filter.objectName != null;
+  const filteredOnObject = filter.objectName != null;
+  const hasComparison = filteredOnObject;
   const viewer = userInfo ? userInfo.id : null;
   const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
   const isAdmin = userInfo?.admin;
+  const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
 
   return (
     <SimplePageLayout
@@ -128,7 +130,7 @@ export const ObjectVersionsPage: React.FC<{
           objectName={filter.objectName ?? null}
           selectedVersions={selectedVersions}
           setSelectedVersions={setSelectedVersions}
-          showDeleteButton={!isReadonly && isAdmin}
+          showDeleteButton={showDeleteButton}
           showCompareButton={hasComparison}
           onCompare={onCompare}
         />
@@ -644,6 +646,7 @@ const DeleteObjectVersionsButtonWithModal: React.FC<{
   const numObjects = objectVersions.length;
   const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
   const objectDigests = objectVersions.map(v => v.split(':')[1]);
+  const deleteTitleStr = `${numObjects} ${objectName} ${versionsStr}`;
 
   return (
     <>
@@ -656,7 +659,7 @@ const DeleteObjectVersionsButtonWithModal: React.FC<{
       <DeleteModal
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={`${numObjects} ${objectName} ${versionsStr}`}
+        deleteTitleStr={deleteTitleStr}
         deleteBodyStrs={objectVersions}
         onDelete={() =>
           objectVersionsDelete(entity, project, objectName, objectDigests)
