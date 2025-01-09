@@ -1,4 +1,5 @@
-import React, {useCallback, useEffect, useState, useRef} from 'react';
+import React, {useCallback, useEffect, useRef,useState} from 'react';
+
 import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -22,11 +23,9 @@ export const EditableCallName: React.FC<{
   const [currNameToDisplay, setCurrNameToDisplay] = useState(nameToDisplay);
   const [isEditing, setIsEditing] = useState(false);
 
-  // 1) Create a ref so we can manually call adjustHeight() any time we like.
+  // 1) Create a ref so we can manually call adjustHeight().
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Listen to changes in provided opName, for components that are not unmounted
-  // before the opName changes.
   useEffect(() => {
     setCurrNameToDisplay(nameToDisplay);
   }, [nameToDisplay]);
@@ -37,11 +36,8 @@ export const EditableCallName: React.FC<{
     // 2) Fire your height recalculation specifically when going from
     //    !isEditing to isEditing (or vice versa).
     if (isEditing && textAreaRef.current) {
-      // "Force" it to do what the effect does:
       const el = textAreaRef.current;
-
-      // Mimic the reset-later portion of the StyledTextArea code:
-      // Let the browser finalize first; then call:
+      // Fixed height for the text area, firing the effect too early.
       setTimeout(() => {
         el.style.height = 'auto';
         const newHeight = el.scrollHeight;

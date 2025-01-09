@@ -24,7 +24,7 @@ export const CallName = styled.div<{$isEditing?: boolean}>`
   font-weight: 600;
   text-align: left;
   word-break: break-all;
-  width: ${props => props.$isEditing ? '100%' : '100%'};
+  width: ${props => (props.$isEditing ? '100%' : 'max-content%')};
 `;
 CallName.displayName = 'S.CallName';
 
@@ -52,10 +52,7 @@ export const CallOverview: React.FC<{
       <Overview>
         <StatusChip value={statusCode} iconOnly />
         <CallName $isEditing={isEditing}>
-          <EditableCallName
-            call={call}
-            onEditingChange={setIsEditing}
-          />
+          <EditableCallName call={call} onEditingChange={setIsEditing} />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
