@@ -75,6 +75,7 @@ from weave.trace_server.trace_server_interface import (
     ObjSchemaForInsert,
     Query,
     RefsReadBatchReq,
+    SortBy,
     StartedCallSchemaForInsert,
     TableCreateReq,
     TableCreateRes,
@@ -110,16 +111,28 @@ class PaginatedIterator(Generic[T, R]):
         fetch_func: FetchFunc[T],
         page_size: int = 1000,
         transform_func: TransformFunc[T, R] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
+        self.limit = limit
+        self.offset = offset
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
+        if self.limit is not None or self.offset is not None:
+            # If limit/offset are provided, make a single request with those parameters
+            offset = self.offset or 0
+            if self.limit is not None:
+                return self.fetch_func(offset, self.limit)
+            return self.fetch_func(offset, self.page_size)
+
+        # Otherwise use standard pagination
         return self.fetch_func(index * self.page_size, self.page_size)
 
     @overload
@@ -129,6 +142,12 @@ class PaginatedIterator(Generic[T, R]):
     def _get_one(self, index: int) -> T | R:
         if index < 0:
             raise IndexError("Negative indexing not supported")
+
+        if self.limit is not None and index >= self.limit:
+            raise IndexError(f"Index {index} out of range")
+
+        if self.offset is not None:
+            index += self.offset
 
         page_index = index // self.page_size
         page_offset = index % self.page_size
@@ -153,6 +172,17 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative stop not supported")
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
+
+        # Apply offset if provided
+        if self.offset is not None:
+            start += self.offset
+            if stop is not None:
+                stop += self.offset
+
+        # Apply limit if provided
+        if self.limit is not None:
+            if stop is None or stop > self.limit:
+                stop = self.limit
 
         i = start
         while stop is None or i < stop:
@@ -191,7 +221,14 @@ def _make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
     filter: CallsFilter,
+    limit_override: int | None = None,
+    offset_override: int | None = None,
+    sort_by: list[SortBy] | None = None,
+    query: Query | None = None,
     include_costs: bool = False,
+    include_feedback: bool = False,
+    columns: list[str] | None = None,
+    expand_columns: list[str] | None = None,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
@@ -201,6 +238,11 @@ def _make_calls_iterator(
                 offset=offset,
                 limit=limit,
                 include_costs=include_costs,
+                include_feedback=include_feedback,
+                query=query,
+                sort_by=sort_by,
+                columns=columns,
+                expand_columns=expand_columns,
             )
         )
         return response.calls
@@ -210,7 +252,12 @@ def _make_calls_iterator(
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
-    return PaginatedIterator(fetch_func, transform_func=transform_func)
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        limit=limit_override,
+        offset=offset_override,
+    )
 
 
 class OpNameError(ValueError):
@@ -685,16 +732,50 @@ class WeaveClient:
     def get_calls(
         self,
         filter: CallsFilter | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortBy] | None = None,
+        query: Query | None = None,
         include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
+        expand_columns: list[str] | None = None,
     ) -> CallsIter:
+        """
+        Get a list of calls.
+
+        Args:
+            filter: A filter to apply to the calls.
+            limit: The maximum number of calls to return.
+            offset: The number of calls to skip.
+            sort_by: A list of fields to sort the calls by.
+            query: A mongo-like query to filter the calls.
+            include_costs: If true, cost info is included at summary.weave
+            include_feedback: If true, feedback info is included at summary.weave.feedback
+            columns: A list of columns to include in the response. If None,
+               all columns are included. Specifying fewer columns may be more performant.
+               Some columns are always included: id, project_id, trace_id, op_name, started_at
+            expand_columns: A list of columns with refs to nested objects. Example:
+               ["inputs.self.message", "inputs.model.prompt"]
+
+        Returns:
+            An iterator of calls.
+        """
         if filter is None:
             filter = CallsFilter()
 
         return _make_calls_iterator(
             self.server,
             self._project_id(),
-            filter,
-            include_costs,
+            filter=filter,
+            limit_override=limit,
+            offset_override=offset,
+            sort_by=sort_by,
+            query=query,
+            include_costs=include_costs,
+            include_feedback=include_feedback,
+            columns=columns,
+            expand_columns=expand_columns,
         )
 
     @deprecated(new_name="get_calls")
@@ -710,12 +791,34 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
+        expand_columns: list[str] | None = None,
     ) -> WeaveObject:
+        """
+        Get a single call by its ID.
+
+        Args:
+            call_id: The ID of the call to get.
+            include_costs: If true, cost info is included at summary.weave
+            include_feedback: If true, feedback info is included at summary.weave.feedback
+            columns: A list of columns to include in the response. If None,
+               all columns are included. Specifying fewer columns may be more performant.
+               Some columns are always included: id, project_id, trace_id, op_name, started_at
+            expand_columns: A list of columns with refs to nested objects. Example:
+               ["inputs.self.message", "inputs.model.prompt"]
+
+        Returns:
+            A call object.
+        """
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
                 filter=CallsFilter(call_ids=[call_id]),
                 include_costs=include_costs,
+                include_feedback=include_feedback,
+                columns=columns,
+                expand_columns=expand_columns,
             )
         )
         if not response.calls:
