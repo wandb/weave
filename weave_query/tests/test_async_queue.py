@@ -45,7 +45,7 @@ async def test_async_process_queue_shared() -> None:
 
 
 @pytest.mark.timeout(10)
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="function")
 async def test_async_thread_queue_shared() -> None:
     queue: Queue = ThreadQueue()
     consumer_thread = threading.Thread(target=process_consumer, args=(queue,))
