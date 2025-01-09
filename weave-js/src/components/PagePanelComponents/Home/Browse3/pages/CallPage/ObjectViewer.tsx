@@ -681,7 +681,7 @@ const ShowMoreButtons = ({
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
         <Button
-          variant="quiet"
+          variant="ghost"
           onClick={() => {
             const {newData, store} = updateTruncatedDataFromStore(
               parentPath,
@@ -696,7 +696,7 @@ const ShowMoreButtons = ({
         </Button>
       )}
       <Button
-        variant="quiet"
+        variant="ghost"
         onClick={() => {
           const {newData, store} = updateTruncatedDataFromStore(
             parentPath,
