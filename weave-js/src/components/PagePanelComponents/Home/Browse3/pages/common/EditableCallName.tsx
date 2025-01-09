@@ -1,14 +1,13 @@
-import EditableField from '@wandb/weave/common/components/EditableField';
-import React, {useCallback, useEffect, useState} from 'react';
-
+import React, {useCallback, useEffect, useState, useRef} from 'react';
+import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {opNiceName} from './Links';
 
 export const EditableCallName: React.FC<{
   call: CallSchema;
-  editableFieldRef: React.RefObject<EditableField>;
-}> = ({call, editableFieldRef}) => {
+  onEditingChange?: (isEditing: boolean) => void;
+}> = ({call, onEditingChange}) => {
   const defaultDisplayName = opNiceName(call.spanName);
   const displayNameIsEmpty =
     call.displayName == null || call.displayName === '';
@@ -21,12 +20,37 @@ export const EditableCallName: React.FC<{
   const {useCallUpdateFunc: useCallRenameFunc} = useWFHooks();
   const callRename = useCallRenameFunc();
   const [currNameToDisplay, setCurrNameToDisplay] = useState(nameToDisplay);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // 1) Create a ref so we can manually call adjustHeight() any time we like.
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   // Listen to changes in provided opName, for components that are not unmounted
   // before the opName changes.
   useEffect(() => {
     setCurrNameToDisplay(nameToDisplay);
   }, [nameToDisplay]);
+
+  useEffect(() => {
+    onEditingChange?.(isEditing);
+
+    // 2) Fire your height recalculation specifically when going from
+    //    !isEditing to isEditing (or vice versa).
+    if (isEditing && textAreaRef.current) {
+      // "Force" it to do what the effect does:
+      const el = textAreaRef.current;
+
+      // Mimic the reset-later portion of the StyledTextArea code:
+      // Let the browser finalize first; then call:
+      setTimeout(() => {
+        el.style.height = 'auto';
+        const newHeight = el.scrollHeight;
+
+        el.style.height = `${newHeight}px`;
+        el.style.overflowY = 'hidden';
+      }, 0);
+    }
+  }, [isEditing, onEditingChange]);
 
   const saveName = useCallback(
     (newName: string) => {
@@ -42,18 +66,42 @@ export const EditableCallName: React.FC<{
         setCurrNameToDisplay(newName);
         callRename(call.entity, call.project, call.callId, newName);
       }
+      setIsEditing(false);
     },
     [defaultDisplayName, call, displayNameIsEmpty, callRename]
   );
 
+  if (!isEditing) {
+    return (
+      <div
+        className="cursor-pointer hover:bg-moon-100 dark:hover:bg-moon-800 px-2 py-1 rounded"
+        onClick={() => setIsEditing(true)}>
+        {currNameToDisplay}
+      </div>
+    );
+  }
+
   return (
-    <EditableField
-      ref={editableFieldRef}
-      className="m-0"
-      value={currNameToDisplay}
-      onFinish={saveName}
-      placeholder={defaultDisplayName}
-      updateValue={true}
-    />
+    <div className='w-full'>
+      <StyledTextArea
+        ref={textAreaRef}
+        value={currNameToDisplay}
+        onChange={e => setCurrNameToDisplay(e.target.value)}
+        onBlur={() => saveName(currNameToDisplay)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            saveName(currNameToDisplay);
+          } else if (e.key === 'Escape') {
+            setIsEditing(false);
+            setCurrNameToDisplay(nameToDisplay);
+          }
+        }}
+        placeholder={defaultDisplayName}
+        autoGrow={true}
+        rows={1}
+        className='w-full'
+      />
+    </div>
   );
 };
