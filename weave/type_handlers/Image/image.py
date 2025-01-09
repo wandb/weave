@@ -49,6 +49,9 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # using the same artifact. Moreover, since we package the deserialization logic with the
     # object payload, we can always change the serialization logic later without breaking
     # existing payloads.
+    if fn := getattr(obj, "filename", None):
+        obj = Image.open(fn)
+
     with artifact.new_file("image.png", binary=True) as f:
         obj.save(f, format="png")  # type: ignore
 
