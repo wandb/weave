@@ -113,11 +113,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               'bg-teal-500 text-white hover:bg-teal-450': isPrimary,
               'bg-teal-450': isPrimary && active,
 
-              // secondary & ghost
+              // secondary
               'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05]': isSecondary,
-              'text-moon-800 dark:text-moon-200': isSecondary || isGhost,
+              'text-moon-800 dark:text-moon-200': isSecondary,
               'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
-                isSecondary || isGhost,
+                isSecondary,
+
+              // ghost
+              'bg-transparent': isGhost,
+              'text-moon-600 dark:text-moon-400': isGhost,
+              'hover:bg-oblivion/[0.07] hover:text-moon-800 dark:hover:bg-moonbeam/[0.09] dark:hover:text-moon-200':
+                isGhost && !active,
+
+              // secondary or ghost
               'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
                 (isSecondary || isGhost) && active,
 

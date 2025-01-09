@@ -189,14 +189,14 @@ const ObjectViewerSectionNonEmpty = ({
       <TitleRow>
         <Title>{title}</Title>
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="row-height-small"
           active={mode === 'collapsed'}
           onClick={onClickCollapsed}
           tooltip="View collapsed"
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
@@ -207,7 +207,7 @@ const ObjectViewerSectionNonEmpty = ({
           }
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="code-alt"
           active={mode === 'json'}
           onClick={() => setMode('json')}
@@ -215,7 +215,7 @@ const ObjectViewerSectionNonEmpty = ({
         />
         {!noHide && (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon="hide-hidden"
             active={mode === 'hidden'}
             onClick={() => setMode('hidden')}
