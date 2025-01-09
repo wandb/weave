@@ -165,6 +165,7 @@ export type FeedbackQueryReq = {
 
 export type Feedback = {
   id: string;
+  project_id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
   creator: string | null; // display name
@@ -347,3 +348,35 @@ export type ActionsExecuteBatchReq = {
 };
 
 export type ActionsExecuteBatchRes = {};
+
+export type TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec;
+
+export interface TableAppendSpec {
+  append: {
+    row: Record<string, any>;
+  };
+}
+
+export interface TablePopSpec {
+  pop: {
+    index: number;
+  };
+}
+
+export interface TableInsertSpec {
+  insert: {
+    index: number;
+    row: Record<string, any>;
+  };
+}
+
+export type TableUpdateReq = {
+  project_id: string;
+  base_digest: string;
+  updates: TableUpdateSpec[];
+};
+
+export type TableUpdateRes = {
+  digest: string;
+  updated_row_digests: string[];
+};
