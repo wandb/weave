@@ -10,11 +10,8 @@ import {Tailwind} from '../../../../Tailwind';
 import {Empty} from '../pages/common/Empty';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
-import {FeedbackGridInner} from './FeedbackGridInner';
-import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
+import {ScoresFeedbackGridInner} from './ScoresFeedbackGridInner';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
-
-const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
 type FeedbackGridProps = {
   entity: string;
@@ -23,12 +20,17 @@ type FeedbackGridProps = {
   objectType?: string;
 };
 
-export const FeedbackGrid = ({
+export const ScorerFeedbackGrid = ({
   entity,
   project,
   weaveRef,
   objectType,
 }: FeedbackGridProps) => {
+  /**
+   * This component is very similar to `FeedbackGrid`, but it only shows scores.
+   * While some of the code is duplicated, it is kept separate to make it easier
+   * to modify in the future.
+   */
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
 
   const {useFeedback} = useWFHooks();
@@ -43,40 +45,16 @@ export const FeedbackGrid = ({
     return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const hasAnnotationFeedback = query.result?.some(f =>
-    f.feedback_type.startsWith(ANNOTATION_PREFIX)
-  );
 
   // Group by feedback on this object vs. descendent objects
   const grouped = useMemo(() => {
     // Exclude runnables as they are presented in a different tab
-    const withoutRunnables = (query.result ?? []).filter(
-      f => !f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
-    );
-    // Combine annotation feedback on (feedback_type, creator)
-    const combined = _.groupBy(
-      withoutRunnables.filter(f =>
-        f.feedback_type.startsWith(ANNOTATION_PREFIX)
-      ),
-      f => `${f.feedback_type}-${f.creator}`
-    );
-    // only keep the most recent feedback for each (feedback_type, creator)
-    const combinedFiltered = Object.values(combined).map(
-      fs =>
-        fs.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )[0]
-    );
-    // add the non-annotation feedback to the combined object
-    combinedFiltered.push(
-      ...withoutRunnables.filter(
-        f => !f.feedback_type.startsWith(ANNOTATION_PREFIX)
-      )
+    const onlyRunnables = (query.result ?? []).filter(f =>
+      f.feedback_type.startsWith(RUNNABLE_FEEDBACK_TYPE_PREFIX)
     );
 
     // Group by feedback on this object vs. descendent objects
-    return _.groupBy(combinedFiltered, f =>
+    return _.groupBy(onlyRunnables, f =>
       f.weave_ref.substring(weaveRef.length)
     );
   }, [query.result, weaveRef]);
@@ -109,17 +87,19 @@ export const FeedbackGrid = ({
       <Empty
         size="small"
         icon="add-reaction"
-        heading="No feedback yet"
-        description="You can provide feedback directly within the Weave UI or through the API."
+        heading="No scores yet"
+        description="Calls are scored by running Evaluations."
         moreInformation={
           <>
             Learn how to{' '}
-            <TargetBlank href="http://wandb.me/weave_feedback">
-              add feedback
+            <TargetBlank href="http://wandb.me/weave_eval_tut">
+              run evaluations
             </TargetBlank>
             .
           </>
         }
+        // Need to add this additional detail once the new API is released.
+        // description="You can add scores to calls by using the `Call.apply_scorer` method."
       />
     );
   }
@@ -131,10 +111,9 @@ export const FeedbackGrid = ({
         return (
           <div key={path}>
             {path && <div className="text-sm text-moon-500">On {path}</div>}
-            <FeedbackGridInner
+            <ScoresFeedbackGridInner
               feedback={grouped[path]}
               currentViewerId={currentViewerId}
-              showAnnotationName={hasAnnotationFeedback}
             />
           </div>
         );
