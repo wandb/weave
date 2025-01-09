@@ -8,7 +8,7 @@ interface ToggleSwitchProps {
 const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
   const [activeButton, setActiveButton] = useState<'python' | 'typescript'>(() => {
     const params = new URLSearchParams(window.location.search);
-    return (params.get('language') as 'python' | 'typescript') || 'python';
+    return (params.get('programming-language') as 'python' | 'typescript') || 'python';
   });
 
   useEffect(() => {
@@ -23,15 +23,15 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
 
             if (isPython) {
               setActiveButton('python');
-              // Update URL without page reload
+              // Update parameter name to match tabs
               const url = new URL(window.location.href);
-              url.searchParams.set('language', 'python');
+              url.searchParams.set('programming-language', 'python');
               window.history.pushState({}, '', url);
             } else if (isTypeScript) {
               setActiveButton('typescript');
-              // Update URL without page reload
+              // Update parameter name to match tabs
               const url = new URL(window.location.href);
-              url.searchParams.set('language', 'typescript');
+              url.searchParams.set('programming-language', 'typescript');
               window.history.pushState({}, '', url);
             }
           }
@@ -75,9 +75,9 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
 
   const handleButtonClick = (language: 'python' | 'typescript') => {
     setActiveButton(language);
-    // Update URL without page reload
+    // Update parameter name to match tabs
     const url = new URL(window.location.href);
-    url.searchParams.set('language', language);
+    url.searchParams.set('programming-language', language);
     window.history.pushState({}, '', url);
   };
 
