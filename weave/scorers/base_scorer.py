@@ -185,7 +185,7 @@ ApplyScorerResult = ApplyScorerSuccess
 
 
 async def apply_scorer_async(
-    scorer: Union[Op, Scorer], example: dict, model_output: dict
+    scorer: Union[Op, Scorer], example: dict, model_output: Any
 ) -> ApplyScorerResult:
     """Apply a scoring function to model output and example data asynchronously.
 
