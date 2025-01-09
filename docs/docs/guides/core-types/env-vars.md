@@ -24,5 +24,5 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 | WEAVE_DEBUG_HTTP        | If set to `1`, turns on HTTP request and response logging for debugging.  |
 | WEAVE_DISABLED          | If set to `true`, all tracing to Weave is disabled.      |
 | WEAVE_PARALLELISM       | In evaluations, the number of examples to evaluate in parallel. `1` runs examples sequentially. Default value is `20`.    |
-| WEAVE_PRINT_CALL_LINK   | Suppress the printing of call URLs. Default value is `false`.                            |
+| WEAVE_PRINT_CALL_LINK   | If set to `false`, call URL printing is suppressed. Default value is `false`.                            |
 | WEAVE_TRACE_LANGCHAIN   | When set to `false`,  explicitly disable global tracing for LangChain.  |                                                              |
