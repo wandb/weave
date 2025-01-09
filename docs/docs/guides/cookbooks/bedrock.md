@@ -1,4 +1,4 @@
-# Amazon Bedrock
+# Working with Amazon Bedrock
 
 Amazon Bedrock provides easy access to foundation models from providers like Anthropic, AI21 Labs, and Stability AI with a single API. With Weights & Biases (W&B) Weave, you can log, debug, and evaluate your Bedrock models to streamline your LLM application development workflow.
 
