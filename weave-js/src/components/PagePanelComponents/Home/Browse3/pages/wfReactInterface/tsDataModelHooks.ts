@@ -915,7 +915,15 @@ const useObjectVersion = (
         })
         .then(res => {
           loadingRef.current = false;
-          setObjectVersionRes(res);
+          if (res.obj == null) {
+            if ('deleted_at' in res) {
+              setError(new Error(JSON.stringify(res)));
+            } else {
+              setError(new Error('Object not found'));
+            }
+          } else {
+            setObjectVersionRes(res);
+          }
         })
         .catch(err => {
           setError(new Error(JSON.stringify(err)));

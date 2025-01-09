@@ -414,6 +414,9 @@ const fetchEvaluationSummaryData = async (
       const ref = modelRefs[objNdx];
       const parsed = parseRef(ref) as WeaveObjectRef;
       const objData = objVal;
+      if (objData == null) {
+        return [ref, null];
+      }
       return [
         ref,
         {

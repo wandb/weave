@@ -664,8 +664,8 @@ const DeleteObjectButtonWithModal: React.FC<{
         deleteTitleStr={deleteStr}
         onDelete={() =>
           objectVersionsDelete(
-            objVersionSchema.project,
             objVersionSchema.entity,
+            objVersionSchema.project,
             objVersionSchema.objectId,
             [objVersionSchema.versionHash]
           )
