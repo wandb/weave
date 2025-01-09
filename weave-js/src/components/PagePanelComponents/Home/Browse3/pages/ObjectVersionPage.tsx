@@ -208,7 +208,12 @@ const ObjectVersionPageInner: React.FC<{
   }
 
   if (isDataset) {
-    return <DatasetVersionPage objectVersion={objectVersion} />;
+    return (
+      <DatasetVersionPage
+        objectVersion={objectVersion}
+        showDeleteButton={showDeleteButton}
+      />
+    );
   }
 
   return (
@@ -638,7 +643,7 @@ const OpVersionCallsLink: React.FC<{
   );
 };
 
-const DeleteObjectButtonWithModal: React.FC<{
+export const DeleteObjectButtonWithModal: React.FC<{
   objVersionSchema: ObjectVersionSchema;
   overrideDisplayStr?: string;
 }> = ({objVersionSchema, overrideDisplayStr}) => {

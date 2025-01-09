@@ -13,6 +13,7 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
+import {DeleteObjectButtonWithModal} from '../pages/ObjectVersionPage';
 import {TabUseDataset} from '../pages/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {objectVersionKeyToRefUri} from '../pages/wfReactInterface/utilities';
@@ -21,7 +22,8 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 
 export const DatasetVersionPage: React.FC<{
   objectVersion: ObjectVersionSchema;
-}> = ({objectVersion}) => {
+  showDeleteButton?: boolean;
+}> = ({objectVersion, showDeleteButton}) => {
   const {useRootObjectVersions, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -73,7 +75,7 @@ export const DatasetVersionPage: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr_auto] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <ObjectVersionsLink
@@ -105,6 +107,11 @@ export const DatasetVersionPage: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
+            </div>
+            <div className="ml-auto">
+              {showDeleteButton && (
+                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+              )}
             </div>
           </div>
         </Tailwind>
