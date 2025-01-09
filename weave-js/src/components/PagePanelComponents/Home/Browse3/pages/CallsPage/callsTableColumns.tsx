@@ -430,10 +430,10 @@ function buildCallsTableColumns(
         }
         return {
           field,
-          headerName: 'Scores.' + parsed.scorerName + '.' + parsed.scorePath,
+          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
           width: 150,
           renderHeader: () => {
-            return <div>{parsed.scorerName + '.' + parsed.scorePath}</div>;
+            return <div>{parsed.scorerName + parsed.scorePath}</div>;
           },
           valueGetter: (unused: any, row: any) => {
             return row[c];

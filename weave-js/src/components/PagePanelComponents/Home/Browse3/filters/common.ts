@@ -59,7 +59,7 @@ export const getFieldLabel = (field: string): string => {
     if (parsed === null) {
       return field;
     }
-    return parsed.scorerName + '.' + parsed.scorePath;
+    return parsed.scorerName + parsed.scorePath;
   }
   return FIELD_LABELS[field] ?? field;
 };

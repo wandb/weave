@@ -22,7 +22,7 @@ export const parseScorerFeedbackField = (
   }
   const [scorerName, ...rest] = res.split('.');
   const prefixedScorePath = rest.join('.');
-  const pathPrefix = RUNNABLE_FEEDBACK_OUTPUT_PART + '.';
+  const pathPrefix = RUNNABLE_FEEDBACK_OUTPUT_PART;
   if (!prefixedScorePath.startsWith(pathPrefix)) {
     return null;
   }
@@ -41,5 +41,5 @@ export const convertScorerFeedbackFieldToBackendFilter = (
     return field;
   }
   const {scorerName, scorePath} = parsed;
-  return `feedback.[${RUNNABLE_FEEDBACK_TYPE_PREFIX}.${scorerName}].${RUNNABLE_FEEDBACK_OUTPUT_PART}.${scorePath}`;
+  return `feedback.[${RUNNABLE_FEEDBACK_TYPE_PREFIX}.${scorerName}].${RUNNABLE_FEEDBACK_OUTPUT_PART}${scorePath}`;
 };
