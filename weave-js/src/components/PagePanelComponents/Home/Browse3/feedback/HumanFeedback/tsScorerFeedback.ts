@@ -41,5 +41,5 @@ export const convertScorerFeedbackFieldToBackendFilter = (
     return field;
   }
   const {scorerName, scorePath} = parsed;
-  return `feedback.[${RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX}.${scorerName}].${RUNNABLE_FEEDBACK_OUTPUT_PART}.${scorePath}`;
+  return `feedback.[${RUNNABLE_FEEDBACK_TYPE_PREFIX}.${scorerName}].${RUNNABLE_FEEDBACK_OUTPUT_PART}.${scorePath}`;
 };
