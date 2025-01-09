@@ -668,7 +668,7 @@ export const PaginationButtons = () => {
   return (
     <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handlePrevPage}
         disabled={page === 0}
@@ -688,7 +688,7 @@ export const PaginationButtons = () => {
         {start}-{end} of {rowCount}
       </Box>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handleNextPage}
         disabled={page >= pageCount - 1}
