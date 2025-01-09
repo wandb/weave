@@ -1,9 +1,9 @@
 # always use lowercase keys for the redact keys
-REDACT_KEYS = (
+REDACT_KEYS = {
     "api_key",
     "auth_headers",
     "authorization",
-)
+}
 REDACTED_VALUE = "REDACTED"
 
 
