@@ -273,7 +273,7 @@ export const FilterBar = ({
               <div className="handle flex items-center pb-12">
                 <div className="flex-auto font-semibold">Filters</div>
                 {selectedCalls.length > 0 && (
-                  <Button size="small" variant="quiet" onClick={onSetSelected}>
+                  <Button size="small" variant="ghost" onClick={onSetSelected}>
                     {`Selected rows (${selectedCalls.length})`}
                   </Button>
                 )}
@@ -308,7 +308,7 @@ export const FilterBar = ({
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="add-new"
                 disabled={filterModel.items.length === 0}
                 onClick={() => onAddFilter('')}>
@@ -317,7 +317,7 @@ export const FilterBar = ({
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="delete"
                 disabled={filterModel.items.length === 0}
                 onClick={onRemoveAll}>
