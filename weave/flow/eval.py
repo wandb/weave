@@ -27,8 +27,6 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
-from weave.scorers.base_scorer import apply_scorer_async
-from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
@@ -209,22 +207,8 @@ class Evaluation(Object):
         scorers = self._post_init_scorers
 
         for scorer in scorers:
-            apply_scorer_result = await apply_scorer_async(
-                scorer, example, model_output
-            )
+            apply_scorer_result = await model_call.apply_scorer(scorer, example)
             result = apply_scorer_result.result
-            score_call = apply_scorer_result.score_call
-
-            wc = get_weave_client()
-            if wc:
-                scorer_ref_uri = None
-                if weave_isinstance(scorer, Scorer):
-                    # Very important: if the score is generated from a Scorer subclass,
-                    # then scorer_ref_uri will be None, and we will use the op_name from
-                    # the score_call instead.
-                    scorer_ref = get_ref(scorer)
-                    scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-                wc._send_score_call(model_call, score_call, scorer_ref_uri)
             scorer_attributes = get_scorer_attributes(scorer)
             scorer_name = scorer_attributes.scorer_name
             scores[scorer_name] = result
