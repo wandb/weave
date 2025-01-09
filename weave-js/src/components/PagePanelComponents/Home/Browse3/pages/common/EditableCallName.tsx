@@ -1,6 +1,6 @@
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useCallback, useEffect, useRef,useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -73,7 +73,9 @@ export const EditableCallName: React.FC<{
 
   // Add click outside handler
   useEffect(() => {
-    if (!isEditing) return;
+    if (!isEditing) {
+      return;
+    }
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -94,14 +96,14 @@ export const EditableCallName: React.FC<{
     return (
       <Tailwind>
         <div
-          className="group flex cursor-pointer items-center px-[8px] py-[4px] rounded hover:bg-moon-100 dark:hover:bg-moon-800"
+          className="group flex cursor-pointer items-center rounded px-[8px] py-[4px] hover:bg-moon-100 dark:hover:bg-moon-800"
           onClick={() => setIsEditing(true)}>
           {currNameToDisplay}
-          <Icon 
-            name="pencil-edit" 
-            width={16} 
+          <Icon
+            name="pencil-edit"
+            width={16}
             height={16}
-            className="ml-[8px] min-w-[16px] opacity-0 group-hover:opacity-100 text-moon-500"
+            className="ml-[8px] min-w-[16px] text-moon-500 opacity-0 group-hover:opacity-100"
           />
         </div>
       </Tailwind>
@@ -110,7 +112,7 @@ export const EditableCallName: React.FC<{
 
   return (
     <Tailwind>
-      <div className='w-full' ref={containerRef}>
+      <div className="w-full" ref={containerRef}>
         <StyledTextArea
           ref={textAreaRef}
           value={currNameToDisplay}
@@ -128,7 +130,7 @@ export const EditableCallName: React.FC<{
           placeholder={defaultDisplayName}
           autoGrow={true}
           rows={1}
-          className='w-full px-[8px] py-[4px]'
+          className="w-full px-[8px] py-[4px]"
         />
       </div>
     </Tailwind>
