@@ -70,6 +70,7 @@ const sidebars: SidebarsConfig = {
         "guides/tools/comparison",
         "guides/tools/playground",
         "guides/core-types/media",
+        "guides/core-types/env-vars",
         {
           type: "category",
           collapsible: true,
