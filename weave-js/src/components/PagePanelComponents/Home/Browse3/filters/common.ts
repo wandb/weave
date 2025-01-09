@@ -348,8 +348,8 @@ export function getGroupedOperatorOptions(
   }
   // Fallback: show all grouped
   return [
-    {label: 'String', options: stringOperators},
-    {label: 'Number', options: numberOperators},
+    {label: 'Text', options: stringOperators},
+    {label: 'Numeric', options: numberOperators},
     {label: 'Boolean', options: boolOperators},
     {label: 'Date', options: dateOperators},
     {label: 'Other', options: anyOperators},
