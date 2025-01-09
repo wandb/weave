@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 Weave's serialization layer saves and versions objects.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     ```python
@@ -39,7 +39,7 @@ Saving an object with a name will create the first version of that object if it 
 
 ## Getting an object back
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     `weave.publish` returns a Ref. You can call `.get()` on any Ref to get the object back.
 

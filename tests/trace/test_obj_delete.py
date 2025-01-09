@@ -193,14 +193,15 @@ def test_read_deleted_object(client: WeaveClient):
             )
         )
 
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
-        client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                project_id=client._project_id(),
-                object_ids=["obj_1"],
-                refs=[obj1_v2.uri()],
-            )
+    ref_res = client.server.refs_read_batch(
+        tsi.RefsReadBatchReq(
+            project_id=client._project_id(),
+            object_ids=["obj_1"],
+            refs=[obj1_v2.uri()],
         )
+    )
+    assert len(ref_res.vals) == 1
+    assert ref_res.vals[0] is None
 
 
 def test_op_versions(client: WeaveClient):
@@ -250,11 +251,12 @@ def test_read_deleted_op(client: WeaveClient):
             )
         )
 
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
-        client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                project_id=client._project_id(),
-                object_ids=["my_op"],
-                refs=[op_ref.uri()],
-            )
+    ref_res = client.server.refs_read_batch(
+        tsi.RefsReadBatchReq(
+            project_id=client._project_id(),
+            object_ids=["my_op"],
+            refs=[op_ref.uri()],
         )
+    )
+    assert len(ref_res.vals) == 1
+    assert ref_res.vals[0] is None

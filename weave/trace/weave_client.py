@@ -785,6 +785,8 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        from weave.trace.api import _global_postprocess_inputs
+
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -798,6 +800,9 @@ class WeaveClient:
             inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
             inputs_postprocessed = inputs_redacted
+
+        if _global_postprocess_inputs:
+            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -886,6 +891,8 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        from weave.trace.api import _global_postprocess_output
+
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
@@ -894,6 +901,10 @@ class WeaveClient:
             postprocessed_output = op.postprocess_output(original_output)
         else:
             postprocessed_output = original_output
+
+        if _global_postprocess_output:
+            postprocessed_output = _global_postprocess_output(postprocessed_output)
+
         self._save_nested_objects(postprocessed_output)
         output_as_refs = map_to_refs(postprocessed_output)
         call.output = postprocessed_output
