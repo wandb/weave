@@ -12,12 +12,19 @@ _registry: dict[str, type] = {}
 
 
 def register(cls: type) -> type:
+    """Decorator to register a class with the objectify function.
+
+    Registered classes will be able to be deserialized directly into their base objects
+    instead of into a WeaveObject."""
     _registry[cls.__name__] = cls
     return cls
 
 
 def objectify(obj: WeaveObject) -> Any:
     if not (cls_name := getattr(obj, "_class_name", None)):
+        return obj
+
+    if cls_name not in _registry:
         return obj
 
     cls = _registry[cls_name]
