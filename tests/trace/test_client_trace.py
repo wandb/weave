@@ -3234,4 +3234,5 @@ def test_calls_len(client):
     test()
     test()
 
-    assert len(list(test.calls())) == 2
+    assert len(test.calls()) == 2
+    assert len(client.get_calls()) == 2
