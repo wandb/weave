@@ -25,9 +25,8 @@ export const EditableCallName: React.FC<{
   const [currNameToDisplay, setCurrNameToDisplay] = useState(nameToDisplay);
   const [isEditing, setIsEditing] = useState(false);
 
-  // 1) Create a ref so we can manually call adjustHeight().
+  // Create a ref so we can manually call adjustHeight().
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  // Add containerRef to track clicks outside
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,15 +36,13 @@ export const EditableCallName: React.FC<{
   useEffect(() => {
     onEditingChange?.(isEditing);
 
-    // 2) Fire your height recalculation specifically when going from
-    //    !isEditing to isEditing (or vice versa).
+    // Fire height recalculation specifically when going from isEditing.
     if (isEditing && textAreaRef.current) {
       const el = textAreaRef.current;
-      // Fixed height for the text area, firing the effect too early.
+      // Fixes issue with size refreshing too quickly since we use scrollHeight for autoGrow.
       setTimeout(() => {
         el.style.height = 'auto';
         const newHeight = el.scrollHeight;
-
         el.style.height = `${newHeight}px`;
         el.style.overflowY = 'hidden';
       }, 0);
@@ -71,7 +68,6 @@ export const EditableCallName: React.FC<{
     [defaultDisplayName, call, displayNameIsEmpty, callRename]
   );
 
-  // Add click outside handler
   useEffect(() => {
     if (!isEditing) {
       return;
