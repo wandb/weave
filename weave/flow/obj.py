@@ -56,7 +56,7 @@ class Object(BaseModel):
         """It's up to the subclass to implement this!
 
         Using the @objectify.register decorator will also implement this automatically."""
-        raise NotImplementedError("from_uri not implemented for this object")
+        raise NotImplementedError
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
