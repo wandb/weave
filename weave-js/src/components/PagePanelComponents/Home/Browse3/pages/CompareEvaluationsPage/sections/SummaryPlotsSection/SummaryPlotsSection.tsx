@@ -192,7 +192,7 @@ const PaginationControls: React.FC<{
       <Tailwind>
         <div className="flex items-center">
           <Button
-            variant="quiet"
+            variant="ghost"
             onClick={onPrevPage}
             disabled={currentPage === 0}
             icon="chevron-next"
@@ -202,7 +202,7 @@ const PaginationControls: React.FC<{
             {startIndex}-{endIndex} of {totalPlots}
           </span>
           <Button
-            variant="quiet"
+            variant="ghost"
             onClick={onNextPage}
             disabled={currentPage === totalPages - 1}
             icon="chevron-next"
