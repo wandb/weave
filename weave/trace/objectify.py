@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -11,12 +11,24 @@ if TYPE_CHECKING:
 _registry: dict[str, type] = {}
 
 
-def register(cls: type) -> type:
+T = TypeVar("T")
+
+
+def register(cls: type[T]) -> type[T]:
     """Decorator to register a class with the objectify function.
 
     Registered classes will be able to be deserialized directly into their base objects
     instead of into a WeaveObject."""
     _registry[cls.__name__] = cls
+
+    @classmethod
+    def from_uri(cls, uri: str) -> T:
+        import weave
+
+        return weave.ref(uri).get()
+
+    cls.from_uri = from_uri
+
     return cls
 
 

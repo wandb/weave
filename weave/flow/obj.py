@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -50,6 +50,13 @@ class Object(BaseModel):
     )
 
     __str__ = BaseModel.__repr__
+
+    @classmethod
+    def from_uri(cls, uri: str) -> Self:
+        """It's up to the subclass to implement this!
+
+        Using the @objectify.register decorator will also implement this automatically."""
+        raise NotImplementedError("from_uri not implemented for this object")
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.

@@ -70,9 +70,5 @@ class Dataset(Object):
                 )
         return rows
 
-    @classmethod
-    def from_uri(cls, uri: str) -> Self:
-        return weave.ref(uri).get()
-
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
