@@ -234,7 +234,7 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
-  public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+  public objDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
     return this.makeRequest<TraceObjDeleteReq, TraceObjDeleteRes>(
       '/obj/delete',
       req
