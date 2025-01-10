@@ -3,7 +3,16 @@ import pytest
 import weave
 
 
-@pytest.fixture(params=["dataset", "model", "evaluation"])
+@pytest.fixture(
+    params=[
+        "dataset",
+        "model",
+        "evaluation",
+        "string_prompt",
+        "messages_prompt",
+        "easy_prompt",
+    ]
+)
 def obj(request):
     examples = [
         {"question": "What is 2+2?", "expected": "4"},
@@ -22,6 +31,12 @@ def obj(request):
         return SimpleModel()
     elif request.param == "evaluation":
         return weave.Evaluation(dataset=examples)
+    elif request.param == "string_prompt":
+        return weave.StringPrompt("Hello, world!")
+    elif request.param == "messages_prompt":
+        return weave.MessagesPrompt([{"role": "user", "content": "Hello, world!"}])
+    elif request.param == "easy_prompt":
+        return weave.EasyPrompt("Hello world!")
 
 
 def test_uri_get(client, obj):
