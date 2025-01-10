@@ -1,6 +1,5 @@
 import asyncio
 import threading
-from typing import Optional
 
 import aioprocessing
 import pytest
@@ -18,7 +17,7 @@ async def process_producer(queue: Queue) -> None:
     await asyncio.wait(tasks)
 
 
-def process_consumer(queue: Queue, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+def process_consumer(queue: Queue) -> None:
     async def _consume():
         for _ in range(3):
             if isinstance(queue, ThreadQueue):
@@ -28,10 +27,7 @@ def process_consumer(queue: Queue, loop: Optional[asyncio.AbstractEventLoop] = N
             print(f"Consumer: {item}", flush=True)
             queue.task_done()
 
-    if isinstance(queue, ThreadQueue):
-        asyncio.run_coroutine_threadsafe(_consume(), loop).result()
-    else:
-        asyncio.run(_consume())
+    asyncio.run(_consume())
 
 
 @pytest.mark.timeout(10)
@@ -52,8 +48,7 @@ async def test_async_process_queue_shared() -> None:
 @pytest.mark.asyncio
 async def test_async_thread_queue_shared() -> None:
     queue: Queue = ThreadQueue()
-    loop = asyncio.get_event_loop()
-    consumer_thread = threading.Thread(target=process_consumer, args=(queue, loop))
+    consumer_thread = threading.Thread(target=process_consumer, args=(queue,))
     consumer_thread.start()
 
     await process_producer(queue)
