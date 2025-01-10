@@ -45,5 +45,5 @@ def test_uri_get(client, obj):
     obj_cls = type(obj)
     obj2 = obj_cls.from_uri(ref.uri())
 
-    for field in obj.model_fields:
-        assert getattr(obj, field.name) == getattr(obj2, field.name)
+    for field_name in obj.model_fields:
+        assert getattr(obj, field_name) == getattr(obj2, field_name)
