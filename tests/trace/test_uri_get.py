@@ -6,7 +6,6 @@ import weave
 @pytest.fixture(
     params=[
         "dataset",
-        "model",
         "evaluation",
         "string_prompt",
         "messages_prompt",
@@ -21,14 +20,6 @@ def obj(request):
 
     if request.param == "dataset":
         return weave.Dataset(rows=examples)
-    elif request.param == "model":
-
-        class SimpleModel(weave.Model):
-            @weave.op()
-            def predict(self, question: str) -> dict:
-                return {"answer": "4"}
-
-        return SimpleModel()
     elif request.param == "evaluation":
         return weave.Evaluation(dataset=examples)
     elif request.param == "string_prompt":
