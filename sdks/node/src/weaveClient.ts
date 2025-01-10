@@ -2,6 +2,7 @@ import {AsyncLocalStorage} from 'async_hooks';
 import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
+import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {Dataset} from './dataset';
 import {computeDigest} from './digest';
 import {
@@ -386,7 +387,7 @@ export class WeaveClient {
       const classChain = getClassChain(obj);
       const className = classChain[0];
       if (!objId) {
-        objId = obj.id;
+        objId = sanitizeObjectName(obj.id);
       }
 
       let saveAttrs = obj.saveAttrs();
@@ -410,7 +411,6 @@ export class WeaveClient {
         },
       });
       const ref = new ObjectRef(this.projectId, objId, response.data.digest);
-      // console.log(`Saved object: ${ref.ui_url()}`);
       return ref;
     })();
 
@@ -828,4 +828,24 @@ async function maybeFormatCode(code: string) {
   //     // prettier not available or formatting failed, just use the original string
   //     return code;
   //   }
+}
+
+function sanitizeObjectName(name: string): string {
+  // Replaces any non-alphanumeric characters with a single dash and removes
+  // any leading or trailing dashes. This is more restrictive than the DB
+  // constraints and can be relaxed if needed.
+  let res = name.replace(/[^\w._]+/g, '-'); // non-words
+  res = res.replace(/([._-]{2,})+/g, '-'); // multiple separators
+  res = res.replace(/^[-_]+|[-_]+$/g, ''); // leading/trailing separators
+
+  if (!res) {
+    throw new Error(`Invalid object name: ${name}`);
+  }
+
+  // Truncate if too long
+  if (res.length > MAX_OBJECT_NAME_LENGTH) {
+    res = res.slice(0, MAX_OBJECT_NAME_LENGTH);
+  }
+
+  return res;
 }
