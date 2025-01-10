@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {LoadingDots} from '../../../../../LoadingDots';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
@@ -44,27 +44,33 @@ export const PILImageImage: React.FC<{
   if (imageBinary.loading) {
     return <LoadingDots />;
   } else if (imageBinary.result == null) {
-    return <span></span>;
+    return <span>No img data</span>;
   }
 
   const arrayBuffer = imageBinary.result as any as ArrayBuffer;
-  const blob = new Blob([arrayBuffer], {
-    type: `image/${imageFileExt}`,
-  });
-  const url = URL.createObjectURL(blob);
+  const [imgUrl, setImgUrl] = useState<string>();
+
+  useEffect(() => {
+    const blob = new Blob([arrayBuffer], {type: `image/${imageFileExt}`});
+    const url = URL.createObjectURL(blob);
+    setImgUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [arrayBuffer, imageFileExt]);
 
   // TODO: It would be nice to have a more general image render - similar to the
   // ValueViewImage that does things like light box, general scaling,
   // downloading, etc..
-  return (
+  return imgUrl ? (
     <img
-      src={url}
-      alt="Custom"
+      src={imgUrl}
+      alt={`Image from ${imageKey}`}
       style={{
         width: '100%',
         height: '100%',
         objectFit: 'contain',
       }}
     />
+  ) : (
+    <span></span>
   );
 };
