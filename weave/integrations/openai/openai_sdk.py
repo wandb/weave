@@ -404,6 +404,18 @@ def get_openai_patcher(
     async_completions_parse_settings = base.model_copy(
         update={"name": base.name or "openai.beta.chat.completions.parse"}
     )
+    moderation_create_settings = base.model_copy(
+        update={"name": base.name or "openai.moderations.create"}
+    )
+    async_moderation_create_settings = base.model_copy(
+        update={"name": base.name or "openai.moderations.create"}
+    )
+    embeddings_create_settings = base.model_copy(
+        update={"name": base.name or "openai.embeddings.create"}
+    )
+    async_embeddings_create_settings = base.model_copy(
+        update={"name": base.name or "openai.embeddings.create"}
+    )
 
     _openai_patcher = MultiPatcher(
         [
@@ -430,6 +442,26 @@ def get_openai_patcher(
                 ),
                 "AsyncCompletions.parse",
                 create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.moderations"),
+                "Moderations.create",
+                create_wrapper_sync(settings=moderation_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.moderations"),
+                "AsyncModerations.create",
+                create_wrapper_async(settings=async_moderation_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.embeddings"),
+                "Embeddings.create",
+                create_wrapper_sync(settings=embeddings_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.embeddings"),
+                "AsyncEmbeddings.create",
+                create_wrapper_async(settings=async_embeddings_create_settings),
             ),
         ]
     )

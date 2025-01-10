@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import importlib
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from mistralai.models.chat_completion import (
@@ -11,11 +14,13 @@ if TYPE_CHECKING:
         ChatCompletionStreamResponse,
     )
 
+_mistral_patcher: MultiPatcher | None = None
+
 
 def mistral_accumulator(
-    acc: Optional["ChatCompletionResponse"],
-    value: "ChatCompletionStreamResponse",
-) -> "ChatCompletionResponse":
+    acc: ChatCompletionResponse | None,
+    value: ChatCompletionStreamResponse,
+) -> ChatCompletionResponse:
     # This import should be safe at this point
     from mistralai.models.chat_completion import (
         ChatCompletionResponse,
@@ -72,37 +77,78 @@ def mistral_accumulator(
     return acc
 
 
-def mistral_stream_wrapper(fn: Callable) -> Callable:
-    op = weave.op()(fn)
-    acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
-    return acc_op
+def mistral_stream_wrapper(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
+        return acc_op
+
+    return wrapper
 
 
-mistral_patcher = MultiPatcher(
-    [
-        # Patch the sync, non-streaming chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("mistralai.client"),
-            "MistralClient.chat",
-            weave.op(),
-        ),
-        # Patch the sync, streaming chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("mistralai.client"),
-            "MistralClient.chat_stream",
-            mistral_stream_wrapper,
-        ),
-        # Patch the async, non-streaming chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("mistralai.async_client"),
-            "MistralAsyncClient.chat",
-            weave.op(),
-        ),
-        # Patch the async, streaming chat method
-        SymbolPatcher(
-            lambda: importlib.import_module("mistralai.async_client"),
-            "MistralAsyncClient.chat_stream",
-            mistral_stream_wrapper,
-        ),
-    ]
-)
+def mistral_wrapper(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        return op
+
+    return wrapper
+
+
+def get_mistral_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _mistral_patcher
+    if _mistral_patcher is not None:
+        return _mistral_patcher
+
+    base = settings.op_settings
+
+    chat_settings = base.model_copy(update={"name": base.name or "mistralai.chat"})
+    chat_stream_settings = base.model_copy(
+        update={"name": base.name or "mistralai.chat_stream"}
+    )
+    async_chat_settings = base.model_copy(
+        update={"name": base.name or "mistralai.async_client.chat"}
+    )
+    async_chat_stream_settings = base.model_copy(
+        update={"name": base.name or "mistralai.async_client.chat_stream"}
+    )
+
+    _mistral_patcher = MultiPatcher(
+        [
+            # Patch the sync, non-streaming chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("mistralai.client"),
+                "MistralClient.chat",
+                mistral_wrapper(chat_settings),
+            ),
+            # Patch the sync, streaming chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("mistralai.client"),
+                "MistralClient.chat_stream",
+                mistral_stream_wrapper(chat_stream_settings),
+            ),
+            # Patch the async, non-streaming chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("mistralai.async_client"),
+                "MistralAsyncClient.chat",
+                mistral_wrapper(async_chat_settings),
+            ),
+            # Patch the async, streaming chat method
+            SymbolPatcher(
+                lambda: importlib.import_module("mistralai.async_client"),
+                "MistralAsyncClient.chat_stream",
+                mistral_stream_wrapper(async_chat_stream_settings),
+            ),
+        ]
+    )
+
+    return _mistral_patcher

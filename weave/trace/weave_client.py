@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import inspect
 import json
 import logging
 import platform
@@ -11,7 +10,16 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
-from typing import Any, Callable, Generic, Protocol, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Protocol,
+    TypeVar,
+    cast,
+    overload,
+)
 
 import pydantic
 from requests import HTTPError
@@ -23,6 +31,7 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -39,7 +48,7 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import client_parallelism
@@ -84,6 +93,10 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+if TYPE_CHECKING:
+    from weave.scorers.base_scorer import ApplyScorerResult, Scorer
+
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -447,43 +460,60 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
-    def _apply_scorer(self, scorer_op: Op) -> None:
+    async def apply_scorer(
+        self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
+    ) -> ApplyScorerResult:
         """
-        This is a private method that applies a scorer to a call and records the feedback.
-        In the near future, this will be made public, but for now it is only used internally
-        for testing.
+        `apply_scorer` is a method that applies a Scorer to a Call. This is useful
+        for guarding application logic with a scorer and/or monitoring the quality
+        of critical ops. Scorers are automatically logged to Weave as Feedback and
+        can be used in queries & analysis.
 
-        Before making this public, we should refactor such that the `predict_and_score` method
-        inside `eval.py` uses this method inside the scorer block.
+        Args:
+            scorer: The Scorer to apply.
+            additional_scorer_kwargs: Additional kwargs to pass to the scorer. This is
+                useful for passing in additional context that is not part of the call
+                inputs.useful for passing in additional context that is not part of the call
+                inputs.
 
-        Current limitations:
-        - only works for ops (not Scorer class)
-        - no async support
-        - no context yet (ie. ground truth)
+        Returns:
+            The result of the scorer application in the form of an `ApplyScorerResult`.
+
+        ```python
+        class ApplyScorerSuccess:
+            result: Any
+            score_call: Call
+        ```
+
+        Example usage:
+
+        ```python
+        my_scorer = ... # construct a scorer
+        prediction, prediction_call = my_op.call(input_data)
+        result, score_call = prediction.apply_scorer(my_scorer)
+        ```
         """
-        client = weave_client_context.require_weave_client()
-        scorer_signature = inspect.signature(scorer_op)
-        scorer_arg_names = list(scorer_signature.parameters.keys())
-        score_args = {k: v for k, v in self.inputs.items() if k in scorer_arg_names}
-        if "output" in scorer_arg_names:
-            score_args["output"] = self.output
-        _, score_call = scorer_op.call(**score_args)
-        scorer_op_ref = get_ref(scorer_op)
-        if scorer_op_ref is None:
-            raise ValueError("Scorer op has no ref")
-        self_ref = get_ref(self)
-        if self_ref is None:
-            raise ValueError("Call has no ref")
-        score_results = score_call.output
-        score_call_ref = get_ref(score_call)
-        if score_call_ref is None:
-            raise ValueError("Score call has no ref")
-        client._add_runnable_feedback(
-            weave_ref_uri=self_ref.uri(),
-            output=score_results,
-            call_ref_uri=score_call_ref.uri(),
-            runnable_ref_uri=scorer_op_ref.uri(),
-        )
+        from weave.scorers.base_scorer import Scorer, apply_scorer_async
+
+        model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
+        example = {**model_inputs, **(additional_scorer_kwargs or {})}
+        output = self.output
+        if isinstance(output, ObjectRef):
+            output = output.get()
+        apply_scorer_result = await apply_scorer_async(scorer, example, output)
+        score_call = apply_scorer_result.score_call
+
+        wc = weave_client_context.get_weave_client()
+        if wc:
+            scorer_ref_uri = None
+            if weave_isinstance(scorer, Scorer):
+                # Very important: if the score is generated from a Scorer subclass,
+                # then scorer_ref_uri will be None, and we will use the op_name from
+                # the score_call instead.
+                scorer_ref = get_ref(scorer)
+                scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
+            wc._send_score_call(self, score_call, scorer_ref_uri)
+        return apply_scorer_result
 
 
 def make_client_call(
@@ -763,6 +793,8 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        from weave.trace.api import _global_postprocess_inputs
+
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -776,6 +808,9 @@ class WeaveClient:
             inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
             inputs_postprocessed = inputs_redacted
+
+        if _global_postprocess_inputs:
+            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -810,6 +845,7 @@ class WeaveClient:
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
+            # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes,
         )
@@ -863,6 +899,8 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        from weave.trace.api import _global_postprocess_output
+
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
@@ -871,9 +909,13 @@ class WeaveClient:
             postprocessed_output = op.postprocess_output(original_output)
         else:
             postprocessed_output = original_output
-        self._save_nested_objects(postprocessed_output)
 
-        call.output = map_to_refs(postprocessed_output)
+        if _global_postprocess_output:
+            postprocessed_output = _global_postprocess_output(postprocessed_output)
+
+        self._save_nested_objects(postprocessed_output)
+        output_as_refs = map_to_refs(postprocessed_output)
+        call.output = postprocessed_output
 
         # Summary handling
         summary = {}
@@ -928,7 +970,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(call.output, project_id, self, use_dictify=False)
+            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -1676,7 +1718,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if k in REDACT_KEYS:
+            if should_redact(k):
                 dict_res[k] = REDACTED_VALUE
             else:
                 dict_res[k] = redact_sensitive_keys(v)

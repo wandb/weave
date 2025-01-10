@@ -73,7 +73,7 @@ export const ObjectViewerGroupingCell: FC<
         }}>
         {isGroup || isExpandableRef ? (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon={
               isGroup && rowNode.childrenExpanded
                 ? 'chevron-down'

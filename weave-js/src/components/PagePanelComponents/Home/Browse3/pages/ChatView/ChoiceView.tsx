@@ -21,7 +21,7 @@ export const ChoiceView = ({
   const {message} = choice;
   return (
     <MessagePanel
-      index={choice.index}
+      index={choiceIndex || choice.index}
       message={message}
       isStructuredOutput={isStructuredOutput}
       isNested={isNested}

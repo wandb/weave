@@ -70,7 +70,7 @@ export const ChoicesDrawer = ({
       <Tailwind>
         <div className="flex flex-col p-12">
           {choices.map((c, index) => (
-            <div key={c.index}>
+            <div key={index}>
               <div className="flex items-center gap-4 font-semibold">
                 <Tag color="moon" label={`Response ${index + 1}`} />
                 {index === selectedChoiceIndex ? (
