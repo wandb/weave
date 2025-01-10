@@ -46,4 +46,6 @@ def objectify(obj: WeaveObject) -> Any:
         params = inspect.signature(cls.__init__).parameters
     fields = {f: getattr(obj, f) for f in params if f != "self" and hasattr(obj, f)}
 
-    return cls(**fields)
+    obj = cls(**fields)
+    obj.__dict__["ref"] = obj.ref
+    return obj

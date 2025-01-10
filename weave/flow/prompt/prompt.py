@@ -12,6 +12,7 @@ from rich.table import Table
 
 from weave.flow.obj import Object
 from weave.flow.prompt.common import ROLE_COLORS, color_role
+from weave.trace import objectify
 from weave.trace.api import publish as weave_publish
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
@@ -76,6 +77,7 @@ class Prompt(Object):
         raise NotImplementedError("Subclasses must implement format()")
 
 
+@objectify.register
 class StringPrompt(Prompt):
     content: str = ""
 
@@ -94,6 +96,7 @@ class StringPrompt(Prompt):
         return prompt
 
 
+@objectify.register
 class MessagesPrompt(Prompt):
     messages: list[dict] = Field(default_factory=list)
 
@@ -121,6 +124,7 @@ class MessagesPrompt(Prompt):
         return prompt
 
 
+@objectify.register
 class EasyPrompt(UserList, Prompt):
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
