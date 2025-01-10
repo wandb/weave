@@ -88,7 +88,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
               />
 
               {/* TODO: N times to run is not supported for all models */}
-              {/* TODO: rerun if this is not supported in the backend */}
+              {/* TODO: rerun in backend if this is not supported */}
               <PlaygroundSlider
                 min={1}
                 max={100}
@@ -96,7 +96,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 setValue={value =>
                   setPlaygroundStateField(idx, 'nTimes', value)
                 }
-                label="Completion iterations"
+                label="Number of trials"
                 value={playgroundState.nTimes}
               />
 

@@ -71,7 +71,7 @@ export const TestOnlyExampleSchema = z.object({
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 
-export const baseObjectClassRegistry = {
+export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
@@ -79,10 +79,10 @@ export const baseObjectClassRegistry = {
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
 
-export const GeneratedBaseObjectClassesZodSchema = z.object(
-  baseObjectClassRegistry
+export const GeneratedBuiltinObjectClassesZodSchema = z.object(
+  builtinObjectClassRegistry
 );
 
-export type GeneratedBaseObjectClassesZod = z.infer<
-  typeof GeneratedBaseObjectClassesZodSchema
+export type GeneratedBuiltinObjectClassesZod = z.infer<
+  typeof GeneratedBuiltinObjectClassesZodSchema
 >;

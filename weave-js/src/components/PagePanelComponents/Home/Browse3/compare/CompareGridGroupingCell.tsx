@@ -81,7 +81,7 @@ export const CompareGridGroupingCell: FC<
         }}>
         {isExpandable ? (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon={
               isGroup && rowNode.childrenExpanded
                 ? 'chevron-down'

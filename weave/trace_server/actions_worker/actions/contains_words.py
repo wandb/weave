@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from weave.trace_server.interface.base_object_classes.actions import (
+from weave.trace_server.interface.builtin_object_classes.actions import (
     ContainsWordsActionConfig,
 )
 from weave.trace_server.trace_server_interface import (
