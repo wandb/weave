@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Union
 
 from pydantic import field_validator
 
@@ -41,6 +41,17 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    def __iter__(self) -> Iterator[dict]:
+        return iter(self.rows)
+
+    def __len__(self) -> int:
+        return len(
+            self.rows
+        )  # TODO: this may be slow; should we call out to calls stats query?
+
+    # TODO: should we implement slice on Table, or just here?  I think Table?
+    def __getitem__(self, key: Union[int, slice]) -> dict: ...
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
