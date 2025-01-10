@@ -23,5 +23,13 @@ def configure_redaction(
     _redacted_value = redacted_value
 
 
+def get_redacted_keys() -> set[str]:
+    return _redact_keys
+
+
+def get_redacted_value() -> str:
+    return _redacted_value
+
+
 def should_redact(key: str) -> bool:
     return key.lower() in _redact_keys

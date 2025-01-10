@@ -24,7 +24,7 @@ from weave.trace.ipython import (
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
-from weave.trace.sanitize import DEFAULT_REDACTED_VALUE, should_redact
+from weave.trace.sanitize import get_redacted_value, should_redact
 from weave.trace_server.trace_server_interface_util import str_digest
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
@@ -448,7 +448,7 @@ def _get_code_deps(
 
                     # Redact sensitive values
                     if should_redact(var_name):
-                        json_val = DEFAULT_REDACTED_VALUE
+                        json_val = get_redacted_value()
                     else:
                         json_val = to_json(var_value, client._project_id(), client)
                 except Exception as e:
@@ -457,7 +457,7 @@ def _get_code_deps(
                     )
                 else:
                     if should_redact(var_name):
-                        json_str = f'"{DEFAULT_REDACTED_VALUE}"'
+                        json_str = f'"{get_redacted_value()}"'
                     else:
                         json_str = json.dumps(json_val, cls=RefJSONEncoder, indent=4)
                     code_paragraph = f"{var_name} = " + json_str + "\n"
