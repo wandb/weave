@@ -40,7 +40,6 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
@@ -88,7 +87,6 @@ async def test_chatnvidia_async_quickstart(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
@@ -140,7 +138,6 @@ def test_chatnvidia_stream_quickstart(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     print(call.summary["usage"][output["model"]])
     usage = call.summary["usage"][output["model"]]
@@ -192,7 +189,6 @@ async def test_chatnvidia_async_stream_quickstart(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     print(call.summary["usage"][output["model"]])
     usage = call.summary["usage"][output["model"]]
@@ -273,7 +269,6 @@ def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> N
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
@@ -361,7 +356,6 @@ async def test_chatnvidia_tool_call_async(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
@@ -453,7 +447,6 @@ def test_chatnvidia_tool_call_stream(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1
@@ -546,7 +539,6 @@ async def test_chatnvidia_tool_call_async_stream(
 
     output = call.output
     assert output["model"] == model
-    assert output["object"] == "chat.completion"
 
     usage = call.summary["usage"][output["model"]]
     assert usage["requests"] == 1

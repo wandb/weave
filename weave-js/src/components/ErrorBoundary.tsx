@@ -1,7 +1,7 @@
 import {datadogRum} from '@datadog/browser-rum';
 import * as Sentry from '@sentry/react';
 import React, {Component, ErrorInfo, ReactNode} from 'react';
-import {v7 as uuidv7} from 'uuid';
+import {v4 as uuidv4} from 'uuid';
 
 import {weaveErrorToDDPayload} from '../errors';
 import {ErrorPanel} from './ErrorPanel';
@@ -18,7 +18,7 @@ type State = {
 
 export class ErrorBoundary extends Component<Props, State> {
   public static getDerivedStateFromError(error: Error): State {
-    return {uuid: uuidv7(), timestamp: new Date(), error};
+    return {uuid: uuidv4(), timestamp: new Date(), error};
   }
   public state: State = {
     uuid: undefined,

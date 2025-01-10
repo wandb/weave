@@ -7,6 +7,7 @@ import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
+import {DatasetVersionPage} from '../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -27,7 +28,6 @@ import {
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabPrompt} from './TabPrompt';
-import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
 import {TabUsePrompt} from './TabUsePrompt';
@@ -198,6 +198,10 @@ const ObjectVersionPageInner: React.FC<{
     return <CenteredAnimatedLoader />;
   }
 
+  if (isDataset) {
+    return <DatasetVersionPage objectVersion={objectVersion} />;
+  }
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -319,9 +323,9 @@ const ObjectVersionPageInner: React.FC<{
             ]
           : []),
         {
-          label: isDataset ? 'Rows' : 'Values',
+          label: 'Values',
           content: (
-            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
+            <ScrollableTabContent>
               <Box
                 sx={{
                   flex: '0 0 auto',
@@ -358,12 +362,6 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
-                  />
-                ) : baseObjectClass === 'Dataset' ? (
-                  <TabUseDataset
-                    name={objectName}
-                    uri={refUri}
-                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel

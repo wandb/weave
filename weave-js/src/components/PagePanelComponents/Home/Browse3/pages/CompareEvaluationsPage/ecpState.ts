@@ -7,9 +7,15 @@
 
 import {useMemo} from 'react';
 
-import {useEvaluationComparisonData} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
+import {
+  useEvaluationComparisonResults,
+  useEvaluationComparisonSummary,
+} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {EvaluationComparisonData} from './ecpTypes';
+import {
+  EvaluationComparisonResults,
+  EvaluationComparisonSummary,
+} from './ecpTypes';
 import {getMetricIds} from './ecpUtil';
 
 /**
@@ -17,7 +23,9 @@ import {getMetricIds} from './ecpUtil';
  */
 export type EvaluationComparisonState = {
   // The normalized data for the evaluations
-  data: EvaluationComparisonData;
+  summary: EvaluationComparisonSummary;
+  // The results of the evaluations
+  loadableComparisonResults: Loadable<EvaluationComparisonResults>;
   // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
@@ -50,18 +58,28 @@ export const useEvaluationComparisonState = (
   const orderedCallIds = useMemo(() => {
     return getCallIdsOrderedForQuery(evaluationCallIds);
   }, [evaluationCallIds]);
-  const data = useEvaluationComparisonData(entity, project, orderedCallIds);
+  const summaryData = useEvaluationComparisonSummary(
+    entity,
+    project,
+    orderedCallIds
+  );
+  const resultsData = useEvaluationComparisonResults(
+    entity,
+    project,
+    orderedCallIds,
+    summaryData.result
+  );
 
   const value = useMemo(() => {
-    if (data.result == null || data.loading) {
+    if (summaryData.result == null || summaryData.loading) {
       return {loading: true, result: null};
     }
 
     const scorerDimensions = Object.keys(
-      getMetricIds(data.result, 'score', 'scorer')
+      getMetricIds(summaryData.result, 'score', 'scorer')
     );
     const derivedDimensions = Object.keys(
-      getMetricIds(data.result, 'score', 'derived')
+      getMetricIds(summaryData.result, 'score', 'derived')
     );
 
     let newComparisonDimensions = comparisonDimensions;
@@ -93,7 +111,8 @@ export const useEvaluationComparisonState = (
     return {
       loading: false,
       result: {
-        data: data.result,
+        summary: summaryData.result,
+        loadableComparisonResults: resultsData,
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
         selectedMetrics,
@@ -101,9 +120,10 @@ export const useEvaluationComparisonState = (
       },
     };
   }, [
-    data.result,
-    data.loading,
+    summaryData.result,
+    summaryData.loading,
     comparisonDimensions,
+    resultsData,
     selectedInputDigest,
     selectedMetrics,
     evaluationCallIds,
@@ -132,8 +152,8 @@ const getCallIdsOrderedForQuery = (callIds: string[]) => {
  */
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
   const baselineCallId = getBaselineCallId(state);
-  const baselineRef = state.data.evaluationCalls[baselineCallId].modelRef;
-  const refs = Object.keys(state.data.models);
+  const baselineRef = state.summary.evaluationCalls[baselineCallId].modelRef;
+  const refs = Object.keys(state.summary.models);
   // Make sure the baseline model is first
   moveItemToFront(refs, baselineRef);
   return refs;

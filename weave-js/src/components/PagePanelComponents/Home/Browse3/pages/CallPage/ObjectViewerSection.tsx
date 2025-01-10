@@ -228,14 +228,14 @@ const ObjectViewerSectionNonEmpty = ({
           {title}
         </Title>
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="collapse"
           onClick={onClickCollapsed}
           tooltip="Collapse all"
           active={isModeCollapsed(mode)}
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="expand-uncollapse"
           onClick={onClickExpanded}
           tooltip={
@@ -246,7 +246,7 @@ const ObjectViewerSectionNonEmpty = ({
           active={isModeExpanded(mode)}
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="code-alt"
           active={isModeJson(mode)}
           onClick={() => setMode('json')}
