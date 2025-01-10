@@ -187,6 +187,8 @@ class PaginatedIterator(Generic[T, R]):
         return self._get_slice(slice(0, None, 1))
 
     def __len__(self) -> int:
+        """This method is included for convenience.  It includes a network call, which
+        is typically slower than most other len() operations!"""
         if not self.size_func:
             raise TypeError("This iterator does not support len()")
         return self.size_func()
