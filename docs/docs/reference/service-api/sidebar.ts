@@ -128,6 +128,12 @@ const sidebar: SidebarsConfig = {
           label: "Table Query",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/table-query-stats-table-query-stats-post",
+          label: "Table Query Stats",
+          className: "api-method post",
+        },
       ],
     },
     {
@@ -164,6 +170,31 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Costs",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/cost-create-cost-create-post",
+          label: "Cost Create",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/cost-query-cost-query-post",
+          label: "Cost Query",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/cost-purge-cost-purge-post",
+          label: "Cost Purge",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
       label: "Feedback",
       collapsed: false,
       items: [
@@ -183,6 +214,12 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/feedback-purge-feedback-purge-post",
           label: "Feedback Purge",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/feedback-replace-feedback-replace-post",
+          label: "Feedback Replace",
           className: "api-method post",
         },
       ],

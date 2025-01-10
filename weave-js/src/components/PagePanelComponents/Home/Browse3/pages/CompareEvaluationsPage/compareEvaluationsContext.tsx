@@ -1,5 +1,6 @@
 import {Box} from '@material-ui/core';
-import React, {useMemo} from 'react';
+import {useDeepMemo} from '@wandb/weave/hookUtils';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {LinearProgress} from '../../../../../LinearProgress';
@@ -9,13 +10,14 @@ import {ComparisonDimensionsType} from './ecpState';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  addEvaluationCall: (newCallId: string) => void;
+  removeEvaluationCall: (callId: string) => void;
+  setEvaluationCallOrder: (newCallIdOrder: string[]) => void;
 } | null>(null);
 
 export const useCompareEvaluationsState = () => {
@@ -29,38 +31,45 @@ export const useCompareEvaluationsState = () => {
 export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
-  evaluationCallIds: string[];
-  setBaselineEvaluationCallId: React.Dispatch<
-    React.SetStateAction<string | null>
-  >;
+  initialEvaluationCallIds: string[];
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+
+  onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
   >;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
-  baselineEvaluationCallId?: string;
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 }> = ({
   entity,
   project,
-  evaluationCallIds,
-  setBaselineEvaluationCallId,
+  initialEvaluationCallIds,
+  selectedMetrics,
+  setSelectedMetrics,
+  onEvaluationCallIdsUpdate,
   setComparisonDimensions,
-
   setSelectedInputDigest,
-
-  baselineEvaluationCallId,
   comparisonDimensions,
   selectedInputDigest,
   children,
 }) => {
+  const initialEvaluationCallIdsMemo = useDeepMemo(initialEvaluationCallIds);
+  const [evaluationCallIds, setEvaluationCallIds] = useState(
+    initialEvaluationCallIdsMemo
+  );
+  useEffect(() => {
+    setEvaluationCallIds(initialEvaluationCallIdsMemo);
+  }, [initialEvaluationCallIdsMemo]);
+
   const initialState = useEvaluationComparisonState(
     entity,
     project,
     evaluationCallIds,
-    baselineEvaluationCallId,
     comparisonDimensions,
-    selectedInputDigest
+    selectedInputDigest,
+    selectedMetrics ?? undefined
   );
 
   const value = useMemo(() => {
@@ -69,16 +78,35 @@ export const CompareEvaluationsProvider: React.FC<{
     }
     return {
       state: initialState.result,
-      setBaselineEvaluationCallId,
       setComparisonDimensions,
       setSelectedInputDigest,
+      setSelectedMetrics,
+      addEvaluationCall: (newCallId: string) => {
+        const newEvaluationCallIds = [...evaluationCallIds, newCallId];
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
+      },
+      removeEvaluationCall: (callId: string) => {
+        const newEvaluationCallIds = evaluationCallIds.filter(
+          id => id !== callId
+        );
+        setEvaluationCallIds(newEvaluationCallIds);
+        onEvaluationCallIdsUpdate(newEvaluationCallIds);
+      },
+      setEvaluationCallOrder: (newCallIdOrder: string[]) => {
+        setEvaluationCallIds(newCallIdOrder);
+        onEvaluationCallIdsUpdate(newCallIdOrder);
+      },
     };
   }, [
     initialState.loading,
     initialState.result,
-    setBaselineEvaluationCallId,
+    setEvaluationCallIds,
+    evaluationCallIds,
+    onEvaluationCallIdsUpdate,
     setComparisonDimensions,
     setSelectedInputDigest,
+    setSelectedMetrics,
   ]);
 
   if (!value) {

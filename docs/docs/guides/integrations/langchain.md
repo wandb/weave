@@ -196,7 +196,7 @@ Evaluations help you measure the performance of your models. By using the [`weav
 
 ```python
 
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 sentences = [
     "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",

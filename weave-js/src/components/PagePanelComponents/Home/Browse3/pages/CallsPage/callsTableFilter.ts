@@ -125,9 +125,15 @@ export const useOpVersionOptions = (
 } => {
   const {useOpVersions} = useWFHooks();
   // Get all the "latest" versions
-  const latestVersions = useOpVersions(entity, project, {
-    latestOnly: true,
-  });
+  const latestVersions = useOpVersions(
+    entity,
+    project,
+    {
+      latestOnly: true,
+    },
+    undefined,
+    true // metadataOnly
+  );
 
   // Get all the versions of the currently selected op
   const currentRef = effectiveFilter.opVersionRefs?.[0] ?? null;
@@ -141,6 +147,7 @@ export const useOpVersionOptions = (
       opIds: [currentOpId ?? ''],
     },
     undefined,
+    true, // metadataOnly
     {
       skip: !currentOpId,
     }

@@ -8,8 +8,6 @@ from weave.deploy import gcp as google
 from weave.trace import api
 from weave.trace.refs import ObjectRef, parse_uri
 
-# from .model_server import app
-
 # TODO: does this work?
 os.environ["PYTHONUNBUFFERED"] = "1"
 
@@ -20,24 +18,7 @@ def cli() -> None:
     pass
 
 
-# Not included for now.
-# @cli.command("ui", help="Start the weave UI.")
-# def start_ui() -> None:
-#     print("Starting server...")
-#     try:
-#         from weave.legacy.weave import server
-#     except ModuleNotFoundError:
-#         print("Run 'pip install weave[engine]' to use the local server.")
-#         sys.exit(1)
-#     serv = server.HttpServer(port=3000)  # type: ignore
-#     serv.start()
-#     print("Server started")
-#     print(f"http://localhost:3000/{BROWSE3_PATH}")
-#     while True:
-#         time.sleep(10)
-
-
-@cli.command(help="Serve weave models.")
+@cli.command(help="Serve weave models.")  # pyright: ignore[reportFunctionMemberAccess]
 @click.argument("model_ref")
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
@@ -56,7 +37,7 @@ def serve(
 ) -> None:
     parsed_ref = parse_uri(model_ref)
     if not isinstance(parsed_ref, ObjectRef):
-        raise ValueError(f"Expected a weave artifact uri, got {parsed_ref}")
+        raise TypeError(f"Expected a weave artifact uri, got {parsed_ref}")
     ref_project = parsed_ref.project
     project_override = project or os.getenv("PROJECT_NAME")
     if project_override:
@@ -73,7 +54,7 @@ def serve(
         )
 
 
-@cli.group(help="Deploy weave models.")
+@cli.group(help="Deploy weave models.")  # pyright: ignore[reportFunctionMemberAccess]
 def deploy() -> None:
     pass
 

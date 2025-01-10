@@ -1,22 +1,16 @@
 import datetime
 import inspect
 import typing
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic  # type: ignore
 
-try:
-    from typing import Annotated
-# Support python 3.8
-except ImportError:
-    from typing_extensions import Annotated  # type: ignore
-
-from weave.legacy.weave import cache, op_args, pyfunc_type_util, weave_pydantic
-from weave.legacy.weave.wandb_api import WandbApiAsync
 from weave.trace import errors
-from weave.trace.op import Op
+from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
+from weave.wandb_interface.wandb_api import WandbApiAsync
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
@@ -81,7 +75,7 @@ def object_method_app(
     obj = obj_ref.get()
 
     attrs: dict[str, Op] = {attr: getattr(obj, attr) for attr in dir(obj)}
-    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, Op)}
+    op_attrs = {k: v for k, v in attrs.items() if is_op(v)}
 
     if not op_attrs:
         raise ValueError("No ops found on object")
@@ -89,15 +83,16 @@ def object_method_app(
     if method_name is None:
         if len(op_attrs) > 1:
             raise ValueError(
-                "Multiple ops found on object (%s), must specify method_name argument"
-                % ", ".join(op_attrs)
+                "Multiple ops found on object ({}), must specify method_name argument".format(
+                    ", ".join(op_attrs)
+                )
             )
         method_name = next(iter(op_attrs))
 
     if (method := getattr(obj, method_name, None)) is None:
         raise ValueError(f"Method {method_name} not found")
 
-    if not isinstance((unbound_method := method.__func__), Op):
+    if not is_op(unbound_method := method.__func__):
         raise ValueError(f"Expected an op, got {unbound_method}")
 
     try:
@@ -107,7 +102,7 @@ def object_method_app(
             f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
         )
     if not isinstance(args, op_args.OpNamedArgs):
-        raise ValueError("predict op must have named args")
+        raise TypeError("predict op must have named args")
 
     arg_types = args.weave_type().property_types
     del arg_types["self"]

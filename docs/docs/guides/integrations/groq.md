@@ -86,7 +86,7 @@ Organizing experimentation is difficult when there are many moving pieces. By us
 
 In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
 
-In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
+In the example below, you can experiment with `GroqCityVisitRecommender`. Every time you change one of these, you'll get a new _version_ of `GroqCityVisitRecommender`.
 
 ```python
 import os
@@ -129,7 +129,7 @@ print(city_recommender.predict("Los Angeles"))
 
 ### Serving a Weave Model
 
-Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
+Given a weave reference to any `weave.Model` object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
 
 | [![dspy_weave_model_serve.png](./imgs/groq/groq_weave_model_version.png)](https://wandb.ai/geekyrakshit/groq-test/weave/objects/GroqCityVisitRecommender/versions/6O1xPTJ9yFx8uuCjJAlI7KgcVYxXKn7JxfmVD9AQT5Q) |
 |---|

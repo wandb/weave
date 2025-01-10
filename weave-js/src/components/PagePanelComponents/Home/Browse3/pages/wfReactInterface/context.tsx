@@ -8,8 +8,9 @@
  *    project and configures the context accordingly.
  */
 
-import React, {createContext, FC, useContext} from 'react';
+import React, {createContext, FC, useContext, useMemo} from 'react';
 
+import {useHasTraceServerClientContext} from './traceServerClientContext';
 import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
@@ -33,5 +34,51 @@ export const WFDataModelAutoProvider: FC<{
     <WFDataModelHooksContext.Provider value={tsWFDataModelHooks}>
       {children}
     </WFDataModelHooksContext.Provider>
+  );
+};
+
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * objects or calls.
+ */
+export const useProjectHasTraceServerData = (
+  entity: string,
+  project: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const objs = tsWFDataModelHooks.useRootObjectVersions(
+    entity,
+    project,
+    {},
+    1,
+    true,
+    {
+      skip: !hasTraceServer,
+      noAutoRefresh: true,
+    }
+  );
+  const columns = useMemo(() => ['id'], []);
+
+  const calls = tsWFDataModelHooks.useCalls(
+    entity,
+    project,
+    {},
+    1,
+    undefined,
+    undefined,
+    undefined,
+    columns,
+    undefined,
+    {
+      skip: !hasTraceServer,
+    }
+  );
+  const loading = objs.loading || calls.loading;
+  return useMemo(
+    () => ({
+      loading,
+      result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
+    }),
+    [loading, objs.result, calls.result]
   );
 };

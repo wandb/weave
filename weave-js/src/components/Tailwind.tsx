@@ -34,3 +34,26 @@ export const Tailwind: React.FC<TailwindProps> = ({
     </div>
   );
 };
+
+/**
+ * A tailwind wrapper with display: contents so that it doesn't affect document flow
+ */
+export const TailwindContents: React.FC<TailwindProps> = ({
+  children,
+  className,
+  style,
+}) => {
+  const styles = React.useMemo(
+    () => ({
+      ...style,
+      display: 'contents',
+    }),
+    [style]
+  );
+
+  return (
+    <Tailwind style={styles} className={className}>
+      {children}
+    </Tailwind>
+  );
+};

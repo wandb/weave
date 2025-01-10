@@ -1,4 +1,5 @@
 import json
+import os
 
 import requests
 
@@ -91,6 +92,7 @@ def main():
     raw_json = get_raw_json()
     safe_for_docs_json = apply_doc_fixes(raw_json)
     safe_for_docs_json = set_servers(safe_for_docs_json)
+    os.makedirs("./scripts/.cache", exist_ok=True)
     with open("./scripts/.cache/service_api_openapi_docs.json", "w") as f:
         json.dump(safe_for_docs_json, f, indent=2)
 

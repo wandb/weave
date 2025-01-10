@@ -2,6 +2,7 @@
  * with an upgrade of react-spring, so we've switched back to the semantic loader.
  * The react-spring version also used 100% cpu, we should use an animated gif
  * instead if we want a custom loader */
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React from 'react';
 import {Loader, StrictLoaderProps} from 'semantic-ui-react';
 
@@ -17,6 +18,9 @@ export interface WandbLoaderProps extends StrictLoaderProps {
   size?: StrictLoaderProps['size'];
 }
 
+/**
+ * @deprecated use the new wave loader instead
+ */
 const WandbLoader: React.FC<WandbLoaderProps> = React.memo(
   ({className, inline, size = 'huge'}) => {
     return <Loader active inline={inline} size={size} className={className} />;
@@ -25,11 +29,17 @@ const WandbLoader: React.FC<WandbLoaderProps> = React.memo(
 
 export default WandbLoader;
 
-export interface TrackedWandbLoaderProps extends WandbLoaderProps {
+export type TrackedWandbLoaderProps = {
   /* Log the exception to an external service */
   captureException?: (error: unknown) => void;
   /* A unique name so we can differentiate between the loaders */
   name: string;
+  /* the sampling rate as a percentage, defaults to 10% */
+  samplingRate?: number;
+  /* Optional callback fired when finished loading */
+  onComplete?(name: string, data: Record<string, unknown> | undefined): void;
+  /* Optional callback fired when started loading */
+  onStart?(name: string): void;
   /**
    * Run an optional callback that returns an object with additional fields to
    * send to the analytics platform. Useful for getting lifecycle data from the
@@ -38,15 +48,23 @@ export interface TrackedWandbLoaderProps extends WandbLoaderProps {
    * keeps us from needing to wire this component up that data store
    */
   profilingCb?: () => Record<string, unknown>;
-  /* the sampling rate as a percentage, defaults to 10% */
-  samplingRate?: number;
   /* Tell me you're a Segment .track() event without telling me about Segment */
   track: (eventName: string, data: Record<string, unknown> | undefined) => void;
-  /* Optional callback fired when finished loading */
-  onComplete?(name: string, data: Record<string, unknown> | undefined): void;
-  /* Optional callback fired when started loading */
-  onStart?(name: string): void;
-}
+};
+
+export const fireOnRandom = (
+  cb: () => void,
+  samplingRate: number,
+  randomNum: number = Math.random()
+) => {
+  if (samplingRate > 1 || samplingRate < 0) {
+    throw new Error('Sampling rate must be between 0 and 1');
+  }
+
+  if (randomNum < samplingRate) {
+    cb();
+  }
+};
 
 export const TrackedWandbLoader = ({
   captureException,
@@ -57,7 +75,7 @@ export const TrackedWandbLoader = ({
   onComplete,
   onStart,
   ...props
-}: TrackedWandbLoaderProps) => {
+}: TrackedWandbLoaderProps & WandbLoaderProps) => {
   useLifecycleProfiling(
     name,
     (data: ProfileData) => {
@@ -72,10 +90,9 @@ export const TrackedWandbLoader = ({
         if (onComplete) {
           onComplete(name, trackedData);
         }
-        const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
-        if (randomNum <= samplingRate * 100) {
+        fireOnRandom(() => {
           track('wandb-loader-onscreen', trackedData);
-        }
+        }, samplingRate);
       } catch (e) {
         // Tracking should be able to fail gracefully without breaking the app
         captureException?.(e);
@@ -85,4 +102,44 @@ export const TrackedWandbLoader = ({
   );
 
   return <WandbLoader {...props} />;
+};
+
+export const TrackedWaveLoader = ({
+  captureException,
+  name,
+  profilingCb,
+  samplingRate = 0.1,
+  track,
+  onComplete,
+  onStart,
+  size,
+}: TrackedWandbLoaderProps & {
+  size: 'small' | 'huge';
+}) => {
+  useLifecycleProfiling(
+    name,
+    (data: ProfileData) => {
+      try {
+        // log the lifecycle for each loader to segment
+        const additionalData = profilingCb ? profilingCb() : {};
+        const trackedData = {
+          componentId: data.id,
+          duration: data.duration,
+          ...additionalData,
+        };
+        if (onComplete) {
+          onComplete(name, trackedData);
+        }
+        fireOnRandom(() => {
+          track('wandb-loader-onscreen', trackedData);
+        }, samplingRate);
+      } catch (e) {
+        // Tracking should be able to fail gracefully without breaking the app
+        captureException?.(e);
+      }
+    },
+    onStart
+  );
+
+  return <WaveLoader size={size} />;
 };

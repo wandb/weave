@@ -9,21 +9,40 @@ export const useProjectSidebar = (
   viewingRestricted: boolean,
   hasModelsData: boolean,
   hasWeaveData: boolean,
-  isLargeWorkspaceModeEnabled: boolean,
-  hasTraceBackend: boolean = true
+  hasTraceBackend: boolean = true,
+  hasModelsAccess: boolean = true,
+  isLaunchActive: boolean = false,
+  isWandbAdmin: boolean = false
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
-  const showModelsSidebarItems = hasModelsData || !hasTraceBackend;
+  let showModelsSidebarItems = hasModelsData || !hasTraceBackend;
   // Should show weave sidebar items if we have weave data and we have a trace backend
-  const showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
+  let showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
 
-  const isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
-  const isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+  let isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
+  let isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+
+  if (!hasModelsAccess) {
+    showModelsSidebarItems = false;
+    isModelsOnly = false;
+
+    showWeaveSidebarItems = true;
+    isWeaveOnly = true;
+  }
 
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
+
   return useMemo(() => {
+    const weaveOnlyMenu = [
+      'weave/leaderboards',
+      'weave/operations',
+      'weave/objects',
+    ];
+    if (isWandbAdmin) {
+      weaveOnlyMenu.push('weave/mods');
+    }
     const allItems = isLoading
       ? []
       : [
@@ -36,8 +55,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Overview',
             slug: 'overview',
-            isShown: !isWeaveOnly,
-            isDisabled: false,
+            isShown: isModelsOnly,
             iconName: IconNames.Info,
           },
           {
@@ -58,17 +76,9 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Charts',
-            slug: 'charts',
-            isShown: isLargeWorkspaceModeEnabled && isModelsOnly,
-            isDisabled: viewingRestricted,
-            iconName: IconNames.ChartVerticalBars,
-          },
-          {
-            type: 'button' as const,
             name: 'Jobs',
             slug: 'jobs',
-            isShown: isModelsOnly,
+            isShown: isModelsOnly && isLaunchActive,
             isDisabled: viewingRestricted,
             iconName: IconNames.FlashBolt,
           },
@@ -93,7 +103,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Reports',
             slug: 'reportlist',
-            isShown: !isWeaveOnly,
+            isShown: isModelsOnly,
             isDisabled: viewingRestricted,
             iconName: IconNames.Report,
           },
@@ -109,17 +119,15 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             isShown: isShowAll,
             key: 'moreModels',
-            menu: ['charts', 'jobs', 'automations', 'sweeps', 'artifacts'],
+            menu: [
+              'jobs',
+              'automations',
+              'sweeps',
+              'reportlist',
+              'artifacts',
+              'overview',
+            ],
           },
-          // Remember to hide weave if env is not prod
-          // {
-          //   type: 'button' as const,
-          //   name: 'Weave',
-          //   slug: 'weave',
-          //   isShown: !showWeaveSidebarItems,
-          //   iconName: IconNames.CodeAlt,
-          //   isDisabled: viewingRestricted,
-          // },
           {
             type: 'divider' as const,
             key: 'dividerModelsWeave',
@@ -132,47 +140,74 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Evaluations',
+            name: 'Traces',
+            slug: 'weave/traces',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.LayoutTabs,
+          },
+          {
+            type: 'button' as const,
+            name: 'Evals',
             slug: 'weave/evaluations',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.TypeBoolean,
-            // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
+            iconName: IconNames.BaselineAlt,
+          },
+          {
+            type: 'button' as const,
+            name: 'Playground',
+            slug: 'weave/playground',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.RobotServiceMember,
+          },
+          {
+            type: 'button' as const,
+            name: 'Prompts',
+            slug: 'weave/prompts',
+            isShown: isWeaveOnly,
+            iconName: IconNames.ForumChatBubble,
           },
           {
             type: 'button' as const,
             name: 'Models',
             slug: 'weave/models',
-            isShown: showWeaveSidebarItems || isShowAll,
+            isShown: isWeaveOnly,
             iconName: IconNames.Model,
           },
           {
             type: 'button' as const,
             name: 'Datasets',
             slug: 'weave/datasets',
-            isShown: showWeaveSidebarItems || isShowAll,
+            isShown: isWeaveOnly,
             iconName: IconNames.Table,
           },
           {
-            type: 'divider' as const,
-            key: 'dividerWithinWeave',
+            type: 'button' as const,
+            name: 'Scorers',
+            slug: 'weave/scorers',
             isShown: isWeaveOnly,
+            iconName: IconNames.TypeNumberAlt,
           },
           {
             type: 'button' as const,
-            name: 'Traces',
-            slug: 'weave/traces',
-            isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.LayoutTabs,
-            // path: baseRouter.callsUIUrl(entity, project, {
-            //   traceRootsOnly: true,
-            // }),
+            name: 'Mods',
+            slug: 'weave/mods',
+            isShown: false, // Only shown in overflow menu
+            isDisabled: !isWandbAdmin,
+            iconName: IconNames.LayoutGrid,
           },
           {
             type: 'button' as const,
-            name: 'Operations',
+            name: 'Leaders',
+            slug: 'weave/leaderboards',
+            isShown: false, // Only shown in overflow menu
+            iconName: IconNames.BenchmarkSquare,
+          },
+          {
+            type: 'button' as const,
+            name: 'Ops',
             slug: 'weave/operations',
             additionalSlugs: ['weave/op-versions'],
-            isShown: isWeaveOnly,
+            isShown: false, // Only shown in overflow menu
             iconName: IconNames.JobProgramCode,
           },
           {
@@ -180,17 +215,25 @@ export const useProjectSidebar = (
             name: 'Objects',
             slug: 'weave/objects',
             additionalSlugs: ['weave/object-versions'],
-            isShown: isWeaveOnly,
+            isShown: false, // Only shown in overflow menu
             iconName: IconNames.CubeContainer,
           },
           {
             type: 'menuPlaceholder' as const,
-            // name: 'More',
-            // slug: 'moreWeave',
-            key: 'moreWeave',
+            key: 'moreWeaveOnly',
+            isShown: isWeaveOnly,
+            menu: weaveOnlyMenu,
+          },
+          {
+            type: 'menuPlaceholder' as const,
+            key: 'moreWeaveBoth',
             isShown: isShowAll,
-            // iconName: IconNames.OverflowHorizontal,
-            menu: ['weave/operations', 'weave/objects'],
+            menu: [
+              'weave/prompts',
+              'weave/models',
+              'weave/datasets',
+              'weave/scorers',
+            ].concat(weaveOnlyMenu),
           },
         ];
 
@@ -217,11 +260,12 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isLargeWorkspaceModeEnabled,
-    isModelsOnly,
-    isWeaveOnly,
-    showWeaveSidebarItems,
     isShowAll,
+    isWeaveOnly,
     viewingRestricted,
+    isModelsOnly,
+    showWeaveSidebarItems,
+    isLaunchActive,
+    isWandbAdmin,
   ]);
 };

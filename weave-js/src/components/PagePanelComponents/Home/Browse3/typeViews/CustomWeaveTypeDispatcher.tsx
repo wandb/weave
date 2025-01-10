@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
@@ -23,11 +24,22 @@ const customWeaveTypeRegistry: {
       project: string;
       data: any; // I wish this could be typed more specifically
     }>;
+    preferredRowHeight?: number;
   };
 } = {
   'PIL.Image.Image': {
     component: PILImageImage,
+    preferredRowHeight: 350,
   },
+  'wave.Wave_read': {
+    component: AudioPlayer,
+  },
+};
+
+export const getCustomWeaveTypePreferredRowHeight = (
+  typeId: string
+): number | undefined => {
+  return customWeaveTypeRegistry[typeId]?.preferredRowHeight;
 };
 
 /**

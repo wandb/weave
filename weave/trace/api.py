@@ -1,31 +1,44 @@
 """The top-level functions for Weave Trace API."""
 
+from __future__ import annotations
+
 import contextlib
 import os
 import threading
 import time
-from typing import Any, Callable, Iterator, Optional, Union
+from collections.abc import Iterator
+from typing import Any
 
-# TODO: type_serializers is imported here to trigger registration of the image serializer.
+# TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from weave import type_serializers  # noqa: F401
-from weave.legacy.weave import urls
-from weave.trace import util
-from weave.trace.call_context import get_current_call
-from weave.trace.client_context import weave_client as weave_client_context
+from weave import type_handlers  # noqa: F401
+from weave.trace import urls, util, weave_client, weave_init
+from weave.trace.autopatch import AutopatchSettings
+from weave.trace.constants import TRACE_OBJECT_EMOJI
+from weave.trace.context import call_context
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context.call_context import get_current_call, require_current_call
+from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
+from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.settings import (
+    UserSettings,
+    parse_and_apply_settings,
+    should_disable_weave,
+)
+from weave.trace.table import Table
+from weave.trace_server.interface.builtin_object_classes import leaderboard
 
-from . import context, weave_client, weave_init
-from .constants import TRACE_OBJECT_EMOJI
-from .op import Op, op
-from .refs import ObjectRef, parse_uri
-from .settings import UserSettings, parse_and_apply_settings
-from .table import Table
+_global_postprocess_inputs: PostprocessInputsFunc | None = None
+_global_postprocess_output: PostprocessOutputFunc | None = None
 
 
 def init(
     project_name: str,
     *,
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -37,16 +50,36 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases project to log to.
+        settings: Configuration for the Weave client generally.
+        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
+        global_postprocess_output: A function that will be applied to all outputs of all ops.
+
+    NOTE: Global postprocessing settings are applied to all ops after each op's own
+    postprocessing.  The order is always:
+    1. Op-specific postprocessing
+    2. Global postprocessing
 
     Returns:
         A Weave client.
     """
-    # This is the stream-table backend. Disabling it in favor of the new
-    # trace-server backend.
-    # return weave_init.init_wandb(project_name).client
-    # return weave_init.init_trace_remote(project_name).client
     parse_and_apply_settings(settings)
-    return weave_init.init_weave(project_name).client
+
+    global _global_postprocess_inputs
+    global _global_postprocess_output
+
+    _global_postprocess_inputs = global_postprocess_inputs
+    _global_postprocess_output = global_postprocess_output
+
+    if should_disable_weave():
+        return weave_init.init_weave_disabled().client
+
+    initialized_client = weave_init.init_weave(
+        project_name,
+        autopatch_settings=autopatch_settings,
+    )
+
+    return initialized_client.client
 
 
 @contextlib.contextmanager
@@ -72,25 +105,7 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def as_op(fn: Callable) -> Op:
-    """Given a @weave.op() decorated function, return its Op.
-
-    @weave.op() decorated functions are instances of Op already, so this
-    function should be a no-op at runtime. But you can use it to satisfy type checkers
-    if you need to access OpDef attributes in a typesafe way.
-
-    Args:
-        fn: A weave.op() decorated function.
-
-    Returns:
-        The Op of the function.
-    """
-    if not isinstance(fn, Op):
-        raise ValueError("fn must be a weave.op() decorated function")
-    return fn
-
-
-def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -124,6 +139,12 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.project,
                 ref.name,
                 ref.digest,
+            )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
@@ -165,15 +186,15 @@ def ref(location: str) -> weave_client.ObjectRef:
 
     uri = parse_uri(location)
     if not isinstance(uri, weave_client.ObjectRef):
-        raise ValueError("Expected an object ref")
+        raise TypeError("Expected an object ref")
     return uri
 
 
-def obj_ref(obj: Any) -> Optional[weave_client.ObjectRef]:
+def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
     return weave_client.get_ref(obj)
 
 
-def output_of(obj: Any) -> Optional[weave_client.Call]:
+def output_of(obj: Any) -> weave_client.Call | None:
     client = weave_client_context.require_weave_client()
 
     ref = obj_ref(obj)
@@ -185,28 +206,37 @@ def output_of(obj: Any) -> Optional[weave_client.Call]:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    cur_attributes = {**context.call_attributes.get()}
+    """
+    Context manager for setting attributes on a call.
+
+    Example:
+
+    ```python
+    with weave.attributes({'env': 'production'}):
+        print(my_function.call("World"))
+    ```
+    """
+    cur_attributes = {**call_context.call_attributes.get()}
     cur_attributes.update(attributes)
 
-    token = context.call_attributes.set(cur_attributes)
+    token = call_context.call_attributes.set(cur_attributes)
     try:
         yield
     finally:
-        context.call_attributes.reset(token)
+        call_context.call_attributes.reset(token)
 
 
 def serve(
     model_ref: ObjectRef,
-    method_name: Optional[str] = None,
-    auth_entity: Optional[str] = None,
+    method_name: str | None = None,
+    auth_entity: str | None = None,
     port: int = 9996,
     thread: bool = False,
 ) -> str:
     import uvicorn
 
-    from weave.legacy.weave import wandb_api
-
-    from .serve_fastapi import object_method_app
+    from weave.trace.serve_fastapi import object_method_app
+    from weave.wandb_interface import wandb_api
 
     client = weave_client_context.require_weave_client()
     # if not isinstance(
@@ -222,7 +252,7 @@ def serve(
 
     wandb_api_ctx = wandb_api.get_wandb_api_context()
     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = context.call_attributes.get()
+    trace_attrs = call_context.call_attributes.get()
 
     def run() -> None:
         # This function doesn't return, because uvicorn.run does not return.
@@ -276,4 +306,5 @@ __all__ = [
     "parse_uri",
     "get_current_call",
     "weave_client_context",
+    "require_current_call",
 ]

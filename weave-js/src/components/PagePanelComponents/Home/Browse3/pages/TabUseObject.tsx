@@ -3,9 +3,9 @@ import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {abbreviateRef} from '../../../../../util/refs';
-import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {TabUseBanner} from './TabUseBanner';
 
 type TabUseObjectProps = {
   name: string;
@@ -15,15 +15,15 @@ type TabUseObjectProps = {
 export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
   const pythonName = isValidVarName(name) ? name : 'obj';
   return (
-    <Box m={2}>
-      <Alert icon="lightbulb-info">
+    <Box className="text-sm">
+      <TabUseBanner>
         See{' '}
         <DocLink
           path="guides/tracking/objects#getting-an-object-back"
           text="Weave docs on refs"
         />{' '}
         for more information.
-      </Alert>
+      </TabUseBanner>
 
       <Box mt={2}>
         The ref for this object version is:
@@ -32,6 +32,7 @@ export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
       <Box mt={2}>
         Use the following code to retrieve this object version:
         <CopyableText
+          language="python"
           text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"

@@ -11,6 +11,7 @@ export const ButtonVariants = {
   Ghost: 'ghost',
   Quiet: 'quiet',
   Destructive: 'destructive',
+  Outline: 'outline',
 } as const;
 export type ButtonVariant =
   (typeof ButtonVariants)[keyof typeof ButtonVariants];

@@ -1,10 +1,14 @@
 import atexit
+import logging
 import time
 from queue import Queue
 from threading import Event, Lock, Thread
-from typing import Callable, Generic, List, TypeVar
+from typing import Callable, Generic, TypeVar
+
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -12,7 +16,7 @@ class AsyncBatchProcessor(Generic[T]):
 
     def __init__(
         self,
-        processor_fn: Callable[[List[T]], None],
+        processor_fn: Callable[[list[T]], None],
         max_batch_size: int = 100,
         min_batch_interval: float = 1.0,
     ) -> None:
@@ -20,7 +24,7 @@ class AsyncBatchProcessor(Generic[T]):
         Initializes an instance of AsyncBatchProcessor.
 
         Args:
-            processor_fn (Callable[[List[T]], None]): The function to process the batches of items.
+            processor_fn (Callable[[list[T]], None]): The function to process the batches of items.
             max_batch_size (int, optional): The maximum size of each batch. Defaults to 100.
             min_batch_interval (float, optional): The minimum interval between processing batches. Defaults to 1.0.
         """
@@ -35,12 +39,12 @@ class AsyncBatchProcessor(Generic[T]):
         self.processing_thread.start()
         atexit.register(self.wait_until_all_processed)  # Register cleanup function
 
-    def enqueue(self, items: List[T]) -> None:
+    def enqueue(self, items: list[T]) -> None:
         """
         Enqueues a list of items to be processed.
 
         Args:
-            items (List[T]): The items to be processed.
+            items (list[T]): The items to be processed.
         """
         with self.lock:
             for item in items:
@@ -49,12 +53,17 @@ class AsyncBatchProcessor(Generic[T]):
     def _process_batches(self) -> None:
         """Internal method that continuously processes batches of items from the queue."""
         while True:
-            current_batch: List[T] = []
+            current_batch: list[T] = []
             while not self.queue.empty() and len(current_batch) < self.max_batch_size:
                 current_batch.append(self.queue.get())
 
             if current_batch:
-                self.processor_fn(current_batch)
+                try:
+                    self.processor_fn(current_batch)
+                except Exception as e:
+                    if get_raise_on_captured_errors():
+                        raise
+                    logger.exception(f"Error processing batch: {e}")
 
             if self.stop_event.is_set() and self.queue.empty():
                 break

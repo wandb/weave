@@ -655,37 +655,33 @@ export const opNumberCos = OpKinds.makeStandardOp({
   resolver: ({n}) => Math.cos(n),
 });
 
-const timestampSecondUpperBound = 60 * 60 * 24 * 365 * 1000; // first 1000 years
-const timestampMilliSecondUpperBound = timestampSecondUpperBound * 1000;
-const timestampMicroSecondUpperBound = timestampMilliSecondUpperBound * 1000;
-const timestampNanoSecondUpperBound = timestampMicroSecondUpperBound * 1000;
+// Use min and max timestamps from python builtin datetime library
+// for consistency between weave0 and weave_query resolver imeplemntation
+const PY_DATETIME_MAX_MS = 50000000000000;
+const PY_DATETIME_MIN_MS = -50000000000000;
 
 // we will start by making this a simple millisecond converter, but
 // in the future we can make the unit customizable.
 export const opNumberToTimestamp = OpKinds.makeStandardOp({
   name: 'number-toTimestamp',
   argTypes: {val: 'number'},
-  description: `Converts a ${docType('number')} to a ${docType(
-    'timestamp'
-  )}. Values less than ${timestampSecondUpperBound} will be converted to seconds, values less than ${timestampMilliSecondUpperBound} will be converted to milliseconds, values less than ${timestampMicroSecondUpperBound} will be converted to microseconds, and values less than ${timestampNanoSecondUpperBound} will be converted to nanoseconds.`,
-  argDescriptions: {val: 'Number to convert to a timestamp'},
+  description: `Converts a ${docType('number')} to a ${docType('timestamp')}.`,
+  argDescriptions: {
+    val: 'Number (unix time in miliseconds, microseconds, or nanoseconds) to convert to a timestamp',
+  },
   returnValueDescription: `Timestamp`,
   returnType: inputTypes => ({
     type: 'timestamp',
     unit: 'ms',
   }),
   resolver: ({val}) => {
-    if (val < timestampSecondUpperBound) {
-      return Math.floor(val * 1000);
-    } else if (val < timestampMilliSecondUpperBound) {
-      return Math.floor(val);
-    } else if (val < timestampMicroSecondUpperBound) {
-      return Math.floor(val / 1000);
-    } else if (val < timestampNanoSecondUpperBound) {
-      return Math.floor(val / 1000 / 1000);
-    } else {
-      return null;
+    while (
+      Math.abs(val) > PY_DATETIME_MAX_MS ||
+      Math.abs(val) < PY_DATETIME_MIN_MS
+    ) {
+      val = val / 1000;
     }
+    return val;
   },
 });
 

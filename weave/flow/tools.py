@@ -1,10 +1,11 @@
 import inspect
 import json
-from typing import Callable, get_type_hints
-
-from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionToolParam
+from typing import TYPE_CHECKING, Callable, get_type_hints
 
 from weave.flow.console import LogEvents
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionToolParam
 
 
 def generate_json_schema(func: Callable) -> dict:
@@ -68,7 +69,9 @@ def generate_json_schema(func: Callable) -> dict:
     return schema
 
 
-def chat_call_tool_params(tools: list[Callable]) -> list[ChatCompletionToolParam]:
+def chat_call_tool_params(tools: list[Callable]) -> list["ChatCompletionToolParam"]:
+    from openai.types.chat import ChatCompletionToolParam
+
     chat_tools = [generate_json_schema(tool) for tool in tools]
     return [ChatCompletionToolParam(**tool) for tool in chat_tools]
 
@@ -81,7 +84,7 @@ def get_tool(tools: list[Callable], name: str) -> Callable:
 
 
 def perform_tool_calls(
-    tools: list[Callable], tool_calls: list[ChatCompletionMessageToolCall]
+    tools: list[Callable], tool_calls: list["ChatCompletionMessageToolCall"]
 ) -> list[dict]:
     messages = []
     for tool_call in tool_calls:

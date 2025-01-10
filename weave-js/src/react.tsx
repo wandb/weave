@@ -47,6 +47,7 @@ import {
   useState,
 } from 'react';
 
+import {captureAndThrowError} from './common/util/sentry';
 import {WEAVE_REF_PREFIX} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
@@ -351,11 +352,11 @@ export const useNodeValue = <T extends Type>(
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
     if (error != null) {
-      const message =
-        'Node execution failed (useNodeValue): ' + errorToText(error);
-      // console.error(message);
-
-      throw new UseNodeValueServerExecutionError(message);
+      const message = `Node execution failed (useNodeValue): ${errorToText(
+        error
+      )}`;
+      const err = new UseNodeValueServerExecutionError(message);
+      captureAndThrowError(err, {fingerprint: ['useNodeValue']});
     }
     if (isConstNode(node)) {
       if (isFunction(node.type)) {
@@ -549,6 +550,14 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '$', // End of the string
   ].join('')
 );
+
+export const parseRefMaybe = (s: string): ObjectRef | null => {
+  try {
+    return parseRef(s);
+  } catch (e) {
+    return null;
+  }
+};
 
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
@@ -1226,10 +1235,15 @@ export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirec
   };
 
 export const useExpandedNode = (
-  node: NodeOrVoidNode
+  node: NodeOrVoidNode,
+  newVars?: {[key: string]: Node} | null
 ): {loading: boolean; result: NodeOrVoidNode} => {
   const [error, setError] = useState();
-  const {stack} = usePanelContext();
+  const {stack: origStack} = usePanelContext();
+
+  const stack = useMemo(() => {
+    return pushFrame(origStack, newVars ?? {});
+  }, [newVars, origStack]);
 
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
@@ -1261,7 +1275,7 @@ export const useExpandedNode = (
     if (error != null) {
       // rethrow in render thread
       console.error('useExpanded error', error);
-      throw new Error(error);
+      throw error;
     }
     return {
       loading: node.nodeType !== 'output' ? false : node !== result.node,

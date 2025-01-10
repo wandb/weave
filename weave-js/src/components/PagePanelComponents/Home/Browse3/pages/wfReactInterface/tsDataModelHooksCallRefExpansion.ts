@@ -29,115 +29,36 @@ export const useClientSideCallRefExpansion = (
   const [isExpanding, setIsExpanding] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     if (calls.loading || calls.result == null) {
       setExpandedCalls([]);
       setIsExpanding(true);
       return;
     }
 
-    const doExpansionIteration = async (
-      traceCalls: traceServerClientTypes.TraceCallSchema[]
-    ) => {
-      const refsNeeded = new Set<string>();
-      const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
-      traceCalls.forEach(call => {
-        expandedRefColumnsList.forEach(col => {
-          const colParts = col.split('.');
-          let value: any = call;
-          for (const part of colParts) {
-            while (
-              typeof value === 'object' &&
-              value != null &&
-              EXPANDED_REF_VAL_KEY in value
-            ) {
-              value = value[EXPANDED_REF_VAL_KEY];
-            }
-            if (value == null) {
-              break;
-            }
-            if (typeof value !== 'object' || !(part in value)) {
-              value = null;
-              break;
-            }
-            value = value[part];
-          }
-          while (
-            typeof value === 'object' &&
-            value != null &&
-            EXPANDED_REF_VAL_KEY in value
-          ) {
-            value = value[EXPANDED_REF_VAL_KEY];
-          }
-          if (isExpandableRef(value)) {
-            refsNeeded.add(value);
-          }
-        });
-      });
+    if (calls.result.length === 0) {
+      setExpandedCalls([]);
+      setIsExpanding(false);
+      return;
+    }
 
-      const refsNeededArray = Array.from(refsNeeded);
+    const callResultStart = calls.result;
 
-      if (refsNeededArray.length === 0) {
-        setExpandedCalls(traceCalls);
+    doExpansionIteration(
+      callResultStart.map(c => c.traceCall!),
+      expandedRefColumns ?? new Set<string>(),
+      getTsClient()
+    ).then(innerExpandedCalls => {
+      if (calls.result === callResultStart && mounted) {
+        setExpandedCalls(innerExpandedCalls);
         setIsExpanding(false);
-        return;
       }
+    });
 
-      setIsExpanding(true);
-      const refsData = await directFetchRefsData(
-        refsNeededArray,
-        getTsClient()
-      );
-      const refsDataMap = new Map<string, any>();
-      refsNeededArray.forEach((ref, i) => {
-        refsDataMap.set(ref, refsData[i]);
-      });
-
-      const expandedTraceCalls = traceCalls.map(call => {
-        call = _.cloneDeep(call);
-        expandedRefColumnsList.forEach(col => {
-          const colParts = col.split('.');
-          let value: any = call;
-          const path: string[] = [];
-          for (const part of colParts) {
-            while (
-              typeof value === 'object' &&
-              value != null &&
-              EXPANDED_REF_VAL_KEY in value
-            ) {
-              value = value[EXPANDED_REF_VAL_KEY];
-              path.push(EXPANDED_REF_VAL_KEY);
-            }
-            if (value == null) {
-              break;
-            }
-            if (typeof value !== 'object' || !(part in value)) {
-              value = null;
-              break;
-            }
-            value = value[part];
-            path.push(part);
-          }
-          while (
-            typeof value === 'object' &&
-            value != null &&
-            EXPANDED_REF_VAL_KEY in value
-          ) {
-            value = value[EXPANDED_REF_VAL_KEY];
-            path.push(EXPANDED_REF_VAL_KEY);
-          }
-          if (isWeaveRef(value) && refsDataMap.has(value)) {
-            const refObj = refsDataMap.get(value);
-            _.set(call, path, makeRefExpandedPayload(value, refObj));
-          }
-        });
-        return call;
-      });
-
-      doExpansionIteration(expandedTraceCalls);
+    return () => {
+      mounted = false;
     };
-
-    doExpansionIteration(calls.result.map(c => c.traceCall!));
-  }, [calls.loading, calls.result, expandedRefColumns, getTsClient]);
+  }, [calls, calls.loading, calls.result, expandedRefColumns, getTsClient]);
 
   return useMemo(() => {
     return {
@@ -145,6 +66,103 @@ export const useClientSideCallRefExpansion = (
       isExpanding,
     };
   }, [expandedCalls, isExpanding]);
+};
+
+const doExpansionIteration = async (
+  traceCalls: traceServerClientTypes.TraceCallSchema[],
+  expandedRefColumns: Set<string>,
+  client: traceServerClient.TraceServerClient
+): Promise<traceServerClientTypes.TraceCallSchema[]> => {
+  const refsNeeded = new Set<string>();
+  const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+  traceCalls.forEach(call => {
+    expandedRefColumnsList.forEach(col => {
+      const colParts = col.split('.');
+      let value: any = call;
+      for (const part of colParts) {
+        while (
+          typeof value === 'object' &&
+          value != null &&
+          EXPANDED_REF_VAL_KEY in value
+        ) {
+          value = value[EXPANDED_REF_VAL_KEY];
+        }
+        if (value == null) {
+          break;
+        }
+        if (typeof value !== 'object' || !(part in value)) {
+          value = null;
+          break;
+        }
+        value = value[part];
+      }
+      while (
+        typeof value === 'object' &&
+        value != null &&
+        EXPANDED_REF_VAL_KEY in value
+      ) {
+        value = value[EXPANDED_REF_VAL_KEY];
+      }
+      if (isExpandableRef(value)) {
+        refsNeeded.add(value);
+      }
+    });
+  });
+
+  const refsNeededArray = Array.from(refsNeeded);
+
+  if (refsNeededArray.length === 0) {
+    return traceCalls;
+  }
+
+  const refsData = await directFetchRefsData(refsNeededArray, client);
+  const refsDataMap = new Map<string, any>();
+  refsNeededArray.forEach((ref, i) => {
+    refsDataMap.set(ref, refsData[i]);
+  });
+
+  const expandedTraceCalls = traceCalls.map(call => {
+    call = _.cloneDeep(call);
+    expandedRefColumnsList.forEach(col => {
+      const colParts = col.split('.');
+      let value: any = call;
+      const path: string[] = [];
+      for (const part of colParts) {
+        while (
+          typeof value === 'object' &&
+          value != null &&
+          EXPANDED_REF_VAL_KEY in value
+        ) {
+          value = value[EXPANDED_REF_VAL_KEY];
+          path.push(EXPANDED_REF_VAL_KEY);
+        }
+        if (value == null) {
+          break;
+        }
+        if (typeof value !== 'object' || !(part in value)) {
+          value = null;
+          break;
+        }
+        value = value[part];
+        path.push(part);
+      }
+      while (
+        typeof value === 'object' &&
+        value != null &&
+        EXPANDED_REF_VAL_KEY in value
+      ) {
+        value = value[EXPANDED_REF_VAL_KEY];
+        path.push(EXPANDED_REF_VAL_KEY);
+      }
+      if (isWeaveRef(value) && refsDataMap.has(value)) {
+        const refObj = refsDataMap.get(value);
+        _.set(call, path, makeRefExpandedPayload(value, refObj));
+      }
+    });
+    return call;
+  });
+
+  return doExpansionIteration(expandedTraceCalls, expandedRefColumns, client);
 };
 
 export type ExpandedRefWithValue<T = any> = {

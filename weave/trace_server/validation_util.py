@@ -1,8 +1,8 @@
 import base64
-import typing
 import uuid
+from typing import Optional
 
-from . import refs_internal
+from weave.trace_server import refs_internal
 
 
 class CHValidationError(Exception):
@@ -39,9 +39,7 @@ def require_base64(s: str) -> str:
     return s
 
 
-def require_internal_ref_uri(
-    s: str, refClass: typing.Optional[typing.Type] = None
-) -> str:
+def require_internal_ref_uri(s: str, refClass: Optional[type] = None) -> str:
     if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
         raise CHValidationError(
             f"Invalid ref: {s}. Must start with {refs_internal.WEAVE_INTERNAL_SCHEME}:///"

@@ -1,4 +1,4 @@
-import {GridPinnedColumns} from '@mui/x-data-grid-pro';
+import {GridPinnedColumnFields} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 
 const isValidPinValue = (value: any): boolean => {
@@ -7,9 +7,9 @@ const isValidPinValue = (value: any): boolean => {
 
 // Columns that are always pinned left don't need to be present in serialized state.
 export const removeAlwaysLeft = (
-  pinModel: GridPinnedColumns,
+  pinModel: GridPinnedColumnFields,
   alwaysLeft: string[]
-): GridPinnedColumns => {
+): GridPinnedColumnFields => {
   if (!pinModel.left) {
     return pinModel;
   }
@@ -22,9 +22,9 @@ export const removeAlwaysLeft = (
 
 // Ensure specified columns are always pinned left.
 const ensureAlwaysLeft = (
-  pinModel: GridPinnedColumns,
+  pinModel: GridPinnedColumnFields,
   alwaysLeft: string[]
-): GridPinnedColumns => {
+): GridPinnedColumnFields => {
   let left = pinModel.left ?? [];
   left = left.filter(col => !alwaysLeft.includes(col));
   left = alwaysLeft.concat(left);
@@ -36,9 +36,9 @@ const ensureAlwaysLeft = (
 
 export const getValidPinModel = (
   jsonString: string,
-  def: GridPinnedColumns | null = null,
+  def: GridPinnedColumnFields | null = null,
   alwaysLeft?: string[]
-): GridPinnedColumns => {
+): GridPinnedColumnFields => {
   def = def ?? {};
   try {
     const parsed = JSON.parse(jsonString);
@@ -49,7 +49,7 @@ export const getValidPinModel = (
           key => ['left', 'right'].includes(key) && isValidPinValue(parsed[key])
         )
       ) {
-        const pinModel = parsed as GridPinnedColumns;
+        const pinModel = parsed as GridPinnedColumnFields;
         if (alwaysLeft) {
           return ensureAlwaysLeft(pinModel, alwaysLeft);
         }

@@ -2,9 +2,9 @@ import os
 
 from fastapi import FastAPI
 from modal import Image, Secret, Stub, asgi_app
+from weave_query.uris import WeaveURI
 
 from weave.deploy.util import safe_name
-from weave.legacy.weave.uris import WeaveURI
 from weave.trace.refs import ObjectRef, parse_uri
 
 image = (
@@ -31,7 +31,7 @@ def fastapi_app() -> FastAPI:
 
     uri_ref = parse_uri(os.environ["MODEL_REF"])
     if not isinstance(uri_ref, ObjectRef):
-        raise ValueError(f"Expected a weave object uri, got {type(uri_ref)}")
+        raise TypeError(f"Expected a weave object uri, got {type(uri_ref)}")
     app = object_method_app(uri_ref, auth_entity=os.environ.get("AUTH_ENTITY"))
 
     api.init(os.environ["PROJECT_NAME"])

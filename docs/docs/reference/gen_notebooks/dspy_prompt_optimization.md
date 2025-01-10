@@ -13,7 +13,6 @@ title: Prompt Optimization
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{prompt-optim-notebook} -->
 
 # Optimizing LLM Workflows Using DSPy and Weave
@@ -125,6 +124,8 @@ def get_dataset(metadata: Metadata):
 dspy_train_examples, dspy_val_examples = get_dataset(metadata)
 ```
 
+![](../../media/dspy_optimization/1.png)
+
 ## The DSPy Program
 
 [DSPy](https://dspy-docs.vercel.app) is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
@@ -189,6 +190,8 @@ prediction = baseline_module(dspy_train_examples[0]["question"])
 rich.print(prediction)
 ```
 
+![](../../media/dspy_optimization/2.png)
+
 ## Evaluating our DSPy Program
 
 Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](../../guides/core-types/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
@@ -218,6 +221,8 @@ evaluation = weave.Evaluation(
 
 await evaluation.evaluate(baseline_module.forward)
 ```
+
+![](../../media/dspy_optimization/3.png)
 
 :::note
 If you're running from a python script, you can use the following code to run the evaluation:
@@ -258,6 +263,8 @@ def get_optimized_program(model: dspy.Module, metadata: Metadata) -> dspy.Module
 optimized_module = get_optimized_program(baseline_module, metadata)
 ```
 
+![](../../media/dspy_optimization/4.png)
+
 :::warning
 Running the evaluation causal reasoning dataset will cost approximately $0.04 in OpenAI credits.
 :::
@@ -274,6 +281,8 @@ evaluation = weave.Evaluation(
 
 await evaluation.evaluate(optimized_module.forward)
 ```
+
+![](../../media/dspy_optimization/5.png)
 
 When coomparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with siginificantly more accuracy.
 

@@ -14,7 +14,7 @@ import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 import * as traceServerClientTypes from './traceServerClientTypes'; // TODO: This import is not ideal, should delete this whole interface
-import {ContentType} from './traceServerClientTypes';
+import {ContentType, TableUpdateSpec} from './traceServerClientTypes';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -106,12 +106,12 @@ export type ObjectVersionKey =
   | WandbArtifactObjectVersionKey
   | WeaveObjectVersionKey;
 
-export type ObjectVersionSchema = ObjectVersionKey & {
+export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   baseObjectClass: string | null;
   createdAtMs: number;
-  val: any;
+  val: T;
 };
 
 export type ObjectVersionFilter = {
@@ -162,7 +162,10 @@ export type Refetchable = {
 };
 
 export type WFDataModelHooksInterface = {
-  useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
+  useCall: (
+    key: CallKey | null,
+    opts?: {includeCosts?: boolean}
+  ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
     project: string,
@@ -173,15 +176,20 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefColumns?: Set<string>,
-    opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<CallSchema[]>;
+    opts?: {
+      skip?: boolean;
+      refetchOnDelete?: boolean;
+      includeCosts?: boolean;
+      includeFeedback?: boolean;
+    }
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     entity: string,
     project: string,
     filter: CallFilter,
     query?: Query,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes>;
+  ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;
   useCallsDeleteFunc: () => (
     entity: string,
     project: string,
@@ -203,25 +211,50 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
     columns?: string[],
-    expandedRefCols?: string[]
+    expandedRefCols?: string[],
+    includeFeedback?: boolean
   ) => Promise<Blob>;
+  useObjCreate: () => (
+    projectId: string,
+    objectId: string,
+    val: any,
+    baseObjectClass?: string
+  ) => Promise<string>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,
     filter: OpVersionFilter,
     limit?: number,
+    metadataOnly?: boolean,
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
   ) => Loadable<ObjectVersionSchema | null>;
+  useTableRowsQuery: (
+    entity: string,
+    project: string,
+    digest: string,
+    filter?: traceServerClientTypes.TraceTableQueryReq['filter'],
+    limit?: traceServerClientTypes.TraceTableQueryReq['limit'],
+    offset?: traceServerClientTypes.TraceTableQueryReq['offset'],
+    sortBy?: traceServerClientTypes.TraceTableQueryReq['sort_by'],
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryRes>;
+  useTableQueryStats: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClientTypes.TraceTableQueryStatsRes>;
   useRootObjectVersions: (
     entity: string,
     project: string,
     filter: ObjectVersionFilter,
     limit?: number,
-    opts?: {skip?: boolean}
+    metadataOnly?: boolean,
+    opts?: {skip?: boolean; noAutoRefresh?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
@@ -242,7 +275,13 @@ export type WFDataModelHooksInterface = {
   useFeedback: (
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]
-  ) => LoadableWithError<any[] | null> & Refetchable;
+  ) => LoadableWithError<traceServerClientTypes.Feedback[] | null> &
+    Refetchable;
+  useTableUpdate: () => (
+    projectId: string,
+    baseDigest: string,
+    updates: traceServerClientTypes.TableUpdateSpec[]
+  ) => Promise<traceServerClientTypes.TableUpdateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

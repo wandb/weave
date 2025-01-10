@@ -23,17 +23,18 @@ Outstanding Optimizations/Work:
 
 * [ ] Implement column selection at interface level so that it can be used here
 * [ ] Consider how we will do latency order/filter
-* [ ] Consider how we will do feedback fields
 
 """
 
 import logging
-import typing
+import re
+from typing import Literal, Optional, cast
 
 import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -50,20 +51,22 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 
 
-class CallsMergedField(BaseModel):
+class QueryBuilderField(BaseModel):
     field: str
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+
+class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
         return False
 
@@ -75,38 +78,23 @@ class CallsMergedAggField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
-    extra_path: typing.Optional[list[str]] = None
+    extra_path: Optional[list[str]] = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
+        cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
-        if cast != "exists":
-            path_str = "'$'"
-            if self.extra_path:
-                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-                path_str = _param_slot(param_name, "String")
-            val = f"JSON_VALUE({res}, {path_str})"
-            return clickhouse_cast(val, cast)
-        else:
-            # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
-            # between null, non-existent, "", and "null"!
-            path_parts = []
-            if self.extra_path:
-                for part in self.extra_path:
-                    path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
-            safe_path = "".join(path_parts)
-            return f"(NOT (JSONType({res}{safe_path}) = 'Null' OR JSONType({res}{safe_path}) IS NULL))"
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:
@@ -126,13 +114,121 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return True
 
 
+class CallsMergedFeedbackPayloadField(CallsMergedField):
+    feedback_type: str
+    extra_path: list[str]
+
+    @classmethod
+    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+        """Expected format: `[feedback.type].dot.path`"""
+        regex = re.compile(r"^(\[.+\])\.(.+\..+)$")
+        match = regex.match(path)
+        if not match:
+            raise InvalidFieldError(f"Invalid feedback path: {path}")
+        feedback_type, path = match.groups()
+        if feedback_type[0] != "[" or feedback_type[-1] != "]":
+            raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
+        extra_path = path.split(".")
+        if extra_path[0] != "payload":
+            raise InvalidFieldError(f"Invalid feedback path: {path}")
+        feedback_type = feedback_type[1:-1]
+        return CallsMergedFeedbackPayloadField(
+            field="payload_dump", feedback_type=feedback_type, extra_path=extra_path[1:]
+        )
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        inner = super().as_sql(pb, "feedback")
+        param_name = pb.add_param(self.feedback_type)
+        res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        raise NotImplementedError(
+            "Feedback fields cannot be selected directly, yet - implement me!"
+        )
+
+
+class QueryBuilderDynamicField(QueryBuilderField):
+    # This is a temporary solution to address a specific use case.
+    # We need to reuse the `CallsMergedDynamicField` mechanics in the table_query,
+    # but the table_query is not an aggregating table. Therefore, we
+    # can't use `CallsMergedDynamicField` directly because it
+    # inherits from `CallsMergedAggField`.
+    #
+    # To solve this, we've created `QueryBuilderDynamicField`, which is similar to
+    # `CallsMergedDynamicField` but doesn't inherit from `CallsMergedAggField`.
+    # Both classes use `json_dump_field_as_sql` for the main functionality.
+    #
+    # While this approach isn't as DRY as we'd like, it allows us to implement
+    # the needed functionality with minimal refactoring. In the future, we should
+    # consider a more elegant solution that reduces code duplication.
+
+    extra_path: Optional[list[str]] = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        res = super().as_sql(pb, table_alias)
+        return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        if self.extra_path:
+            raise NotImplementedError(
+                "Dynamic fields cannot be selected directly, yet - implement me!"
+            )
+        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+
+
+def json_dump_field_as_sql(
+    pb: ParamBuilder,
+    table_alias: str,
+    root_field_sanitized: str,
+    extra_path: Optional[list[str]] = None,
+    cast: Optional[tsi_query.CastTo] = None,
+) -> str:
+    if cast != "exists":
+        path_str = "'$'"
+        if extra_path:
+            param_name = pb.add_param(quote_json_path_parts(extra_path))
+            path_str = _param_slot(param_name, "String")
+        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        return clickhouse_cast(val, cast)
+    else:
+        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
+        # This workaround helps to handle these cases.
+        path_parts = []
+        if extra_path:
+            for part in extra_path:
+                path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+        safe_path = "".join(path_parts)
+        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+
+
 class OrderField(BaseModel):
-    field: CallsMergedField
-    direction: typing.Literal["ASC", "DESC"]
+    field: QueryBuilderField
+    direction: Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
-        if isinstance(self.field, CallsMergedDynamicField):
+        options: list[tuple[Optional[tsi_query.CastTo], str]]
+        if isinstance(
+            self.field,
+            (
+                QueryBuilderDynamicField,
+                CallsMergedDynamicField,
+                CallsMergedFeedbackPayloadField,
+            ),
+        ):
             # Prioritize existence, then cast to double, then str
             options = [
                 ("exists", "desc"),
@@ -151,7 +247,7 @@ class OrderField(BaseModel):
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
-    _consumed_fields: typing.Optional[list[CallsMergedField]] = None
+    _consumed_fields: Optional[list[CallsMergedField]] = None
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         conditions = process_query_to_conditions(
@@ -162,7 +258,7 @@ class Condition(BaseModel):
         if self._consumed_fields is None:
             self._consumed_fields = []
             for field in conditions.fields_used:
-                self._consumed_fields.append(get_field_by_name(field))
+                self._consumed_fields.append(field)
         return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(self) -> list[CallsMergedField]:
@@ -213,10 +309,10 @@ class CallsQuery(BaseModel):
     project_id: str
     select_fields: list[CallsMergedField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
-    hardcoded_filter: typing.Optional[HardCodedFilter] = None
+    hardcoded_filter: Optional[HardCodedFilter] = None
     order_fields: list[OrderField] = Field(default_factory=list)
-    limit: typing.Optional[int] = None
-    offset: typing.Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
     include_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
@@ -242,7 +338,7 @@ class CallsQuery(BaseModel):
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
-        direction = typing.cast(typing.Literal["ASC", "DESC"], direction)
+        direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
             OrderField(field=get_field_by_name(field), direction=direction)
         )
@@ -341,7 +437,7 @@ class CallsQuery(BaseModel):
         SELECT {SELECT_FIELDS}
         FROM calls_merged
         WHERE project_id = {PROJECT_ID}
-        AND id IN (filtered_calls)
+        AND id IN filtered_calls
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
@@ -398,6 +494,15 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Important: We must always filter out calls that have not been started
+        # This can occur when there is an out of order call part insertion or worse,
+        # when such occurance happens and the client terminates early.
+        self.add_condition(
+            tsi_query.NotOperation.model_validate(
+                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            )
+        )
+
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
@@ -438,9 +543,16 @@ class CallsQuery(BaseModel):
         """
 
         if self.include_costs:
+            # TODO: We should unify the calls query order by fields to be orm sort by fields
+            order_by_fields = [
+                tsi.SortBy(
+                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                )
+                for sort_by in self.order_fields
+            ]
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
@@ -454,8 +566,9 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: typing.Optional[str] = None,
+        id_subquery_name: Optional[str] = None,
     ) -> str:
+        needs_feedback = False
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
@@ -466,6 +579,10 @@ class CallsQuery(BaseModel):
             having_conditions_sql.extend(
                 c.as_sql(pb, table_alias) for c in self.query_conditions
             )
+            for query_condition in self.query_conditions:
+                for field in query_condition._get_consumed_fields():
+                    if isinstance(field, CallsMergedFeedbackPayloadField):
+                        needs_feedback = True
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
@@ -482,6 +599,9 @@ class CallsQuery(BaseModel):
                     for order_field in self.order_fields
                 ]
             )
+            for order_field in self.order_fields:
+                if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+                    needs_feedback = True
 
         limit_sql = ""
         if self.limit is not None:
@@ -493,23 +613,36 @@ class CallsQuery(BaseModel):
 
         id_subquery_sql = ""
         if id_subquery_name is not None:
-            id_subquery_sql = f"AND (id IN {id_subquery_name})"
+            id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
 
         project_param = pb.add_param(self.project_id)
 
         # Special Optimization
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask_sql = f"AND (id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask_sql = f"AND (calls_merged.id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
+
+        feedback_join_sql = ""
+        feedback_where_sql = ""
+        if needs_feedback:
+            feedback_where_sql = (
+                f" AND calls_merged.project_id = {_param_slot(project_param, 'String')}"
+            )
+            feedback_join_sql = f"""
+            LEFT JOIN feedback
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
+            """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
-        WHERE project_id = {_param_slot(project_param, 'String')}
+        {feedback_join_sql}
+        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
+        {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
-        GROUP BY (project_id, id)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
         {limit_sql}
@@ -543,22 +676,25 @@ ALLOWED_CALL_FIELDS = {
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
-        field_parts = name.split(".")
-        start_part = field_parts[0]
-        dumped_start_part = start_part + "_dump"
-        if dumped_start_part in ALLOWED_CALL_FIELDS:
-            field = ALLOWED_CALL_FIELDS[dumped_start_part]
-            if isinstance(field, CallsMergedDynamicField):
-                if len(field_parts) > 1:
-                    return field.with_path(field_parts[1:])
-            return field
-        raise ValueError(f"Field {name} is not allowed")
+        if name.startswith("feedback."):
+            return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
+        else:
+            field_parts = name.split(".")
+            start_part = field_parts[0]
+            dumped_start_part = start_part + "_dump"
+            if dumped_start_part in ALLOWED_CALL_FIELDS:
+                field = ALLOWED_CALL_FIELDS[dumped_start_part]
+                if isinstance(field, CallsMergedDynamicField):
+                    if len(field_parts) > 1:
+                        return field.with_path(field_parts[1:])
+                return field
+            raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 
 class FilterToConditions(BaseModel):
     conditions: list[str]
-    fields_used: set[str]
+    fields_used: list[CallsMergedField]
 
 
 def process_query_to_conditions(
@@ -568,7 +704,7 @@ def process_query_to_conditions(
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
-    raw_fields_used = set()
+    raw_fields_used: dict[str, CallsMergedField] = {}
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -621,7 +757,7 @@ def process_query_to_conditions(
                 position_operation = "positionCaseInsensitive"
             cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
-            raise ValueError(f"Unknown operation type: {operation}")
+            raise TypeError(f"Unknown operation type: {operation}")
 
         return cond
 
@@ -634,7 +770,7 @@ def process_query_to_conditions(
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
             field = structured_field.as_sql(param_builder, table_alias)
-            raw_fields_used.add(structured_field.field)
+            raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
@@ -654,13 +790,15 @@ def process_query_to_conditions(
         ):
             return process_operation(operand)
         else:
-            raise ValueError(f"Unknown operand type: {operand}")
+            raise TypeError(f"Unknown operand type: {operand}")
 
     filter_cond = process_operation(query.expr_)
 
     conditions.append(filter_cond)
 
-    return FilterToConditions(conditions=conditions, fields_used=raw_fields_used)
+    return FilterToConditions(
+        conditions=conditions, fields_used=list(raw_fields_used.values())
+    )
 
 
 def process_calls_filter_to_conditions(
@@ -676,10 +814,10 @@ def process_calls_filter_to_conditions(
         # If there are any non-wildcarded names, then we at least have an IN condition
         # If there are any wildcarded names, then we have a LIKE condition for each
 
-        or_conditions: typing.List[str] = []
+        or_conditions: list[str] = []
 
-        non_wildcarded_names: typing.List[str] = []
-        wildcarded_names: typing.List[str] = []
+        non_wildcarded_names: list[str] = []
+        wildcarded_names: list[str] = []
         for name in filter.op_names:
             if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                 wildcarded_names.append(name)

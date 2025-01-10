@@ -2,7 +2,7 @@ import {
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
-  GridPinnedColumns,
+  GridPinnedColumnFields,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import React, {FC, useMemo} from 'react';
@@ -35,8 +35,8 @@ export const CallsPage: FC<{
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
 
-  pinModel: GridPinnedColumns;
-  setPinModel: (newModel: GridPinnedColumns) => void;
+  pinModel: GridPinnedColumnFields;
+  setPinModel: (newModel: GridPinnedColumnFields) => void;
 
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;

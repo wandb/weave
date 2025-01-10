@@ -105,10 +105,15 @@ const Markdown: React.FC<MarkdownEditorProps> = ({
     updateHeight();
   }, [html, updateHeight]);
 
+  // The `tw-eject` class is used to optionally eject from `.tw-style` resets if this component happens to be rendered with a `.tw-style` parent in the tree
+  // see: src/wandbTailwindPreflight.css
   return (
-    <div ref={ref} className="markdown-content">
+    <div
+      ref={ref}
+      className="markdown-content"
+      data-testid="markdown-container">
       <Item.Description
-        className={condensed ? '' : 'markdown'}
+        className={`tw-eject ${condensed ? '' : 'markdown'}`}
         dangerouslySetInnerHTML={{
           __html: html,
         }}

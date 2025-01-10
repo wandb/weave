@@ -1,5 +1,3 @@
-import moment from 'moment';
-
 import * as Urls from '../../_external/util/urls';
 import {list, maybe, typedDict} from '../../model/helpers';
 import {docType} from '../../util/docs';
@@ -87,7 +85,7 @@ export const opArtifactCreatedAt = makeArtifactOp({
   argDescriptions: {artifact: artifactArgDescription},
   returnValueDescription: `The creation date of the ${docType('artifact')}`,
   returnType: inputTypes => 'date',
-  resolver: ({artifact}) => moment(artifact.createdAt + 'Z').toDate(),
+  resolver: ({artifact}) => artifact.createdAt,
 });
 
 export const opArtifactProject = makeArtifactOp({

@@ -93,7 +93,7 @@ export class ObjectPath {
 
   hasHiddenKey(): boolean {
     const t = this.tail();
-    return typeof t === 'string' && (t.startsWith('_') || t === 'name');
+    return typeof t === 'string' && t.startsWith('_');
   }
 
   length(): number {
@@ -155,7 +155,7 @@ export class ObjectPath {
   }
 }
 
-type ValueType =
+export type ValueType =
   | 'null'
   | 'undefined'
   | 'boolean'
@@ -304,7 +304,7 @@ export const mapObject = (
   data: any,
   transform: (context: TraverseContext) => any
 ) => {
-  const result = {};
+  const result = getValueType(data) === 'array' ? [] : {};
   traverse(data, context => {
     if (context.depth === 0) {
       return;

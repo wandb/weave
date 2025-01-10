@@ -13,7 +13,6 @@ title: Introduction Notebook
 
 
 
-<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{intro-colab} -->
 
 # 🏃‍♀️ Quickstart
@@ -72,6 +71,8 @@ weave.init('project-name')      # initialize tracking for a specific W&B project
 
 Add the @weave.op decorator to the functions you want to track
 
+![](../../media/intro/1.png)
+
 
 ```python
 from openai import OpenAI
@@ -82,7 +83,7 @@ weave.init(PROJECT)
 
 client = OpenAI()
 response = client.chat.completions.create(
-    model="gpt-3.5-turbo-1106",
+    model="gpt-4o-mini",
     messages=[
         {
             "role": "system",
@@ -101,6 +102,8 @@ You can find your interactive dashboard by clicking any of the  👆 wandb links
 ## Vendor Integrations (OpenAI, Anthropic, Mistral, etc...)
 
 Here, we're automatically tracking all calls to `openai`. We automatically track a lot of LLM libraries, but it's really easy to add support for whatever LLM you're using, as you'll see below. 
+
+![](../../media/intro/2.png)
 
 
 ```python
@@ -128,6 +131,8 @@ Now that you've seen the basics, let's combine all of the above and track some d
 
 
 
+![](../../media/intro/3.png)
+
 
 ```python
 from openai import OpenAI
@@ -148,7 +153,7 @@ def correct_grammar(user_input):
 
     stripped = strip_user_input(user_input)
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -168,6 +173,8 @@ print(result)
 ## Track Errors
 
 Whenever your code crashes, weave will highlight what caused the issue. This is especially useful for finding things like JSON parsing issues that can occasionally happen when parsing data from LLM responses.
+
+![](../../media/intro/4.png)
 
 
 ```python
@@ -191,7 +198,7 @@ def correct_grammar(user_input):
 
     stripped = strip_user_input(user_input)
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -221,6 +228,8 @@ Organizing experimentation is difficult when there are many moving pieces. You c
 
 Many times, it is useful to track & version data, just like you track and version code. For example, here we define a `SystemPrompt(weave.Object)` object that can be shared between teammates
 
+![](../../media/intro/5.png)
+
 
 ```python
 import weave
@@ -241,6 +250,8 @@ weave.publish(system_prompt)
 ## Model Tracking
 
 Models are so common of an object type, that we have a special class to represent them: `weave.Model`. The only requirement is that we define a `predict` method.
+
+![](../../media/intro/6.png)
 
 
 ```python
@@ -271,7 +282,7 @@ class OpenAIGrammarCorrector(weave.Model):
 
 
 corrector = OpenAIGrammarCorrector(
-    openai_model_name="gpt-3.5-turbo-1106",
+    openai_model_name="gpt-4o-mini",
     system_message="You are a grammar checker, correct the following user input.",
 )
 
@@ -282,6 +293,8 @@ print(result)
 ## Dataset Tracking
 
 Similar to models, a `weave.Dataset` object exists to help track, organize, and operate on datasets
+
+![](../../media/intro/7.png)
 
 
 ```python
@@ -294,8 +307,8 @@ dataset = weave.Dataset(
         },
         {"user_input": "  I write good   ", "expected": "I write well"},
         {
-            "user_input": "  GPT-3 is smartest AI model.   ",
-            "expected": "GPT-3 is the smartest AI model.",
+            "user_input": "  GPT-4 is smartest AI model.   ",
+            "expected": "GPT-4 is the smartest AI model.",
         },
     ],
 )
@@ -309,6 +322,8 @@ Notice that we saved a versioned `GrammarCorrector` object that captures the con
 
 You can publish objects and then retrieve them in your code. You can even call functions from your retrieved objects!
 
+![](../../media/intro/8.png)
+
 
 ```python
 import weave
@@ -316,13 +331,15 @@ import weave
 weave.init(PROJECT)
 
 corrector = OpenAIGrammarCorrector(
-    openai_model_name="gpt-3.5-turbo-1106",
+    openai_model_name="gpt-4o-mini",
     system_message="You are a grammar checker, correct the following user input.",
 )
 
 ref = weave.publish(corrector)
 print(ref.uri())
 ```
+
+![](../../media/intro/9.png)
 
 
 ```python
@@ -345,6 +362,8 @@ print(result)
 Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
 
 See a preview of the API below:
+
+![](../../media/intro/10.png)
 
 
 ```python

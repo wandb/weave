@@ -9,7 +9,7 @@ import {EventData} from './types';
  * Previously `window.analytics.track` was assigned as a default for `track` arguments in function declarations so that the dependency on Segment could be easily injected (useful for things like testing), e.g.:
  * `const makeTracker = (track = window?.analytics?.track) => (name, data) => track(name,data)`
  *
- * However, the fn often runs with the initialization of the JS bundle, which is _before_ the deferred loading of Segment completes and overwrites the fn at `window.analytics.track`. So moving this to an easily mockable exported object. Thus we can easily overwrite it w/ mocks in tests, but the `track` call will still resolve its reference to Segment after initialiation
+ * However, the fn often runs with the initialization of the JS bundle, which is _before_ the deferred loading of Segment completes and overwrites the fn at `window.analytics.track`. So moving this to an easily mockable exported object. Thus we can easily overwrite it w/ mocks in tests, but the `track` call will still resolve its reference to Segment after initialization
  */
 
 export const Analytics = {
@@ -54,7 +54,7 @@ export const Analytics = {
         trackCall(eventName, eventData);
       } catch (err) {
         // this is probably an impossible edge case where Segment shows as initialized
-        // but the tracking fn call is unvailable
+        // but the tracking fn call is unavailable
         captureMessage(
           'Segment initialized, unknown error calling track function'
         );

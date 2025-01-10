@@ -1,0 +1,38 @@
+{
+    "screenshots": [
+        {
+            "url": "https://wandb.ai/timssweeney/weave-docs/weave/calls/0191a037-bc0d-7b81-8943-2afa4f372d7c",
+            "output_path": "./static/img/screenshots/basic_call.png",
+            "selector": "body",
+            "viewport_size": [1920, 1080],
+            "clicks": ["#onetrust-reject-all-handler", "span[data-testid='KeyboardArrowRightIcon']", "span[data-testid='KeyboardArrowRightIcon']", "body"],
+            "delay": 5,
+            "local_storage": {
+                "weaveflow-tracetree-width-number": 345
+            },
+            "zoom": 1.5
+        },
+        {
+            "url": "https://wandb.ai/timssweeney/weave-docs/weave/calls?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Ftimssweeney%2Fweave-docs%2Fop%2Fsupport_router%3AXEVlTYVYTBo7IlWsz775To2lNfem34ZDrohkIlpfIGY%22%5D%7D&peekPath=%2Ftimssweeney%2Fweave-docs%2Fcalls%2F0191a037-bc0d-7b81-8943-2afa4f372d7c",
+            "output_path": "./static/img/screenshots/calls_macro.png",
+            "selector": "body",
+            "viewport_size": [1920, 1080],
+            "clicks": ["#onetrust-reject-all-handler"],
+            "delay": 5,
+            "local_storage": {
+                "weaveflow-tracetree-width-number": 345,
+                "weaveflow-drawer-width-pixels": 675
+            },
+            "zoom": 1.0
+        },
+        {
+            "url": "https://wandb.ai/timssweeney/weave-docs/weave/calls?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Ftimssweeney%2Fweave-docs%2Fop%2Fsupport_router%3AXEVlTYVYTBo7IlWsz775To2lNfem34ZDrohkIlpfIGY%22%5D%7D&filters=%7B%22items%22%3A%5B%7B%22id%22%3A0%2C%22field%22%3A%22output.response.category%22%2C%22operator%22%3A%22%28string%29%3A+equals%22%2C%22value%22%3A%22network%22%7D%2C%7B%22id%22%3A1%2C%22field%22%3A%22output.response.difficulty%22%2C%22operator%22%3A%22%28number%29%3A+%3E%3D%22%2C%22value%22%3A0.3%7D%5D%2C%22logicOperator%22%3A%22and%22%7D",
+            "output_path": "./static/img/screenshots/calls_filter.png",
+            "selector": "body",
+            "viewport_size": [1920, 1080],
+            "clicks": ["#onetrust-reject-all-handler", ".select-none"],
+            "delay": 5,
+            "zoom": 1.5
+        }
+    ]
+}

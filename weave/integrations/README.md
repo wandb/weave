@@ -69,8 +69,8 @@ This directory contains various integrations for Weave. As of this writing, ther
    4. Add any assertions to validate correct logging. The base case to validate that a call was logged would be:
 
    ```
-   res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-   assert len(res.calls) == 1
+   calls = list(client.calls())
+   assert len(calls) == 1
    ```
 
 4. At this point, you should be able to run the unit test and see a failure at the `assert len(res.calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. Note: the `--record-mode=rewrite` tells the system to ignore any recorded network calls.

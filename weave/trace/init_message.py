@@ -1,15 +1,17 @@
-import typing
+from __future__ import annotations
 
-from weave.legacy.weave import urls
+from typing import TYPE_CHECKING
+
+from weave.trace import urls
 from weave.trace.pypi_version_check import check_available
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
 
 REQUIRED_WANDB_VERSION = "0.16.4"
 
 
-def _parse_version(version: str) -> "packaging.version.Version":
+def _parse_version(version: str) -> packaging.version.Version:
     """Parse a version string into a version object.
 
     This function is a wrapper around the `packaging.version.parse` function, which
@@ -72,10 +74,7 @@ def assert_min_weave_version(
 
 
 def print_init_message(
-    username: typing.Optional[str],
-    entity_name: str,
-    project_name: str,
-    read_only: bool,
+    username: str | None, entity_name: str, project_name: str, read_only: bool
 ) -> None:
     try:
         _print_version_check()

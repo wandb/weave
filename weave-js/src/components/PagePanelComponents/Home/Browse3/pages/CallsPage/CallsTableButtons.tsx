@@ -1,8 +1,18 @@
 import {Box, Popover} from '@mui/material';
-import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {
+  GridFilterModel,
+  gridPageCountSelector,
+  gridPageSelector,
+  gridPageSizeSelector,
+  gridRowCountSelector,
+  GridSortModel,
+  useGridApiContext,
+  useGridSelector,
+} from '@mui/x-data-grid-pro';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
-import {Radio} from '@wandb/weave/components';
+import {Radio, Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {
@@ -61,6 +71,7 @@ export const ExportSelector = ({
     entityName: userInfoLoaded?.username ?? '',
     skip: viewerLoading,
   });
+  const [includeFeedback, setIncludeFeedback] = useState(false);
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -90,7 +101,15 @@ export const ExportSelector = ({
     // TODO(gst): allow specifying offset
     const offset = 0;
     const limit = MAX_EXPORT;
-    // TODO(gst): add support for JSONL and JSON column selection
+
+    // Explicitly add feedback column for CSV/TSV exports
+    if (
+      [ContentType.csv, ContentType.tsv].includes(contentType) &&
+      includeFeedback
+    ) {
+      visibleColumns.push('summary.weave.feedback');
+    }
+
     const leafColumns = [ContentType.csv, ContentType.tsv].includes(contentType)
       ? makeLeafColumns(visibleColumns)
       : undefined;
@@ -105,7 +124,8 @@ export const ExportSelector = ({
       sortBy,
       filterBy,
       leafColumns,
-      refColumnsToExpand
+      refColumnsToExpand,
+      includeFeedback
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
@@ -141,7 +161,8 @@ export const ExportSelector = ({
     lowLevelFilter,
     filterBy,
     refColumnsToExpand,
-    sortBy
+    sortBy,
+    includeFeedback
   );
   const curlText = makeCurlText(
     callQueryParams.entity,
@@ -150,7 +171,8 @@ export const ExportSelector = ({
     lowLevelFilter,
     filterBy,
     refColumnsToExpand,
-    sortBy
+    sortBy,
+    includeFeedback
   );
 
   return (
@@ -205,6 +227,28 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
+            <div
+              className={classNames(
+                'flex items-center py-2',
+                disabled ? 'opacity-40' : ''
+              )}>
+              <Switch.Root
+                id="include-feedback"
+                size="small"
+                checked={includeFeedback}
+                onCheckedChange={setIncludeFeedback}
+                disabled={disabled}>
+                <Switch.Thumb size="small" checked={includeFeedback} />
+              </Switch.Root>
+              <label
+                htmlFor="include-feedback"
+                className={classNames(
+                  'ml-6',
+                  disabled ? '' : 'cursor-pointer'
+                )}>
+                Include feedback
+              </label>
+            </div>
             <DownloadGrid
               pythonText={pythonText}
               curlText={curlText}
@@ -379,6 +423,29 @@ export const CompareEvaluationsTableButton: FC<{
   </Box>
 );
 
+export const CompareTracesTableButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  tooltipText?: string;
+}> = ({onClick, disabled, tooltipText}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-4"
+      size="medium"
+      variant="primary"
+      disabled={disabled}
+      onClick={onClick}
+      tooltip={tooltipText}>
+      Compare
+    </Button>
+  </Box>
+);
+
 export const BulkDeleteButton: FC<{
   disabled?: boolean;
   onClick: () => void;
@@ -397,6 +464,29 @@ export const BulkDeleteButton: FC<{
         onClick={onClick}
         tooltip="Select rows with the checkbox to delete"
         icon="delete"
+      />
+    </Box>
+  );
+};
+
+export const RefreshButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant="outline"
+        size="medium"
+        onClick={onClick}
+        disabled={disabled}
+        tooltip="Refresh"
+        icon="reload-refresh"
       />
     </Box>
   );
@@ -436,7 +526,8 @@ function makeCodeText(
   filter: CallFilter,
   query: Query | undefined,
   expandColumns: string[],
-  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
+  includeFeedback: boolean
 ) {
   let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.server.calls_query_stream({\n`;
@@ -444,33 +535,42 @@ function makeCodeText(
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
+    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
+      '", "'
+    )}"]},\n`;
     if (expandColumns.length > 0) {
       const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
       codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+    }
+    if (includeFeedback) {
+      codeStr += `   "include_feedback": true,\n`;
     }
     // specifying call_ids ignores other filters, return early
     codeStr += `})`;
     return codeStr;
   }
-
-  if (filter.opVersionRefs) {
-    codeStr += `   "op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
-  }
-  if (filter.runIds) {
-    codeStr += `   "run_ids": ["${filter.runIds.join('", "')}"],\n`;
-  }
-  if (filter.userIds) {
-    codeStr += `   "user_ids": ["${filter.userIds.join('", "')}"],\n`;
-  }
-  if (filter.traceId) {
-    codeStr += `   "trace_id": "${filter.traceId}",\n`;
-  }
-  if (filter.traceRootsOnly) {
-    codeStr += `   "trace_roots_only": True,\n`;
-  }
-  if (filter.parentIds) {
-    codeStr += `   "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
+  if (Object.values(filter).some(value => value !== undefined)) {
+    codeStr += `   "filter": {`;
+    if (filter.opVersionRefs) {
+      codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
+    }
+    if (filter.runIds) {
+      codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
+    }
+    if (filter.userIds) {
+      codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
+    }
+    if (filter.traceId) {
+      codeStr += `"trace_ids": ["${filter.traceId}"],`;
+    }
+    if (filter.traceRootsOnly) {
+      codeStr += `"trace_roots_only": True,`;
+    }
+    if (filter.parentIds) {
+      codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
+    }
+    codeStr = codeStr.slice(0, -1);
+    codeStr += `},\n`;
   }
   if (query) {
     codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
@@ -482,6 +582,9 @@ function makeCodeText(
 
   if (sortBy.length > 0) {
     codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+  }
+  if (includeFeedback) {
+    codeStr += `   "include_feedback": True,\n`;
   }
 
   codeStr += `})`;
@@ -496,7 +599,8 @@ function makeCurlText(
   filter: CallFilter,
   query: Query | undefined,
   expandColumns: string[],
-  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
+  includeFeedback: boolean
 ) {
   const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   const filterStr = JSON.stringify(
@@ -535,8 +639,61 @@ curl '${baseUrl}/calls/stream_query' \\
   }
   baseCurl += `    "limit":${MAX_EXPORT},
     "offset":0,
-    "sort_by":${JSON.stringify(sortBy, null, 0)}
+    "sort_by":${JSON.stringify(sortBy, null, 0)},
+    "include_feedback": ${includeFeedback}
   }'`;
 
   return baseCurl;
 }
+
+export const PaginationButtons = () => {
+  const apiRef = useGridApiContext();
+  const page = useGridSelector(apiRef, gridPageSelector);
+  const pageCount = useGridSelector(apiRef, gridPageCountSelector);
+  const pageSize = useGridSelector(apiRef, gridPageSizeSelector);
+  const rowCount = useGridSelector(apiRef, gridRowCountSelector);
+
+  const handlePrevPage = () => {
+    apiRef.current.setPage(page - 1);
+  };
+
+  const handleNextPage = () => {
+    apiRef.current.setPage(page + 1);
+  };
+
+  // Calculate the item range being displayed
+  const start = rowCount > 0 ? page * pageSize + 1 : 0;
+  const end = Math.min(rowCount, (page + 1) * pageSize);
+
+  return (
+    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
+      <Button
+        variant="ghost"
+        size="medium"
+        onClick={handlePrevPage}
+        disabled={page === 0}
+        icon="chevron-back"
+      />
+      <Box
+        mx={1}
+        sx={{
+          fontSize: '14px',
+          fontWeight: '400',
+          color: MOON_500,
+          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
+          minWidth: '90px',
+          display: 'flex',
+          justifyContent: 'center',
+        }}>
+        {start}-{end} of {rowCount}
+      </Box>
+      <Button
+        variant="ghost"
+        size="medium"
+        onClick={handleNextPage}
+        disabled={page >= pageCount - 1}
+        icon="chevron-next"
+      />
+    </Box>
+  );
+};

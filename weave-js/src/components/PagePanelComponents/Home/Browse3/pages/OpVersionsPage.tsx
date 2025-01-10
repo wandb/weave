@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../common/css/color.styles';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -86,10 +87,16 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
-  const filteredOpVersions = useOpVersions(props.entity, props.project, {
-    opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
-    latestOnly: effectivelyLatestOnly,
-  });
+  const filteredOpVersions = useOpVersions(
+    props.entity,
+    props.project,
+    {
+      opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
+      latestOnly: effectivelyLatestOnly,
+    },
+    undefined,
+    true
+  );
 
   const rows: GridRowsProp = useMemo(() => {
     return (filteredOpVersions.result ?? []).map((ov, i) => {
@@ -115,6 +122,7 @@ export const FilterableOpVersionsTable: React.FC<{
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
             fullWidth={true}
+            color={TEAL_600}
           />
         );
       },
@@ -223,7 +231,6 @@ export const FilterableOpVersionsTable: React.FC<{
       columnHeaderHeight={40}
       rowHeight={38}
       columns={columns}
-      experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
@@ -245,7 +252,8 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
     {
       opIds: [obj.opId],
     },
-    100
+    100,
+    true // metadataOnly
   );
   if (ops.loading) {
     return <LoadingDots />;

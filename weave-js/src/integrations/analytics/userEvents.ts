@@ -100,3 +100,48 @@ export const exportClicked = makeTrackEvent<
     };
   }
 >('Weave export clicked');
+
+export const callTreeCellClicked = makeTrackEvent<
+  {
+    callId: string;
+    entity: string;
+    project: string;
+    traceId: string;
+    path: string;
+    isParentRow: boolean;
+    heirarchyDepth: number;
+  },
+  {
+    _description: `User clicked a call tree cell`;
+    _location: '';
+    _motivation: 'Used for tracking call tree cell clicks';
+    callId: {
+      description: 'ID of call';
+      exampleValues: ['bb5621fd-91bc-42af-b017-1a34e3250330'];
+    };
+    entity: {
+      description: 'Entity of call';
+      exampleValues: ['my-entity'];
+    };
+    project: {
+      description: 'Project of call';
+      exampleValues: ['my-project'];
+    };
+    traceId: {
+      description: 'ID of trace';
+      exampleValues: ['bb5621fd-91bc-42af-b017-1a34e3250330'];
+    };
+    path: {
+      description: 'Path of call';
+      exampleValues: ['my-path'];
+    };
+    isParentRow: {
+      description: 'Whether the cell clicked is a parent row';
+      exampleValues: [true, false];
+    };
+    heirarchyDepth: {
+      description: 'Depth of the heirarchy';
+      exampleValues: [1, 2, 3];
+    };
+  }
+>('Weave call tree cell clicked');

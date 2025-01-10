@@ -4,7 +4,7 @@ import json
 import openai
 
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 # We create a model class with one predict function.
 # All inputs, predictions and parameters are automatically captured for easy inspection.
@@ -65,8 +65,8 @@ examples = [
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def fruit_name_score(target: dict, model_output: dict) -> dict:
-    return {"correct": target["fruit"] == model_output["fruit"]}
+def fruit_name_score(target: dict, output: dict) -> dict:
+    return {"correct": target["fruit"] == output["fruit"]}
 
 
 # Finally, we run an evaluation of this model.

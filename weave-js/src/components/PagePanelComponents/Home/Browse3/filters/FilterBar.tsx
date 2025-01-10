@@ -10,6 +10,10 @@ import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../feedback/HumanFeedback/tsHumanFeedback';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -104,6 +108,18 @@ export const FilterBar = ({
         value: col.field,
         label: (col.headerName ?? col.field).substring('attributes.'.length),
         description: FIELD_DESCRIPTIONS[col.field],
+      });
+    } else if (
+      col.field.startsWith('summary.weave.feedback.wandb.annotation')
+    ) {
+      const parsed = parseFeedbackType(col.field);
+      if (!parsed) {
+        continue;
+      }
+      const backendFilter = convertFeedbackFieldToBackendFilter(parsed.field);
+      (options[0] as GroupedOption).options.push({
+        value: backendFilter,
+        label: parsed ? parsed.displayName : col.field,
       });
     } else {
       (options[0] as GroupedOption).options.push({
@@ -211,7 +227,7 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className="flex cursor-pointer items-center gap-4 rounded px-8 py-4 outline outline-moon-250 hover:outline-2 hover:outline-teal-500/40"
+        className="border-box flex h-32 cursor-pointer items-center gap-4 rounded border border-moon-200 px-8 hover:border-teal-500/40"
         onClick={onClick}>
         <div>
           <IconFilterAlt />
@@ -257,7 +273,7 @@ export const FilterBar = ({
               <div className="handle flex items-center pb-12">
                 <div className="flex-auto font-semibold">Filters</div>
                 {selectedCalls.length > 0 && (
-                  <Button size="small" variant="quiet" onClick={onSetSelected}>
+                  <Button size="small" variant="ghost" onClick={onSetSelected}>
                     {`Selected rows (${selectedCalls.length})`}
                   </Button>
                 )}
@@ -292,7 +308,7 @@ export const FilterBar = ({
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="add-new"
                 disabled={filterModel.items.length === 0}
                 onClick={() => onAddFilter('')}>
@@ -301,7 +317,7 @@ export const FilterBar = ({
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="delete"
                 disabled={filterModel.items.length === 0}
                 onClick={onRemoveAll}>

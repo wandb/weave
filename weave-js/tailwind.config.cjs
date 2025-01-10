@@ -13,8 +13,13 @@ module.exports = {
      */
     boxShadow: {
       none: 'none',
-      md: '0px 12px 24px 0px #15181F29',
-      lg: '0px 24px 48px 0px #15181F29',
+      flat: '0px 4px 8px 0px #0D0F120a', // oblivion 4%
+      medium: '0px 12px 24px 0px #0D0F1229', // oblivion 16%
+      deep: '0px 24px 48px 0px #0D0F123d', // oblivion 24%
+
+      // deprecated shadow configs
+      md: '0px 12px 24px 0px #15181F29', // use shadow-medium instead
+      lg: '0px 24px 48px 0px #15181F29', // use shadow-deep instead
     },
     spacing: {
       0: '0rem',
@@ -64,24 +69,24 @@ module.exports = {
       transparent: 'transparent',
       current: 'currentColor',
       white: '#FFFFFF',
-      moonbeam: '#EDE8FF',
-      oblivion: '#15181F',
+      moonbeam: '#F1EFF8',
+      oblivion: '#0D0F12',
       moon: {
-        50: '#FAFAFA',
-        100: '#F5F6F7',
-        150: '#EDEFF2',
-        200: '#E4E6EB',
-        250: '#DADEE3',
-        300: '#D3D7DE',
-        350: '#C2C6CF',
-        400: '#AEB3BD',
-        450: '#8E949E',
+        50: '#FDFDFD',
+        100: '#F8F8F8',
+        150: '#F0F0F0',
+        200: '#E8E8E9',
+        250: '#DFE0E2',
+        300: '#D4D5D9',
+        350: '#C5C7CC',
+        400: '#B1B4B9',
+        450: '#8F949E',
         500: '#79808A',
         550: '#676D78',
         600: '#565C66',
         650: '#4B535C',
         700: '#3F464F',
-        750: '#343A42',
+        750: '#363C44',
         800: '#2B3038',
         850: '#20242B',
         900: '#1A1D24',
@@ -188,6 +193,19 @@ module.exports = {
       },
     },
     extend: {
+      animation: {
+        wave: 'wave 3s linear  infinite',
+      },
+      keyframes: {
+        wave: {
+          '0%, 30%, 100%': {
+            transform: 'initial',
+          },
+          '15%': {
+            transform: 'translateY(-10px)',
+          },
+        },
+      },
       opacity: {
         35: '.35',
       },
@@ -208,6 +226,6 @@ module.exports = {
      in their parent hierarchy */
   important: '.tw-style',
   experimental: {
-    optimizeUniversalDefaults: true
+    optimizeUniversalDefaults: true,
   },
 };

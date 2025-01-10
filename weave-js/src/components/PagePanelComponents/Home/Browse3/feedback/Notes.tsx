@@ -96,7 +96,10 @@ export const Notes = ({
               const creator =
                 // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
                 // change the fallback from `n.wb_user_id` to `null`-like (this means no access)
-                n.creator ?? userMap[n.wb_user_id]?.username ?? n.wb_user_id;
+                n.creator ??
+                userMap[n.wb_user_id]?.username ??
+                userMap[n.wb_user_id]?.name ??
+                n.wb_user_id;
               return (
                 <div key={n.id} className="flex items-start">
                   <div className="ml-12">

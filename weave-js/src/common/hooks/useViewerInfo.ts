@@ -3,16 +3,15 @@
  * There is a query engine based approach in useViewerUserInfo.ts.
  */
 
-import {gql} from '@apollo/client';
+import {gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
-
-import {apolloClient} from '../../apollo';
 
 const VIEWER_QUERY = gql`
   query Viewer {
     viewer {
       id
       username
+      admin
       teams {
         edges {
           node {
@@ -30,6 +29,7 @@ type UserInfo = {
   id: string;
   username: string;
   teams: string[];
+  admin: boolean;
 };
 type UserInfoResponseLoading = {
   loading: true;
@@ -46,6 +46,8 @@ export const useViewerInfo = (): UserInfoResponse => {
     loading: true,
     userInfo: {},
   });
+
+  const apolloClient = useApolloClient();
 
   useEffect(() => {
     let mounted = true;
@@ -71,13 +73,14 @@ export const useViewerInfo = (): UserInfoResponse => {
           id,
           username,
           teams,
+          admin: userInfo.admin,
         },
       });
     });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apolloClient]);
 
   return response;
 };

@@ -72,23 +72,15 @@ const PreserveWrapping = styled.div`
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
 
-// Regular expressions for common Markdown syntax
-// Note this is intentionally limited in scope to reduce false positives.
-const LIKELY_MARKDOWN_PATTERNS: RegExp[] = [
-  /```[\s\S]*```/, // Code block
-  /\[.+\]\(.+\)/, // Links [text](url)
-  /!\[.*\]\(.+\)/, // Images ![alt](url)
-];
-
-const isLikelyMarkdown = (value: string): boolean => {
-  return LIKELY_MARKDOWN_PATTERNS.some(pattern => pattern.test(value));
-};
-
 const getDefaultFormat = (value: string): Format => {
   // TODO: Add JSON detection.
-  if (isLikelyMarkdown(value)) {
-    return 'Markdown';
-  }
+  // We previously would autoselect the markdown renderer if the string appeared
+  // to have markdown content. Unfortunately, our markdown renderer can hang
+  // for several seconds on large strings and was particularly a problem when
+  // the user would do something like expand all inputs. Rendering the markdown
+  // is nice for cases like embedded code or images, so it would be nice to revisit
+  // this if we can fix the issue with the renderer somehow. Leaving this function
+  // in the code for that reason.
   return 'Text';
 };
 

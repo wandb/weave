@@ -5,6 +5,7 @@ import {
   isListLike,
   isTaggedValue,
   isTypedDict,
+  isUnion,
   listObjectType,
   ListType,
   MemoizedHasher,
@@ -18,6 +19,7 @@ import {
   OutputNode,
   taggedValueValueType,
   Type,
+  TypedDictType,
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
@@ -29,11 +31,11 @@ import {WeaveFormatContextType} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {useTableStateWithRefinedExpressions} from './tableStateReact';
 
-// Formatting for PanelNumbers and PanelStrings inside Tables
+// Formatting for PanelNumber and PanelString headers and values inside Tables
 export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
   const t = nullableTaggableStrip(colType);
   const numberFormat =
-    t === 'number'
+    t === 'number' || t === 'float' || t === 'int'
       ? {
           textAlign: 'right' as const,
           justifyContent: 'normal',
@@ -42,9 +44,17 @@ export const getColumnCellFormats = (colType: Type): WeaveFormatContextType => {
         }
       : {};
   const stringFormat = {spacing: t === 'string'};
+  const columnFormat = {
+    textAlign:
+      t === 'number' || t === 'float' || t === 'int'
+        ? ('right' as const)
+        : ('center' as const),
+  };
+
   return {
     numberFormat,
     stringFormat,
+    columnFormat,
   };
 };
 
@@ -52,29 +62,67 @@ export const stripTag = (type: Type): Type => {
   return isTaggedValue(type) ? taggedValueValueType(type) : type;
 };
 
-// Very simple type shape comparison
-export const typeShapesMatch = (type: Type, toType: Type): boolean => {
-  type = stripTag(type);
-  toType = stripTag(toType);
-  if (isList(type) || isList(toType)) {
-    if (!isList(type) || !isList(toType)) {
-      return false;
-    } else {
-      return typeShapesMatch(listObjectType(type), listObjectType(toType));
-    }
-  } else if (isTypedDict(type) || isTypedDict(toType)) {
-    if (!isTypedDict(type) || !isTypedDict(toType)) {
-      return false;
-    } else {
-      for (const key of Object.keys(toType.propertyTypes)) {
-        const toKeyType = toType.propertyTypes[key]!;
-        const keyType = type.propertyTypes[key];
-        if (keyType === undefined || !typeShapesMatch(keyType, toKeyType)) {
-          return false;
-        }
+// Very simple type shape comparison util used to determine if tableState
+// needs to be reset or not.
+export const typesAreConcattable = (type: Type, toType: Type): boolean => {
+  function propertyTypesAreCompatible(
+    incomingTypedDict: TypedDictType,
+    toTypedDict: TypedDictType
+  ) {
+    for (const key of Object.keys(toTypedDict.propertyTypes)) {
+      const keyType = incomingTypedDict.propertyTypes[key];
+      const toKeyType = toTypedDict.propertyTypes[key];
+      if (keyType === undefined || !typesAreConcattable(keyType, toKeyType!)) {
+        return false;
       }
     }
+    return true;
   }
+
+  type = stripTag(type);
+  toType = stripTag(toType);
+
+  // List type handling
+  if (isList(type) || isList(toType)) {
+    return (
+      isList(type) &&
+      isList(toType) &&
+      typesAreConcattable(listObjectType(type), listObjectType(toType))
+    );
+  }
+  // TypedDict type handling
+  if (isTypedDict(type) || isTypedDict(toType)) {
+    // Handle union<typedDict> case
+    //
+    // This is meant for special cases where a user adds another column to their table
+    // in a subsequent run.
+    if (isTypedDict(toType) && isUnion(type)) {
+      return type.members.every(
+        member =>
+          isTypedDict(member) &&
+          isTypedDict(toType) &&
+          propertyTypesAreCompatible(member, toType)
+      );
+    }
+
+    if (!isTypedDict(type) || !isTypedDict(toType)) {
+      return false;
+    }
+
+    return propertyTypesAreCompatible(type, toType);
+  }
+
+  // 2024/11/20, Note from Dom:
+  // This util's original behavior never properly handled comparing two union types together;
+  // it just returned true. To minimize the risk of shipping a regression, I am leaving this
+  // legacy behavior alone for now.
+
+  // This returns true when comparing:
+  //   Two compatible TypedDicts
+  //   One TypedDict to a compatible Union<TypedDict[]>
+  //   Two Unions of any type
+  //
+  //   Two Lists that contain any of the types mentioned above
   return true;
 };
 

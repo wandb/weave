@@ -1,7 +1,7 @@
 /**
  * This file contains a few utilities for working with the
- * `MetricDefinitionMap`s in the `EvaluationComparisonData` object. The
- * `EvaluationComparisonData` state is a normalized representation of the data,
+ * `MetricDefinitionMap`s in the `EvaluationComparisonSummary` object. The
+ * `EvaluationComparisonSummary` state is a normalized representation of the data,
  * which is good for not duplicating data, but does present some challenges when
  * trying to build the final rendering of the data. As an application-specific
  * consideration, when comparing evaluations, metrics can be represented by the
@@ -13,7 +13,7 @@
  */
 import _ from 'lodash';
 
-import {EvaluationComparisonData, MetricDefinition} from './ecpTypes';
+import {EvaluationComparisonSummary, MetricDefinition} from './ecpTypes';
 import {MetricType} from './ecpTypes';
 import {getScoreKeyNameFromScorerRef} from './ecpUtil';
 import {flattenedDimensionPath} from './ecpUtil';
@@ -69,22 +69,23 @@ export type CompositeSummaryMetricGroupForKeyPath = {
 };
 
 /**
- * Builds a `CompositeScoreMetrics` object from the `EvaluationComparisonData`.
+ * Builds a `CompositeScoreMetrics` object from the `EvaluationComparisonSummary`.
  * This is the primary utility for converting the normalized data into a form
  * that is more useful for rendering the data.
  */
 export const buildCompositeMetricsMap = (
-  data: EvaluationComparisonData,
-  mType: MetricType
+  summaryData: EvaluationComparisonSummary,
+  mType: MetricType,
+  selectedMetrics: Record<string, boolean> | undefined = undefined
 ): CompositeScoreMetrics => {
   const composite: CompositeScoreMetrics = {};
 
   // Get the metric definition map based on the metric type
   let metricDefinitionMap;
   if (mType === 'score') {
-    metricDefinitionMap = data.scoreMetrics;
+    metricDefinitionMap = summaryData.scoreMetrics;
   } else if (mType === 'summary') {
-    metricDefinitionMap = data.summaryMetrics;
+    metricDefinitionMap = summaryData.summaryMetrics;
   } else {
     throw new Error(`Invalid metric type: ${mType}`);
   }
@@ -93,6 +94,12 @@ export const buildCompositeMetricsMap = (
   Object.entries(metricDefinitionMap).forEach(([metricId, metric]) => {
     const groupName = groupNameForMetric(metric);
     const ref = refForMetric(metric);
+    const keyPath = flattenedDimensionPath(metric);
+
+    if (selectedMetrics && !selectedMetrics[keyPath]) {
+      // Skip metrics that are not in the selectedMetrics map
+      return;
+    }
 
     if (!composite[groupName]) {
       composite[groupName] = {
@@ -104,8 +111,6 @@ export const buildCompositeMetricsMap = (
     if (!metricGroup.scorerRefs.includes(ref)) {
       metricGroup.scorerRefs.push(ref);
     }
-
-    const keyPath = flattenedDimensionPath(metric);
 
     if (!metricGroup.metrics[keyPath]) {
       metricGroup.metrics[keyPath] = {
@@ -123,9 +128,10 @@ export const buildCompositeMetricsMap = (
       };
     }
 
-    const evals = Object.values(data.evaluationCalls)
+    const evals = Object.values(summaryData.evaluationCalls)
       .filter(evaluationCall => {
-        const evaluation = data.evaluations[evaluationCall.evaluationRef];
+        const evaluation =
+          summaryData.evaluations[evaluationCall.evaluationRef];
         return (
           metric.scorerOpOrObjRef == null ||
           evaluation.scorerRefs.includes(metric.scorerOpOrObjRef)

@@ -1,7 +1,11 @@
 import hashlib
 import re
+from collections.abc import Iterable
+from typing import Any, Union
 
-MAX_RUN_NAME_LENGTH = 128
+from weave.trace.refs import OpRef, parse_uri
+from weave.trace.weave_client import Call, CallsIter
+from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
 
 def make_pythonic_function_name(name: str) -> str:
@@ -12,10 +16,10 @@ def make_pythonic_function_name(name: str) -> str:
 
 
 def truncate_op_name(name: str) -> str:
-    if len(name) <= MAX_RUN_NAME_LENGTH:
+    if len(name) <= MAX_OP_NAME_LENGTH:
         return name
 
-    trim_amount_needed = len(name) - MAX_RUN_NAME_LENGTH
+    trim_amount_needed = len(name) - MAX_OP_NAME_LENGTH
     parts = name.split(".")
     last_part = parts[-1]
 
@@ -65,3 +69,42 @@ def _truncate_string(s: str, max_len: int, from_start: bool = False) -> str:
 
 def _hash_str(s: str, hash_len: int) -> str:
     return hashlib.md5(s.encode()).hexdigest()[:hash_len]
+
+
+def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) -> list:
+    lst = []
+    for call in calls:
+        lst.append((call, depth))
+        lst.extend(flatten_calls(call.children(), depth=depth + 1))
+    return lst
+
+
+def flattened_calls_to_names(flattened_calls: list) -> list:
+    lst = []
+    for call, depth in flattened_calls:
+        ref = parse_uri(call.op_name)
+        assert isinstance(ref, OpRef)
+        lst.append((ref.name, depth))
+    return lst
+
+
+def op_name_from_ref(ref: str) -> str:
+    return ref.split("/")[-1].split(":")[0]
+
+
+def filter_body(r: Any) -> Any:
+    r.body = ""
+    return r
+
+
+def _make_string_of_length(n: int) -> str:
+    return "a" * n
+
+
+def _truncated_str(tail_len: int, total_len: int) -> tuple:
+    name = (
+        _make_string_of_length(total_len - tail_len - 1)
+        + "."
+        + _make_string_of_length(tail_len)
+    )
+    return name, truncate_op_name(name)

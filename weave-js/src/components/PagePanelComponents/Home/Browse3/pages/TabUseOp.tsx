@@ -3,9 +3,9 @@ import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {abbreviateRef} from '../../../../../util/refs';
-import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {TabUseBanner} from './TabUseBanner';
 
 type TabUseOpProps = {
   name: string;
@@ -16,15 +16,11 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
   const pythonName = isValidVarName(name) ? name : 'op';
 
   return (
-    <Box m={2}>
-      <Alert icon="lightbulb-info">
-        See{' '}
-        <DocLink
-          path="guides/tracking/objects#getting-an-object-back"
-          text="Weave docs on refs"
-        />{' '}
-        for more information.
-      </Alert>
+    <Box className="text-sm">
+      <TabUseBanner>
+        See <DocLink path="guides/tracking/ops" text="Weave docs on ops" /> for
+        more information.
+      </TabUseBanner>
 
       <Box mt={2}>
         The ref for this operation version is:
@@ -33,6 +29,7 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
       <Box mt={2}>
         Use the following code to retrieve this operation version:
         <CopyableText
+          language="python"
           text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"

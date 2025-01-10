@@ -22,7 +22,7 @@ client = openai.OpenAI(
 # highlight-next-line
     api_key=os.environ.get("OPENROUTER_API_KEY"),
 # highlight-next-line
-    base_url="https://api.together.xyz/v1",
+    base_url="https://openrouter.ai/api/v1",
 # highlight-next-line
 )
 chat_completion = client.chat.completions.create(
@@ -30,7 +30,7 @@ chat_completion = client.chat.completions.create(
     "HTTP-Referer": $YOUR_SITE_URL, # Optional, for including your app on openrouter.ai rankings.
     "X-Title": $YOUR_APP_NAME, # Optional. Shows in rankings on openrouter.ai.
     },
-    model="microsoft/phi-3-mini-128k-instruct:free",
+    model="meta-llama/llama-3.1-8b-instruct:free",
     messages=[
         {"role": "system", "content": system_content},
         {"role": "user", "content": user_content},

@@ -1,5 +1,4 @@
 import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
 import React, {useMemo} from 'react';
 
 import {
@@ -14,41 +13,17 @@ import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
-import {
-  BOX_RADIUS,
-  CIRCLE_SIZE,
-  EVAL_DEF_HEIGHT,
-  STANDARD_BORDER,
-} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
-import {HorizontalBox} from '../../Layout';
 
-export const EvaluationDefinition: React.FC<{
-  state: EvaluationComparisonState;
-  callId: string;
-}> = props => {
-  return (
-    <HorizontalBox
-      sx={{
-        height: EVAL_DEF_HEIGHT,
-        borderRadius: BOX_RADIUS,
-        border: STANDARD_BORDER,
-        padding: '12px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-      <EvaluationCallLink {...props} />
-      <VerticalBar />
-      <EvaluationModelLink {...props} />
-    </HorizontalBox>
-  );
-};
 export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const {entity, project} = props.state.data;
+  const evaluationCall = props.state.summary.evaluationCalls?.[props.callId];
+  if (!evaluationCall) {
+    return null;
+  }
+  const {entity, project} = props.state.summary;
 
   return (
     <CallLink
@@ -56,14 +31,7 @@ export const EvaluationCallLink: React.FC<{
       projectName={project}
       opName={evaluationCall.name}
       callId={props.callId}
-      icon={
-        <Circle
-          sx={{
-            color: evaluationCall.color,
-            height: CIRCLE_SIZE,
-          }}
-        />
-      }
+      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
       color={MOON_800}
     />
   );
@@ -74,8 +42,8 @@ export const EvaluationModelLink: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {useObjectVersion} = useWFHooks();
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const modelObj = props.state.data.models[evaluationCall.modelRef];
+  const evaluationCall = props.state.summary.evaluationCalls[props.callId];
+  const modelObj = props.state.summary.models[evaluationCall.modelRef];
   const objRef = useMemo(
     () => parseRef(modelObj.ref) as WeaveObjectRef,
     [modelObj.ref]
@@ -118,9 +86,9 @@ export const EvaluationDatasetLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
+  const evaluationCall = props.state.summary.evaluationCalls[props.callId];
   const evaluationObj =
-    props.state.data.evaluations[evaluationCall.evaluationRef];
+    props.state.summary.evaluations[evaluationCall.evaluationRef];
   const parsed = parseRef(evaluationObj.datasetRef);
   if (!parsed) {
     return null;
@@ -147,11 +115,12 @@ const ModelIcon: React.FC = () => {
     </Box>
   );
 };
-const VerticalBar: React.FC = () => {
+
+export const VerticalBar: React.FC = () => {
   return (
     <div
       style={{
-        width: '2px',
+        width: '1px',
         height: '100%',
         backgroundColor: MOON_300,
       }}

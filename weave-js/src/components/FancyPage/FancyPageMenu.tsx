@@ -34,6 +34,7 @@ export const FancyPageMenu = ({
     `@media (max-width:${MEDIUM_BREAKPOINT}px)`
   );
   const menuSide = isHorizontal ? 'bottom' : 'right';
+  const validMenuItems = menuItems.filter(Boolean);
 
   return (
     <DropdownMenu.Root open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -43,7 +44,9 @@ export const FancyPageMenu = ({
             <ItemIcon color={colorIconBg}>
               <IconOverflowHorizontal />
             </ItemIcon>
-            <ItemLabel color={colorText}>More</ItemLabel>
+            <ItemLabel className="night-aware" color={colorText}>
+              More
+            </ItemLabel>
           </MenuButton>
         </div>
       </DropdownMenu.Trigger>
@@ -52,12 +55,11 @@ export const FancyPageMenu = ({
           align="end"
           side={menuSide}
           style={STYLE_MENU_CONTENT}>
-          {menuItems.map((menuItem, i) => {
+          {validMenuItems.map((menuItem, i) => {
             if (menuItem.type !== 'button') {
               return null;
             }
             const linkProps = {
-              key: menuItem.slug,
               to: menuItem.isDisabled
                 ? {}
                 : {
@@ -73,7 +75,7 @@ export const FancyPageMenu = ({
               },
             };
             return (
-              <Link {...linkProps}>
+              <Link key={menuItem.slug} {...linkProps}>
                 <DropdownMenu.Item {...menuItemProps}>
                   <Icon name={menuItem.iconName} />
                   {menuItem.nameTooltip || menuItem.name}

@@ -1,18 +1,54 @@
+from __future__ import annotations
+
 import importlib
-import typing
 from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
+from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
 
+_openai_patcher: MultiPatcher | None = None
 
-def openai_on_finish_post_processor(
-    value: typing.Optional["ChatCompletionChunk"],
-) -> typing.Optional[typing.Dict]:
+
+def maybe_unwrap_api_response(value: Any) -> Any:
+    """If the caller requests a raw response, we unwrap the APIResponse object.
+    We take a very conservative approach to only unwrap the types we know about.
+    """
+    maybe_value: Any = None
+    try:
+        from openai._legacy_response import LegacyAPIResponse
+
+        if isinstance(value, LegacyAPIResponse):
+            maybe_value = value.parse()
+    except:
+        pass
+
+    try:
+        from openai._response import APIResponse
+
+        if isinstance(value, APIResponse):
+            maybe_value = value.parse()
+    except:
+        pass
+
+    try:
+        from openai.types.chat import ChatCompletion, ChatCompletionChunk
+
+        if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
+            return maybe_value
+    except:
+        pass
+
+    return value
+
+
+def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -24,9 +60,11 @@ def openai_on_finish_post_processor(
         Function,
     )
 
+    value = maybe_unwrap_api_response(value)
+
     def _get_function_call(
-        function_call: typing.Optional[ChoiceDeltaFunctionCall],
-    ) -> typing.Optional[FunctionCall]:
+        function_call: ChoiceDeltaFunctionCall | None,
+    ) -> FunctionCall | None:
         if function_call is None:
             return function_call
         if isinstance(function_call, ChoiceDeltaFunctionCall):
@@ -38,8 +76,8 @@ def openai_on_finish_post_processor(
             return None
 
     def _get_tool_calls(
-        tool_calls: typing.Optional[typing.List[ChoiceDeltaToolCall]],
-    ) -> typing.Optional[typing.List[ChatCompletionMessageToolCall]]:
+        tool_calls: list[ChoiceDeltaToolCall] | None,
+    ) -> list[ChatCompletionMessageToolCall] | None:
         if tool_calls is None:
             return tool_calls
 
@@ -59,8 +97,9 @@ def openai_on_finish_post_processor(
                 )
         return _tool_calls
 
+    dump = None
     if isinstance(value, ChatCompletionChunk):
-        final_value = ChatCompletion(
+        dump = ChatCompletion(
             id=value.id,
             choices=[
                 {
@@ -81,17 +120,21 @@ def openai_on_finish_post_processor(
             object="chat.completion",
             system_fingerprint=value.system_fingerprint,
             usage=value.usage if hasattr(value, "usage") else None,
-        )
-        return final_value.model_dump(exclude_unset=True, exclude_none=True)
-    else:
+        ).model_dump(exclude_unset=True, exclude_none=True)
+    elif not hasattr(value, "model_dump"):
         return value
+    else:
+        dump = value.model_dump(exclude_unset=True, exclude_none=True)
+    if hasattr(value, "_request_id"):
+        dump["request_id"] = value._request_id
+    return dump
 
 
 def openai_accumulator(
-    acc: typing.Optional["ChatCompletionChunk"],
-    value: "ChatCompletionChunk",
+    acc: ChatCompletionChunk | None,
+    value: ChatCompletionChunk,
     skip_last: bool = False,
-) -> "ChatCompletionChunk":
+) -> ChatCompletionChunk:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -101,7 +144,7 @@ def openai_accumulator(
 
     def _process_chunk(
         chunk: ChatCompletionChunk, acc_choices: list[dict] = []
-    ) -> typing.List[typing.Dict]:
+    ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
@@ -231,34 +274,61 @@ def openai_accumulator(
 
 
 # Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: typing.Dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
+def should_use_accumulator(inputs: dict) -> bool:
+    return (
+        isinstance(inputs, dict)
+        and bool(inputs.get("stream"))
+        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
+        # is an APIResponse object. This is very hard to mock/patch for the streaming use
+        # case, so we don't even try.
+        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
+        == "true"
+    )
 
 
-def create_wrapper_sync(
-    name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+def openai_on_input_handler(
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
+    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
+        original_args = args
+        original_kwargs = kwargs
+        prompt = args[1]
+        args = args[:-1]
+        kwargs.update(prompt.as_dict())
+        inputs = {
+            "prompt": prompt,
+        }
+        return ProcessedInputs(
+            original_args=original_args,
+            original_kwargs=original_kwargs,
+            args=args,
+            kwargs=kwargs,
+            inputs=inputs,
+        )
+    return None
+
+
+def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
 
-        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
+        def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
-                return fn(
-                    *args, **kwargs
-                )  # This is where the final execution of fn is happening.
+                return fn(*args, **kwargs)
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+        def _openai_stream_options_is_set(inputs: dict) -> bool:
             if inputs.get("stream_options") is not None:
                 return True
             return False
 
-        op = weave.op()(_add_stream_options(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_add_stream_options(fn), **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -274,28 +344,27 @@ def create_wrapper_sync(
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
-def create_wrapper_async(
-    name: str,
-) -> typing.Callable[[typing.Callable], typing.Callable]:
-    def wrapper(fn: typing.Callable) -> typing.Callable:
+def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
 
-        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
+        def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
                 return await fn(*args, **kwargs)
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+        def _openai_stream_options_is_set(inputs: dict) -> bool:
             if inputs.get("stream_options") is not None:
                 return True
             return False
 
-        op = weave.op()(_add_stream_options(fn))
-        op.name = name  # type: ignore
+        op_kwargs = settings.model_dump()
+        op = weave.op(_add_stream_options(fn), **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -308,18 +377,93 @@ def create_wrapper_async(
     return wrapper
 
 
-symbol_patchers = [
-    # Patch the Completions.create method
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "Completions.create",
-        create_wrapper_sync(name="openai.chat.completions.create"),
-    ),
-    SymbolPatcher(
-        lambda: importlib.import_module("openai.resources.chat.completions"),
-        "AsyncCompletions.create",
-        create_wrapper_async(name="openai.chat.completions.create"),
-    ),
-]
+def get_openai_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
 
-openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _openai_patcher
+    if _openai_patcher is not None:
+        return _openai_patcher
+
+    base = settings.op_settings
+
+    completions_create_settings = base.model_copy(
+        update={"name": base.name or "openai.chat.completions.create"}
+    )
+    async_completions_create_settings = base.model_copy(
+        update={"name": base.name or "openai.chat.completions.create"}
+    )
+    completions_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.beta.chat.completions.parse"}
+    )
+    async_completions_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.beta.chat.completions.parse"}
+    )
+    moderation_create_settings = base.model_copy(
+        update={"name": base.name or "openai.moderations.create"}
+    )
+    async_moderation_create_settings = base.model_copy(
+        update={"name": base.name or "openai.moderations.create"}
+    )
+    embeddings_create_settings = base.model_copy(
+        update={"name": base.name or "openai.embeddings.create"}
+    )
+    async_embeddings_create_settings = base.model_copy(
+        update={"name": base.name or "openai.embeddings.create"}
+    )
+
+    _openai_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "Completions.create",
+                create_wrapper_sync(settings=completions_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "AsyncCompletions.create",
+                create_wrapper_async(settings=async_completions_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.beta.chat.completions"
+                ),
+                "Completions.parse",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module(
+                    "openai.resources.beta.chat.completions"
+                ),
+                "AsyncCompletions.parse",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.moderations"),
+                "Moderations.create",
+                create_wrapper_sync(settings=moderation_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.moderations"),
+                "AsyncModerations.create",
+                create_wrapper_async(settings=async_moderation_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.embeddings"),
+                "Embeddings.create",
+                create_wrapper_sync(settings=embeddings_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.embeddings"),
+                "AsyncEmbeddings.create",
+                create_wrapper_async(settings=async_embeddings_create_settings),
+            ),
+        ]
+    )
+
+    return _openai_patcher

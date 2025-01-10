@@ -32,7 +32,6 @@ export const ColumnName = styled.div`
     color: ${globals.primary};
   }
   overflow: hidden;
-  text-align: left;
 `;
 ColumnName.displayName = 'S.ColumnName';
 
@@ -99,18 +98,23 @@ FilterIcon.displayName = 'S.FilterIcon';
 
 export const ColumnAction = styled.div<{isHovered?: boolean}>`
   cursor: pointer;
+  height: 100%;
+  background-color: transparent;
+`;
+ColumnAction.displayName = 'S.ColumnAction';
+
+export const ColumnActionContainer = styled.div<{isHovered?: boolean}>`
+  display: flex;
   padding: 5px 0px 0px 0px;
+  font-size: 20px;
   flex: 0 0 auto;
   height: 100%;
-  background: white;
-  font-size: 20px;
 
   :hover {
     background-color: ${hexToRGB(OBLIVION, 0.04)};
   }
-  background-color: transparent;
 `;
-ColumnAction.displayName = 'S.ColumnAction';
+ColumnActionContainer.displayName = 'S.ColumnActionContainer';
 
 export const TableAction = styled.div<{
   highlight?: boolean;

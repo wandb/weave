@@ -69,16 +69,17 @@
  *  across different datasets.
  */
 
-import _ from 'lodash';
 import {sum} from 'lodash';
-import {useEffect, useMemo, useState} from 'react';
+import _ from 'lodash';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
-  EvaluationComparisonData,
+  EvaluationComparisonResults,
+  EvaluationComparisonSummary,
   MetricDefinition,
 } from '../CompareEvaluationsPage/ecpTypes';
 import {
@@ -99,24 +100,27 @@ import {TraceCallSchema} from './traceServerClientTypes';
  * Primary react hook for fetching evaluation comparison data. This could be
  * moved into the Trace Server hooks at some point, hence the location of the file.
  */
-export const useEvaluationComparisonData = (
+export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Loadable<EvaluationComparisonData> => {
+): Loadable<EvaluationComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<EvaluationComparisonData | null>(null);
+  const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
   const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
+  const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
+
   useEffect(() => {
     setData(null);
     let mounted = true;
-    fetchEvaluationComparisonData(
+    fetchEvaluationSummaryData(
       getTraceServerClient(),
       entity,
       project,
       evaluationCallIdsMemo
     ).then(dataRes => {
       if (mounted) {
+        evaluationCallIdsRef.current = evaluationCallIdsMemo;
         setData(dataRes);
       }
     });
@@ -126,33 +130,84 @@ export const useEvaluationComparisonData = (
   }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
 
   return useMemo(() => {
-    if (data == null) {
+    if (
+      data == null ||
+      evaluationCallIdsRef.current !== evaluationCallIdsMemo
+    ) {
       return {loading: true, result: null};
     }
     return {loading: false, result: data};
-  }, [data]);
+  }, [data, evaluationCallIdsMemo]);
 };
 
 /**
- * This function is responsible for building the data structure used to describe
- * the comparison of evaluations. It is a complex function that fetches data from
- * the trace server and builds a normalized data structure.
+ * Primary react hook for fetching evaluation comparison data. This could be
+ * moved into the Trace Server hooks at some point, hence the location of the file.
  */
-const fetchEvaluationComparisonData = async (
+export const useEvaluationComparisonResults = (
+  entity: string,
+  project: string,
+  evaluationCallIds: string[],
+  summaryData: EvaluationComparisonSummary | null
+): Loadable<EvaluationComparisonResults> => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [data, setData] = useState<EvaluationComparisonResults | null>(null);
+  const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
+  const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
+
+  useEffect(() => {
+    setData(null);
+    let mounted = true;
+    if (summaryData == null) {
+      return;
+    }
+    fetchEvaluationComparisonResults(
+      getTraceServerClient(),
+      entity,
+      project,
+      evaluationCallIdsMemo,
+      summaryData
+    ).then(dataRes => {
+      if (mounted) {
+        evaluationCallIdsRef.current = evaluationCallIdsMemo;
+        setData(dataRes);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [
+    entity,
+    evaluationCallIdsMemo,
+    project,
+    getTraceServerClient,
+    summaryData,
+  ]);
+
+  return useMemo(() => {
+    if (
+      data == null ||
+      evaluationCallIdsRef.current !== evaluationCallIdsMemo
+    ) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: data};
+  }, [data, evaluationCallIdsMemo]);
+};
+
+const fetchEvaluationSummaryData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
   evaluationCallIds: string[]
-): Promise<EvaluationComparisonData> => {
+): Promise<EvaluationComparisonSummary> => {
   const projectId = projectIdFromParts({entity, project});
-  const result: EvaluationComparisonData = {
+  const result: EvaluationComparisonSummary = {
     entity,
     project,
     evaluationCalls: {},
     evaluations: {},
-    inputs: {},
     models: {},
-    resultRows: {},
     scoreMetrics: {},
     summaryMetrics: {},
   };
@@ -170,13 +225,6 @@ const fetchEvaluationComparisonData = async (
     filter: {call_ids: evaluationCallIds},
   });
 
-  // Kick off the trace query to get the actual trace data
-  const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceResProm = traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
-  });
-
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
       evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
@@ -191,6 +239,7 @@ const fetchEvaluationComparisonData = async (
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
+        traceId: call.trace_id,
       },
     ])
   );
@@ -236,7 +285,20 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = output[scorerKey];
+      // TODO: REMOVE when sanitized scorer names have been released
+      // this is a hack to support previous unsanitized scorer names
+      // that have spaces.
+      let score = output[scorerKey];
+      if (score == null && scorerKey.includes('-')) {
+        // no score found, '-' means we probably sanitized an illegal character
+        const foundScorerNameMaybe = fuzzyMatchScorerName(
+          Object.keys(output),
+          scorerKey
+        );
+        if (foundScorerNameMaybe != null) {
+          score = output[foundScorerNameMaybe];
+        }
+      }
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -373,9 +435,71 @@ const fetchEvaluationComparisonData = async (
     })
   );
 
+  return result;
+};
+
+/**
+ * This function is responsible for building the data structure used to describe
+ * the comparison of evaluations. It is a complex function that fetches data from
+ * the trace server and builds a normalized data structure.
+ */
+const fetchEvaluationComparisonResults = async (
+  traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
+  entity: string,
+  project: string,
+  evaluationCallIds: string[],
+  summaryData: EvaluationComparisonSummary
+): Promise<EvaluationComparisonResults> => {
+  const projectId = projectIdFromParts({entity, project});
+  const result: EvaluationComparisonResults = {
+    inputs: {},
+    resultRows: {},
+  };
+
+  // Kick off the trace query to get the actual trace data
+  // Note: we split this into 2 steps to ensure we only get level 2 children
+  // of the evaluations. This avoids massive overhead of fetching gigantic traces
+  // for every evaluation.
+  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
+    call => call.traceId
+  );
+  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
+  const evalTraceResProm = traceServerClient
+    .callsStreamQuery({
+      project_id: projectId,
+      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
+    })
+    .then(predictAndScoreCallRes => {
+      // Then, get all the children of those calls (predictions + scores)
+      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+        call => call.id
+      );
+
+      return Promise.all(
+        _.chunk(predictAndScoreIds, 500).map(chunk => {
+          return traceServerClient
+            .callsStreamQuery({
+              project_id: projectId,
+              filter: {trace_ids: evalTraceIds, parent_ids: chunk},
+            })
+            .then(predictionsAndScoresCallsRes => {
+              return predictionsAndScoresCallsRes.calls;
+            });
+        })
+      ).then(predictionsAndScoresCallsResMany => {
+        return {
+          calls: [
+            ...predictAndScoreCallRes.calls,
+            ...predictionsAndScoresCallsResMany.flat(),
+          ],
+        };
+      });
+    });
+
   // 3.5 Populate the inputs
   // We only ned 1 since we are going to effectively do an inner join on the rowDigest
-  const datasetRef = Object.values(result.evaluations)[0].datasetRef as string;
+  const datasetRef = Object.values(summaryData.evaluations)[0]
+    .datasetRef as string;
   const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
   const rowsRef = datasetObjRes.vals[0].rows;
   const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
@@ -398,7 +522,7 @@ const fetchEvaluationComparisonData = async (
 
   // Create a set of all of the scorer refs
   const scorerRefs = new Set(
-    Object.values(result.evaluations).flatMap(
+    Object.values(summaryData.evaluations).flatMap(
       evaluation => evaluation.scorerRefs
     )
   );
@@ -422,14 +546,14 @@ const fetchEvaluationComparisonData = async (
   // Fill in the autosummary source calls
   summaryOps.forEach(summarizedOp => {
     const evalCallId = summarizedOp.parent_id!;
-    const evalCall = result.evaluationCalls[evalCallId];
+    const evalCall = summaryData.evaluationCalls[evalCallId];
     if (evalCall == null) {
       return;
     }
     Object.entries(evalCall.summaryMetrics).forEach(
       ([metricId, metricResult]) => {
         if (
-          result.summaryMetrics[metricId].source === 'scorer' ||
+          summaryData.summaryMetrics[metricId].source === 'scorer' ||
           // Special case that the model latency is also a summary metric calc
           metricDefinitionId(modelLatencyMetricDimension) === metricId
         ) {
@@ -438,6 +562,10 @@ const fetchEvaluationComparisonData = async (
       }
     );
   });
+
+  const modelRefs = Object.values(summaryData.evaluationCalls).map(
+    evalCall => evalCall.modelRef
+  );
 
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
@@ -460,17 +588,8 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const possiblePredictNames = [
-              'predict',
-              'infer',
-              'forward',
-              'invoke',
-            ];
             const isProbablyPredictCall =
-              (_.some(possiblePredictNames, name =>
-                traceCall.op_name.includes(`.${name}:`)
-              ) &&
-                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.inputs.self) ||
               modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
@@ -566,7 +685,7 @@ const fetchEvaluationComparisonData = async (
                     scorerOpOrObjRef: scorerRef,
                   };
                   const metricId = metricDefinitionId(metricDimension);
-                  result.scoreMetrics[metricId] = metricDimension;
+                  summaryData.scoreMetrics[metricId] = metricDimension;
                   predictAndScoreFinal.scoreMetrics[metricId] = {
                     sourceCallId: traceCall.id,
                     value: scoreVal,
@@ -579,7 +698,7 @@ const fetchEvaluationComparisonData = async (
                     scorerOpOrObjRef: scorerRef,
                   };
                   const metricId = metricDefinitionId(metricDimension);
-                  result.scoreMetrics[metricId] = metricDimension;
+                  summaryData.scoreMetrics[metricId] = metricDimension;
 
                   predictAndScoreFinal.scoreMetrics[metricId] = {
                     sourceCallId: traceCall.id,
@@ -615,7 +734,7 @@ const fetchEvaluationComparisonData = async (
       if (isSummaryChild && isProbablyBoundScoreCall && isSummaryOp) {
         // Now fill in the source of the eval score
         const evalCallId = maybeParentSummaryOp!.parent_id!;
-        const evalCall = result.evaluationCalls[evalCallId];
+        const evalCall = summaryData.evaluationCalls[evalCallId];
         if (evalCall == null) {
           return;
         }
@@ -635,7 +754,7 @@ const fetchEvaluationComparisonData = async (
     Object.entries(result.resultRows).filter(([digest, row]) => {
       return (
         Object.values(row.evaluations).length ===
-        Object.values(result.evaluationCalls).length
+        Object.values(summaryData.evaluationCalls).length
       );
     })
   );
@@ -720,3 +839,13 @@ type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+
+function fuzzyMatchScorerName(
+  scoreNames: string[],
+  possibleScorerName: string
+) {
+  // anytime we see a '-' in possibleScorerName, it can be any illegal character
+  // in score names. Use a regex to find matches, and return the first match.
+  const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
+  return scoreNames.find(name => regex.test(name));
+}

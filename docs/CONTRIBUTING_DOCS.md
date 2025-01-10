@@ -19,8 +19,9 @@ Satisfy the following dependencies to create, build, and locally serve Weave Doc
   npm install --global yarn
   ```
 - Make sure your python environment is setup by running the following from the repro root:
-  - `pip install -r requirements.dev.txt` 
-  - `pip install -e .` 
+  - `pip install -r requirements.dev.txt`
+  - `pip install -e .`
+- Run `playwright install`
 - Install an IDE (e.g. VS Code) or Text Editor (e.g. Sublime)
 
 &nbsp;
@@ -82,7 +83,9 @@ git push origin <your-feature-branch>
 8. Open a pull request from the new branch to the original repo.
 
 ## DocGen
+
 Currently, we have 3 forms of doc generation:
+
 1. Python Doc Gen
 2. Service Doc Gen
 3. Notebook Doc Gen
@@ -108,17 +111,18 @@ Python doc gen uses `lazydocs` as the core library for building markdown docs fr
 
 ### Service Doc Gen
 
-See `docs/scripts/generate_service_api_spec.py`  and `./docs/reference/service-api`
+See `docs/scripts/generate_service_api_spec.py` and `./docs/reference/service-api`
 
 Service doc generation loads the `openapi.json` file describing the server, processes it, then uses the `docusaurus-plugin-openapi-docs` plugin to generate markdown files from that specification.
 
-To improve docs, basically follow FastAPI's instructions to create good Swagger docs by adding field-level and endpoint-level documentation using their APIs. Assuming your have made some changes, `docs/scripts/generate_service_api_spec.py` needs a server to point to. You can either deploy to prod, or run the server locally and point to it in `docs/scripts/generate_service_api_spec.py`. From there, `docs/scripts/generate_service_api_spec.py` will download the spec, clean it up, and build the docs!
+To improve docs, basically follow FastAPI's instructions to create good Swagger docs by adding field-level and endpoint-level documentation using their APIs. Assuming you have made some changes, `docs/scripts/generate_service_api_spec.py` needs a server to point to. You can either deploy to prod, or run the server locally and point to it in `docs/scripts/generate_service_api_spec.py`. From there, `docs/scripts/generate_service_api_spec.py` will download the spec, clean it up, and build the docs!
 
 ### Notebook Doc Gen
 
 See `docs/scripts/generate_notebooks.py`, `./docs/notebooks`, and `./docs/reference/gen_notebooks`.
 
 This script will load all notebooks in `./docs/notebooks`, transforming them into viable markdown docs in `./docs/reference/gen_notebooks` which can be referenced by docusaurus just like any other markdown file. If you need header metadata, you can add a markdown block at the top of your notebook with:
+
 ```
 <!-- docusaurus_head_meta::start
 ---
@@ -126,4 +130,3 @@ title: Head Metadata
 ---
 docusaurus_head_meta::end -->
 ```
-

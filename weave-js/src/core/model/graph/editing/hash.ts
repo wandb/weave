@@ -3,7 +3,7 @@ import _ from 'lodash';
 import type {EditingNode, EditingOp} from './types';
 
 // TODO: is this unique enough for now?
-const cyrb53 = (str: string, seed = 0) => {
+export const cyrb53 = (str: string, seed = 0) => {
   /* tslint:disable:no-bitwise */
   let h1 = 0xdeadbeef ^ seed;
   let h2 = 0x41c6ce57 ^ seed;

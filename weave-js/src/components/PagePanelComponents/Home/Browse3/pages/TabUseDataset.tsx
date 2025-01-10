@@ -4,9 +4,9 @@ import React from 'react';
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
 import {abbreviateRef} from '../../../../../util/refs';
-import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {TabUseBanner} from './TabUseBanner';
 import {
   OBJECT_ATTR_EDGE_NAME,
   TABLE_ID_EDGE_NAME,
@@ -43,8 +43,8 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
   }
 
   return (
-    <Box m={2}>
-      <Alert icon="lightbulb-info">
+    <Box className="text-sm">
+      <TabUseBanner>
         See{' '}
         <DocLink
           path="guides/tracking/objects#getting-an-object-back"
@@ -52,7 +52,7 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
         />{' '}
         and <DocLink path="guides/core-types/datasets" text="datasets" /> for
         more information.
-      </Alert>
+      </TabUseBanner>
 
       <Box mt={2}>
         The ref for this {label} is:
@@ -61,14 +61,15 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
       <Box mt={2}>
         Use the following code to retrieve this {label}:
         <CopyableText
+          language="python"
           text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"
         />
         {long && (
           <>
-            or
-            <CopyableText text={long} />
+            <div className="mt-8">or</div>
+            <CopyableText language="python" text={long} />
           </>
         )}
       </Box>

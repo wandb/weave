@@ -1,6 +1,5 @@
-import {gql} from '@apollo/client';
+import {ApolloClient, gql, useApolloClient} from '@apollo/client';
 import {Avatar, Popover, TooltipProps} from '@mui/material';
-import {apolloClient} from '@wandb/weave/apollo';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/NotApplicable';
 import React, {useEffect, useRef, useState} from 'react';
@@ -233,7 +232,7 @@ type UserLinkProps = {
   hasPopover?: boolean; // Can you click to open more a popup
 };
 
-const fetchUser = (userId: string) => {
+const fetchUser = (userId: string, apolloClient: ApolloClient<object>) => {
   return apolloClient
     .query({
       query: FIND_USER_QUERY as any,
@@ -246,19 +245,20 @@ const fetchUser = (userId: string) => {
     });
 };
 
-const fetchUsers = (userIds: string[]) => {
+const fetchUsers = (userIds: string[], apolloClient: ApolloClient<object>) => {
   // This is not great, gorilla does not allow multi-user-lookup by id :(
-  return Promise.all(userIds.map(fetchUser));
+  return Promise.all(userIds.map(userId => fetchUser(userId, apolloClient)));
 };
 
 export const useUsers = (userIds: string[]) => {
   const memoedUserIds = useDeepMemo(userIds);
+  const apolloClient = useApolloClient();
 
   const [users, setUsers] = useState<UserResult>('load');
   useEffect(() => {
     let mounted = true;
     setUsers('loading');
-    fetchUsers(memoedUserIds)
+    fetchUsers(memoedUserIds, apolloClient)
       .then(userRes => {
         if (!mounted) {
           return;
@@ -274,7 +274,7 @@ export const useUsers = (userIds: string[]) => {
     return () => {
       mounted = false;
     };
-  }, [memoedUserIds]);
+  }, [apolloClient, memoedUserIds]);
 
   return users;
 };

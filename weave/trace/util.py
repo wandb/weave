@@ -1,8 +1,39 @@
+from __future__ import annotations
+
+import warnings
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
-from functools import partial
+from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Iterable, Iterator, Optional
+from typing import Any, Callable
+
+LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
+logged_messages = []
+
+
+def log_once(log_method: Callable[[str], None], message: str) -> None:
+    """Logs a message once, suppressing subsequent messages of the same type. This
+    is useful for notifying the user about errors without spamming the logs.
+
+    This is mostly useful for cases where the same error message might occur many times.
+    For example, if an op fails to save, it is likely going to happen every time that op is
+    called. Or, if we have an error in our patched iterator, then it likely happens every time
+    we iterate over the result. This allows use to inform the user about the error without
+    clogging up their logs.
+
+    Args:
+        log_method: The method to use to log the message. This should accept a string argument.
+        message: The message to log.
+
+    Example:
+    ```python
+    log_once(logger.error, "Failed to save op")
+    ```
+    """
+    if message not in logged_messages:
+        log_method(message + LOG_ONCE_MESSAGE_SUFFIX)
+        logged_messages.append(message)
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -45,7 +76,7 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         self,
         fn: Callable,
         *iterables: Iterable[Iterable],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         chunksize: int = 1,
     ) -> Iterator:
         contexts = [copy_context() for _ in range(len(list(iterables[0])))]
@@ -70,7 +101,7 @@ class ContextAwareThread(_Thread):
     (see call_context.py), but new threads do not automatically copy context from
     the parent, which can cause the call context to be lost -- not good!  This
     class automates contextvar copying so using this thread "just works" as the
-    user probaly expects.
+    user probably expects.
 
     You can achieve the same effect without this class by instead writing:
 
@@ -117,6 +148,24 @@ def is_notebook() -> bool:
         # if "VSCODE_PID" in os.environ:
         #     return False
     return True
+
+
+def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Decorator to mark a function as deprecated and redirect users to `new_name`."""
+
+    def deco(func: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            warnings.warn(
+                f"{func.__name__} is deprecated and will be removed in a future version. Use {new_name} instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return deco
 
 
 # rename for cleaner export

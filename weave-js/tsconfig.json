@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": false,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react",
     "lib": [
       "es6",
       "dom",

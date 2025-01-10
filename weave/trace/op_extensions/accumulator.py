@@ -1,20 +1,18 @@
-import atexit
-import weakref
-from typing import (
-    Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    Generator,
-    Generic,
-    Iterator,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
+from __future__ import annotations
 
+import atexit
+import logging
+import sys
+import traceback
+import weakref
+from collections.abc import AsyncIterator, Generator, Iterator
+from typing import Any, Callable, Generic, Optional, TypeVar
+
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.op import FinishCallbackType, Op
+from weave.trace.util import log_once
+
+logger = logging.getLogger(__name__)
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -24,14 +22,37 @@ _OnYieldType = Callable[[V], None]
 _OnErrorType = Callable[[Exception], None]
 _OnCloseType = Callable[[], None]
 
+ON_CLOSE_MSG = "Error closing iterator, call data may be incomplete:\n{}"
+ON_ERROR_MSG = "Error capturing error from iterator, call data may be incomplete:\n{}"
+ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete:\n{}"
+ON_AYIELD_MSG = (
+    "Error capturing async value from iterator, call data may be incomplete:\n{}"
+)
+
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
+        return obj.__aiter__()
+
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP007
+        try:
+            return await obj.__anext__()
+        except StopAsyncIteration:
+            if default is not None:
+                return default
+            else:
+                raise
+
 
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
 
     def __init__(
         self,
-        iterator_or_ctx_manager: Union[Iterator, AsyncIterator],
+        iterator_or_ctx_manager: Iterator | AsyncIterator,
         on_yield: _OnYieldType,
         on_error: _OnErrorType,
         on_close: _OnCloseType,
@@ -46,51 +67,101 @@ class _IteratorWrapper(Generic[V]):
 
     def _call_on_close_once(self) -> None:
         if not self._on_finished_called:
-            self._on_close()  # type: ignore
+            try:
+                self._on_close()  # type: ignore
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
         if not self._on_finished_called:
-            self._on_error(e)
+            try:
+                self._on_error(e)
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_ERROR_MSG.format(traceback.format_exc()))
             self._on_finished_called = True
 
-    def __iter__(self) -> "_IteratorWrapper":
+    def __iter__(self) -> _IteratorWrapper:
         return self
 
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
-            raise TypeError(
-                f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = iter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call next on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
-            self._on_yield(value)
-            return value
+            try:
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+                self._on_yield(value)
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
         except (StopIteration, StopAsyncIteration) as e:
             self._call_on_close_once()
             raise
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
-    def __aiter__(self) -> "_IteratorWrapper":
+    def __aiter__(self) -> _IteratorWrapper:
         return self
 
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
-            raise TypeError(
-                f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
-            )
+            try:
+                # This is kept as a type ignore because the `google-generativeai` pkg seems
+                # to yield an object that has properties of both value and iterator, but doesn't
+                # seem to pass the isinstance(obj, Iterator) check...
+                self._iterator_or_ctx_manager = aiter(self._iterator_or_ctx_manager)  # type: ignore
+            except TypeError:
+                raise TypeError(
+                    f"Cannot call anext on an object of type {type(self._iterator_or_ctx_manager)}"
+                )
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
-            self._on_yield(value)
-            return value
+            try:
+                self._on_yield(value)
+                # Here we do a try/catch because we don't want to
+                # break the user process if we trip up on processing
+                # the yielded value
+            except Exception as e:
+                # We actually use StopIteration to signal the end of the iterator
+                # in some cases (like when we don't want to surface the last chunk
+                # with usage info from openai integration).
+                if isinstance(e, (StopAsyncIteration, StopIteration)):
+                    raise
+                if get_raise_on_captured_errors():
+                    raise
+                log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
             raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
             raise
+        else:
+            return value
 
     def __del__(self) -> None:
         self._call_on_close_once()
@@ -111,7 +182,7 @@ class _IteratorWrapper(Generic[V]):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __enter__(self) -> "_IteratorWrapper":
+    def __enter__(self) -> _IteratorWrapper:
         if hasattr(self._iterator_or_ctx_manager, "__enter__"):
             # let's enter the context manager to get the stream iterator
             self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
@@ -119,9 +190,9 @@ class _IteratorWrapper(Generic[V]):
 
     def __exit__(
         self,
-        exc_type: Optional[Exception],
-        exc_value: Optional[BaseException],
-        traceback: Optional[Any],
+        exc_type: Exception | None,
+        exc_value: BaseException | None,
+        traceback: Any,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
@@ -131,7 +202,7 @@ class _IteratorWrapper(Generic[V]):
             self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
-    async def __aenter__(self) -> "_IteratorWrapper":
+    async def __aenter__(self) -> _IteratorWrapper:
         if hasattr(
             self._iterator_or_ctx_manager, "__aenter__"
         ):  # let's enter the context manager
@@ -142,9 +213,9 @@ class _IteratorWrapper(Generic[V]):
 
     async def __aexit__(
         self,
-        exc_type: Optional[Exception],
-        exc_value: Optional[BaseException],
-        traceback: Optional[Any],
+        exc_type: Exception | None,
+        exc_value: BaseException | None,
+        traceback: Any,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
@@ -153,11 +224,11 @@ class _IteratorWrapper(Generic[V]):
 
 def add_accumulator(
     op: Op,
-    make_accumulator: Callable[[Dict], Callable[[S, V], S]],
+    make_accumulator: Callable[[dict], Callable[[S, V], S]],
     *,
-    should_accumulate: Optional[Callable[[Dict], bool]] = None,
-    on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
-    iterator_wrapper: Type[_IteratorWrapper] = _IteratorWrapper,
+    should_accumulate: Callable[[dict], bool] | None = None,
+    on_finish_post_processor: Callable[[Any], Any] | None = None,
+    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
@@ -186,9 +257,9 @@ def add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
+        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
     ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: Optional[BaseException] = None) -> None:
+        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
             if on_finish_post_processor is not None:
                 value = on_finish_post_processor(value)
             on_finish(value, e)
@@ -214,8 +285,8 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-    iterator_wrapper: Type["_IteratorWrapper"] = _IteratorWrapper,
-) -> "_IteratorWrapper":
+    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
+) -> _IteratorWrapper:
     acc: _Accumulator = _Accumulator(accumulator)
 
     def on_yield(value: V) -> None:
@@ -231,12 +302,12 @@ def _build_iterator_from_accumulator_for_op(
 
 
 class _Accumulator(Generic[S, V]):
-    state: Optional[S]
+    state: S | None
 
     def __init__(
         self,
-        accumulator: Callable[[Optional[S], V], S],
-        initial_state: Optional[S] = None,
+        accumulator: Callable[[S | None, V], S],
+        initial_state: S | None = None,
     ):
         self._accumulator = accumulator
         self._state = initial_state
@@ -251,5 +322,5 @@ class _Accumulator(Generic[S, V]):
             self._state = e.value
             raise
 
-    def get_state(self) -> Optional[S]:
+    def get_state(self) -> S | None:
         return self._state

@@ -1,0 +1,6 @@
+include requirements.*
+include wb_schema.gql
+graft weave_query
+global-exclude */__pycache__/*
+global-exclude *.pyc
+global-exclude */cassettes/*

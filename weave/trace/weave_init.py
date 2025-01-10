@@ -1,10 +1,9 @@
-import typing
+from __future__ import annotations
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
-from weave.trace.client_context import weave_client as weave_client_context
-from weave.trace_server import remote_http_trace_server, sqlite_trace_server
-
-_current_inited_client = None
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace_server import sqlite_trace_server
+from weave.trace_server_bindings import remote_http_trace_server
 
 
 class InitializedClient:
@@ -16,8 +15,11 @@ class InitializedClient:
         weave_client_context.set_weave_client_global(None)
 
 
-def get_username() -> typing.Optional[str]:
-    from weave.legacy.weave import wandb_api
+_current_inited_client: InitializedClient | None = None
+
+
+def get_username() -> str | None:
+    from weave.wandb_interface import wandb_api
 
     api = wandb_api.get_wandb_api_sync()
     try:
@@ -27,7 +29,7 @@ def get_username() -> typing.Optional[str]:
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -61,7 +63,9 @@ Args:
 
 
 def init_weave(
-    project_name: str, ensure_project_exists: bool = True
+    project_name: str,
+    ensure_project_exists: bool = True,
+    autopatch_settings: autopatch.AutopatchSettings | None = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
@@ -75,7 +79,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
@@ -96,8 +100,9 @@ def init_weave(
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
+
     remote_server = init_weave_get_server(api_key)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
@@ -108,7 +113,7 @@ def init_weave(
 
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
 
@@ -117,7 +122,7 @@ def init_weave(
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
-    autopatch.autopatch()
+    autopatch.autopatch(autopatch_settings)
 
     username = get_username()
     try:
@@ -147,10 +152,36 @@ def init_weave(
     return _current_inited_client
 
 
+def init_weave_disabled() -> InitializedClient:
+    """Initialize a dummy client that does nothing.
+
+    This is used when the program is execuring with Weave disabled.
+
+    Note: as currently implemented, any explicit calls to client.{X} will
+    likely fail, since the user is not authenticated. The purpose of
+    disabling weave is to disable _tracing_. Programs that attempt to
+    make requests (eg. publishing, fetching, querying) while disabled
+    will fail.
+    """
+    global _current_inited_client
+    if _current_inited_client is not None:
+        _current_inited_client.reset()
+
+    client = weave_client.WeaveClient(
+        "DISABLED",
+        "DISABLED",
+        init_weave_get_server("DISABLED", should_batch=False),
+        ensure_project_exists=False,
+    )
+
+    return InitializedClient(client)
+
+
 def init_weave_get_server(
-    api_key: typing.Optional[str] = None,
+    api_key: str | None = None,
+    should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res

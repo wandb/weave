@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from time import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
@@ -154,15 +154,15 @@ if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
     session.mount("https://", adapter)
 
 
-def get(url: str, params: Optional[Dict[str, str]] = None, **kwargs: Any) -> Response:
+def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
     """Send a GET request with optional logging."""
     return session.get(url, params=params, **kwargs)
 
 
 def post(
     url: str,
-    data: Optional[Union[Dict[str, Any], str]] = None,
-    json: Optional[Dict[str, Any]] = None,
+    data: Optional[Union[dict[str, Any], str]] = None,
+    json: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""

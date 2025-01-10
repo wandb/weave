@@ -6,47 +6,49 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Dict, Iterator, Optional, cast
+from collections.abc import Iterator
+from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
 
 from weave.trace_server import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    NotFoundError,
+    ObjectDeletedError,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.ids import generate_id
+from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    digest_is_version_like,
+    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
+    make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
-from weave.trace_server.validation import object_id_validator
-
-from . import trace_server_interface as tsi
-from .ids import generate_id
-from .interface import query as tsi_query
-from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.validation import object_id_validator
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
-
-
-class NotFoundError(Exception):
-    pass
 
 
 _conn_cursor: contextvars.ContextVar[
@@ -260,7 +262,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         non_wildcarded_names.append(name)
 
                 if non_wildcarded_names:
-                    in_expr = ", ".join((f"'{x}'" for x in non_wildcarded_names))
+                    in_expr = ", ".join(f"'{x}'" for x in non_wildcarded_names)
                     or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
                 for name_ndx, name in enumerate(wildcarded_names):
@@ -281,18 +283,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.parent_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.trace_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.call_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.call_ids)
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
                 conds.append("parent_id IS NULL")
             if filter.wb_run_ids:
-                in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
 
         if req.query:
@@ -335,7 +337,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         rhs_part = f"LOWER({rhs_part})"
                     cond = f"instr({lhs_part}, {rhs_part})"
                 else:
-                    raise ValueError(f"Unknown operation type: {operation}")
+                    raise TypeError(f"Unknown operation type: {operation}")
 
                 return cond
 
@@ -376,7 +378,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ):
                     return process_operation(operand)
                 else:
-                    raise ValueError(f"Unknown operand type: {operand}")
+                    raise TypeError(f"Unknown operand type: {operand}")
 
             filter_cond = process_operation(req.query.expr_)
 
@@ -399,9 +401,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if conditions_part:
             query += f" AND {conditions_part}"
 
-        order_by = (
-            None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
-        )
+        # Match the batch server:
+        if req.sort_by is None:
+            order_by = [("started_at", "asc")]
+        elif len(req.sort_by) == 0:
+            order_by = None
+        else:
+            order_by = [(s.field, s.direction) for s in req.sort_by]
+
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
@@ -438,7 +445,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if limit:
             query += f" LIMIT {limit}"
         if req.offset:
+            if limit is None:
+                query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
+
         print("QUERY", query)
 
         cursor.execute(query)
@@ -446,7 +456,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchall()
         calls = []
         for row in query_result:
-            call_dict = {k: v for k, v in zip(select_columns, row)}
+            call_dict = dict(zip(select_columns, row))
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
@@ -459,8 +469,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         )[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
-            if "display_name" in call_dict and call_dict["display_name"] == "":
-                call_dict["display_name"] = None
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
+            # fill in derived summary fields
+            call_dict["summary"] = make_derived_summary_fields(
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=datetime.datetime.fromisoformat(call_dict["started_at"]),
+                ended_at=(
+                    datetime.datetime.fromisoformat(call_dict["ended_at"])
+                    if call_dict.get("ended_at")
+                    else None
+                ),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
+            )
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -482,8 +505,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
     def _expand_refs(
-        self, data: Dict[str, Any], expand_columns: list[str]
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], expand_columns: list[str]
+    ) -> dict[str, Any]:
         """
         Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
@@ -587,23 +610,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
-        json_val = json.dumps(req.obj.val)
+
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
+        )
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
+        project_id, object_id = req.obj.project_id, req.obj.object_id
 
         # Validate
-        object_id_validator(req.obj.object_id)
+        object_id_validator(object_id)
 
-        req_obj = req.obj
-        # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
-            cursor.execute("BEGIN TRANSACTION")
-            # first get version count
-            cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req_obj.project_id, req_obj.object_id),
-            )
-            version_index = cursor.fetchone()[0]
+            if self._obj_exists(cursor, project_id, object_id, digest):
+                return tsi.ObjCreateRes(digest=digest)
 
+            cursor.execute("BEGIN TRANSACTION")
+            self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
+            version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
@@ -615,41 +640,104 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val_dump,
                     digest,
                     version_index,
-                    is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    is_latest,
+                    deleted_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
+                    created_at = excluded.created_at,
+                    kind = excluded.kind,
+                    base_object_class = excluded.base_object_class,
+                    refs = excluded.refs,
+                    val_dump = excluded.val_dump,
+                    version_index = excluded.version_index,
+                    is_latest = excluded.is_latest,
+                    deleted_at = excluded.deleted_at
+                """,
                 (
-                    req_obj.project_id,
-                    req_obj.object_id,
+                    project_id,
+                    object_id,
                     datetime.datetime.now().isoformat(),
-                    get_kind(req_obj.val),
-                    get_base_object_class(req_obj.val),
+                    get_kind(processed_val),
+                    processed_result["base_object_class"],
                     json.dumps([]),
                     json_val,
                     digest,
                     version_index,
                     1,
+                    None,
                 ),
             )
             conn.commit()
         return tsi.ObjCreateRes(digest=digest)
 
+    def _obj_exists(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
+    ) -> bool:
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL",
+            (project_id, object_id, digest),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return False
+        return return_row[0] > 0
+
+    def _mark_existing_objects_as_not_latest(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> None:
+        """Mark all existing objects with such id as not latest.
+        We are creating a new object with the same id, all existing ones are no longer latest.
+        """
+        cursor.execute(
+            "UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+
+    def _get_obj_version_index(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> int:
+        """Get the version index for a new object with such id."""
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return 0
+        return return_row[0]
+
+    @staticmethod
+    def _make_digest_condition(digest: str) -> str:
+        if digest == "latest":
+            return "is_latest = 1"
+        else:
+            (is_version, version_index) = digest_is_version_like(digest)
+            if is_version:
+                return f"version_index = '{version_index}'"
+            else:
+                return f"digest = '{digest}'"
+
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [f"object_id = '{req.object_id}'"]
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            conds.append(f"digest = '{req.digest}'")
+        digest_condition = self._make_digest_condition(req.digest)
+        conds.append(digest_condition)
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            include_deleted=True,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}",
+                deleted_at=objs[0].deleted_at,
+            )
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
+        parameters: dict[str, Any] = {}
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -657,27 +745,88 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("kind != 'op'")
             if req.filter.object_ids:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_ids])
-                conds.append(f"object_id IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.object_ids])
+                conds.append(f"object_id IN ({placeholders})")
+                parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
-                in_list = ", ".join([f"'{t}'" for t in req.filter.base_object_classes])
-                conds.append(f"base_object_class IN ({in_list})")
+                placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
+                conds.append(f"base_object_class IN ({placeholders})")
+                parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            parameters=parameters,
+            metadata_only=req.metadata_only,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
         )
 
         return tsi.ObjQueryRes(objs=objs)
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
+        # First, select the objects that match the query
+        select_query = """
+            SELECT digest FROM objects
+            WHERE project_id = ? AND
+                object_id = ? AND
+                deleted_at IS NULL
+        """
+        parameters = [req.project_id, req.object_id]
+        if req.digests:
+            digest_conditions = [
+                self._make_digest_condition(digest) for digest in req.digests
+            ]
+            digest_conditions_str = " OR ".join(digest_conditions)
+            select_query += f"AND ({digest_conditions_str})"
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(select_query, parameters)
+        matching_objects = cursor.fetchall()
+
+        if len(matching_objects) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+        found_digests = {obj[0] for obj in matching_objects}
+        if req.digests:
+            given_digests = set(req.digests)
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        # Create a delete query that will set the deleted_at field to now
+        delete_query = """
+            UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+            WHERE project_id = ? AND
+                object_id = ? AND
+                digest IN ({})
+        """.format(", ".join("?" * len(found_digests)))
+        delete_parameters = [req.project_id, req.object_id] + list(found_digests)
+
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute(delete_query, delete_parameters)
+            conn.commit()
+
+        return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((req.table.project_id, row_digest, row_json))
@@ -700,7 +849,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -725,7 +874,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
             row_digest = str_digest(row_json)
             if row_digest not in known_digests:
@@ -733,14 +882,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 known_digests.add(row_digest)
             return row_digest
 
+        updated_digests = []
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
                 new_digest = add_new_row_needed_to_insert(update.append.row)
                 final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
                 if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
                     raise ValueError("Index out of range")
-                final_row_digests.pop(update.pop.index)
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
             elif isinstance(update, tsi.TableInsertSpec):
                 if (
                     update.insert.index > len(final_row_digests)
@@ -749,8 +901,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Index out of range")
                 new_digest = add_new_row_needed_to_insert(update.insert.row)
                 final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
             else:
-                raise ValueError("Unrecognized update", update)
+                raise TypeError("Unrecognized update", update)
 
         # Perform the actual DB inserts
         with self.lock:
@@ -770,17 +923,102 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableUpdateRes(digest=digest)
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
+        parameters: list[str] = []
         if req.filter:
-            raise NotImplementedError("Table filter not implemented")
+            if req.filter.row_digests:
+                conds.append(
+                    "tr.digest IN ({})".format(
+                        ",".join("?" * len(req.filter.row_digests))
+                    )
+                )
+                parameters.extend(req.filter.row_digests)
         else:
             conds.append("1 = 1")
-        rows = self._table_query(req.project_id, req.digest, conditions=conds)
 
-        return tsi.TableQueryRes(rows=rows)
+        predicate = " AND ".join(conds)
+
+        # Construct the ORDER BY clause
+        order_by = ""
+        if req.sort_by:
+            sort_parts = []
+            for sort in req.sort_by:
+                field = sort.field
+                direction = sort.direction.upper()
+                if "." in field:
+                    # Handle nested fields
+                    parts = field.split(".")
+                    field = f"json_extract(tr.val, '$.{'.'.join(parts)}')"
+                else:
+                    field = f"json_extract(tr.val, '$.{field}')"
+                sort_parts.append(f"{field} {direction}")
+            order_by = f"ORDER BY {', '.join(sort_parts)}"
+        else:
+            order_by = "ORDER BY OrderedDigests.original_order"
+        # First get the row IDs by querying tables
+        query = f"""
+        WITH OrderedDigests AS (
+            SELECT
+                json_each.value AS digest,
+                json_each.id AS original_order
+            FROM
+                tables,
+                json_each(tables.row_digests)
+            WHERE
+                tables.project_id = ? AND
+                tables.digest = ?
+        )
+        SELECT
+            tr.digest,
+            tr.val
+        FROM
+            OrderedDigests
+            JOIN table_rows tr ON OrderedDigests.digest = tr.digest
+        WHERE {predicate}
+        {order_by}
+        """
+
+        if req.limit is not None:
+            query += f" LIMIT {req.limit}"
+        if req.offset is not None:
+            if req.limit is None:
+                query += " LIMIT -1"
+            query += f" OFFSET {req.offset}"
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, [req.project_id, req.digest] + list(parameters))
+        query_result = cursor.fetchall()
+
+        return tsi.TableQueryRes(
+            rows=[
+                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+                for r in query_result
+            ]
+        )
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: list[Any] = [req.project_id, req.digest]
+
+        query = """
+        SELECT json_array_length(row_digests)
+        FROM
+            tables
+        WHERE
+            tables.project_id = ? AND
+            tables.digest = ?
+        """
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(query, parameters)
+        row = cursor.fetchone()
+        count = 0
+        if row is not None:
+            count = row[0]
+
+        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -803,10 +1041,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             objs = self._select_objs_query(
                 r.project_id,
                 conditions=conds,
+                include_deleted=True,
             )
             if len(objs) == 0:
                 raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
+            if obj.deleted_at is not None:
+                return None
             val = obj.val
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
@@ -842,7 +1083,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
@@ -874,6 +1115,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "feedback_type": req.feedback_type,
             "payload": req.payload,
             "created_at": created_at,
+            "annotation_ref": req.annotation_ref,
+            "runnable_ref": req.runnable_ref,
+            "call_ref": req.call_ref,
+            "trigger_ref": req.trigger_ref,
         }
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
@@ -916,6 +1161,36 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
         return tsi.FeedbackPurgeRes()
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            },
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        raise NotImplementedError(
+            "actions_execute_batch is not implemented for SQLite trace server"
+        )
+
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = bytes_digest(req.content)
@@ -942,48 +1217,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
-    def _table_query(
-        self,
-        project_id: str,
-        digest: str,
-        conditions: Optional[list[str]] = None,
-        limit: Optional[int] = None,
-        parameters: Optional[dict[str, Any]] = None,
-    ) -> list[tsi.TableRowSchema]:
-        conn, cursor = get_conn_cursor(self.db_path)
-        conds = ["project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        print("COST CREATE is not implemented for local sqlite", req)
+        return tsi.CostCreateRes()
 
-        predicate = " AND ".join(conds)
-        # First get the row IDs by querying tables
-        cursor.execute(
-            """
-            WITH OrderedDigests AS (
-                SELECT
-                    json_each.value AS digest
-                FROM
-                    tables,
-                    json_each(tables.row_digests)
-                WHERE
-                    tables.project_id = ? AND
-                    tables.digest = ?
-                ORDER BY
-                    json_each.id
-            )
-            SELECT
-                table_rows.digest,
-                table_rows.val
-            FROM
-                OrderedDigests
-                JOIN table_rows ON OrderedDigests.digest = table_rows.digest
-            """,
-            (project_id, digest),
-        )
-        query_result = cursor.fetchall()
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
-        ]
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        print("COST QUERY is not implemented for local sqlite", req)
+        return tsi.CostQueryRes()
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        print("COST PURGE is not implemented for local sqlite", req)
+        return tsi.CostPurgeRes()
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        print("COMPLETIONS CREATE is not implemented for local sqlite", req)
+        return tsi.CompletionsCreateRes()
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1006,16 +1256,62 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
+        parameters: Optional[dict[str, Any]] = None,
+        metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
+        include_deleted: bool = False,
+        offset: Optional[int] = None,
+        sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
-        pred = " AND ".join(conditions or ["1 = 1"])
-        cursor.execute(
-            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
-            + pred
-            + " ORDER BY created_at ASC",
-            (project_id,),
-        )
+        conditions = conditions or []
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
+        if not conditions:
+            conditions.append("1 = 1")
+        pred = " AND ".join(conditions)
+        val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
+        query = f"""
+            SELECT
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                {val_dump_part},
+                digest,
+                version_index,
+                is_latest,
+                deleted_at
+            FROM objects
+            WHERE project_id = ? AND {pred}
+        """
+
+        if sort_by:
+            valid_sort_fields = {"object_id", "created_at"}
+            sort_clauses = []
+            for sort in sort_by:
+                if sort.field in valid_sort_fields and sort.direction in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
+            if sort_clauses:
+                query += f" ORDER BY {', '.join(sort_clauses)}"
+        else:
+            query += " ORDER BY created_at ASC"
+
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
+
+        params = [project_id]
+        if parameters:
+            for param_list in parameters.values():
+                params.extend(param_list)
+
+        cursor.execute(query, params)
         query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []
         for row in query_result:
@@ -1026,14 +1322,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
-                    val=json.loads(row[6]),
-                    digest=row[7],
-                    version_index=row[8],
-                    is_latest=row[9],
+                    val=json.loads(row[5]),
+                    digest=row[6],
+                    version_index=row[7],
+                    is_latest=row[8],
+                    deleted_at=row[9],
                 )
             )
-
         return result
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        results = self.table_query(req)
+        yield from results.rows
 
 
 def get_type(val: Any) -> str:
@@ -1055,20 +1357,6 @@ def get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
-
-
-def get_base_object_class(val: Any) -> Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
 
 
 def _transform_external_calls_field_to_internal_calls_field(

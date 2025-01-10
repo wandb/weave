@@ -1,3 +1,4 @@
+import {cyrb53} from '@wandb/weave/core';
 import {RefObject} from 'react';
 
 /**
@@ -66,6 +67,10 @@ export const TAG_HOVER_COLOR: Record<TagColorName, string> = {
   green: 'hover:bg-green-300/[0.68] hover:dark:bg-green-700/[0.68]',
   red: 'hover:bg-red-300/[0.68] hover:dark:bg-red-700/[0.68]',
 };
+
+export function getTagColorByString(str: string): TagColorName {
+  return TAG_HUE_WHEEL[cyrb53(str) % TAG_HUE_WHEEL.length];
+}
 
 export function getRandomTagColor(): TagColorName {
   const randomIndex = Math.floor(Math.random() * TAG_HUE_WHEEL.length);

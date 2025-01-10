@@ -1,0 +1,88 @@
+name: Check which tests to run
+
+on:
+  workflow_call:
+    outputs:
+      weave_query_tests:
+        value: ${{ jobs.check.outputs.weave_query_tests }}
+      weave_js_tests:
+        value: ${{ jobs.check.outputs.weave_js_tests }}
+      trace_server_tests:
+        value: ${{ jobs.check.outputs.trace_server_tests }}
+
+env:
+  WEAVE_QUERY_PATHS: 'weave_query/'
+  WEAVE_JS_PATHS: 'weave-js/'
+  TRACE_SERVER_PATHS: 'weave/trace_server/'
+  # Everything else is implicitly trace SDK
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
+      weave_js_tests: ${{ steps.weave_js.outputs.run_tests }}
+      trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.head_ref }}
+      - name: Get changed files
+        run: |
+          # Fetch all branches
+          git fetch --all
+
+          # Determine the base branch and current commit
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For pull requests
+            BASE_BRANCH="${{ github.base_ref }}"
+            CURRENT_COMMIT="${{ github.event.pull_request.head.sha }}"
+          else
+            # For pushes
+            BASE_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+            CURRENT_COMMIT="${{ github.sha }}"
+          fi
+          echo "Base branch is $BASE_BRANCH"
+
+          # Find the common ancestor
+          MERGE_BASE=$(git merge-base origin/$BASE_BRANCH $CURRENT_COMMIT)
+
+          # Get changed files
+          changed_files=$(git diff --name-only $MERGE_BASE $CURRENT_COMMIT)
+          echo "Changed files:"
+          echo "$changed_files"
+          echo "changed_files<<EOF" >> $GITHUB_ENV
+          echo "$changed_files" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - id: weave_query
+        name: Weave Query Checks
+        run: |
+          for path in ${{ env.WEAVE_QUERY_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
+      - id: weave_js
+        name: Weave JS Checks
+        run: |
+          for path in ${{ env.WEAVE_JS_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
+      - id: trace_server
+        name: Weave Trace Server Checks
+        run: |
+          for path in ${{ env.TRACE_SERVER_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT

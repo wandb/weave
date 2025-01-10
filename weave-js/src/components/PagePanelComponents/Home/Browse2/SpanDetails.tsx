@@ -4,6 +4,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';
 
+import {parseRefMaybe} from '../../../../react';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {Call} from './callTree';
 import {DisplayControlChars} from './CommonLib';
@@ -13,7 +14,7 @@ import {
   OpenAIChatInputView,
   OpenAIChatOutputView,
 } from './openai';
-import {parseRefMaybe, SmallRef} from './SmallRef';
+import {SmallRef} from './SmallRef';
 
 const ObjectView: FC<{obj: any}> = ({obj}) => {
   if (_.isPlainObject(obj)) {

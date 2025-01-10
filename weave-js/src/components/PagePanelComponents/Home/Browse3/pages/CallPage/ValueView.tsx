@@ -1,7 +1,11 @@
 import React, {useMemo} from 'react';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  parseRefMaybe,
+} from '../../../../../../react';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -29,11 +33,31 @@ type ValueViewProps = {
 export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
+    if (data.valueType === 'object' && Object.keys(data.value).length === 0) {
+      return <ValueViewPrimitive>Empty object</ValueViewPrimitive>;
+    }
     if (data.valueType === 'object' && '_ref' in data.value) {
-      return <SmallRef objRef={parseRef(data.value._ref)} />;
+      const innerRef = data.value._ref;
+      const ref = parseRefMaybe(innerRef);
+      if (ref != null) {
+        return <SmallRef objRef={ref} />;
+      } else {
+        console.error('Expected ref, found', innerRef, typeof innerRef);
+      }
+    }
+    if (data.valueType === 'object' && '__class__' in data.value) {
+      const cls = data.value.__class__;
+      let clsName = cls.name;
+      if (cls.module) {
+        clsName = cls.module + '.' + clsName;
+      }
+      return <ValueViewPrimitive>{clsName}</ValueViewPrimitive>;
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
-      return <DataTableView data={data.value} />;
+      return <DataTableView data={data.value} autoPageSize={true} />;
+    }
+    if (data.valueType === 'array' && data.value.length === 0) {
+      return <ValueViewPrimitive>Empty list</ValueViewPrimitive>;
     }
     return null;
   }
@@ -74,8 +98,10 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'array') {
+    if (data.value.length === 0) {
+      return <ValueViewPrimitive>Empty list</ValueViewPrimitive>;
+    }
     // Compared to toString this keeps the square brackets.
-    // This is particularly helpful for empty lists, for which toString would return an empty string.
     return <div>{JSON.stringify(data.value)}</div>;
   }
 

@@ -10,8 +10,8 @@ import typing
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface import query as tsi_query
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
 
@@ -45,12 +45,21 @@ class ParamBuilder:
     ):
         global param_builder_count
         param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
+        self._params: dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
         self._database_type = database_type
+        self._param_to_name: dict[typing.Any, str] = {}
 
     def add_param(self, param_value: typing.Any) -> str:
         param_name = self._prefix + str(len(self._params))
+
+        # Only attempt caching for hashable values
+        if isinstance(param_value, typing.Hashable):
+            if param_value in self._param_to_name:
+                return self._param_to_name[param_value]
+            self._param_to_name[param_value] = param_name
+
+        # For non-hashable values, just generate a new param without caching
         self._params[param_name] = param_value
         return param_name
 
@@ -72,7 +81,7 @@ class ParamBuilder:
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
 
-    def get_params(self) -> typing.Dict[str, typing.Any]:
+    def get_params(self) -> dict[str, typing.Any]:
         return {**self._params}
 
 
@@ -171,7 +180,7 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tup: typing.Tuple, fields: list[str]) -> Row:
+    def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
         d = {}
         for i, field in enumerate(fields):
             if field.endswith("_dump"):
@@ -183,7 +192,7 @@ class Table:
                 d[field] = value
         return d
 
-    def tuples_to_rows(self, tuples: list[typing.Tuple], fields: list[str]) -> Rows:
+    def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:
         rows = []
         for t in tuples:
             rows.append(self.tuple_to_row(t, fields))
@@ -222,7 +231,7 @@ class Select:
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
-    _order_by: typing.Optional[typing.List[tsi.SortBy]]
+    _order_by: typing.Optional[list[tsi.SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
     _group_by: typing.Optional[list[str]]
@@ -261,7 +270,7 @@ class Select:
         self._query = query
         return self
 
-    def order_by(self, order_by: typing.Optional[typing.List[tsi.SortBy]]) -> "Select":
+    def order_by(self, order_by: typing.Optional[list[tsi.SortBy]]) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (
@@ -342,6 +351,19 @@ class Select:
         if joined:
             sql += f"\nWHERE {joined}"
 
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
+
         if self._order_by is not None:
             order_parts = []
             for clause in self._order_by:
@@ -386,18 +408,6 @@ class Select:
         if self._offset is not None:
             param_offset = param_builder.add(self._offset, "offset", "UInt64")
             sql += f"\nOFFSET {param_offset}"
-        if self._group_by is not None:
-            internal_fields = [
-                _transform_external_field_to_internal_field(
-                    f,
-                    self.all_columns,
-                    self.table.json_cols,
-                    param_builder=param_builder,
-                )[0]
-                for f in self._group_by
-            ]
-            joined_fields = ", ".join(internal_fields)
-            sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
@@ -457,7 +467,7 @@ class Insert:
         return PreparedInsert(sql=sql, column_names=column_names, data=data)
 
 
-def combine_conditions(conditions: typing.List[str], operator: str) -> str:
+def combine_conditions(conditions: list[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
     conditions = [c for c in conditions if c is not None and c != ""]
@@ -473,12 +483,12 @@ def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
+    elif isinstance(value, bool):
+        return "Bool"
     elif isinstance(value, int):
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
     elif value is None:
         return "Nullable(String)"
     else:
@@ -555,6 +565,7 @@ def _transform_external_field_to_internal_field(
     # validate field
     if (
         field not in all_columns
+        and field != "*"
         and field.lower() != "count(*)"
         and not any(
             # Checks that a column is in the field, allows prefixed columns to be used
@@ -638,7 +649,7 @@ def _process_query_to_conditions(
                 position_operation = "positionCaseInsensitive"
             cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
-            raise ValueError(f"Unknown operation type: {operation}")
+            raise TypeError(f"Unknown operation type: {operation}")
 
         return cond
 
@@ -675,7 +686,7 @@ def _process_query_to_conditions(
         ):
             return process_operation(operand)
         else:
-            raise ValueError(f"Unknown operand type: {operand}")
+            raise TypeError(f"Unknown operand type: {operand}")
 
     filter_cond = process_operation(query.expr_)
 

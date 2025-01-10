@@ -17,7 +17,6 @@ type ExpandHeaderProps = {
 export const Header = styled.div`
   display: flex;
   align-items: center;
-  font-weight: 600;
 `;
 Header.displayName = 'S.Header';
 
@@ -40,7 +39,7 @@ export const ExpandHeader = ({
           trigger={
             <Button
               className="ml-4"
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-next"
               onClick={onClick}

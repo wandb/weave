@@ -1,7 +1,5 @@
 import json
 import subprocess
-from rich import print
-
 
 import weave
 from weave.flow.agent import Agent, AgentState
@@ -28,8 +26,7 @@ def run_command(command: str) -> str:
     try:
         completed_process = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             shell=True,
         )

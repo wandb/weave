@@ -9,29 +9,33 @@ import {
   MOON_300,
   MOON_600,
 } from '../../../../../../../../common/css/color.styles';
-import {WeaveObjectRef} from '../../../../../../../../react';
+import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
+  buildCompositeMetricsMap,
   CompositeScoreMetrics,
   DERIVED_SCORER_REF_PLACEHOLDER,
   evalCallIdToScorerRefs,
   resolveDimension,
 } from '../../compositeMetricsUtil';
-import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
+  SIGNIFICANT_DIGITS,
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from '../../ecpConstants';
-import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {
+  EvaluationComparisonState,
+  getBaselineCallId,
+  getOrderedCallIds,
+  getOrderedModelRefs,
+} from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox} from '../../Layout';
@@ -64,6 +68,7 @@ const GridCell = styled.div<{
     }
   `}
 `;
+GridCell.displayName = 'S.GridCell';
 
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
@@ -73,7 +78,7 @@ export const ScorecardSection: React.FC<{
     [props.state]
   );
   const datasetRefs = useMemo(
-    () => Object.values(props.state.data.evaluations).map(e => e.datasetRef),
+    () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
     [props.state]
   );
   const evalCallIds = useMemo(
@@ -84,7 +89,7 @@ export const ScorecardSection: React.FC<{
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
+      const model = props.state.summary.models[ref];
       Object.keys(model.properties).forEach(prop => {
         if (!propsRes[prop]) {
           propsRes[prop] = {};
@@ -95,7 +100,7 @@ export const ScorecardSection: React.FC<{
 
     // Make sure predict op is last
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
+      const model = props.state.summary.models[ref];
       if (!propsRes.predict) {
         propsRes.predict = {};
       }
@@ -103,7 +108,7 @@ export const ScorecardSection: React.FC<{
     });
 
     return propsRes;
-  }, [modelRefs, props.state.data.models]);
+  }, [modelRefs, props.state.summary.models]);
   const propsWithDifferences = useMemo(() => {
     return Object.keys(modelProps).filter(prop => {
       const values = Object.values(modelProps[prop]);
@@ -113,12 +118,16 @@ export const ScorecardSection: React.FC<{
   const [diffOnly, setDiffOnly] = React.useState(true);
 
   const compositeSummaryMetrics = useMemo(() => {
-    return buildCompositeMetricsMap(props.state.data, 'summary');
+    return buildCompositeMetricsMap(
+      props.state.summary,
+      'summary',
+      props.state.selectedMetrics
+    );
   }, [props.state]);
 
   const onCallClick = usePeekCall(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
@@ -286,7 +295,7 @@ export const ScorecardSection: React.FC<{
               </GridCell>
               {evalCallIds.map((evalCallId, mNdx) => {
                 const model =
-                  props.state.data.evaluationCalls[evalCallId].modelRef;
+                  props.state.summary.evaluationCalls[evalCallId].modelRef;
                 const parsed = parseRefMaybe(
                   modelProps[prop][model]
                 ) as WeaveObjectRef;
@@ -406,7 +415,7 @@ export const ScorecardSection: React.FC<{
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline = resolveSummaryMetricResult(
-                        props.state.baselineEvaluationCallId,
+                        getBaselineCallId(props.state),
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,
@@ -551,7 +560,7 @@ const resolveSummaryMetricResult = (
   const baseline = baselineDimension
     ? resolveSummaryMetricResultForEvaluateCall(
         baselineDimension,
-        state.data.evaluationCalls[evalCallId]
+        state.summary.evaluationCalls[evalCallId]
       )
     : undefined;
   return baseline;

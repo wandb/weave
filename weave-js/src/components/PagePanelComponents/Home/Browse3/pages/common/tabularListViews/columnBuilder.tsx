@@ -11,11 +11,14 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
 import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
-import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
+import {CollapseHeader} from '../../../../Browse2/CollapseHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
-import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {
+  CellFilterWrapper,
+  OnAddFilter,
+} from '../../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../../filters/common';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
@@ -203,7 +206,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   onCollapse?: (col: string) => void,
   onExpand?: (col: string) => void,
   columnIsSortable?: (col: string) => boolean,
-  onAddFilter?: (field: string, operator: string | null, value: any) => void
+  onAddFilter?: OnAddFilter
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -262,18 +265,12 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       field: key,
       sortable: columnIsSortable && columnIsSortable(key),
       headerName: key,
+      display: 'flex',
       renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
+        return <div>{key.split('.').slice(-1)[0]}</div>;
       },
-      valueGetter: cellParams => {
-        const val = valueForKey(cellParams.row, key);
+      valueGetter: (unused: any, row: any) => {
+        const val = valueForKey(row, key);
         if (Array.isArray(val) || typeof val === 'object') {
           try {
             return JSON.stringify(val);
@@ -285,12 +282,14 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       },
       renderCell: cellParams => {
         const {entity, project} = entityProjectFromRow(cellParams.row);
+
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
           return (
             <CellFilterWrapper
               onAddFilter={onAddFilter}
               field={key}
+              rowId={cellParams.id.toString()}
               operation={'(any): isEmpty'}
               value={undefined}>
               <NotApplicable />
@@ -302,6 +301,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
             <CellFilterWrapper
               onAddFilter={onAddFilter}
               field={key}
+              rowId={cellParams.id.toString()}
               operation={null}
               value={val}
               style={{
