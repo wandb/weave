@@ -15,7 +15,10 @@ import {
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -32,6 +35,7 @@ import {
 } from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
+import {DeleteModal} from './common/DeleteModal';
 import {Empty} from './common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
@@ -83,6 +87,7 @@ export const ObjectVersionsPage: React.FC<{
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
   const history = useHistory();
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -103,21 +108,33 @@ export const ObjectVersionsPage: React.FC<{
     return 'All Objects';
   }, [filter.objectName, filter.baseObjectClass]);
 
-  const hasComparison = filter.objectName != null;
-  const headerExtra = hasComparison ? (
-    <Button
-      className="mr-16"
-      disabled={selectedVersions.length < 2}
-      onClick={onCompare}>
-      Compare
-    </Button>
-  ) : undefined;
+  if (loadingUserInfo) {
+    return <Loading />;
+  }
+
+  const filteredOnObject = filter.objectName != null;
+  const hasComparison = filteredOnObject;
+  const viewer = userInfo ? userInfo.id : null;
+  const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
+  const isAdmin = userInfo?.admin;
+  const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
 
   return (
     <SimplePageLayout
       title={title}
       hideTabsIfSingle
-      headerExtra={headerExtra}
+      headerExtra={
+        <ObjectVersionsPageHeaderExtra
+          entity={entity}
+          project={project}
+          objectName={filter.objectName ?? null}
+          selectedVersions={selectedVersions}
+          setSelectedVersions={setSelectedVersions}
+          showDeleteButton={showDeleteButton}
+          showCompareButton={hasComparison}
+          onCompare={onCompare}
+        />
+      }
       tabs={[
         {
           label: '',
@@ -135,6 +152,51 @@ export const ObjectVersionsPage: React.FC<{
         },
       ]}
     />
+  );
+};
+
+const ObjectVersionsPageHeaderExtra: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string | null;
+  selectedVersions: string[];
+  setSelectedVersions: (selected: string[]) => void;
+  showDeleteButton?: boolean;
+  showCompareButton?: boolean;
+  onCompare: () => void;
+}> = ({
+  entity,
+  project,
+  objectName,
+  selectedVersions,
+  setSelectedVersions,
+  showDeleteButton,
+  showCompareButton,
+  onCompare,
+}) => {
+  const compareButton = showCompareButton ? (
+    <Button disabled={selectedVersions.length < 2} onClick={onCompare}>
+      Compare
+    </Button>
+  ) : undefined;
+  const deleteButton = showDeleteButton ? (
+    <DeleteObjectVersionsButtonWithModal
+      entity={entity}
+      project={project}
+      objectName={objectName ?? ''}
+      objectVersions={selectedVersions}
+      disabled={selectedVersions.length === 0 || !objectName}
+      onSuccess={() => setSelectedVersions([])}
+    />
+  ) : undefined;
+
+  return (
+    <Tailwind>
+      <div className="mr-16 flex gap-8">
+        {compareButton}
+        {deleteButton}
+      </div>
+    </Tailwind>
   );
 };
 
@@ -566,5 +628,44 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       neverPeek
       variant="secondary"
     />
+  );
+};
+
+const DeleteObjectVersionsButtonWithModal: React.FC<{
+  entity: string;
+  project: string;
+  objectName: string;
+  objectVersions: string[];
+  disabled?: boolean;
+  onSuccess: () => void;
+}> = ({entity, project, objectName, objectVersions, disabled, onSuccess}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectVersionsDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const numObjects = objectVersions.length;
+  const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
+  const objectDigests = objectVersions.map(v => v.split(':')[1]);
+  const deleteTitleStr = `${numObjects} ${objectName} ${versionsStr}`;
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+        disabled={disabled}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteTitleStr}
+        deleteBodyStrs={objectVersions}
+        onDelete={() =>
+          objectVersionsDelete(entity, project, objectName, objectDigests)
+        }
+        onSuccess={onSuccess}
+      />
+    </>
   );
 };
