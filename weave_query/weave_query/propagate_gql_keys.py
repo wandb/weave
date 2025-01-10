@@ -43,6 +43,11 @@ def _propagate_gql_keys_for_node(
         raise ValueError('GQL key function returned "Invalid" type')
 
     if is_mapped:
+        # Handle tag propagation for mapped run ops
+        if opdef_util.should_tag_op_def_outputs(opdef.derived_from):
+            new_output_type = tagged_value_type.TaggedValueType(
+                types.TypedDict({first_arg_name: unwrapped_input_type}), new_output_type
+            )
         new_output_type = types.List(new_output_type)
 
     # now we rewrap the types to propagate the tags
