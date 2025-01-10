@@ -3224,3 +3224,14 @@ def test_op_sampling_child_follows_parent(client):
 
     assert parent_traces == num_runs  # Parent was always traced
     assert child_traces == num_runs  # Child was traced whenever parent was
+
+
+def test_calls_len(client):
+    @weave.op
+    def test():
+        return 1
+
+    test()
+    test()
+
+    assert len(list(test.calls())) == 2
