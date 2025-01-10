@@ -5,6 +5,7 @@ from pydantic import field_validator
 
 import weave
 from weave.flow.obj import Object
+from weave.trace import objectify
 from weave.trace.vals import WeaveTable
 
 
@@ -14,7 +15,7 @@ def short_str(obj: Any, limit: int = 25) -> str:
         return str_val[:limit] + "..."
     return str_val
 
-
+@objectify.register
 class Dataset(Object):
     """
     Dataset object with easy saving and automatic versioning
@@ -66,6 +67,7 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)

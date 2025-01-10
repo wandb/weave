@@ -10,7 +10,7 @@ from typing import Any, Literal, Optional, SupportsIndex, Union
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.trace import box
+from weave.trace import box, objectify
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
@@ -707,9 +707,42 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(
-                val, ref=new_ref, server=server, root=root, parent=parent
-            )
+            obj = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
+            return objectify.objectify(obj)
+
+            # if not (cls_name := getattr(obj, "_class_name", None)):
+            #     return obj
+
+            # if cls_name == "Dataset":
+            #     from weave.flow.dataset import Dataset
+
+            #     return Dataset(
+            #         name=obj.name,
+            #         description=obj.description,
+            #         rows=obj.rows,
+            #     )
+
+            # if cls_name == "Object":
+            #     from weave.flow.obj import Object
+
+            #     return Object(
+            #         name=obj.name,
+            #         description=obj.description,
+            #     )
+
+            # if cls_name == "Evaluation":
+            #     from weave.flow.eval import Evaluation
+
+            #     return Evaluation(
+            #         name=obj.name,
+            #         description=obj.description,
+            #         dataset=obj.dataset,
+            #         scorers=obj.scorers,
+            #         preprocess_model_input=obj.preprocess_model_input,
+            #         trials=obj.trials,
+            #         evaluation_name=obj.evaluation_name,
+            #     )
+
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
