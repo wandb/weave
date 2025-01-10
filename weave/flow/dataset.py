@@ -1,11 +1,13 @@
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
+from dataclasses import asdict
 from typing import Any
 
-from pydantic import field_validator
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.vals import WeaveTable
+from weave.trace.weave_client import Call
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -13,6 +15,14 @@ def short_str(obj: Any, limit: int = 25) -> str:
     if len(str_val) > limit:
         return str_val[:limit] + "..."
     return str_val
+
+
+def convert_to_dict(call: Call) -> dict:
+    d = asdict(call)
+    for k in d:
+        if k.startswith("_"):
+            d.pop(k)
+    return d
 
 
 class Dataset(Object):
@@ -41,6 +51,11 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    @classmethod
+    def from_calls(cls, calls: Iterable[Call]) -> Self:
+        rows = [convert_to_dict(call) for call in calls]
+        return cls(rows=rows)
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
