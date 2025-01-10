@@ -3,9 +3,11 @@ from __future__ import annotations
 import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
+from datetime import datetime
 from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
+from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -227,6 +229,13 @@ class ObjectRef(RefWithExtra):
             for i in range(len(potential_ancestor.extra))
         )
 
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_object_version(self)
+
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
@@ -235,6 +244,13 @@ class OpRef(ObjectRef):
         if self.extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_op_version(self)
 
 
 @dataclass(frozen=True)
@@ -261,6 +277,19 @@ class CallRef(RefWithExtra):
         if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+
+@dataclass(frozen=True)
+class DeletedRef(Ref):
+    ref: Ref
+    deleted_at: datetime
+    error: ObjectDeletedError
+
+    def __repr__(self) -> str:
+        return f"<DeletedRef {self.uri()}>"
+
+    def uri(self) -> str:
+        return self.ref.uri()
 
 
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
