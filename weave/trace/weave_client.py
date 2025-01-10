@@ -663,7 +663,7 @@ class WeaveClient:
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(self, ref: ObjectRef) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
@@ -707,7 +707,7 @@ class WeaveClient:
 
         val = from_json(data, project_id, self.server)
 
-        return make_trace_obj(val, ref, self.server, None)
+        return make_trace_obj(val, ref, self.server, None, objectify=objectify)
 
     ################ Query API ################
 

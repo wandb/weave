@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.flow.obj import Object
-from weave.trace import objectify
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
@@ -18,7 +17,6 @@ from weave.trace.op_caller import async_call_op
 from weave.trace.weave_client import Call, sanitize_object_name
 
 
-@objectify.register
 class Scorer(Object):
     column_map: Optional[dict[str, str]] = Field(
         default=None,

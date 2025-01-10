@@ -7,7 +7,7 @@ from typing_extensions import Self
 import weave
 from weave.flow.obj import Object
 from weave.trace import objectify
-from weave.trace.vals import WeaveTable
+from weave.trace.vals import WeaveObject, WeaveTable
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -44,6 +44,11 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        rows = obj.rows
+        return cls(rows=rows)
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:

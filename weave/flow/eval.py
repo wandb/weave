@@ -117,6 +117,15 @@ class Evaluation(Object):
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        return cls(
+            dataset=obj.dataset,
+            scorers=obj.scorers,
+            preprocess_model_input=obj.preprocess_model_input,
+            evaluation_name=obj.evaluation_name,
+        )
+
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":
         if self.evaluation_name:
