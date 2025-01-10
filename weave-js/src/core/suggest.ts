@@ -527,7 +527,9 @@ async function autosuggestNodes(
 
     if (node.nodeType === 'void') {
       const frame = toFrame(stack);
-      const variableNames = Object.keys(frame);
+      const variableNames = Object.keys(frame).filter(
+        key => !key.includes('runColors') // runColors is used to color the row index in the table, but we don't want to suggest it (see WB-21774)
+      );
       if (variableNames.length > 0) {
         for (const varName of variableNames) {
           // Recursively suggest results for each variable
