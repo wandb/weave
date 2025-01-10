@@ -649,7 +649,7 @@ def make_trace_obj(
             val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
             prepare_obj(val)
         except ObjectDeletedError as e:
-            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, _error=e)
+            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
             logger.warning(f"Could not read deleted object: {new_ref}")
 
     if isinstance(val, Table):

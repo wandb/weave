@@ -283,7 +283,7 @@ class CallRef(RefWithExtra):
 class DeletedRef(Ref):
     ref: Ref
     deleted_at: datetime
-    _error: ObjectDeletedError
+    error: ObjectDeletedError
 
     def __repr__(self) -> str:
         return f"<DeletedRef {self.uri()}>"
