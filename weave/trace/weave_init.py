@@ -18,6 +18,16 @@ class InitializedClient:
 _current_inited_client: InitializedClient | None = None
 
 
+def get_viewer_id() -> str | None:
+    from weave.wandb_interface import wandb_api
+
+    api = wandb_api.get_wandb_api_sync()
+    try:
+        return api.viewer_id()
+    except AttributeError:
+        return None
+
+
 def get_username() -> str | None:
     from weave.wandb_interface import wandb_api
 

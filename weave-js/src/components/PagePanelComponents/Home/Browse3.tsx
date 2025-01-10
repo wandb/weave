@@ -29,9 +29,20 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {
+  ProjectInfo,
+  useProjectInfo,
+} from '../../../common/hooks/useProjectInfo';
+import {
+  MaybeUserInfo,
+  useViewerInfo,
+} from '../../../common/hooks/useViewerInfo';
 import {URL_BROWSE3} from '../../../urls';
+// import {useLocalStorage} from '../../../util/useLocalStorage';
+import {Alert} from '../../Alert';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {Loading} from '../../Loading';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
@@ -59,6 +70,7 @@ import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {CallsPageDefaultView} from './Browse3/pages/CallsPage/CallsPageDefaultView';
 import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_FILTER_CALLS,
@@ -92,6 +104,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {sanitizeObjectId} from './Browse3/pages/wfReactInterface/traceServerDirectClient';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -659,10 +672,123 @@ const CallPageBinding = () => {
   );
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
-  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
+    entity,
+    project
+  );
+  if (loadingUserInfo || loadingProjectInfo) {
+    return <Loading />;
+  }
+  if (!projectInfo) {
+    return <Alert severity="error">Invalid project: {project}</Alert>;
+  }
+  return (
+    <CallsPageBindingWithProject
+      userInfo={userInfo}
+      projectInfo={projectInfo}
+    />
+  );
+};
+
+type ComparePageBindingWithProjectProps = {
+  projectInfo: ProjectInfo;
+  userInfo: MaybeUserInfo;
+};
+
+const CallsPageBindingWithProject = ({
+  projectInfo,
+  userInfo,
+}: ComparePageBindingWithProjectProps) => {
   const query = useURLSearchParamsDict();
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  if (!query.view) {
+    return (
+      <CallsPageDefaultView entity={entity} project={project} table={tab} />
+    );
+  }
+  // const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+  // // Using internal ID because it doesn't change across project renames
+  // const storageKey = `SavedView.lastViewed.${projectInfo.internalIdEncoded}.${tab}`;
+  // console.log({storageKey, query});
+  // const [lastView, setLastView] = useLocalStorage(storageKey, 'default');
+  // if (lastView !== 'default' && Object.keys(query).length === 0) {
+  //   console.log('returning CallsPageBindingLoadView');
+  //   return (
+  //     <CallsPageBindingLoadView
+  //       entity={entity}
+  //       project={project}
+  //       view={lastView}
+  //     />
+  //   );
+  // }
+  // console.log('returning CallsPageBindingLoaded');
+  return (
+    <CallsPageBindingLoaded projectInfo={projectInfo} userInfo={userInfo} />
+  );
+};
+
+// type CallsPageBindingLoadViewProps = {
+//   entity: string;
+//   project: string;
+//   view: string;
+// };
+
+// Load a saved view
+// const CallsPageBindingLoadView = ({
+//   entity,
+//   project,
+//   view,
+// }: CallsPageBindingLoadViewProps) => {
+//   const history = useHistory();
+//   const getTsClient = useGetTraceServerClientContext();
+//   const tsClient = getTsClient();
+//   tsClient
+//     .objRead({
+//       project_id: projectIdFromParts({
+//         entity,
+//         project,
+//       }),
+//       object_id: view,
+//       digest: 'latest',
+//     })
+//     .then((res: TraceObjReadRes) => {
+//       const search = savedViewObjectToQuery(res.obj);
+//       if (search) {
+//         history.replace({search});
+//       } else {
+//         // TODO: saved view has no description. We don't want to
+//         // go into an infinite loop of requests. Should have a
+//         // way to report error.
+//       }
+//     });
+//   return <Loading />;
+// };
+
+const CallsPageBindingLoaded = ({
+  projectInfo,
+  userInfo,
+}: ComparePageBindingWithProjectProps) => {
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
+
+  const currentViewerId = userInfo ? userInfo.id : null;
+  const isReadonly = !currentViewerId || !userInfo?.teams.includes(entity);
+
+  const query = useURLSearchParamsDict();
+
+  // // Using internal ID because it doesn't change across project renames
+  // const [lastView, setLastView] = useLocalStorage(
+  //   `SavedView.lastViewed.${projectInfo.internalIdEncoded}.${tab}`,
+  //   'default'
+  // );
+  const onRecordLastView = (loadedView: string) => {
+    // setLastView(loadedView);
+  };
+  // const view = query.view ? sanitizeObjectId(query.view) : lastView;
+  const view = query.view ? sanitizeObjectId(query.view) : 'default';
+
   const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
@@ -774,8 +900,12 @@ const CallsPageBinding = () => {
 
   return (
     <CallsPage
+      currentViewerId={currentViewerId}
+      isReadonly={isReadonly}
       entity={entity}
       project={project}
+      view={view}
+      onRecordLastView={onRecordLastView}
       initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
