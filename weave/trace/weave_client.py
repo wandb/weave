@@ -225,7 +225,11 @@ def _make_calls_iterator(
         )
         return response.count
 
-    return PaginatedIterator(fetch_func, transform_func, size_func)
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        size_func=size_func,
+    )
 
 
 class OpNameError(ValueError):
