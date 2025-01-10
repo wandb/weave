@@ -123,6 +123,7 @@ class Evaluation(Object):
             dataset=obj.dataset,
             scorers=obj.scorers,
             preprocess_model_input=obj.preprocess_model_input,
+            trials=obj.trials,
             evaluation_name=obj.evaluation_name,
         )
 

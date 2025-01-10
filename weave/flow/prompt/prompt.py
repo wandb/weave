@@ -9,6 +9,7 @@ from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, overload
 
 from pydantic import Field
 from rich.table import Table
+from typing_extensions import Self
 
 from weave.flow.obj import Object
 from weave.flow.prompt.common import ROLE_COLORS, color_role
@@ -17,6 +18,7 @@ from weave.trace.api import publish as weave_publish
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
 from weave.trace.rich import pydantic_util
+from weave.trace.vals import WeaveObject
 
 
 class Message(TypedDict):
@@ -89,7 +91,7 @@ class StringPrompt(Prompt):
         return self.content.format(**kwargs)
 
     @classmethod
-    def from_obj(cls, obj: Any) -> "StringPrompt":
+    def from_obj(cls, obj: WeaveObject) -> Self:
         prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
@@ -117,7 +119,7 @@ class MessagesPrompt(Prompt):
         return [self.format_message(m, **kwargs) for m in self.messages]
 
     @classmethod
-    def from_obj(cls, obj: Any) -> "MessagesPrompt":
+    def from_obj(cls, obj: WeaveObject) -> Self:
         prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
@@ -424,7 +426,7 @@ class EasyPrompt(UserList, Prompt):
         }
 
     @classmethod
-    def from_obj(cls, obj: Any) -> "EasyPrompt":
+    def from_obj(cls, obj: WeaveObject) -> Self:
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
@@ -438,7 +440,7 @@ class EasyPrompt(UserList, Prompt):
         )
 
     @staticmethod
-    def load(fp: IO) -> "EasyPrompt":
+    def load(fp: IO) -> Self:
         if isinstance(fp, str):  # Common mistake
             raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
@@ -448,7 +450,7 @@ class EasyPrompt(UserList, Prompt):
         return prompt
 
     @staticmethod
-    def load_file(filepath: Union[str, Path]) -> "Prompt":
+    def load_file(filepath: Union[str, Path]) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path) as f:
             return EasyPrompt.load(f)
