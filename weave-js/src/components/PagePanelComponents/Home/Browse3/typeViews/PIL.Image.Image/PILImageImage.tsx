@@ -31,7 +31,7 @@ export const PILImageImage: React.FC<{
     key => key in imageTypes
   ) as keyof PILImageImageTypePayload['files'];
   if (!imageKey) {
-    throw new Error('No image file found');
+    return <span>Img not found!</span>;
   }
 
   const imageBinary = useFileContent(
