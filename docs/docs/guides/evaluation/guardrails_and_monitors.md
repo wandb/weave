@@ -15,7 +15,7 @@ Here's a basic example of a custom scorer:
 
 ```python
 class MyScorer(Scorer):
-    def score(self, result: str) -> float:
+    def score(self, output: str) -> float:
         """
         Evaluate the given result and return a score between 0 and 1.
         
