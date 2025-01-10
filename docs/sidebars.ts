@@ -70,6 +70,7 @@ const sidebars: SidebarsConfig = {
         "guides/tools/comparison",
         "guides/tools/playground",
         "guides/core-types/media",
+        "guides/core-types/env-vars",
         {
           type: "category",
           collapsible: true,
@@ -96,6 +97,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
             "guides/integrations/mistral",
+            "guides/integrations/azure",
             "guides/integrations/google-gemini",
             "guides/integrations/together_ai",
             "guides/integrations/groq",

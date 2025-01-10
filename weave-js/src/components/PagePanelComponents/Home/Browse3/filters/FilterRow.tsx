@@ -89,7 +89,7 @@ export const FilterRow = ({
         {item.id != null && (
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="delete"
             tooltip="Remove this filter"
             onClick={() => onRemoveFilter(item.id)}

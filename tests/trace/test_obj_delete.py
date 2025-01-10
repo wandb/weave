@@ -184,7 +184,7 @@ def test_read_deleted_object(client: WeaveClient):
 
     _obj_delete(client, "obj_1", [obj1_v2.digest])
 
-    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
         client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),
@@ -192,15 +192,17 @@ def test_read_deleted_object(client: WeaveClient):
                 digest=obj1_v2.digest,
             )
         )
+    assert e.value.deleted_at is not None
 
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
-        client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                project_id=client._project_id(),
-                object_ids=["obj_1"],
-                refs=[obj1_v2.uri()],
-            )
+    ref_res = client.server.refs_read_batch(
+        tsi.RefsReadBatchReq(
+            project_id=client._project_id(),
+            object_ids=["obj_1"],
+            refs=[obj1_v2.uri()],
         )
+    )
+    assert len(ref_res.vals) == 1
+    assert ref_res.vals[0] is None
 
 
 def test_op_versions(client: WeaveClient):
@@ -241,7 +243,7 @@ def test_read_deleted_op(client: WeaveClient):
 
     _obj_delete(client, "my_op", [op_ref.digest])
 
-    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
         client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),
@@ -249,12 +251,14 @@ def test_read_deleted_op(client: WeaveClient):
                 digest=op_ref.digest,
             )
         )
+    assert e.value.deleted_at is not None
 
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
-        client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                project_id=client._project_id(),
-                object_ids=["my_op"],
-                refs=[op_ref.uri()],
-            )
+    ref_res = client.server.refs_read_batch(
+        tsi.RefsReadBatchReq(
+            project_id=client._project_id(),
+            object_ids=["my_op"],
+            refs=[op_ref.uri()],
         )
+    )
+    assert len(ref_res.vals) == 1
+    assert ref_res.vals[0] is None

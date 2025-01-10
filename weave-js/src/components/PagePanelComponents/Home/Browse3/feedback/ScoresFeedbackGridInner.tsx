@@ -1,22 +1,16 @@
-import {
-  GridColDef,
-  GridRenderCellParams,
-  GridRowHeightParams,
-} from '@mui/x-data-grid-pro';
+import {Box} from '@mui/material';
+import {GridColDef, GridRowHeightParams} from '@mui/x-data-grid-pro';
+import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import React from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
-import {CellValueString} from '../../Browse2/CellValueString';
-import {CopyableId} from '../pages/common/Id';
+import {CellValue} from '../../Browse2/CellValue';
+import {SmallRef} from '../../Browse2/SmallRef';
+import {CallRefLink} from '../pages/common/Links';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
-import {FeedbackTypeChip} from './FeedbackTypeChip';
-import {
-  getHumanAnnotationNameFromFeedbackType,
-  isHumanAnnotationType,
-} from './StructuredFeedback/humanAnnotationTypes';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
@@ -24,66 +18,80 @@ type FeedbackGridInnerProps = {
   showAnnotationName?: boolean;
 };
 
-export const FeedbackGridInner = ({
+export const ScoresFeedbackGridInner = ({
   feedback,
   currentViewerId,
   showAnnotationName,
 }: FeedbackGridInnerProps) => {
-  const columns: GridColDef[] = [
+  /**
+   * This component is very similar to `FeedbackGridInner`, but it only shows scores.
+   * While some of the code is duplicated, it is kept separate to make it easier
+   * to modify in the future.
+   */
+  const columns: Array<GridColDef<Feedback>> = [
     {
-      field: 'feedback_type',
-      headerName: 'Type',
+      field: 'runnable_ref',
+      headerName: 'Scorer',
       display: 'flex',
-      renderCell: params => (
-        <div className="overflow-hidden">
-          <FeedbackTypeChip feedbackType={params.row.feedback_type} />
-        </div>
-      ),
+      flex: 1,
+      renderCell: params => {
+        const runnable_ref = params.row.runnable_ref;
+        if (!runnable_ref) {
+          return null;
+        }
+        const objRef = parseRefMaybe(runnable_ref);
+        if (!objRef) {
+          return null;
+        }
+        return (
+          <div className="overflow-hidden">
+            <SmallRef objRef={objRef} />
+          </div>
+        );
+      },
     },
-    ...(showAnnotationName
-      ? [
-          {
-            field: 'annotation_name',
-            headerName: 'Name',
-            flex: 1,
-            renderCell: (params: GridRenderCellParams) => {
-              const feedbackType = params.row.feedback_type;
-              const annotationName = isHumanAnnotationType(feedbackType)
-                ? getHumanAnnotationNameFromFeedbackType(feedbackType)
-                : null;
-              if (!annotationName) {
-                return null;
-              }
-              return <CellValueString value={annotationName} />;
-            },
-          },
-        ]
-      : []),
     {
       field: 'payload',
-      headerName: 'Feedback',
+      headerName: 'Score',
       sortable: false,
       flex: 1,
       renderCell: params => {
-        if (params.row.feedback_type === 'wandb.note.1') {
-          return <CellValueString value={params.row.payload.note} />;
+        const value = params.row.payload.output;
+        return (
+          <Box
+            sx={{
+              width: '100%',
+              display: 'flex',
+              height: '100%',
+              lineHeight: '20px',
+              alignItems: 'center',
+            }}>
+            <CellValue value={value} />
+          </Box>
+        );
+      },
+    },
+    {
+      field: 'call_ref',
+      headerName: 'Score Call',
+      display: 'flex',
+      renderCell: params => {
+        const call_ref = params.row.call_ref;
+        if (!call_ref) {
+          return null;
         }
-        if (params.row.feedback_type === 'wandb.reaction.1') {
-          return (
-            <span className="night-aware">{params.row.payload.emoji}</span>
-          );
+        const objRef = parseRefMaybe(call_ref);
+        if (!objRef) {
+          return null;
         }
-        if (isHumanAnnotationType(params.row.feedback_type)) {
-          if (typeof params.row.payload.value === 'string') {
-            return <CellValueString value={params.row.payload.value} />;
-          }
-          return (
-            <CellValueString
-              value={JSON.stringify(params.row.payload.value ?? null)}
-            />
-          );
+        if (!isWeaveObjectRef(objRef)) {
+          return null;
         }
-        return <CellValueString value={JSON.stringify(params.row.payload)} />;
+        return (
+          <div className="overflow-hidden">
+            <CallRefLink callRef={objRef} />
+          </div>
+        );
       },
     },
     {
@@ -94,14 +102,6 @@ export const FeedbackGridInner = ({
       renderCell: params => (
         <Timestamp value={params.row.created_at} format="relative" />
       ),
-    },
-    {
-      field: 'id',
-      headerName: 'ID',
-      width: 48,
-      minWidth: 48,
-      display: 'flex',
-      renderCell: params => <CopyableId id={params.row.id} type="Feedback" />,
     },
     {
       field: 'wb_user_id',

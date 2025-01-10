@@ -13,7 +13,7 @@ Follow these steps to track your first call or <a class="vertical-align-colab-bu
 
 First install the weave library:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```bash
     pip install weave
@@ -43,7 +43,7 @@ To get started with tracking your first project with Weave:
 
 _In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     # highlight-next-line
