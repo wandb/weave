@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.sanitize import DEFAULT_REDACTED_VALUE, should_redact
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -149,7 +149,7 @@ def dictify(
         dict_result = {}
         for k, v in obj.items():
             if should_redact(k):
-                dict_result[k] = REDACTED_VALUE
+                dict_result[k] = DEFAULT_REDACTED_VALUE
             else:
                 dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
         return dict_result
@@ -161,7 +161,7 @@ def dictify(
                 to_dict_result = {}
                 for k, v in as_dict.items():
                     if should_redact(k):
-                        to_dict_result[k] = REDACTED_VALUE
+                        to_dict_result[k] = DEFAULT_REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
                         to_dict_result[k] = dictify(v, maxdepth, depth + 1)
                     else:
@@ -188,7 +188,7 @@ def dictify(
             if attr.startswith("_"):
                 continue
             if should_redact(attr):
-                result[attr] = REDACTED_VALUE
+                result[attr] = DEFAULT_REDACTED_VALUE
                 continue
             try:
                 val = getattr(obj, attr)
