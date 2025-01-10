@@ -1,19 +1,20 @@
-# 🚀 Weave Quickstart Guide
+# Weave with TypeScript Quickstart Guide
 
-Get started using Weave to:
+You can use W&B Weave with Typescript to:
+
 - Log and debug language model inputs, outputs, and traces
 - Build rigorous, apples-to-apples evaluations for language model use cases
 - Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
-See the full Weave documentation [here](https://wandb.me/weave).
-## 📝 Function Tracking
+For more information, see the [Weave documentation](/). 
 
-Add the weave.op wrapper to the functions you want to track.
-After adding weave.op and calling the function, visit the W&B dashboard 
-to see it tracked within your project.
+## Function tracking
 
-💡 We automatically track your code - check the code tab in the UI!
-Initializes the Weave project
+To use Weave in your Typescript code, initialize a new Weave project and add the `weave.op` wrapper to the functions you want to track.
+
+After adding `weave.op` and calling the function, visit the W&B dashboard to see it tracked within your project.
+
+We automatically track your code - check the code tab in the UI!
 
 ```typescript
 async function initializeWeaveProject() {
@@ -34,8 +35,7 @@ function stripUserInput(userInput: string): string {
 }
 ```
 
-Track a simple function call with Weave.
-This example shows how basic function tracking works.
+The following example shows how basic function tracking works.
 
 ```typescript
 async function demonstrateBasicTracking() {
@@ -44,16 +44,18 @@ async function demonstrateBasicTracking() {
 }
 ```
 
-## 🔌 OpenAI Integration
+## OpenAI integration
 
-Track OpenAI API calls with Weave.
-All OpenAI calls are automatically tracked, including:
+Weave automatically tracks all OpenAI calls, including:
+
 - Token usage
 - API costs
 - Request/response pairs
 - Model configurations
 
-Note: We also support other LLM providers like Anthropic and Mistral.
+:::note
+In addition to OpenAI, Weave supports automatic logging of other LLM providers, such as Anthropic and Mistral. For the full list, see [LLM Providers in the Integrations documentation](../../guides/integrations/index.md#llm-providers).
+:::
 
 ```typescript
 function initializeOpenAIClient() {
@@ -74,13 +76,13 @@ async function demonstrateOpenAITracking() {
 }
 ```
 
-## 🔄 Nested Function Tracking
+## Nested function tracking
 
-Track complex workflows by combining multiple tracked functions
-and LLM calls while preserving the entire execution trace.
-This enables:
+Weave allows you to track complex workflows by combining multiple tracked functions
+and LLM calls while preserving the entire execution trace. The benefits of this include:
+
 - Full visibility into your application's logic flow
-- Debugging of complex chains of operations
+- Easy debugging of complex chains of operations
 - Performance optimization opportunities
 
 ```typescript
@@ -108,10 +110,10 @@ async function demonstrateNestedTracking() {
 }
 ```
 
-## 📊 Dataset Management
+## Dataset management
 
-Create and manage datasets with Weave.
-Similar to models, weave.Dataset helps:
+You can create and manage datasets with Weave using the [`weave.Dataset`](../../guides/core-types/datasets.md) class. Similar to [Weave `Models`](../../guides/core-types/models.md), `weave.Dataset` helps:
+
 - Track and version your data
 - Organize test cases
 - Share datasets between team members
@@ -146,17 +148,16 @@ function createGrammarDataset(): weave.Dataset<GrammarExample> {
 }
 ```
 
-## 📈 Evaluation Framework
+## Evaluation framework
 
-Run systematic evaluations with Weave.
-Evaluation-driven development helps you reliably iterate on an application.
-The Evaluation class:
-- Assesses Model performance on a Dataset
+Weave supports evaluation-driven development with the [`Evaluation` class](../../guides/core-types/evaluations.md). Evaluations help you reliably iterate on your GenAI application. The `Evaluation` class does the following:
+
+- Assesses `Model` performance on a `Dataset`
 - Applies custom scoring functions
 - Generates detailed performance reports
 - Enables comparison between model versions
 
-See the full evaluation tutorial at: http://wandb.me/weave_eval_tut
+You can find a complete evaluation tutorial at [http://wandb.me/weave_eval_tut](http://wandb.me/weave_eval_tut)
 
 ```typescript
 class OpenAIGrammarCorrector {
@@ -215,7 +216,7 @@ async function runEvaluation() {
 }
 ```
 
-Main function to run all demonstrations
+The following `main` function runs all demonstrations:
 
 ```typescript
 async function main() {
