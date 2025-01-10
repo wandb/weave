@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from pydantic import field_validator
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
@@ -68,6 +69,10 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    @classmethod
+    def from_uri(cls, uri: str) -> Self:
+        return weave.ref(uri).get()
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)

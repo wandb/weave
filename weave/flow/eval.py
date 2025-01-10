@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional, Union, cast
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
+from typing_extensions import Self
 
 import weave
 from weave.flow import util
@@ -115,6 +116,10 @@ class Evaluation(Object):
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
+    @classmethod
+    def from_uri(cls, uri: str) -> Self:
+        return weave.ref(uri).get()
 
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":
