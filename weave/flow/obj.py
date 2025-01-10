@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Optional, Self, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -8,6 +8,7 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
     model_validator,
 )
+from typing_extensions import Self
 
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
