@@ -13,7 +13,7 @@ This guide will show you how to:
 
 ## Sample code
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
