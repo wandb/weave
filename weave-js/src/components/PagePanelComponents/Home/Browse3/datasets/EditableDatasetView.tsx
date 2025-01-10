@@ -93,15 +93,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     pageSize: 50,
   });
 
-  // Reset sort model and pagination if we enter edit mode with sorting applied.
-  useEffect(() => {
-    if (isEditing && sortModel.length > 0) {
-      setPaginationModel({page: 0, pageSize: 50});
-      setSortModel([]);
-      setSortBy([]);
-    }
-  }, [isEditing, sortModel]);
-
   const sharedRef = useContext(WeaveCHTableSourceRefContext);
 
   const history = useHistory();
@@ -261,16 +252,14 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
 
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
-      return loadedRows.map((row, i) => {
+      return loadedRows.map(row => {
         const digest = row.digest;
-        const absoluteIndex =
-          i + paginationModel.pageSize * paginationModel.page;
-        const editedRow = editedCellsMap.get(absoluteIndex);
+        const editedRow = editedCellsMap.get(row.original_index);
         const value = flattenObjectPreservingWeaveTypes(row.val);
         return {
           ___weave: {
-            id: `${digest}_${absoluteIndex}`,
-            index: absoluteIndex,
+            id: `${digest}_${row.original_index}`,
+            index: row.original_index,
             isNew: false,
           },
           ...(editedRow ? {...value, ...editedRow} : value),
@@ -278,7 +267,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       });
     }
     return [];
-  }, [loadedRows, fetchQueryLoaded, editedCellsMap, paginationModel]);
+  }, [loadedRows, fetchQueryLoaded, editedCellsMap]);
 
   const combinedRows = useMemo(() => {
     if (
@@ -380,7 +369,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       headerName: field as string,
       flex: 1,
       editable: isEditing,
-      sortable: !isEditing,
+      sortable: true,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
         const editedRow = editedCellsMap.get(params.row.___weave?.index);
