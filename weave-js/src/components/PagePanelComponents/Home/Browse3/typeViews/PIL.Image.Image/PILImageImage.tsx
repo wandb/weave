@@ -1,6 +1,7 @@
 import React from 'react';
 
 import {LoadingDots} from '../../../../../LoadingDots';
+import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
@@ -30,15 +31,15 @@ export const PILImageImage: React.FC<{
   const imageKey = Object.keys(props.data.files).find(
     key => key in imageTypes
   ) as keyof PILImageImageTypePayload['files'];
-  if (!imageKey) {
-    return <span>Img not found!</span>;
-  }
-
   const imageBinary = useFileContent(
     props.entity,
     props.project,
     props.data.files[imageKey]
   );
+
+  if (!imageKey) {
+    return <NotApplicable />;
+  }
   const imageFileExt = imageTypes[imageKey as keyof typeof imageTypes];
 
   if (imageBinary.loading) {
