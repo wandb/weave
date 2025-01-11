@@ -18,13 +18,13 @@ export const Overview = styled.div`
 `;
 Overview.displayName = 'S.Overview';
 
-export const CallName = styled.div`
+export const CallName = styled.div<{$isEditing?: boolean}>`
   font-family: Source Sans Pro;
   font-size: 16px;
   font-weight: 600;
-  line-height: 20px;
-  letter-spacing: 0px;
   text-align: left;
+  word-break: break-all;
+  width: ${props => (props.$isEditing ? '100%' : 'max-content%')};
 `;
 CallName.displayName = 'S.CallName';
 
@@ -45,20 +45,20 @@ export const CallOverview: React.FC<{
   const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
 
   return (
     <>
       <Overview>
         <StatusChip value={statusCode} iconOnly />
-        <CallName>
-          <EditableCallName
-            call={call}
-            editableFieldRef={editableCallDisplayNameRef}
-          />
+        <CallName $isEditing={isEditing}>
+          <EditableCallName call={call} onEditingChange={setIsEditing} />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
         <Spacer />
-        <Reactions weaveRef={refCall} forceVisible={true} />
+        <div>
+          <Reactions weaveRef={refCall} forceVisible={true} />
+        </div>
         <OverflowBin>
           <OverflowMenu
             selectedCalls={[call]}
