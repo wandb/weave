@@ -17,7 +17,7 @@ const sidebars: SidebarsConfig = {
         "introduction",
         {
           type: "doc",
-          label: "Trace LLMs",
+          label: "Quickstart",
           id: "quickstart",
         },
         {
