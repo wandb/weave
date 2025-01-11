@@ -60,10 +60,6 @@ export const Tag: React.FC<TagProps> = React.memo(
     canDelete = canDelete ?? true;
     showColor = showColor ?? true;
 
-    // As per new design guidelines, colors for tags and aliases are no longer random
-    // Since they've been fixed based on tag type (aka `noun`), the color assignment here will ignore
-    // the database color index. This can be modified in the future if the design decision changes
-    // based on user feedback
     const colorName = colorIndexToName(showColor, nounToTagType(noun));
     return (
       <Label
@@ -90,8 +86,8 @@ export const Tag: React.FC<TagProps> = React.memo(
               e.stopPropagation();
               onDelete(e);
             }}
-            onMouseOver={() => setShowDeleteAlert(true)}
-            onMouseOut={() => setShowDeleteAlert(false)}
+            onMouseEnter={() => setShowDeleteAlert(true)}
+            onMouseLeave={() => setShowDeleteAlert(false)}
             $pos="right"
             $opacity={0.6}
             $cursor="pointer"

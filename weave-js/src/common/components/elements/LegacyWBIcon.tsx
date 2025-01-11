@@ -1,4 +1,4 @@
-import React, {memo} from 'react';
+import React, {memo, RefObject} from 'react';
 import {Icon, Ref} from 'semantic-ui-react';
 
 // Copied from semantic since the type isn't exported
@@ -19,17 +19,16 @@ export interface LegacyWBIconProps {
   rotated?: 'clockwise' | 'counterclockwise';
   link?: boolean;
   className?: string;
-  onClick?: any;
-  onMouseDown?: any;
-  onMouseEnter?: any;
-  onMouseLeave?: any;
-  style?: any;
-
-  'data-test'?: any;
-
+  onClick?: (e: React.MouseEvent) => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: (e: React.MouseEvent) => void;
+  style?: React.CSSProperties;
+  'data-test'?: string;
   role?: string;
   ariaHidden?: string;
   ariaLabel?: string;
+  ref?: RefObject<HTMLElement> | ((node: HTMLElement | null) => void);
 }
 
 const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
@@ -72,9 +71,6 @@ const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
       'aria-hidden': ariaHidden,
       'aria-label': ariaLabel,
     };
-    if (ref == null) {
-      return <Icon {...passProps} className={className} />;
-    }
     return (
       <Ref innerRef={ref}>
         <Icon {...passProps} className={className} />
