@@ -8,6 +8,7 @@ __version__ = version.VERSION
 
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
+from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
@@ -40,4 +41,5 @@ __docspec__ = [
     MessagesPrompt,
     Evaluation,
     Scorer,
+    AnnotationSpec,
 ]
