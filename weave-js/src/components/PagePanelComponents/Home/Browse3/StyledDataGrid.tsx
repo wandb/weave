@@ -30,18 +30,22 @@ const backgroundColorSelectedForDeletion = hexToRGB(RED_300, 0.32);
 // Use our custom loading component that matches our palette.
 const LoadingOverlay = () => <Loading centered />;
 
+// Add this new type
+type StyledDataGridProps = DataGridProProps & {
+  keepBorders?: boolean;
+  pinnedColumnsWidth?: number;
+};
+
+// Update the styled component to accept pinnedColumnsWidth
 export const StyledDataGrid = styled(
-  ({
-    keepBorders,
-    ...otherProps
-  }: DataGridProProps & {keepBorders?: boolean}) => {
+  ({keepBorders, pinnedColumnsWidth, ...otherProps}: StyledDataGridProps) => {
     const slots = otherProps.slots ?? {};
     if (!slots.loadingOverlay) {
       slots.loadingOverlay = LoadingOverlay;
     }
     return <DataGridPro slots={slots} {...otherProps} />;
   }
-)(({keepBorders}) => ({
+)(({keepBorders, pinnedColumnsWidth = 0}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
   fontFamily: 'Source Sans Pro',
@@ -49,6 +53,14 @@ export const StyledDataGrid = styled(
   '& .MuiDataGrid-columnHeader': {
     backgroundColor: MOON_50,
     color: MOON_500,
+    position: 'sticky',
+    left: pinnedColumnsWidth + 1, // Add 1px padding for border
+    maxWidth: '100vw',
+    zIndex: 1,
+  },
+
+  '& .MuiDataGrid-columnHeader--pinnedLeft': {
+    zIndex: 2,
   },
 
   '& .MuiDataGrid-columnHeaderTitle': {
