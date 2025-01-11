@@ -69,7 +69,7 @@ export const ChoicesViewCarousel = ({
             icon="visible"
             onClick={() => setIsDrawerOpen(true)}
             tooltip="View all choices">
-            Review
+            View trials
           </Button>
         </div>
       }

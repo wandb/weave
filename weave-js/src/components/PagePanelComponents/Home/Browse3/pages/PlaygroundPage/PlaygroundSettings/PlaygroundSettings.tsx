@@ -59,7 +59,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
               sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '4px',
+                gap: '16px',
                 mt: 2,
               }}>
               <ResponseFormatEditor
@@ -158,13 +158,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
                 }}>
-                <label
-                  className="cursor-pointer"
-                  htmlFor="trackWithWeaveSwitch">
-                  Track this LLM call with Weave
-                </label>
                 <Switch.Root
                   id="trackWithWeaveSwitch"
                   size="small"
@@ -181,6 +175,11 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     checked={playgroundStates[idx].trackLLMCall}
                   />
                 </Switch.Root>
+                <label
+                  className="ml-[8px] cursor-pointer text-[14px]"
+                  htmlFor="trackWithWeaveSwitch">
+                  Track this LLM call with Weave
+                </label>
               </Box>
             </Box>
           </Tabs.Content>

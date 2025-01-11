@@ -27,10 +27,9 @@ export const ResponseFormatEditor: React.FC<ResponseFormatEditorProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
-        pb: '4px',
+        gap: '4px',
       }}>
-      <span>Response format</span>
+      <span style={{fontSize: '14px'}}>Response format</span>
       <Select
         value={options.find(opt => opt.value === responseFormat)}
         onChange={option => {

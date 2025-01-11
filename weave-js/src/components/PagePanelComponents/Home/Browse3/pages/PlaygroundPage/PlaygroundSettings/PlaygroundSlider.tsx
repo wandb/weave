@@ -3,6 +3,7 @@ import {TextField} from '@mui/material';
 import Slider from '@mui/material/Slider';
 import {styled} from '@mui/material/styles';
 import {
+  MOON_200,
   MOON_250,
   MOON_350,
   TEAL_500,
@@ -93,13 +94,14 @@ export const PlaygroundSlider = ({
   }, [props.value, props.min, props.max, setValue]);
 
   return (
-    <Box sx={{lineHeight: '20px'}}>
+    <Box sx={{lineHeight: '14px'}}>
       <Box
         sx={{
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-        <span>{props.label}</span>
+        <span style={{fontSize: '14px'}}>{props.label}</span>
         <TextField
           value={
             editing !== null
@@ -120,9 +122,13 @@ export const PlaygroundSlider = ({
             width: 50,
             '& input': {
               fontFamily: 'Source Sans Pro',
-              fontSize: '16px',
-              padding: 0,
+              fontSize: '14px',
+              padding: '0 2px',
               textAlign: 'right',
+              borderRadius: '4px',
+              '&:hover': {
+                backgroundColor: MOON_200,
+              },
             },
           }}
         />
