@@ -1,5 +1,8 @@
+from typing import Any
+
 from pydantic import Field, field_validator
 
+import weave
 from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
@@ -32,6 +35,10 @@ class LLMScorer(Scorer):
                 f"Invalid client type. Expected one of {_LLM_CLIENTS_NAMES}, got {client_type_name}"
             )
         return v
+
+    @weave.op
+    async def score(self, *, output: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError
 
 
 class InstructorLLMScorer(Scorer):

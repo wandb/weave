@@ -14,7 +14,7 @@ from weave.scorers.hallucination_scorer import (
 # mock the create function
 @pytest.fixture
 def mock_create(monkeypatch):
-    def _mock_create(*args, **kwargs):
+    async def _mock_create(*args, **kwargs):
         return HallucinationResponse(
             chain_of_thought="The output is consistent with the input data.",
             reasonings=[
@@ -40,10 +40,11 @@ def hallucination_scorer(mock_create):
     )
 
 
-def test_hallucination_scorer_score(hallucination_scorer, mock_create):
+@pytest.mark.asyncio
+async def test_hallucination_scorer_score(hallucination_scorer, mock_create):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
-    result = hallucination_scorer.score(output=output, context=context)
+    result = await hallucination_scorer.score(output=output, context=context)
     # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
