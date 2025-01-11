@@ -889,6 +889,14 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class PermanentlyDeleteProjectReq(BaseModel):
+    project_id: str
+
+
+class PermanentlyDeleteProjectRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -940,3 +948,8 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Delete All Project Data
+    def permanently_delete_project(
+        self, req: PermanentlyDeleteProjectReq
+    ) -> PermanentlyDeleteProjectRes: ...
