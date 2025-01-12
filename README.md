@@ -3,20 +3,21 @@
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
 [![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
 [![Download Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)
-[![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
-)](https://github.com/wandb/weave)
+[![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master)](https://github.com/wandb/weave)
 
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/)!
 
 ---
 
-You can use Weave to:
+## Key Features
 
-- Log and debug language model inputs, outputs, and traces
-- Build rigorous, apples-to-apples evaluations for language model use cases
-- Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
+Weave empowers you to:
 
-Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
+- 🔍 **Log and Debug**: Efficiently track language model inputs, outputs, and traces.
+- 📊 **Conduct Rigorous Evaluations**: Implement apples-to-apples comparisons for various language model use cases.
+- 🗂️ **Organize Your Workflow**: Manage data across the entire LLM workflow—from experimentation to evaluations to production.
+
+Our goal is to introduce rigor, best practices, and composability into the inherently experimental process of developing Generative AI software, while minimizing cognitive overhead.
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/wandb/weave/master/docs/static/weave-ui-example.jpg" width="100%">
@@ -24,10 +25,13 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ## Documentation
 
-Our documentation site can be found [here](https://wandb.me/weave)
+For detailed documentation, visit our [documentation site](https://wandb.me/weave).
 
 ## Installation
-```
+
+You can install Weave using :
+
+```bash
 pip install weave
 ```
 
@@ -59,7 +63,8 @@ def main():
 main()
 ```
 
-### Fuller Example 
+### Detailed Example
+Here’s a comprehensive example that integrates with OpenAI’s API :
 
 ```python
 import weave
@@ -97,10 +102,11 @@ extract_fruit(sentence)
 
 ## Contributing
 
-Interested in pulling back the hood or contributing? Awesome, before you dive in, here's what you need to know.
+We welcome contributions! Here’s how you can get involved:
 
-We're in the process of 🧹 cleaning up 🧹. This codebase contains a large amount code for the "Weave engine" and "Weave boards", which we've put on pause as we focus on Tracing and Evaluations.
+- 🔧 **Current Focus**: We are currently cleaning up the codebase. Much of the code for the "Weave engine" and "Weave boards" is on pause as we prioritize Tracing and Evaluations.
 
-The Weave Tracing code is mostly in: `weave/trace` and `weave/trace_server`.
+- 🗂️ **Code Organization**:
+  - The Weave Tracing code is mainly in `weave/trace` and `weave/trace_server`.
+  - The Weave Evaluations code resides in `weave/flow`.
 
-The Weave Evaluations code is mostly in `weave/flow`.
