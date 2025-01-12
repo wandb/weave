@@ -57,6 +57,7 @@ export {
   IconDate,
   IconDelete,
   IconDiamond,
+  IconDiff,
   IconDiscordSocial,
   IconDockerWhale,
   IconDocument,

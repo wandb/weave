@@ -1,17 +1,21 @@
 import Box from '@mui/material/Box';
+import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {Icon, IconName} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip} from '../../../../Tooltip';
+import {useClosePeek} from '../context';
+import {DatasetVersionPage} from '../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -27,13 +31,13 @@ import {
 } from './common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from './LeaderboardTab';
 import {TabPrompt} from './TabPrompt';
-import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
 import {TabUsePrompt} from './TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
+  isObjDeleteError,
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
 } from './wfReactInterface/utilities';
@@ -94,7 +98,10 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (isObjDeleteError(objectVersion.error)) {
+    const deletedAtMessage = objectVersion.error?.message ?? 'Object deleted';
+    return <NotFoundPanel title={deletedAtMessage} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
@@ -176,6 +183,8 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
+  const showDeleteButton = useShowDeleteButton();
+
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
       typeof viewerData !== 'object' ||
@@ -198,6 +207,15 @@ const ObjectVersionPageInner: React.FC<{
     return <CenteredAnimatedLoader />;
   }
 
+  if (isDataset) {
+    return (
+      <DatasetVersionPage
+        objectVersion={objectVersion}
+        showDeleteButton={showDeleteButton}
+      />
+    );
+  }
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -212,7 +230,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -251,6 +269,11 @@ const ObjectVersionPageInner: React.FC<{
               <div className="block">
                 <p className="text-moon-500">Subpath</p>
                 <p>{refExtra}</p>
+              </div>
+            )}
+            {showDeleteButton && (
+              <div className="ml-auto">
+                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
               </div>
             )}
           </div>
@@ -319,9 +342,9 @@ const ObjectVersionPageInner: React.FC<{
             ]
           : []),
         {
-          label: isDataset ? 'Rows' : 'Values',
+          label: 'Values',
           content: (
-            <ScrollableTabContent sx={isDataset ? {p: 0} : {}}>
+            <ScrollableTabContent>
               <Box
                 sx={{
                   flex: '0 0 auto',
@@ -358,12 +381,6 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
-                  />
-                ) : baseObjectClass === 'Dataset' ? (
-                  <TabUseDataset
-                    name={objectName}
-                    uri={refUri}
-                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel
@@ -622,6 +639,44 @@ const OpVersionCallsLink: React.FC<{
         variant="secondary"
       />
       ]
+    </>
+  );
+};
+
+export const DeleteObjectButtonWithModal: React.FC<{
+  objVersionSchema: ObjectVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({objVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {objectVersionsDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const deleteStr =
+    overrideDisplayStr ??
+    `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteStr}
+        onDelete={() =>
+          objectVersionsDelete(
+            objVersionSchema.entity,
+            objVersionSchema.project,
+            objVersionSchema.objectId,
+            [objVersionSchema.versionHash]
+          )
+        }
+        onSuccess={closePeek}
+      />
     </>
   );
 };

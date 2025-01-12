@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import json
 import platform
+import random
 import sys
 import time
 from collections import defaultdict, namedtuple
@@ -3005,6 +3006,8 @@ def test_op_sampling(client):
     always_traced_calls = 0
     sometimes_traced_calls = 0
 
+    random.seed(0)
+
     @weave.op(tracing_sample_rate=0.0)
     def never_traced(x: int) -> int:
         nonlocal never_traced_calls
@@ -3044,13 +3047,15 @@ def test_op_sampling(client):
         sometimes_traced(i)
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
-    assert 35 < num_traces < 65  # But only traced ~50% of the time
+    assert num_traces == 38
 
 
 def test_op_sampling_async(client):
     never_traced_calls = 0
     always_traced_calls = 0
     sometimes_traced_calls = 0
+
+    random.seed(0)
 
     @weave.op(tracing_sample_rate=0.0)
     async def never_traced(x: int) -> int:
@@ -3092,7 +3097,7 @@ def test_op_sampling_async(client):
         asyncio.run(sometimes_traced(i))
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
-    assert 35 < num_traces < 65  # But only traced ~50% of the time
+    assert num_traces == 38
 
 
 def test_op_sampling_inheritance(client):
@@ -3219,3 +3224,15 @@ def test_op_sampling_child_follows_parent(client):
 
     assert parent_traces == num_runs  # Parent was always traced
     assert child_traces == num_runs  # Child was traced whenever parent was
+
+
+def test_calls_len(client):
+    @weave.op
+    def test():
+        return 1
+
+    test()
+    test()
+
+    assert len(test.calls()) == 2
+    assert len(client.get_calls()) == 2

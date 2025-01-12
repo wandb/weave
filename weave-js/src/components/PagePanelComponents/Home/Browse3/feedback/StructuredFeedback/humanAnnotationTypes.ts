@@ -1,4 +1,4 @@
-import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBaseObjectClasses.zod';
+import {AnnotationSpec} from '../../pages/wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {Feedback} from '../../pages/wfReactInterface/traceServerClientTypes';
 
 export const HUMAN_ANNOTATION_BASE_TYPE = 'wandb.annotation';
@@ -23,3 +23,9 @@ export type HumanAnnotationPayload = {
 };
 
 export type HumanAnnotation = Feedback & {};
+
+export const isHumanAnnotationType = (feedbackType: string) =>
+  feedbackType.startsWith(HUMAN_ANNOTATION_BASE_TYPE);
+
+export const getHumanAnnotationNameFromFeedbackType = (feedbackType: string) =>
+  feedbackType.split('.').pop();

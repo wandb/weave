@@ -45,7 +45,6 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.base_object_class_util import process_incoming_object_val
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -60,6 +59,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
+    ObjDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -69,6 +69,8 @@ from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
+    ObjectDeletedError,
     RequestTooLarge,
 )
 from weave.trace_server.feedback import (
@@ -80,6 +82,12 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
+)
+from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.objects_query_builder import (
+    ObjectMetadataQueryBuilder,
+    format_metadata_objects_from_query_result,
+    make_objects_val_query_and_parameters,
 )
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -97,7 +105,6 @@ from weave.trace_server.token_costs import (
 from weave.trace_server.trace_server_common import (
     DynamicBatchProcessor,
     LRUCache,
-    digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -123,10 +130,6 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 100
 INITIAL_CALLS_STREAM_BATCH_SIZE = 100
 MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-
-class NotFoundError(Exception):
-    pass
 
 
 CallCHInsertable = Union[
@@ -525,57 +528,54 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        conds = [
-            "is_op = 1",
-            "digest = {digest: String}",
-        ]
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters = {"name": req.name, "digest": req.digest}
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_object_ids_condition([req.name], "op_name")
+        object_query_builder.set_include_deleted(include_deleted=True)
+
+        objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
+        op = objs[0]
+        if op.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
+                deleted_at=op.deleted_at,
+            )
+
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        parameters = {}
-        conds: list[str] = ["is_op = 1"]
-        object_id_conditions: list[str] = []
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
         if req.filter:
             if req.filter.op_names:
-                object_id_conditions.append("object_id IN {op_names: Array(String)}")
-                parameters["op_names"] = req.filter.op_names
+                object_query_builder.add_object_ids_condition(
+                    req.filter.op_names, "op_names"
+                )
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                object_query_builder.add_is_latest_condition()
 
-        ch_objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        ch_objs = self._select_objs_query(object_query_builder)
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        val, base_object_class = process_incoming_object_val(
-            req.obj.val, req.obj.set_base_object_class
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
         )
-
-        json_val = json.dumps(val)
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
-            kind=get_kind(val),
-            base_object_class=base_object_class,
-            refs=extract_refs_from_values(val),
+            kind=get_kind(processed_val),
+            base_object_class=processed_result["base_object_class"],
+            refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
         )
@@ -588,63 +588,120 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds: list[str] = []
-        object_id_conditions = ["object_id = {object_id: String}"]
-        parameters: dict[str, Union[str, int]] = {"object_id": req.object_id}
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
-            if is_version:
-                conds.append("version_index = {version_index: UInt64}")
-                parameters["version_index"] = version_index
-            else:
-                conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-        )
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        object_query_builder.set_include_deleted(include_deleted=True)
+
+        objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
+            )
+
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conds: list[str] = []
-        object_id_conditions: list[str] = []
-        parameters = {}
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append("is_op = 1")
+                    object_query_builder.add_is_op_condition(True)
                 else:
-                    conds.append("is_op = 0")
+                    object_query_builder.add_is_op_condition(False)
             if req.filter.object_ids:
-                object_id_conditions.append("object_id IN {object_ids: Array(String)}")
-                parameters["object_ids"] = req.filter.object_ids
-            if req.filter.latest_only:
-                conds.append("is_latest = 1")
-            if req.filter.base_object_classes:
-                conds.append(
-                    "base_object_class IN {base_object_classes: Array(String)}"
+                object_query_builder.add_object_ids_condition(
+                    req.filter.object_ids, "object_ids"
                 )
-                parameters["base_object_classes"] = req.filter.base_object_classes
-
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            object_id_conditions=object_id_conditions,
-            parameters=parameters,
-            metadata_only=req.metadata_only,
-            limit=req.limit,
-            offset=req.offset,
-            sort_by=req.sort_by,
-        )
+            if req.filter.latest_only:
+                object_query_builder.add_is_latest_condition()
+            if req.filter.base_object_classes:
+                object_query_builder.add_base_object_classes_condition(
+                    req.filter.base_object_classes
+                )
+        if req.limit is not None:
+            object_query_builder.set_limit(req.limit)
+        if req.offset is not None:
+            object_query_builder.set_offset(req.offset)
+        if req.sort_by:
+            for sort in req.sort_by:
+                object_query_builder.add_order(sort.field, sort.direction)
+        metadata_only = req.metadata_only or False
+        object_query_builder.set_include_deleted(include_deleted=False)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        """
+        Delete object versions by digest, belonging to given object_id.
+        All deletion in this method is "soft". Deletion occurs by inserting
+        a new row into the object_versions table with the deleted_at field set.
+        Inserted rows share identical primary keys (order by) with original rows,
+        and will be combined by the ReplacingMergeTree engine at database merge
+        time.
+        If no digests are provided all versions will have their data overwritten with
+        an empty val_dump.
+        """
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        metadata_only = True
+        if req.digests:
+            object_query_builder.add_digests_conditions(*req.digests)
+            metadata_only = False
+
+        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+
+        delete_insertables = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for obj in object_versions:
+            original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
+            delete_insertables.append(
+                ObjDeleteCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    digest=obj.digest,
+                    kind=obj.kind,
+                    val_dump=obj.val_dump,
+                    refs=obj.refs,
+                    base_object_class=obj.base_object_class,
+                    deleted_at=now,
+                    # Keep the original created_at timestamp
+                    created_at=original_created_at,
+                )
+            )
+
+        if len(delete_insertables) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+
+        if req.digests:
+            given_digests = set(req.digests)
+            found_digests = {obj.digest for obj in delete_insertables}
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        data = [list(obj.model_dump().values()) for obj in delete_insertables]
+        column_names = list(delete_insertables[0].model_fields.keys())
+
+        self._insert("object_versions", data=data, column_names=column_names)
+        num_deleted = len(delete_insertables)
+
+        return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -950,7 +1007,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> Any:
             conds: list[str] = []
             object_id_conds: list[str] = []
-            parameters = {}
+            parameters: dict[str, Union[str, int]] = {}
+            ref_digests: set[str] = set()
 
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
@@ -975,17 +1033,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_id_conds.append(f"object_id = {{{object_id_param_key}: String}}")
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
-
+                ref_digests.add(ref.version)
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
-                objs = self._select_objs_query(
+                object_query_builder = ObjectMetadataQueryBuilder(
                     project_id=project_id_scope,
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
                     parameters=parameters,
+                    include_deleted=True,
                 )
-                for obj in objs:
+                objs = self._select_objs_query(object_query_builder)
+                found_digests = {obj.digest for obj in objs}
+                if len(ref_digests) != len(found_digests):
+                    raise NotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    )
+                # filter out deleted objects
+                valid_objects = [obj for obj in objs if obj.deleted_at is None]
+                for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
             return [
@@ -1335,7 +1402,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1024
+        MAX_PAYLOAD = 1 << 20  # 1 MiB
         if len(payload) > MAX_PAYLOAD:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
@@ -1447,8 +1514,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        isBedrock = model_info.get("litellm_provider") == "bedrock"
-        if not api_key and not isBedrock:
+        provider = model_info.get("litellm_provider")
+        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
@@ -1458,7 +1525,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = lite_llm_completion(
             api_key,
             req.inputs,
-            isBedrock,
+            provider,
         )
         end_time = datetime.datetime.now()
 
@@ -1562,14 +1629,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _select_objs_query(
         self,
-        project_id: str,
-        conditions: Optional[list[str]] = None,
-        object_id_conditions: Optional[list[str]] = None,
-        parameters: Optional[dict[str, Any]] = None,
-        metadata_only: Optional[bool] = False,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        sort_by: Optional[list[tsi.SortBy]] = None,
+        object_query_builder: ObjectMetadataQueryBuilder,
+        metadata_only: bool = False,
     ) -> list[SelectableCHObjSchema]:
         """
         Main query for fetching objects.
@@ -1587,146 +1648,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if metadata_only is True, then we return early and dont grab the value.
             Otherwise, make a second query to grab the val_dump from the db
         """
-        if not conditions:
-            conditions = ["1 = 1"]
-        if not object_id_conditions:
-            object_id_conditions = ["1 = 1"]
-
-        conditions_part = combine_conditions(conditions, "AND")
-        object_id_conditions_part = combine_conditions(object_id_conditions, "AND")
-
-        limit_part = ""
-        offset_part = ""
-        if limit is not None:
-            limit_part = f"LIMIT {int(limit)}"
-        if offset is not None:
-            offset_part = f" OFFSET {int(offset)}"
-
-        sort_part = ""
-        if sort_by:
-            valid_sort_fields = {"object_id", "created_at"}
-            sort_clauses = []
-            for sort in sort_by:
-                if sort.field in valid_sort_fields and sort.direction in {
-                    "asc",
-                    "desc",
-                }:
-                    sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
-            if sort_clauses:
-                sort_part = f"ORDER BY {', '.join(sort_clauses)}"
-
-        if parameters is None:
-            parameters = {}
-
-        select_without_val_dump_query = f"""
-            SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                digest,
-                is_op,
-                version_index,
-                version_count,
-                is_latest
-            FROM (
-                SELECT project_id,
-                    object_id,
-                    created_at,
-                    kind,
-                    base_object_class,
-                    refs,
-                    digest,
-                    is_op,
-                    row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
-                        ORDER BY created_at ASC
-                    ) - 1 AS version_index,
-                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(version_index + 1 = version_count, 1, 0) AS is_latest
-                FROM (
-                    SELECT project_id,
-                        object_id,
-                        created_at,
-                        kind,
-                        base_object_class,
-                        refs,
-                        digest,
-                        if (kind = 'op', 1, 0) AS is_op,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {{project_id: String}} AND
-                        {object_id_conditions_part}
-                )
-                WHERE rn = 1
-            )
-            WHERE {conditions_part}
-            {sort_part}
-            {limit_part}
-            {offset_part}
-        """
-        query_result = self._query_stream(
-            select_without_val_dump_query,
-            {"project_id": project_id, **parameters},
-        )
-        result: list[SelectableCHObjSchema] = []
-        for row in query_result:
-            result.append(
-                SelectableCHObjSchema.model_validate(
-                    dict(
-                        zip(
-                            [
-                                "project_id",
-                                "object_id",
-                                "created_at",
-                                "kind",
-                                "base_object_class",
-                                "refs",
-                                "digest",
-                                "is_op",
-                                "version_index",
-                                "version_count",
-                                "is_latest",
-                                "val_dump",
-                            ],
-                            # Add an empty val_dump to the end of the row
-                            list(row) + ["{}"],
-                        )
-                    )
-                )
-            )
+        obj_metadata_query = object_query_builder.make_metadata_query()
+        parameters = object_query_builder.parameters or {}
+        query_result = self._query_stream(obj_metadata_query, parameters)
+        metadata_result = format_metadata_objects_from_query_result(query_result)
 
         # -- Don't make second query for object values if metadata_only --
-        if metadata_only:
-            return result
+        if metadata_only or len(metadata_result) == 0:
+            return metadata_result
 
-        # now get the val_dump for each object
-        object_ids = list({row.object_id for row in result})
-        digests = list({row.digest for row in result})
-        query = """
-            SELECT object_id, digest, any(val_dump)
-            FROM object_versions
-            WHERE project_id = {project_id: String} AND
-                object_id IN {object_ids: Array(String)} AND
-                digest IN {digests: Array(String)}
-            GROUP BY object_id, digest
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_ids": object_ids,
-            "digests": digests,
-        }
-        query_result = self._query_stream(query, parameters)
+        value_query, value_parameters = make_objects_val_query_and_parameters(
+            project_id=object_query_builder.project_id,
+            object_ids=list({row.object_id for row in metadata_result}),
+            digests=list({row.digest for row in metadata_result}),
+        )
+        query_result = self._query_stream(value_query, value_parameters)
         # Map (object_id, digest) to val_dump
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
@@ -1734,9 +1670,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_values[(object_id, digest)] = val_dump
 
         # update the val_dump for each object
-        for obj in result:
+        for obj in metadata_result:
             obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
-        return result
+        return metadata_result
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
@@ -1929,6 +1865,15 @@ def _ensure_datetimes_have_tz(
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
+
+def _ensure_datetimes_have_tz_strict(
+    dt: datetime.datetime,
+) -> datetime.datetime:
+    res = _ensure_datetimes_have_tz(dt)
+    if res is None:
+        raise ValueError(f"Datetime is None: {dt}")
+    return res
 
 
 def _nullable_dict_dump_to_dict(

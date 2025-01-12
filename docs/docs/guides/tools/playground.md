@@ -57,45 +57,67 @@ There are two ways to access the Playground:
 
 ## Select an LLM
 
-You can switch the LLM using the dropdown menu in the top left. Currently, the available models are:
+You can switch the LLM using the dropdown menu in the top left. The available models from various providers are listed below:
 
-- gpt-40-mini
-- claude-3-5-sonnet-20240620
+- [AI21](#ai21)
+- [Amazon](#amazon)
+- [Anthropic](#anthropic)
+- [Cohere](#cohere)
+- [Google](#google)
+- [Groq](#groq)
+- [Meta](#meta)
+- [Mistral](#mistral)
+- [OpenAI](#openai)
+- [X.AI](#xai)
+
+
+### AI21
+- ai21.j2-mid-v1
+- ai21.j2-ultra-v1
+
+### Amazon
+- amazon.nova-lite
+- amazon.nova-micro
+- amazon.nova-pro
+- amazon.titan-text-express-v1
+- amazon.titan-text-lite-v1
+
+### Anthropic
+- anthropic.claude-3-5-sonnet-20240620-v1:0
+- anthropic.claude-3-haiku-20240307-v1:0
+- anthropic.claude-3-opus-20240229-v1:0
+- anthropic.claude-3-sonnet-20240229-v1:0
+- anthropic.claude-instant-v1
+- anthropic.claude-v2
+- anthropic.claude-v2:1
 - claude-3-5-sonnet-20241022
 - claude-3-haiku-20240307
 - claude-3-opus-20240229
 - claude-3-sonnet-20240229
+
+### Cohere
+- cohere.command-light-text-v14
+- cohere.command-r-plus-v1:0
+- cohere.command-r-v1:0
+- cohere.command-text-v14
+
+### Google
+- gemini/gemini-1.5-flash
 - gemini/gemini-1.5-flash-001
 - gemini/gemini-1.5-flash-002
 - gemini/gemini-1.5-flash-8b-exp-0827
 - gemini/gemini-1.5-flash-8b-exp-0924
 - gemini/gemini-1.5-flash-exp-0827
 - gemini/gemini-1.5-flash-latest
-- gemini/gemini-1.5-flash
+- gemini/gemini-1.5-pro
 - gemini/gemini-1.5-pro-001
 - gemini/gemini-1.5-pro-002
 - gemini/gemini-1.5-pro-exp-0801
 - gemini/gemini-1.5-pro-exp-0827
 - gemini/gemini-1.5-pro-latest
-- gemini/gemini-1.5-pro
 - gemini/gemini-pro
-- gpt-3.5-turbo-0125
-- gpt-3.5-turbo-1106
-- gpt-3.5-turbo-16k
-- gpt-3.5-turbo
-- gpt-4-0125-preview
-- gpt-4-0314
-- gpt-4-0613
-- gpt-4-1106-preview
-- gpt-4-32k-0314
-- gpt-4-turbo-2024-04-09
-- gpt-4-turbo-preview
-- gpt-4-turbo
-- gpt-4
-- gpt-40-2024-05-13
-- gpt-40-2024-08-06
-- gpt-40-mini-2024-07-18
-- gpt-4o
+
+### Groq
 - groq/gemma-7b-it
 - groq/gemma2-9b-it
 - groq/llama-3.1-70b-versatile
@@ -105,36 +127,49 @@ You can switch the LLM using the dropdown menu in the top left. Currently, the a
 - groq/llama3-groq-70b-8192-tool-use-preview
 - groq/llama3-groq-8b-8192-tool-use-preview
 - groq/mixtral-8x7b-32768
-- o1-mini-2024-09-12
-- o1-mini
-- o1-preview-2024-09-12
-- o1-preview
-- ai21.j2-mid-v1
-- ai21.j2-ultra-v1
-- amazon.titan-text-lite-v1
-- amazon.titan-text-express-v1
-- mistral.mistral-7b-instruct-v0:2
-- mistral.mixtral-8x7b-instruct-v0:1
-- mistral.mistral-large-2402-v1:0
-- mistral.mistral-large-2407-v1:0
-- anthropic.claude-3-sonnet-20240229-v1:0
-- anthropic.claude-3-5-sonnet-20240620-v1:0
-- anthropic.claude-3-haiku-20240307-v1:0
-- anthropic.claude-3-opus-20240229-v1:0
-- anthropic.claude-v2
-- anthropic.claude-v2:1
-- anthropic.claude-instant-v1
-- cohere.command-text-v14
-- cohere.command-light-text-v14
-- cohere.command-r-plus-v1:0
-- cohere.command-r-v1:0
+
+### Meta
 - meta.llama2-13b-chat-v1
 - meta.llama2-70b-chat-v1
-- meta.llama3-8b-instruct-v1:0
-- meta.llama3-70b-instruct-v1:0
-- meta.llama3-1-8b-instruct-v1:0
-- meta.llama3-1-70b-instruct-v1:0
 - meta.llama3-1-405b-instruct-v1:0
+- meta.llama3-1-70b-instruct-v1:0
+- meta.llama3-1-8b-instruct-v1:0
+- meta.llama3-70b-instruct-v1:0
+- meta.llama3-8b-instruct-v1:0
+
+### Mistral
+- mistral.mistral-7b-instruct-v0:2
+- mistral.mistral-large-2402-v1:0
+- mistral.mistral-large-2407-v1:0
+- mistral.mixtral-8x7b-instruct-v0:1
+
+### OpenAI
+- gpt-3.5-turbo
+- gpt-3.5-turbo-0125
+- gpt-3.5-turbo-1106
+- gpt-3.5-turbo-16k
+- gpt-4
+- gpt-4-0125-preview
+- gpt-4-0314
+- gpt-4-0613
+- gpt-4-1106-preview
+- gpt-4-32k-0314
+- gpt-4-turbo
+- gpt-4-turbo-2024-04-09
+- gpt-4-turbo-preview
+- gpt-40-2024-05-13
+- gpt-40-2024-08-06
+- gpt-40-mini
+- gpt-40-mini-2024-07-18
+- gpt-4o
+- o1-mini
+- o1-mini-2024-09-12
+- o1-preview
+- o1-preview-2024-09-12
+
+### X.AI
+- xai/grok-beta
+
 
 ## Adjust LLM parameters
 

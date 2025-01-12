@@ -9,7 +9,7 @@ In Weave, _scorers_ are used to evaluate AI outputs and return evaluation metric
 
 The types of scorers available depend on whether you are using Python or Typescript.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     Scorers are passed to a `weave.Evaluation` object during evaluation. There are three types of scorers available for Python:
     
@@ -43,6 +43,10 @@ The following section provides information on how to:
 - [Map column names](#map-column-names-with-column_map) if the `score` argument names don't match the column names in your dataset.
 - [Access or customize a final summarization from the scorer](#final-summarization-of-the-scorer)
 
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
+
 ### Initialize scorers with local models
 
 If you are running W&B customised models locally on a CPU or GPU, then you must load the model weights from disk to use scorers. In the following example, the model weights for the `HallucinationScorer` are downloaded from `model_path`:
@@ -62,8 +66,15 @@ from weave.scorers import HallucinationScorer
 
 hallu_scorer = HallucinationScorer(base_url="http://localhost:8000/v1")
 ```
+    
+  </TabItem>
+</Tabs>
 
-### Run scorers
+### Class-based Scorers
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators, or make multiple function calls, you can use the `Scorer` class.
 
 Running a scorer does not depend on where the underlying model is being run. In the initialization examples above, a set of texts can be scored using the same code.
 
@@ -96,7 +107,7 @@ local_model_path = f"models/toxicity_scorer"
 art.download(local_model_path)
 ```
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
   ### Access input from the dataset row
@@ -178,13 +189,11 @@ art.download(local_model_path)
         {name: 'myScorer'}
     );
     ```
-
-  ### Mapping column names with `columnMapping`
     
-    :::note
-
+    ### Mapping column names with `columnMapping`
+    
+    :::important
     In TypeScript, this feature is currently available only from the `Evaluation` object, not individual scorers.
-
     :::
 
     Sometimes your `datasetRow` keys will not exactly match the scorer's naming scheme, but they are semantically similar. In this case, you can map the columns using the `Evaluation`'s `columnMapping` option.
@@ -214,7 +223,7 @@ art.download(local_model_path)
 
 The following section describes how to output the standard final summarization from a scorer, alternatively, output a custom summarization.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     During the evaluation, the score will be computed for each row of your dataset. To provide a final score for the evaluation, you can use the provided `auto_summarize` method depending on the returning type of the output. In the `auto_summarize` method: 
 
@@ -256,7 +265,152 @@ The following section describes how to output the standard final summarization f
     - Count and fraction for boolean columns
     - Other column types are ignored
 
-    Custom summarization not currently supported for Typescript
+    Custom summarization is not currently supported for Typescript
+  </TabItem>
+</Tabs>
 
+## Predefined Scorers
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    **Installation**
+
+    To use Weave's predefined scorers you need to install some additional dependencies:
+
+    ```bash
+    pip install weave[scorers]
+    ```
+
+    **LLM-evaluators**
+
+    The pre-defined scorers that use LLMs support the OpenAI, Anthropic, Google GenerativeAI and MistralAI clients. They also use `weave`'s `InstructorLLMScorer` class, so you'll need to install the [`instructor`](https://github.com/instructor-ai/instructor) Python package to be able to use them. You can get all necessary dependencies with `pip install "weave[scorers]"`
+
+    ### `HallucinationFreeScorer`
+
+    This scorer checks if your AI system's output includes any hallucinations based on the input data.
+
+    ```python
+    from weave.scorers import HallucinationFreeScorer
+
+    llm_client = ... # initialize your LLM client here
+
+    scorer = HallucinationFreeScorer(
+        client=llm_client,
+        model_id="gpt-4o"
+    )
+    ```
+
+    **Customization:**
+
+    - Customize the `system_prompt` and `user_prompt` attributes of the scorer to define what "hallucination" means for you.
+
+    **Notes:**
+
+    - The `score` method expects an input column named `context`. If your dataset uses a different name, use the `column_map` attribute to map `context` to the dataset column.
+
+    Here you have an example in the context of an evaluation:
+
+    ```python
+    import asyncio
+    from openai import OpenAI
+    import weave
+    from weave.scorers import HallucinationFreeScorer
+
+    # Initialize clients and scorers
+    llm_client = OpenAI()
+    hallucination_scorer = HallucinationFreeScorer(
+        client=llm_client,
+        model_id="gpt-4o",
+        column_map={"context": "input", "output": "other_col"}
+    )
+
+    # Create dataset
+    dataset = [
+        {"input": "John likes various types of cheese."},
+        {"input": "Pepe likes various types of cheese."},
+    ]
+
+    @weave.op
+    def model(input: str) -> str:
+        return "The person's favorite cheese is cheddar."
+
+    # Run evaluation
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[hallucination_scorer],
+    )
+    result = asyncio.run(evaluation.evaluate(model))
+    print(result)
+    # {'HallucinationFreeScorer': {'has_hallucination': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 1.4395725727081299}}
+    ```
+
+    ---
+
+    ### `SummarizationScorer`
+
+    Use an LLM to compare a summary to the original text and evaluate the quality of the summary.
+
+    ```python
+    from weave.scorers import SummarizationScorer
+
+    llm_client = ... # initialize your LLM client here
+
+    scorer = SummarizationScorer(
+        client=llm_client,
+        model_id="gpt-4o"
+    )
+    ```
+
+    **How It Works:**
+
+    This scorer evaluates summaries in two ways:
+
+    1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary in order to estimate the "information density" of the summary. Uses an LLM to extract the entities. Similar to how entity density is used in the Chain of Density paper, https://arxiv.org/abs/2309.04269
+
+    2. **Quality Grading:** Uses an LLM-evaluator to grade the summary as `poor`, `ok`, or `excellent`. These grades are converted to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) so you can calculate averages.
+
+    **Customization:**
+
+    - Adjust `summarization_evaluation_system_prompt` and `summarization_evaluation_prompt` to define what makes a good summary.
+
+    **Notes:**
+
+    - This scorer uses the `InstructorLLMScorer` class.
+    - The `score` method expects the original text that was summarized to be present in the `input` column of the dataset. Use the `column_map` class attribute to map `input` to the correct dataset column if needed.
+
+    Here you have an example usage of the `SummarizationScorer` in the context of an evaluation:
+
+    ```python
+    import asyncio
+    from openai import OpenAI
+    import weave
+    from weave.scorers import SummarizationScorer
+
+    class SummarizationModel(weave.Model):
+        @weave.op()
+        async def predict(self, input: str) -> str:
+            return "This is a summary of the input text."
+
+    # Initialize clients and scorers
+    llm_client = OpenAI()
+    model = SummarizationModel()
+    summarization_scorer = SummarizationScorer(
+        client=llm_client,
+        model_id="gpt-4o",
+    )
+    # Create dataset
+    dataset = [
+        {"input": "The quick brown fox jumps over the lazy dog."},
+        {"input": "Artificial Intelligence is revolutionizing various industries."}
+    ]
+
+    # Run evaluation
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
+    results = asyncio.run(evaluation.evaluate(model))
+    print(results)
+    # {'SummarizationScorer': {'is_entity_dense': {'true_count': 0, 'true_fraction': 0.0}, 'summarization_eval_score': {'mean': 0.0}, 'entity_density': {'mean': 0.0}}, 'model_latency': {'mean': 6.210803985595703e-05}}
+    ```
+
+    ---
   </TabItem>
 </Tabs>

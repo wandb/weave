@@ -1,3 +1,4 @@
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import React from 'react';
 
@@ -26,10 +27,30 @@ export const PlaygroundMessagePanelButtons: React.FC<
 }) => {
   const {deleteMessage, deleteChoice, retry} = usePlaygroundContext();
 
+  const handleCopy = async () => {
+    if (contentRef.current?.textContent) {
+      try {
+        await navigator.clipboard.writeText(contentRef.current.textContent);
+        toast('Message copied to clipboard');
+      } catch (error) {
+        toast('Failed to copy message');
+      }
+    }
+  };
+
   return (
     <div className="ml-auto flex gap-4 rounded-lg pt-[8px]">
       <Button
-        variant="quiet"
+        variant="ghost"
+        size="small"
+        startIcon="copy"
+        onClick={handleCopy}
+        tooltip={!hasContent ? 'No content to copy' : 'Copy message'}
+        disabled={!hasContent}>
+        Copy
+      </Button>
+      <Button
+        variant="ghost"
         size="small"
         startIcon="randomize-reset-reload"
         onClick={() => retry?.(index, choiceIndex)}
@@ -42,16 +63,11 @@ export const PlaygroundMessagePanelButtons: React.FC<
         Retry
       </Button>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="pencil-edit"
         onClick={() => {
-          setEditorHeight(
-            contentRef?.current?.clientHeight
-              ? // Accounts for padding and save buttons
-                contentRef.current.clientHeight - 56
-              : null
-          );
+          setEditorHeight(contentRef?.current?.clientHeight ?? null);
         }}
         tooltip={
           !hasContent ? 'We currently do not support editing functions' : 'Edit'
@@ -60,7 +76,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         Edit
       </Button>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="delete"
         onClick={() => {
