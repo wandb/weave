@@ -45,7 +45,7 @@ def test_uri_get(client, obj):
 
 
 @pytest.mark.asyncio
-async def test_gotten_methods(client, obj):
+async def test_gotten_methods(client):
     @weave.op
     def model(a: int) -> int:
         return a + 1
