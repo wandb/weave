@@ -49,6 +49,10 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # using the same artifact. Moreover, since we package the deserialization logic with the
     # object payload, we can always change the serialization logic later without breaking
     # existing payloads.
+
+    # PIL Images opened from files are loaded lazily.  When these images are passed across
+    # thread boundaries (e.g. via FutureExecutor), their file handles may become invalid.
+    # We re-open the file to ensure that the image is fully loaded into memory before saving.
     if fn := getattr(obj, "filename", None):
         obj = Image.open(fn)
 
