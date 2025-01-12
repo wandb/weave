@@ -435,8 +435,8 @@ class EasyPrompt(UserList, Prompt):
             requirements=requirements,
         )
 
-    @staticmethod
-    def load(fp: IO) -> Self:
+    @classmethod
+    def load(cls, fp: IO) -> Self:
         if isinstance(fp, str):  # Common mistake
             raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
@@ -445,8 +445,8 @@ class EasyPrompt(UserList, Prompt):
         prompt = EasyPrompt(**data)
         return prompt
 
-    @staticmethod
-    def load_file(filepath: Union[str, Path]) -> Self:
+    @classmethod
+    def load_file(cls, filepath: Union[str, Path]) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path) as f:
             return EasyPrompt.load(f)
