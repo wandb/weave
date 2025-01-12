@@ -36,5 +36,8 @@ def test_uri_get(client, obj):
     obj_cls = type(obj)
     obj2 = obj_cls.from_uri(ref.uri())
 
+    assert isinstance(obj, obj_cls)
+    assert isinstance(obj2, obj_cls)
+
     for field_name in obj.model_fields:
         assert getattr(obj, field_name) == getattr(obj2, field_name)
