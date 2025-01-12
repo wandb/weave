@@ -10,6 +10,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
+from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.trace.weave_client import get_ref
@@ -54,9 +55,9 @@ class Object(BaseModel):
 
     @classmethod
     def from_uri(cls, uri: str) -> Self:
-        if not hasattr(cls, "from_obj"):
+        if not isinstance(cls, Objectifyable):
             raise NotImplementedError(
-                "Subclass must implement `from_obj` to support deserialization from a URI."
+                f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
             )
 
         import weave
