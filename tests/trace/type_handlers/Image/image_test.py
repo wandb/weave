@@ -1,4 +1,5 @@
 import random
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -169,3 +170,20 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res, dict)
     assert "model_latency" in res and "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
+
+
+@pytest.mark.asyncio
+async def test_many_images_will_consistently_log():
+    # This test is a bit strange -- I can't get the issue to repro inside pytest, but
+    # it will work when run as a script.  See the actual script for more details.
+    res = subprocess.run(
+        ["python", "trace/type_handlers/Image/image_saving_script.py"],
+        capture_output=True,
+        text=True,
+    )
+
+    # This should always be True because the future executor won't raise an exception
+    assert res.returncode == 0
+
+    # But if there's an issue, the stderr will contain `Task failed:`
+    assert "Task failed" not in res.stderr
