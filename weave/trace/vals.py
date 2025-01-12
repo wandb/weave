@@ -11,12 +11,12 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
-from weave.trace import objectify as objectify_module
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
+from weave.trace.objectify import WeaveConvertible
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
@@ -619,7 +619,6 @@ def make_trace_obj(
     server: TraceServerInterface,
     root: Optional[Traceable],
     parent: Any = None,
-    objectify: bool = True,
 ) -> Any:
     if isinstance(val, Traceable):
         # If val is a WeaveTable, we want to refer to it via the outer object
@@ -710,8 +709,8 @@ def make_trace_obj(
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
             obj = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
-            if objectify:
-                return objectify_module.objectify(obj)
+            if isinstance(obj, WeaveConvertible):
+                return obj.from_obj(obj)
             return obj
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)

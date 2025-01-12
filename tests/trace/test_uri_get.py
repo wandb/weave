@@ -6,10 +6,10 @@ import weave
 @pytest.fixture(
     params=[
         "dataset",
-        # "evaluation",
-        # "string_prompt",
-        # "messages_prompt",
-        # "easy_prompt",
+        "evaluation",
+        "string_prompt",
+        "messages_prompt",
+        "easy_prompt",
     ]
 )
 def obj(request):

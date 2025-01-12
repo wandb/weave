@@ -28,7 +28,6 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
-from weave.trace import objectify
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
@@ -59,7 +58,6 @@ DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 
 
-@objectify.register
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.

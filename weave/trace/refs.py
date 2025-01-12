@@ -162,7 +162,7 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
-    def get(self, *, objectify: bool = True) -> Any:
+    def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
@@ -171,7 +171,7 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return gc.get(self, objectify=objectify)
+            return gc.get(self)
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
@@ -181,7 +181,7 @@ class ObjectRef(RefWithExtra):
             f"{self.entity}/{self.project}", ensure_project_exists=False
         )
         try:
-            res = init_client.client.get(self, objectify=objectify)
+            res = init_client.client.get(self)
         finally:
             init_client.reset()
         return res

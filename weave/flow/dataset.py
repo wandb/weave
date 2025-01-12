@@ -6,7 +6,6 @@ from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.trace import objectify
 from weave.trace.vals import WeaveObject, WeaveTable
 
 
@@ -17,7 +16,6 @@ def short_str(obj: Any, limit: int = 25) -> str:
     return str_val
 
 
-@objectify.register
 class Dataset(Object):
     """
     Dataset object with easy saving and automatic versioning

@@ -54,10 +54,15 @@ class Object(BaseModel):
 
     @classmethod
     def from_uri(cls, uri: str) -> Self:
-        """It's up to the subclass to implement this!
+        if not hasattr(cls, "from_obj"):
+            raise NotImplementedError(
+                "Subclass must implement `from_obj` to support deserialization from a URI."
+            )
 
-        Using the @objectify.register decorator will also implement this automatically."""
-        raise NotImplementedError
+        import weave
+
+        obj = weave.ref(uri).get()
+        return cls.from_obj(obj)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
