@@ -57,8 +57,6 @@ async def test_gotten_methods(client, obj):
     ev2 = weave.Evaluation.from_uri(ref.uri())
     await ev2.evaluate(model)
 
-    # TODO: Replace with client versions when they are available
-
     # Ensure that the Evaluation object we get back is equivalent to the one published.
     # If they are the same, calling evaluate again should not publish new versions of any
     # relevant objects of ops.
@@ -70,6 +68,7 @@ async def test_gotten_methods(client, obj):
         "Dataset",
         "example_evaluation",
     ]
+    # TODO: Replace with client version of this query when available
     res = client.server.objs_query(
         ObjQueryReq(project_id=client._project_id()),
         filter=ObjectVersionFilter(object_ids=relevant_object_ids),
