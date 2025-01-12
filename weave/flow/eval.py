@@ -118,6 +118,8 @@ class Evaluation(Object):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         return cls(
+            name=obj.name,
+            description=obj.description,
             dataset=obj.dataset,
             scorers=obj.scorers,
             preprocess_model_input=obj.preprocess_model_input,

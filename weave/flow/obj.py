@@ -54,7 +54,7 @@ class Object(BaseModel):
     __str__ = BaseModel.__repr__
 
     @classmethod
-    def from_uri(cls, uri: str) -> Self:
+    def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
         if not isinstance(cls, Objectifyable):
             raise NotImplementedError(
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
@@ -62,8 +62,10 @@ class Object(BaseModel):
 
         import weave
 
-        obj = weave.ref(uri).get()
-        return cls.from_obj(obj)
+        weave_obj = weave.ref(uri).get()
+        if objectify:
+            return cls.from_obj(weave_obj)
+        return weave_obj
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.

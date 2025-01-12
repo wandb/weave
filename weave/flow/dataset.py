@@ -45,7 +45,11 @@ class Dataset(Object):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        return cls(rows=obj.rows)
+        return cls(
+            name=obj.name,
+            description=obj.description,
+            rows=obj.rows,
+        )
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
