@@ -16,7 +16,7 @@ from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
-from weave.trace.objectify import WeaveConvertible
+from weave.trace.objectify import Objectifyable
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
@@ -709,7 +709,7 @@ def make_trace_obj(
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
             obj = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
-            if isinstance(obj, WeaveConvertible):
+            if isinstance(obj, Objectifyable):
                 return obj.from_obj(obj)
             return obj
         elif isinstance(val, list):

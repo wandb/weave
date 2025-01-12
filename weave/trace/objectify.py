@@ -9,6 +9,6 @@ T = TypeVar("T")
 
 
 @runtime_checkable
-class WeaveConvertible(Protocol):
+class Objectifyable(Protocol):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Any: ...
