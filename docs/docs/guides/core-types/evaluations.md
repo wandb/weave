@@ -1,87 +1,119 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Evaluations
 
-Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+To systematically improve your LLM application, test changes against a consistent dataset of inputs. This allows you to catch regressions and inspect application behavior under various conditions. In Weave, an _evaluation_ is designed to assess the performance of your LLM application against a test dataset.
+
+In a Weave evaluation, a set of examples is passed through your application, and the output is scored according to [scoring](../scorers/scorers-overview.md) functions. You can view the results in the Weave UI.
+
+This page describes the steps required to [create an evaluation](#create-an-evaluation). An [example](#example-evaluation) and additional [usage notes and tips](#usage-notes-and-tips) are also included.
 
 ![Evals hero](../../../static/img/evals-hero.png)
 
-```python
-import weave
-from weave import Evaluation
-import asyncio
+## Create an evaluation
 
-# Collect your examples
-examples = [
-    {"question": "What is the capital of France?", "expected": "Paris"},
-    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
-    {"question": "What is the square root of 64?", "expected": "8"},
-]
+:::tip
+Toggle between tabs to view code samples and details specific to Python or TypeScript.
+:::
 
-# Define any custom scoring function
-@weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
-    # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
+To create an evaluation in Weave, follow these steps:
 
-@weave.op()
-def function_to_evaluate(question: str):
-    # here's where you would add your LLM call and return the output
-    return  {'generated_text': 'Paris'}
-
-# Score your examples using scoring functions
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1]
-)
-
-# Start tracking the evaluation
-weave.init('intro-example')
-# Run the evaluation
-asyncio.run(evaluation.evaluate(function_to_evaluate))
-```
-
-## Create an Evaluation
-
-To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
-
-Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+1. [Define an evaluation dataset](#define-an-evaluation-dataset)
+2. [Define scoring functions](#define-scoring-functions)
+3. [Define an evaluation target](#define-an-evaluation-target)
 
 ### Define an evaluation dataset
 
-First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
 
-### Defining scoring functions
+First, create a test dataset to evaluate your application. The dataset should include failure cases, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
 
-Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+1. Define a [Dataset](/guides/core-types/datasets).
+2. Define a list of dictionaries with a collection of examples to be evaluated. For example:
+   ```python
+   examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+        {"question": "What is the square root of 64?", "expected": "8"},
+    ]
+   ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>
+   
 
-Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
+Next, [define scoring functions](#define-scoring-functions).
 
-This will take `expected` from the dictionary for scoring.
+### Define scoring functions
 
-```python
-import weave
+Next, create a list of scoring functions, also known as _scorers_. Scorers are used to score the performance of your system against the evaluation dataset. 
 
-# Collect your examples
-examples = [
-    {"question": "What is the capital of France?", "expected": "Paris"},
-    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
-    {"question": "What is the square root of 64?", "expected": "8"},
-]
+:::important
+Scorers must include a `model_output` keyword argument. Other arguments are user-defined and are derived from the dataset examples. Scorers use dictionary keys that correspond to argument names.
+:::
 
-# Define any custom scoring function
-@weave.op()
-def match_score1(expected: str, model_output: dict) -> dict:
-    # Here is where you'd define the logic to score the model output
-    return {'match': expected == model_output['generated_text']}
-```
+The options available depend on whether you are using Typescript or Python:
 
-### Optional: Define a custom `Scorer` class
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+  There are three types of scorers available for Python:
 
-In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score.
+    :::tip
+    [Built-in scorers](../scorers/built-in-scorers.md) are available for many common use cases. Before creating a custom scorer, check if one of the built-in scorers can address your use case.
+    :::
 
-See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
+    1. [Built-in scorer](../scorers/built-in-scorers.md): Pre-built scorers designed for common use cases.
+    2. [Function-based scorers](../scorers/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
+    3. [Class-based scorers](../scorers/custom-scorers#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
 
-### Define a Model to evaluate
+    In the following example, the function-based scorer `match_score1()` will take `expected` from the dictionary for scoring.
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+    ```python
+    import weave
+
+    # Collect your examples
+    examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+        {"question": "What is the square root of 64?", "expected": "8"},
+    ]
+
+    # Define any custom scoring function
+    @weave.op()
+    def match_score1(expected: str, model_output: dict) -> dict:
+        # Here is where you'd define the logic to score the model output
+        return {'match': expected == model_output['generated_text']}
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Only [function-based scorers](../scorers/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../scorers/custom-scorers.md#class-based-scorers) and [built-in scorers](../scorers/built-in-scorers.md), you will need to use Python.
+  </TabItem>
+</Tabs>
+
+:::tip
+Learn more about [how scorers work in evaluations and how to use them](../scorers/scorers-overview.md). 
+:::
+
+Next, [define an evaluation target](#define-an-evaluation-target).
+
+### Define an evaluation target
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+Once your test dataset and scoring functions are defined, you can define the target for evaluation. You can [evaluate a `Model`](#evaluate-a-model) or any [function](#evaluate-a-function) by scoring their outputs against the dataset.
+
+#### Evaluate a `Model` 
+
+`Models` are used when you have attributes that you want to experiment with and capture in Weave.
+To evaluate a `Model`, use the `evaluate` method from `Evaluation`. 
+
+The following example runs `predict()` on each example and scores the output with each scoring function defined in the `scorers` list using the `examples` dataset.
 
 ```python
 from weave import Model, Evaluation
@@ -92,7 +124,7 @@ class MyModel(Model):
 
     @weave.op()
     def predict(self, question: str):
-        # here's where you would add your LLM call and return the output
+        # Here's where you would add your LLM call and return the output
         return {'generated_text': 'Hello, ' + self.prompt}
 
 model = MyModel(prompt='World')
@@ -104,37 +136,9 @@ weave.init('intro-example') # begin tracking results with weave
 asyncio.run(evaluation.evaluate(model))
 ```
 
-This will run `predict` on each example and score the output with each scoring functions.
+#### Evaluate a function 
 
-#### Custom Naming
-
-You can change the name of the Evaluation itself by passing a `name` parameter to the `Evaluation` class.
-
-```python
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1], name="My Evaluation"
-)
-```
-
-You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary.
-
-:::note
-
-Using the `__weave` dictionary sets the call display name which is distinct from the Evaluation object name. In the
-UI, you will see the display name if set, otherwise the Evaluation object name will be used.
-
-:::
-
-```python
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1]
-)
-evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
-```
-
-### Define a function to evaluate
-
-Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
+Alternatively, you can also evaluate any function by wrapping it with a `@weave.op()`.
 
 ```python
 @weave.op()
@@ -144,14 +148,24 @@ def function_to_evaluate(question: str):
 
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>
 
-### Pulling it all together
+## Example evaluation
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+The example demonstrates an evaluation using a `dataset`, two scorers (`match_score1` and `match_score2`), and both a `model` and `function_to_evaluate`. You can use this example as a template for your own evaluations.
 
 ```python
 from weave import Evaluation, Model
 import weave
 import asyncio
-weave.init('intro-example')
+
 examples = [
     {"question": "What is the capital of France?", "expected": "Paris"},
     {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
@@ -177,6 +191,9 @@ class MyModel(Model):
 model = MyModel(prompt='World')
 evaluation = Evaluation(dataset=examples, scorers=[match_score1, match_score2])
 
+# Start tracking the evaluation
+weave.init('intro-example')
+
 asyncio.run(evaluation.evaluate(model))
 
 @weave.op()
@@ -186,3 +203,39 @@ def function_to_evaluate(question: str):
 
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific example.
+  </TabItem>
+</Tabs>
+
+
+
+## Usage notes and tips
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+### Change the name of an evaluation
+
+Change the name of the evaluation by passing a `name` parameter to the `Evaluation` class.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1], name="My Evaluation"
+)
+```
+
+You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary. The `__weave` dictionary allows you to set the call display name, which is distinct from the `Evaluation` object name. In the UI, you will see the display name if set. Otherwise, the `Evaluation` object name will be used.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
+```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>
