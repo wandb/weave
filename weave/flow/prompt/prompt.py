@@ -283,12 +283,15 @@ class EasyPrompt(UserList, Prompt):
         return bound
 
     @overload
-    def __getitem__(self, key: SupportsIndex) -> Any: ...
+    def __getitem__(self, key: SupportsIndex) -> Message: ...
 
     @overload
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
 
-    def __getitem__(self, key: Union[SupportsIndex, slice]) -> Any:
+    @overload
+    def __getitem__(self, key: str) -> Any: ...
+
+    def __getitem__(self, key: Union[SupportsIndex, slice, str]) -> Any:
         """Override getitem to return a Message, Prompt object, or config value."""
         if isinstance(key, SupportsIndex):
             int_index = key.__index__()

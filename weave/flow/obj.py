@@ -55,6 +55,18 @@ class Object(BaseModel):
 
     @classmethod
     def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
+        """Deserialize an object from a URI.
+
+        Objects must explicitly implement or register with the @register_object decorator
+        to support deserialization from a URI.
+
+        Args:
+            uri: The URI to deserialize from.
+            objectify: Whether to objectify the object.
+
+        Returns:
+            The deserialized object.
+        """
         if not isinstance(cls, Objectifyable):
             raise NotImplementedError(
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."

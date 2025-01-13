@@ -1,28 +1,30 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+
+from weave.trace.vals import WeaveObject
 
 if TYPE_CHECKING:
-    from weave.trace.vals import WeaveObject
+    from weave.flow.obj import Object
 
-T = TypeVar("T")
-
-
-_registry: dict[str, T] = {}
+T_co = TypeVar("T_co", bound="Object", covariant=True)
 
 
 @runtime_checkable
-class Objectifyable(Protocol):
+class Objectifyable(Protocol[T_co]):
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Any: ...
+    def from_obj(cls, obj: WeaveObject) -> T_co: ...
 
 
-def register_object(cls: type) -> type:
+_registry: dict[str, type[Object]] = {}
+
+
+def register_object(cls: type[T_co]) -> type[T_co]:
     _registry[cls.__name__] = cls
     return cls
 
 
-def get_cls(cls_name: str) -> T:
+def get_cls(cls_name: str) -> type[Object]:
     if cls_name not in _registry:
-        raise ValueError(f"No objectifyable class found for {cls_name}")
+        raise ValueError(f"No objectifyable class found for `{cls_name}`")
     return _registry[cls_name]
