@@ -3,15 +3,19 @@ import TabItem from '@theme/TabItem';
 
 # Evaluations
 
-To systematically improve your LLM application, it's helpful to test your changes against a consistent dataset of potential inputs so that you can catch regressions and inspect your application's behaviour under different conditions. In Weave, the `Evaluation` class is designed to assess the performance of a `Model` on a test dataset.
+To systematically improve your LLM application, test changes against a consistent dataset of inputs. This allows you to catch regressions and inspect application behavior under various conditions. In Weave, an _evaluation_ is designed to assess the performance of your LLM application against a test dataset.
 
-In a Weave evaluation, a set of examples is passed through your application, and the output is scored according to multiple scoring functions. The result provides you with an overview of your application's performance in a rich UI to summarizing individual outputs and scores.
+In a Weave evaluation, a set of examples is passed through your application, and the output is scored according to [scoring](../scorers/scorers-overview.md) functions. You can view the results in the Weave UI.
 
-This page describes the steps required to [create an evaluation](#create-an-evaluation). A complete [Python example](#python-example) and additional [usage notes and tips](#usage-notes-and-tips) are also included.
+This page describes the steps required to [create an evaluation](#create-an-evaluation). An [example](#example-evaluation) and additional [usage notes and tips](#usage-notes-and-tips) are also included.
 
 ![Evals hero](../../../static/img/evals-hero.png)
 
 ## Create an evaluation
+
+:::tip
+Toggle between tabs to view code samples and details specific to Python or TypeScript.
+:::
 
 To create an evaluation in Weave, follow these steps:
 
@@ -21,7 +25,10 @@ To create an evaluation in Weave, follow these steps:
 
 ### Define an evaluation dataset
 
-First, create a test dataset to evaluate your application against. Generally, the dataset should include failure cases that you want to test for, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+First, create a test dataset to evaluate your application. The dataset should include failure cases, similar to software unit tests in Test-Driven Development (TDD). You have two options to create a dataset:
 
 1. Define a [Dataset](/guides/core-types/datasets).
 2. Define a list of dictionaries with a collection of examples to be evaluated. For example:
@@ -32,13 +39,22 @@ First, create a test dataset to evaluate your application against. Generally, th
         {"question": "What is the square root of 64?", "expected": "8"},
     ]
    ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>
    
 
 Next, [define scoring functions](#define-scoring-functions).
 
 ### Define scoring functions
 
-Next, create a list of scoring functions, also known as _scorers_. Scorers are used to score the performance of an AI system against the evaluation dataset. Scorers must have a `model_output` keyword argument. Other arguments are user defined and are taken from the dataset examples. The scorer will only use the necessary keys by using a dictionary key based on the argument name.
+Next, create a list of scoring functions, also known as _scorers_. Scorers are used to score the performance of your system against the evaluation dataset. 
+
+:::important
+Scorers must include a `model_output` keyword argument. Other arguments are user-defined and are derived from the dataset examples. Scorers use dictionary keys that correspond to argument names.
+:::
 
 The options available depend on whether you are using Typescript or Python:
 
@@ -47,12 +63,12 @@ The options available depend on whether you are using Typescript or Python:
   There are three types of scorers available for Python:
 
     :::tip
-    [Predefined scorers](../evaluation/predefined-scorers.md) are available for many common use cases. Before creating a custom scorer, check if one of the predefined scorers can address your use case.
+    [Built-in scorers](../scorers/built-in-scorers.md) are available for many common use cases. Before creating a custom scorer, check if one of the built-in scorers can address your use case.
     :::
 
-    1. [Predefined scorer](../evaluation/predefined-scorers.md): Pre-built scorers designed for common use cases.
-    2. [Function-based scorers](../evaluation/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
-    3. [Class-based scorers](../evaluation/custom-scorers#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
+    1. [Built-in scorer](../scorers/built-in-scorers.md): Pre-built scorers designed for common use cases.
+    2. [Function-based scorers](../scorers/custom-scorers#function-based-scorers): Simple Python functions decorated with `@weave.op`.
+    3. [Class-based scorers](../scorers/custom-scorers#class-based-scorers): Python classes that inherit from `weave.Scorer` for more complex evaluations.
 
     In the following example, the function-based scorer `match_score1()` will take `expected` from the dictionary for scoring.
 
@@ -75,19 +91,22 @@ The options available depend on whether you are using Typescript or Python:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-     Only [function-based scorers](../evaluation/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../evaluation/custom-scorers.md#class-based-scorers) and [predefined scorers](../evaluation/predefined-scorers.md), you will need to use Python.
+     Only [function-based scorers](../scorers/custom-scorers#function-based-scorers) are available for Typescript. For [class-based](../scorers/custom-scorers.md#class-based-scorers) and [built-in scorers](../scorers/built-in-scorers.md), you will need to use Python.
   </TabItem>
 </Tabs>
 
 :::tip
-Learn more about [how scorers work in evaluations and how to use them](../evaluation/scorers.md). 
+Learn more about [how scorers work in evaluations and how to use them](../scorers/scorers-overview.md). 
 :::
 
 Next, [define an evaluation target](#define-an-evaluation-target).
 
 ### Define an evaluation target
 
-Once your test dataset and scoring functions are defined, you can define the target for evaluation. You can [evaluate a `Model`](#evaluate-a-model) or any [function](#evaluate-a-function). 
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+Once your test dataset and scoring functions are defined, you can define the target for evaluation. You can [evaluate a `Model`](#evaluate-a-model) or any [function](#evaluate-a-function) by scoring their outputs against the dataset.
 
 #### Evaluate a `Model` 
 
@@ -129,10 +148,18 @@ def function_to_evaluate(question: str):
 
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>
 
-## Python example
+## Example evaluation
 
-The following example shows an evaluation that uses `dataset` and two scorers, `match_score1` and `match_score2`, to run evaluations on `model` and `function_to_evaluate`. You can use this example as a template for your own evaluations.
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
+The example demonstrates an evaluation using a `dataset`, two scorers (`match_score1` and `match_score2`), and both a `model` and `function_to_evaluate`. You can use this example as a template for your own evaluations.
 
 ```python
 from weave import Evaluation, Model
@@ -176,12 +203,22 @@ def function_to_evaluate(question: str):
 
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific example.
+  </TabItem>
+</Tabs>
+
+
 
 ## Usage notes and tips
 
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+
 ### Change the name of an evaluation
 
-You can change the name of the evaluation by passing a `name` parameter to the `Evaluation` class.
+Change the name of the evaluation by passing a `name` parameter to the `Evaluation` class.
 
 ```python
 evaluation = Evaluation(
@@ -189,7 +226,7 @@ evaluation = Evaluation(
 )
 ```
 
-You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary. Using the `__weave` dictionary sets the call display name which is distinct from the `Evaluation` object name. In the UI, you will see the display name if set. Otherwise, the `Evaluation` object name will be used.
+You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary. The `__weave` dictionary allows you to set the call display name, which is distinct from the `Evaluation` object name. In the UI, you will see the display name if set. Otherwise, the `Evaluation` object name will be used.
 
 ```python
 evaluation = Evaluation(
@@ -197,3 +234,8 @@ evaluation = Evaluation(
 )
 evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
 ```
+</TabItem>
+  <TabItem value="typescript" label="TypeScript">
+     Check back for a TypeScript-specific information.
+  </TabItem>
+</Tabs>

@@ -3,23 +3,27 @@ import TabItem from '@theme/TabItem';
 
 # Custom scorers
 
-In Weave, you can create your own custom [scorers](../evaluation/scorers.md). The scorers can either be class-based or function-based. 
+In Weave, you can create your own custom [scorers](../scorers/scorers-overview.md). Scorers can be either class-based or function-based. 
 
 :::tip
-If you're using Python, there are various  predefined scorers available for common use cases. For more information, see [Select a predefined scorer](../evaluation/predefined-scorers.md#select-a-predefined-scorer) on the [Predefined scorers page](../evaluation/predefined-scorers.md).
+Python offers a wide range of built-in scorers for common use cases. For more information, see [Select a built-in scorer](../scorers/built-in-scorers.md#select-a-built-in-scorer) on the [built-in scorers page](../scorers/built-in-scorers.md).
 :::
 
 ## Select the right type of custom scorer
 
-Choosing the right type of custom scorer depends on your evaluation needs:
+Choosing the right type of custom scorer depends on the your scenario complexity and requirements:
 
-- [Function-based scorers](#function-based-scorers): Use if your evaluation logic is simple and can be implemented in a single function. Examples include checking if text is uppercase, validating a specific condition, and applying straightforward transformations. **Function-based scorers are available in both Python and Typescript.**
+- [Function-based scorers](#function-based-scorers): Use if your evaluation logic is simple and can be implemented in a single function. Examples include checking if text is uppercase, validating specific conditions, or applying straightforward transformations. **Function-based scorers are available in both Python and TypeScript.**
 
 - [Class-based scorers](#class-based-scorers): Use if your evaluation requires advanced logic, maintaining metadata, or multiple steps. Examples include keeping track of additional scorer metadata, trying different prompts for your LLM-evaluators, and making multiple function calls. **Class-based scorers are only available in Python.**
 
 ## Function-based scorers
 
-Function-based scorers are available in both Python and Typescript.
+Function-based scorers are available in both Python and TypeScript.
+
+:::tip
+Toggle between tabs to view code samples and details specific to Python or TypeScript.
+:::
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
@@ -27,7 +31,7 @@ Function-based scorers are available in both Python and Typescript.
      
      ### How to create a function-based scorer
      
-     To create a function-based scorer, define a function that:
+     To create a function-based scorer, define a function that meets the following criteria:
      - Is decorated with `@weave.op`.
      - Returns a dictionary.
 
@@ -49,7 +53,7 @@ Function-based scorers are available in both Python and Typescript.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    Function-based scorers in Typescript are functions wrapped with `weave.op` that accept an object with `modelOutput` and optionally `datasetRow`. 
+    Function-based scorers in TypeScript are functions wrapped with `weave.op` that accept an object with `modelOutput` and optionally `datasetRow`. 
     
     ### How to create a function-based scorer
      
@@ -84,10 +88,10 @@ Function-based scorers are available in both Python and Typescript.
 ## Class-based scorers
 
 :::note
-This feature is not available in Typescript. All usage instructions and code examples in this section are for Python.
+This feature is not available in TypeScript. All usage instructions and code examples in this section are for Python.
 :::
 
-Class-based scorers are useful for more advanced evaluations. Classs-based scorers inherit from  the `Scorer` class. 
+Class-based scorers are useful for more advanced evaluations. Class-based scorers inherit from  the `Scorer` class. 
 
 #### How to create a class-based scorer
 
@@ -100,7 +104,7 @@ To create a class-based scorer, create a Python class that:
 
 #### Example
 
-The following example shows a class-based scorer called `SummarizationScorer`. This class-based scorer uses `gpt-4o` to evaluate how good a summary is by comparing it to the original text.
+The following example shows a class-based scorer called `SummarizationScorer`. This class-based scorer uses `gpt-4o` to evaluate the quality of a summary by comparing it to the original text..
 
 ```python
 import weave
@@ -124,7 +128,7 @@ class SummarizationScorer(Scorer):
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": (
-                    f"Analyse how good the summary is compared to the original text."
+                    f"Analyze how good the summary is compared to the original text."
                     f"Summary: {summary}\n{processed_text}"
                 )}])
         return {"summary_quality": res}
