@@ -159,6 +159,22 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     return ref
 
 
+def save(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
+    """Alias for publish."""
+    return publish(obj, name)
+
+
+def delete(obj: Any) -> None:
+    """Delete an object from weave.  Deleted objects cannot be retrieved!"""
+    if isinstance(obj, weave_client.ObjectRef):
+        ...
+
+    elif ref := getattr(obj, "ref", None):
+        ...
+
+    raise ValueError
+
+
 def ref(location: str) -> weave_client.ObjectRef:
     """Construct a Ref to a Weave object.
 
@@ -307,4 +323,6 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "save",
+    "delete",
 ]
