@@ -323,4 +323,6 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "save",
+    "delete",
 ]
