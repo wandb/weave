@@ -498,9 +498,16 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
-          const valCount = _.isArray(val) ? val.length : 0;
+          const valIsArray = Array.isArray(val);
+          const valCount = valIsArray ? val.length : 0;
+
+          // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
+          const valIsLimit = valIsArray
+            ? val.includes(ITEM_LIMIT_VALUE)
+            : val === ITEM_LIMIT_VALUE;
+
           if (valCount < itemCount() || !atItemLimit()) {
-            if (onChange && val !== ITEM_LIMIT_VALUE) {
+            if (onChange && !valIsLimit) {
               onChange(e, {value: val});
             }
           }

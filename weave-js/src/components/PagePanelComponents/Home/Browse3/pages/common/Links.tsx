@@ -4,6 +4,7 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
+import {WeaveObjectRef} from '@wandb/weave/react';
 import React from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
@@ -266,6 +267,47 @@ export const OpVersionLink: React.FC<{
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
           {text}
+        </Link>
+      </LinkTruncater>
+    </LinkWrapper>
+  );
+};
+
+export const CallRefLink: React.FC<{
+  callRef: WeaveObjectRef;
+}> = props => {
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const callId = props.callRef.artifactName;
+  const to = peekingRouter.callUIUrl(
+    props.callRef.entityName,
+    props.callRef.projectName,
+    '',
+    callId
+  );
+  const onClick = () => {
+    history.push(to);
+  };
+
+  if (props.callRef.weaveKind !== 'call') {
+    return null;
+  }
+
+  return (
+    <LinkWrapper onClick={onClick}>
+      <LinkTruncater>
+        <Link
+          to={to}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            // allow flex items to shrink below their minimum content size
+            minWidth: 0,
+          }}>
+          <span style={{flexShrink: 0}}>
+            <Id id={callId} type="Call" />
+          </span>
         </Link>
       </LinkTruncater>
     </LinkWrapper>
