@@ -33,3 +33,23 @@ def test_dataset(client):
 
     assert df.equals(df2)
     assert ds.rows == ds2.rows
+
+
+def test_calls_to_dataframe(client):
+    @weave.op
+    def greet(name: str, age: int) -> str:
+        return f"Hello, {name}! You are {age} years old."
+
+    greet("Alice", 30)
+    greet("Bob", 25)
+
+    calls = greet.calls()
+    dataset = Dataset.from_calls(calls)
+    df = dataset.to_pandas()
+
+    assert df["name"].tolist() == ["Alice", "Bob"]
+    assert df["age"].tolist() == [30, 25]
+    assert df["output"].tolist() == [
+        "Hello, Alice! You are 30 years old.",
+        "Hello, Bob! You are 25 years old.",
+    ]
