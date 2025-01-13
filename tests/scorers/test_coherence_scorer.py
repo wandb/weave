@@ -27,7 +27,7 @@ def test_score_messages(coherence_scorer):
 
 
 @pytest.mark.asyncio
-async def test_score_with_chat_history(coherence_scorer):
+def test_score_with_chat_history(coherence_scorer):
     """Test the async .score method with chat history."""
     prompt = "This is a test prompt."
     output = "This is a coherent response."
@@ -35,17 +35,17 @@ async def test_score_with_chat_history(coherence_scorer):
         {"role": "user", "text": "Hello"},
         {"role": "assistant", "text": "Hi"},
     ]
-    result = await coherence_scorer.score(prompt, output, chat_history=chat_history)
+    result = coherence_scorer.score(prompt, output, chat_history=chat_history)
     assert result["flagged"]
     assert result["extras"]["coherence_label"] == "A Little Incoherent"
 
 
 @pytest.mark.asyncio
-async def test_score_with_context(coherence_scorer):
+def test_score_with_context(coherence_scorer):
     """Test the async .score method with additional context."""
     prompt = "This is a test prompt."
     output = "This is a coherent response."
     context = "This is additional context."
-    result = await coherence_scorer.score(prompt, output, context=context)
+    result = coherence_scorer.score(prompt, output, context=context)
     assert result["flagged"]
     assert result["extras"]["coherence_label"] == "A Little Incoherent"
