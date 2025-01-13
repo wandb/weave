@@ -639,16 +639,18 @@ def make_trace_obj(
         new_ref = val
         extra = val.extra
         try:
+            project_id = f"{val.entity}/{val.project}"
             read_res = server.obj_read(
                 ObjReadReq(
-                    project_id=f"{val.entity}/{val.project}",
+                    project_id=project_id,
                     object_id=val.name,
                     digest=val.digest,
                 )
             )
-            val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
+            val = from_json(read_res.obj.val, project_id, server)
             prepare_obj(val)
         except ObjectDeletedError as e:
+            # encountered a deleted object, return DeletedRef, warn and continue
             val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
             logger.warning(f"Could not read deleted object: {new_ref}")
 
@@ -759,7 +761,7 @@ def make_trace_obj(
 
         pass
     else:
-        if hasattr(box_val, "ref"):
+        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
             setattr(box_val, "ref", new_ref)
     return box_val
 

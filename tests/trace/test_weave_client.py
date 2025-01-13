@@ -1626,7 +1626,7 @@ def test_recursive_object_deletion(client):
     assert isinstance(obj_2["b"], DeletedRef)
     assert obj_2["b"].deleted_at == DatetimeMatcher()
     assert obj_2["b"].ref == obj1_ref
-    assert obj_2["b"].error.includes("was deleted at")
+    assert isinstance(obj_2["b"].error, weave.trace_server.errors.ObjectDeletedError)
 
     # Object2 should store the ref to object2, as instantiated
     assert obj3_ref.get() == {"c": obj2}
@@ -1649,8 +1649,12 @@ def test_delete_op_version(client):
     calls = list(my_op.calls())
     assert len(calls) == 1
 
-    # try to call the deleted op (?)
+    # call the deleted op, this should still work (?)
     my_op(1)
 
     calls = list(my_op.calls())
     assert len(calls) == 2
+
+    # but the ref is still deleted
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        op_ref.get()

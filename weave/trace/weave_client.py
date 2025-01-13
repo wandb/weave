@@ -676,14 +676,15 @@ class WeaveClient:
                 )
             )
         except HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
-            elif e.response is not None and e.response.content:
-                try:
-                    reason = json.loads(e.response.content).get("reason")
-                    raise ValueError(reason)
-                except json.JSONDecodeError:
-                    raise ValueError(e.response.content)
+            if e.response is not None:
+                if e.response.content:
+                    try:
+                        reason = json.loads(e.response.content).get("reason")
+                        raise ValueError(reason)
+                    except json.JSONDecodeError:
+                        raise ValueError(e.response.content)
+                if e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
         # At this point, `ref.digest` is one of three things:
