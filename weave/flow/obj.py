@@ -51,6 +51,18 @@ class Object(BaseModel):
 
     __str__ = BaseModel.__repr__
 
+    def save(self, name: str | None = None) -> ObjectRef:
+        import weave
+
+        if name is None:
+            name = self.name
+        return weave.save(self, name)
+
+    def delete(self) -> None:
+        import weave
+
+        weave.delete(self)
+
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
     @model_validator(mode="wrap")
