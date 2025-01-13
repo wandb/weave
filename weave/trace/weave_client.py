@@ -63,6 +63,7 @@ from weave.trace_server.trace_server_interface import (
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
+    CallsQueryStatsReq,
     CallStartReq,
     CallUpdateReq,
     CostCreateInput,
@@ -112,6 +113,7 @@ class FetchFunc(Protocol[T]):
 
 
 TransformFunc = Callable[[T], R]
+SizeFunc = Callable[[], int]
 
 
 class PaginatedIterator(Generic[T, R]):
@@ -123,10 +125,12 @@ class PaginatedIterator(Generic[T, R]):
         fetch_func: FetchFunc[T],
         page_size: int = 1000,
         transform_func: TransformFunc[T, R] | None = None,
+        size_func: SizeFunc | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
+        self.size_func = size_func
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
@@ -195,6 +199,13 @@ class PaginatedIterator(Generic[T, R]):
     def __iter__(self) -> Iterator[T] | Iterator[R]:
         return self._get_slice(slice(0, None, 1))
 
+    def __len__(self) -> int:
+        """This method is included for convenience.  It includes a network call, which
+        is typically slower than most other len() operations!"""
+        if not self.size_func:
+            raise TypeError("This iterator does not support len()")
+        return self.size_func()
+
 
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
@@ -223,7 +234,17 @@ def _make_calls_iterator(
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
-    return PaginatedIterator(fetch_func, transform_func=transform_func)
+    def size_func() -> int:
+        response = server.calls_query_stats(
+            CallsQueryStatsReq(project_id=project_id, filter=filter)
+        )
+        return response.count
+
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        size_func=size_func,
+    )
 
 
 class OpNameError(ValueError):
