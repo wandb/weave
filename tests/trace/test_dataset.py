@@ -42,3 +42,23 @@ def test_dataset_from_calls(client):
     assert rows[1]["inputs"]["name"] == "Bob"
     assert rows[1]["inputs"]["age"] == 25
     assert rows[1]["output"] == "Hello Bob, you are 25!"
+
+
+def test_dataset_from_op(client):
+    @weave.op
+    def greet(name: str, age: int) -> str:
+        return f"Hello {name}, you are {age}!"
+
+    greet("Alice", 30)
+    greet("Bob", 25)
+
+    dataset = weave.Dataset.from_op(greet)
+    rows = list(dataset.rows)
+
+    assert len(rows) == 2
+    assert rows[0]["inputs"]["name"] == "Alice"
+    assert rows[0]["inputs"]["age"] == 30
+    assert rows[0]["output"] == "Hello Alice, you are 30!"
+    assert rows[1]["inputs"]["name"] == "Bob"
+    assert rows[1]["inputs"]["age"] == 25
+    assert rows[1]["output"] == "Hello Bob, you are 25!"
