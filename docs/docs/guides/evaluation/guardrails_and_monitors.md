@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 ![Feedback](./../../../static/img/guardrails_scorers.png)
 
-Weave provides a robust framework for implementing safety controls and monitoring systems in LLM applications through a unified scoring system. This guide explains how to leverage Scorers as both guardrails for active intervention and monitors for passive evaluation in production environments.
+Weave provides a robust framework for implementing safety controls and monitoring systems in LLM applications through a unified scoring system. This guide explains how to leverage scorers as both guardrails for active intervention and monitors for passive evaluation in production environments.
 
 ## Core Concepts
 
