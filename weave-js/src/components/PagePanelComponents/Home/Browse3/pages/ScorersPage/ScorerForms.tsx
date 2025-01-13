@@ -20,7 +20,7 @@ export const ProgrammaticScorerForm: FC<ScorerFormProps<any>> = ({
         borderRadius: '8px',
       }}>
       Programmatic scorers must be written in Python. Please refer to the{' '}
-      <Link to="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+      <Link to="https://weave-docs.wandb.ai/guides/scorers/scorers#class-based-scorers">
         scorer documentation
       </Link>{' '}
       for more information.

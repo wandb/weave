@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Working with scorers
+# Working With Scorers
 
 The following page provides information about working with scorers. You can use this page to learn how to:
 

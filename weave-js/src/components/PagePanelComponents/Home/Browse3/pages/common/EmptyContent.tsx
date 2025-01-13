@@ -191,7 +191,7 @@ export const EMPTY_PROPS_PROGRAMMATIC_SCORERS: EmptyProps = {
   moreInformation: (
     <>
       Learn more about{' '}
-      <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/scorers#class-based-scorers">
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/scorers/scorers#class-based-scorers">
         creating and using scorers
       </TargetBlank>{' '}
       in evaluations.
