@@ -534,6 +534,13 @@ class Call:
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
 
+    def to_dict(self) -> dict:
+        d = {k: v for k, v in dataclasses.asdict(self).items() if not k.startswith("_")}
+        d["op_name"] = self.op_name
+        d["display_name"] = self.display_name
+
+        return d
+
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
