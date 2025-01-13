@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from pydantic import (
     BaseModel,
@@ -51,7 +51,7 @@ class Object(BaseModel):
 
     __str__ = BaseModel.__repr__
 
-    def save(self, name: str | None = None) -> ObjectRef:
+    def save(self, name: Union[str, None] = None) -> ObjectRef:
         import weave
 
         if name is None:
