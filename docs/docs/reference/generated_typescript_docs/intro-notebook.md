@@ -29,12 +29,6 @@ const stripUserInput = weave.op(function stripUserInput(userInput: string): stri
 });
 ```
 
-```typescript
-function stripUserInput(userInput: string): string {
-    return userInput.trim();
-}
-```
-
 The following example shows how basic function tracking works.
 
 ```typescript
@@ -140,8 +134,8 @@ function createGrammarDataset(): weave.Dataset<GrammarExample> {
                 expected: "I write well"
             },
             {
-                userInput: "GPT-4 is smartest AI model.",
-                expected: "GPT-4 is the smartest AI model."
+                userInput: "LLM's are best",
+                expected: "LLM's are the best"
             }
         ]
     });

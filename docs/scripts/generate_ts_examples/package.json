@@ -7,9 +7,6 @@
     "start-intro-notebook": "ts-node src/intro-notebook.ts",
     "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts",
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@types/node": "^22.10.2",
     "dotenv": "^16.4.7",

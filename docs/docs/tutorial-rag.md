@@ -390,7 +390,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```typescript
+    ```plaintext
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
   </TabItem>
@@ -405,7 +405,7 @@ To use this as a scorer, you would initialize it and pass it to `scorers` argume
     ```
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```typescript
+    ```plaintext
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
   </TabItem>
