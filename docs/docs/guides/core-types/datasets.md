@@ -92,7 +92,7 @@ This guide will show you how to:
     </TabItem>
 
     <TabItem value="from-op" label="From Op">
-    You can also construct a `Dataset` from a list of dictionaries.
+    You can construct a `Dataset` using an `Op`.  This will return a dataset containing all calls using that `Op`, which can be useful if you want to eval/monitor the `Op` over time.
 
     ```python
     @weave.op
