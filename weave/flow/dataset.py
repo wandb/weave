@@ -6,6 +6,7 @@ from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
+from weave.trace.op import Op
 from weave.trace.vals import WeaveTable
 from weave.trace.weave_client import Call
 
@@ -46,6 +47,11 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    @classmethod
+    def from_op(cls, op: Op) -> Self:
+        calls = op.calls()
+        return cls.from_calls(calls)
 
     @classmethod
     def from_calls(cls, calls: Iterable[Call]) -> Self:
