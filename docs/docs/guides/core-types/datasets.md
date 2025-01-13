@@ -91,6 +91,21 @@ This guide will show you how to:
     ```
     </TabItem>
 
+    <TabItem value="from-op" label="From Op">
+    You can also construct a `Dataset` from a list of dictionaries.
+
+    ```python
+    @weave.op
+    def model(task: str) -> str:
+        return f"Now working on {task}"
+
+    model(task="fetch")
+    model(task="parse")
+
+    dataset = Dataset.from_op(model)  # Contains the two calls, fetch and parse
+    ```
+    </TabItem>
+
     <TabItem value="from-pandas" label="From Pandas">
     You can also freely convert between `Dataset`s and `pandas.DataFrame`s.
 
