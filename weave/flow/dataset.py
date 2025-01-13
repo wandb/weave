@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Union, overload
 
 from pydantic import field_validator
 
@@ -69,3 +69,27 @@ class Dataset(Object):
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
+
+    def __len__(self) -> int:
+        # TODO: This can be slow for large datasets...
+        return len(list(self.rows))
+
+    @overload
+    def __getitem__(self, key: int) -> dict: ...
+    @overload
+    def __getitem__(self, key: slice) -> list[dict]: ...
+    def __getitem__(self, key: Union[int, slice]) -> Union[dict, list[dict]]:
+        if isinstance(key, int):
+            if key < 0:
+                raise IndexError("Negative indexing is not supported")
+            return self.rows[key]
+        elif isinstance(key, slice):
+            if key.start is not None and key.start < 0:
+                raise IndexError("Negative indexing is not supported")
+            if key.stop is not None and key.stop < 0:
+                raise IndexError("Negative indexing is not supported")
+            if key.step is not None and key.step < 0:
+                raise IndexError("Negative step is not supported")
+            return list(self.rows[key])
+
+        raise TypeError(f"Invalid key type: {type(key)}")
