@@ -103,7 +103,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
         return response.json()
 
     @weave.op
-    async def score(
+    def score(
         self,
         input: str,
         output: str,
