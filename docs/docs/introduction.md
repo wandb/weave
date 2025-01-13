@@ -23,4 +23,4 @@ You can use Weave to:
 ## What's next?
 
 - Try the **[Quickstart](/quickstart)** to see Weave in action.
-- Check out our **[AI Academy](https://www.wandb.courses/pages/w-b-courses)** to learn how build an advanced RAG system, improve your LLM prompting, fine-tune an LLM and more.
+- Check out our **[AI Academy](https://www.wandb.courses/pages/w-b-courses)** to learn how build an advanced RAG system, improve your LLM prompting, fine-tune an LLM, and more.
