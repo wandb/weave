@@ -1,7 +1,8 @@
 from collections.abc import Iterable, Iterator
-from typing import Any, Self
+from typing import Any
 
 from pydantic import field_validator
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
