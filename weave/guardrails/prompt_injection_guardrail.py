@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -27,7 +27,7 @@ class PromptInjectionLLMGuardrail(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, prompt: str) -> Dict[str, Any]:
+    def score(self, prompt: str) -> dict[str, Any]:
         user_prompt = (
             PROMPT_INJECTION_SURVEY_PAPER_SUMMARY
             + f"""
