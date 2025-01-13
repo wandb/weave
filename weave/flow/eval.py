@@ -295,7 +295,7 @@ class Evaluation(Object):
         # also bad. In the near-term, this will at least solve the problem of
         # breaking summarization with big datasets, but this is not the correct
         # long-term solution.
-        eval_results = await self.get_eval_results(model, verbose)
+        eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
