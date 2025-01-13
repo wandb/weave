@@ -8,7 +8,9 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
     model_validator,
 )
+from typing_extensions import Self
 
+from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.trace.weave_client import get_ref
@@ -50,6 +52,28 @@ class Object(BaseModel):
     )
 
     __str__ = BaseModel.__repr__
+
+    @classmethod
+    def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
+        """Deserialize an object from a URI.
+
+        Objects must explicitly implement or register with the @register_object decorator
+        to support deserialization from a URI.
+
+        Args:
+            uri: The URI to deserialize from.
+            objectify: Whether to objectify the object.
+
+        Returns:
+            The deserialized object.
+        """
+        if not isinstance(cls, Objectifyable):
+            raise NotImplementedError(
+                f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
+            )
+        import weave
+
+        return weave.ref(uri).get(objectify=objectify)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
