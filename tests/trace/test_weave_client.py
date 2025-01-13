@@ -1602,10 +1602,6 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
-def equal_deleted_ref(expected: DeletedRef, actual: DeletedRef):
-    return expected.ref == actual.ref and str(actual.error).count("was deleted at") == 1
-
-
 def test_recursive_object_deletion(client):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
@@ -1626,7 +1622,12 @@ def test_recursive_object_deletion(client):
 
     # Make sure we can get obj2, but the ref to object 1 should return None
     obj_2 = obj2_ref.get()
-    assert equal_deleted_ref(DeletedRef(ref=obj1_ref, error=""), obj_2["b"])
+
+    assert isinstance(obj_2["b"], DeletedRef)
+    assert obj_2["b"].deleted_at == DatetimeMatcher()
+    assert obj_2["b"].ref == obj1_ref
+    assert obj_2["b"].error.includes("was deleted at")
+
     # Object2 should store the ref to object2, as instantiated
     assert obj3_ref.get() == {"c": obj2}
 
