@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Custom scorers
+# Custom Scorers
 
 In Weave, you can create your own custom [scorers](../scorers/scorers-overview.md). Scorers can be either class-based or function-based. 
 
