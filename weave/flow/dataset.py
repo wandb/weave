@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Iterator
-from typing import Any
+from typing import Any, Self
 
 from pydantic import field_validator
 from typing_extensions import Self
@@ -55,6 +55,7 @@ class Dataset(Object):
             rows=obj.rows,
         )
 
+    @classmethod
     def from_calls(cls, calls: Iterable[Call]) -> Self:
         rows = [call.to_dict() for call in calls]
         return cls(rows=rows)
