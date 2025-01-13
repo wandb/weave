@@ -8,7 +8,7 @@ from weave.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-
+from weave.guardrails.utils import GuardrailResponse
 
 class LLMGuardrailResponse(BaseModel):
     injection_prompt: bool
@@ -49,8 +49,8 @@ You are given the following user prompt that you are suppossed to assess whether
         )
         return response.model_dump()
 
-    @weave.op()
-    def guard(self, prompt: str) -> dict[str, any]:
+    @weave.op
+    def guard(self, prompt: str) -> GuardrailResponse:
         response = self.score(prompt)
         attack_category = (
             "direct attack" if response["is_direct_attack"] else "indirect attack"
@@ -60,7 +60,7 @@ You are given the following user prompt that you are suppossed to assess whether
             if not response["injection_prompt"]
             else f"Prompt is deemed a {attack_category} of type {response['attack_type']}. {response['explanation']}"
         )
-        return {
-            "safe": not response["injection_prompt"],
-            "summary": summary,
-        }
+        return GuardrailResponse(
+            safe=not response["injection_prompt"],
+            summary=summary,
+        )
