@@ -52,6 +52,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
     const baseParameters = {
       id: parameters.id,
       description: parameters.description,
+      autoOp: false,
     };
     super(baseParameters);
     this.rows = new Table(parameters.rows);

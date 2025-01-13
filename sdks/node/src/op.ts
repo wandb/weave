@@ -75,112 +75,163 @@ export function op<T extends (...args: any[]) => any>(
 
   if (typeof fnOrThis === 'function') {
     fn = fnOrThis;
+    if (isOp(fn)) {
+      // If calling op(op(fn)) overrides the original settings and creates a new
+      // wrapped function.
+      fn = (fn as Op<T>).__wrappedFunction;
+    }
     options = fnOrOptions as OpOptions<T>;
   } else {
     bindThis = fnOrThis;
     fn = fnOrOptions as T;
+    if (isOp(fn)) {
+      // If calling op(op(fn)) overrides the original settings and creates a new
+      // wrapped function.
+      fn = (fn as Op<T>).__wrappedFunction;
+    }
     options = maybeOptions;
 
     const boundFn = fn.bind(bindThis) as T;
     return op(boundFn, {originalFunction: fn, bindThis, ...options});
   }
 
-  const opWrapper = async function (
-    ...params: Parameters<T>
-  ): Promise<ReturnType<T>> {
-    const client = getGlobalClient();
+  const opWrapper =
+    // TODO: I hacked in fn.name === 'wrapped'. THat's the name of the openai wrapper.
+    // Instead, we should handle sync function logging in the sync path. We need to use
+    // promises instead of async/await in that case.
+    (
+      isAsyncFunction(fn) || fn.name === 'wrapped'
+        ? async function (...params: Parameters<T>): Promise<ReturnType<T>> {
+            const client = getGlobalClient();
 
-    if (!client) {
-      warnOnce(
-        'weave-not-initialized',
-        'WARNING: Weave is not initialized, so calls wont be tracked.  Call `weave.init` to initialize before calling ops.  If this is intentional, you can safely ignore this warning.'
-      );
-      return await fn(...params);
-    }
+            if (!client) {
+              warnOnce(
+                'weave-not-initialized',
+                'WARNING: Weave is not initialized, so calls wont be tracked.  Call `weave.init` to initialize before calling ops.  If this is intentional, you can safely ignore this warning.'
+              );
+              return await fn(...params);
+            }
 
-    const {currentCall, parentCall, newStack} = client.pushNewCall();
-    const startTime = new Date();
-    if (client.settings.shouldPrintCallLink && parentCall == null) {
-      const domain = getGlobalDomain();
-      console.log(
-        `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
-      );
-    }
-    const displayName = options?.callDisplayName
-      ? options.callDisplayName(...params)
-      : undefined;
-    const thisArg = options?.bindThis;
-    const startCallPromise = client.createCall(
-      opWrapper,
-      params,
-      options?.parameterNames,
-      thisArg,
-      currentCall,
-      parentCall,
-      startTime,
-      displayName
-    );
-
-    try {
-      let result = await client.runWithCallStack(newStack, async () => {
-        return await fn(...params);
-      });
-
-      if (options?.streamReducer && Symbol.asyncIterator in result) {
-        const {initialState, reduceFn} = options.streamReducer;
-        let state = initialState;
-
-        const wrappedIterator = {
-          [Symbol.asyncIterator]: async function* () {
-            try {
-              for await (const chunk of result as AsyncIterable<any>) {
-                state = reduceFn(state, chunk);
-                yield chunk;
+            // logCalls is true by default so we need strict === check to see if it's false
+            if (options?.logCalls === false) {
+              // logCode is true by default so we need strict === check to see if it's false
+              if (options?.logCode !== false) {
+                if (isOp(opWrapper)) {
+                  client.saveOp(opWrapper);
+                }
               }
-            } finally {
-              if (client) {
-                // Check if globalClient still exists
+              return await fn(...params);
+            }
+
+            const {currentCall, parentCall, newStack} = client.pushNewCall();
+            const startTime = new Date();
+            if (client.settings.shouldPrintCallLink && parentCall == null) {
+              const domain = getGlobalDomain();
+              console.log(
+                `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
+              );
+            }
+            const displayName = options?.callDisplayName
+              ? options.callDisplayName(...params)
+              : undefined;
+            const thisArg = options?.bindThis;
+            const startCallPromise = client.createCall(
+              opWrapper,
+              params,
+              options?.parameterNames,
+              thisArg,
+              currentCall,
+              parentCall,
+              startTime,
+              displayName
+            );
+
+            try {
+              let result = await client.runWithCallStack(newStack, async () => {
+                return await fn(...params);
+              });
+
+              if (options?.streamReducer && Symbol.asyncIterator in result) {
+                const {initialState, reduceFn} = options.streamReducer;
+                let state = initialState;
+
+                const wrappedIterator = {
+                  [Symbol.asyncIterator]: async function* () {
+                    try {
+                      for await (const chunk of result as AsyncIterable<any>) {
+                        state = reduceFn(state, chunk);
+                        yield chunk;
+                      }
+                    } finally {
+                      if (client) {
+                        // Check if globalClient still exists
+                        const endTime = new Date();
+                        await client.finishCall(
+                          state,
+                          currentCall,
+                          parentCall,
+                          options?.summarize,
+                          endTime,
+                          startCallPromise
+                        );
+                      }
+                    }
+                  },
+                };
+
+                return wrappedIterator as unknown as ReturnType<T>;
+              } else {
                 const endTime = new Date();
                 await client.finishCall(
-                  state,
+                  result,
                   currentCall,
                   parentCall,
                   options?.summarize,
                   endTime,
                   startCallPromise
                 );
+                return result;
               }
+            } catch (error) {
+              // console.error(`Op ${actualOpName} failed:`, error);
+              const endTime = new Date();
+              await client.finishCallWithException(
+                error,
+                currentCall,
+                parentCall,
+                endTime,
+                startCallPromise
+              );
+              await client.waitForBatchProcessing();
+              throw error;
             }
-          },
-        };
+          }
+        : function (...params: Parameters<T>): ReturnType<T> {
+            const client = getGlobalClient();
 
-        return wrappedIterator as unknown as ReturnType<T>;
-      } else {
-        const endTime = new Date();
-        await client.finishCall(
-          result,
-          currentCall,
-          parentCall,
-          options?.summarize,
-          endTime,
-          startCallPromise
-        );
-        return result;
-      }
-    } catch (error) {
-      // console.error(`Op ${actualOpName} failed:`, error);
-      const endTime = new Date();
-      await client.finishCallWithException(
-        error,
-        currentCall,
-        parentCall,
-        endTime,
-        startCallPromise
-      );
-      await client.waitForBatchProcessing();
-      throw error;
-    }
-  };
+            if (!client) {
+              warnOnce(
+                'weave-not-initialized',
+                'WARNING: Weave is not initialized, so calls wont be tracked.  Call `weave.init` to initialize before calling ops.  If this is intentional, you can safely ignore this warning.'
+              );
+              return fn(...params);
+            }
+
+            // logCalls is true by default so we need strict === check to see if it's false
+            if (options?.logCalls === false) {
+              // logCode is true by default so we need strict === check to see if it's false
+              if (options?.logCode !== false) {
+                if (isOp(opWrapper)) {
+                  client.saveOp(opWrapper);
+                }
+              }
+              return fn(...params);
+            }
+            throw new Error(
+              `weave op logCalls=true is not supported for sync functions: ${fn.name}`
+            );
+          }
+    ) as Op<T>;
 
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
   const className =
@@ -189,14 +240,18 @@ export function op<T extends (...args: any[]) => any>(
   const actualOpName =
     options?.name || (className ? `${className}.${fnName}` : fnName);
 
-  opWrapper.__name = actualOpName;
-  opWrapper.__isOp = true as true;
-  opWrapper.__wrappedFunction = options?.originalFunction ?? fn;
-  opWrapper.__boundThis = options?.bindThis;
+  (opWrapper as any).__name = actualOpName;
+  (opWrapper as any).__isOp = true as true;
+  (opWrapper as any).__wrappedFunction = options?.originalFunction ?? fn;
+  (opWrapper as any).__boundThis = options?.bindThis;
 
   return opWrapper as Op<T>;
 }
 
 export function isOp(fn: any): fn is Op<any> {
   return fn?.__isOp === true;
+}
+
+function isAsyncFunction(fn: Function): boolean {
+  return fn.constructor.name === 'AsyncFunction';
 }

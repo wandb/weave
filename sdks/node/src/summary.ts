@@ -47,7 +47,10 @@ export function processSummary(
 
   if (ownSummary.usage) {
     for (const model in ownSummary.usage) {
-      if (typeof ownSummary.usage[model] === 'object') {
+      if (
+        ownSummary.usage[model] != null &&
+        typeof ownSummary.usage[model] === 'object'
+      ) {
         ownSummary.usage[model] = {
           requests: 1,
           ...ownSummary.usage[model],

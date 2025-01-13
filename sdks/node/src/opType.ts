@@ -24,6 +24,8 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
   bindThis?: WeaveObject;
   parameterNames?: ParameterNamesOption;
+  logCode?: boolean;
+  logCalls?: boolean;
 }
 
 export function isOp(value: any): value is Op<any> {

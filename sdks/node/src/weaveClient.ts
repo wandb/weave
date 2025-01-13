@@ -78,6 +78,8 @@ export class WeaveClient {
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
   private readonly BATCH_INTERVAL: number = 200;
+  private errorCount = 0;
+  private readonly MAX_ERRORS = 10;
 
   constructor(
     public traceServerApi: TraceServerApi<any>,
@@ -112,26 +114,47 @@ export class WeaveClient {
       return;
     }
 
-    this.isBatchProcessing = true;
-
     // We count characters item by item, and try to limit batches to about
     // this size.
-    const maxBatchSizeChars = 5 * 1024 * 1024;
+    const maxBatchSizeChars = 10 * 1024 * 1024;
 
     let batchToProcess = [];
     let currentBatchSize = 0;
 
     while (this.callQueue.length > 0 && currentBatchSize < maxBatchSizeChars) {
-      const item = this.callQueue[0];
+      const item = this.callQueue.shift();
+      if (item == null) {
+        throw new Error('Impossible!');
+      }
       const itemSize = JSON.stringify(item).length;
 
+      if (itemSize > maxBatchSizeChars) {
+        console.error(
+          `Item size ${itemSize} is greater than max batch size ${maxBatchSizeChars}`
+        );
+        // Log the oversized item
+        const fs = require('fs');
+        const logEntry = `${new Date().toISOString()} OVERSIZED ITEM:\nSize: ${itemSize}\nItem:\n${JSON.stringify(item)}\n\n`;
+        fs.appendFileSync('/tmp/weaveRequests.log', logEntry);
+        continue;
+      }
+
       if (currentBatchSize + itemSize <= maxBatchSizeChars) {
-        batchToProcess.push(this.callQueue.shift()!);
+        batchToProcess.push(item);
         currentBatchSize += itemSize;
       } else {
+        // doesn't fit, put it back
+        this.callQueue.unshift(item);
         break;
       }
     }
+
+    if (batchToProcess.length === 0) {
+      this.batchProcessTimeout = null;
+      return;
+    }
+
+    this.isBatchProcessing = true;
 
     const batchReq = {
       batch: batchToProcess.map(item => ({
@@ -145,9 +168,24 @@ export class WeaveClient {
         batchReq
       );
     } catch (error) {
+      this.errorCount++;
       console.error('Error processing batch:', error);
+
+      // Log the failed request with error details
+      const fs = require('fs');
+      const logEntry = `${new Date().toISOString()} ERROR:\nError: ${JSON.stringify(error)}\nRequest:\n${JSON.stringify(batchReq)}\n\n`;
+      fs.appendFileSync('/tmp/weaveRequests.log', logEntry);
+
       // Put failed items back at the front of the queue
       this.callQueue.unshift(...batchToProcess);
+
+      // Exit if we've hit the error threshold
+      if (this.errorCount >= this.MAX_ERRORS) {
+        console.error(
+          `Exceeded maximum number of errors (${this.MAX_ERRORS}). Exiting.`
+        );
+        process.exit(1);
+      }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
@@ -432,9 +470,17 @@ export class WeaveClient {
    * (currently only Dataset/DatasetRow in the js client) has refs
    * available immediately.
    */
-  private saveWeaveValues(val: any): void {
-    if (Array.isArray(val)) {
-      val.map(item => this.saveWeaveValues(item));
+  private saveWeaveValues(val: any, depth: number = 0): void {
+    if (depth > 20) {
+      console.error('Depth limit exceeded');
+      console.log('VALUE', val);
+      throw new Error('Depth limit exceeded');
+    }
+    // if its a WeaveClient, don't do anything
+    if (val instanceof WeaveClient) {
+      return;
+    } else if (Array.isArray(val)) {
+      val.map(item => this.saveWeaveValues(item, depth + 1));
     } else if (val != null && val.__savedRef) {
       return;
     } else if (val instanceof WeaveObject) {
@@ -447,7 +493,7 @@ export class WeaveClient {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
       for (const [key, value] of Object.entries(val)) {
-        this.saveWeaveValues(value);
+        this.saveWeaveValues(value, depth + 1);
       }
     }
   }
@@ -509,7 +555,13 @@ export class WeaveClient {
    * has been called on the value.
    */
   private async serializedVal(val: any): Promise<any> {
-    if (Array.isArray(val)) {
+    if (val instanceof Set) {
+      val = Array.from(val);
+    }
+
+    if (val instanceof WeaveClient) {
+      return '<WeaveClient>';
+    } else if (Array.isArray(val)) {
       return Promise.all(val.map(async item => this.serializedVal(item)));
     } else if (val != null && val.__savedRef) {
       return (await val.__savedRef).uri();
@@ -734,7 +786,9 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
         result[key] = leftValue + result[key];
       } else if (
+        leftValue != null &&
         typeof leftValue === 'object' &&
+        result[key] != null &&
         typeof result[key] === 'object'
       ) {
         result[key] = mergeSummaries(leftValue, result[key]);
