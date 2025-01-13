@@ -75,6 +75,6 @@ async def test_gotten_methods(client):
             filter=ObjectVersionFilter(object_ids=relevant_object_ids),
         )
     )
-    for obj in res:
+    for obj in res.objs:
         assert obj.version_index == 0
         assert obj.is_latest == 1
