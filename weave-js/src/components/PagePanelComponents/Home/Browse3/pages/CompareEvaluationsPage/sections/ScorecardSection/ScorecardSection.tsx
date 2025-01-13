@@ -90,11 +90,11 @@ export const ScorecardSection: React.FC<{
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
     modelRefs.forEach(ref => {
       const model = props.state.summary.models[ref];
-      Object.keys(model.properties).forEach(prop => {
+      Object.keys(model?.properties ?? {}).forEach(prop => {
         if (!propsRes[prop]) {
           propsRes[prop] = {};
         }
-        propsRes[prop][ref] = model.properties[prop];
+        propsRes[prop][ref] = model?.properties?.[prop];
       });
     });
 
@@ -104,7 +104,7 @@ export const ScorecardSection: React.FC<{
       if (!propsRes.predict) {
         propsRes.predict = {};
       }
-      propsRes.predict[ref] = model.predictOpRef;
+      propsRes.predict[ref] = model?.predictOpRef;
     });
 
     return propsRes;
