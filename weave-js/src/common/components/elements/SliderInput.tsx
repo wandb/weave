@@ -1,12 +1,13 @@
 import classNames from 'classnames';
-import _ from 'lodash';
-import React from 'react';
+import _, {isEmpty} from 'lodash';
+import React, {useEffect} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
+import {SliderKeyboardOperation} from '../../util/media';
 
 export interface SliderInputProps {
   min: number;
@@ -24,6 +25,9 @@ export interface SliderInputProps {
   ticks?: number[];
   disabled?: boolean;
   strideLength?: number;
+  keyboardBindings?: {
+    [key: string]: SliderKeyboardOperation;
+  };
   onChange(value: number): void;
 }
 
@@ -45,6 +49,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     ticks,
     disabled,
     strideLength,
+    keyboardBindings,
     onChange,
   }) => {
     const [sliderValue, setSliderValue] = React.useState(value ?? 0);
@@ -74,6 +79,40 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
       },
       [ticks, min, max, sliderValue, onChangeDebounced]
     );
+
+    const keyboardOperations = {
+      [SliderKeyboardOperation.INCREMENT]: (_: KeyboardEvent) => {
+        update(sliderValue + 1);
+      },
+      [SliderKeyboardOperation.DECREMENT]: (_: KeyboardEvent) => {
+        update(sliderValue - 1);
+      },
+    };
+
+    const getKeyboardOperationHandler = (op: SliderKeyboardOperation) => {
+      return keyboardOperations[op];
+    };
+
+    const stepKeyboardListener = (event: KeyboardEvent) => {
+      if (isEmpty(keyboardBindings)) {
+        return;
+      }
+      const eventKey = event.key;
+      const operation = (keyboardBindings ?? {})[eventKey];
+      if (operation) {
+        const handler = getKeyboardOperationHandler(operation);
+        return handler(event);
+      }
+    };
+
+    useEffect(() => {
+      if (!isEmpty(keyboardBindings)) {
+        document.addEventListener('keydown', stepKeyboardListener, true);
+      }
+      return () => {
+        document.removeEventListener('keydown', stepKeyboardListener, true);
+      };
+    }, [keyboardBindings]);
 
     React.useEffect(() => {
       if (value != null) {
