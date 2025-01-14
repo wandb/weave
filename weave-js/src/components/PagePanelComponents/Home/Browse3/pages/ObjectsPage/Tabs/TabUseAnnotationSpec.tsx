@@ -81,12 +81,12 @@ const makeAnnotateCallCode = (
   projectName: string
 ) => `api = weave.init('${projectName}')
 
-for call in api.get_calls():
-  call.feedback.add(
-    feedback_type='${fullSpecName}',
-    payload={"value": ${payloadValue}},
-    annotation_ref='${uri}'
-  )`;
+call = api.get_calls()[0]
+call.feedback.add(
+  feedback_type='${fullSpecName}',
+  payload={"value": ${payloadValue}},
+  annotation_ref='${uri}'
+)`;
 
 const makeAnnotationPayloadFromSpec = (
   spec?: AnnotationSpec['field_schema']
