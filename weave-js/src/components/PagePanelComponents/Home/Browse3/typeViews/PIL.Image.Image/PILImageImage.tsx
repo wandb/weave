@@ -30,11 +30,12 @@ export const PILImageImage: React.FC<{
 
   const imageKey = Object.keys(props.data.files).find(
     key => key in imageTypes
-  ) as keyof PILImageImageTypePayload['files'];
+  ) as keyof PILImageImageTypePayload['files'] | undefined;
   const imageBinary = useFileContent(
     props.entity,
     props.project,
-    props.data.files[imageKey]
+    imageKey ? props.data.files[imageKey] : '',
+    {skip: !imageKey}
   );
 
   if (!imageKey) {
