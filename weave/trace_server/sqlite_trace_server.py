@@ -617,7 +617,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
-        project_id, object_id = req.obj.project_id, req.obj.object_id
+        project_id, object_id, wb_user_id = (
+            req.obj.project_id,
+            req.obj.object_id,
+            req.wb_user_id,
+        )
 
         # Validate
         object_id_validator(object_id)
@@ -641,7 +645,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     is_latest,
-                    deleted_at
+                    deleted_at,
+                    wb_user_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
@@ -651,7 +656,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val_dump = excluded.val_dump,
                     version_index = excluded.version_index,
                     is_latest = excluded.is_latest,
-                    deleted_at = excluded.deleted_at
+                    deleted_at = excluded.deleted_at,
+                    wb_user_id = excluded.wb_user_id
                 """,
                 (
                     project_id,
@@ -665,6 +671,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index,
                     1,
                     None,
+                    wb_user_id,
                 ),
             )
             conn.commit()
@@ -1282,7 +1289,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 digest,
                 version_index,
                 is_latest,
-                deleted_at
+                deleted_at,
+                wb_user_id
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1327,6 +1335,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index=row[7],
                     is_latest=row[8],
                     deleted_at=row[9],
+                    wb_user_id=row[10],
                 )
             )
         return result
