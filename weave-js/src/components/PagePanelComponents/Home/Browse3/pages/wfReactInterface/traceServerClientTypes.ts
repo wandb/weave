@@ -165,6 +165,7 @@ export type FeedbackQueryReq = {
 
 export type Feedback = {
   id: string;
+  project_id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
   creator: string | null; // display name
@@ -249,6 +250,17 @@ export type TraceObjCreateReq<T extends any = any> = {
 
 export type TraceObjCreateRes = {
   digest: string;
+};
+
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digests: string[];
+};
+
+export type TraceObjDeleteRes = {
+  num_deleted?: number;
+  detail?: string;
 };
 
 export type TraceRefsReadBatchReq = {

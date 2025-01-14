@@ -41,7 +41,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
   return (
     <div className="ml-auto flex gap-4 rounded-lg pt-[8px]">
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="copy"
         onClick={handleCopy}
@@ -50,7 +50,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         Copy
       </Button>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="randomize-reset-reload"
         onClick={() => retry?.(index, choiceIndex)}
@@ -63,7 +63,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         Retry
       </Button>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="pencil-edit"
         onClick={() => {
@@ -76,7 +76,7 @@ export const PlaygroundMessagePanelButtons: React.FC<
         Edit
       </Button>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="small"
         startIcon="delete"
         onClick={() => {

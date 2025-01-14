@@ -220,7 +220,9 @@ export type WFDataModelHooksInterface = {
     val: any,
     baseObjectClass?: string
   ) => Promise<string>;
-  useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
+  useOpVersion: (
+    key: OpVersionKey | null
+  ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,
@@ -231,7 +233,7 @@ export type WFDataModelHooksInterface = {
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
-  ) => Loadable<ObjectVersionSchema | null>;
+  ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
     project: string,
@@ -256,6 +258,26 @@ export type WFDataModelHooksInterface = {
     metadataOnly?: boolean,
     opts?: {skip?: boolean; noAutoRefresh?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
+  useObjectDeleteFunc: () => {
+    objectVersionsDelete: (
+      entity: string,
+      project: string,
+      objectId: string,
+      digests: string[]
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    objectDeleteAllVersions: (
+      key: ObjectVersionKey
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    opVersionsDelete: (
+      entity: string,
+      project: string,
+      opId: string,
+      digests: string[]
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    opDeleteAllVersions: (
+      key: OpVersionKey
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+  };
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
@@ -275,7 +297,8 @@ export type WFDataModelHooksInterface = {
   useFeedback: (
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]
-  ) => LoadableWithError<any[] | null> & Refetchable;
+  ) => LoadableWithError<traceServerClientTypes.Feedback[] | null> &
+    Refetchable;
   useTableUpdate: () => (
     projectId: string,
     baseDigest: string,
