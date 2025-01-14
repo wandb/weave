@@ -14,6 +14,7 @@ from typing_extensions import Self
 from weave.flow.obj import Object
 from weave.flow.prompt.common import ROLE_COLORS, color_role
 from weave.trace.api import publish as weave_publish
+from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
 from weave.trace.rich import pydantic_util
@@ -78,6 +79,7 @@ class Prompt(Object):
         raise NotImplementedError("Subclasses must implement format()")
 
 
+@register_object
 class StringPrompt(Prompt):
     content: str = ""
 
@@ -93,9 +95,11 @@ class StringPrompt(Prompt):
         prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
+        prompt.ref = obj.ref
         return prompt
 
 
+@register_object
 class MessagesPrompt(Prompt):
     messages: list[dict] = Field(default_factory=list)
 
@@ -120,9 +124,11 @@ class MessagesPrompt(Prompt):
         prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
+        prompt.ref = obj.ref
         return prompt
 
 
+@register_object
 class EasyPrompt(UserList, Prompt):
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
@@ -430,6 +436,7 @@ class EasyPrompt(UserList, Prompt):
         return cls(
             name=obj.name,
             description=obj.description,
+            ref=obj.ref,
             messages=messages,
             config=config,
             requirements=requirements,

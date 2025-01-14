@@ -31,6 +31,7 @@ from weave.scorers import (
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -58,6 +59,7 @@ DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 
 
+@register_object
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -120,6 +122,7 @@ class Evaluation(Object):
         return cls(
             name=obj.name,
             description=obj.description,
+            ref=obj.ref,
             dataset=obj.dataset,
             scorers=obj.scorers,
             preprocess_model_input=obj.preprocess_model_input,

@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from weave.flow.prompt.prompt import EasyPrompt
 from weave.trace_server.trace_server_interface import ObjectVersionFilter, ObjQueryReq
 
 
@@ -31,17 +32,32 @@ def obj(request):
         return weave.EasyPrompt("Hello world!")
 
 
-def test_uri_get(client, obj):
+def test_ref_get(client, obj):
     ref = weave.publish(obj)
 
     obj_cls = type(obj)
     obj2 = obj_cls.from_uri(ref.uri())
-
-    assert isinstance(obj, obj_cls)
+    obj3 = ref.get()
     assert isinstance(obj2, obj_cls)
+    assert isinstance(obj3, obj_cls)
 
     for field_name in obj.model_fields:
-        assert getattr(obj, field_name) == getattr(obj2, field_name)
+        obj_field_val = getattr(obj, field_name)
+        obj2_field_val = getattr(obj2, field_name)
+        obj3_field_val = getattr(obj3, field_name)
+
+        # This is a special case for EasyPrompt's unique init signature where `config`
+        # represents the kwargs passed into the class itself.  Since the original object
+        # has not been published, there is no ref and the key is omitted from the first
+        # `config`.  After publishing, there is a ref so the `config` dict has an
+        # additional `ref` key.  For comparison purposes, we pop the key to ensure the
+        # rest of the config dict is the same.
+        if obj_cls is EasyPrompt and field_name == "config":
+            obj2_field_val.pop("ref")
+            obj3_field_val.pop("ref")
+
+        assert obj_field_val == obj2_field_val
+        assert obj_field_val == obj3_field_val
 
 
 @pytest.mark.asyncio

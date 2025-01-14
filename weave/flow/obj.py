@@ -40,6 +40,7 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    ref: Optional[ObjectRef] = None
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -62,10 +63,7 @@ class Object(BaseModel):
 
         import weave
 
-        weave_obj = weave.ref(uri).get()
-        if objectify:
-            return cls.from_obj(weave_obj)
-        return weave_obj
+        return weave.ref(uri).get(objectify=objectify)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
