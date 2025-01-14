@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
 import logging
 import platform
 import re
@@ -63,6 +64,7 @@ from weave.trace_server.trace_server_interface import (
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
+    CallsQueryStatsReq,
     CallStartReq,
     CallUpdateReq,
     CostCreateInput,
@@ -77,6 +79,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -113,6 +116,7 @@ class FetchFunc(Protocol[T]):
 
 
 TransformFunc = Callable[[T], R]
+SizeFunc = Callable[[], int]
 
 
 class PaginatedIterator(Generic[T, R]):
@@ -124,28 +128,26 @@ class PaginatedIterator(Generic[T, R]):
         fetch_func: FetchFunc[T],
         page_size: int = 1000,
         transform_func: TransformFunc[T, R] | None = None,
+        size_func: SizeFunc | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
+        self.size_func = size_func
         self.limit = limit
         self.offset = offset
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be greater than 0")
+        if offset is not None and offset < 0:
+            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
-        if self.limit is not None or self.offset is not None:
-            # If limit/offset are provided, make a single request with those parameters
-            offset = self.offset or 0
-            if self.limit is not None:
-                return self.fetch_func(offset, self.limit)
-            return self.fetch_func(offset, self.page_size)
-
-        # Otherwise use standard pagination
         return self.fetch_func(index * self.page_size, self.page_size)
 
     @overload
@@ -156,11 +158,11 @@ class PaginatedIterator(Generic[T, R]):
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
-        if self.limit is not None and index >= self.limit:
-            raise IndexError(f"Index {index} out of range")
-
         if self.offset is not None:
             index += self.offset
+
+        if self.limit is not None and index >= self.limit:
+            raise IndexError(f"Index {index} out of range")
 
         page_index = index // self.page_size
         page_offset = index % self.page_size
@@ -185,7 +187,7 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative stop not supported")
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
-
+        
         # Apply offset if provided
         if self.offset is not None:
             start += self.offset
@@ -224,6 +226,13 @@ class PaginatedIterator(Generic[T, R]):
     def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
     def __iter__(self) -> Iterator[T] | Iterator[R]:
         return self._get_slice(slice(0, None, 1))
+
+    def __len__(self) -> int:
+        """This method is included for convenience.  It includes a network call, which
+        is typically slower than most other len() operations!"""
+        if not self.size_func:
+            raise TypeError("This iterator does not support len()")
+        return self.size_func()
 
 
 # TODO: should be Call, not WeaveObject
@@ -265,9 +274,16 @@ def _make_calls_iterator(
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
+    def size_func() -> int:
+        response = server.calls_query_stats(
+            CallsQueryStatsReq(project_id=project_id, filter=filter)
+        )
+        return response.count
+
     return PaginatedIterator(
         fetch_func,
         transform_func=transform_func,
+        size_func=size_func,
         limit=limit_override,
         offset=offset_override,
     )
@@ -721,8 +737,15 @@ class WeaveClient:
                 )
             )
         except HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            if e.response is not None:
+                if e.response.content:
+                    try:
+                        reason = json.loads(e.response.content).get("reason")
+                        raise ValueError(reason)
+                    except json.JSONDecodeError:
+                        raise ValueError(e.response.content)
+                if e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1086,6 +1109,26 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_version(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digests=[object.digest],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op_version(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op.name,
+                digests=[op.digest],
             )
         )
 
@@ -1785,7 +1828,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if should_redact(k):
+            if isinstance(k, str) and should_redact(k):
                 dict_res[k] = REDACTED_VALUE
             else:
                 dict_res[k] = redact_sensitive_keys(v)

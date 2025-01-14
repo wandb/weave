@@ -25,6 +25,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
@@ -1650,3 +1651,116 @@ def test_long_display_names_are_elided(client):
     calls = list(func.calls())
     call = calls[0]
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+
+def test_object_deletion(client):
+    # Simple case, delete a single version of an object
+    obj = {"a": 5}
+    weave_obj = weave.publish(obj, "my-obj")
+    assert client.get(weave_obj) == obj
+
+    client.delete_object_version(weave_obj)
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj)
+
+    # create 3 versions of the object
+    obj["a"] = 6
+    weave_ref2 = weave.publish(obj, "my-obj")
+    obj["a"] = 7
+    weave_ref3 = weave.publish(obj, "my-obj")
+    obj["a"] = 8
+    weave_ref4 = weave.publish(obj, "my-obj")
+
+    # delete weave_obj3 with class method
+    weave_ref3.delete()
+
+    # make sure we can't get the deleted object
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_ref3)
+
+    # make sure we can still get the existing object versions
+    assert client.get(weave_ref4)
+    assert client.get(weave_ref2)
+
+    # count the number of versions of the object
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
+        )
+    )
+    assert len(versions.objs) == 2
+
+    # iterate over the versions, confirm the indexes are correct
+    assert versions.objs[0].version_index == 3
+    assert versions.objs[1].version_index == 1
+
+    weave_ref4.delete()
+    weave_ref2.delete()
+
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+        )
+    )
+    assert len(versions.objs) == 0
+
+
+def test_recursive_object_deletion(client):
+    # Create a bunch of objects that refer to each other
+    obj1 = {"a": 5}
+    obj1_ref = weave.publish(obj1, "obj1")
+
+    obj2 = {"b": obj1_ref}
+    obj2_ref = weave.publish(obj2, "obj2")
+
+    obj3 = {"c": obj2_ref}
+    obj3_ref = weave.publish(obj3, "obj3")
+
+    # Delete obj1
+    obj1_ref.delete()
+
+    # Make sure we can't get obj1
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        obj1_ref.get()
+
+    # Make sure we can get obj2, but the ref to object 1 should return None
+    obj_2 = obj2_ref.get()
+
+    assert isinstance(obj_2["b"], DeletedRef)
+    assert obj_2["b"].deleted_at == DatetimeMatcher()
+    assert obj_2["b"].ref == obj1_ref
+    assert isinstance(obj_2["b"].error, weave.trace_server.errors.ObjectDeletedError)
+
+    # Object2 should store the ref to object2, as instantiated
+    assert obj3_ref.get() == {"c": obj2}
+
+
+def test_delete_op_version(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    my_op(1)
+
+    op_ref = weave.publish(my_op, "my-op")
+    op_ref.delete()
+
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        op_ref.get()
+
+    # lets get the calls
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+
+    # call the deleted op, this should still work (?)
+    my_op(1)
+
+    calls = list(my_op.calls())
+    assert len(calls) == 2
+
+    # but the ref is still deleted
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        op_ref.get()

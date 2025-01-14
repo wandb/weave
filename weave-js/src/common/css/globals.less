@@ -58,25 +58,25 @@
 @primaryLight: #6ba6fa;
 @primaryText: @primary;
 
-@success: #00B5A0;
+@success: #00b5a0;
 @successBackground: rgba(0, 181, 160, 0.08);
 @successBorder: rgba(0, 181, 160, 0.5);
 @successDark: #008472;
-@successLight: #5BE8D1;
+@successLight: #5be8d1;
 @successText: #008576;
 
-@warning: #F59174;
+@warning: #f59174;
 @warningBackground: rgba(245, 145, 116, 0.08);
 @warningBorder: rgba(245, 145, 116, 0.5);
-@warningDark: #BF6248;
-@warningLight: #FFC2A3;
-@warningText: #DA3D10;
+@warningDark: #bf6248;
+@warningLight: #ffc2a3;
+@warningText: #da3d10;
 
-@info: #03B7CE;
+@info: #03b7ce;
 @infoBackground: rgba(3, 182, 206, 0.08);
 @infoBorder: rgba(3, 182, 206, 0.5);
-@infoDark: #00879D;
-@infoLight: #61EAFF;
+@infoDark: #00879d;
+@infoLight: #61eaff;
 @infoText: #028293;
 
 /*******************************
@@ -153,32 +153,31 @@
 
 @galleryAdminPurple: #bd9df4;
 
-@commentYellow: #FFE897; 
-
+@commentYellow: #ffe897;
 
 // Box shadows
 // TODO: camel case these
 
 // Box shadows at different levels from material
 @level-navbar-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02),
-0 1px 2px rgba(0, 0, 0, 0.12);
+  0 1px 2px rgba(0, 0, 0, 0.12);
 @level-1-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12),
-0 1px 2px rgba(0, 0, 0, 0.24);
+  0 1px 2px rgba(0, 0, 0, 0.24);
 @level-2-box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16),
-0 3px 6px rgba(0, 0, 0, 0.23);
+  0 3px 6px rgba(0, 0, 0, 0.23);
 @level-3-box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19),
-0 6px 6px rgba(0, 0, 0, 0.23);
+  0 6px 6px rgba(0, 0, 0, 0.23);
 @level-3-box-shadow-faint: 0 10px 20px rgba(0, 0, 0, 0.07),
-0 6px 6px rgba(0, 0, 0, 0.07);
+  0 6px 6px rgba(0, 0, 0, 0.07);
 @level-4-box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25),
-0 10px 10px rgba(0, 0, 0, 0.22);
-@level-5-box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30),
-0 15px 12px rgba(0, 0, 0, 0.22);
+  0 10px 10px rgba(0, 0, 0, 0.22);
+@level-5-box-shadow: 0 19px 38px rgba(0, 0, 0, 0.3),
+  0 15px 12px rgba(0, 0, 0, 0.22);
 
-@box-shadow-buttons-charts: 0px 1px 3px 0px rgba(54,58,61,0.12);
-@box-shadow-buttons-charts-hover: 0px 3px 6px 0px rgba(54,58,61,0.12);
-@box-shadow-modal: 0px 8px 16px 0px rgba(54,58,61,0.16);
-@box-shadow-dropdown: 0px 4px 8px 0px rgba(54,58,61,0.12);
+@box-shadow-buttons-charts: 0px 1px 3px 0px rgba(54, 58, 61, 0.12);
+@box-shadow-buttons-charts-hover: 0px 3px 6px 0px rgba(54, 58, 61, 0.12);
+@box-shadow-modal: 0px 8px 16px 0px rgba(54, 58, 61, 0.16);
+@box-shadow-dropdown: 0px 4px 8px 0px rgba(54, 58, 61, 0.12);
 @box-shadow-section: 1px 1px 20px 0px #e6e6e6;
 
 // Inner tab box-shadow
@@ -201,7 +200,8 @@
 // Need contrast and brightness adjustments, otherwise very dark gray merges with black.
 @nightModeFilter: invert(100%) hue-rotate(180deg) contrast(80%) brightness(120%);
 // Need to re-apply filter to images to revert them.
-@nightModeFilterRevert: brightness(83.3333%) contrast(125%) hue-rotate(180deg) invert(100%);
+@nightModeFilterRevert: brightness(83.3333%) contrast(125%) hue-rotate(180deg)
+  invert(100%);
 
 // Functional Color Rules
 // These should wrap the above colors with semantic names
@@ -229,7 +229,7 @@
 
 @searchNavHeight: 60px;
 @galleryNavHeight: 60px;
-@fancyPageSidebarWidth: 52px;
+@fancyPageSidebarWidth: 56px;
 @mobileBarHeight: @fancyPageSidebarWidth;
 @reportCoverHorizontalMargin: 28px;
 @reportDraftBackgroundColor: #fff8e3;
@@ -243,7 +243,7 @@
   }
 }
 
-.single-line-text(){
+.single-line-text() {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
