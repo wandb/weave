@@ -240,6 +240,7 @@ def test_prompt_as_pydantic_dict():
     assert prompt.as_pydantic_dict() == {
         "name": None,
         "description": None,
+        "ref": None,
         "config": {
             "model": "gpt-4o",
             "temperature": 0.8,

@@ -2,10 +2,12 @@ from collections.abc import Iterator
 from typing import Any
 
 from pydantic import field_validator
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.vals import WeaveTable
+from weave.trace.objectify import register_object
+from weave.trace.vals import WeaveObject, WeaveTable
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -15,6 +17,7 @@ def short_str(obj: Any, limit: int = 25) -> str:
     return str_val
 
 
+@register_object
 class Dataset(Object):
     """
     Dataset object with easy saving and automatic versioning
@@ -41,6 +44,15 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        return cls(
+            name=obj.name,
+            description=obj.description,
+            ref=obj.ref,
+            rows=obj.rows,
+        )
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
