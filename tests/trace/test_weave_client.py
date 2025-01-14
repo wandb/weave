@@ -370,7 +370,7 @@ def test_get_calls_complete(client):
         "y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2"
     )
 
-    query = weave_client.Query(
+    query = tsi.Query(
         **{
             "$expr": {
                 "$contains": {
@@ -384,11 +384,11 @@ def test_get_calls_complete(client):
     # use all the parameters to get_calls
     client_result = list(
         client.get_calls(
-            filter=weave_client.CallsFilter(op_names=[call1.op_name]),
+            filter=tsi.CallsFilter(op_names=[call1.op_name]),
             limit=1,
             offset=0,
             query=query,
-            sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
             include_feedback=True,
             columns=["inputs.dataset.rows"],
         )
@@ -406,7 +406,7 @@ def test_get_calls_complete(client):
                 limit=1,
                 offset=0,
                 query=query,
-                sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
                 include_feedback=True,
                 columns=["inputs.dataset"],
                 expand_columns=["inputs.dataset"],
@@ -429,7 +429,7 @@ def test_get_calls_complete(client):
     # add a simple query
     client_result = list(
         client.get_calls(
-            sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
             query=query,
             include_costs=True,
             include_feedback=True,
@@ -439,7 +439,7 @@ def test_get_calls_complete(client):
         client.server.calls_query(
             tsi.CallsQueryReq(
                 project_id="shawn/test-project",
-                sort_by=[weave_client.SortBy(field="started_at", direction="desc")],
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
                 query=query,
                 include_costs=True,
                 include_feedback=True,

@@ -187,7 +187,7 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative stop not supported")
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
-        
+
         # Apply offset if provided
         if self.offset is not None:
             start += self.offset
