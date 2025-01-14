@@ -1,10 +1,13 @@
-import React, {useMemo} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useMemo, useState} from 'react';
 
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
+import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
@@ -70,13 +73,14 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
+  const showDeleteButton = useShowDeleteButton();
 
   return (
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -138,6 +142,11 @@ const OpVersionPageInner: React.FC<{
                 <p>-</p>
               )}
             </div>
+            {showDeleteButton && (
+              <div className="ml-auto">
+                <DeleteOpButtonWithModal opVersionSchema={opVersion} />
+              </div>
+            )}
           </div>
         </Tailwind>
       }
@@ -170,5 +179,43 @@ const OpVersionPageInner: React.FC<{
           : []),
       ]}
     />
+  );
+};
+
+const DeleteOpButtonWithModal: React.FC<{
+  opVersionSchema: OpVersionSchema;
+  overrideDisplayStr?: string;
+}> = ({opVersionSchema, overrideDisplayStr}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const closePeek = useClosePeek();
+  const {opVersionsDelete} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const deleteStr =
+    overrideDisplayStr ??
+    `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteStr}
+        onDelete={() =>
+          opVersionsDelete(
+            opVersionSchema.entity,
+            opVersionSchema.project,
+            opVersionSchema.opId,
+            [opVersionSchema.versionHash]
+          )
+        }
+        onSuccess={closePeek}
+      />
+    </>
   );
 };

@@ -2,7 +2,7 @@
 
 Google offers two ways of calling Gemini via API:
 
-1. Via the [Vertex APIs](https://cloud.google.com/vertexai/docs).
+1. Via the [Vertex APIs](https://cloud.google.com/vertex-ai/docs).
 2. Via the [Gemini API SDK](https://ai.google.dev/gemini-api/docs/quickstart?lang=python).
 
 ## Tracing

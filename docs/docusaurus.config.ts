@@ -196,11 +196,15 @@ const config: Config = {
       style: "dark",
       links: [
         {
-          title: "Docs",
+          title: "Learning",
           items: [
             {
               label: "Documentation",
               to: "/quickstart",
+            },
+            {
+              label: "LLM Courses",
+              href: "https://www.wandb.courses/",
             },
           ],
         },

@@ -6,7 +6,7 @@ import {
   InputLabel,
 } from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {
@@ -167,11 +167,24 @@ const NestedForm: React.FC<{
   const [currentValue, setCurrentValue] = useState(
     getNestedValue(config, currentPath)
   );
+
+  // Only update parent config on blur, for string fields
+  const handleBlur = useCallback(() => {
+    if (currentValue !== getNestedValue(config, currentPath)) {
+      updateConfig(currentPath, currentValue, config, setConfig);
+    }
+  }, [currentValue, currentPath, config, setConfig]);
+  const handleChange = useCallback((value: string) => {
+    setCurrentValue(value);
+  }, []);
+
+  // set current value for non-string fields
   useEffect(() => {
     setCurrentValue(getNestedValue(config, currentPath));
   }, [config, currentPath]);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
     return (
@@ -294,7 +307,6 @@ const NestedForm: React.FC<{
   } else if (isZodType(fieldSchema, s => s instanceof z.ZodBoolean)) {
     fieldType = 'checkbox';
   }
-  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
     <TextFieldWithLabel
@@ -302,7 +314,8 @@ const NestedForm: React.FC<{
       label={!hideLabel ? keyName : undefined}
       type={fieldType}
       value={currentValue ?? ''}
-      onChange={value => updateConfig(currentPath, value, config, setConfig)}
+      onChange={handleChange}
+      onBlur={handleBlur}
       autoFocus={autoFocus}
     />
   );
