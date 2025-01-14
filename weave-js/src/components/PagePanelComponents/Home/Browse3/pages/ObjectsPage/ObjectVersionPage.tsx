@@ -1,21 +1,19 @@
 import Box from '@mui/material/Box';
-import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
 import {Tooltip} from '../../../../../Tooltip';
-import {useClosePeek} from '../../context';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
 import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
-import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
+import {useShowDeleteButton} from '../common/DeleteModal';
 import {
   CallLink,
   CallsLink,
@@ -30,6 +28,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
+import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {TabPrompt} from '../TabPrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -43,9 +42,9 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
+import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
-import {TabUsePrompt} from './Tabs/TabUsePrompt';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -639,44 +638,6 @@ const OpVersionCallsLink: React.FC<{
         variant="secondary"
       />
       ]
-    </>
-  );
-};
-
-export const DeleteObjectButtonWithModal: React.FC<{
-  objVersionSchema: ObjectVersionSchema;
-  overrideDisplayStr?: string;
-}> = ({objVersionSchema, overrideDisplayStr}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const closePeek = useClosePeek();
-  const {objectVersionsDelete} = useObjectDeleteFunc();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const deleteStr =
-    overrideDisplayStr ??
-    `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
-
-  return (
-    <>
-      <Button
-        icon="delete"
-        variant="ghost"
-        onClick={() => setDeleteModalOpen(true)}
-      />
-      <DeleteModal
-        open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={deleteStr}
-        onDelete={() =>
-          objectVersionsDelete(
-            objVersionSchema.entity,
-            objVersionSchema.project,
-            objVersionSchema.objectId,
-            [objVersionSchema.versionHash]
-          )
-        }
-        onSuccess={closePeek}
-      />
     </>
   );
 };

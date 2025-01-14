@@ -13,7 +13,7 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
-import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectVersionPage';
+import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectDeleteButtons';
 import {TabUseDataset} from '../pages/ObjectsPage/Tabs/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {objectVersionKeyToRefUri} from '../pages/wfReactInterface/utilities';

@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
+import {FilterableObjectVersionsTable} from './ObjectVersionsTable';
 
 export const ObjectPage: React.FC<{
   entity: string;

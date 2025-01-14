@@ -73,11 +73,9 @@ import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/Leaderboar
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
+import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
-import {
-  ObjectVersionsPage,
-  WFHighLevelObjectVersionFilter,
-} from './Browse3/pages/ObjectsPage/ObjectVersionsPage';
+import {ObjectVersionsPage} from './Browse3/pages/ObjectsPage/ObjectVersionsPage';
 import {OpPage} from './Browse3/pages/OpsPage/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';

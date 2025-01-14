@@ -19,7 +19,7 @@ import {
   useWeaveflowRouteContext,
 } from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
-import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/ObjectVersionsPage';
+import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from '../OpsPage/OpVersionsPage';
 import {Id} from './Id';
 
