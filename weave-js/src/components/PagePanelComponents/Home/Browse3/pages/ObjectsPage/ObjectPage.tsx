@@ -1,25 +1,25 @@
 import React from 'react';
 
-import {SimplePageLayout} from './common/SimplePageLayout';
-import {FilterableOpVersionsTable} from './OpVersionsPage';
+import {SimplePageLayout} from '../common/SimplePageLayout';
+import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 
-export const OpPage: React.FC<{
+export const ObjectPage: React.FC<{
   entity: string;
   project: string;
-  opName: string;
+  objectName: string;
 }> = props => {
   return (
     <SimplePageLayout
-      title={`Op: ${props.opName}`}
+      title={`Object: ${props.objectName}`}
       tabs={[
         {
           label: 'All Versions',
           content: (
-            <FilterableOpVersionsTable
+            <FilterableObjectVersionsTable
               entity={props.entity}
               project={props.project}
               frozenFilter={{
-                opName: props.opName,
+                objectName: props.objectName,
               }}
             />
           ),

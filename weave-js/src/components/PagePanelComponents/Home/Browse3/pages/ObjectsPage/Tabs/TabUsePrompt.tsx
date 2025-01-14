@@ -1,12 +1,12 @@
 import {Box} from '@mui/material';
 import React from 'react';
 
-import {isValidVarName} from '../../../../../core/util/var';
-import {parseRef} from '../../../../../react';
-import {abbreviateRef} from '../../../../../util/refs';
-import {Alert} from '../../../../Alert';
-import {CopyableText} from '../../../../CopyableText';
-import {DocLink} from './common/Links';
+import {isValidVarName} from '../../../../../../../core/util/var';
+import {parseRef} from '../../../../../../../react';
+import {abbreviateRef} from '../../../../../../../util/refs';
+import {Alert} from '../../../../../../Alert';
+import {CopyableText} from '../../../../../../CopyableText';
+import {DocLink} from '../../common/Links';
 
 type Data = Record<string, any>;
 

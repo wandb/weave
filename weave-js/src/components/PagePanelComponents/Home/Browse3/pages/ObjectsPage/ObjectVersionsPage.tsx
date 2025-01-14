@@ -23,20 +23,20 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {TEAL_600} from '../../../../../common/css/color.styles';
-import {Button} from '../../../../Button';
-import {ErrorPanel} from '../../../../ErrorPanel';
-import {Loading} from '../../../../Loading';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Timestamp} from '../../../../Timestamp';
+import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {Button} from '../../../../../Button';
+import {ErrorPanel} from '../../../../../ErrorPanel';
+import {Loading} from '../../../../../Loading';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Timestamp} from '../../../../../Timestamp';
 import {
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
-} from '../context';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {basicField} from './common/DataTable';
-import {DeleteModal} from './common/DeleteModal';
-import {Empty} from './common/Empty';
+} from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {basicField} from '../common/DataTable';
+import {DeleteModal} from '../common/DeleteModal';
+import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
   EMPTY_PROPS_ANNOTATIONS,
@@ -46,35 +46,35 @@ import {
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
-} from './common/EmptyContent';
+} from '../common/EmptyContent';
 import {
   CustomLink,
   ObjectVersionLink,
   ObjectVersionsLink,
   objectVersionText,
-} from './common/Links';
-import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
+} from '../common/Links';
+import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   buildDynamicColumns,
   prepareFlattenedDataForTable,
-} from './common/tabularListViews/columnBuilder';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useControllableState, useURLSearchParamsDict} from './util';
+} from '../common/tabularListViews/columnBuilder';
+import {TypeVersionCategoryChip} from '../common/TypeVersionCategoryChip';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
-} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
   isTableRef,
   makeRefExpandedPayload,
-} from './wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
-} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const DATASET_BASE_OBJECT_CLASS = 'Dataset';
 

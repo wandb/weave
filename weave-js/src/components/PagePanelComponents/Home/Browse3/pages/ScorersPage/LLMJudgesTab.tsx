@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
+import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsPage';
 export const LLMJudgesTab: React.FC<{
   entity: string;
   project: string;

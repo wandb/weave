@@ -1,16 +1,16 @@
 import {Box} from '@mui/material';
 import React from 'react';
 
-import {isValidVarName} from '../../../../../core/util/var';
-import {parseRef} from '../../../../../react';
-import {abbreviateRef} from '../../../../../util/refs';
-import {CopyableText} from '../../../../CopyableText';
-import {DocLink} from './common/Links';
-import {TabUseBanner} from './TabUseBanner';
+import {isValidVarName} from '../../../../../../../core/util/var';
+import {parseRef} from '../../../../../../../react';
+import {abbreviateRef} from '../../../../../../../util/refs';
+import {CopyableText} from '../../../../../../CopyableText';
+import {DocLink} from '../../common/Links';
+import {TabUseBanner} from '../../TabUseBanner';
 import {
   OBJECT_ATTR_EDGE_NAME,
   TABLE_ID_EDGE_NAME,
-} from './wfReactInterface/constants';
+} from '../../wfReactInterface/constants';
 
 type TabUseDatasetProps = {
   name: string;

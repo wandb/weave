@@ -3,49 +3,49 @@ import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo, useState} from 'react';
 
-import {maybePluralizeWord} from '../../../../../core/util/string';
-import {Icon, IconName} from '../../../../Icon';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {Tooltip} from '../../../../Tooltip';
-import {useClosePeek} from '../context';
-import {DatasetVersionPage} from '../datasets/DatasetVersionPage';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
-import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
-import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
-import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
-import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
+import {maybePluralizeWord} from '../../../../../../core/util/string';
+import {Icon, IconName} from '../../../../../Icon';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
+import {Tooltip} from '../../../../../Tooltip';
+import {useClosePeek} from '../../context';
+import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
+import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
+import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
+import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
 import {
   CallLink,
   CallsLink,
   ObjectVersionsLink,
   objectVersionText,
   OpVersionLink,
-} from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
-} from './common/SimplePageLayout';
-import {EvaluationLeaderboardTab} from './LeaderboardTab';
-import {TabPrompt} from './TabPrompt';
-import {TabUseModel} from './TabUseModel';
-import {TabUseObject} from './TabUseObject';
-import {TabUsePrompt} from './TabUsePrompt';
-import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+} from '../common/SimplePageLayout';
+import {EvaluationLeaderboardTab} from '../LeaderboardTab';
+import {TabPrompt} from '../TabPrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
   isObjDeleteError,
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
-} from './wfReactInterface/utilities';
+} from '../wfReactInterface/utilities';
 import {
   CallSchema,
   KnownBaseObjectClassType,
   ObjectVersionSchema,
-} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../wfReactInterface/wfDataModelHooksInterface';
+import {TabUseModel} from './Tabs/TabUseModel';
+import {TabUseObject} from './Tabs/TabUseObject';
+import {TabUsePrompt} from './Tabs/TabUsePrompt';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
