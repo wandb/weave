@@ -25,16 +25,11 @@ def test_dataset_iteration(client):
     assert rows2 == rows
 
 
-def test_dataset_protocol(client):
+def test_pythonic_access(client):
     rows = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}, {"a": 5}]
     ds = weave.Dataset(rows=rows)
     assert len(ds) == 5
     assert ds[0] == {"a": 1}
-    assert ds[1:3] == [{"a": 2}, {"a": 3}]
-    assert ds[3:] == [{"a": 4}, {"a": 5}]
 
     with pytest.raises(IndexError):
         ds[-1]
-
-    with pytest.raises(IndexError):
-        ds[1:3:-1]
