@@ -620,7 +620,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
-            req.wb_user_id,
+            req.obj.wb_user_id,
         )
 
         # Validate
