@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from weave.flow.obj import Object
     from weave.trace.vals import WeaveObject
 
-T_co = TypeVar("T", bound="Object", covariant=True)
+T_co = TypeVar("T_co", bound="Object", covariant=True)
 
 
 @runtime_checkable
