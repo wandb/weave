@@ -116,8 +116,7 @@ export const ObjectVersionsPage: React.FC<{
   const hasComparison = filteredOnObject;
   const viewer = userInfo ? userInfo.id : null;
   const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
-  const isAdmin = userInfo?.admin;
-  const showDeleteButton = filteredOnObject && !isReadonly && isAdmin;
+  const showDeleteButton = filteredOnObject && !isReadonly;
 
   return (
     <SimplePageLayout
