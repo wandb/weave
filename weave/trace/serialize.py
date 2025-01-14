@@ -148,7 +148,7 @@ def dictify(
     elif isinstance(obj, dict):
         dict_result = {}
         for k, v in obj.items():
-            if should_redact(k):
+            if isinstance(k, str) and should_redact(k):
                 dict_result[k] = REDACTED_VALUE
             else:
                 dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
@@ -160,7 +160,7 @@ def dictify(
             if isinstance(as_dict, dict):
                 to_dict_result = {}
                 for k, v in as_dict.items():
-                    if should_redact(k):
+                    if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
                         to_dict_result[k] = dictify(v, maxdepth, depth + 1)
