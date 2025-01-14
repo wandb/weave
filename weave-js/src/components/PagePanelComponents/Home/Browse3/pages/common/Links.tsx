@@ -20,7 +20,7 @@ import {
 } from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
-import {WFHighLevelOpVersionFilter} from '../OpsPage/OpVersionsPage';
+import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';

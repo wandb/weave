@@ -26,10 +26,7 @@ import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-
-export type WFHighLevelOpVersionFilter = {
-  opName?: string | null;
-};
+import {WFHighLevelOpVersionFilter} from './opsPageTypes';
 
 export const OpVersionsPage: React.FC<{
   entity: string;
