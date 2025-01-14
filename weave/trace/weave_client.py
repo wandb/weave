@@ -141,7 +141,7 @@ class PaginatedIterator(Generic[T, R]):
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
-        if limit is not None and limit < 0:
+        if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
         if offset is not None and offset < 0:
             raise ValueError("offset must be greater than or equal to 0")
@@ -158,11 +158,11 @@ class PaginatedIterator(Generic[T, R]):
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
+        if self.limit is not None and index >= self.limit + (self.offset or 0):
+            raise IndexError(f"Index {index} out of range")
+
         if self.offset is not None:
             index += self.offset
-
-        if self.limit is not None and index >= self.limit:
-            raise IndexError(f"Index {index} out of range")
 
         page_index = index // self.page_size
         page_offset = index % self.page_size
@@ -188,16 +188,16 @@ class PaginatedIterator(Generic[T, R]):
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
 
+        # Apply limit if provided
+        if self.limit is not None:
+            if stop is None or stop > self.limit:
+                stop = self.limit
+
         # Apply offset if provided
         if self.offset is not None:
             start += self.offset
             if stop is not None:
                 stop += self.offset
-
-        # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
 
         i = start
         while stop is None or i < stop:
@@ -278,6 +278,11 @@ def _make_calls_iterator(
         response = server.calls_query_stats(
             CallsQueryStatsReq(project_id=project_id, filter=filter)
         )
+        if limit_override is not None:
+            offset = offset_override or 0
+            return min(limit_override, response.count - offset)
+        if offset_override is not None:
+            return response.count - offset_override
         return response.count
 
     return PaginatedIterator(
