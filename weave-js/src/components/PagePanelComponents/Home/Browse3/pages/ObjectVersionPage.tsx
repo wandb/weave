@@ -388,6 +388,13 @@ const ObjectVersionPageInner: React.FC<{
                     uri={refUri}
                     projectName={projectName}
                   />
+                ) : baseObjectClass === 'AnnotationSpec' ? (
+                  <TabUseAnnotationSpec
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                  />
                 ) : (
                   <TabUseObject name={objectName} uri={refUri} />
                 )}
