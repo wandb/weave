@@ -38,6 +38,7 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
+from weave.trace.pii_redaction import redact_pii
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -817,10 +818,11 @@ class WeaveClient:
         op_def_ref = self._save_op(unbound_op)
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_pii_redacted = redact_pii(inputs_redacted)
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_pii_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_pii_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -918,10 +920,12 @@ class WeaveClient:
         call.ended_at = ended_at
         original_output = output
 
+        redacted_output = redact_pii(original_output)
+
         if op is not None and op.postprocess_output:
-            postprocessed_output = op.postprocess_output(original_output)
+            postprocessed_output = op.postprocess_output(redacted_output)
         else:
-            postprocessed_output = original_output
+            postprocessed_output = redacted_output
 
         if _global_postprocess_output:
             postprocessed_output = _global_postprocess_output(postprocessed_output)
