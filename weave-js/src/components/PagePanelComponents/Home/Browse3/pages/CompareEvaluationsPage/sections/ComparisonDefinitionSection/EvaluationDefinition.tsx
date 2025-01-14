@@ -1,5 +1,4 @@
-import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
+import {Box} from '@mui/material';
 import React, {useMemo} from 'react';
 
 import {
@@ -10,11 +9,11 @@ import {
 import {hexToRGB} from '../../../../../../../../common/css/utils';
 import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Icon, IconNames} from '../../../../../../../Icon';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
+import {objectRefDisplayName, SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
+import {isObjDeleteError} from '../../../wfReactInterface/utilities';
 import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
-import {CIRCLE_SIZE} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
 
 export const EvaluationCallLink: React.FC<{
@@ -33,14 +32,7 @@ export const EvaluationCallLink: React.FC<{
       projectName={project}
       opName={evaluationCall.name}
       callId={props.callId}
-      icon={
-        <Circle
-          sx={{
-            color: evaluationCall.color,
-            height: CIRCLE_SIZE,
-          }}
-        />
-      }
+      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
       color={MOON_800}
     />
   );
@@ -52,11 +44,10 @@ export const EvaluationModelLink: React.FC<{
 }> = props => {
   const {useObjectVersion} = useWFHooks();
   const evaluationCall = props.state.summary.evaluationCalls[props.callId];
-  const modelObj = props.state.summary.models[evaluationCall.modelRef];
-  const objRef = useMemo(
-    () => parseRef(modelObj.ref) as WeaveObjectRef,
-    [modelObj.ref]
-  );
+  const objRef = useMemo(() => {
+    return parseRef(evaluationCall.modelRef) as WeaveObjectRef;
+  }, [evaluationCall.modelRef]);
+
   const objVersionKey = useMemo(() => {
     return {
       scheme: 'weave',
@@ -78,10 +69,31 @@ export const EvaluationModelLink: React.FC<{
   ]);
   const objectVersion = useObjectVersion(objVersionKey);
 
+  if (isObjDeleteError(objectVersion.error)) {
+    return (
+      <Box
+        sx={{
+          height: '22px',
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+          fontWeight: 500,
+          textDecoration: 'line-through',
+        }}>
+        <Box display="flex" alignItems="center">
+          <ModelIcon />
+          {objectRefDisplayName(objRef).label}
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <ObjectVersionLink
-      entityName={modelObj.entity}
-      projectName={modelObj.project}
+      entityName={objRef.entityName}
+      projectName={objRef.projectName}
       objectName={objRef.artifactName}
       version={objRef.artifactVersion}
       versionIndex={objectVersion.result?.versionIndex ?? 0}

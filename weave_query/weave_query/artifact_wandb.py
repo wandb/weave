@@ -163,6 +163,8 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
                 "clientID": art_id,
             },
         )
+    if not (res and res['clientIDMapping']):
+        raise errors.WeaveArtifactCollectionNotFound
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
