@@ -10,6 +10,7 @@ from pydantic import (
 )
 from typing_extensions import Self
 
+from weave.trace import api
 from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
@@ -60,10 +61,7 @@ class Object(BaseModel):
             raise NotImplementedError(
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
             )
-
-        import weave
-
-        return weave.ref(uri).get(objectify=objectify)
+        return api.ref(uri).get(objectify=objectify)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
