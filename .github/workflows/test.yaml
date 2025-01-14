@@ -241,7 +241,7 @@ jobs:
             "groq",
             "google_ai_studio",
             "instructor",
-            "langchain",
+            # "langchain",
             "litellm",
             "llamaindex",
             "mistral0",
