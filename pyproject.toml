@@ -47,17 +47,56 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llm_providers = [
+# Generally helpful groupings
+dev = ["weave[integrations]", "weave[scorers]", "weave[test]", "weave[docs]"]
+integrations = [
   "weave[anthropic]",
+  "weave[cerebras]",
   "weave[cohere]",
+  "weave[dspy]",
   "weave[google_ai_studio]",
   "weave[groq]",
-  "weave[mistral1]",
-  "weave[openai]",
-  "weave[vertexai]",
+  "weave[instructor]",
   "weave[langchain]",
+  "weave[langchain_nvidia_ai_endpoints]",
+  "weave[litellm]",
+  "weave[llamaindex]",
+  "weave[mistral1]",
+  "weave[notdiamond]",
+  "weave[openai]",
+  "weave[modal]",
+  "weave[vertexai]",
 ]
+test = [
+  "weave[unit_tests]",
+  "weave[integration_tests]",
+  "weave[serving_tests]",
+  "weave[scorers_tests]",
+  "weave[pandas-test]",
+]
+
+# For devs
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
+scorers_tests = ["weave[scorers]", "weave[integrations]"]
+pandas-test = ["pandas>=2.2.3"]
+unit_tests = [
+  "nox",
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
+  "pytest-xdist>=3.1.0",
+  "pytest-rerunfailures>=12.0",
+  "pytest-rerunfailures>=14.0",
+  "clickhouse_connect==0.7.0",
+  "fastapi>=0.110.0",
+  "sqlparse==0.5.0",
+
+]
+integration_tests = ["pytest-recording>=0.13.2", "vcrpy>=7.0.0"]
+serving_tests = ["flask", "uvicorn>=0.27.0", "pillow", "filelock", "httpx"]
+
+
+# Integrations
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
@@ -85,35 +124,10 @@ llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = ["Levenshtein>=0.26.0", "instructor>=1.5.2"]
-scorers_tests = ["weave[scorers]", "weave[llm_providers]"]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
-pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
 vertexai = ["vertexai>=1.70.0"]
-test = [
-  "nox",
-  "pytest>=8.2.0",
-  "pytest-asyncio>=0.23.6",
-  "pytest-cov>=5.0.0",
-  "pytest-xdist>=3.1.0",
-  "pytest-rerunfailures>=12.0",
-  "pytest-rerunfailures>=14.0",
-  "clickhouse_connect==0.7.0",
-  "fastapi>=0.110.0",
-  "sqlparse==0.5.0",
-
-  # Integration Tests
-  "pytest-recording>=0.13.2",
-  "vcrpy>=7.0.0",
-
-  # serving tests
-  "flask",
-  "uvicorn>=0.27.0",
-  "pillow",
-  "filelock",
-  "httpx",
-]
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
