@@ -1,11 +1,11 @@
 import {Box} from '@mui/material';
 import React from 'react';
 
-import {isValidVarName} from '../../../../../core/util/var';
-import {abbreviateRef} from '../../../../../util/refs';
-import {CopyableText} from '../../../../CopyableText';
-import {DocLink} from './common/Links';
-import {TabUseBanner} from './TabUseBanner';
+import {isValidVarName} from '../../../../../../../core/util/var';
+import {abbreviateRef} from '../../../../../../../util/refs';
+import {CopyableText} from '../../../../../../CopyableText';
+import {DocLink} from '../../common/Links';
+import {TabUseBanner} from '../../TabUseBanner';
 
 type TabUseOpProps = {
   name: string;
