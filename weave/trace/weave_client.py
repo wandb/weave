@@ -792,6 +792,7 @@ class WeaveClient:
         attributes._set_weave_item("os_version", platform.version())
         attributes._set_weave_item("os_release", platform.release())
         attributes._set_weave_item("sys_version", sys.version)
+        attributes._set_weave_item("tracing_sample_rate", op.tracing_sample_rate)
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
