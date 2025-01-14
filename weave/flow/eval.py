@@ -28,13 +28,15 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
+from weave.trace.context import weave_client_context
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, get_ref
+from weave.trace.weave_client import Call, CallsIter, get_ref
+from weave.trace_server.trace_server_interface import CallsFilter
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -317,6 +319,24 @@ class Evaluation(Object):
         print("Evaluation summary", summary)
 
         return summary
+
+    def get_evaluation_results(self) -> dict[str, CallsIter]:
+        # TODO: When refs are available on the Eval object, narrow to just the current
+        # version of evaluation, not all as currently implemented
+
+        if not self.evaluate.ref:
+            raise ValueError(
+                "Evaluation must be run or published before calling get_evaluation_results"
+            )
+
+        eval_calls = self.evaluate.calls()
+        wc = weave_client_context.require_weave_client()
+        return {
+            cast(str, call.display_name): wc.get_calls(
+                CallsFilter(parent_ids=[call.id])
+            )
+            for call in eval_calls
+        }
 
 
 def evaluate(
