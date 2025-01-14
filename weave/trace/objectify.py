@@ -6,12 +6,11 @@ if TYPE_CHECKING:
     from weave.flow.obj import Object
     from weave.trace.vals import WeaveObject
 
-T = TypeVar("T")
-T_co = TypeVar("T_co", bound="Object", covariant=True)
+T_co = TypeVar("T", bound=Object, covariant=True)
 
 
 @runtime_checkable
-class Objectifyable(Protocol):
+class Objectifyable(Protocol[T_co]):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> T_co: ...
 
@@ -19,7 +18,7 @@ class Objectifyable(Protocol):
 _registry: dict[str, type[Object]] = {}
 
 
-def register_object(cls: type[T]) -> type[T]:
+def register_object(cls: type[T_co]) -> type[T_co]:
     _registry[cls.__name__] = cls
     return cls
 

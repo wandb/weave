@@ -5,7 +5,7 @@ import re
 import textwrap
 from collections import UserList
 from pathlib import Path
-from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, overload
+from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, cast, overload
 
 from pydantic import Field
 from rich.table import Table
@@ -95,7 +95,7 @@ class StringPrompt(Prompt):
         prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
-        prompt.ref = obj.ref
+        prompt.ref = cast(ObjectRef, obj.ref)
         return prompt
 
 
@@ -124,7 +124,7 @@ class MessagesPrompt(Prompt):
         prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
-        prompt.ref = obj.ref
+        prompt.ref = cast(ObjectRef, obj.ref)
         return prompt
 
 
