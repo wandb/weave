@@ -1429,13 +1429,13 @@ def test_summary_tokens_cost(client):
 
     callsWithCost = list(
         client.get_calls(
-            weave_client.CallsFilter(op_names=[call.op_name]),
+            filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
     callsNoCost = list(
         client.get_calls(
-            weave_client.CallsFilter(op_names=[call.op_name]),
+            filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
     )
