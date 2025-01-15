@@ -310,10 +310,12 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
