@@ -81,3 +81,12 @@ class Dataset(Object):
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
+
+    def __len__(self) -> int:
+        # TODO: This can be slow for large datasets...
+        return len(list(self.rows))
+
+    def __getitem__(self, key: int) -> dict:
+        if key < 0:
+            raise IndexError("Negative indexing is not supported")
+        return self.rows[key]

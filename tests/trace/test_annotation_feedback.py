@@ -2,7 +2,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.annotation_spec import AnnotationSpec
+from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
 
