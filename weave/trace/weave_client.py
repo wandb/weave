@@ -789,6 +789,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
         self,
+        *,
         filter: CallsFilter | None = None,
         limit: int | None = None,
         offset: int | None = None,
