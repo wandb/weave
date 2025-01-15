@@ -1321,14 +1321,14 @@ class WeaveClient:
                 print(status.model_dump_json(indent=2))
                 time.sleep(sec)
 
-        # thread = threading.Thread(target=_print_status, daemon=True)
-        # thread.start()
+        thread = threading.Thread(target=_print_status, daemon=True)
+        thread.start()
 
         try:
             yield
         finally:
             stop_event.set()
-            # thread.join()
+            thread.join()
 
     @trace_sentry.global_trace_sentry.watch()
     def _send_score_call(
@@ -1725,17 +1725,16 @@ class WeaveClient:
 
     def _flush(self) -> None:
         # TODO: make this an env var
-        with self.live_status(sec=1):
-            # Used to wait until all currently enqueued jobs are processed
-            if not self.future_executor._in_thread_context.get():
-                self.future_executor.flush()
-            if self._server_is_flushable:
-                # We don't want to do an instance check here because it could
-                # be susceptible to shutdown race conditions. So we save a boolean
-                # _server_is_flushable and only call this if we know the server is
-                # flushable. The # type: ignore is safe because we check the type
-                # first.
-                self.server.call_processor.wait_until_all_processed()  # type: ignore
+        # Used to wait until all currently enqueued jobs are processed
+        if not self.future_executor._in_thread_context.get():
+            self.future_executor.flush()
+        if self._server_is_flushable:
+            # We don't want to do an instance check here because it could
+            # be susceptible to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable. The # type: ignore is safe because we check the type
+            # first.
+            self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         return self.future_executor.defer(self.server.file_create, req)

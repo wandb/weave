@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
@@ -100,7 +101,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
-        self.remote_request_counter: dict[str, int] = {}
+        self.remote_request_counter: dict[str, int] = defaultdict(int)
 
     def counted_post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         self.remote_request_counter[url] += 1
