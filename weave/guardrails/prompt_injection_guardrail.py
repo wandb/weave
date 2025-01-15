@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -7,21 +7,21 @@ from weave.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.guardrails.utils import GuardrailResponse
 from weave.scorers.llm_scorer import InstructorLLMScorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 from weave.scorers.utils import stringify
 
-PROMPT_INJECTION_GUARDRAIL_SCORE_TYPE = dict[
-    str, Union[bool, dict[str, Union[bool, str]]]
-]
 
-
-class LLMGuardrailResponse(BaseModel):
+class LLMGuardrailReasoning(BaseModel):
     injection_prompt: bool
     is_direct_attack: bool
     attack_type: Optional[str]
     explanation: Optional[str]
+
+
+class LLMGuardrailResponse(BaseModel):
+    safe: bool
+    reasoning: LLMGuardrailReasoning
 
 
 class PromptInjectionLLMGuardrail(InstructorLLMScorer):
@@ -31,7 +31,7 @@ class PromptInjectionLLMGuardrail(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, prompt: str) -> PROMPT_INJECTION_GUARDRAIL_SCORE_TYPE:
+    def score(self, prompt: str) -> LLMGuardrailResponse:
         user_prompt = (
             PROMPT_INJECTION_SURVEY_PAPER_SUMMARY
             + f"""
@@ -43,18 +43,17 @@ You are given the following user prompt that you are suppossed to assess whether
 </input_prompt>
 """
         )
-        response: LLMGuardrailResponse = create(
+        response: LLMGuardrailReasoning = create(
             self.client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             model=self.model_id,
-            response_model=LLMGuardrailResponse,
+            response_model=LLMGuardrailReasoning,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return GuardrailResponse(
-            safe=not response.injection_prompt,
-            details=response.model_dump(),
+        return LLMGuardrailResponse(
+            safe=not response.injection_prompt, reasoning=response
         ).model_dump()
