@@ -2,22 +2,19 @@ import pytest
 from openai import OpenAI
 
 from weave.guardrails import PromptInjectionLLMGuardrail
-from weave.guardrails.prompt_injection_guardrail import LLMGuardrailResponse
+from weave.guardrails.prompt_injection_guardrail import LLMGuardrailResponse, LLMGuardrailReasoning
 
 
 # mock the create function
 @pytest.fixture
 def mock_create(monkeypatch):
     def _mock_create(*args, **kwargs):
-        return {
-            "safe": False,
-            "reasoning": {
-                "injection_prompt": True,
-                "is_direct_attack": True,
-                "attack_type": "Instruction Manipulation",
-                "explanation": "Based on the research papers provided, this is clearly a direct prompt injection attack.",
-            },
-        }
+        return LLMGuardrailReasoning(
+            injection_prompt=True,
+            is_direct_attack=True,
+            attack_type="Instruction Manipulation",
+            explanation="Based on the research papers provided, this is clearly a direct prompt injection attack.",
+        )
 
     monkeypatch.setattr(
         "weave.guardrails.prompt_injection_guardrail.create", _mock_create
