@@ -202,6 +202,7 @@ type Project implements Node {
   createdAt: DateTime!
   updatedAt: DateTime
   id: ID!
+  internalId: ID!
   name: String!
   runs(filters: JSONString, order: String, first: Int): RunConnection
   entity: Entity!
