@@ -73,7 +73,7 @@ const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
       title,
       'aria-hidden': ariaHidden,
       'aria-label': ariaLabel,
-      disabled: disabled,
+      disabled,
     };
     if (ref == null) {
       return <Icon {...passProps} className={className} />;
