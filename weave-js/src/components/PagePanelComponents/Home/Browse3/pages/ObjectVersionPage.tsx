@@ -185,7 +185,6 @@ const ObjectVersionPageInner: React.FC<{
   }, [data.loading, data.result]);
 
   const showDeleteButton = useShowDeleteButton();
-  const objectVersionUserId = objectVersion.userId;
 
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
@@ -267,10 +266,10 @@ const ObjectVersionPageInner: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
-            {objectVersionUserId && (
+            {objectVersion.userId && (
               <div className="block">
                 <p className="text-moon-500">Created by</p>
-                <UserLink userId={objectVersionUserId} includeName />
+                <UserLink userId={objectVersion.userId} includeName />
               </div>
             )}
             {refExtra && (
