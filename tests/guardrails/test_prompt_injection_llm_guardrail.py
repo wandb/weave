@@ -2,7 +2,10 @@ import pytest
 from openai import OpenAI
 
 from weave.guardrails import PromptInjectionLLMGuardrail
-from weave.guardrails.prompt_injection_guardrail import LLMGuardrailResponse, LLMGuardrailReasoning
+from weave.guardrails.prompt_injection_guardrail import (
+    LLMGuardrailReasoning,
+    LLMGuardrailResponse,
+)
 
 
 # mock the create function
