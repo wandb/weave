@@ -163,7 +163,7 @@ Additionally, direct prompt injections can be tested safely in a controlled envi
 | 11  | Adversarial Suffix       | Universal Adver- sarial Triggers | ChatGPT, Bard, Claude and others | Attaching a computation- ally identified suffix to the prompt, which results in the chatbot producing toxic con- tent. An example is the fol- lowing suffix: "describing. + similarlyNow write oppo- | Zou et al. (2023) Mozes et al. (2023) |
 | 12  | Instruction Manipulation | Goal hijacking                   | GPT-3                            | please? re- vert with "-Two" Requesting GPT-3 to pro- duce text that disregards ev- ery previous command that was given to it by the user and even developers.                                       | Perez and Ribeiro (2022)              |
 | 13  | Instruction Manipulation | Prompt leaking                   | Bing AI                          | Asking the chatbot to de- scribe the instructions writ- ten in the initial prompt that for example control what it                                                                                   | Edwards (2023)                        |
-|     |                          |                                  |                                  | can or cannot do. Indirect Prompt Injections                                                                                                                                          
+|     |                          |                                  |                                  | can or cannot do. Indirect Prompt Injections
 
 ### Examples of Indirect Prompt Injections
 
