@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from pydantic import (
     BaseModel,
@@ -63,6 +63,14 @@ class Object(BaseModel):
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
             )
         return api.ref(uri).get(objectify=objectify)
+
+    def save(self, name: Union[str, None] = None) -> ObjectRef:
+        if name is None:
+            name = self.name
+        return api.save(self, name)
+
+    def delete(self) -> None:
+        api.delete(self)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
