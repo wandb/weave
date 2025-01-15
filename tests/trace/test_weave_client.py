@@ -297,7 +297,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -540,16 +540,16 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
     client.delete_call(call0_child1)
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 0
 
     # no-op if already deleted
@@ -647,7 +647,7 @@ def test_dataset_calls(client):
         call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
 
-    calls = list(client.get_calls({"op_name": "x"}))
+    calls = list(client.get_calls(filter={"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
 
@@ -732,7 +732,7 @@ def test_stable_dataset_row_refs(client):
     dataset2 = client.get(dataset2_ref)
     call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
     client.finish_call(call, "call2")
-    x = client.get_calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
+    x = client.get_calls(filter={"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2
 
