@@ -169,3 +169,13 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
     assert len(res.objs) == 10
     for obj in res.objs:
         assert obj.val
+
+
+def test_objs_query_wb_user_id(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+    assert len(res.objs) == 3
+    assert all(obj.wb_user_id == "shawn" for obj in res.objs)

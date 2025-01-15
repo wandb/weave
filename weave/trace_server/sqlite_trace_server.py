@@ -111,6 +111,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
                 object_id TEXT,
+                wb_user_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
@@ -647,7 +648,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest,
                     deleted_at,
                     wb_user_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
                     kind = excluded.kind,
@@ -656,8 +657,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val_dump = excluded.val_dump,
                     version_index = excluded.version_index,
                     is_latest = excluded.is_latest,
-                    deleted_at = excluded.deleted_at,
-                    wb_user_id = excluded.wb_user_id
+                    deleted_at = excluded.deleted_at
                 """,
                 (
                     project_id,
