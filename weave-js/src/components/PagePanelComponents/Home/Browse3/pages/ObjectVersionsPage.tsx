@@ -18,6 +18,7 @@ import {
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
@@ -305,6 +306,7 @@ export const ObjectVersionsTable: React.FC<{
   hidePeerVersionsColumn?: boolean;
   hideCategoryColumn?: boolean;
   hideCreatedAtColumn?: boolean;
+  hideUserColumn?: boolean;
   hideVersionSuffix?: boolean;
   onRowClick?: (objectVersion: ObjectVersionSchema) => void;
   selectedVersions?: string[];
@@ -336,6 +338,8 @@ export const ObjectVersionsTable: React.FC<{
       };
     });
   }, [props.objectVersions]);
+
+  const showUserColumn = rows.some(row => row.obj.userId != null);
 
   // TODO: We should make this page very robust similar to the CallsTable page.
   // We will want to do nearly all the same things: URL state management,
@@ -500,6 +504,26 @@ export const ObjectVersionsTable: React.FC<{
       );
     }
 
+    if (!props.hideUserColumn || !showUserColumn) {
+      cols.push(
+        basicField('userId', 'User', {
+          width: 150,
+          filterable: false,
+          sortable: false,
+          valueGetter: (unused: any, row: any) => {
+            return row.obj.userId;
+          },
+          renderCell: (params: any) => {
+            const userId = params.value;
+            if (userId == null) {
+              return <div></div>;
+            }
+            return <UserLink userId={userId} includeName />;
+          },
+        })
+      );
+    }
+
     if (!props.hideCreatedAtColumn) {
       cols.push(
         basicField('createdAtMs', 'Created', {
@@ -530,7 +554,14 @@ export const ObjectVersionsTable: React.FC<{
     }
 
     return {cols, groups};
-  }, [props, showPropsAsColumns, rows, selectedVersions, setSelectedVersions]);
+  }, [
+    props,
+    showPropsAsColumns,
+    rows,
+    selectedVersions,
+    setSelectedVersions,
+    showUserColumn,
+  ]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();

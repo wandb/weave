@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import {Button} from '@wandb/weave/components/Button';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo, useState} from 'react';
 
@@ -184,6 +185,7 @@ const ObjectVersionPageInner: React.FC<{
   }, [data.loading, data.result]);
 
   const showDeleteButton = useShowDeleteButton();
+  const objectVersionUserId = objectVersion.userId;
 
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
@@ -265,6 +267,12 @@ const ObjectVersionPageInner: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
+            {objectVersionUserId && (
+              <div className="block">
+                <p className="text-moon-500">Created by</p>
+                <UserLink userId={objectVersionUserId} includeName />
+              </div>
+            )}
             {refExtra && (
               <div className="block">
                 <p className="text-moon-500">Subpath</p>
