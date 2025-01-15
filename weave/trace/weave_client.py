@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
 import logging
 import platform
 import re
@@ -36,6 +37,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
+from weave.trace.objectify import maybe_objectify
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
@@ -78,6 +80,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -684,7 +687,7 @@ class WeaveClient:
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(self, ref: ObjectRef) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
@@ -695,8 +698,15 @@ class WeaveClient:
                 )
             )
         except HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            if e.response is not None:
+                if e.response.content:
+                    try:
+                        reason = json.loads(e.response.content).get("reason")
+                        raise ValueError(reason)
+                    except json.JSONDecodeError:
+                        raise ValueError(e.response.content)
+                if e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -727,8 +737,10 @@ class WeaveClient:
             data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
-
-        return make_trace_obj(val, ref, self.server, None)
+        weave_obj = make_trace_obj(val, ref, self.server, None)
+        if objectify:
+            return maybe_objectify(weave_obj)
+        return weave_obj
 
     ################ Query API ################
 
@@ -1012,6 +1024,26 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_version(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digests=[object.digest],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op_version(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op.name,
+                digests=[op.digest],
             )
         )
 
@@ -1711,7 +1743,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
-            if should_redact(k):
+            if isinstance(k, str) and should_redact(k):
                 dict_res[k] = REDACTED_VALUE
             else:
                 dict_res[k] = redact_sensitive_keys(v)
