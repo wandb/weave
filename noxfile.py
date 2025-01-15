@@ -86,6 +86,7 @@ def tests(session, shard):
         env["ANTHROPIC_API_KEY"] = session.env.get("ANTHROPIC_API_KEY")
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
         env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
+        env["HF_API_TOKEN"] = session.env.get("HF_API_TOKEN")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
