@@ -13,6 +13,7 @@ import {Icon, IconName, IconNames} from '../../../Icon';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+import {isObjDeleteError} from '../Browse3/pages/wfReactInterface/utilities';
 import {
   ObjectVersionKey,
   OpVersionKey,
@@ -125,6 +126,11 @@ export const SmallRef: FC<{
   }
   const objectVersion = useObjectVersion(objVersionKey);
   const opVersion = useOpVersion(opVersionKey);
+
+  const isDeleted =
+    isObjDeleteError(objectVersion?.error) ||
+    isObjDeleteError(opVersion?.error);
+
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
@@ -177,13 +183,14 @@ export const SmallRef: FC<{
             overflow: 'hidden',
             whiteSpace: 'nowrap',
             textOverflow: 'ellipsis',
+            textDecoration: isDeleted ? 'line-through' : 'none',
           }}>
           {label}
         </Box>
       )}
     </Box>
   );
-  if (refTypeQuery.loading) {
+  if (refTypeQuery.loading || isDeleted) {
     return Item;
   }
   if (!isArtifactRef && !isWeaveObjRef) {

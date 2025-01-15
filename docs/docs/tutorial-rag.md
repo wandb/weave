@@ -3,12 +3,6 @@ import TabItem from '@theme/TabItem';
 
 # Tutorial: Model-Based Evaluation of RAG applications
 
-:::important
-
-This tutorial is currently only available for Python.
-
-:::
-
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases.
 
 In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
@@ -22,7 +16,7 @@ Check out the [RAG++ course](https://www.wandb.courses/courses/rag-in-production
 
 First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -59,8 +53,44 @@ First, we compute the embeddings for our articles. You would typically do this o
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+    ```typescript
+    require('dotenv').config();
+    import { OpenAI } from 'openai';
+    import * as weave from 'weave';
+
+    interface Article {
+        text: string;
+        embedding?: number[];
+    }
+
+    const articles: Article[] = [
+        { 
+            text: `Novo Nordisk and Eli Lilly rival soars 32 percent...` // truncated for brevity
+        },
+        // ... other articles
+    ];
+
+    function cosineSimilarity(a: number[], b: number[]): number {
+        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+        return dotProduct / (magnitudeA * magnitudeB);
+    }
+
+    const docsToEmbeddings = weave.op(async function(docs: Article[]): Promise<Article[]> {
+        const openai = new OpenAI();
+        const enrichedDocs = await Promise.all(docs.map(async (doc) => {
+            const response = await openai.embeddings.create({
+                input: doc.text,
+                model: "text-embedding-3-small"
+            });
+            return {
+                ...doc,
+                embedding: response.data[0].embedding
+            };
+        }));
+        return enrichedDocs;
+    });
     ```
   </TabItem>
 </Tabs>
@@ -69,7 +99,7 @@ First, we compute the embeddings for our articles. You would typically do this o
 
 Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -135,8 +165,46 @@ Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+    ```typescript
+    class RAGModel {
+        private openai: OpenAI;
+        private systemMessage: string;
+        private modelName: string;
+        private articleEmbeddings: Article[];
+
+        constructor(config: {
+            systemMessage: string;
+            modelName?: string;
+            articleEmbeddings: Article[];
+        }) {
+            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.systemMessage = config.systemMessage;
+            this.modelName = config.modelName || "gpt-3.5-turbo-1106";
+            this.articleEmbeddings = config.articleEmbeddings;
+            this.predict = weave.op(this, this.predict);
+        }
+
+        async predict(question: string): Promise<{
+            answer: string;
+            context: string;
+        }> {
+            const context = await this.getMostRelevantDocument(question);
+            
+            const response = await this.openai.chat.completions.create({
+                model: this.modelName,
+                messages: [
+                    { role: "system", content: this.systemMessage },
+                    { role: "user", content: `Use the following information...` }
+                ],
+                temperature: 0
+            });
+
+            return {
+                answer: response.choices[0].message.content || "",
+                context
+            };
+        }
+    }
     ```
   </TabItem>
 </Tabs>
@@ -149,7 +217,7 @@ When there aren't simple ways to evaluate your application, one approach is to u
 
 As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -202,8 +270,37 @@ As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll 
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+    ```typescript
+    const contextPrecisionScore = weave.op(async function(args: {
+        datasetRow: QuestionRow;
+        modelOutput: { answer: string; context: string; }
+    }): Promise<ScorerResult> {
+        const openai = new OpenAI();
+        
+        const prompt = `Given question, answer and context verify if the context was useful...`;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content || "{}");
+        return {
+            verdict: parseInt(result.verdict) === 1
+        };
+    });
+
+    const evaluation = new weave.Evaluation({
+        dataset: createQuestionDataset(),
+        scorers: [contextPrecisionScore]
+    });
+
+    await evaluation.evaluate({
+        model: weave.op((args: { datasetRow: QuestionRow }) => 
+            model.predict(args.datasetRow.question)
+        )
+    });
     ```
   </TabItem>
 </Tabs>
@@ -221,7 +318,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 3. _Optional:_ Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
    - this function has to have a `@weave.op()` decorator.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from weave.scorers import Scorer
@@ -301,7 +398,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 
 To use this as a scorer, you would initialize it and pass it to `scorers` argument in your `Evaluation like this:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
@@ -328,7 +425,7 @@ To get the same result for your RAG apps:
 
 Here, we show the code in it's entirety.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     from openai import OpenAI
@@ -470,8 +567,185 @@ Here, we show the code in it's entirety.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
+    ```typescript
+    require('dotenv').config();
+    import { OpenAI } from 'openai';
+    import * as weave from 'weave';
+
+    interface Article {
+        text: string;
+        embedding?: number[];
+    }
+
+    const articles: Article[] = [
+        { 
+            text: `Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too, one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.`
+        },
+        { 
+            text: `Berkshire shares jump after big profit gain as Buffetts conglomerate nears $1 trillion valuation Berkshire Hathaway shares rose on Monday after Warren Buffetts conglomerate posted strong earnings for the fourth quarter over the weekend. Berkshires Class A and B shares jumped more than 1.5%, each. Class A shares are higher by more than 17% this year, while Class B has gained more than 18%. Berkshire was last valued at $930.1 billion, up from $905.5 billion where it closed on Friday, according to FactSet. Berkshire on Saturday posted fourth-quarter operating earnings of $8.481 billion, about 28 percent higher than the $6.625 billion from the year-ago period, driven by big gains in its insurance business. Operating earnings refers to profits from businesses across insurance, railroads and utilities. Meanwhile, Berkshires cash levels also swelled to record levels. The conglomerate held $167.6 billion in cash in the fourth quarter, surpassing the $157.2 billion record the conglomerate held in the prior quarter.`
+        },
+        { 
+            text: `Highmark Health says its combining tech from Google and Epic to give doctors easier access to information Highmark Health announced it is integrating technology from Google Cloud and the health-care software company Epic Systems. The integration aims to make it easier for both payers and providers to access key information they need, even if its stored across multiple points and formats, the company said. Highmark is the parent company of a health plan with 7 million members, a provider network of 14 hospitals and other entities`
+        }
+    ];
+
+    function cosineSimilarity(a: number[], b: number[]): number {
+        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+        return dotProduct / (magnitudeA * magnitudeB);
+    }
+
+    const docsToEmbeddings = weave.op(async function(docs: Article[]): Promise<Article[]> {
+        const openai = new OpenAI();
+        const enrichedDocs = await Promise.all(docs.map(async (doc) => {
+            const response = await openai.embeddings.create({
+                input: doc.text,
+                model: "text-embedding-3-small"
+            });
+            return {
+                ...doc,
+                embedding: response.data[0].embedding
+            };
+        }));
+        return enrichedDocs;
+    });
+
+    class RAGModel {
+        private openai: OpenAI;
+        private systemMessage: string;
+        private modelName: string;
+        private articleEmbeddings: Article[];
+
+        constructor(config: {
+            systemMessage: string;
+            modelName?: string;
+            articleEmbeddings: Article[];
+        }) {
+            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.systemMessage = config.systemMessage;
+            this.modelName = config.modelName || "gpt-3.5-turbo-1106";
+            this.articleEmbeddings = config.articleEmbeddings;
+            this.predict = weave.op(this, this.predict);
+        }
+
+        private async getMostRelevantDocument(query: string): Promise<string> {
+            const queryEmbedding = await this.openai.embeddings.create({
+                input: query,
+                model: "text-embedding-3-small"
+            });
+
+            const similarities = this.articleEmbeddings.map(doc => {
+                if (!doc.embedding) return 0;
+                return cosineSimilarity(queryEmbedding.data[0].embedding, doc.embedding);
+            });
+
+            const mostRelevantIndex = similarities.indexOf(Math.max(...similarities));
+            return this.articleEmbeddings[mostRelevantIndex].text;
+        }
+
+        async predict(question: string): Promise<{
+            answer: string;
+            context: string;
+        }> {
+            const context = await this.getMostRelevantDocument(question);
+            
+            const response = await this.openai.chat.completions.create({
+                model: this.modelName,
+                messages: [
+                    { role: "system", content: this.systemMessage },
+                    { 
+                        role: "user", 
+                        content: `Use the following information to answer the subsequent question. If the answer cannot be found, write "I don't know."
+                        Context:
+                        """
+                        ${context}
+                        """
+                        Question: ${question}`
+                    }
+                ],
+                temperature: 0
+            });
+
+            return {
+                answer: response.choices[0].message.content || "",
+                context
+            };
+        }
+    }
+
+    interface ScorerResult {
+        verdict: boolean;
+    }
+
+    interface QuestionRow {
+        question: string;
+    }
+
+    function createQuestionDataset(): weave.Dataset<QuestionRow> {
+        return new weave.Dataset<QuestionRow>({
+            id: 'rag-questions',
+            rows: [
+                { question: "What significant result was reported about Zealand Pharma's obesity trial?" },
+                { question: "How much did Berkshire Hathaway's cash levels increase in the fourth quarter?" },
+                { question: "What is the goal of Highmark Health's integration of Google Cloud and Epic Systems technology?" }
+            ]
+        });
+    }
+
+    const contextPrecisionScore = weave.op(async function(args: {
+        datasetRow: QuestionRow;
+        modelOutput: { answer: string; context: string; }
+    }): Promise<ScorerResult> {
+        const openai = new OpenAI();
+        
+        const prompt = `Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
+        Output in only valid JSON format.
+
+        question: ${args.datasetRow.question}
+        context: ${args.modelOutput.context}
+        answer: ${args.modelOutput.answer}
+        verdict: `;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content || "{}");
+        return {
+            verdict: parseInt(result.verdict) === 1
+        };
+    });
+
+    async function main() {
+        await weave.init('rag-qa-ts');
+        
+        const articleEmbeddings = await docsToEmbeddings(articles);
+        
+        const model = new RAGModel({
+            systemMessage: "You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source.",
+            articleEmbeddings
+        });
+
+        const evaluation = new weave.Evaluation({
+            dataset: createQuestionDataset(),
+            scorers: [contextPrecisionScore]
+        });
+
+        const results = await evaluation.evaluate({
+            model: weave.op((args: { datasetRow: QuestionRow }) => 
+                model.predict(args.datasetRow.question)
+            )
+        });
+        
+        console.log('Evaluation results:', results);
+    }
+
+    if (require.main === module) {
+        main().catch(console.error);
+    }
     ```
   </TabItem>
 </Tabs>
@@ -480,7 +754,3 @@ Here, we show the code in it's entirety.
 
 We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
 We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
-
-```
-
-```

@@ -417,15 +417,19 @@ def _do_call(
     # Handle all of the possible cases where we would skip tracing.
     if settings.should_disable_weave():
         res = func(*pargs.args, **pargs.kwargs)
+        call.output = res
         return res, call
     if weave_client_context.get_weave_client() is None:
         res = func(*pargs.args, **pargs.kwargs)
+        call.output = res
         return res, call
     if not op._tracing_enabled:
         res = func(*pargs.args, **pargs.kwargs)
+        call.output = res
         return res, call
     if not get_tracing_enabled():
         res = func(*pargs.args, **pargs.kwargs)
+        call.output = res
         return res, call
 
     current_call = call_context.get_current_call()
@@ -435,6 +439,7 @@ def _do_call(
             # Disable tracing for this call and all descendants
             with tracing_disabled():
                 res = func(*pargs.args, **pargs.kwargs)
+                call.output = res
                 return res, call
 
     # Proceed with tracing. Note that we don't check the sample rate here.
@@ -478,15 +483,19 @@ async def _do_call_async(
     # Handle all of the possible cases where we would skip tracing.
     if settings.should_disable_weave():
         res = await func(*args, **kwargs)
+        call.output = res
         return res, call
     if weave_client_context.get_weave_client() is None:
         res = await func(*args, **kwargs)
+        call.output = res
         return res, call
     if not op._tracing_enabled:
         res = await func(*args, **kwargs)
+        call.output = res
         return res, call
     if not get_tracing_enabled():
         res = await func(*args, **kwargs)
+        call.output = res
         return res, call
 
     current_call = call_context.get_current_call()
@@ -496,6 +505,7 @@ async def _do_call_async(
             # Disable tracing for this call and all descendants
             with tracing_disabled():
                 res = await func(*args, **kwargs)
+                call.output = res
                 return res, call
 
     # Proceed with tracing
