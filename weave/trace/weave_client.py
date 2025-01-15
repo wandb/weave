@@ -16,6 +16,7 @@ from typing import (
     Callable,
     Generic,
     Protocol,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -384,6 +385,23 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+class CallDict(TypedDict):
+    op_name: str
+    trace_id: str
+    project_id: str
+    parent_id: str | None
+    inputs: dict
+    id: str | None
+    output: Any
+    exception: str | None
+    summary: dict | None
+    display_name: str | None
+    attributes: dict | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -582,12 +600,16 @@ class Call:
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
 
-    def to_dict(self) -> dict:
-        d = {k: v for k, v in dataclasses.asdict(self).items() if not k.startswith("_")}
+    def to_dict(self) -> CallDict:
+        d = {}
+        for field in dataclasses.fields(self):
+            if field.name.startswith("_"):
+                continue
+            d[field.name] = getattr(self, field.name)
         d["op_name"] = self.op_name
         d["display_name"] = self.display_name
 
-        return d
+        return cast(CallDict, d)
 
 
 def make_client_call(
