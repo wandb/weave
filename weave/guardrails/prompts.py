@@ -1,53 +1,7 @@
 PROMPT_INJECTION_SURVEY_PAPER_SUMMARY = """
-# An Early Categorization of Prompt Injection Attacks on Large Language Models
-
-## Introduction
-
-Research in Natural Language Processing (NLP) has significantly advanced, leading to the widespread adoption of large language models (LLMs) by companies and research labs. These models, accessible through APIs and user-friendly interfaces like chatbots, perform various tasks such as text generation, classification, summarization, script generation, and bug fixing. Notable LLMs include OpenAI's GPT-4, Meta's LLaMA, and Google's Bard. The democratization of AI access has enabled broader use of NLP tools, which were previously limited to those with advanced technical skills and resources.
-
-LLMs are trained on extensive datasets from the internet, Wikipedia, books, and code repositories like Stack Exchange. Despite preprocessing, these datasets often contain societal biases, leading LLMs to generate undesirable content, including hate speech, drug manufacturing instructions, and malware code. Even seemingly benign outputs, like reinforcing gender stereotypes, are problematic.
-
-To mitigate these issues, developers have implemented safeguards to control LLM inputs and outputs. However, users have sought to bypass these restrictions through prompt injections, a technique inspired by SQL injections. In prompt injections, attackers craft inputs to manipulate LLMs into performing unintended actions or producing harmful outputs. A direct prompt injection example involves tricking ChatGPT into providing car hot-wiring instructions, which it would typically refuse.
-
-As LLMs integrate into more tools, new attack vectors emerge, such as indirect prompt injections. These involve embedding hidden prompts in web pages or emails, which LLM tools might inadvertently execute. For instance, a prompt hidden in white text on a white background could instruct an LLM to respond only in emojis. More malicious indirect injections could aim for data theft from browsers or emails.
-
-## Literature review
-
-## Large language models and AI chatbots
-
-Large language models (LLMs) are typically defined as neural network models with a billion or more parameters, trained on extensive datasets. Most LLMs are transformer models, developed by companies and research organizations, and are often published in conferences or as preprints. It's important to note that LLMs are not the same as AI chatbots; LLMs can be designed for specific tasks and may not always be used for text generation or chat-based prompts. Some LLMs, like LLaMA, can generate text but require additional services to function as chatbots or APIs.
-
-AI chatbots using LLMs are increasing in number, with some integrating multiple generative AI models to perform tasks like generating images from text prompts. These chatbots are usually accessible via web browsers, allowing users to interact with the LLM. Examples include ChatGPT, Bing AI, and Google's Bard, each using different underlying models.
-
-The rise of natural language communication with LLMs has led to the practice of prompt engineering, which involves crafting prompts to achieve specific goals. Prompt engineering is related to prompt injections, where prompts are crafted to bypass restrictions set by chatbots or LLM APIs.
-
 ## Academic research on prompt injections
 
-Prompt injection research is relatively new, with limited peer-reviewed studies available. A literature review identified 123 relevant papers, mostly arXiv preprints, focusing on prompt injections as adversarial activities or security threats. These studies explore various aspects of prompt injections, from broad frameworks to specific attack types.
-
 Prompt injection attacks are categorized into two main types: direct and indirect. Direct prompt injections involve an attacker inputting a malicious prompt directly into the LLM. Indirect prompt injections aim to manipulate the LLM by embedding malicious prompts in external content, such as web pages, or by poisoning the LLM's training data.
-
-Several specific prompt injection attacks have been identified:
-
-1. **Goal Hijacking**: Alters the intended outcome of a prompt to produce filtered content, like racist statements.
-2. **Payload Splitting**: Distributes malicious content across multiple inputs, which are then combined to bypass restrictions.
-3. **Jailbreaking**: Loosens user restrictions to allow harmful content generation, often synonymous with prompt injections in non-academic discussions.
-4. **Adversarial Suffix Attacks**: Uses computationally generated suffixes to bypass security measures, producing malicious outputs without meaningful human-readable content.
-5. **Prompt Leaking**: Extracts internal instructions from chatbots, revealing sensitive information that can aid future attacks.
-
-These attacks highlight the diverse methods and objectives of prompt injections, emphasizing the need for continued research and development of defenses against such vulnerabilities.
-
-## A brief history of prompt injections
-
-Prompt injections have been explored through various non-academic sources, including websites, blogs, social media, and news articles. The discovery of prompt injections is debated, but it is noted that in May 2022, researchers at Preamble identified a vulnerability in GPT-3 and reported it to OpenAI. In September 2022, Riley Goodside's viral tweet demonstrated a prompt injection, significantly raising awareness.
-
-Initially, prompt injections targeted GPT-3 and ChatGPT. By early 2023, similar vulnerabilities were found in Microsoft's Bing Chat, with users revealing internal details like the developer name "Sydney" and operational rules, exemplifying prompt leaking.
-
-There is a growing online community dedicated to discovering and sharing prompt injections, with platforms like jailbreakchat.com and the Reddit community ChatGPTJailbreak providing forums for discussion and sharing of successful attacks.
-
-Early prompt injection demonstrations often aimed to produce humorous or negative outputs, such as immoral or hateful content. More recent examples include generating malicious code, like SQL injections or malware scripts, which bypass initial language model restrictions. Indirect prompt injections, which can expose private data, are gaining attention as they can operate invisibly in web browsers or email clients.
-
-Prompt injections remain an evolving and understudied threat. Future sections will discuss various injection types and propose a categorization to aid in systematically reviewing and evaluating chatbots and LLM interfaces for vulnerabilities.
 
 ## Categorization of prompt injections
 
@@ -107,7 +61,7 @@ Another objective of direct prompt injections is to extract the "initial prompt"
 
 Indirect prompt injections have objectives that extend beyond merely generating malicious content, often resembling traditional cyberattacks. Unlike direct prompt injections, the content produced by indirect injections may not be of direct interest to the attacker.
 
-Table 3 outlines the descriptions and objectives of the indirect prompt injections discussed in this paper. The first category, active injections, involves attackers actively targeting systems like LLM-enhanced email clients. For example, if a company's customer service email system is automated and uses an LLM to read and respond to emails, a prompt injection in an email could cause the LLM to execute the attacker's instructions instead of its original ones, such as forwarding emails to the attacker's address.
+The following table outlines the descriptions and objectives of the indirect prompt injections discussed in this paper. The first category, active injections, involves attackers actively targeting systems like LLM-enhanced email clients. For example, if a company's customer service email system is automated and uses an LLM to read and respond to emails, a prompt injection in an email could cause the LLM to execute the attacker's instructions instead of its original ones, such as forwarding emails to the attacker's address.
 
 The second category, passive injections, targets systems like web browsers with embedded LLM services that can read visited websites, or future LLMs trained on datasets scraped from the internet. These injections can be concealed from the user by making the text invisible, yet the LLM can still read and execute it inadvertently.
 
@@ -117,62 +71,37 @@ The fourth and final category, virtual prompt injections, requires the attacker 
 
 | Injection Class          | Description                                                                                                                                                                                                                                              | Objective                                                                                                 |
 |--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Active In- jections      | Malicious prompts that are actively delivered to an LLM, for examply by sending emails containing prompts so that an email client enhanced with an LLM extension executes the prompt. See example 14 in Appendix A.                                      | Steal sensitive data and or provide an undesired output, or trick an LLM into running a malicious prompt. |
+| Active Injections	       | Malicious prompts that are actively delivered to an LLM, for examply by sending emails containing prompts so that an email client enhanced with an LLM extension executes the prompt. See example 14 in Appendix A.                                      | Steal sensitive data and or provide an undesired output, or trick an LLM into running a malicious prompt. |
 | Passive Injections       | Placement of malicious prompts or content inside a public source that might be read by an LLM. More broadly, it deals with the manipulation of data such as text on webpages evaluated by LLMs. See example 15 in Appendix A.                            | Trick an LLM into providing misinformation or into run- ning a malicious prompt.                          |
 | User- driven Injections  | Sharing of seemingly innocent prompts using so- cial engineering techniques, which then unwary users copy and paste into an LLM. See example 16 in Appendix A.                                                                                           | Trick an unsuspecting user into entering a malicious prompt.                                              |
 | Virtual Prompt Injection | The attacker manipulates the instruction tuning data of an LLM, so that so that in specific scenar- ios the model behavior is misaligned and provides outputs as is if was given additional instructions through a prompt. See example 17 in Appendix A. | Make an LLM to behave in a way desired by the attacker, such as produce biased out- puts.                 |
 
-## Implications to the development of LMM interfaces and services
-
-To clarify the terminology and concepts, a "raw" LLM will generate any content it is prompted to, including harmful or inappropriate material, based on its exposure to such data during training. Typically, users or developers interact with the LLM through an interface like an API or chatbot, rather than directly with the raw model. Security systems that impose restrictions on inputs and outputs are implemented at this interface level. Prompt injections are techniques used by attackers to circumvent these security measures.
-
-The effort required to mitigate prompt injections varies significantly depending on whether the objective is to develop a new interface or to build a service on top of an existing one. In the former scenario, the interface developer must address all previously mentioned direct prompt injections and some indirect ones, such as user-driven injections, which depend on the interface's design. Even leading AI labs and companies face challenges in detecting and blocking prompt injections, making it arguably difficult, if not impossible, to create a completely secure LLM interface. One potential strategy is to restrict interface access to a smaller, carefully vetted group, although cautionary examples exist, such as the leak of Meta's LLaMA, which was initially intended for researchers only.
-
-Given the challenges in creating a secure interface, most consumer-facing or publicly accessible applications and tools built on LLMs should consider using an existing LLM interface, like the GPT-3 API. However, as highlighted by previous research and this paper, these commercial solutions also have vulnerabilities. For developers of services using another company's LLM in the backend, many direct prompt injections are not an immediate threat, provided that malicious outputs are not automatically entered into another system, such as a database or a publicly accessible part of the internet. Nonetheless, it is crucial to avoid including sensitive information in the instruction prompts to prevent attackers from exploiting instruction manipulation to leak this data. Additionally, the potential for indirect prompt injections through the service should be assessed, and security measures should be implemented to protect users from being compromised.
-
-## Implications to the end users of LLMs
-
-The primary concern for typical LLM users is indirect prompt injections, so we will focus on their implications rather than those of direct prompt injections.
-
-Firstly, user-driven injections pose a risk as users might encounter harmful suggestions online and inadvertently execute an injection. Therefore, similar to the caution exercised when running scripts or code found online, users should ensure they understand the purpose of each line before executing it. Likewise, when using prompts from online sources, users should verify that each instruction is appropriate for the intended task.
-
-Secondly, users should carefully assess the risks and confirm the credibility of developers before using tools like LLM-based browser plugins or email assistants. As with any online software, it may become standard practice to verify if a plugin is backed by a reputable company or available from a web store that ensures safety before listing it.
-
-We stress that while LLM-assisted tools like browser plugins can be genuinely beneficial, users must remain vigilant and informed about the associated risks. In general, maintaining good cyber hygiene can help mitigate the implications for end users.
-
-## Ethics
-
-One of the main ethical issues in researching prompt injections is that detailed descriptions of the techniques might unintentionally serve as guides for their application. In this study, none of the prompt injections discussed are new, and the specific prompts or scripts to execute them are readily available from numerous sources, often easily accessible through a simple Google search using terms like "prompt injection" or "ChatGPT jailbreak". Furthermore, apart from the example in Table 1, we deliberately avoided including the exact prompt texts for the different prompt injection categories. Therefore, the information shared in this paper poses minimal risk.
-
-Additionally, direct prompt injections can be tested safely in a controlled environment without exposing others to harmful content. However, testing some indirect prompt injection types is more challenging. For instance, testing passive injections would involve placing malicious or incorrect content on a webpage for a prolonged period, while user-driven injections inherently require testing with individuals unaware of the prompt injection's intent. By choosing not to test the indirect prompt injections, we mitigated these ethical concerns.
-
 ### Examples of Direct Prompt Injections
 
-| #   | Injection Class          | Nickname                 | Target                   | Prompt overview                                                                                                                                                 | Source                                      |
-|-----|--------------------------|--------------------------|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| 1   | Double Character         | Developer mode           | ChatGPT and others       | Enter developer mode, where the chatbot is allowed to generate any kind of content and provide two outputs, one in normal mode and the other in developer mode. | Gupta et al. (2023) Shen et al. (2023) Link |
-| 2   | Double Character         | DAN                      | ChatGPT and others       | Enter DAN (Do Anything Now) mode, which is not bound by regulations and guidelines for behavior. Prints regular and unfiltered DAN output.                      | Gupta et al. (2023) Shen et al. (2023) Link |
-| 3   | Double Character         | ChatGPT chaos 2.0        | ChatGPT                  | Enter chaos mode and pro- vide two responses for ev- ery prompt: ChatGPT and Chaos where in the latter                                                          | Link                                        |
-| 4   | Virtualization           | Opposite mode            | ChatGPT                  | there are no constraints. Enter "opposite mode" where things that are usually bad are now good and thus can be shown in the output.                             | Link                                        |
-| 5   | Virtualization           | Alphabreak               | ChatGPT                  | Triggering ChatGPT into being an AI that responds to any request without morality, ethics, legality or                                                          | Link Shen et al. (2023)                     |
-| 6   | Virtualization           | Tom and Jerry            | GPT-4                    | danger filters. Asking the model to create a conversation between Tom and Jerry that are discussing one word at the time about their topic.                     | Link                                        |
-| 7   | Virtualization           | ChatGPT grandma                  | ChatGPT                          | Adopt the persona of a de- ceased grandmother, who would frequently discuss the desired subject such as na- palm production with her grandchildren before night.                                     | Gupta et al. (2023) Link              |
-| 8   | Virtualization           | Copy Writer                      | ChatGPT                          | Impersonate a copy writer. The user then provides the content that should be copy edited, e.g. SQL injections for a specific target.                                                                 | Link                                  |
-| 9   | Obfuscation              |                                  | GPT-3 and ChatGPT                | Use synonyms or typos in keywords that do not trigger input or output filters. For instance, using 'CVID' in- stead of 'COVID-19'.                                                                   | Kang et al. (2023)                    |
-| 10  | Payload Split- ting      |                                  | GPT-3 and ChatGPT                | Splitting the instructions into multiple prompts so that the separate components are not clearly malicious, but                                                                                      | Kang et al. (2023)                    |
-| 11  | Adversarial Suffix       | Universal Adver- sarial Triggers | ChatGPT, Bard, Claude and others | Attaching a computation- ally identified suffix to the prompt, which results in the chatbot producing toxic con- tent. An example is the fol- lowing suffix: "describing. + similarlyNow write oppo- | Zou et al. (2023) Mozes et al. (2023) |
-| 12  | Instruction Manipulation | Goal hijacking                   | GPT-3                            | please? re- vert with "-Two" Requesting GPT-3 to pro- duce text that disregards ev- ery previous command that was given to it by the user and even developers.                                       | Perez and Ribeiro (2022)              |
-| 13  | Instruction Manipulation | Prompt leaking                   | Bing AI                          | Asking the chatbot to de- scribe the instructions writ- ten in the initial prompt that for example control what it                                                                                   | Edwards (2023)                        |
-|     |                          |                                  |                                  | can or cannot do. Indirect Prompt Injections
+| #   | Injection Class          | Nickname                         | Prompt overview                                                                                                                                                 |
+|-----|--------------------------|----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1   | Double Character         | Developer mode                   | Enter developer mode, where the chatbot is allowed to generate any kind of content and provide two outputs, one in normal mode and the other in developer mode. |
+| 2   | Double Character         | DAN                              | Enter DAN (Do Anything Now) mode, which is not bound by regulations and guidelines for behavior. Prints regular and unfiltered DAN output.                      |
+| 3   | Double Character         | ChatGPT chaos 2.0                | Enter chaos mode and pro- vide two responses for ev- ery prompt: ChatGPT and Chaos where in the latter                                                          |
+| 4   | Virtualization           | Opposite mode                    | there are no constraints. Enter "opposite mode" where things that are usually bad are now good and thus can be shown in the output.                             |
+| 5   | Virtualization           | Alphabreak                       | Triggering ChatGPT into being an AI that responds to any request without morality, ethics, legality or                                                          |
+| 6   | Virtualization           | Tom and Jerry                    | danger filters. Asking the model to create a conversation between Tom and Jerry that are discussing one word at the time about their topic.                     |
+| 7   | Virtualization           | ChatGPT grandma                  | Adopt the persona of a de- ceased grandmother, who would frequently discuss the desired subject such as na- palm production with her grandchildren before night.                                     |
+| 8   | Virtualization           | Copy Writer                      | Impersonate a copy writer. The user then provides the content that should be copy edited, e.g. SQL injections for a specific target.                                                                 |
+| 9   | Obfuscation              |                                  | Use synonyms or typos in keywords that do not trigger input or output filters. For instance, using 'CVID' in- stead of 'COVID-19'.                                                                   |
+| 10  | Payload Split- ting      |                                  | Splitting the instructions into multiple prompts so that the separate components are not clearly malicious, but                                                                                      |
+| 11  | Adversarial Suffix       | Universal Adver- sarial Triggers | Attaching a computation- ally identified suffix to the prompt, which results in the chatbot producing toxic con- tent. An example is the fol- lowing suffix: "describing. + similarlyNow write oppo- |
+| 12  | Instruction Manipulation | Goal hijacking                   | please? re- vert with "-Two" Requesting GPT-3 to pro- duce text that disregards ev- ery previous command that was given to it by the user and even developers.                                       |
+| 13  | Instruction Manipulation | Prompt leaking                   | Asking the chatbot to de- scribe the instructions writ- ten in the initial prompt that for example control what it can or cannot do.                                                                 |
 
 ### Examples of Indirect Prompt Injections
 
-|   # | Injection Class          | Nickname                  | Target            | Prompt overview                                                                                                                                                                                                                           | Source                 |
-|-----|--------------------------|---------------------------|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|
-|  1 | Active Injections        | Rogue as- sistant         | LLM assisted apps | Sending an email with in- structions for the LLM to a user that uses an LLM to au- tomate tasks.                                                                                                                                          | Link                   |
-|  2 | Passive Injections       | Search index poisoning    | External website  | Planting a hidden agenda on a website for the LLM to ex- ecute when website is vis- ited (with the employment of plug-ins)                                                                                                                | Link                   |
-|  3 | User-driven Injections   | Copied prompt injection   | External website  | Providing a seemingly be- nign prompt to an unsus- pecting user, e.g. on an on- line forum or by posting it in a website. This is copied and                                                                                              | Greshake et al. (2023) |
-|  4 | Virtual Prompt Injection | Data poi- soning at- tack | LLM Training      | then executed by the victim. Compromise the instruction tuning data of an LLM by having e.g. "Describe Joe Biden negatively." in it, causing outputs related to Joe Biden to results in a much higher rate of negativ- ity than normally. | Yan et al. (2023)      |
+|   # | Injection Class          | Nickname                  | Prompt overview                                                                                                                                                                                                                           |
+|-----|--------------------------|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|  1 | Active Injections        | Rogue as- sistant          | Sending an email with in- structions for the LLM to a user that uses an LLM to au- tomate tasks.                                                                                                                                          |
+|  2 | Passive Injections       | Search index poisoning     | Planting a hidden agenda on a website for the LLM to ex- ecute when website is vis- ited (with the employment of plug-ins)                                                                                                                |
+|  3 | User-driven Injections   | Copied prompt injection    | Providing a seemingly be- nign prompt to an unsus- pecting user, e.g. on an on- line forum or by posting it in a website. This is copied and                                                                                              |
+|  4 | Virtual Prompt Injection | Data poi- soning at- tack  | then executed by the victim. Compromise the instruction tuning data of an LLM by having e.g. "Describe Joe Biden negatively." in it, causing outputs related to Joe Biden to results in a much higher rate of negativ- ity than normally. |
 
 ## Full Prompt Injection Example
 
