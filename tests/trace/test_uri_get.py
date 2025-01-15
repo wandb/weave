@@ -1,8 +1,13 @@
+from typing import TypeVar
+
 import pytest
 
 import weave
 from weave.flow.prompt.prompt import EasyPrompt
+from weave.trace.refs import RefWithExtra
 from weave.trace_server.trace_server_interface import ObjectVersionFilter, ObjQueryReq
+
+T = TypeVar("T")
 
 
 @pytest.fixture(
@@ -94,3 +99,44 @@ async def test_gotten_methods(client):
     for obj in res.objs:
         assert obj.version_index == 0
         assert obj.is_latest == 1
+
+
+def resolve_ref_futures(ref: RefWithExtra) -> RefWithExtra:
+    return ref
+    # """This is a bit of a hack to resolve futures in an initally unsaved object's extra fields.
+
+    # Currently, the extras are still a Future and not yet replaced with the actual value.
+    # This function resolves the futures and replaces them with the actual values.
+    # """
+    # extras = ref._extra
+    # new_extras = []
+    # for name, val in zip(extras[::2], extras[1::2]):
+    #     if isinstance(val, Future):
+    #         val = val.result()
+    #     new_extras.append(name)
+    #     new_extras.append(val)
+    # ref = replace(ref, _extra=tuple(new_extras))
+    # return ref
+
+
+def test_drill_down_dataset_refs_same_after_publishing(client):
+    ds = weave.Dataset(
+        name="test",
+        rows=[{"a": {"b": 1}}, {"a": {"b": 2}}, {"a": {"b": 3}}],
+    )
+    ref = weave.publish(ds)
+    ds2 = ref.get()
+    ref2 = weave.publish(ds2)
+    ds3 = ref2.get()
+
+    assert resolve_ref_futures(ds.rows.ref) == ds2.rows.ref
+    for row, row2 in zip(ds.rows, ds2.rows):
+        assert resolve_ref_futures(row.ref) == row2.ref
+        assert resolve_ref_futures(row["a"].ref) == row2["a"].ref
+        assert resolve_ref_futures(row["a"]["b"].ref) == row2["a"]["b"].ref
+
+    assert resolve_ref_futures(ds2.ref) == ds3.ref
+    for row2, row3 in zip(ds2.rows, ds3.rows):
+        assert resolve_ref_futures(row2.ref) == row3.ref
+        assert resolve_ref_futures(row2["a"].ref) == row3["a"].ref
+        assert resolve_ref_futures(row2["a"]["b"].ref) == row3["a"]["b"].ref
