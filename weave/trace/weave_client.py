@@ -37,6 +37,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
+from weave.trace.objectify import maybe_objectify
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
@@ -731,7 +732,7 @@ class WeaveClient:
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(self, ref: ObjectRef) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
@@ -781,8 +782,10 @@ class WeaveClient:
             data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
-
-        return make_trace_obj(val, ref, self.server, None)
+        weave_obj = make_trace_obj(val, ref, self.server, None)
+        if objectify:
+            return maybe_objectify(weave_obj)
+        return weave_obj
 
     ################ Query API ################
 
