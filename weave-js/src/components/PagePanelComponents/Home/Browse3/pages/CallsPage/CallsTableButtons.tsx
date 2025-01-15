@@ -529,8 +529,8 @@ function makeCodeText(
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
   includeFeedback: boolean
 ) {
-  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\napi = weave.init("${project}")`;
-  codeStr += `\ncalls = api.get_calls(\n`;
+  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
+  codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
     codeStr += `   filter={"call_ids": ["${filteredCallIds.join('", "')}"]},\n`;
