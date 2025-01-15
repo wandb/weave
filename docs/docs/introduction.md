@@ -4,7 +4,7 @@ slug: /
 
 # W&B Weave
 
-Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
+Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
 
 - **Track:** Log and analyze LLM application inputs and outputs for debugging and further analysis.
 - **Experiment:** Test and compare models, prompts, inputs, and outputs.
