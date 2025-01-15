@@ -100,6 +100,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
+        self.remote_request_counter: dict[str, int] = {}
+
+    def counted_post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        self.remote_request_counter[url] += 1
+        return requests.post(url, *args, **kwargs)
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -157,7 +162,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        r = requests.post(
+        r = self.counted_post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,
             auth=self._auth,
@@ -184,7 +189,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> requests.Response:
-        r = requests.post(
+        r = self.counted_post(
             self.trace_server_url + url,
             # `by_alias` is required since we have Mongo-style properties in the
             # query models that are aliased to conform to start with `$`. Without
@@ -472,7 +477,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
+        r = self.counted_post(
             self.trace_server_url + "/files/create",
             auth=self._auth,
             data={"project_id": req.project_id},
@@ -492,7 +497,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        r = requests.post(
+        r = self.counted_post(
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
             auth=self._auth,
