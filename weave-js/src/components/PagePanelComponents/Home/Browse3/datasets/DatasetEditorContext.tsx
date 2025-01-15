@@ -75,7 +75,7 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
   const processRowUpdate = useCallback(
     (newRow: DatasetRow, oldRow: DatasetRow): DatasetRow => {
       const changedField = Object.keys(newRow).find(
-        key => newRow[key] !== oldRow[key] && key !== 'id'
+        key => newRow[key] !== oldRow[key]
       );
 
       if (changedField) {

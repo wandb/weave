@@ -295,6 +295,7 @@ export type TraceTableQueryRes = {
   rows: Array<{
     digest: string;
     val: any;
+    original_index?: number;
   }>;
 };
 
