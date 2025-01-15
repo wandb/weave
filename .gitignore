@@ -18,3 +18,10 @@ gha-creds-*.json
 .nox
 *.log
 */file::memory:?cache=shared
+tests/weave_models/**/vocab.txt
+tests/weave_models/**/tokenizer*.json
+tests/weave_models/**/special_tokens_map.json
+tests/weave_models/**/*.model
+tests/weave_models/.locks/
+tests/weave_models/models--*/
+tests/weave_models/*/
