@@ -217,9 +217,16 @@ export interface CallsQueryReq {
   query?: Query | null;
   /**
    * Include Costs
+   * Beta, subject to change. If true, the response will include any model costs for each call.
    * @default false
    */
   include_costs?: boolean | null;
+  /**
+   * Include Feedback
+   * Beta, subject to change. If true, the response will include feedback for each call.
+   * @default false
+   */
+  include_feedback?: boolean | null;
   /** Columns */
   columns?: string[] | null;
   /**
@@ -307,6 +314,106 @@ export interface ConvertSpec {
   to: 'double' | 'string' | 'int' | 'bool' | 'exists';
 }
 
+/** CostCreateInput */
+export interface CostCreateInput {
+  /** Prompt Token Cost */
+  prompt_token_cost: number;
+  /** Completion Token Cost */
+  completion_token_cost: number;
+  /**
+   * Prompt Token Cost Unit
+   * The unit of the cost for the prompt tokens
+   * @default "USD"
+   */
+  prompt_token_cost_unit?: string | null;
+  /**
+   * Completion Token Cost Unit
+   * The unit of the cost for the completion tokens
+   * @default "USD"
+   */
+  completion_token_cost_unit?: string | null;
+  /**
+   * Effective Date
+   * The date after which the cost is effective for, will default to the current date if not provided
+   */
+  effective_date?: string | null;
+  /**
+   * Provider Id
+   * The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'
+   */
+  provider_id?: string | null;
+}
+
+/** CostCreateReq */
+export interface CostCreateReq {
+  /** Project Id */
+  project_id: string;
+  /** Costs */
+  costs: Record<string, CostCreateInput>;
+  /**
+   * Wb User Id
+   * Do not set directly. Server will automatically populate this field.
+   */
+  wb_user_id?: string | null;
+}
+
+/** CostCreateRes */
+export interface CostCreateRes {
+  /** Ids */
+  ids: any[][];
+}
+
+/** CostPurgeReq */
+export interface CostPurgeReq {
+  /** Project Id */
+  project_id: string;
+  query: Query;
+}
+
+/** CostPurgeRes */
+export type CostPurgeRes = object;
+
+/** CostQueryOutput */
+export interface CostQueryOutput {
+  /** Id */
+  id?: string | null;
+  /** Llm Id */
+  llm_id?: string | null;
+  /** Prompt Token Cost */
+  prompt_token_cost?: number | null;
+  /** Completion Token Cost */
+  completion_token_cost?: number | null;
+  /** Prompt Token Cost Unit */
+  prompt_token_cost_unit?: string | null;
+  /** Completion Token Cost Unit */
+  completion_token_cost_unit?: string | null;
+  /** Effective Date */
+  effective_date?: string | null;
+  /** Provider Id */
+  provider_id?: string | null;
+}
+
+/** CostQueryReq */
+export interface CostQueryReq {
+  /** Project Id */
+  project_id: string;
+  /** Fields */
+  fields?: string[] | null;
+  query?: Query | null;
+  /** Sort By */
+  sort_by?: SortBy[] | null;
+  /** Limit */
+  limit?: number | null;
+  /** Offset */
+  offset?: number | null;
+}
+
+/** CostQueryRes */
+export interface CostQueryRes {
+  /** Results */
+  results: CostQueryOutput[];
+}
+
 /** EndedCallSchemaForInsert */
 export interface EndedCallSchemaForInsert {
   /** Project Id */
@@ -347,6 +454,14 @@ export interface FeedbackCreateReq {
   feedback_type: string;
   /** Payload */
   payload: object;
+  /** Annotation Ref */
+  annotation_ref?: string | null;
+  /** Runnable Ref */
+  runnable_ref?: string | null;
+  /** Call Ref */
+  call_ref?: string | null;
+  /** Trigger Ref */
+  trigger_ref?: string | null;
   /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
@@ -398,6 +513,50 @@ export interface FeedbackQueryReq {
 export interface FeedbackQueryRes {
   /** Result */
   result: object[];
+}
+
+/** FeedbackReplaceReq */
+export interface FeedbackReplaceReq {
+  /** Project Id */
+  project_id: string;
+  /** Weave Ref */
+  weave_ref: string;
+  /** Creator */
+  creator?: string | null;
+  /** Feedback Type */
+  feedback_type: string;
+  /** Payload */
+  payload: object;
+  /** Annotation Ref */
+  annotation_ref?: string | null;
+  /** Runnable Ref */
+  runnable_ref?: string | null;
+  /** Call Ref */
+  call_ref?: string | null;
+  /** Trigger Ref */
+  trigger_ref?: string | null;
+  /**
+   * Wb User Id
+   * Do not set directly. Server will automatically populate this field.
+   */
+  wb_user_id?: string | null;
+  /** Feedback Id */
+  feedback_id: string;
+}
+
+/** FeedbackReplaceRes */
+export interface FeedbackReplaceRes {
+  /** Id */
+  id: string;
+  /**
+   * Created At
+   * @format date-time
+   */
+  created_at: string;
+  /** Wb User Id */
+  wb_user_id: string;
+  /** Payload */
+  payload: object;
 }
 
 /** FileContentReadReq */
@@ -475,13 +634,7 @@ export interface LLMUsageSchema {
 /** LiteralOperation */
 export interface LiteralOperation {
   /** $Literal */
-  $literal:
-    | string
-    | number
-    | boolean
-    | Record<string, LiteralOperation>
-    | LiteralOperation[]
-    | null;
+  $literal: string | number | boolean | Record<string, LiteralOperation> | LiteralOperation[] | null;
 }
 
 /** NotOperation */
@@ -507,9 +660,34 @@ export interface ObjCreateRes {
 
 /** ObjQueryReq */
 export interface ObjQueryReq {
-  /** Project Id */
+  /**
+   * Project Id
+   * The ID of the project to query
+   */
   project_id: string;
+  /** Filter criteria for the query. See `ObjectVersionFilter` */
   filter?: ObjectVersionFilter | null;
+  /**
+   * Limit
+   * Maximum number of results to return
+   */
+  limit?: number | null;
+  /**
+   * Offset
+   * Number of results to skip before returning
+   */
+  offset?: number | null;
+  /**
+   * Sort By
+   * Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.
+   */
+  sort_by?: SortBy[] | null;
+  /**
+   * Metadata Only
+   * If true, the `val` column is not read from the database and is empty.All other fields are returned.
+   * @default false
+   */
+  metadata_only?: boolean | null;
 }
 
 /** ObjQueryRes */
@@ -568,17 +746,36 @@ export interface ObjSchemaForInsert {
   object_id: string;
   /** Val */
   val: any;
+  /** Builtin Object Class */
+  builtin_object_class?: string | null;
+  /**
+   * Set Base Object Class
+   * @deprecated
+   */
+  set_base_object_class?: string | null;
 }
 
 /** ObjectVersionFilter */
 export interface ObjectVersionFilter {
-  /** Base Object Classes */
+  /**
+   * Base Object Classes
+   * Filter objects by their base classes
+   */
   base_object_classes?: string[] | null;
-  /** Object Ids */
+  /**
+   * Object Ids
+   * Filter objects by their IDs
+   */
   object_ids?: string[] | null;
-  /** Is Op */
+  /**
+   * Is Op
+   * Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects
+   */
   is_op?: boolean | null;
-  /** Latest Only */
+  /**
+   * Latest Only
+   * If True, return only the latest version of each object. `False` and `None` will return all versions
+   */
   latest_only?: boolean | null;
 }
 
@@ -699,6 +896,11 @@ export interface TableCreateReq {
 export interface TableCreateRes {
   /** Digest */
   digest: string;
+  /**
+   * Row Digests
+   * The digests of the rows that were created
+   */
+  row_digests?: string[];
 }
 
 /** TableInsertSpec */
@@ -727,15 +929,33 @@ export interface TablePopSpecPayload {
 
 /** TableQueryReq */
 export interface TableQueryReq {
-  /** Project Id */
+  /**
+   * Project Id
+   * The ID of the project
+   */
   project_id: string;
-  /** Digest */
+  /**
+   * Digest
+   * The digest of the table to query
+   */
   digest: string;
+  /** Optional filter to apply to the query. See `TableRowFilter` for more details. */
   filter?: TableRowFilter | null;
-  /** Limit */
+  /**
+   * Limit
+   * Maximum number of rows to return
+   */
   limit?: number | null;
-  /** Offset */
+  /**
+   * Offset
+   * Number of rows to skip before starting to return rows
+   */
   offset?: number | null;
+  /**
+   * Sort By
+   * List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).
+   */
+  sort_by?: SortBy[] | null;
 }
 
 /** TableQueryRes */
@@ -744,9 +964,32 @@ export interface TableQueryRes {
   rows: TableRowSchema[];
 }
 
+/** TableQueryStatsReq */
+export interface TableQueryStatsReq {
+  /**
+   * Project Id
+   * The ID of the project
+   */
+  project_id: string;
+  /**
+   * Digest
+   * The digest of the table to query
+   */
+  digest: string;
+}
+
+/** TableQueryStatsRes */
+export interface TableQueryStatsRes {
+  /** Count */
+  count: number;
+}
+
 /** TableRowFilter */
 export interface TableRowFilter {
-  /** Row Digests */
+  /**
+   * Row Digests
+   * List of row digests to filter by
+   */
   row_digests?: string[] | null;
 }
 
@@ -780,6 +1023,11 @@ export interface TableUpdateReq {
 export interface TableUpdateRes {
   /** Digest */
   digest: string;
+  /**
+   * Updated Row Digests
+   * The digests of the rows that were updated
+   */
+  updated_row_digests?: string[];
 }
 
 /** ValidationError */
@@ -814,22 +1062,16 @@ export interface FullRequestParams extends Omit<RequestInit, 'body'> {
   cancelToken?: CancelToken;
 }
 
-export type RequestParams = Omit<
-  FullRequestParams,
-  'body' | 'method' | 'query' | 'path'
->;
+export type RequestParams = Omit<FullRequestParams, 'body' | 'method' | 'query' | 'path'>;
 
 export interface ApiConfig<SecurityDataType = unknown> {
   baseUrl?: string;
   baseApiParams?: Omit<RequestParams, 'baseUrl' | 'cancelToken' | 'signal'>;
-  securityWorker?: (
-    securityData: SecurityDataType | null
-  ) => Promise<RequestParams | void> | RequestParams | void;
+  securityWorker?: (securityData: SecurityDataType | null) => Promise<RequestParams | void> | RequestParams | void;
   customFetch?: typeof fetch;
 }
 
-export interface HttpResponse<D extends unknown, E extends unknown = unknown>
-  extends Response {
+export interface HttpResponse<D extends unknown, E extends unknown = unknown> extends Response {
   data: D;
   error: E;
 }
@@ -844,12 +1086,11 @@ export enum ContentType {
 }
 
 export class HttpClient<SecurityDataType = unknown> {
-  public baseUrl: string = '';
+  public baseUrl: string = 'https://api.wandb.ai';
   private securityData: SecurityDataType | null = null;
   private securityWorker?: ApiConfig<SecurityDataType>['securityWorker'];
   private abortControllers = new Map<CancelToken, AbortController>();
-  private customFetch = (...fetchParams: Parameters<typeof fetch>) =>
-    fetch(...fetchParams);
+  private customFetch = (...fetchParams: Parameters<typeof fetch>) => fetch(...fetchParams);
 
   private baseApiParams: RequestParams = {
     credentials: 'same-origin',
@@ -882,15 +1123,9 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected toQueryString(rawQuery?: QueryParamsType): string {
     const query = rawQuery || {};
-    const keys = Object.keys(query).filter(
-      key => 'undefined' !== typeof query[key]
-    );
+    const keys = Object.keys(query).filter(key => 'undefined' !== typeof query[key]);
     return keys
-      .map(key =>
-        Array.isArray(query[key])
-          ? this.addArrayQueryParam(query, key)
-          : this.addQueryParam(query, key)
-      )
+      .map(key => (Array.isArray(query[key]) ? this.addArrayQueryParam(query, key) : this.addQueryParam(query, key)))
       .join('&');
   }
 
@@ -901,13 +1136,8 @@ export class HttpClient<SecurityDataType = unknown> {
 
   private contentFormatters: Record<ContentType, (input: any) => any> = {
     [ContentType.Json]: (input: any) =>
-      input !== null && (typeof input === 'object' || typeof input === 'string')
-        ? JSON.stringify(input)
-        : input,
-    [ContentType.Text]: (input: any) =>
-      input !== null && typeof input !== 'string'
-        ? JSON.stringify(input)
-        : input,
+      input !== null && (typeof input === 'object' || typeof input === 'string') ? JSON.stringify(input) : input,
+    [ContentType.Text]: (input: any) => (input !== null && typeof input !== 'string' ? JSON.stringify(input) : input),
     [ContentType.FormData]: (input: any) =>
       Object.keys(input || {}).reduce((formData, key) => {
         const property = input[key];
@@ -924,10 +1154,7 @@ export class HttpClient<SecurityDataType = unknown> {
     [ContentType.UrlEncoded]: (input: any) => this.toQueryString(input),
   };
 
-  protected mergeRequestParams(
-    params1: RequestParams,
-    params2?: RequestParams
-  ): RequestParams {
+  protected mergeRequestParams(params1: RequestParams, params2?: RequestParams): RequestParams {
     return {
       ...this.baseApiParams,
       ...params1,
@@ -940,9 +1167,7 @@ export class HttpClient<SecurityDataType = unknown> {
     };
   }
 
-  protected createAbortSignal = (
-    cancelToken: CancelToken
-  ): AbortSignal | undefined => {
+  protected createAbortSignal = (cancelToken: CancelToken): AbortSignal | undefined => {
     if (this.abortControllers.has(cancelToken)) {
       const abortController = this.abortControllers.get(cancelToken);
       if (abortController) {
@@ -986,26 +1211,15 @@ export class HttpClient<SecurityDataType = unknown> {
     const payloadFormatter = this.contentFormatters[type || ContentType.Json];
     const responseFormat = format || requestParams.format;
 
-    return this.customFetch(
-      `${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`,
-      {
-        ...requestParams,
-        headers: {
-          ...(requestParams.headers || {}),
-          ...(type && type !== ContentType.FormData
-            ? {'Content-Type': type}
-            : {}),
-        },
-        signal:
-          (cancelToken
-            ? this.createAbortSignal(cancelToken)
-            : requestParams.signal) || null,
-        body:
-          typeof body === 'undefined' || body === null
-            ? null
-            : payloadFormatter(body),
-      }
-    ).then(async response => {
+    return this.customFetch(`${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`, {
+      ...requestParams,
+      headers: {
+        ...(requestParams.headers || {}),
+        ...(type && type !== ContentType.FormData ? {'Content-Type': type} : {}),
+      },
+      signal: (cancelToken ? this.createAbortSignal(cancelToken) : requestParams.signal) || null,
+      body: typeof body === 'undefined' || body === null ? null : payloadFormatter(body),
+    }).then(async response => {
       const r = response.clone() as HttpResponse<T, E>;
       r.data = null as unknown as T;
       r.error = null as unknown as E;
@@ -1039,10 +1253,9 @@ export class HttpClient<SecurityDataType = unknown> {
 /**
  * @title FastAPI
  * @version 0.1.0
+ * @baseUrl https://api.wandb.ai
  */
-export class Api<
-  SecurityDataType extends unknown,
-> extends HttpClient<SecurityDataType> {
+export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDataType> {
   health = {
     /**
      * No description
@@ -1127,10 +1340,7 @@ export class Api<
      * @request POST:/call/upsert_batch
      * @secure
      */
-    callStartBatchCallUpsertBatchPost: (
-      data: CallCreateBatchReq,
-      params: RequestParams = {}
-    ) =>
+    callStartBatchCallUpsertBatchPost: (data: CallCreateBatchReq, params: RequestParams = {}) =>
       this.request<CallCreateBatchRes, HTTPValidationError>({
         path: `/call/upsert_batch`,
         method: 'POST',
@@ -1150,10 +1360,7 @@ export class Api<
      * @request POST:/call/update
      * @secure
      */
-    callUpdateCallUpdatePost: (
-      data: CallUpdateReq,
-      params: RequestParams = {}
-    ) =>
+    callUpdateCallUpdatePost: (data: CallUpdateReq, params: RequestParams = {}) =>
       this.request<CallUpdateRes, HTTPValidationError>({
         path: `/call/update`,
         method: 'POST',
@@ -1194,10 +1401,7 @@ export class Api<
      * @request POST:/calls/delete
      * @secure
      */
-    callsDeleteCallsDeletePost: (
-      data: CallsDeleteReq,
-      params: RequestParams = {}
-    ) =>
+    callsDeleteCallsDeletePost: (data: CallsDeleteReq, params: RequestParams = {}) =>
       this.request<CallsDeleteRes, HTTPValidationError>({
         path: `/calls/delete`,
         method: 'POST',
@@ -1217,10 +1421,7 @@ export class Api<
      * @request POST:/calls/query_stats
      * @secure
      */
-    callsQueryStatsCallsQueryStatsPost: (
-      data: CallsQueryStatsReq,
-      params: RequestParams = {}
-    ) =>
+    callsQueryStatsCallsQueryStatsPost: (data: CallsQueryStatsReq, params: RequestParams = {}) =>
       this.request<CallsQueryStatsRes, HTTPValidationError>({
         path: `/calls/query_stats`,
         method: 'POST',
@@ -1240,10 +1441,7 @@ export class Api<
      * @request POST:/calls/stream_query
      * @secure
      */
-    callsQueryStreamCallsStreamQueryPost: (
-      data: CallsQueryReq,
-      params: RequestParams = {}
-    ) =>
+    callsQueryStreamCallsStreamQueryPost: (data: CallsQueryReq, params: RequestParams = {}) =>
       this.request<any, HTTPValidationError>({
         path: `/calls/stream_query`,
         method: 'POST',
@@ -1326,10 +1524,7 @@ export class Api<
      * @request POST:/table/create
      * @secure
      */
-    tableCreateTableCreatePost: (
-      data: TableCreateReq,
-      params: RequestParams = {}
-    ) =>
+    tableCreateTableCreatePost: (data: TableCreateReq, params: RequestParams = {}) =>
       this.request<TableCreateRes, HTTPValidationError>({
         path: `/table/create`,
         method: 'POST',
@@ -1349,10 +1544,7 @@ export class Api<
      * @request POST:/table/update
      * @secure
      */
-    tableUpdateTableUpdatePost: (
-      data: TableUpdateReq,
-      params: RequestParams = {}
-    ) =>
+    tableUpdateTableUpdatePost: (data: TableUpdateReq, params: RequestParams = {}) =>
       this.request<TableUpdateRes, HTTPValidationError>({
         path: `/table/update`,
         method: 'POST',
@@ -1372,12 +1564,29 @@ export class Api<
      * @request POST:/table/query
      * @secure
      */
-    tableQueryTableQueryPost: (
-      data: TableQueryReq,
-      params: RequestParams = {}
-    ) =>
+    tableQueryTableQueryPost: (data: TableQueryReq, params: RequestParams = {}) =>
       this.request<TableQueryRes, HTTPValidationError>({
         path: `/table/query`,
+        method: 'POST',
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Tables
+     * @name TableQueryStatsTableQueryStatsPost
+     * @summary Table Query Stats
+     * @request POST:/table/query_stats
+     * @secure
+     */
+    tableQueryStatsTableQueryStatsPost: (data: TableQueryStatsReq, params: RequestParams = {}) =>
+      this.request<TableQueryStatsRes, HTTPValidationError>({
+        path: `/table/query_stats`,
         method: 'POST',
         body: data,
         secure: true,
@@ -1396,10 +1605,7 @@ export class Api<
      * @request POST:/refs/read_batch
      * @secure
      */
-    refsReadBatchRefsReadBatchPost: (
-      data: RefsReadBatchReq,
-      params: RequestParams = {}
-    ) =>
+    refsReadBatchRefsReadBatchPost: (data: RefsReadBatchReq, params: RequestParams = {}) =>
       this.request<RefsReadBatchRes, HTTPValidationError>({
         path: `/refs/read_batch`,
         method: 'POST',
@@ -1420,10 +1626,7 @@ export class Api<
      * @request POST:/file/create
      * @secure
      */
-    fileCreateFileCreatePost: (
-      data: BodyFileCreateFileCreatePost,
-      params: RequestParams = {}
-    ) =>
+    fileCreateFileCreatePost: (data: BodyFileCreateFileCreatePost, params: RequestParams = {}) =>
       this.request<FileCreateRes, HTTPValidationError>({
         path: `/file/create`,
         method: 'POST',
@@ -1443,12 +1646,70 @@ export class Api<
      * @request POST:/file/content
      * @secure
      */
-    fileContentFileContentPost: (
-      data: FileContentReadReq,
-      params: RequestParams = {}
-    ) =>
+    fileContentFileContentPost: (data: FileContentReadReq, params: RequestParams = {}) =>
       this.request<any, HTTPValidationError>({
         path: `/file/content`,
+        method: 'POST',
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+  };
+  cost = {
+    /**
+     * No description
+     *
+     * @tags Costs
+     * @name CostCreateCostCreatePost
+     * @summary Cost Create
+     * @request POST:/cost/create
+     * @secure
+     */
+    costCreateCostCreatePost: (data: CostCreateReq, params: RequestParams = {}) =>
+      this.request<CostCreateRes, HTTPValidationError>({
+        path: `/cost/create`,
+        method: 'POST',
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Costs
+     * @name CostQueryCostQueryPost
+     * @summary Cost Query
+     * @request POST:/cost/query
+     * @secure
+     */
+    costQueryCostQueryPost: (data: CostQueryReq, params: RequestParams = {}) =>
+      this.request<CostQueryRes, HTTPValidationError>({
+        path: `/cost/query`,
+        method: 'POST',
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Costs
+     * @name CostPurgeCostPurgePost
+     * @summary Cost Purge
+     * @request POST:/cost/purge
+     * @secure
+     */
+    costPurgeCostPurgePost: (data: CostPurgeReq, params: RequestParams = {}) =>
+      this.request<CostPurgeRes, HTTPValidationError>({
+        path: `/cost/purge`,
         method: 'POST',
         body: data,
         secure: true,
@@ -1467,10 +1728,7 @@ export class Api<
      * @request POST:/feedback/create
      * @secure
      */
-    feedbackCreateFeedbackCreatePost: (
-      data: FeedbackCreateReq,
-      params: RequestParams = {}
-    ) =>
+    feedbackCreateFeedbackCreatePost: (data: FeedbackCreateReq, params: RequestParams = {}) =>
       this.request<FeedbackCreateRes, HTTPValidationError>({
         path: `/feedback/create`,
         method: 'POST',
@@ -1490,10 +1748,7 @@ export class Api<
      * @request POST:/feedback/query
      * @secure
      */
-    feedbackQueryFeedbackQueryPost: (
-      data: FeedbackQueryReq,
-      params: RequestParams = {}
-    ) =>
+    feedbackQueryFeedbackQueryPost: (data: FeedbackQueryReq, params: RequestParams = {}) =>
       this.request<FeedbackQueryRes, HTTPValidationError>({
         path: `/feedback/query`,
         method: 'POST',
@@ -1513,12 +1768,29 @@ export class Api<
      * @request POST:/feedback/purge
      * @secure
      */
-    feedbackPurgeFeedbackPurgePost: (
-      data: FeedbackPurgeReq,
-      params: RequestParams = {}
-    ) =>
+    feedbackPurgeFeedbackPurgePost: (data: FeedbackPurgeReq, params: RequestParams = {}) =>
       this.request<FeedbackPurgeRes, HTTPValidationError>({
         path: `/feedback/purge`,
+        method: 'POST',
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Feedback
+     * @name FeedbackReplaceFeedbackReplacePost
+     * @summary Feedback Replace
+     * @request POST:/feedback/replace
+     * @secure
+     */
+    feedbackReplaceFeedbackReplacePost: (data: FeedbackReplaceReq, params: RequestParams = {}) =>
+      this.request<FeedbackReplaceRes, HTTPValidationError>({
+        path: `/feedback/replace`,
         method: 'POST',
         body: data,
         secure: true,

@@ -1,6 +1,6 @@
-
-## title: NotDiamond Custom Routing
-
+---
+title: NotDiamond Custom Routing
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{intro-colab} -->
 
 
@@ -202,7 +202,7 @@ best_provider_model, nd_model = evaluate_router(
 
 ```python
 @weave.op()
-def is_correct(score: int, model_output: dict) -> dict:
+def is_correct(score: int, output: dict) -> dict:
     # We hack score, since we already have model responses
     return {"correct": score}
 
