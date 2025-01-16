@@ -19,8 +19,8 @@ import {
   useWeaveflowRouteContext,
 } from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
-import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
+import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
+import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';

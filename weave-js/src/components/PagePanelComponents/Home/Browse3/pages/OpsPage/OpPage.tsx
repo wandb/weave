@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {SimplePageLayout} from './common/SimplePageLayout';
+import {SimplePageLayout} from '../common/SimplePageLayout';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
 
 export const OpPage: React.FC<{

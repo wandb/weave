@@ -147,6 +147,7 @@ SELECT
     version_index,
     is_latest,
     deleted_at,
+    wb_user_id,
     version_count,
     is_op
 FROM (
@@ -159,6 +160,7 @@ FROM (
         base_object_class,
         refs,
         digest,
+        wb_user_id,
         is_op,
         row_number() OVER (
             PARTITION BY project_id,
@@ -184,6 +186,7 @@ FROM (
             base_object_class,
             refs,
             digest,
+            wb_user_id,
             if (kind = 'op', 1, 0) AS is_op,
             row_number() OVER (
                 PARTITION BY project_id,

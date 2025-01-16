@@ -124,6 +124,7 @@ class SelectableCHCallSchema(BaseModel):
 
 class ObjCHInsertable(BaseModel):
     project_id: str
+    wb_user_id: Optional[str] = None
     kind: str
     base_object_class: Optional[str]
     object_id: str
@@ -131,6 +132,7 @@ class ObjCHInsertable(BaseModel):
     val_dump: str
     digest: str
 
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
     _refs = field_validator("refs")(validation.refs_list_validator)
@@ -145,6 +147,7 @@ class SelectableCHObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
+    wb_user_id: Optional[str] = None
     refs: list[str]
     val_dump: str
     kind: str

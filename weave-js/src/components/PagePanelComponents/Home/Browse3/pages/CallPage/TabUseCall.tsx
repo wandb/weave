@@ -2,10 +2,10 @@ import {Box} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import React, {useState} from 'react';
 
-import {CopyableText} from '../../../../CopyableText';
-import {DocLink} from './common/Links';
-import {TabUseBanner} from './TabUseBanner';
-import {CallSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import {CopyableText} from '../../../../../CopyableText';
+import {DocLink} from '../common/Links';
+import {TabUseBanner} from '../common/TabUseBanner';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 type TabUseCallProps = {
   call: CallSchema;
