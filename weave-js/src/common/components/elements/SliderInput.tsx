@@ -93,8 +93,28 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
       return keyboardOperations[op];
     };
 
+    function isFormField(node?: Element | null | undefined) {
+      if (!node) {
+        return false;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tagName = node.tagName.toLowerCase();
+
+        return [
+          'input',
+          'textarea',
+          'select',
+          'button',
+          'datalist',
+          'output',
+        ].includes(tagName);
+      }
+
+      return false;
+    }
+
     const stepKeyboardListener = (event: KeyboardEvent) => {
-      if (isEmpty(keyboardBindings)) {
+      if (isEmpty(keyboardBindings) || isFormField(document.activeElement)) {
         return;
       }
       const eventKey = event.key;
