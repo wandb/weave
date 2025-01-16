@@ -1716,11 +1716,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
                 yield from stream
         except Exception as e:
-            logger.exception(
-                f"_query_stream exception: {e}",
-                extra={"query": query, "parameters": parameters},
-            )
-            raise
+            # wrap exception with query and parameters
+            extra = {"query": query, "parameters": parameters}
+            raise type(e)(f"{str(e)} - Query: {query}, Parameters: {parameters}") from None
 
     def _query(
         self,
