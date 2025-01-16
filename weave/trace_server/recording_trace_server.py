@@ -80,7 +80,7 @@ class RecordingTraceServer(TraceServerInterface):
         for name, logs in log_groups.items():
             total_duration = sum(log["duration"] for log in logs)
             count = len(logs)
-            error_count =    sum(1 for log in logs if log["error"] is not None)
+            error_count =    sum(1 for log in logs if log.get("error") is not None)
             groups[name] = {
                 "total_duration": total_duration,
                 "count": count,
