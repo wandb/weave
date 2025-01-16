@@ -1,4 +1,3 @@
-from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import Field, field_validator
@@ -115,16 +114,13 @@ class HuggingFacePipelineScorer(Scorer):
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
         try:
-            if find_spec("transformers") is None:
-                print(
-                    "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
-                )
+            import transformers
         except ImportError:
             print(
                 "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
             )
         if self.pipeline is None:
-            self.set_pipeline()
+            self.load_pipeline()
 
     def load_pipeline(self) -> None:
         raise NotImplementedError(
