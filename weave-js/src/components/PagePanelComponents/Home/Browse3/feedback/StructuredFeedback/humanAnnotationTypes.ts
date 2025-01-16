@@ -26,3 +26,6 @@ export type HumanAnnotation = Feedback & {};
 
 export const isHumanAnnotationType = (feedbackType: string) =>
   feedbackType.startsWith(HUMAN_ANNOTATION_BASE_TYPE);
+
+export const getHumanAnnotationNameFromFeedbackType = (feedbackType: string) =>
+  feedbackType.split('.').pop();

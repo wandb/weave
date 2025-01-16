@@ -152,10 +152,14 @@ export const WeaveCHTable: FC<{
   );
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
+  const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
 
   useEffect(() => {
-    if (!fetchQuery.loading && fetchQuery.result) {
-      setLoadedRows(fetchQuery.result.rows);
+    if (!fetchQuery.loading) {
+      if (fetchQuery.result) {
+        setLoadedRows(fetchQuery.result.rows);
+      }
+      setFetchQueryLoaded(true);
     }
   }, [fetchQuery.loading, fetchQuery.result]);
 
@@ -224,7 +228,7 @@ export const WeaveCHTable: FC<{
       }}>
       <DataTableView
         data={pagedRows}
-        loading={fetchQuery.loading}
+        loading={!fetchQueryLoaded}
         displayKey="val"
         onLinkClick={onClickEnabled ? onClick : undefined}
         fullHeight={props.fullHeight}

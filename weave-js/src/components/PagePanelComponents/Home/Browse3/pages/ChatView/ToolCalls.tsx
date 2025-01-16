@@ -65,7 +65,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
           <div className="text-sm font-semibold text-moon-500">Function</div>
           <Button
             icon={isCopying ? 'checkmark' : 'copy'}
-            variant="quiet"
+            variant="ghost"
             size="small"
             tooltip="Copy"
             onClick={() => handleCopyText(copyText)}
