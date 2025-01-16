@@ -1,5 +1,3 @@
-
-
 import threading
 import time
 from collections import defaultdict
@@ -16,6 +14,7 @@ class LogRecord(TypedDict):
     duration: float
     error: Optional[str]
 
+
 class RecordingTraceServer(TraceServerInterface):
     _next_ts: TraceServerInterface
     _log: list[LogRecord]
@@ -26,7 +25,15 @@ class RecordingTraceServer(TraceServerInterface):
         self._log_lock = threading.Lock()
 
     def __getattribute__(self, name):
-        protected_names = ["_next_ts", "_log", "_log_lock", "_thread_safe_log", "get_log", "summarize_logs", "reset_log"]
+        protected_names = [
+            "_next_ts",
+            "_log",
+            "_log_lock",
+            "_thread_safe_log",
+            "get_log",
+            "summarize_logs",
+            "reset_log",
+        ]
         if name in protected_names:
             return super().__getattribute__(name)
         attr = self._next_ts.__getattribute__(name)
@@ -43,10 +50,16 @@ class RecordingTraceServer(TraceServerInterface):
                     print(args[0].name)
                 res = attr(*args, **kwargs)
                 end = time.perf_counter()
-                self._thread_safe_log(LogRecord(timestamp=now, name=name, duration=end - start))
+                self._thread_safe_log(
+                    LogRecord(timestamp=now, name=name, duration=end - start)
+                )
             except Exception as e:
                 end = time.perf_counter()
-                self._thread_safe_log(LogRecord(timestamp=now, name=name, duration=end - start, error=str(e)))
+                self._thread_safe_log(
+                    LogRecord(
+                        timestamp=now, name=name, duration=end - start, error=str(e)
+                    )
+                )
                 raise e
             return res
 
@@ -80,7 +93,7 @@ class RecordingTraceServer(TraceServerInterface):
         for name, logs in log_groups.items():
             total_duration = sum(log["duration"] for log in logs)
             count = len(logs)
-            error_count =    sum(1 for log in logs if log.get("error") is not None)
+            error_count = sum(1 for log in logs if log.get("error") is not None)
             groups[name] = {
                 "total_duration": total_duration,
                 "count": count,

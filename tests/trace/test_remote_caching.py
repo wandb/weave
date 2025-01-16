@@ -11,7 +11,16 @@ from weave.trace_server.recording_trace_server import RecordingTraceServer
 
 def make_random_image(width: int, height: int) -> PIL.Image:
     image = PIL.Image.new("RGB", (width, height))
-    image.putdata([(int(255*random.random()), int(255*random.random()), int(255*random.random())) for _ in range(width*height)])
+    image.putdata(
+        [
+            (
+                int(255 * random.random()),
+                int(255 * random.random()),
+                int(255 * random.random()),
+            )
+            for _ in range(width * height)
+        ]
+    )
     return image
 
 
@@ -24,12 +33,15 @@ async def test_dataset_perf():
     timings["init"] = time.perf_counter() - clock
 
     # Create the dataset
-    rows = [{
-        "id": i,
-        "image_0": make_random_image(1024, 1024),
-        "image_1": make_random_image(1024, 1024),
-        "truth": i % 2,
-    } for i in range(5)]
+    rows = [
+        {
+            "id": i,
+            "image_0": make_random_image(1024, 1024),
+            "image_1": make_random_image(1024, 1024),
+            "truth": i % 2,
+        }
+        for i in range(5)
+    ]
 
     clock = time.perf_counter()
     dataset = weave.Dataset(rows=rows)
@@ -71,10 +83,7 @@ async def test_dataset_perf():
         @weave.op()
         async def invoke(self, image_0: PIL.Image, image_1: PIL.Image) -> dict:
             # download images...
-            await self.play_matching_game(
-                    image_a=image_0, image_b=image_1
-                )
-
+            await self.play_matching_game(image_a=image_0, image_b=image_1)
 
         @weave.op()
         async def play_matching_game(
@@ -82,10 +91,8 @@ async def test_dataset_perf():
         ) -> tuple[bool, str | None, str | None]:
             model_a_num_similar = await self.get_similar_images(image_a)
 
-
         async def get_similar_images(self, image: PIL.Image):
             set_images = split_thumbail(thumbnail_image=image)
-
 
     def split_thumbail(thumbnail_image: PIL.Image) -> list[PIL.Image]:
         image = thumbnail_image.crop((10, 10, 10, 10))
@@ -94,7 +101,6 @@ async def test_dataset_perf():
         #     image_0.crop((0, 0, 10, 10))
         #     image_1.crop((0, 0, 10, 10))
         #     return 1 if random.random() > 0.5 else 0
-
 
     # if isinstance(client.server, RecordingTraceServer):
     #     client._flush()
