@@ -95,10 +95,14 @@ const makeAnnotationPayloadFromSpec = (
     if (spec.enum) {
       return `"${spec.enum[0] ?? 'Yes'}"`;
     }
-    if (spec.max_length && spec.max_length >= 13) {
-      return `"A great call!"`;
+    const strMsg = 'A great call!';
+    if (
+      !spec.max_length ||
+      (spec.max_length && spec.max_length >= strMsg.length)
+    ) {
+      return `"${strMsg}"`;
     }
-    return '"Yes"';
+    return '"Nice!"';
   }
   if (spec?.type === 'number' || spec?.type === 'integer') {
     if (spec.maximum) {
@@ -112,5 +116,5 @@ const makeAnnotationPayloadFromSpec = (
   if (spec?.type === 'boolean') {
     return 'True';
   }
-  return 'Nice!';
+  return '"Nice!"';
 };
