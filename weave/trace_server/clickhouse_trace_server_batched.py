@@ -174,7 +174,7 @@ ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     # "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
-    "max_memory_usage": 1 * 1024 * ,  # 
+    "max_memory_usage": 1 * 1024 * 1024,  # 1 MiB
 }
 
 
