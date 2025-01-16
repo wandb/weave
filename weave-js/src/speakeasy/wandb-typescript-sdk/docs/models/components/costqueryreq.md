@@ -1,0 +1,34 @@
+# CostQueryReq
+
+## Example Usage
+
+```typescript
+import { CostQueryReq } from "wandb/models/components";
+
+let value: CostQueryReq = {
+  projectId: "entity/project",
+  fields: [
+    "id",
+    "llm_id",
+    "prompt_token_cost",
+    "completion_token_cost",
+    "prompt_token_cost_unit",
+    "completion_token_cost_unit",
+    "effective_date",
+    "provider_id",
+  ],
+  limit: 10,
+  offset: 0,
+};
+```
+
+## Fields
+
+| Field                                                                                                                                                     | Type                                                                                                                                                      | Required                                                                                                                                                  | Description                                                                                                                                               | Example                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`                                                                                                                                               | *string*                                                                                                                                                  | :heavy_check_mark:                                                                                                                                        | N/A                                                                                                                                                       | entity/project                                                                                                                                            |
+| `fields`                                                                                                                                                  | *string*[]                                                                                                                                                | :heavy_minus_sign:                                                                                                                                        | N/A                                                                                                                                                       | [<br/>"id",<br/>"llm_id",<br/>"prompt_token_cost",<br/>"completion_token_cost",<br/>"prompt_token_cost_unit",<br/>"completion_token_cost_unit",<br/>"effective_date",<br/>"provider_id"<br/>] |
+| `query`                                                                                                                                                   | *components.CostQueryReqQuery*[]                                                                                                                          | :heavy_minus_sign:                                                                                                                                        | N/A                                                                                                                                                       |                                                                                                                                                           |
+| `sortBy`                                                                                                                                                  | [components.SortBy](../../models/components/sortby.md)[]                                                                                                  | :heavy_minus_sign:                                                                                                                                        | N/A                                                                                                                                                       |                                                                                                                                                           |
+| `limit`                                                                                                                                                   | *number*                                                                                                                                                  | :heavy_minus_sign:                                                                                                                                        | N/A                                                                                                                                                       | 10                                                                                                                                                        |
+| `offset`                                                                                                                                                  | *number*                                                                                                                                                  | :heavy_minus_sign:                                                                                                                                        | N/A                                                                                                                                                       | 0                                                                                                                                                         |

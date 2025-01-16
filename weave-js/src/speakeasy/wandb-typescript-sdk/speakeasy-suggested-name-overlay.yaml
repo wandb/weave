@@ -1,0 +1,187 @@
+overlay: 1.0.0
+info:
+  title: Speakeasy Suggestions - Weave Trace Server
+  version: 0.0.1
+actions:
+  - target: $["paths"]["/cost/create"]["post"]
+    update:
+      x-speakeasy-name-override: create
+    x-speakeasy-metadata:
+      after: sdk.costs.create()
+      before: sdk.Costs.cost_create_cost_create_post()
+      type: method-name
+  - target: $["paths"]["/cost/query"]["post"]
+    update:
+      x-speakeasy-name-override: query
+    x-speakeasy-metadata:
+      after: sdk.costs.query()
+      before: sdk.Costs.cost_query_cost_query_post()
+      type: method-name
+  - target: $["paths"]["/table/create"]["post"]
+    update:
+      x-speakeasy-name-override: create
+    x-speakeasy-metadata:
+      after: sdk.tables.create()
+      before: sdk.Tables.table_create_table_create_post()
+      type: method-name
+  - target: $["paths"]["/file/create"]["post"]
+    update:
+      x-speakeasy-name-override: create
+    x-speakeasy-metadata:
+      after: sdk.files.create()
+      before: sdk.Files.file_create_file_create_post()
+      type: method-name
+  - target: $["paths"]["/feedback/query"]["post"]
+    update:
+      x-speakeasy-name-override: query
+    x-speakeasy-metadata:
+      after: sdk.feedback.query()
+      before: sdk.Feedback.feedback_query_feedback_query_post()
+      type: method-name
+  - target: $["paths"]["/health"]["get"]
+    update:
+      x-speakeasy-name-override: getHealth
+    x-speakeasy-metadata:
+      after: sdk.service.getHealth()
+      before: sdk.Service.read_root_health_get()
+      type: method-name
+  - target: $["paths"]["/call/end"]["post"]
+    update:
+      x-speakeasy-name-override: end
+    x-speakeasy-metadata:
+      after: sdk.calls.end()
+      before: sdk.Calls.call_end_call_end_post()
+      type: method-name
+  - target: $["paths"]["/obj/create"]["post"]
+    update:
+      x-speakeasy-name-override: create
+    x-speakeasy-metadata:
+      after: sdk.objects.create()
+      before: sdk.Objects.obj_create_obj_create_post()
+      type: method-name
+  - target: $["paths"]["/table/query"]["post"]
+    update:
+      x-speakeasy-name-override: query
+    x-speakeasy-metadata:
+      after: sdk.tables.query()
+      before: sdk.Tables.table_query_table_query_post()
+      type: method-name
+  - target: $["paths"]["/objs/query"]["post"]
+    update:
+      x-speakeasy-name-override: query
+    x-speakeasy-metadata:
+      after: sdk.objects.query()
+      before: sdk.Objects.objs_query_objs_query_post()
+      type: method-name
+  - target: $["paths"]["/server_info"]["get"]
+    update:
+      x-speakeasy-name-override: getServerInfo
+    x-speakeasy-metadata:
+      after: sdk.service.getServerInfo()
+      before: sdk.Service.server_info_server_info_get()
+      type: method-name
+  - target: $["paths"]["/feedback/create"]["post"]
+    update:
+      x-speakeasy-name-override: create
+    x-speakeasy-metadata:
+      after: sdk.feedback.create()
+      before: sdk.Feedback.feedback_create_feedback_create_post()
+      type: method-name
+  - target: $["paths"]["/calls/query_stats"]["post"]
+    update:
+      x-speakeasy-name-override: queryStats
+    x-speakeasy-metadata:
+      after: sdk.calls.queryStats()
+      before: sdk.Calls.calls_query_stats_calls_query_stats_post()
+      type: method-name
+  - target: $["paths"]["/call/read"]["post"]
+    update:
+      x-speakeasy-name-override: read
+    x-speakeasy-metadata:
+      after: sdk.calls.read()
+      before: sdk.Calls.call_read_call_read_post()
+      type: method-name
+  - target: $["paths"]["/table/query_stats"]["post"]
+    update:
+      x-speakeasy-name-override: queryStats
+    x-speakeasy-metadata:
+      after: sdk.tables.queryStats()
+      before: sdk.Tables.table_query_stats_table_query_stats_post()
+      type: method-name
+  - target: $["paths"]["/refs/read_batch"]["post"]
+    update:
+      x-speakeasy-name-override: readBatch
+    x-speakeasy-metadata:
+      after: sdk.refs.readBatch()
+      before: sdk.Refs.refs_read_batch_refs_read_batch_post()
+      type: method-name
+  - target: $["paths"]["/call/upsert_batch"]["post"]
+    update:
+      x-speakeasy-name-override: upsertBatch
+    x-speakeasy-metadata:
+      after: sdk.calls.upsertBatch()
+      before: sdk.Calls.call_start_batch_call_upsert_batch_post()
+      type: method-name
+  - target: $["paths"]["/feedback/purge"]["post"]
+    update:
+      x-speakeasy-name-override: purge
+    x-speakeasy-metadata:
+      after: sdk.feedback.purge()
+      before: sdk.Feedback.feedback_purge_feedback_purge_post()
+      type: method-name
+  - target: $["paths"]["/cost/purge"]["post"]
+    update:
+      x-speakeasy-name-override: purge
+    x-speakeasy-metadata:
+      after: sdk.costs.purge()
+      before: sdk.Costs.cost_purge_cost_purge_post()
+      type: method-name
+  - target: $["paths"]["/calls/stream_query"]["post"]
+    update:
+      x-speakeasy-name-override: streamQuery
+    x-speakeasy-metadata:
+      after: sdk.calls.streamQuery()
+      before: sdk.Calls.calls_query_stream_calls_stream_query_post()
+      type: method-name
+  - target: $["paths"]["/calls/delete"]["post"]
+    update:
+      x-speakeasy-name-override: delete
+    x-speakeasy-metadata:
+      after: sdk.calls.delete()
+      before: sdk.Calls.calls_delete_calls_delete_post()
+      type: method-name
+  - target: $["paths"]["/file/content"]["post"]
+    update:
+      x-speakeasy-name-override: content
+    x-speakeasy-metadata:
+      after: sdk.files.content()
+      before: sdk.Files.file_content_file_content_post()
+      type: method-name
+  - target: $["paths"]["/obj/read"]["post"]
+    update:
+      x-speakeasy-name-override: read
+    x-speakeasy-metadata:
+      after: sdk.objects.read()
+      before: sdk.Objects.obj_read_obj_read_post()
+      type: method-name
+  - target: $["paths"]["/call/update"]["post"]
+    update:
+      x-speakeasy-name-override: update
+    x-speakeasy-metadata:
+      after: sdk.calls.update()
+      before: sdk.Calls.call_update_call_update_post()
+      type: method-name
+  - target: $["paths"]["/call/start"]["post"]
+    update:
+      x-speakeasy-name-override: start
+    x-speakeasy-metadata:
+      after: sdk.calls.start()
+      before: sdk.Calls.call_start_call_start_post()
+      type: method-name
+  - target: $["paths"]["/table/update"]["post"]
+    update:
+      x-speakeasy-name-override: update
+    x-speakeasy-metadata:
+      after: sdk.tables.update()
+      before: sdk.Tables.table_update_table_update_post()
+      type: method-name

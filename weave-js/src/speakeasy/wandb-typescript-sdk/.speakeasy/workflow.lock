@@ -1,0 +1,35 @@
+speakeasyVersion: 1.468.9
+sources:
+    wandb-OAS:
+        sourceNamespace: wandb-oas
+        sourceRevisionDigest: sha256:f70032d4cad89b92671f192792df57dc814e8d0b328e632c1e0547c155f1ae22
+        sourceBlobDigest: sha256:99ea935a85ec0246c15bc4206da4b3248b07c494975781b291efd00ea83e8708
+        tags:
+            - latest
+targets:
+    wandb:
+        source: wandb-OAS
+        sourceNamespace: wandb-oas
+        sourceRevisionDigest: sha256:f70032d4cad89b92671f192792df57dc814e8d0b328e632c1e0547c155f1ae22
+        sourceBlobDigest: sha256:99ea935a85ec0246c15bc4206da4b3248b07c494975781b291efd00ea83e8708
+workflow:
+    workflowVersion: 1.0.0
+    speakeasyVersion: latest
+    sources:
+        wandb-OAS:
+            inputs:
+                - location: ./wandb.yaml
+            overlays:
+                - location: ./speakeasy-suggested-name-overlay.yaml
+                - location: ./speakeasy-suggested-error-overlay.yaml
+                - location: ./change_mutation.yaml
+            registry:
+                location: registry.speakeasyapi.dev/wandb-xdq/wandb/wandb-oas
+    targets:
+        wandb:
+            target: typescript
+            source: wandb-OAS
+            codeSamples:
+                registry:
+                    location: registry.speakeasyapi.dev/wandb-xdq/wandb/wandb-oas-typescript-code-samples
+                blocking: false

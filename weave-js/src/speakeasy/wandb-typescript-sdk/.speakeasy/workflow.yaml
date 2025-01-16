@@ -1,0 +1,20 @@
+workflowVersion: 1.0.0
+speakeasyVersion: latest
+sources:
+    wandb-OAS:
+        inputs:
+            - location: ./wandb.yaml
+        overlays:
+            - location: ./speakeasy-suggested-name-overlay.yaml
+            - location: ./speakeasy-suggested-error-overlay.yaml
+            - location: ./change_mutation.yaml
+        registry:
+            location: registry.speakeasyapi.dev/wandb-xdq/wandb/wandb-oas
+targets:
+    wandb:
+        target: typescript
+        source: wandb-OAS
+        codeSamples:
+            registry:
+                location: registry.speakeasyapi.dev/wandb-xdq/wandb/wandb-oas-typescript-code-samples
+            blocking: false

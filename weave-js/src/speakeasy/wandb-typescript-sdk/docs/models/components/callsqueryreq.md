@@ -1,0 +1,30 @@
+# CallsQueryReq
+
+## Example Usage
+
+```typescript
+import { CallsQueryReq } from "wandb/models/components";
+
+let value: CallsQueryReq = {
+  projectId: "<id>",
+  expandColumns: [
+    "inputs.self.message",
+    "inputs.model.prompt",
+  ],
+};
+```
+
+## Fields
+
+| Field                                                                                      | Type                                                                                       | Required                                                                                   | Description                                                                                | Example                                                                                    |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `projectId`                                                                                | *string*                                                                                   | :heavy_check_mark:                                                                         | N/A                                                                                        |                                                                                            |
+| `filter`                                                                                   | [components.CallsFilter](../../models/components/callsfilter.md)                           | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `limit`                                                                                    | *number*                                                                                   | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `offset`                                                                                   | *number*                                                                                   | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `sortBy`                                                                                   | [components.SortBy](../../models/components/sortby.md)[]                                   | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `query`                                                                                    | *components.CallsQueryReqQuery*[]                                                          | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `includeCosts`                                                                             | *boolean*                                                                                  | :heavy_minus_sign:                                                                         | Beta, subject to change. If true, the response will include any model costs for each call. |                                                                                            |
+| `includeFeedback`                                                                          | *boolean*                                                                                  | :heavy_minus_sign:                                                                         | Beta, subject to change. If true, the response will include feedback for each call.        |                                                                                            |
+| `columns`                                                                                  | *string*[]                                                                                 | :heavy_minus_sign:                                                                         | N/A                                                                                        |                                                                                            |
+| `expandColumns`                                                                            | *string*[]                                                                                 | :heavy_minus_sign:                                                                         | Columns to expand, i.e. refs to other objects                                              | [<br/>"inputs.self.message",<br/>"inputs.model.prompt"<br/>]                               |

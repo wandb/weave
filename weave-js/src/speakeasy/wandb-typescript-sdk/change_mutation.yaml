@@ -1,0 +1,9 @@
+overlay: 1.0.0
+info:
+  title: Change Mutation to Query
+  version: 0.0.1
+actions:
+  - target: $["paths"]["/feedback/query"]["post"]
+    update:
+      x-speakeasy-react-hook:
+        type: query

@@ -1,0 +1,1083 @@
+lockVersion: 2.0.0
+id: 50bd4ba9-e86b-44c8-a6f4-702515fa561f
+management:
+  docChecksum: d93b51441bcaf08b7ca1accbbcb9a67b
+  docVersion: 0.1.0
+  speakeasyVersion: 1.468.9
+  generationVersion: 2.493.21
+  releaseVersion: 0.3.1
+  configChecksum: 743ba6426735b38f16236b378ec5e9ee
+  installationURL: https://github.com/speakeasy-sdks/wandb-typescript-sdk
+features:
+  typescript:
+    additionalDependencies: 0.1.0
+    additionalProperties: 0.1.1
+    constsAndDefaults: 0.1.11
+    core: 3.18.16
+    defaultEnabledRetries: 0.1.0
+    devContainers: 2.90.0
+    enumUnions: 0.1.0
+    envVarSecurityUsage: 0.1.2
+    globalSecurity: 2.82.12
+    globalSecurityCallbacks: 0.1.0
+    globalServerURLs: 2.82.4
+    nameOverrides: 2.81.2
+    nullables: 0.1.0
+    reactQueryHooks: 0.2.2
+    responseFormat: 0.2.3
+    retries: 2.83.0
+    sdkHooks: 0.2.0
+    unions: 2.85.8
+    uploadStreams: 0.1.0
+generatedFiles:
+  - .devcontainer/README.md
+  - .devcontainer/devcontainer.json
+  - .devcontainer/setup.sh
+  - .eslintrc.cjs
+  - .gitattributes
+  - .npmignore
+  - FUNCTIONS.md
+  - REACT_QUERY.md
+  - RUNTIMES.md
+  - USAGE.md
+  - docs/lib/utils/retryconfig.md
+  - docs/models/components/attributes.md
+  - docs/models/components/batch.md
+  - docs/models/components/bodyfilecreatefilecreatepost.md
+  - docs/models/components/callbatchendmode.md
+  - docs/models/components/callbatchstartmode.md
+  - docs/models/components/callcreatebatchreq.md
+  - docs/models/components/callcreatebatchres.md
+  - docs/models/components/callendreq.md
+  - docs/models/components/callendres.md
+  - docs/models/components/callreadreq.md
+  - docs/models/components/callreadres.md
+  - docs/models/components/callschema.md
+  - docs/models/components/callschemaattributes.md
+  - docs/models/components/callschemainputs.md
+  - docs/models/components/callsdeletereq.md
+  - docs/models/components/callsdeleteres.md
+  - docs/models/components/callsfilter.md
+  - docs/models/components/callsqueryreq.md
+  - docs/models/components/callsqueryreqquery.md
+  - docs/models/components/callsquerystatsreq.md
+  - docs/models/components/callsquerystatsres.md
+  - docs/models/components/callstartreq.md
+  - docs/models/components/callstartres.md
+  - docs/models/components/callupdatereq.md
+  - docs/models/components/callupdateres.md
+  - docs/models/components/costcreateinput.md
+  - docs/models/components/costcreatereq.md
+  - docs/models/components/costcreateres.md
+  - docs/models/components/costpurgereq.md
+  - docs/models/components/costpurgereqquery.md
+  - docs/models/components/costpurgeres.md
+  - docs/models/components/costqueryoutput.md
+  - docs/models/components/costqueryreq.md
+  - docs/models/components/costqueryreqquery.md
+  - docs/models/components/costqueryres.md
+  - docs/models/components/direction.md
+  - docs/models/components/endedcallschemaforinsert.md
+  - docs/models/components/feedbackcreatereq.md
+  - docs/models/components/feedbackcreateres.md
+  - docs/models/components/feedbackcreaterespayload.md
+  - docs/models/components/feedbackpurgereq.md
+  - docs/models/components/feedbackpurgereqquery.md
+  - docs/models/components/feedbackpurgeres.md
+  - docs/models/components/feedbackqueryreq.md
+  - docs/models/components/feedbackqueryreqquery.md
+  - docs/models/components/feedbackqueryres.md
+  - docs/models/components/filecontentreadreq.md
+  - docs/models/components/filecreateres.md
+  - docs/models/components/filet.md
+  - docs/models/components/inputs.md
+  - docs/models/components/llmusageschema.md
+  - docs/models/components/loc.md
+  - docs/models/components/objcreatereq.md
+  - docs/models/components/objcreateres.md
+  - docs/models/components/objectversionfilter.md
+  - docs/models/components/objqueryreq.md
+  - docs/models/components/objqueryres.md
+  - docs/models/components/objreadreq.md
+  - docs/models/components/objreadres.md
+  - docs/models/components/objschema.md
+  - docs/models/components/objschemaforinsert.md
+  - docs/models/components/payload.md
+  - docs/models/components/query.md
+  - docs/models/components/refsreadbatchreq.md
+  - docs/models/components/refsreadbatchres.md
+  - docs/models/components/res.md
+  - docs/models/components/result.md
+  - docs/models/components/row.md
+  - docs/models/components/rows.md
+  - docs/models/components/security.md
+  - docs/models/components/serverinfores.md
+  - docs/models/components/sortby.md
+  - docs/models/components/startedcallschemaforinsert.md
+  - docs/models/components/summary.md
+  - docs/models/components/summaryinsertmap.md
+  - docs/models/components/tableappendspec.md
+  - docs/models/components/tableappendspecpayload.md
+  - docs/models/components/tablecreatereq.md
+  - docs/models/components/tablecreateres.md
+  - docs/models/components/tableinsertspec.md
+  - docs/models/components/tableinsertspecpayload.md
+  - docs/models/components/tableinsertspecpayloadrow.md
+  - docs/models/components/tablepopspec.md
+  - docs/models/components/tablepopspecpayload.md
+  - docs/models/components/tablequeryreq.md
+  - docs/models/components/tablequeryres.md
+  - docs/models/components/tablequerystatsreq.md
+  - docs/models/components/tablequerystatsres.md
+  - docs/models/components/tablerowfilter.md
+  - docs/models/components/tablerowschema.md
+  - docs/models/components/tableschemaforinsert.md
+  - docs/models/components/tableupdatereq.md
+  - docs/models/components/tableupdateres.md
+  - docs/models/components/updates.md
+  - docs/models/components/validationerror.md
+  - docs/models/errors/badrequest.md
+  - docs/models/errors/httpvalidationerror.md
+  - docs/models/errors/internalservererror.md
+  - docs/models/errors/notfound.md
+  - docs/models/errors/ratelimited.md
+  - docs/models/errors/timeout.md
+  - docs/models/errors/unauthorized.md
+  - docs/sdks/calls/README.md
+  - docs/sdks/costs/README.md
+  - docs/sdks/feedback/README.md
+  - docs/sdks/files/README.md
+  - docs/sdks/objects/README.md
+  - docs/sdks/refs/README.md
+  - docs/sdks/service/README.md
+  - docs/sdks/tables/README.md
+  - docs/sdks/wandb/README.md
+  - jsr.json
+  - package.json
+  - src/core.ts
+  - src/funcs/callsDelete.ts
+  - src/funcs/callsEnd.ts
+  - src/funcs/callsQueryStats.ts
+  - src/funcs/callsRead.ts
+  - src/funcs/callsStart.ts
+  - src/funcs/callsStreamQuery.ts
+  - src/funcs/callsUpdate.ts
+  - src/funcs/callsUpsertBatch.ts
+  - src/funcs/costsCreate.ts
+  - src/funcs/costsPurge.ts
+  - src/funcs/costsQuery.ts
+  - src/funcs/feedbackCreate.ts
+  - src/funcs/feedbackPurge.ts
+  - src/funcs/feedbackQuery.ts
+  - src/funcs/filesContent.ts
+  - src/funcs/filesCreate.ts
+  - src/funcs/objectsCreate.ts
+  - src/funcs/objectsQuery.ts
+  - src/funcs/objectsRead.ts
+  - src/funcs/refsReadBatch.ts
+  - src/funcs/serviceGetHealth.ts
+  - src/funcs/serviceGetServerInfo.ts
+  - src/funcs/tablesCreate.ts
+  - src/funcs/tablesQuery.ts
+  - src/funcs/tablesQueryStats.ts
+  - src/funcs/tablesUpdate.ts
+  - src/hooks/hooks.ts
+  - src/hooks/index.ts
+  - src/hooks/types.ts
+  - src/index.ts
+  - src/lib/base64.ts
+  - src/lib/config.ts
+  - src/lib/dlv.ts
+  - src/lib/encodings.ts
+  - src/lib/env.ts
+  - src/lib/files.ts
+  - src/lib/http.ts
+  - src/lib/is-plain-object.ts
+  - src/lib/logger.ts
+  - src/lib/matchers.ts
+  - src/lib/primitives.ts
+  - src/lib/retries.ts
+  - src/lib/schemas.ts
+  - src/lib/sdks.ts
+  - src/lib/security.ts
+  - src/lib/url.ts
+  - src/models/components/bodyfilecreatefilecreatepost.ts
+  - src/models/components/callbatchendmode.ts
+  - src/models/components/callbatchstartmode.ts
+  - src/models/components/callcreatebatchreq.ts
+  - src/models/components/callcreatebatchres.ts
+  - src/models/components/callendreq.ts
+  - src/models/components/callendres.ts
+  - src/models/components/callreadreq.ts
+  - src/models/components/callreadres.ts
+  - src/models/components/callschema.ts
+  - src/models/components/callsdeletereq.ts
+  - src/models/components/callsdeleteres.ts
+  - src/models/components/callsfilter.ts
+  - src/models/components/callsqueryreq.ts
+  - src/models/components/callsquerystatsreq.ts
+  - src/models/components/callsquerystatsres.ts
+  - src/models/components/callstartreq.ts
+  - src/models/components/callstartres.ts
+  - src/models/components/callupdatereq.ts
+  - src/models/components/callupdateres.ts
+  - src/models/components/costcreateinput.ts
+  - src/models/components/costcreatereq.ts
+  - src/models/components/costcreateres.ts
+  - src/models/components/costpurgereq.ts
+  - src/models/components/costpurgeres.ts
+  - src/models/components/costqueryoutput.ts
+  - src/models/components/costqueryreq.ts
+  - src/models/components/costqueryres.ts
+  - src/models/components/endedcallschemaforinsert.ts
+  - src/models/components/feedbackcreatereq.ts
+  - src/models/components/feedbackcreateres.ts
+  - src/models/components/feedbackpurgereq.ts
+  - src/models/components/feedbackpurgeres.ts
+  - src/models/components/feedbackqueryreq.ts
+  - src/models/components/feedbackqueryres.ts
+  - src/models/components/filecontentreadreq.ts
+  - src/models/components/filecreateres.ts
+  - src/models/components/index.ts
+  - src/models/components/llmusageschema.ts
+  - src/models/components/objcreatereq.ts
+  - src/models/components/objcreateres.ts
+  - src/models/components/objectversionfilter.ts
+  - src/models/components/objqueryreq.ts
+  - src/models/components/objqueryres.ts
+  - src/models/components/objreadreq.ts
+  - src/models/components/objreadres.ts
+  - src/models/components/objschema.ts
+  - src/models/components/objschemaforinsert.ts
+  - src/models/components/refsreadbatchreq.ts
+  - src/models/components/refsreadbatchres.ts
+  - src/models/components/security.ts
+  - src/models/components/serverinfores.ts
+  - src/models/components/sortby.ts
+  - src/models/components/startedcallschemaforinsert.ts
+  - src/models/components/summaryinsertmap.ts
+  - src/models/components/tableappendspec.ts
+  - src/models/components/tableappendspecpayload.ts
+  - src/models/components/tablecreatereq.ts
+  - src/models/components/tablecreateres.ts
+  - src/models/components/tableinsertspec.ts
+  - src/models/components/tableinsertspecpayload.ts
+  - src/models/components/tablepopspec.ts
+  - src/models/components/tablepopspecpayload.ts
+  - src/models/components/tablequeryreq.ts
+  - src/models/components/tablequeryres.ts
+  - src/models/components/tablequerystatsreq.ts
+  - src/models/components/tablequerystatsres.ts
+  - src/models/components/tablerowfilter.ts
+  - src/models/components/tablerowschema.ts
+  - src/models/components/tableschemaforinsert.ts
+  - src/models/components/tableupdatereq.ts
+  - src/models/components/tableupdateres.ts
+  - src/models/components/validationerror.ts
+  - src/models/errors/apierror.ts
+  - src/models/errors/badrequest.ts
+  - src/models/errors/httpclienterrors.ts
+  - src/models/errors/httpvalidationerror.ts
+  - src/models/errors/index.ts
+  - src/models/errors/internalservererror.ts
+  - src/models/errors/notfound.ts
+  - src/models/errors/ratelimited.ts
+  - src/models/errors/sdkvalidationerror.ts
+  - src/models/errors/timeout.ts
+  - src/models/errors/unauthorized.ts
+  - src/react-query/_context.tsx
+  - src/react-query/_types.ts
+  - src/react-query/callsDelete.ts
+  - src/react-query/callsEnd.ts
+  - src/react-query/callsQueryStats.ts
+  - src/react-query/callsRead.ts
+  - src/react-query/callsStart.ts
+  - src/react-query/callsStreamQuery.ts
+  - src/react-query/callsUpdate.ts
+  - src/react-query/callsUpsertBatch.ts
+  - src/react-query/costsCreate.ts
+  - src/react-query/costsPurge.ts
+  - src/react-query/costsQuery.ts
+  - src/react-query/feedbackCreate.ts
+  - src/react-query/feedbackPurge.ts
+  - src/react-query/feedbackQuery.ts
+  - src/react-query/filesContent.ts
+  - src/react-query/filesCreate.ts
+  - src/react-query/index.ts
+  - src/react-query/objectsCreate.ts
+  - src/react-query/objectsQuery.ts
+  - src/react-query/objectsRead.ts
+  - src/react-query/refsReadBatch.ts
+  - src/react-query/serviceGetHealth.ts
+  - src/react-query/serviceGetServerInfo.ts
+  - src/react-query/tablesCreate.ts
+  - src/react-query/tablesQuery.ts
+  - src/react-query/tablesQueryStats.ts
+  - src/react-query/tablesUpdate.ts
+  - src/sdk/calls.ts
+  - src/sdk/costs.ts
+  - src/sdk/feedback.ts
+  - src/sdk/files.ts
+  - src/sdk/index.ts
+  - src/sdk/objects.ts
+  - src/sdk/refs.ts
+  - src/sdk/sdk.ts
+  - src/sdk/service.ts
+  - src/sdk/tables.ts
+  - src/types/blobs.ts
+  - src/types/constdatetime.ts
+  - src/types/enums.ts
+  - src/types/fp.ts
+  - src/types/index.ts
+  - src/types/operations.ts
+  - src/types/rfcdate.ts
+  - src/types/streams.ts
+  - tsconfig.json
+examples:
+  read_root_health_get:
+    speakeasy-default-read-root-health-get:
+      responses:
+        "200":
+          application/json: "<value>"
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>"}
+        "500":
+          application/json: {"key": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "504":
+          application/json: {}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {}
+  server_info_server_info_get:
+    speakeasy-default-server-info-server-info-get:
+      responses:
+        "200":
+          application/json: {"min_required_weave_python_version": "<value>"}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>"}
+  call_start_call_start_post:
+    speakeasy-default-call-start-call-start-post:
+      requestBody:
+        application/json: {"start": {"project_id": "<id>", "op_name": "<value>", "started_at": "2023-03-07T00:06:01.890Z", "attributes": {}, "inputs": {}}}
+      responses:
+        "200":
+          application/json: {"id": "<id>", "trace_id": "<id>"}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "501":
+          application/json: {}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "511":
+          application/json: {}
+  call_end_call_end_post:
+    speakeasy-default-call-end-call-end-post:
+      requestBody:
+        application/json: {"end": {"project_id": "<id>", "id": "<id>", "ended_at": "2023-10-15T10:16:55.532Z", "summary": {}}}
+      responses:
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "422":
+          application/json: {}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "200":
+          application/json: {}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  call_start_batch_call_upsert_batch_post:
+    speakeasy-default-call-start-batch-call-upsert-batch-post:
+      requestBody:
+        application/json: {"batch": [{"req": {"start": {"project_id": "<id>", "op_name": "<value>", "started_at": "2023-07-09T04:54:32.741Z", "attributes": {}, "inputs": {}}}}, {"req": {"end": {"project_id": "<id>", "id": "<id>", "ended_at": "2025-08-10T08:47:16.049Z", "summary": {}}}}]}
+      responses:
+        "200":
+          application/json: {"res": [{"id": "<id>", "trace_id": "<id>"}]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {}
+  calls_delete_calls_delete_post:
+    speakeasy-default-calls-delete-calls-delete-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "call_ids": []}
+      responses:
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "422":
+          application/json: {}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "200":
+          application/json: {}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  call_update_call_update_post:
+    speakeasy-default-call-update-call-update-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "call_id": "<id>"}
+      responses:
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "422":
+          application/json: {}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>"}
+        "200":
+          application/json: {}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  call_read_call_read_post:
+    speakeasy-default-call-read-call-read-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "id": "<id>"}
+      responses:
+        "200":
+          application/json: {"call": {"id": "<id>", "project_id": "<id>", "op_name": "<value>", "trace_id": "<id>", "started_at": "2024-05-11T22:44:26.107Z", "attributes": {}, "inputs": {}}}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>"}
+  calls_query_stats_calls_query_stats_post:
+    speakeasy-default-calls-query-stats-calls-query-stats-post:
+      requestBody:
+        application/json: {"project_id": "<id>"}
+      responses:
+        "200":
+          application/json: {"count": 50420}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "511":
+          application/json: {"key": "<value>"}
+  calls_query_stream_calls_stream_query_post:
+    speakeasy-default-calls-query-stream-calls-stream-query-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "expand_columns": ["inputs.self.message", "inputs.model.prompt"]}
+      responses:
+        "200":
+          application/json: "<value>"
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>"}
+  obj_create_obj_create_post:
+    speakeasy-default-obj-create-obj-create-post:
+      requestBody:
+        application/json: {"obj": {"project_id": "<id>", "object_id": "<id>", "val": "<value>"}}
+      responses:
+        "200":
+          application/json: {"digest": "<value>"}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {}
+  obj_read_obj_read_post:
+    speakeasy-default-obj-read-obj-read-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "object_id": "<id>", "digest": "<value>"}
+      responses:
+        "200":
+          application/json: {"obj": {"project_id": "<id>", "object_id": "<id>", "created_at": "2022-04-16T21:11:24.249Z", "digest": "<value>", "version_index": 445362, "is_latest": 862785, "kind": "<value>", "base_object_class": "<value>", "val": "<value>"}}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>"}
+  objs_query_objs_query_post:
+    speakeasy-default-objs-query-objs-query-post:
+      requestBody:
+        application/json: {"project_id": "user/project", "filter": {"base_object_classes": ["Dataset"], "object_ids": ["my_favorite_dataset"], "is_op": true, "latest_only": false}, "limit": 100, "offset": 0, "sort_by": [{"field": "created_at", "direction": "desc"}]}
+      responses:
+        "200":
+          application/json: {"objs": [{"project_id": "<id>", "object_id": "<id>", "created_at": "2024-10-23T08:54:42.746Z", "digest": "<value>", "version_index": 812843, "is_latest": 954878, "kind": "<value>", "base_object_class": "<value>", "val": "<value>"}, {"project_id": "<id>", "object_id": "<id>", "created_at": "2024-10-19T18:38:54.498Z", "digest": "<value>", "version_index": 714663, "is_latest": 538625, "kind": "<value>", "base_object_class": "<value>", "val": "<value>"}]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>"}
+  table_create_table_create_post:
+    speakeasy-default-table-create-table-create-post:
+      requestBody:
+        application/json: {"table": {"project_id": "<id>", "rows": [{}]}}
+      responses:
+        "200":
+          application/json: {"digest": "<value>"}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "401":
+          application/json: {"key": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "504":
+          application/json: {"key": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {}
+  table_update_table_update_post:
+    speakeasy-default-table-update-table-update-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "base_digest": "<value>", "updates": []}
+      responses:
+        "200":
+          application/json: {"digest": "<value>"}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  table_query_table_query_post:
+    speakeasy-default-table-query-table-query-post:
+      requestBody:
+        application/json: {"project_id": "my_entity/my_project", "digest": "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims", "filter": {"row_digests": ["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims", "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"]}, "limit": 100, "offset": 10, "sort_by": [{"field": "col_a.prop_b", "direction": "desc"}]}
+      responses:
+        "200":
+          application/json: {"rows": [{"digest": "<value>", "val": "<value>"}, {"digest": "<value>", "val": "<value>"}, {"digest": "<value>", "val": "<value>"}]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>"}
+  table_query_stats_table_query_stats_post:
+    speakeasy-default-table-query-stats-table-query-stats-post:
+      requestBody:
+        application/json: {"project_id": "my_entity/my_project", "digest": "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"}
+      responses:
+        "200":
+          application/json: {"count": 227257}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "511":
+          application/json: {"key": "<value>"}
+  refs_read_batch_refs_read_batch_post:
+    speakeasy-default-refs-read-batch-refs-read-batch-post:
+      requestBody:
+        application/json: {"refs": ["<value>"]}
+      responses:
+        "200":
+          application/json: {"vals": ["<value>", "<value>"]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>"}
+  file_create_file_create_post:
+    speakeasy-default-file-create-file-create-post:
+      requestBody:
+        multipart/form-data: {"project_id": "<id>", "file": {}}
+      responses:
+        "200":
+          application/json: {"digest": "<value>"}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {}
+  file_content_file_content_post:
+    speakeasy-default-file-content-file-content-post:
+      requestBody:
+        application/json: {"project_id": "<id>", "digest": "<value>"}
+      responses:
+        "200":
+          application/json: "<value>"
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>"}
+  cost_create_cost_create_post:
+    speakeasy-default-cost-create-cost-create-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "costs": {"key": {"prompt_token_cost": "1184.23", "completion_token_cost": "6584.66"}}}
+      responses:
+        "200":
+          application/json: {"ids": [["<value>", "<value>", "<value>"]]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {}
+  cost_query_cost_query_post:
+    speakeasy-default-cost-query-cost-query-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "fields": ["id", "llm_id", "prompt_token_cost", "completion_token_cost", "prompt_token_cost_unit", "completion_token_cost_unit", "effective_date", "provider_id"], "limit": 10, "offset": 0}
+      responses:
+        "200":
+          application/json: {"results": [{"id": "2341-asdf-asdf", "llm_id": "gpt4", "prompt_token_cost": 1, "completion_token_cost": 1, "prompt_token_cost_unit": "USD", "completion_token_cost_unit": "USD", "effective_date": "2024-01-01T00:00:00Z", "provider_id": "openai"}]}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  cost_purge_cost_purge_post:
+    speakeasy-default-cost-purge-cost-purge-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "query": ["<value>", "<value>"]}
+      responses:
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "422":
+          application/json: {}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "200":
+          application/json: {}
+        "400":
+          application/json: {}
+        "501":
+          application/json: {}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  feedback_create_feedback_create_post:
+    speakeasy-default-feedback-create-feedback-create-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "weave_ref": "weave:///entity/project/object/name:digest", "creator": "Jane Smith", "feedback_type": "custom", "payload": {}}
+      responses:
+        "200":
+          application/json: {"id": "<id>", "created_at": "2022-09-04T02:19:25.038Z", "wb_user_id": "<id>", "payload": {}}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "404":
+          application/json: {"key": "<value>"}
+        "408":
+          application/json: {"key": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "501":
+          application/json: {"key": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "510":
+          application/json: {"key": "<value>"}
+        "511":
+          application/json: {}
+  feedback_query_feedback_query_post:
+    speakeasy-default-feedback-query-feedback-query-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "fields": ["id", "feedback_type", "payload.note"], "limit": 10, "offset": 0}
+      responses:
+        "200":
+          application/json: {}
+        "422":
+          application/json: {}
+        "400":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "501":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+  feedback_purge_feedback_purge_post:
+    speakeasy-default-feedback-purge-feedback-purge-post:
+      requestBody:
+        application/json: {"project_id": "entity/project", "query": ["9276.23", "<value>"]}
+      responses:
+        "401":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "404":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "408":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "422":
+          application/json: {}
+        "429":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "500":
+          application/json: {"key": "<value>", "key1": "<value>"}
+        "200":
+          application/json: {}
+        "400":
+          application/json: {}
+        "501":
+          application/json: {}
+        "504":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+        "510":
+          application/json: {}
+        "511":
+          application/json: {"key": "<value>", "key1": "<value>", "key2": "<value>"}
+generatedTests: {}

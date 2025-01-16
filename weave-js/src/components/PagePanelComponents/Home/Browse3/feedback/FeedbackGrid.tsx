@@ -13,6 +13,10 @@ import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceSer
 import {FeedbackGridInner} from './FeedbackGridInner';
 import {HUMAN_ANNOTATION_BASE_TYPE} from './StructuredFeedback/humanAnnotationTypes';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+import {WandbCore} from '../../../../../speakeasy/wandb-typescript-sdk/core';
+import {WandbProvider} from '../../../../../speakeasy/wandb-typescript-sdk/react-query';
+import {useServiceGetHealth} from '../../../../../speakeasy/wandb-typescript-sdk/react-query/serviceGetHealth';
 
 const ANNOTATION_PREFIX = `${HUMAN_ANNOTATION_BASE_TYPE}.`;
 
@@ -23,13 +27,41 @@ type FeedbackGridProps = {
   objectType?: string;
 };
 
-export const FeedbackGrid = ({
+const queryClient = new QueryClient();
+const wandb = new WandbCore({
+  security: {
+    username: '', // for now just manually set to your wandb username
+    password: '', // for now just manually set to your wandb password
+  },
+});
+
+queryClient.setQueryDefaults(['wandb'], {retry: false});
+queryClient.setMutationDefaults(['wandb'], {retry: false});
+
+export const FeedbackGrid = (props: FeedbackGridProps) => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <WandbProvider client={wandb}>
+        <FeedbackGridInside {...props} />
+      </WandbProvider>
+    </QueryClientProvider>
+  );
+};
+
+// Rename for simplicity.  The actual grid component needs to be wrapped with a
+// QueryClientProvider and WandbProvider.
+export const FeedbackGridInside = ({
   entity,
   project,
   weaveRef,
   objectType,
 }: FeedbackGridProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+
+  const {data, error, status} = useServiceGetHealth();
+  console.log('data', data);
+  console.log('error', error);
+  console.log('status', status);
 
   const {useFeedback} = useWFHooks();
   const query = useFeedback({
