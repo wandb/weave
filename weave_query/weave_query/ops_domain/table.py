@@ -863,8 +863,7 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
         import errno
         if e.errno == errno.ESTALE:
             return None
-        else:
-            raise e
+        raise
 
 
 @op(name="file-partitionedTable")
