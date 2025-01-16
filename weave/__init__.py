@@ -14,8 +14,13 @@ from weave.flow.eval import Evaluation, Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
+from weave.initialization.pil_image_thread_safety import (
+    make_image_file_thread_safe as make_image_file_thread_safe,
+)
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+
+make_image_file_thread_safe()
 
 # Alias for succinct code
 P = EasyPrompt
