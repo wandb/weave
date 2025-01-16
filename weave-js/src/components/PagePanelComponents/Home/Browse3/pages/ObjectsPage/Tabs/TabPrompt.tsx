@@ -1,8 +1,8 @@
 import classNames from 'classnames';
 import React from 'react';
 
-import {Tailwind} from '../../../../Tailwind';
-import {MessageList} from './ChatView/MessageList';
+import {Tailwind} from '../../../../../../Tailwind';
+import {MessageList} from '../../ChatView/MessageList';
 
 type Data = Record<string, any>;
 
