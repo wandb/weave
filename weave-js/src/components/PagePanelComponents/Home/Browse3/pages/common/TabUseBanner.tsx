@@ -1,6 +1,6 @@
 import React, {ReactNode} from 'react';
 
-import {Alert} from '../../../../Alert';
+import {Alert} from '../../../../../Alert';
 
 type TabUseBannerProps = {
   children?: ReactNode | undefined;
