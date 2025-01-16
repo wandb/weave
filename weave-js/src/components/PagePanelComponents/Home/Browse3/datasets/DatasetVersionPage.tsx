@@ -14,8 +14,8 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
-import {DeleteObjectButtonWithModal} from '../pages/ObjectVersionPage';
-import {TabUseDataset} from '../pages/TabUseDataset';
+import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectDeleteButtons';
+import {TabUseDataset} from '../pages/ObjectsPage/Tabs/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {objectVersionKeyToRefUri} from '../pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
