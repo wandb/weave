@@ -1,3 +1,5 @@
+from concurrent.futures import Future
+from dataclasses import replace
 from typing import TypeVar
 
 import pytest
@@ -102,21 +104,20 @@ async def test_gotten_methods(client):
 
 
 def resolve_ref_futures(ref: RefWithExtra) -> RefWithExtra:
-    return ref
-    # """This is a bit of a hack to resolve futures in an initally unsaved object's extra fields.
+    """This is a bit of a hack to resolve futures in an initally unsaved object's extra fields.
 
-    # Currently, the extras are still a Future and not yet replaced with the actual value.
-    # This function resolves the futures and replaces them with the actual values.
-    # """
-    # extras = ref._extra
-    # new_extras = []
-    # for name, val in zip(extras[::2], extras[1::2]):
-    #     if isinstance(val, Future):
-    #         val = val.result()
-    #     new_extras.append(name)
-    #     new_extras.append(val)
-    # ref = replace(ref, _extra=tuple(new_extras))
-    # return ref
+    Currently, the extras are still a Future and not yet replaced with the actual value.
+    This function resolves the futures and replaces them with the actual values.
+    """
+    extras = ref._extra
+    new_extras = []
+    for name, val in zip(extras[::2], extras[1::2]):
+        if isinstance(val, Future):
+            val = val.result()
+        new_extras.append(name)
+        new_extras.append(val)
+    ref = replace(ref, _extra=tuple(new_extras))
+    return ref
 
 
 def test_drill_down_dataset_refs_same_after_publishing(client):
