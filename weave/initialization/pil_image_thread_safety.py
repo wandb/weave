@@ -16,20 +16,17 @@ We call `make_image_file_thread_safe` in the `__init__.py` file to ensure that t
 import threading
 from functools import wraps
 
-_patch_lock = threading.Lock()
 _patched = False
 
 
 def make_image_file_thread_safe() -> None:
     global _patched
-    with _patch_lock:
-        if _patched:
-            return
-        _patched = True
     try:
         _make_image_file_thread_safe()
     except Exception as e:
         print(f"Failed to patch PIL.ImageFile.ImageFile: {e}.")
+    else:
+        _patched = True
 
 
 def _make_image_file_thread_safe() -> None:
@@ -40,12 +37,12 @@ def _make_image_file_thread_safe() -> None:
 
     @wraps(old_init)
     def new_init(self, *args, **kwargs):  # type: ignore
-        self._load_lock = threading.Lock()
+        self._weave_load_lock = threading.Lock()
         return old_init(self, *args, **kwargs)
 
     @wraps(old_load)
     def new_load(self, *args, **kwargs):  # type: ignore
-        with self._load_lock:
+        with self._weave_load_lock:
             return old_load(self, *args, **kwargs)
 
     ImageFile.__init__ = new_init  # type: ignore
