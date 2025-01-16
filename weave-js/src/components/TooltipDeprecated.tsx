@@ -1,7 +1,7 @@
 /**
  * @deprecated Don't use this in any new code, we're trying to get rid of semantic-ui.
  */
-import {Popup} from 'semantic-ui-react';
+import {Popup, PopupProps} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {
@@ -12,7 +12,9 @@ import {
   WHITE,
 } from '../common/css/globals.styles';
 
-export const TooltipDeprecated = styled(Popup).attrs({
+export const TooltipDeprecated = styled(
+  Popup as React.ComponentType<PopupProps>
+).attrs<PopupProps>({
   basic: true, // This removes the pointing arrow.
   mouseEnterDelay: 500,
   popperModifiers: {

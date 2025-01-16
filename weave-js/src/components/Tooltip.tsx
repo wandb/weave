@@ -1,4 +1,4 @@
-import {Popup} from 'semantic-ui-react';
+import {Popup, PopupProps} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {
@@ -9,7 +9,9 @@ import {
   WHITE,
 } from '../common/css/globals.styles';
 
-export const Tooltip = styled(Popup).attrs({
+export const Tooltip = styled(
+  Popup as React.ComponentType<PopupProps>
+).attrs<PopupProps>({
   basic: true, // This removes the pointing arrow.
   mouseEnterDelay: 500,
   popperModifiers: {

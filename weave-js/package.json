@@ -19,17 +19,17 @@
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --loglevel warn --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
     "direct-prettier": "prettier",
+    "prepare-publish": "tsc --noEmit false && cp package.json README.md .npmrc src/ dist/",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
     "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait",
-    "generate-schemas": "bash scripts/generate-schemas.sh",
-    "postpublish": "rm package.json README.md"
+    "generate-schemas": "bash scripts/generate-schemas.sh"
   },
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "publishConfig": {
     "access": "public",
     "registry": "https://npm.pkg.github.com",
-    "directory": "src"
+    "directory": "dist"
   },
   "dependencies": {
     "@apollo/client": "^3.8.4",
