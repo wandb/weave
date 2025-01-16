@@ -6,7 +6,7 @@ import {parseRef} from '../../../../../../../react';
 import {abbreviateRef} from '../../../../../../../util/refs';
 import {CopyableText} from '../../../../../../CopyableText';
 import {DocLink} from '../../common/Links';
-import {TabUseBanner} from '../../TabUseBanner';
+import {TabUseBanner} from '../../common/TabUseBanner';
 
 type TabUseModelProps = {
   name: string;

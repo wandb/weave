@@ -5,7 +5,7 @@ import {abbreviateRef} from '@wandb/weave/util/refs';
 import React from 'react';
 
 import {DocLink} from '../../common/Links';
-import {TabUseBanner} from '../../TabUseBanner';
+import {TabUseBanner} from '../../common/TabUseBanner';
 import {AnnotationSpec} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 
 type TabUseAnnotationSpecProps = {

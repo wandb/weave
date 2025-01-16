@@ -29,7 +29,6 @@ import {
 } from '../common/SimplePageLayout';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
-import {TabPrompt} from '../TabPrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
@@ -43,6 +42,7 @@ import {
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
+import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
