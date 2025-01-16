@@ -6,30 +6,27 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {TEAL_600} from '../../../../../common/css/color.styles';
-import {ErrorPanel} from '../../../../ErrorPanel';
-import {Loading} from '../../../../Loading';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Timestamp} from '../../../../Timestamp';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {basicField} from './common/DataTable';
-import {Empty} from './common/Empty';
-import {EMPTY_PROPS_OPERATIONS} from './common/EmptyContent';
+import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {ErrorPanel} from '../../../../../ErrorPanel';
+import {Loading} from '../../../../../Loading';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Timestamp} from '../../../../../Timestamp';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {basicField} from '../common/DataTable';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_OPERATIONS} from '../common/EmptyContent';
 import {
   CallsLink,
   opNiceName,
   OpVersionLink,
   OpVersionsLink,
-} from './common/Links';
-import {SimplePageLayout} from './common/SimplePageLayout';
-import {useControllableState, useURLSearchParamsDict} from './util';
-import {useWFHooks} from './wfReactInterface/context';
-import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
-
-export type WFHighLevelOpVersionFilter = {
-  opName?: string | null;
-};
+} from '../common/Links';
+import {SimplePageLayout} from '../common/SimplePageLayout';
+import {useControllableState, useURLSearchParamsDict} from '../util';
+import {useWFHooks} from '../wfReactInterface/context';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {WFHighLevelOpVersionFilter} from './opsPageTypes';
 
 export const OpVersionsPage: React.FC<{
   entity: string;
