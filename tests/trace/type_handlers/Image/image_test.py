@@ -1,11 +1,11 @@
+import io
 import random
 import subprocess
 from pathlib import Path
 
 import pytest
-from PIL import Image
-
 import weave
+from PIL import Image
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -21,26 +21,42 @@ Calls:
 """
 
 
-def test_image_publish(client: WeaveClient) -> None:
+@pytest.fixture(
+    params=[
+        {"format": None},  # Default PIL Image
+        {"format": "JPEG"},
+        {"format": "PNG"},
+    ]
+)
+def test_img(request) -> Image.Image:
     img = Image.new("RGB", (512, 512), "purple")
-    weave.publish(img)
 
-    ref = get_ref(img)
+    if (fmt := request.param["format"]) is not None:
+        buffer = io.BytesIO()
+        img.save(buffer, format=fmt)
+        img = Image.open(buffer)
+
+    return img
+
+
+def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
+    weave.publish(test_img)
+
+    ref = get_ref(test_img)
 
     assert ref is not None
     gotten_img = weave.ref(ref.uri()).get()
-    assert img.tobytes() == gotten_img.tobytes()
+    assert test_img.tobytes() == gotten_img.tobytes()
 
 
 class ImageWrapper(weave.Object):
     img: Image.Image
 
 
-def test_image_as_property(client: WeaveClient) -> None:
+def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_property"
-    img = Image.new("RGB", (512, 512), "purple")
-    img_wrapper = ImageWrapper(img=img)
-    assert img_wrapper.img == img
+    img_wrapper = ImageWrapper(img=test_img)
+    assert img_wrapper.img == test_img
 
     weave.publish(img_wrapper)
 
@@ -48,14 +64,13 @@ def test_image_as_property(client: WeaveClient) -> None:
     assert ref is not None
 
     gotten_img_wrapper = weave.ref(ref.uri()).get()
-    assert gotten_img_wrapper.img.tobytes() == img.tobytes()
+    assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
 
 
-def test_image_as_dataset_cell(client: WeaveClient) -> None:
+def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_dataset_cell"
-    img = Image.new("RGB", (512, 512), "purple")
-    dataset = weave.Dataset(rows=[{"img": img}])
-    assert dataset.rows[0]["img"] == img
+    dataset = weave.Dataset(rows=[{"img": test_img}])
+    assert dataset.rows[0]["img"] == test_img
 
     weave.publish(dataset)
 
@@ -63,12 +78,11 @@ def test_image_as_dataset_cell(client: WeaveClient) -> None:
     assert ref is not None
 
     gotten_dataset = weave.ref(ref.uri()).get()
-    assert gotten_dataset.rows[0]["img"].tobytes() == img.tobytes()
+    assert gotten_dataset.rows[0]["img"].tobytes() == test_img.tobytes()
 
 
 @weave.op
-def image_as_solo_output(publish_first: bool) -> Image.Image:
-    img = Image.new("RGB", (512, 512), "purple")
+def image_as_solo_output(publish_first: bool, img: Image.Image) -> Image.Image:
     if publish_first:
         weave.publish(img)
     return img
@@ -80,9 +94,9 @@ def image_as_input_and_output_part(in_img: Image.Image) -> dict:
 
 
 @pytest.mark.skip("Flaky in CI with Op loading exception.")
-def test_image_as_call_io(client: WeaveClient) -> None:
+def test_image_as_call_io(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_call_io"
-    non_published_img = image_as_solo_output(publish_first=False)
+    non_published_img = image_as_solo_output(publish_first=False, img=test_img)
     img_dict = image_as_input_and_output_part(non_published_img)
 
     exp_bytes = non_published_img.tobytes()
@@ -96,9 +110,9 @@ def test_image_as_call_io(client: WeaveClient) -> None:
     assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
 
 
-def test_image_as_call_io_refs(client: WeaveClient) -> None:
+def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_call_io_refs"
-    non_published_img = image_as_solo_output(publish_first=True)
+    non_published_img = image_as_solo_output(publish_first=True, img=test_img)
     img_dict = image_as_input_and_output_part(non_published_img)
 
     exp_bytes = non_published_img.tobytes()
@@ -170,6 +184,7 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res, dict)
     assert "model_latency" in res and "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
+
 
 
 @pytest.mark.asyncio
