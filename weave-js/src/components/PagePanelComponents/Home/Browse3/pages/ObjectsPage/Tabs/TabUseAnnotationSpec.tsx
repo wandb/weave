@@ -105,13 +105,7 @@ const makeAnnotationPayloadFromSpec = (
     return '"Nice!"';
   }
   if (spec?.type === 'number' || spec?.type === 'integer') {
-    if (spec.maximum) {
-      return `${spec.maximum}`;
-    }
-    if (spec.minimum) {
-      return `${spec.minimum}`;
-    }
-    return '10';
+    return `${spec.maximum ?? spec.minimum ?? 10}`;
   }
   if (spec?.type === 'boolean') {
     return 'True';
