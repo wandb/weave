@@ -5,7 +5,9 @@ from typing import TypeVar
 import pytest
 
 import weave
+from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt
+from weave.trace.objectify import register_object
 from weave.trace.refs import RefWithExtra
 from weave.trace_server.trace_server_interface import ObjectVersionFilter, ObjQueryReq
 
@@ -141,3 +143,15 @@ def test_drill_down_dataset_refs_same_after_publishing(client):
         assert resolve_ref_futures(row2.ref) == row3.ref
         assert resolve_ref_futures(row2["a"].ref) == row3["a"].ref
         assert resolve_ref_futures(row2["a"]["b"].ref) == row3["a"]["b"].ref
+
+
+def test_registration():
+    # This is a second class named Dataset.  The first has already been registered
+    # in weave.flow.obj.  This should raise an error.
+
+    with pytest.raises(ValueError, match="Class Dataset already registered as"):
+
+        @register_object
+        class Dataset(Object):
+            anything: str
+            doesnt_matter: int
