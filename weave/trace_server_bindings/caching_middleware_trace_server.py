@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Callable
@@ -26,6 +27,28 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
         self._cache = diskcache.Cache(cache_dir, size_limit=size_limit)
 
+    def _safe_cache_get(self, key: str) -> Any:
+        try:
+            use_cache = os.getenv("WEAVE_USE_SERVER_CACHE", "true").lower() == "true"
+            if not use_cache:
+                return None
+            return self._cache.get(key)
+        except Exception as e:
+            logger.exception(f"Error getting cached value: {e}")
+            return None
+
+    def _safe_cache_set(self, key: str, value: Any) -> None:
+        try:
+            return self._cache.set(key, value)
+        except Exception as e:
+            logger.exception(f"Error caching value: {e}")
+
+    def _safe_cache_delete(self, key: str) -> None:
+        try:
+            self._cache.delete(key)
+        except Exception as e:
+            logger.exception(f"Error deleting cached value: {e}")
+
     def _with_cache(
         self,
         namespace: str,
@@ -41,21 +64,21 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception(f"Error creating cache key: {e}")
             return func(req)
         try:
-            cached_json_value = self._cache.get(cache_key)
+            cached_json_value = self._safe_cache_get(cache_key)
             if cached_json_value:
                 return deserialize(cached_json_value)
         except Exception as e:
             logger.exception(f"Error validating cached value: {e}")
-            self._cache.delete(cache_key)
+            self._safe_cache_delete(cache_key)
         res = func(req)
         try:
             json_value_to_cache = serialize(res)
-            self._cache.set(cache_key, json_value_to_cache)
+            self._safe_cache_set(cache_key, json_value_to_cache)
         except Exception as e:
             logger.exception(f"Error caching value: {e}")
         return res
 
-    def _with_cache_generic(self, func, req, res_type: Type[tsi.BaseModel]):
+    def _with_cache_generic(self, func, req, res_type: type[tsi.BaseModel]):
         return self._with_cache(
             func.__name__,
             lambda req: req.model_dump_json(),
@@ -103,7 +126,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         for i, ref in enumerate(req.refs):
             existing_result = None
             try:
-                existing_result = self._cache.get(ref)
+                existing_result = self._safe_cache_get(ref)
             except Exception as e:
                 logger.exception(f"Error getting cached value: {e}")
             if existing_result:
@@ -118,15 +141,20 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             for i, val in zip(needed_indices, needed_results.vals):
                 final_results[i] = val
                 try:
-                    self._cache.set(ref, val)
+                    self._safe_cache_set(ref, val)
                 except Exception as e:
                     logger.exception(f"Error caching values: {e}")
 
         return tsi.RefsReadBatchRes(vals=final_results)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        return self._with_cache_generic(
-            self._next_trace_server.file_content_read, req, tsi.FileContentReadRes
+        return self._with_cache(
+            "file_content_read",
+            lambda req: req.model_dump_json(),
+            self._next_trace_server.file_content_read,
+            req,
+            lambda res: res.content,
+            lambda content: tsi.FileContentReadRes(content=content),
         )
 
     # Remaining Un-cacheable Methods:
