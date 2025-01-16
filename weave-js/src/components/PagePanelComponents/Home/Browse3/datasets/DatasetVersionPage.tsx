@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useMemo} from 'react';
 
 import {Icon} from '../../../../Icon';
@@ -108,6 +109,12 @@ export const DatasetVersionPage: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
+            {objectVersion.userId && (
+              <div className="block">
+                <p className="text-moon-500">Created by</p>
+                <UserLink userId={objectVersion.userId} includeName />
+              </div>
+            )}
             {showDeleteButton && (
               <div className="ml-auto mr-0">
                 <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
