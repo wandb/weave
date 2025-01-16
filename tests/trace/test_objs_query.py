@@ -1,3 +1,5 @@
+import base64
+
 import weave
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -169,3 +171,17 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
     assert len(res.objs) == 10
     for obj in res.objs:
         assert obj.val
+
+
+def test_objs_query_wb_user_id(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_1")
+    weave.publish({"i": 2}, name="obj_1")
+    weave.publish({"i": 3}, name="obj_1")
+
+    correct_id = base64.b64encode(bytes(client.server._user_id, "utf-8")).decode(
+        "utf-8"
+    )
+
+    res = client._objects()
+    assert len(res) == 3
+    assert all(obj.wb_user_id == correct_id for obj in res)

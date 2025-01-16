@@ -1,3 +1,6 @@
+---
+title: Service API
+---
 
 
 :::tip[This is a notebook]
@@ -8,6 +11,9 @@
 
 :::
 
+
+
+<!--- @wandbcode{cod-notebook} -->
 
 # Use the Service API to Log and Query Traces
 
