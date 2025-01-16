@@ -1,42 +1,22 @@
-/**
- * This page is the list-view for object versions. When a single object is selected, it
- * becomes a rich table of versions. It is likely that we will want to outfit it
- * with features similar to the calls table. For example:
- * [ ] Add the ability to expand refs
- * [ ] Paginate & stream responses similar to calls
- * [ ] Add the ability to sort / filter on values
- * [ ] Add the ability to sort / filter on expanded values (blocked by general support for expansion operations)
- * [ ] Add sort / filter state to URL
- */
-
 import {
   GridColDef,
   GridColumnGroupingModel,
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
-import {TEAL_600} from '../../../../../common/css/color.styles';
-import {Button} from '../../../../Button';
-import {ErrorPanel} from '../../../../ErrorPanel';
-import {Loading} from '../../../../Loading';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Timestamp} from '../../../../Timestamp';
-import {
-  useWeaveflowCurrentRouteContext,
-  useWeaveflowRouteContext,
-} from '../context';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {basicField} from './common/DataTable';
-import {DeleteModal} from './common/DeleteModal';
-import {Empty} from './common/Empty';
+import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {ErrorPanel} from '../../../../../ErrorPanel';
+import {Loading} from '../../../../../Loading';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Timestamp} from '../../../../../Timestamp';
+import {useWeaveflowRouteContext} from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {basicField} from '../common/DataTable';
+import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_ACTION_SPECS,
   EMPTY_PROPS_ANNOTATIONS,
@@ -46,256 +26,34 @@ import {
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
-} from './common/EmptyContent';
+} from '../common/EmptyContent';
 import {
   CustomLink,
   ObjectVersionLink,
   ObjectVersionsLink,
   objectVersionText,
-} from './common/Links';
-import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
+} from '../common/Links';
+import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {
   buildDynamicColumns,
   prepareFlattenedDataForTable,
-} from './common/tabularListViews/columnBuilder';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useControllableState, useURLSearchParamsDict} from './util';
+} from '../common/tabularListViews/columnBuilder';
+import {TypeVersionCategoryChip} from '../common/TypeVersionCategoryChip';
+import {useURLSearchParamsDict} from '../util';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
-} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
   isTableRef,
   makeRefExpandedPayload,
-} from './wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {
-  KnownBaseObjectClassType,
-  ObjectVersionSchema,
-} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {objectVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {WFHighLevelObjectVersionFilter} from './objectsPageTypes';
 
 const DATASET_BASE_OBJECT_CLASS = 'Dataset';
-
-export const ObjectVersionsPage: React.FC<{
-  entity: string;
-  project: string;
-  initialFilter?: WFHighLevelObjectVersionFilter;
-  // Setting this will make the component a controlled component. The parent
-  // is responsible for updating the filter.
-  onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
-}> = props => {
-  const history = useHistory();
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const router = useWeaveflowCurrentRouteContext();
-  const [filter, setFilter] = useControllableState(
-    props.initialFilter ?? {},
-    props.onFilterUpdate
-  );
-  const {entity, project} = props;
-  const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
-  const onCompare = () => {
-    history.push(router.compareObjectsUri(entity, project, selectedVersions));
-  };
-
-  const title = useMemo(() => {
-    if (filter.objectName) {
-      return 'Versions of ' + filter.objectName;
-    } else if (filter.baseObjectClass) {
-      return _.capitalize(filter.baseObjectClass) + 's';
-    }
-    return 'All Objects';
-  }, [filter.objectName, filter.baseObjectClass]);
-
-  if (loadingUserInfo) {
-    return <Loading />;
-  }
-
-  const filteredOnObject = filter.objectName != null;
-  const hasComparison = filteredOnObject;
-  const viewer = userInfo ? userInfo.id : null;
-  const isReadonly = !viewer || !userInfo?.teams.includes(props.entity);
-  const showDeleteButton = filteredOnObject && !isReadonly;
-
-  return (
-    <SimplePageLayout
-      title={title}
-      hideTabsIfSingle
-      headerExtra={
-        <ObjectVersionsPageHeaderExtra
-          entity={entity}
-          project={project}
-          objectName={filter.objectName ?? null}
-          selectedVersions={selectedVersions}
-          setSelectedVersions={setSelectedVersions}
-          showDeleteButton={showDeleteButton}
-          showCompareButton={hasComparison}
-          onCompare={onCompare}
-        />
-      }
-      tabs={[
-        {
-          label: '',
-          content: (
-            <FilterableObjectVersionsTable
-              {...props}
-              initialFilter={filter}
-              onFilterUpdate={setFilter}
-              selectedVersions={selectedVersions}
-              setSelectedVersions={
-                hasComparison ? setSelectedVersions : undefined
-              }
-            />
-          ),
-        },
-      ]}
-    />
-  );
-};
-
-const ObjectVersionsPageHeaderExtra: React.FC<{
-  entity: string;
-  project: string;
-  objectName: string | null;
-  selectedVersions: string[];
-  setSelectedVersions: (selected: string[]) => void;
-  showDeleteButton?: boolean;
-  showCompareButton?: boolean;
-  onCompare: () => void;
-}> = ({
-  entity,
-  project,
-  objectName,
-  selectedVersions,
-  setSelectedVersions,
-  showDeleteButton,
-  showCompareButton,
-  onCompare,
-}) => {
-  const compareButton = showCompareButton ? (
-    <Button disabled={selectedVersions.length < 2} onClick={onCompare}>
-      Compare
-    </Button>
-  ) : undefined;
-  const deleteButton = showDeleteButton ? (
-    <DeleteObjectVersionsButtonWithModal
-      entity={entity}
-      project={project}
-      objectName={objectName ?? ''}
-      objectVersions={selectedVersions}
-      disabled={selectedVersions.length === 0 || !objectName}
-      onSuccess={() => setSelectedVersions([])}
-    />
-  ) : undefined;
-
-  return (
-    <Tailwind>
-      <div className="mr-16 flex gap-8">
-        {compareButton}
-        {deleteButton}
-      </div>
-    </Tailwind>
-  );
-};
-
-export type WFHighLevelObjectVersionFilter = {
-  objectName?: string | null;
-  baseObjectClass?: KnownBaseObjectClassType | null;
-};
-
-export const FilterableObjectVersionsTable: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelObjectVersionFilter;
-  initialFilter?: WFHighLevelObjectVersionFilter;
-  objectTitle?: string;
-  hideCategoryColumn?: boolean;
-  hideCreatedAtColumn?: boolean;
-  // Setting this will make the component a controlled component. The parent
-  // is responsible for updating the filter.
-  onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
-  selectedVersions?: string[];
-  setSelectedVersions?: (selected: string[]) => void;
-}> = props => {
-  const {useRootObjectVersions} = useWFHooks();
-  const {baseRouter} = useWeaveflowRouteContext();
-
-  const effectiveFilter = useMemo(() => {
-    return {...props.initialFilter, ...props.frozenFilter};
-  }, [props.initialFilter, props.frozenFilter]);
-
-  const effectivelyLatestOnly = !effectiveFilter.objectName;
-
-  const filteredObjectVersions = useRootObjectVersions(
-    props.entity,
-    props.project,
-    {
-      baseObjectClasses: effectiveFilter.baseObjectClass
-        ? [effectiveFilter.baseObjectClass]
-        : undefined,
-      objectIds: effectiveFilter.objectName
-        ? [effectiveFilter.objectName]
-        : undefined,
-      latestOnly: effectivelyLatestOnly,
-    },
-    undefined,
-    effectivelyLatestOnly // metadata only when getting latest
-  );
-
-  if (filteredObjectVersions.loading) {
-    return <Loading centered />;
-  }
-  if (filteredObjectVersions.error) {
-    return <ErrorPanel />;
-  }
-
-  // TODO: Only show the empty state if no filters other than baseObjectClass
-  const objectVersions = filteredObjectVersions.result ?? [];
-  const isEmpty = objectVersions.length === 0;
-  if (isEmpty) {
-    let propsEmpty = EMPTY_PROPS_OBJECTS;
-    const base = props.initialFilter?.baseObjectClass;
-    if ('Prompt' === base) {
-      propsEmpty = EMPTY_PROPS_PROMPTS;
-    } else if ('Model' === base) {
-      propsEmpty = EMPTY_PROPS_MODEL;
-    } else if (DATASET_BASE_OBJECT_CLASS === base) {
-      propsEmpty = EMPTY_PROPS_DATASETS;
-    } else if (base === 'Leaderboard') {
-      propsEmpty = EMPTY_PROPS_LEADERBOARDS;
-    } else if (base === 'Scorer') {
-      propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
-    } else if (base === 'ActionSpec') {
-      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
-    } else if (base === 'AnnotationSpec') {
-      propsEmpty = EMPTY_PROPS_ANNOTATIONS;
-    }
-    return <Empty {...propsEmpty} />;
-  }
-
-  return (
-    <FilterLayoutTemplate
-      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
-      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={baseRouter.objectVersionsUIUrl(
-        props.entity,
-        props.project,
-        effectiveFilter
-      )}>
-      <ObjectVersionsTable
-        objectVersions={objectVersions}
-        objectTitle={props.objectTitle}
-        hidePropsAsColumns={!!effectivelyLatestOnly}
-        hidePeerVersionsColumn={!effectivelyLatestOnly}
-        hideCategoryColumn={props.hideCategoryColumn}
-        hideCreatedAtColumn={props.hideCreatedAtColumn}
-        selectedVersions={props.selectedVersions}
-        setSelectedVersions={props.setSelectedVersions}
-      />
-    </FilterLayoutTemplate>
-  );
-};
 
 export const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
@@ -593,6 +351,99 @@ export const ObjectVersionsTable: React.FC<{
   );
 };
 
+export const FilterableObjectVersionsTable: React.FC<{
+  entity: string;
+  project: string;
+  frozenFilter?: WFHighLevelObjectVersionFilter;
+  initialFilter?: WFHighLevelObjectVersionFilter;
+  objectTitle?: string;
+  hideCategoryColumn?: boolean;
+  hideCreatedAtColumn?: boolean;
+  // Setting this will make the component a controlled component. The parent
+  // is responsible for updating the filter.
+  onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
+  selectedVersions?: string[];
+  setSelectedVersions?: (selected: string[]) => void;
+}> = props => {
+  const {useRootObjectVersions} = useWFHooks();
+  const {baseRouter} = useWeaveflowRouteContext();
+
+  const effectiveFilter = useMemo(() => {
+    return {...props.initialFilter, ...props.frozenFilter};
+  }, [props.initialFilter, props.frozenFilter]);
+
+  const effectivelyLatestOnly = !effectiveFilter.objectName;
+
+  const filteredObjectVersions = useRootObjectVersions(
+    props.entity,
+    props.project,
+    {
+      baseObjectClasses: effectiveFilter.baseObjectClass
+        ? [effectiveFilter.baseObjectClass]
+        : undefined,
+      objectIds: effectiveFilter.objectName
+        ? [effectiveFilter.objectName]
+        : undefined,
+      latestOnly: effectivelyLatestOnly,
+    },
+    undefined,
+    effectivelyLatestOnly // metadata only when getting latest
+  );
+
+  if (filteredObjectVersions.loading) {
+    return <Loading centered />;
+  }
+  if (filteredObjectVersions.error) {
+    return <ErrorPanel />;
+  }
+
+  // TODO: Only show the empty state if no filters other than baseObjectClass
+  const objectVersions = filteredObjectVersions.result ?? [];
+  const isEmpty = objectVersions.length === 0;
+  if (isEmpty) {
+    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    const base = props.initialFilter?.baseObjectClass;
+    if ('Prompt' === base) {
+      propsEmpty = EMPTY_PROPS_PROMPTS;
+    } else if ('Model' === base) {
+      propsEmpty = EMPTY_PROPS_MODEL;
+    } else if (DATASET_BASE_OBJECT_CLASS === base) {
+      propsEmpty = EMPTY_PROPS_DATASETS;
+    } else if (base === 'Leaderboard') {
+      propsEmpty = EMPTY_PROPS_LEADERBOARDS;
+    } else if (base === 'Scorer') {
+      propsEmpty = EMPTY_PROPS_PROGRAMMATIC_SCORERS;
+    } else if (base === 'ActionSpec') {
+      propsEmpty = EMPTY_PROPS_ACTION_SPECS;
+    } else if (base === 'AnnotationSpec') {
+      propsEmpty = EMPTY_PROPS_ANNOTATIONS;
+    }
+    return <Empty {...propsEmpty} />;
+  }
+
+  return (
+    <FilterLayoutTemplate
+      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
+      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
+      filterPopoutTargetUrl={baseRouter.objectVersionsUIUrl(
+        props.entity,
+        props.project,
+        effectiveFilter
+      )}>
+      <ObjectVersionsTable
+        objectVersions={objectVersions}
+        objectTitle={props.objectTitle}
+        hidePropsAsColumns={!!effectivelyLatestOnly}
+        hidePeerVersionsColumn={!effectivelyLatestOnly}
+        hideCategoryColumn={props.hideCategoryColumn}
+        hideCreatedAtColumn={props.hideCreatedAtColumn}
+        selectedVersions={props.selectedVersions}
+        setSelectedVersions={props.setSelectedVersions}
+      />
+    </FilterLayoutTemplate>
+  );
+};
+
 const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
   const {useRootObjectVersions} = useWFHooks();
 
@@ -627,44 +478,5 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       neverPeek
       variant="secondary"
     />
-  );
-};
-
-const DeleteObjectVersionsButtonWithModal: React.FC<{
-  entity: string;
-  project: string;
-  objectName: string;
-  objectVersions: string[];
-  disabled?: boolean;
-  onSuccess: () => void;
-}> = ({entity, project, objectName, objectVersions, disabled, onSuccess}) => {
-  const {useObjectDeleteFunc} = useWFHooks();
-  const {objectVersionsDelete} = useObjectDeleteFunc();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  const numObjects = objectVersions.length;
-  const versionsStr = maybePluralizeWord(numObjects, 'version', 's');
-  const objectDigests = objectVersions.map(v => v.split(':')[1]);
-  const deleteTitleStr = `${numObjects} ${objectName} ${versionsStr}`;
-
-  return (
-    <>
-      <Button
-        icon="delete"
-        variant="ghost"
-        onClick={() => setDeleteModalOpen(true)}
-        disabled={disabled}
-      />
-      <DeleteModal
-        open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        deleteTitleStr={deleteTitleStr}
-        deleteBodyStrs={objectVersions}
-        onDelete={() =>
-          objectVersionsDelete(entity, project, objectName, objectDigests)
-        }
-        onSuccess={onSuccess}
-      />
-    </>
   );
 };
