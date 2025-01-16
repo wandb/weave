@@ -138,11 +138,17 @@ def test_drill_down_dataset_refs_same_after_publishing(client):
         assert resolve_ref_futures(row["a"].ref) == row2["a"].ref
         assert resolve_ref_futures(row["a"]["b"].ref) == row2["a"]["b"].ref
 
-    assert resolve_ref_futures(ds2.ref) == ds3.ref
+    assert ds2.ref == ds3.ref
     for row2, row3 in zip(ds2.rows, ds3.rows):
-        assert resolve_ref_futures(row2.ref) == row3.ref
-        assert resolve_ref_futures(row2["a"].ref) == row3["a"].ref
-        assert resolve_ref_futures(row2["a"]["b"].ref) == row3["a"]["b"].ref
+        assert row2.ref == row3.ref
+        assert row2["a"].ref == row3["a"].ref
+        assert row2["a"]["b"].ref == row3["a"]["b"].ref
+
+    assert ds3.rows == [{"a": {"b": 1}}, {"a": {"b": 2}}, {"a": {"b": 3}}]
+    for i, row in enumerate(ds3.rows, 1):
+        assert row == {"a": {"b": i}}
+        assert row["a"] == {"b": i}
+        assert row["a"]["b"] == i
 
 
 def test_registration():
