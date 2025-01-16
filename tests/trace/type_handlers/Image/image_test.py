@@ -4,8 +4,9 @@ import subprocess
 from pathlib import Path
 
 import pytest
-import weave
 from PIL import Image
+
+import weave
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -184,7 +185,6 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res, dict)
     assert "model_latency" in res and "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
-
 
 
 @pytest.mark.asyncio
