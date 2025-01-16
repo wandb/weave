@@ -79,9 +79,9 @@ const makeAnnotateCallCode = (
   payloadValue: string,
   fullSpecName: string,
   projectName: string
-) => `api = weave.init('${projectName}')
+) => `client = weave.init('${projectName}')
 
-call = api.get_calls()[0]
+call = client.get_calls()[0]
 call.feedback.add(
   feedback_type='${fullSpecName}',
   payload={"value": ${payloadValue}},
