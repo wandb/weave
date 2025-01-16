@@ -3,6 +3,7 @@ from __future__ import annotations
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace_server import sqlite_trace_server
+from weave.trace_server.recording_trace_server import RecordingTraceServer
 from weave.trace_server_bindings import remote_http_trace_server
 
 
@@ -102,11 +103,12 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
+    recording_server = RecordingTraceServer(remote_server)
     # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
-        entity_name, project_name, remote_server, ensure_project_exists
+        entity_name, project_name, recording_server, ensure_project_exists
     )
     # If the project name was formatted by init, update the project name
     project_name = client.project
