@@ -5,7 +5,7 @@ def test_call_to_dict(client):
     @weave.op
     def greet(name: str, age: int) -> str:
         return f"Hello {name}, you are {age}!"
-    
+
     _, call = greet.call("Alice", 30)
     assert call.to_dict() == {
         "op_name": call.op_name,
@@ -23,4 +23,3 @@ def test_call_to_dict(client):
         "trace_id": call.trace_id,
         "project_id": call.project_id,
     }
-
