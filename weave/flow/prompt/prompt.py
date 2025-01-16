@@ -5,20 +5,17 @@ import re
 import textwrap
 from collections import UserList
 from pathlib import Path
-from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, cast, overload
+from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, overload
 
 from pydantic import Field
 from rich.table import Table
-from typing_extensions import Self
 
 from weave.flow.obj import Object
 from weave.flow.prompt.common import ROLE_COLORS, color_role
 from weave.trace.api import publish as weave_publish
-from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
 from weave.trace.rich import pydantic_util
-from weave.trace.vals import WeaveObject
 
 
 class Message(TypedDict):
@@ -79,7 +76,6 @@ class Prompt(Object):
         raise NotImplementedError("Subclasses must implement format()")
 
 
-@register_object
 class StringPrompt(Prompt):
     content: str = ""
 
@@ -91,15 +87,13 @@ class StringPrompt(Prompt):
         return self.content.format(**kwargs)
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: Any) -> "StringPrompt":
         prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
-        prompt.ref = cast(ObjectRef, obj.ref)
         return prompt
 
 
-@register_object
 class MessagesPrompt(Prompt):
     messages: list[dict] = Field(default_factory=list)
 
@@ -120,15 +114,13 @@ class MessagesPrompt(Prompt):
         return [self.format_message(m, **kwargs) for m in self.messages]
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: Any) -> "MessagesPrompt":
         prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
-        prompt.ref = cast(ObjectRef, obj.ref)
         return prompt
 
 
-@register_object
 class EasyPrompt(UserList, Prompt):
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
@@ -428,7 +420,7 @@ class EasyPrompt(UserList, Prompt):
         }
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: Any) -> "EasyPrompt":
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
@@ -436,14 +428,13 @@ class EasyPrompt(UserList, Prompt):
         return cls(
             name=obj.name,
             description=obj.description,
-            ref=obj.ref,
             messages=messages,
             config=config,
             requirements=requirements,
         )
 
-    @classmethod
-    def load(cls, fp: IO) -> Self:
+    @staticmethod
+    def load(fp: IO) -> "EasyPrompt":
         if isinstance(fp, str):  # Common mistake
             raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
@@ -452,8 +443,8 @@ class EasyPrompt(UserList, Prompt):
         prompt = EasyPrompt(**data)
         return prompt
 
-    @classmethod
-    def load_file(cls, filepath: Union[str, Path]) -> Self:
+    @staticmethod
+    def load_file(filepath: Union[str, Path]) -> "Prompt":
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path) as f:
             return EasyPrompt.load(f)

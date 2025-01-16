@@ -28,7 +28,6 @@ def example_class():
         attrs={
             "name": None,
             "description": None,
-            "ref": None,
             "_class_name": "Example",
             "_bases": ["Object", "BaseModel"],
             "a": 1,

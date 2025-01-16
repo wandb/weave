@@ -8,10 +8,7 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
     model_validator,
 )
-from typing_extensions import Self
 
-from weave.trace import api
-from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.trace.weave_client import get_ref
@@ -41,7 +38,6 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    ref: Optional[ObjectRef] = None
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -54,14 +50,6 @@ class Object(BaseModel):
     )
 
     __str__ = BaseModel.__repr__
-
-    @classmethod
-    def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
-        if not isinstance(cls, Objectifyable):
-            raise NotImplementedError(
-                f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
-            )
-        return api.ref(uri).get(objectify=objectify)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
