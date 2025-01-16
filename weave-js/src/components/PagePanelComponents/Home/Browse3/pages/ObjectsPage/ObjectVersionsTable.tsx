@@ -63,7 +63,6 @@ export const ObjectVersionsTable: React.FC<{
   hidePeerVersionsColumn?: boolean;
   hideCategoryColumn?: boolean;
   hideCreatedAtColumn?: boolean;
-  hideUserColumn?: boolean;
   hideVersionSuffix?: boolean;
   onRowClick?: (objectVersion: ObjectVersionSchema) => void;
   selectedVersions?: string[];
@@ -261,7 +260,7 @@ export const ObjectVersionsTable: React.FC<{
       );
     }
 
-    if (!props.hideUserColumn || !showUserColumn) {
+    if (showUserColumn) {
       cols.push(
         basicField('userId', 'User', {
           width: 150,
