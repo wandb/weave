@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {FilterableObjectVersionsTable} from '../ObjectVersionsPage';
+import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 
 export const AnnotationsTab: React.FC<{
   entity: string;
