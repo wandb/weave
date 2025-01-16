@@ -16,8 +16,6 @@ We call `make_image_file_thread_safe` in the `__init__.py` file to ensure that t
 import threading
 from functools import wraps
 
-from PIL.ImageFile import ImageFile
-
 _patch_lock = threading.Lock()
 _patched = False
 
@@ -28,6 +26,14 @@ def make_image_file_thread_safe() -> None:
         if _patched:
             return
         _patched = True
+    try:
+        _make_image_file_thread_safe()
+    except Exception as e:
+        print(f"Failed to patch PIL.ImageFile.ImageFile: {e}.")
+
+
+def _make_image_file_thread_safe() -> None:
+    from PIL.ImageFile import ImageFile
 
     old_load = ImageFile.load
     old_init = ImageFile.__init__
