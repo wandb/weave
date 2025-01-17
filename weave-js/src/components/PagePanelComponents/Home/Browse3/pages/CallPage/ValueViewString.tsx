@@ -86,19 +86,19 @@ const getDefaultFormat = (value: string): Format => {
 
 export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const trimmed = value.trim();
+  const hasScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
   const [hasFull, setHasFull] = useState(false);
-  const defaultScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
 
   const [format, setFormat] = useState(getDefaultFormat(value));
   useEffect(() => {
     setFormat(getDefaultFormat(value));
   }, [value]);
 
-  const [mode, setMode] = useState(defaultScrolling ? (isExpanded ? 1 : 0) : 0);
+  const [mode, setMode] = useState(hasScrolling ? (isExpanded ? 1 : 0) : 0);
 
   useEffect(() => {
-    setMode(defaultScrolling ? (isExpanded ? 1 : 0) : 0);
-  }, [defaultScrolling, isExpanded]);
+    setMode(hasScrolling ? (isExpanded ? 1 : 0) : 0);
+  }, [hasScrolling, isExpanded]);
 
   const onClick = () => {
     const numModes = hasFull ? 3 : 2;
@@ -208,7 +208,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     );
   }
   return (
-    <Collapsed hasScrolling={isExpanded} onClick={onClick}>
+    <Collapsed hasScrolling onClick={onClick}>
       {content}
     </Collapsed>
   );
