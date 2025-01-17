@@ -30,6 +30,10 @@ class Batch(BaseModel):
     batch: list[Union[StartBatchItem, EndBatchItem]]
 
 
+class BatchRes(BaseModel):
+    res: list[Union[tsi.CallStartRes, tsi.CallEndRes]]
+
+
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
