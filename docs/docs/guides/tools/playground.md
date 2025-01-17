@@ -16,7 +16,7 @@ Evaluating LLM prompts and responses is challenging. The Weave Playground is des
 Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
 
 - [Prerequisites](#prerequisites)
-   - [Add a provider API key](#add-a-provider-api-key)
+   - [Add provider credentials and information](#add-provider-credentials-and-information)
    - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
 - [Adjust LLM parameters](#adjust-llm-parameters)
@@ -24,20 +24,25 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Retry, edit, and delete messages](#retry-edit-and-delete-messages)
 - [Add a new message](#add-a-new-message)
 - [Compare LLMs](#compare-llms)
+- [Adjust the number of trials](#adjust-the-number-of-trials)
 
 ## Prerequisites
 
-Before you can use Playground, you must [add an API key](#add-a-provider-api-key) for your preferred LLM provider(s), and [open the Playground UI](#access-the-playground). 
+Before you can use Playground, you must [add provider credentials](#add-provider-credentials-and-information), and [open the Playground UI](#access-the-playground). 
 
-### Add a provider API key 
+### Add provider credentials and information 
 
-Playground currently supports OpenAI, Anthropic, Gemini, and Groq models.
-To use one of the available LLMs, your W&B admin must add the appropriate API key to your team secrets in W&B settings.
+Playground currently supports OpenAI, Anthropic, Gemini, Groq, and Amazon Bedrock models.
+To use one of the available models, add the appropriate information to your team secrets in W&B settings.
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
 - Gemini: `GOOGLE_API_KEY`
 - Groq: `GEMMA_API_KEY`
+- Amazon Bedrock:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION_NAME`
 
 ### Access the Playground
 
@@ -53,45 +58,67 @@ There are two ways to access the Playground:
 
 ## Select an LLM
 
-You can switch the LLM using the dropdown menu in the top left. Currently, the available models are:
+You can switch the LLM using the dropdown menu in the top left. The available models from various providers are listed below:
 
-- gpt-40-mini
-- claude-3-5-sonnet-20240620
+- [AI21](#ai21)
+- [Amazon](#amazon)
+- [Anthropic](#anthropic)
+- [Cohere](#cohere)
+- [Google](#google)
+- [Groq](#groq)
+- [Meta](#meta)
+- [Mistral](#mistral)
+- [OpenAI](#openai)
+- [X.AI](#xai)
+
+
+### AI21
+- ai21.j2-mid-v1
+- ai21.j2-ultra-v1
+
+### Amazon
+- amazon.nova-lite
+- amazon.nova-micro
+- amazon.nova-pro
+- amazon.titan-text-express-v1
+- amazon.titan-text-lite-v1
+
+### Anthropic
+- anthropic.claude-3-5-sonnet-20240620-v1:0
+- anthropic.claude-3-haiku-20240307-v1:0
+- anthropic.claude-3-opus-20240229-v1:0
+- anthropic.claude-3-sonnet-20240229-v1:0
+- anthropic.claude-instant-v1
+- anthropic.claude-v2
+- anthropic.claude-v2:1
 - claude-3-5-sonnet-20241022
 - claude-3-haiku-20240307
 - claude-3-opus-20240229
 - claude-3-sonnet-20240229
+
+### Cohere
+- cohere.command-light-text-v14
+- cohere.command-r-plus-v1:0
+- cohere.command-r-v1:0
+- cohere.command-text-v14
+
+### Google
+- gemini/gemini-1.5-flash
 - gemini/gemini-1.5-flash-001
 - gemini/gemini-1.5-flash-002
 - gemini/gemini-1.5-flash-8b-exp-0827
 - gemini/gemini-1.5-flash-8b-exp-0924
 - gemini/gemini-1.5-flash-exp-0827
 - gemini/gemini-1.5-flash-latest
-- gemini/gemini-1.5-flash
+- gemini/gemini-1.5-pro
 - gemini/gemini-1.5-pro-001
 - gemini/gemini-1.5-pro-002
 - gemini/gemini-1.5-pro-exp-0801
 - gemini/gemini-1.5-pro-exp-0827
 - gemini/gemini-1.5-pro-latest
-- gemini/gemini-1.5-pro
 - gemini/gemini-pro
-- gpt-3.5-turbo-0125
-- gpt-3.5-turbo-1106
-- gpt-3.5-turbo-16k
-- gpt-3.5-turbo
-- gpt-4-0125-preview
-- gpt-4-0314
-- gpt-4-0613
-- gpt-4-1106-preview
-- gpt-4-32k-0314
-- gpt-4-turbo-2024-04-09
-- gpt-4-turbo-preview
-- gpt-4-turbo
-- gpt-4
-- gpt-40-2024-05-13
-- gpt-40-2024-08-06
-- gpt-40-mini-2024-07-18
-- gpt-4o
+
+### Groq
 - groq/gemma-7b-it
 - groq/gemma2-9b-it
 - groq/llama-3.1-70b-versatile
@@ -101,10 +128,49 @@ You can switch the LLM using the dropdown menu in the top left. Currently, the a
 - groq/llama3-groq-70b-8192-tool-use-preview
 - groq/llama3-groq-8b-8192-tool-use-preview
 - groq/mixtral-8x7b-32768
-- o1-mini-2024-09-12
+
+### Meta
+- meta.llama2-13b-chat-v1
+- meta.llama2-70b-chat-v1
+- meta.llama3-1-405b-instruct-v1:0
+- meta.llama3-1-70b-instruct-v1:0
+- meta.llama3-1-8b-instruct-v1:0
+- meta.llama3-70b-instruct-v1:0
+- meta.llama3-8b-instruct-v1:0
+
+### Mistral
+- mistral.mistral-7b-instruct-v0:2
+- mistral.mistral-large-2402-v1:0
+- mistral.mistral-large-2407-v1:0
+- mistral.mixtral-8x7b-instruct-v0:1
+
+### OpenAI
+- gpt-3.5-turbo
+- gpt-3.5-turbo-0125
+- gpt-3.5-turbo-1106
+- gpt-3.5-turbo-16k
+- gpt-4
+- gpt-4-0125-preview
+- gpt-4-0314
+- gpt-4-0613
+- gpt-4-1106-preview
+- gpt-4-32k-0314
+- gpt-4-turbo
+- gpt-4-turbo-2024-04-09
+- gpt-4-turbo-preview
+- gpt-40-2024-05-13
+- gpt-40-2024-08-06
+- gpt-40-mini
+- gpt-40-mini-2024-07-18
+- gpt-4o
 - o1-mini
-- o1-preview-2024-09-12
+- o1-mini-2024-09-12
 - o1-preview
+- o1-preview-2024-09-12
+
+### X.AI
+- xai/grok-beta
+
 
 ## Adjust LLM parameters
 
@@ -157,3 +223,10 @@ Playground allows you to compare LLMs. To perform a comparison, do the following
    - [Adjust parameters](#adjust-llm-parameters)
    - [Add functions](#add-a-function)
 3. In the message box, enter a message that you want to test with both models and press **Send**.
+
+## Adjust the number of trials
+
+Playground allows you to generate multiple outputs for the same input by setting the number of trials. The default setting is `1`. To adjust the number of trials, do the following:
+
+1. In the Playground UI, open the settings sidebar if it is not already open.
+2. Adjust the **Number of trials**.

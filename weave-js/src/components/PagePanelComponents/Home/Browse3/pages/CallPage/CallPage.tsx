@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
@@ -17,7 +16,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -25,6 +24,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
 import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -36,17 +36,16 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
-import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
+import {TabUseCall} from './TabUseCall';
 
 export const CallPage: FC<{
   entity: string;
@@ -71,15 +70,20 @@ export const CallPage: FC<{
 };
 
 export const useShowRunnableUI = () => {
-  const viewerInfo = useViewerInfo();
-  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+  return false;
+  // Uncomment to re-enable
+  // const viewerInfo = useViewerInfo();
+  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
-  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
+
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const showTryInPlayground =
+    !isPeeking || !window.location.toString().includes('/weave/playground');
 
   const handleOpenInPlayground = () => {
     window.open(
@@ -115,13 +119,22 @@ const useCallTabs = (call: CallSchema) => {
             label: 'Chat',
             content: (
               <>
-                <Button
-                  variant="secondary"
-                  startIcon="sandbox-playground"
-                  className="m-16 mb-8"
-                  onClick={handleOpenInPlayground}>
-                  Open chat in playground
-                </Button>
+                {showTryInPlayground && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      width: '100%',
+                      padding: '8px 16px',
+                    }}>
+                    <Button
+                      variant="ghost"
+                      startIcon="robot-service-member"
+                      onClick={handleOpenInPlayground}>
+                      Try in playground
+                    </Button>
+                  </Box>
+                )}
                 <ScrollableTabContent>
                   <Tailwind>
                     <CallChat call={call.traceCall!} />
@@ -158,6 +171,19 @@ const useCallTabs = (call: CallSchema) => {
       ),
     },
     {
+      label: 'Scores',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <ScorerFeedbackGrid
+            entity={entity}
+            project={project}
+            weaveRef={weaveRef}
+            objectType="call"
+          />
+        </Tailwind>
+      ),
+    },
+    {
       label: 'Summary',
       content: (
         <Tailwind style={{height: '100%', overflow: 'auto'}}>
@@ -165,21 +191,6 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
-    // For now, we are only showing this tab for W&B admins since the
-    // feature is in active development. We want to be able to get
-    // feedback without enabling for all users.
-    ...(showScores
-      ? [
-          {
-            label: 'Scores (W&B Admin Preview)',
-            content: (
-              <Tailwind>
-                <CallScoresViewer call={call} />
-              </Tailwind>
-            ),
-          },
-        ]
-      : []),
     {
       label: 'Use',
       content: (
@@ -222,7 +233,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         !showTraceTree,
-        showFeedbackExpand
+        showFeedbackExpand ? true : undefined
       )
     );
   }, [
@@ -245,7 +256,7 @@ const CallPageInnerVertical: FC<{
         call.callId,
         path,
         showTraceTree,
-        !showFeedbackExpand
+        !showFeedbackExpand ? true : undefined
       )
     );
   }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
@@ -299,7 +310,7 @@ const CallPageInnerVertical: FC<{
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const showPaginationContols = isPeeking && rowIdsConfigured;
+  const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
 
@@ -317,10 +328,10 @@ const CallPageInnerVertical: FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationContols && (
+          {showPaginationControls && (
             <PaginationControls call={call} path={path} />
           )}
-          <Box sx={{marginLeft: showPaginationContols ? 0 : 'auto'}}>
+          <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}

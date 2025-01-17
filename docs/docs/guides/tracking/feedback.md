@@ -3,35 +3,79 @@ import TabItem from '@theme/TabItem';
 
 # Feedback
 
-Evaluating LLM applications automatically is challenging. Teams often rely on direct user feedback, particularly from domain experts, who assess the content quality using simple indicators such as thumbs up or down. Developers also actively identify and resolve content issues.
+Efficiently evaluating LLM applications requires robust tooling to collect and analyze feedback. Weave provides an integrated feedback system, allowing users to provide call feedback directly through the UI or programmatically via the SDK. Various feedback types are supported, including emoji reactions, textual comments, and structured data, enabling teams to:
 
-Weave's feedback feature enables users to provide feedback directly within the Weave UI or through the API. You can add emoji reactions, textual notes, and structured data to calls. This feedback helps compile evaluation datasets, monitor application performance, and collect examples for advanced tasks like fine-tuning.
+- Build evaluation datasets for performance monitoring.
+- Identify and resolve LLM content issues effectively.
+- Gather examples for advanced tasks like fine-tuning.
 
-## View and Add Feedback within UI
+This guide covers how to use Weave’s feedback functionality in both the UI and SDK, query and manage feedback, and use human annotations for detailed evaluations. 
 
-Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Use these buttons to add reactions or notes.
+- [Provide feedback in the UI](#provide-feedback-in-the-ui)
+- [Provide feedback via the SDK](#provide-feedback-via-the-sdk)
+- [Add human annotations](#add-human-annotations)
 
-![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
+## Provide feedback in the UI
 
-View and edit feedback in the header of the call details page.
+In the Weave UI, you can add and view feedback [from the call details page](#from-the-call-details-page) or [using the icons](#use-the-icons).
 
-![Screenshot of feedback controls in call details header](imgs/feedback_call_header.png)
+### From the call details page
 
-View the feedback for a call on the "Feedback" tab of the call details page.
+1. In the sidebar, navigate to **Traces**.
+2. Find the row for the call that you want to add feedback to.
+3. Open the call details page.
+4. Select the **Feedback** column for the call.
+5. Add, view, or delete feedback:
+   - *[Add and view feedback using the icons](#use-the-icons)* located in the upper right corner of the call details feedback view.
+   - *View and delete feedback from the call details feedback table.* Delete feedback by clicking the trashcan icon in the rightmost column of the appropriate feedback row.
 
 ![Screenshot of Feedback tab in call details](imgs/feedback_tab.png)
 
-Access copy-and-paste examples on the "Use" tab of the call details page to manipulate the feedback for that call using the SDK.
+### Use the icons
 
-![Screenshot of Use tab in call details](imgs/feedback_use.png)
+You can add or remove a reaction, and add a note using the icons that are located in both the call table and individual call details pages.
 
-## SDK
+- *Call table*: Located in **Feedback** column in the appropriate row in the call table.
+- *Call details page*: Located in the upper right corner of each call details page.
 
-Use the Weave SDK to programmatically add, remove, and query feedback on calls.
+To add a reaction:
+  1. Click the emoji icon. 
+  2. Add a thumbs up, thumbs down, or click the **+** icon for more emojis.
 
-### Querying a project's feedback
+To remove a reaction:
+  1. Hover over the emoji reaction you want to remove.
+  2. Click the reaction to remove it.
 
-<Tabs groupId="programming-language">
+> You can also delete feedback from the [**Feedback** column on the call details page.](#from-the-call-details-page).
+
+To add a comment:
+  1. Click the comment bubble icon. 
+  2. In the text box, add your note. 
+  3. To save the note, press the **Enter** key. You can add additional notes.
+
+![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
+
+## Provide feedback via the SDK
+
+> You can find SDK usage examples for feedback in the UI under the **Use** tab in the call details page.
+
+You can use the Weave SDK to programmatically add, remove, and query feedback on calls. 
+
+### Query a project's feedback
+
+You can query the feedback for your Weave project using the SDK. The SDK supports the following feedback query operations:
+
+- `client.get_feedback()`: Returns all feedback in a project.
+- `client.get_feedback("<feedback_uuid>")`: Return a specific feedback object specified by `<feedback_uuid>` as a collection.
+- `client.get_feedback(reaction="<reaction_type>")`: Returns all feedback objects for a specific reaction type.
+
+You can also get additional information for each feedback object in `client.get_feedback()`: 
+- `id`: The feedback object ID.
+- `created_at`: The creation time information for the feedback object.
+- `feedback_type`: The type of feedback (reaction, note, custom).
+- `payload`: The feedback payload
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -41,14 +85,13 @@ Use the Weave SDK to programmatically add, remove, and query feedback on calls.
     all_feedback = client.get_feedback()
 
     # Fetch a specific feedback object by id.
-    # Note that the API still returns a collection, which is expected
-    # to contain zero or one item(s).
+    # The API returns a collection, which is expected to contain at most one item.
     one_feedback = client.get_feedback("<feedback_uuid>")[0]
 
     # Find all feedback objects with a specific reaction. You can specify offset and limit.
     thumbs_up = client.get_feedback(reaction="👍", limit=10)
 
-    # After retrieval you can view the details of individual feedback objects.
+    # After retrieval, view the details of individual feedback objects.
     for f in client.get_feedback():
         print(f.id)
         print(f.created_at)
@@ -64,9 +107,15 @@ Use the Weave SDK to programmatically add, remove, and query feedback on calls.
   </TabItem>
 </Tabs>
 
-### Adding feedback to a call
+### Add feedback to a call
 
-<Tabs groupId="programming-language">
+You can add feedback to a call using the call's UUID. To use the UUID to get a particular call, [retrieve it during or after call execution](#retrieve-the-call-uuid). The SDK supports the following operations for adding feedback to a call:
+
+- `call.feedback.add_reaction("<reaction_type>")`: Add one of the supported `<reaction_types>` (emojis), such as 👍.
+- `call.feedback.add_note("<note>")`: Add a note.
+- `call.feedback.add("<label>", <object>)`: Add a custom feedback `<object>` specified by `<label>`.
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -82,7 +131,7 @@ Use the Weave SDK to programmatically add, remove, and query feedback on calls.
 
     # Adding custom key/value pairs.
     # The first argument is a user-defined "type" string.
-    # Feedback must be JSON serializable and less than 1kb when serialized.
+    # Feedback must be JSON serializable and less than 1 KB when serialized.
     call.feedback.add("correctness", { "value": 5 })
     ```
 
@@ -94,11 +143,18 @@ Use the Weave SDK to programmatically add, remove, and query feedback on calls.
   </TabItem>
 </Tabs>
 
-### Retrieving the Call UUID
+#### Retrieve the call UUID
 
-For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. Here is how to get the UUID of the call from within the operation:
+For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. 
 
-<Tabs groupId="programming-language">
+- [During call execution](#during-call-execution)
+- [After call execution](#after-call-execution)
+
+##### During call execution
+
+To retrieve the UUID during call execution, get the current call, and return the ID.
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
 
@@ -123,9 +179,11 @@ For scenarios where you need to add feedback immediately after a call, you can r
   </TabItem>
 </Tabs>
 
-Additionally, you can use call() method to execute the operation and retrieve the call ID after execution of the function:
+##### After call execution
 
-<Tabs groupId="programming-language">
+Alternatively, you can use `call()` method to execute the operation and retrieve the ID after call execution:
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -148,27 +206,11 @@ Additionally, you can use call() method to execute the operation and retrieve th
   </TabItem>
 </Tabs>
 
-### Querying feedback on a call
+### Delete feedback from a call
 
-<Tabs groupId="programming-language">
-  <TabItem value="python" label="Python" default>
-    ```python
-    for f in call.feedback:
-        print(f.id)
-        print(f.feedback_type)
-        print(f.payload)
-    ```
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-    ```plaintext
-    This feature is not available in TypeScript yet.  Stay tuned!
-    ```
-  </TabItem>
-</Tabs>
+You can delete feedback from a particular call by specifying a UUID.
 
-### Deleting feedback from a call
-
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     call.feedback.purge("<feedback_uuid>")
@@ -181,31 +223,59 @@ Additionally, you can use call() method to execute the operation and retrieve th
   </TabItem>
 </Tabs>
 
-## Human annotation
+## Add human annotations
 
-Human annotations are supported in the weave UI after configuration of a Human Annotation scorer, which can be accessed via the `Scorers` page in the navigation sidebar. Once configured, annotations can be used when inspecting individual calls in the main Call or Evaluation table, by selecting the marker icon in the call header (seen below).
+Human annotations are supported in the Weave UI. To make human annotations, you must first create a Human Annotation scorer using either the [UI](#create-a-human-annotation-scorer-in-the-ui) or the [API](#create-a-human-annotation-scorer-using-the-api). Then, you can [use the scorer in the UI to make annotations](#use-the-human-annotation-scorer-in-the-ui), and [modify your annotation scorers using the API](#modify-a-human-annotation-scorer-using-the-api).
 
-![Marker icon in call header](./imgs/marker-icon.png)
+### Create a human annotation scorer in the UI
 
-### Creating a Human Annotation scorer
+To create a human annotation scorer in the UI, do the following:
 
-To create a scorer, click "create scorer" in the "Scorers" page (accessed via the navigation sidebar). Select the type of scorer, in this case: "Human annotation". Then fill out the subsequent form to configure the scorer, paying special attention to the `Type`, which will be used to determine the type of feedback that will be collected. Here is an example scorer configuration where a human labeler is asked to choose which type of document the llm used:
+1. In the sidebar, navigate to **Scorers**.
+2. In the upper right corner, click **+ Create scorer**.
+3. In the configuration page, set:
+   - `Scorer type` to `Human annotation`
+   - `Name`
+   - `Description`
+   - `Type`, which determines the type of feedback that will be collected, such as `boolean` or `integer`.
+4. Click **Create scorer**. Now, you can [use your scorer to make annotations](#use-the-human-annotation-scorer-in-the-ui).
+
+In the following example, a human annotator is asked to select which type of document the LLM ingested. As such, the `Type` selected for the score configuration is an `enum` containing the possible document types.
 
 ![Human Annotation scorer form](./imgs/human-annotation-scorer-form.png)
 
-This scorer will automatically show up in the "Feedback" sidebar with the options provided.
+### Use the human annotation scorer in the UI
 
-![Human Annotation scorer feedback sidebar](./imgs/full-feedback-sidebar.png)
+Once you [create a human annotation scorer](#create-a-human-annotation-scorer-in-the-ui), it will automatically display in the **Feedback** sidebar of the call details page with the configured options. To use the scorer, do the following:
 
-Once labeled, the feedback can also be viewed in the calls table (refreshing the table may be required). The column can be ordered and filtered.
+1. In the sidebar, navigate to **Traces**
+2. Find the row for the call that you want to add a human annotation to.
+3. Open the call details page. 
+4. In the upper right corner, click the **Show feedback** button. 
+
+   ![Marker icon in call header](./imgs/marker-icon.png)
+
+   Your available human annotation scorers display in the sidebar. 
+
+   ![Human Annotation scorer feedback sidebar](./imgs/full-feedback-sidebar.png)
+5. Make an annotation.
+6. Click **Save**.
+7. In the call details page, click **Feedback** to view the calls table. The new annotation displays in the table. You can also view the annotations in the **Annotations** column in the call table in **Traces**.
+   
+   > Refresh the call table to view the most up-to-date information.
 
 ![Human Annotation scorer feedback in calls table](./imgs/feedback-in-the-table.png)
 
-### Through the API
+### Create a human annotation scorer using the API
 
-Human annotation scorers can also be configured through the API. Each scorer is its own object, which is created and updated independently. The following example creates two scorers, one for the temperature of the llm call, and one for the tone of the response. Simply import the `AnnotationSpec` class from `weave.flow.annotation_spec` and use the `save` method on the weave client to create the scorer.
+Human annotation scorers can also be created through the API.  Each scorer is its own object, which is created and updated independently. To create a human annotation scorer programmatically, do the following:
 
-<Tabs groupId="programming-language">
+1. Import the `AnnotationSpec` class from `weave.flow.annotation_spec` 
+2. Use the `save` method on the weave client to create the scorer. 
+
+In the following example, two scorers are created. The first scorer, `Temperature`, is used to score the perceived temperature of the LLM call. The second scorer, `Tone`, is used to score the tone of the LLM response. Each scorer is created using `save` with an associated object ID (`temperature-scorer` and `tone-scorer`).
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -242,11 +312,13 @@ Human annotation scorers can also be configured through the API. Each scorer is 
   </TabItem>
 </Tabs>
 
-### Modifying a Human Annotation scorer
+### Modify a human annotation scorer using the API
 
-Building on the previous example, the following code creates a new version of the temperature scorer, by using the same object-id when saving.
+Expanding on [creating a human annotation scorer using the API](#create-a-human-annotation-scorer-using-the-api), the following example creates an updated version of the `Temperature` scorer, by using the original object ID (`temperature-scorer`) on `save`. The result is an updated object, with a history of all versions. 
 
-<Tabs groupId="programming-language">
+> You can view human annotation scorer object history in the **Scorers** tab under **Human annotations**.
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -274,7 +346,5 @@ Building on the previous example, the following code creates a new version of th
     ```
   </TabItem>
 </Tabs>
-
-The result is an updated object, with a history of all versions. This can be viewed in the scorers tab, under "Human annotations".
 
 ![Human Annotation scorer history](./imgs/human-annotation-scorer-history.png)

@@ -4,11 +4,13 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
+import {WeaveObjectRef} from '@wandb/weave/react';
 import React from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {
   FEEDBACK_EXPAND_PARAM,
   PATH_PARAM,
@@ -17,8 +19,8 @@ import {
   useWeaveflowRouteContext,
 } from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
-import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
+import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
+import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';
@@ -271,6 +273,47 @@ export const OpVersionLink: React.FC<{
   );
 };
 
+export const CallRefLink: React.FC<{
+  callRef: WeaveObjectRef;
+}> = props => {
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const callId = props.callRef.artifactName;
+  const to = peekingRouter.callUIUrl(
+    props.callRef.entityName,
+    props.callRef.projectName,
+    '',
+    callId
+  );
+  const onClick = () => {
+    history.push(to);
+  };
+
+  if (props.callRef.weaveKind !== 'call') {
+    return null;
+  }
+
+  return (
+    <LinkWrapper onClick={onClick}>
+      <LinkTruncater>
+        <Link
+          to={to}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            // allow flex items to shrink below their minimum content size
+            minWidth: 0,
+          }}>
+          <span style={{flexShrink: 0}}>
+            <Id id={callId} type="Call" />
+          </span>
+        </Link>
+      </LinkTruncater>
+    </LinkWrapper>
+  );
+};
+
 export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
@@ -282,6 +325,7 @@ export const CallLink: React.FC<{
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
+  isEval?: boolean;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -297,8 +341,14 @@ export const CallLink: React.FC<{
   const existingPath = peekParams.get(PATH_PARAM) ?? '';
   // Preserve the path only when showing trace tree
   const path = props.preservePath ? existingPath : null;
-  // default to true if not specified
-  const showTraceTree = !(peekParams.get(TRACETREE_PARAM) === '0');
+  // default to true if not specified and not an eval
+  const traceTreeParam = peekParams.get(TRACETREE_PARAM);
+  const showTraceTree =
+    traceTreeParam === '1'
+      ? true
+      : traceTreeParam === '0'
+      ? false
+      : !props.isEval;
   // default to false if not specified
   const showFeedbackExpand = peekParams.get(FEEDBACK_EXPAND_PARAM) === '1';
   const to = peekingRouter.callUIUrl(
@@ -407,7 +457,8 @@ export const CallsLink: React.FC<{
       $variant={props.variant}
       to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount}
-      {props.countIsLimited ? '+' : ''} calls
+      {props.countIsLimited ? '+' : ''}{' '}
+      {maybePluralizeWord(props.callCount, 'call')}
     </Link>
   );
 };
@@ -420,6 +471,7 @@ export const ObjectVersionsLink: React.FC<{
   filter?: WFHighLevelObjectVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
+  children?: React.ReactNode;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
@@ -431,9 +483,13 @@ export const ObjectVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount}
-      {props.countIsLimited ? '+' : ''} version
-      {props.versionCount !== 1 ? 's' : ''}
+      {props.children ?? (
+        <>
+          {props.versionCount}
+          {props.countIsLimited ? '+' : ''} version
+          {props.versionCount !== 1 ? 's' : ''}
+        </>
+      )}
     </Link>
   );
 };
@@ -446,6 +502,7 @@ export const OpVersionsLink: React.FC<{
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
+  children?: React.ReactNode;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
@@ -453,9 +510,13 @@ export const OpVersionsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
-      {props.versionCount}
-      {props.countIsLimited ? '+' : ''} version
-      {props.versionCount !== 1 ? 's' : ''}
+      {props.children ?? (
+        <>
+          {props.versionCount}
+          {props.countIsLimited ? '+' : ''} version
+          {props.versionCount !== 1 ? 's' : ''}
+        </>
+      )}
     </Link>
   );
 };

@@ -1,31 +1,19 @@
 import {Button} from '@wandb/weave/components/Button';
+import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import React from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../../context';
 import {Reactions} from '../../../feedback/Reactions';
+import {TraceCostStats} from '../../CallPage/cost';
 import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 
 export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
-  let totalTokens = 0;
-  if (call?.summary?.usage) {
-    for (const key of Object.keys(call.summary.usage)) {
-      totalTokens +=
-        call.summary.usage[key].prompt_tokens ||
-        call.summary.usage[key].input_tokens ||
-        0;
-      totalTokens +=
-        call.summary.usage[key].completion_tokens ||
-        call.summary.usage[key].output_tokens ||
-        0;
-    }
-  }
-
   const [entityName, projectName] = call?.project_id?.split('/') || [];
   const callId = call?.id || '';
-  const latency = call?.summary?.weave?.latency_ms;
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
@@ -43,25 +31,39 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
     false
   );
 
+  const latency = call?.summary?.weave?.latency_ms ?? 0;
+  const usageData = call?.summary?.usage;
+  const costData = call?.summary?.weave?.costs;
+
   return (
     <Tailwind>
-      <div className="flex w-full flex-wrap items-center justify-center gap-8 py-8 text-sm text-moon-500">
-        <span>Latency: {latency}ms</span>
-        <span>•</span>
+      <div className="flex w-full items-center justify-center gap-8 py-8">
+        <TraceCostStats
+          usageData={usageData}
+          costData={costData}
+          latency_ms={latency}
+          costLoading={false}
+        />
         {(call.output as any)?.choices?.[0]?.finish_reason && (
-          <>
-            <span>
-              Finish reason: {(call.output as any).choices[0].finish_reason}
-            </span>
-            <span>•</span>
-          </>
+          <Tooltip
+            content="Finish reason"
+            trigger={
+              // Placing in span so tooltip shows up
+              <span>
+                <Pill
+                  icon="checkmark-circle"
+                  label={(call.output as any).choices[0].finish_reason}
+                  color="moon"
+                  className="-ml-[8px] bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500"
+                />
+              </span>
+            }
+          />
         )}
-        <span>{totalTokens} tokens</span>
-        <span>•</span>
         {callLink && (
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="open-new-tab"
             onClick={() => {
               history.push(callLink);

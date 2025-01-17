@@ -313,18 +313,20 @@ const SimpleTabView: FC<{
         height: '100%',
         overflow: 'hidden',
       }}>
-      <Box
-        sx={{
-          maxHeight: '50%',
-          flex: '0 0 auto',
-          width: '100%',
-          overflow: 'auto',
-          pt: 1,
-          px: 2,
-          alignContent: 'center',
-        }}>
-        {props.headerContent}
-      </Box>
+      {props.headerContent && (
+        <Box
+          sx={{
+            maxHeight: '50%',
+            flex: '0 0 auto',
+            width: '100%',
+            overflow: 'auto',
+            pt: 1,
+            px: 2,
+            alignContent: 'center',
+          }}>
+          {props.headerContent}
+        </Box>
+      )}
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
           style={{margin: '12px 16px 0 16px'}}

@@ -19,18 +19,25 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
     // for each provider, get all the LLMs that are supported by that provider
     label: LLM_PROVIDER_LABELS[provider],
     // filtering to the LLMs that are supported by that provider
-    options: Object.keys(LLM_MAX_TOKENS).reduce<
-      Array<{group: string; label: string; value: string}>
-    >((acc, llm) => {
-      if (LLM_MAX_TOKENS[llm as LLMMaxTokensKey].provider === provider) {
-        acc.push({
-          group: provider,
-          label: llm,
-          value: llm,
-        });
-      }
-      return acc;
-    }, []),
+    options: Object.keys(LLM_MAX_TOKENS)
+      .reduce<
+        Array<{
+          provider_label: string;
+          label: string;
+          value: string;
+        }>
+      >((acc, llm) => {
+        if (LLM_MAX_TOKENS[llm as LLMMaxTokensKey].provider === provider) {
+          acc.push({
+            provider_label: LLM_PROVIDER_LABELS[provider],
+            // add provider to the label if the LLM is not already prefixed with it
+            label: llm.includes(provider) ? llm : provider + '/' + llm,
+            value: llm,
+          });
+        }
+        return acc;
+      }, [])
+      .sort((a, b) => a.label.localeCompare(b.label)),
   }));
 
   return (
@@ -40,11 +47,11 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
         maxWidth: '100%',
         '& .MuiOutlinedInput-root': {
           width: 'max-content',
-          maxWidth: '200px',
+          maxWidth: '300px',
         },
         '& > div': {
           width: 'max-content',
-          maxWidth: '200px',
+          maxWidth: '300px',
         },
         '& .MuiAutocomplete-popper, & [class*="-menu"]': {
           width: '300px !important',
@@ -70,6 +77,14 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({value, onChange}) => {
         options={options}
         size="medium"
         isSearchable
+        filterOption={(option, inputValue) => {
+          const searchTerm = inputValue.toLowerCase();
+          return (
+            option.data.provider_label.toLowerCase().includes(searchTerm) ||
+            option.data.label.toLowerCase().includes(searchTerm) ||
+            option.data.value.toLowerCase().includes(searchTerm)
+          );
+        }}
       />
     </Box>
   );

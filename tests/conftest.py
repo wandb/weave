@@ -330,6 +330,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        req.obj.wb_user_id = self._user_id
+        return super().obj_create(req)
+
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():
@@ -477,7 +481,9 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
-def create_client(request) -> weave_init.InitializedClient:
+def create_client(
+    request, autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None
+) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -513,7 +519,7 @@ def create_client(request) -> weave_init.InitializedClient:
             entity, project, make_server_recorder(server)
         )
         inited_client = weave_init.InitializedClient(client)
-        autopatch.autopatch()
+        autopatch.autopatch(autopatch_settings)
 
     return inited_client
 
@@ -527,6 +533,7 @@ def client(request):
         yield inited_client.client
     finally:
         inited_client.reset()
+        autopatch.reset_autopatch()
 
 
 @pytest.fixture()
@@ -534,12 +541,13 @@ def client_creator(request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
-    def client():
-        inited_client = create_client(request)
+    def client(autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None):
+        inited_client = create_client(request, autopatch_settings)
         try:
             yield inited_client.client
         finally:
             inited_client.reset()
+            autopatch.reset_autopatch()
 
     yield client
 

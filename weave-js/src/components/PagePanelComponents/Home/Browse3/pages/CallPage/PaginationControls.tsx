@@ -3,7 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useContext, useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {TableRowSelectionContext} from '../../../Browse3';
+import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -28,7 +28,7 @@ export const PaginationControls: FC<{
   const showFeedbackExpand =
     FEEDBACK_EXPAND_PARAM in query
       ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : false;
+      : undefined;
 
   const onNextCall = useCallback(() => {
     const nextCallId = getNextRowId?.(call.callId);

@@ -186,12 +186,25 @@ class ObjSchema(BaseModel):
     base_object_class: Optional[str]
     val: Any
 
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    set_base_object_class: Optional[str] = None
+    builtin_object_class: Optional[str] = None
+    # Keeping `set_base_object_class` here until it is successfully removed from UI client
+    set_base_object_class: Optional[str] = Field(
+        include=False, default=None, deprecated=True
+    )
+
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    def model_post_init(self, __context: Any) -> None:
+        # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
+        if self.set_base_object_class is not None and self.builtin_object_class is None:
+            self.builtin_object_class = self.set_base_object_class
 
 
 class TableSchemaForInsert(BaseModel):
@@ -465,6 +478,19 @@ class ObjQueryReq(BaseModel):
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
     )
+
+
+class ObjDeleteReq(BaseModel):
+    project_id: str
+    object_id: str
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the object will be deleted.",
+    )
+
+
+class ObjDeleteRes(BaseModel):
+    num_deleted: int
 
 
 class ObjQueryRes(BaseModel):
@@ -897,6 +923,7 @@ class TraceServerInterface(Protocol):
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...

@@ -55,14 +55,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         if code_class == 4 and e.response.status_code != 429:
             return False
 
-        # Unknown server error
-        # TODO(np): We need to fix the server to return proper status codes
-        # for downstream 401, 403, 404, etc... Those should propagate back to
-        # the client.
-        if e.response.status_code == 500:
-            return False
-
-    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
+    # Otherwise, retry: 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
@@ -357,6 +350,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ObjQueryRes:
         return self._generic_request(
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
+        )
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        return self._generic_request(
+            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
 
     def table_create(

@@ -13,7 +13,7 @@ type PlaygroundMessagePanelEditorProps = {
   pendingToolResponseId?: string;
   message: Message;
   index: number;
-  isChoice: boolean;
+  choiceIndex?: number;
   setEditorHeight: (height: number | null) => void;
 };
 
@@ -21,7 +21,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
 > = ({
   index,
-  isChoice,
+  choiceIndex,
   setEditorHeight,
   editorHeight,
   isNested,
@@ -45,10 +45,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
   }, [initialContent]);
 
   const handleSave = () => {
-    if (isChoice) {
-      editChoice?.(index, {
+    if (choiceIndex !== undefined) {
+      editChoice?.(choiceIndex, {
+        ...message,
         content: editedContent,
-        role: message.role,
       });
     } else {
       editMessage?.(index, {
@@ -65,15 +65,19 @@ export const PlaygroundMessagePanelEditor: React.FC<
   };
 
   return (
-    <div className={classNames('w-full pt-16', isNested ? 'px-2' : 'px-16')}>
+    <div
+      className={classNames(
+        'w-full pt-[6px]',
+        isNested ? 'px-[4px]' : 'px-[16px]'
+      )}>
       <StyledTextArea
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
-        autoGrow
-        maxHeight={160}
+        startHeight={320}
       />
-      <div className="z-100 mt-8 flex justify-end gap-8">
-        <Button variant="quiet" size="medium" onClick={handleCancel}>
+      {/* 6px vs. 8px to make up for extra padding from textarea field */}
+      <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
+        <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
         <Button

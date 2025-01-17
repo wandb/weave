@@ -8,7 +8,7 @@ import pytest
 from packaging.version import parse as version_parse
 
 import weave
-from weave.integrations.litellm.litellm import litellm_patcher
+from weave.integrations.litellm.litellm import get_litellm_patcher
 
 # This PR:
 # https://github.com/BerriAI/litellm/commit/fe2aa706e8ff4edbcd109897e5da6b83ef6ad693
@@ -38,9 +38,9 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
         yield
         return
 
-    litellm_patcher.attempt_patch()
+    get_litellm_patcher().attempt_patch()
     yield
-    litellm_patcher.undo_patch()
+    get_litellm_patcher().undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode

@@ -471,7 +471,8 @@ export const BulkDeleteButton: FC<{
 
 export const RefreshButton: FC<{
   onClick: () => void;
-}> = ({onClick}) => {
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
   return (
     <Box
       sx={{
@@ -483,6 +484,7 @@ export const RefreshButton: FC<{
         variant="outline"
         size="medium"
         onClick={onClick}
+        disabled={disabled}
         tooltip="Refresh"
         icon="reload-refresh"
       />
@@ -666,7 +668,7 @@ export const PaginationButtons = () => {
   return (
     <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handlePrevPage}
         disabled={page === 0}
@@ -686,7 +688,7 @@ export const PaginationButtons = () => {
         {start}-{end} of {rowCount}
       </Box>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handleNextPage}
         disabled={page >= pageCount - 1}

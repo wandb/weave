@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import json
 import platform
+import random
 import sys
 import time
 from collections import defaultdict, namedtuple
@@ -60,7 +61,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 
 
 def test_simple_op(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -229,7 +230,7 @@ def test_call_read_not_found(client):
 
 
 def test_graph_call_ordering(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -263,27 +264,27 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     class Number(weave.Object):
         value: int
 
-    @weave.op()
+    @weave.op
     def adder(a: Number) -> Number:
         return Number(value=a.value + a.value)
 
     adder_v0 = adder
 
-    @weave.op()
+    @weave.op  # type: ignore
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
 
-    @weave.op()
+    @weave.op
     def subtractor(a: Number, b) -> Number:
         return Number(value=a.value - b)
 
-    @weave.op()
+    @weave.op
     def multiplier(
         a: Number, b
     ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
-    @weave.op()
+    @weave.op
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
@@ -691,7 +692,7 @@ def test_trace_call_query_offset(client):
 
 
 def test_trace_call_sort(client):
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict, delay) -> dict:
         import time
 
@@ -727,7 +728,7 @@ def test_trace_call_sort_with_mixed_types(client):
         # SQLite does not support sorting over mixed types in a column, so we skip this test
         return
 
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict) -> dict:
         import time
 
@@ -769,7 +770,7 @@ def test_trace_call_sort_with_mixed_types(client):
 def test_trace_call_filter(client):
     is_sqlite = client_is_sqlite(client)
 
-    @weave.op()
+    @weave.op
     def basic_op(in_val: dict, delay) -> dict:
         return in_val
 
@@ -1160,7 +1161,7 @@ def test_trace_call_filter(client):
 
 
 def test_ops_with_default_params(client):
-    @weave.op()
+    @weave.op
     def op_with_default(a: int, b: int = 10) -> int:
         return a + b
 
@@ -1234,7 +1235,7 @@ def test_root_type(client):
 
 
 def test_attributes_on_ops(client):
-    @weave.op()
+    @weave.op
     def op_with_attrs(a: int, b: int) -> int:
         return a + b
 
@@ -1277,7 +1278,7 @@ def test_dataclass_support(client):
     class MyDataclass:
         val: int
 
-    @weave.op()
+    @weave.op
     def dataclass_maker(a: MyDataclass, b: MyDataclass) -> MyDataclass:
         return MyDataclass(a.val + b.val)
 
@@ -1322,7 +1323,7 @@ def test_dataclass_support(client):
 
 
 def test_op_retrieval(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -1336,7 +1337,7 @@ def test_bound_op_retrieval(client):
     class CustomType(weave.Object):
         a: int
 
-        @weave.op()
+        @weave.op
         def op_with_custom_type(self, v):
             return self.a + v
 
@@ -1359,7 +1360,7 @@ def test_bound_op_retrieval_no_self(client):
     class CustomTypeWithoutSelf(weave.Object):
         a: int
 
-        @weave.op()
+        @weave.op
         def op_with_custom_type(me, v):
             return me.a + v
 
@@ -1379,7 +1380,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:tiRVKBWTP7LOwjBEqe79WFS7HEibm1WG8nfe94VWZBo/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1387,7 +1388,7 @@ def test_dataset_row_ref(client):
 
 
 def test_tuple_support(client):
-    @weave.op()
+    @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
@@ -1411,7 +1412,7 @@ def test_tuple_support(client):
 
 
 def test_namedtuple_support(client):
-    @weave.op()
+    @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
@@ -1442,7 +1443,7 @@ def test_named_reuse(client):
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri()).get()
 
-    @weave.op()
+    @weave.op
     async def dummy_score(output):
         return 1
 
@@ -1489,7 +1490,7 @@ def test_unknown_input_and_output_types(client):
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
-    @weave.op()
+    @weave.op
     def op_with_unknown_types(a: MyUnknownClassA, b: float) -> MyUnknownClassB:
         return MyUnknownClassB(a.a_val + b)
 
@@ -1564,19 +1565,19 @@ def _patched_default_initializer(trace_client: weave_client.WeaveClient):
 
 
 def test_single_primitive_output(client):
-    @weave.op()
+    @weave.op
     def single_int_output(a: int) -> int:
         return a
 
-    @weave.op()
+    @weave.op
     def single_bool_output(a: int) -> bool:
         return a == 1
 
-    @weave.op()
+    @weave.op
     def single_none_output(a: int) -> None:
         return None
 
-    @weave.op()
+    @weave.op
     def dict_output(a: int, b: bool, c: None) -> dict:
         return {"a": a, "b": b, "c": c}
 
@@ -1669,14 +1670,14 @@ def test_mapped_execution(client, mapper):
 
     events = []
 
-    @weave.op()
+    @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
         time.sleep(0.3)
         events.append("A(E):" + str(a))
         return a
 
-    @weave.op()
+    @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
         time.sleep(0.2)
@@ -1684,7 +1685,7 @@ def test_mapped_execution(client, mapper):
         events.append("B(E):" + str(b))
         return res
 
-    @weave.op()
+    @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
         time.sleep(0.1)
@@ -1692,7 +1693,7 @@ def test_mapped_execution(client, mapper):
         events.append("C(E):" + str(c))
         return res
 
-    @weave.op()
+    @weave.op
     def op_mapper(vals):
         return mapper(op_c, vals)
 
@@ -2127,7 +2128,7 @@ def test_call_query_stream_equality(client):
 
 def test_call_query_stream_columns(client):
     @weave.op
-    def calculate(a: int, b: int) -> int:
+    def calculate(a: int, b: int) -> dict[str, Any]:
         return {"result": {"a + b": a + b}, "not result": 123}
 
     for i in range(2):
@@ -2170,7 +2171,7 @@ def test_call_query_stream_columns_with_costs(client):
         return
 
     @weave.op
-    def calculate(a: int, b: int) -> int:
+    def calculate(a: int, b: int) -> dict[str, Any]:
         return {
             "result": {"a + b": a + b},
             "not result": 123,
@@ -2238,7 +2239,7 @@ def test_call_query_stream_columns_with_costs(client):
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
-    @weave.op()
+    @weave.op
     def test_op(label, val):
         return val
 
@@ -2272,7 +2273,8 @@ def test_sort_and_filter_through_refs(client):
 
     # Ref at A, B and C
     test_op(
-        values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
+        values[7],
+        {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})},
     )
 
     for first, last, sort_by in [
@@ -2355,7 +2357,7 @@ def test_sort_and_filter_through_refs(client):
 
 
 def test_in_operation(client):
-    @weave.op()
+    @weave.op
     def test_op(label, val):
         return val
 
@@ -2500,7 +2502,7 @@ def test_calls_iter_different_value_same_page_cached(client):
 
 
 class BasicModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, x):
         return {"answer": "42"}
 
@@ -2546,7 +2548,7 @@ def test_calls_stream_column_expansion(client):
     class NestedObject(weave.Object):
         b: SimpleObject
 
-    @weave.op()
+    @weave.op
     def return_nested_object(nested_obj: NestedObject):
         return nested_obj
 
@@ -2745,7 +2747,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+    exp_digest = "iVLhViJ3vm8vMMo3Qj35mK7GiyP8jv3OJqasIGXjN0s"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -2997,3 +2999,240 @@ def test_weave_finish_unsets_client(client):
     foo()
     assert len(list(weave_client.get_calls())) == 1
     assert weave.trace.weave_init._current_inited_client is None
+
+
+def test_op_sampling(client):
+    never_traced_calls = 0
+    always_traced_calls = 0
+    sometimes_traced_calls = 0
+
+    random.seed(0)
+
+    @weave.op(tracing_sample_rate=0.0)
+    def never_traced(x: int) -> int:
+        nonlocal never_traced_calls
+        never_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)
+    def always_traced(x: int) -> int:
+        nonlocal always_traced_calls
+        always_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.5)
+    def sometimes_traced(x: int) -> int:
+        nonlocal sometimes_traced_calls
+        sometimes_traced_calls += 1
+        return x + 1
+
+    weave.publish(never_traced)
+    # Never traced should execute but not be traced
+    for i in range(10):
+        never_traced(i)
+    assert never_traced_calls == 10  # Function was called
+    assert len(list(never_traced.calls())) == 0  # Not traced
+
+    # Always traced should execute and be traced
+    for i in range(10):
+        always_traced(i)
+    assert always_traced_calls == 10  # Function was called
+    assert len(list(always_traced.calls())) == 10  # And traced
+    # Sanity check that the call_start was logged, unlike in the never_traced case.
+    assert "call_start" in client.server.attribute_access_log
+
+    # Sometimes traced should execute always but only be traced sometimes
+    num_runs = 100
+    for i in range(num_runs):
+        sometimes_traced(i)
+    assert sometimes_traced_calls == num_runs  # Function was called every time
+    num_traces = len(list(sometimes_traced.calls()))
+    assert num_traces == 38
+
+
+def test_op_sampling_async(client):
+    never_traced_calls = 0
+    always_traced_calls = 0
+    sometimes_traced_calls = 0
+
+    random.seed(0)
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def never_traced(x: int) -> int:
+        nonlocal never_traced_calls
+        never_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)
+    async def always_traced(x: int) -> int:
+        nonlocal always_traced_calls
+        always_traced_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.5)
+    async def sometimes_traced(x: int) -> int:
+        nonlocal sometimes_traced_calls
+        sometimes_traced_calls += 1
+        return x + 1
+
+    import asyncio
+
+    weave.publish(never_traced)
+    # Never traced should execute but not be traced
+    for i in range(10):
+        asyncio.run(never_traced(i))
+    assert never_traced_calls == 10  # Function was called
+    assert len(list(never_traced.calls())) == 0  # Not traced
+
+    # Always traced should execute and be traced
+    for i in range(10):
+        asyncio.run(always_traced(i))
+    assert always_traced_calls == 10  # Function was called
+    assert len(list(always_traced.calls())) == 10  # And traced
+    assert "call_start" in client.server.attribute_access_log
+
+    # Sometimes traced should execute always but only be traced sometimes
+    num_runs = 100
+    for i in range(num_runs):
+        asyncio.run(sometimes_traced(i))
+    assert sometimes_traced_calls == num_runs  # Function was called every time
+    num_traces = len(list(sometimes_traced.calls()))
+    assert num_traces == 38
+
+
+def test_op_sampling_inheritance(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    def parent_op(x: int) -> int:
+        nonlocal parent_calls
+        parent_calls += 1
+        return child_op(x)
+
+    weave.publish(parent_op)
+    # When parent is sampled out, child should still execute but not be traced
+    for i in range(10):
+        parent_op(i)
+
+    assert parent_calls == 10  # Parent function executed
+    assert child_calls == 10  # Child function executed
+    assert len(list(parent_op.calls())) == 0  # Parent not traced
+
+    # Reset counters
+    child_calls = 0
+
+    # Direct calls to child should execute and be traced
+    for i in range(10):
+        child_op(i)
+
+    assert child_calls == 10  # Child function executed
+    assert len(list(child_op.calls())) == 10  # And was traced
+    assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+
+
+def test_op_sampling_inheritance_async(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    async def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def parent_op(x: int) -> int:
+        nonlocal parent_calls
+        parent_calls += 1
+        return await child_op(x)
+
+    import asyncio
+
+    weave.publish(parent_op)
+    # When parent is sampled out, child should still execute but not be traced
+    for i in range(10):
+        asyncio.run(parent_op(i))
+
+    assert parent_calls == 10  # Parent function executed
+    assert child_calls == 10  # Child function executed
+    assert len(list(parent_op.calls())) == 0  # Parent not traced
+
+    # Reset counters
+    child_calls = 0
+
+    # Direct calls to child should execute and be traced
+    for i in range(10):
+        asyncio.run(child_op(i))
+
+    assert child_calls == 10  # Child function executed
+    assert len(list(child_op.calls())) == 10  # And was traced
+    assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+
+
+def test_op_sampling_invalid_rates(client):
+    with pytest.raises(ValueError):
+
+        @weave.op(tracing_sample_rate=-0.5)
+        def negative_rate():
+            pass
+
+    with pytest.raises(ValueError):
+
+        @weave.op(tracing_sample_rate=1.5)
+        def too_high_rate():
+            pass
+
+    with pytest.raises(TypeError):
+
+        @weave.op(tracing_sample_rate="invalid")  # type: ignore
+        def invalid_type():
+            pass
+
+
+def test_op_sampling_child_follows_parent(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op(tracing_sample_rate=0.0)  # Never traced
+    def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)  # Always traced
+    def parent_op(x: int) -> int:
+        nonlocal parent_calls
+        parent_calls += 1
+        return child_op(x)
+
+    num_runs = 100
+    for i in range(num_runs):
+        parent_op(i)
+
+    assert parent_calls == num_runs  # Parent was always executed
+    assert child_calls == num_runs  # Child was always executed
+
+    parent_traces = len(list(parent_op.calls()))
+    child_traces = len(list(child_op.calls()))
+
+    assert parent_traces == num_runs  # Parent was always traced
+    assert child_traces == num_runs  # Child was traced whenever parent was
+
+
+def test_calls_len(client):
+    @weave.op
+    def test():
+        return 1
+
+    test()
+    test()
+
+    assert len(test.calls()) == 2
+    assert len(client.get_calls()) == 2

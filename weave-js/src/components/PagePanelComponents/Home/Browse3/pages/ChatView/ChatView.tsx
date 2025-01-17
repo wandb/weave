@@ -27,16 +27,14 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   return (
     <div className="flex flex-col pb-32">
-      <span className="mb-[-16px] text-sm font-semibold text-moon-800">
-        Messages
-      </span>
+      <p className="mb-[8px] text-sm font-semibold text-moon-800">Messages</p>
       <MessageList
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
       />
       {chatResult?.choices && chatResult.choices.length > 0 && (
         <>
-          <span className="-mb-16 mt-24 text-sm font-semibold text-moon-800">
+          <span className="mb-[8px] text-sm font-semibold text-moon-800">
             Response
           </span>
           <div ref={outputRef}>

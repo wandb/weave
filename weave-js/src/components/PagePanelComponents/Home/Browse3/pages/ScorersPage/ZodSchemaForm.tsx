@@ -6,7 +6,7 @@ import {
   InputLabel,
 } from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {z} from 'zod';
 
 import {
@@ -153,11 +153,38 @@ const NestedForm: React.FC<{
   setConfig: (config: Record<string, any>) => void;
   path: string[];
   hideLabel?: boolean;
-}> = ({keyName, fieldSchema, config, setConfig, path, hideLabel}) => {
-  const currentPath = [...path, keyName];
-  const currentValue = getNestedValue(config, currentPath);
+  autoFocus?: boolean;
+}> = ({
+  keyName,
+  fieldSchema,
+  config,
+  setConfig,
+  path,
+  hideLabel,
+  autoFocus,
+}) => {
+  const currentPath = useMemo(() => [...path, keyName], [path, keyName]);
+  const [currentValue, setCurrentValue] = useState(
+    getNestedValue(config, currentPath)
+  );
+
+  // Only update parent config on blur, for string fields
+  const handleBlur = useCallback(() => {
+    if (currentValue !== getNestedValue(config, currentPath)) {
+      updateConfig(currentPath, currentValue, config, setConfig);
+    }
+  }, [currentValue, currentPath, config, setConfig]);
+  const handleChange = useCallback((value: string) => {
+    setCurrentValue(value);
+  }, []);
+
+  // set current value for non-string fields
+  useEffect(() => {
+    setCurrentValue(getNestedValue(config, currentPath));
+  }, [config, currentPath]);
 
   const unwrappedSchema = unwrapSchema(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   if (unwrappedSchema instanceof z.ZodDiscriminatedUnion) {
     return (
@@ -283,10 +310,13 @@ const NestedForm: React.FC<{
 
   return (
     <TextFieldWithLabel
+      isOptional={isOptional}
       label={!hideLabel ? keyName : undefined}
       type={fieldType}
       value={currentValue ?? ''}
-      onChange={value => updateConfig(currentPath, value, config, setConfig)}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      autoFocus={autoFocus}
     />
   );
 };
@@ -335,56 +365,72 @@ const ArrayField: React.FC<{
           <DescriptionTooltip description={fieldDescription} />
         )}
       </Box>
-      {arrayValue.map((item, index) => (
-        <Box
-          key={index}
-          display="flex"
-          flexDirection="column"
-          alignItems="flex-start"
-          style={{
-            width: '100%',
-            gap: 4,
-            alignItems: 'center',
-            height: '35px',
-            marginBottom: '4px',
-          }}>
-          <Box flexGrow={1} width="100%" display="flex" alignItems="center">
-            <Box flexGrow={1}>
-              <NestedForm
-                keyName={`${index}`}
-                fieldSchema={elementSchema}
-                config={{[`${index}`]: item}}
-                setConfig={newItemConfig => {
-                  const newArray = [...arrayValue];
-                  newArray[index] = newItemConfig[`${index}`];
-                  updateConfig(targetPath, newArray, config, setConfig);
-                }}
-                path={[]}
-                hideLabel
-              />
-            </Box>
-            <Box mb={2} ml={1}>
-              <Button
-                size="small"
-                variant="ghost"
-                icon="delete"
-                tooltip="Remove this entry"
-                disabled={arrayValue.length <= minItems}
-                onClick={() =>
-                  removeArrayItem(targetPath, index, config, setConfig)
-                }
-              />
+      <Box border="1px solid #e0e0e0" borderRadius="4px" p={2}>
+        {arrayValue.map((item, index) => (
+          <Box
+            key={index}
+            display="flex"
+            flexDirection="column"
+            alignItems="flex-start"
+            style={{
+              width: '100%',
+              gap: 4,
+              alignItems: 'center',
+              height: '35px',
+              marginBottom: '16px',
+              marginTop: '8px',
+              marginLeft: '8px',
+            }}>
+            <Box flexGrow={1} width="100%" display="flex" alignItems="center">
+              <Box flexGrow={1}>
+                <NestedForm
+                  keyName={`${index}`}
+                  fieldSchema={elementSchema}
+                  config={{[`${index}`]: item}}
+                  setConfig={newItemConfig => {
+                    const newArray = [...arrayValue];
+                    newArray[index] = newItemConfig[`${index}`];
+                    updateConfig(targetPath, newArray, config, setConfig);
+                  }}
+                  path={[]}
+                  hideLabel
+                  autoFocus={index === arrayValue.length - 1}
+                />
+              </Box>
+              <Box mb={4} ml={4} mr={4}>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="delete"
+                  tooltip="Remove this entry"
+                  disabled={arrayValue.length <= minItems}
+                  onClick={() =>
+                    removeArrayItem(targetPath, index, config, setConfig)
+                  }
+                />
+              </Box>
             </Box>
           </Box>
+        ))}
+        <Box mt={2} style={{width: '100%'}}>
+          <Button
+            variant="secondary"
+            icon="add-new"
+            className="w-full"
+            style={{
+              padding: '4px',
+              width: '100%',
+              marginLeft: '8px',
+              marginRight: '8px',
+              marginBottom: '8px',
+            }}
+            onClick={() =>
+              addArrayItem(targetPath, elementSchema, config, setConfig)
+            }>
+            Add item
+          </Button>
         </Box>
-      ))}
-      <Button
-        variant="secondary"
-        onClick={() =>
-          addArrayItem(targetPath, elementSchema, config, setConfig)
-        }>
-        Add item
-      </Button>
+      </Box>
     </FormControl>
   );
 };
@@ -695,6 +741,7 @@ const NumberField: React.FC<{
     (unwrappedSchema._def.checks.find(check => check.kind === 'max') as any)
       ?.value ?? undefined;
   const fieldDescription = getFieldDescription(fieldSchema);
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   return (
     <Box display="flex" alignContent="center" justifyContent="space-between">
@@ -703,6 +750,7 @@ const NumberField: React.FC<{
         type="number"
         value={(value ?? '').toString()}
         style={{width: '100%'}}
+        isOptional={isOptional}
         onChange={newValue => {
           const finalValue = newValue === '' ? undefined : Number(newValue);
           if (
@@ -744,6 +792,7 @@ const LiteralField: React.FC<{
   setConfig,
 }) => {
   const literalValue = unwrappedSchema.value;
+  const isOptional = fieldSchema instanceof z.ZodOptional;
 
   useEffect(() => {
     if (value !== literalValue) {
@@ -751,7 +800,14 @@ const LiteralField: React.FC<{
     }
   }, [value, literalValue, targetPath, config, setConfig]);
 
-  return <TextFieldWithLabel label={keyName} disabled value={literalValue} />;
+  return (
+    <TextFieldWithLabel
+      isOptional={isOptional}
+      label={keyName}
+      disabled
+      value={literalValue}
+    />
+  );
 };
 
 const BooleanField: React.FC<{

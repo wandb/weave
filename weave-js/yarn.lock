@@ -4776,11 +4776,6 @@
   resolved "https://registry.yarnpkg.com/@types/unist/-/unist-2.0.7.tgz#5b06ad6894b236a1d2bd6b2f07850ca5c59cf4d6"
   integrity sha512-cputDpIbFgLUaGQn6Vqg3/YsJwxUwHLO13v3i5ouxT4lat0khip9AEWxtERujXV9wxIB1EyF97BSJFt6vpdI8g==
 
-"@types/uuid@^9.0.1":
-  version "9.0.2"
-  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-9.0.2.tgz#ede1d1b1e451548d44919dc226253e32a6952c4b"
-  integrity sha512-kNnC1GFBLuhImSnV7w4njQkUiJi0ZXUycu1rUaouPqiKlXkh77JKgdRnTAp1x5eBwcIwbtI+3otwzuIDEuDoxQ==
-
 "@types/wavesurfer.js@^2.0.0":
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/@types/wavesurfer.js/-/wavesurfer.js-2.0.2.tgz#b98a4d57ca24ee2028ae6dd5c2208b568bb73842"
@@ -5049,13 +5044,15 @@
     loupe "^2.3.7"
     pretty-format "^29.7.0"
 
-"@wandb/semantic@file:./wandb-semantic-v0.0.1.tgz":
+"@wandb/semantic@^0.0.1":
   version "0.0.1"
-  resolved "file:./wandb-semantic-v0.0.1.tgz#554f3dcff44f09e3d97397456deb7b1998da66f8"
+  resolved "https://npm.pkg.github.com/download/@wandb/semantic/0.0.1/879e6cf3b80ad29b7f3b636b2eb170763ffa79fd#879e6cf3b80ad29b7f3b636b2eb170763ffa79fd"
+  integrity sha512-tt48NPjbz9/2F+T7vpjZQQvanmF780wx7e7U430viZwr+DFn0l+EWz2yDYYzistRZgOSrsnibn8xdgk9O3tfgw==
 
-"@wandb/ui@file:./wandb-ui-0.1.0.tgz":
+"@wandb/ui@^0.1.0":
   version "0.1.0"
-  resolved "file:./wandb-ui-0.1.0.tgz#35a65383ff97eedea3c8324cb914c9c6ab4de748"
+  resolved "https://npm.pkg.github.com/download/@wandb/ui/0.1.0/bc6d881055e2c0614fcd0f967321b511b2bacf63#bc6d881055e2c0614fcd0f967321b511b2bacf63"
+  integrity sha512-WtaCzYUcGIHcq7KIsehg0yD4WFG4DX5/c31wP+yAkyJ8kQIET1qQComgCb52OoLiypHO55lD4MvfNG5HyrB9ww==
   dependencies:
     "@material-ui/lab" "^4.0.0-alpha.60"
     autosuggest-highlight "^3.1.1"
@@ -7187,7 +7184,7 @@ dequal@^2.0.0, dequal@^2.0.3:
   resolved "https://registry.yarnpkg.com/dequal/-/dequal-2.0.3.tgz#2644214f1997d39ed0ee0ece72335490a7ac67be"
   integrity sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==
 
-detect-browser@^5.2.1:
+detect-browser@^5.3.0:
   version "5.3.0"
   resolved "https://registry.yarnpkg.com/detect-browser/-/detect-browser-5.3.0.tgz#9705ef2bddf46072d0f7265a1fe300e36fe7ceca"
   integrity sha512-53rsFbGdwMwlF7qvCt0ypLM5V5/Mbl0szB7GPN8y9NCcbknYOeVVXdrXEq+90IwAfrrzt6Hd+u2E2ntakICU8w==
@@ -15032,6 +15029,11 @@ util-deprecate@^1.0.1, util-deprecate@^1.0.2, util-deprecate@~1.0.1:
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
   integrity sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==
 
+uuid@^11.0.3:
+  version "11.0.3"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.3.tgz#248451cac9d1a4a4128033e765d137e2b2c49a3d"
+  integrity sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg==
+
 uuid@^2.0.2:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-2.0.3.tgz#67e2e863797215530dff318e5bf9dcebfd47b21a"
@@ -15041,11 +15043,6 @@ uuid@^3.0.0, uuid@^3.4.0:
   version "3.4.0"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
   integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
-
-uuid@^9.0.0:
-  version "9.0.0"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-9.0.0.tgz#592f550650024a38ceb0c562f2f6aa435761efb5"
-  integrity sha512-MXcSTerfPa4uqyzStbRoTgt5XIe3x5+42+q1sDuy3R5MDk66URdLMOZe5aPX/SQd+kuYAh0FdP/pO28IkQyTeg==
 
 uvu@^0.5.0:
   version "0.5.6"
