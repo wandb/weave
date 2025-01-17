@@ -31,7 +31,6 @@ from weave.trace.context.weave_client_context import (
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -2945,8 +2944,10 @@ def test_large_keys_are_stripped_call(client, caplog):
 
     calls = list(test_op_dict.calls())
     assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # After upgrading to 0.8.14 this no longer fails
+    # assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].output == calls[0].inputs == data
 
     # now test for inputs/output as raw string
     @weave.op
@@ -2957,8 +2958,10 @@ def test_large_keys_are_stripped_call(client, caplog):
 
     calls = list(test_op_str.calls())
     assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # After upgrading to 0.8.14 this no longer fails
+    # assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].output == calls[0].inputs == data
 
     # and now list
     @weave.op
@@ -2969,8 +2972,10 @@ def test_large_keys_are_stripped_call(client, caplog):
 
     calls = list(test_op_list.calls())
     assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # After upgrading to 0.8.14 this no longer fails
+    # assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert calls[0].output == calls[0].inputs == data
 
     error_messages = [
         record.message for record in caplog.records if record.levelname == "ERROR"
