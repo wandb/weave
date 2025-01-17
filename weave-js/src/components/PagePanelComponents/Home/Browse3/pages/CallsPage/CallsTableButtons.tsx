@@ -26,6 +26,7 @@ import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import {Select} from '../../../../../Form/Select';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -642,6 +643,11 @@ curl '${baseUrl}/calls/stream_query' \\
   return baseCurl;
 }
 
+type PageSizeOption = {
+  readonly value: number;
+  readonly label: string;
+};
+
 export const PaginationButtons = () => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
@@ -661,35 +667,77 @@ export const PaginationButtons = () => {
   const start = rowCount > 0 ? page * pageSize + 1 : 0;
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
+  const pageSizes = [10, 25, 50, 100];
+  if (!pageSizes.includes(pageSize)) {
+    pageSizes.push(pageSize);
+    pageSizes.sort((a, b) => a - b);
+  }
+  const pageSizeOptions = pageSizes.map(sz => ({
+    value: sz,
+    label: sz.toString(),
+  }));
+  const pageSizeValue = pageSizeOptions.find(o => o.value === pageSize);
+  const onPageSizeChange = (option: PageSizeOption | null) => {
+    if (option) {
+      apiRef.current.setPageSize(option.value);
+    }
+  };
+
   return (
-    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
-      <Button
-        variant="ghost"
-        size="medium"
-        onClick={handlePrevPage}
-        disabled={page === 0}
-        icon="chevron-back"
-      />
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="space-between"
+      width="100%"
+      padding={1}>
+      <Box display="flex" alignItems="center">
+        <Button
+          variant="ghost"
+          size="medium"
+          onClick={handlePrevPage}
+          disabled={page === 0}
+          icon="chevron-back"
+        />
+        <Box
+          mx={1}
+          sx={{
+            fontSize: '14px',
+            fontWeight: '400',
+            color: MOON_500,
+            // This is so that when we go from 1-100 -> 101-200, the buttons don't jump
+            minWidth: '90px',
+            display: 'flex',
+            justifyContent: 'center',
+          }}>
+          {start}-{end} of {rowCount}
+        </Box>
+        <Button
+          variant="ghost"
+          size="medium"
+          onClick={handleNextPage}
+          disabled={page >= pageCount - 1}
+          icon="chevron-next"
+        />
+      </Box>
       <Box
-        mx={1}
         sx={{
           fontSize: '14px',
           fontWeight: '400',
           color: MOON_500,
-          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
-          minWidth: '90px',
           display: 'flex',
-          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '8px',
         }}>
-        {start}-{end} of {rowCount}
+        Per page:
+        <Select<PageSizeOption>
+          size="small"
+          menuPlacement="top"
+          options={pageSizeOptions}
+          value={pageSizeValue}
+          isSearchable={false}
+          onChange={onPageSizeChange}
+        />
       </Box>
-      <Button
-        variant="ghost"
-        size="medium"
-        onClick={handleNextPage}
-        disabled={page >= pageCount - 1}
-        icon="chevron-next"
-      />
     </Box>
   );
 };
