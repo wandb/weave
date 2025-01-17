@@ -7,7 +7,9 @@ from .http_trace_server import build_minimal_blind_authenticating_trace_server
 
 @pytest.fixture
 def get_http_trace_server():
-    def _get_http_trace_server(resolver: TraceServerInterface):
+    def _get_http_trace_server(
+        resolver: TraceServerInterface, assumed_user_id: str = "test_user"
+    ):
         app = build_minimal_blind_authenticating_trace_server(
             resolver=resolver,
             assumed_user_id="test_user",

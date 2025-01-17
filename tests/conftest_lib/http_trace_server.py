@@ -1,5 +1,5 @@
 """
-This file exposes tools that are capable of exposing a trace server over HTTP for 
+This file exposes tools that are capable of exposing a trace server over HTTP for
 the purposes of testing. This allows the RemoteHTTPTraceServer to be tested as part
 of our unit tests seemlessly. Allowing this service to run in memory is useful for
 debugging and breakpointing.
@@ -20,7 +20,9 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.remote_http_trace_server import Batch, BatchRes
 
 
-def build_minimal_blind_authenticating_trace_server(resolver: tsi.TraceServerInterface, assumed_user_id: str = "test_user"):
+def build_minimal_blind_authenticating_trace_server(
+    resolver: tsi.TraceServerInterface, assumed_user_id: str = "test_user"
+):
     return make_minimal_fastapi_app(
         TestOnlyUserInjectingExternalTraceServer(
             resolver,
@@ -28,7 +30,6 @@ def build_minimal_blind_authenticating_trace_server(resolver: tsi.TraceServerInt
             "test_user",
         )
     )
-
 
 
 def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
@@ -66,7 +67,6 @@ def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
     app.post("/table/query_stats")(resolver.table_query_stats)
 
     return app
-
 
 
 class TwoWayMapping:

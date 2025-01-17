@@ -61,12 +61,7 @@ Args:
     ensure_project_exists (bool): If True (default), the client will attempt to create the project if it does not exist.
 """
 
-
-def init_weave(
-    project_name: str,
-    ensure_project_exists: bool = True,
-    autopatch_settings: autopatch.AutopatchSettings | None = None,
-) -> InitializedClient:
+def _possibly_reset_client(project_name: str, ensure_project_exists: bool):
     global _current_inited_client
     if _current_inited_client is not None:
         # TODO: Prob should move into settings
@@ -79,6 +74,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
+def _authenticate_with_wandb(project_name: str):
     from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
@@ -101,30 +97,11 @@ def init_weave(
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
 
-    remote_server = init_weave_get_server(api_key)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    # server = ClickHouseTraceServer(host="localhost")
-    client = weave_client.WeaveClient(
-        entity_name, project_name, remote_server, ensure_project_exists
-    )
-    # If the project name was formatted by init, update the project name
-    project_name = client.project
-
-    _current_inited_client = InitializedClient(client)
-    # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
-
-    # init_client = InitializedClient(client)  # type: ignore
-
-    # autopatching is only supported for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this autopatch call can be
-    # moved to InitializedClient.__init__
-    autopatch.autopatch(autopatch_settings)
-
     username = get_username()
+    
+    return api_key, entity_name, project_name, username
+
+def _perform_version_check(remote_server: remote_http_trace_server.RemoteHTTPTraceServer, username: str, entity_name: str, project_name: str, ensure_project_exists: bool):
     try:
         min_required_version = (
             remote_server.server_info().min_required_weave_python_version
@@ -140,6 +117,11 @@ def init_weave(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )
 
+def _configure_sentry(
+    entity_name: str,
+    project_name: str,
+    username: str | None,
+):
     user_context = {"username": username} if username else None
     trace_sentry.global_trace_sentry.configure_scope(
         {
@@ -149,7 +131,37 @@ def init_weave(
         }
     )
 
+def _update_initialized_global_client(remote_server: remote_http_trace_server.RemoteHTTPTraceServer, entity_name: str, project_name: str, ensure_project_exists: bool, autopatch_settings: autopatch.AutopatchSettings | None = None) -> InitializedClient:
+    global _current_inited_client
+    client = weave_client.WeaveClient(
+        entity_name, project_name, remote_server, ensure_project_exists
+    )
+    # If the project name was formatted by init, update the project name
+    project_name = client.project
+
+    _possibly_reset_client(project_name, ensure_project_exists)
+    _current_inited_client = InitializedClient(client)
+
+    # autopatching is only supported for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this autopatch call can be
+    # moved to InitializedClient.__init__
+    autopatch.autopatch(autopatch_settings)
+
     return _current_inited_client
+
+def init_weave(
+    project_name: str,
+    ensure_project_exists: bool = True,
+    autopatch_settings: autopatch.AutopatchSettings | None = None,
+) -> InitializedClient:
+    api_key, entity_name, project_name, username = _authenticate_with_wandb(project_name)
+
+    remote_server = init_weave_get_server(api_key)
+    _perform_version_check(remote_server, username, entity_name, project_name, ensure_project_exists)
+    _configure_sentry(entity_name, project_name, username)
+
+    return _update_initialized_global_client(remote_server, entity_name, project_name, ensure_project_exists, autopatch_settings)
+
 
 
 def init_weave_disabled() -> InitializedClient:
