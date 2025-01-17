@@ -9,6 +9,7 @@ Weave will automatically capture traces for Bedrock API calls. You can use the B
 ```python
 import weave
 import boto3
+import json
 from weave.integrations.bedrock.bedrock_sdk import patch_client
 
 weave.init("my_bedrock_app")
@@ -30,6 +31,23 @@ response = client.invoke_model(
     contentType='application/json',
     accept='application/json'
 )
+response_dict = json.loads(response.get('body').read())
+print(response_dict["content"][0]["text"])
+```
+
+of using the `converse` API:
+
+```python
+messages = [{"role": "user", "content": [{"text": "What is the capital of France?"}]}]
+
+response = client.converse(
+    modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
+    system=[{"text": "You are a helpful AI assistant."}],
+    messages=messages,
+    inferenceConfig={"maxTokens": 100},
+)
+print(response["output"]["message"]["content"][0]["text"])
+
 ```
 
 ## Wrapping with your own ops
@@ -37,7 +55,7 @@ response = client.invoke_model(
 You can create reusable operations using the `@weave.op()` decorator. Here's an example showing both the `invoke_model` and `converse` APIs:
 
 ```python
-@weave.op()
+@weave.op
 def call_model_invoke(
     model_id: str,
     prompt: str,
@@ -61,7 +79,7 @@ def call_model_invoke(
     )
     return json.loads(response.get('body').read())
 
-@weave.op()
+@weave.op
 def call_model_converse(
     model_id: str,
     messages: str,
@@ -89,7 +107,7 @@ class BedrockLLM(weave.Model):
     max_tokens: int = 100
     system_message: str = "You are a helpful AI assistant."
 
-    @weave.op()
+    @weave.op
     def predict(self, prompt: str) -> str:
         "Generate a response using Bedrock's converse API"
         
@@ -104,7 +122,7 @@ class BedrockLLM(weave.Model):
             messages=messages,
             inferenceConfig={"maxTokens": self.max_tokens},
         )
-        return response
+        return response["output"]["message"]["content"][0]["text"]
 
 # Create and use the model
 model = BedrockLLM(
@@ -113,6 +131,7 @@ model = BedrockLLM(
     system_message="You are an expert software engineer that knows a lot of programming. You prefer short answers."
 )
 result = model.predict("What is the best way to handle errors in Python?")
+print(result)
 ```
 
 This approach allows you to version your experiments and easily track different configurations of your Bedrock-based application.
