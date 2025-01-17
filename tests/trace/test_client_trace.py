@@ -2927,6 +2927,7 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     )
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
+
 def test_large_keys_are_stripped_call(client, caplog):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
