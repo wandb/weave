@@ -88,6 +88,7 @@ openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
 vertexai = ["vertexai>=1.70.0"]
+bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
   "nox",
   "pytest>=8.2.0",
