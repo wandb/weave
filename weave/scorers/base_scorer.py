@@ -20,7 +20,7 @@ from weave.trace.weave_client import Call, sanitize_object_name
 class Scorer(Object):
     column_map: Optional[dict[str, str]] = Field(
         default=None,
-        description="A mapping from column names in the dataset to the names expected by the scorer",
+        description="Mapping from column names in the dataset to the names expected by the scorer",
     )
 
     def model_post_init(self, __context: Any) -> None:

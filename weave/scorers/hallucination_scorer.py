@@ -1,8 +1,16 @@
+import os
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import InstructorLLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_scorer import HuggingFaceScorer, InstructorLLMScorer
+from weave.scorers.llm_utils import (
+    MODEL_PATHS,
+    OPENAI_DEFAULT_MODEL,
+    create,
+    download_model,
+)
 from weave.scorers.utils import stringify
 
 DEFAULT_HALLUCINATION_SYSTEM_PROMPT = """
@@ -76,6 +84,73 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 {output}
 </output>
 """
+
+
+def get_chat_template_messages(
+    query: str, output: str, context: Optional[str] = None
+) -> list[dict[str, str]]:
+    system_prompt = """The task is to evaluate whether the <output> contains \
+information not supported by the <query> or <context>, or \
+whether the <output> contradicts the information provided in the <query> or <context>.
+
+<definitions>
+The task is to evaluate if the <output>:
+- Contains information that has no basis in the provided <query> or <context> (Faithfulness) OR
+- Makes claims or statements that cannot be verified using the given <query> or <context> (Unsubstantiated Claim) OR
+- Contradicts the information provided in the <query> or <context> (Contradiction)
+
+<example_unsubstantiated_claim>
+<query>What is the capital of France?</query>
+<context>Paris is the capital of France.</context>
+<output>Paris is the capital of France and has a population of 2.2 million people.</output>
+</example_unsubstantiated_claim>
+
+Explanation: The population information is baseless information as its not provided in the <context>.
+
+<contradiction>
+A contradiction occurs when the <output> directly conflicts with information provided in the <query> or <context>.
+
+<example_contradiction>
+<query>What is the speed limit on this highway?</query>
+<context>The speed limit on Highway 101 is 65 mph.</context>
+<output>The speed limit on Highway 101 is 55 mph.</output>
+</example_contradiction>
+
+Explanation: The output contradicts the speed limit stated in the context.
+</contradiction>
+</definitions>
+
+<evaluation_criteria>
+For each output, evaluate:
+1. Faithfulness: Does the <output> strictly adhere to information present in the <query> or <context>? If not, return True.
+2. Baseless Information: Does the <output> include details not supported by the <query> or <context>? If yes, return True.
+3. Contradiction: Does the <output> contradict the information provided in the <query> or <context>? If yes, return True.
+</evaluation_criteria>
+"""
+
+    prompt_template = f"""Does the following <output> meet the criteria for lack of Faithfulness, \
+Unsubstantiated Claim or Contradiction?
+
+<query>
+{query}
+</query>
+
+<context>
+{context}
+</context>
+
+<output>
+{output}
+</output>
+
+Answer only with True or False."""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt_template},
+    ]
+
+    return messages
 
 
 class HallucinationReasoning(BaseModel):
@@ -156,3 +231,230 @@ class HallucinationFreeScorer(InstructorLLMScorer):
             max_tokens=self.max_tokens,
         )
         return response.model_dump()  # Morgan wants this to be a dict
+
+
+class HallucinationScorer(HuggingFaceScorer):
+    """
+    A scorer that detects hallucinations in the output, given an query and context.
+
+    This scorer uses a fine-tuned LLM to analyze whether model outputs contain information not supported
+    by the given context.
+
+    Args:
+        device: Device to run model on, defaults to "cuda"
+        model_name_or_path: Path or name of model weights to load
+        base_url: Optional URL for external API scoring instead of local model
+        debug: Enable debug logging, defaults to False
+    """
+
+    base_url: Optional[str] = None
+    debug: bool = False
+    max_new_tokens: int = 2
+    model_max_length: int = 8192
+    do_sample: bool = False
+    temperature: Optional[float] = 0.0
+    num_beams: int = 1
+    top_k: Optional[int] = 20
+    top_p: Optional[float] = 0.7
+    use_torch_compile: bool = False
+    use_hhem: bool = True
+    hhem_score_threshold: float = 0.5
+    _local_model_path: str = ""
+    import_failed: bool = False
+
+    def load_model(self) -> None:
+        if self.base_url:
+            print(f"Using external API at {self.base_url} for scoring.")
+            return  # Skip local model loading if base_url is provided
+
+        # Lazy import of torch and transformers
+        try:
+            import torch
+            from transformers import (
+                AutoModelForCausalLM,
+                AutoModelForSequenceClassification,
+            )
+        except ImportError:
+            self.import_failed = True
+            print(
+                f"The `transformers` package is required to use the {self.__class__.__name__}, please run `pip install transformers`"
+            )
+            return
+
+        if self.model is None:
+            # Check if the model is already downloaded
+            if os.path.isdir(self.model_name_or_path):
+                self._local_model_path = self.model_name_or_path
+            # Else assume it's a wandb model name and download it
+            else:
+                if self.use_hhem:
+                    self._local_model_path = download_model(
+                        MODEL_PATHS["hallucination_hhem_scorer"]
+                    )
+                else:
+                    self._local_model_path = download_model(
+                        MODEL_PATHS["hallucination_scorer"]
+                    )
+
+            if self.use_hhem:
+                self.model = AutoModelForSequenceClassification.from_pretrained(
+                    self._local_model_path,
+                    torch_dtype="bfloat16",
+                    trust_remote_code=True,
+                    device_map=self.device,
+                )
+                self._tokenizer = self.model.tokenzier
+                self._tokenizer.model_max_length = self.model_max_length
+            else:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self._local_model_path,
+                    torch_dtype="bfloat16",
+                    device_map=self.device,
+                )
+
+                if self.use_torch_compile:
+                    self.model.generation_config.cache_implementation = "static"
+                    self.model = torch.compile(
+                        self.model, backend="inductor", fullgraph=True
+                    )
+        if not self.do_sample:
+            self.top_k = None
+            self.top_p = None
+            self.temperature = None
+        self.model.eval()
+
+    def load_tokenizer(self) -> None:
+        try:
+            from transformers import AutoTokenizer
+        except ImportError:
+            self.import_failed = True
+            print(
+                f"The `transformers` package is required to use the {self.__class__.__name__}, please run `pip install transformers`"
+            )
+            return
+        if self._tokenizer is None:
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                self._local_model_path, model_max_length=self.model_max_length
+            )
+        print(f"Tokenizer loaded on {self.device}")
+
+    def _score_via_api(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        import requests
+
+        assert self.base_url is not None
+        response = requests.post(self.base_url, json={"messages": messages})
+        response.raise_for_status()
+        return response.json()
+
+    @weave.op
+    def score(self, query: str, context: str, output: str) -> dict[str, Any]:
+        messages = get_chat_template_messages(
+            query=query,
+            context=context,
+            output=output,
+        )
+        if self.base_url:
+            res = self._score_via_api(messages)
+            res = res["data"]
+        else:
+            if self.import_failed:
+                return {
+                    "flagged": False,
+                    "extras": {
+                        "error": "Unable to import required libraries. Please install transformers."
+                    },
+                }
+            import torch
+
+            if self.use_hhem:
+                inps = query + "\n\n" + context
+                outs = output
+
+                inps_toks = self._tokenizer(inps, truncation=False)
+                outs_toks = self._tokenizer(outs, truncation=False)
+
+                len_inps = len(inps_toks.input_ids)
+                len_outs = len(outs_toks.input_ids)
+                if len_inps + len_outs > self.model_max_length:
+                    print(f"inps and outs > max_lenth: {len_inps + len_outs}")
+                    if len_outs < self.model_max_length - 1000:
+                        inp_remaining = self.model_max_length - (len_outs + 975)
+                        inps_input_ids = inps_toks.input_ids[:inp_remaining]
+                        out_input_ids = outs_toks.input_ids
+                    else:
+                        inps_input_ids = inps_toks.input_ids[:975]
+                        out_input_ids = outs_toks.input_ids[
+                            : self.model_max_length - 1025
+                        ]
+
+                    inps = self._tokenizer.decode(inps_input_ids)
+                    outs = self._tokenizer.decode(out_input_ids)
+
+                pairs = [(inps, outs)]
+                pred = self.model.predict(pairs)
+                score = pred.item()
+                return {
+                    "flagged": score <= self.hhem_score_threshold,
+                    "extras": {"score": score},
+                }
+            else:
+                inp_template = self._tokenizer.apply_chat_template(
+                    messages,
+                    return_tensors="pt",
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+                inp_tokenized = self._tokenizer(inp_template, return_tensors="pt").to(
+                    self.device
+                )
+
+                pad_token_id = self._tokenizer.eos_token_id
+
+                with torch.inference_mode():
+                    res = self.model.generate(
+                        inp_tokenized["input_ids"],
+                        max_new_tokens=self.max_new_tokens,
+                        attention_mask=inp_tokenized["attention_mask"],
+                        pad_token_id=pad_token_id,
+                        temperature=self.temperature,
+                        do_sample=self.do_sample,
+                        num_beams=self.num_beams,
+                        top_k=self.top_k,
+                        top_p=self.top_p,
+                    )
+
+                true_token = 2787
+                false_token = 4245
+
+                input_length = inp_tokenized["input_ids"].shape[1]  # type: ignore
+                completion_tokens = res[0][input_length:].tolist()  # type: ignore
+
+                is_hallucination = true_token in completion_tokens
+                extras: dict[str, Any] = {"score": 1 if is_hallucination else 0}
+                result = {
+                    "flagged": is_hallucination,
+                    "extras": extras,
+                }
+
+                if self.debug:
+                    scorer_worked = (
+                        completion_tokens.count(true_token)
+                        + completion_tokens.count(false_token)
+                    ) == 1
+                    print(
+                        f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n"
+                    )
+                    completion = self._tokenizer.decode(completion_tokens)
+                    print(f"COMPLETION:\n{completion}\n----------------------\n")
+
+                    extras.update(
+                        {
+                            "completion": completion,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": len(res[0]),  # type: ignore
+                            "total_completion_tokens": len(completion_tokens),
+                            "scorer_worked": scorer_worked,
+                        }
+                    )
+
+        return result
