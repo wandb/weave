@@ -100,12 +100,10 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     setMode(hasScrolling ? (isExpanded ? 1 : 0) : 0);
   }, [hasScrolling, isExpanded]);
 
-  const onClick = hasScrolling
-    ? () => {
-        const numModes = hasFull ? 3 : 2;
-        setMode((mode + 1) % numModes);
-      }
-    : undefined;
+  const onClick = () => {
+    const numModes = hasFull ? 3 : 2;
+    setMode((mode + 1) % numModes);
+  };
   const copy = useCallback(() => {
     copyToClipboard(value);
     toast('Copied to clipboard');
@@ -210,7 +208,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     );
   }
   return (
-    <Collapsed hasScrolling={hasScrolling} onClick={onClick}>
+    <Collapsed hasScrolling onClick={onClick}>
       {content}
     </Collapsed>
   );
