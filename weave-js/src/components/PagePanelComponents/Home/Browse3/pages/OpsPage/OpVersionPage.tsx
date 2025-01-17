@@ -73,7 +73,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entity);
 
   return (
     <SimplePageLayoutWithHeader
