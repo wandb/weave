@@ -36,29 +36,29 @@ SETTINGS_PREFIX = "WEAVE_"
 class UserSettings(BaseModel):
     """User configuration for Weave.
 
-    All configs can be overrided with environment variables.  The precedence is
+    All configs can be overridden with environment variables.  The precedence is
     environment variables > `weave.trace.settings.UserSettings`."""
 
     disabled: bool = False
     """Toggles Weave tracing.
 
     If True, all weave ops will behave like regular functions.
-    Can be overrided with the environment variable `WEAVE_DISABLED`"""
+    Can be overridden with the environment variable `WEAVE_DISABLED`"""
 
     print_call_link: bool = True
     """Toggles link printing to the terminal.
 
     If True, prints a link to the Weave UI when calling a weave op.
-    Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
+    Can be overridden with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
     capture_code: bool = True
     """Toggles code capture for ops.
 
     If True, saves code for ops so they can be reloaded for later use.
-    Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`
+    Can be overridden with the environment variable `WEAVE_CAPTURE_CODE`
 
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
-    may lead to unexpected behaviour.  Make sure this is only set once at the start!
+    may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
 
     client_parallelism: Optional[int] = None
@@ -71,6 +71,28 @@ class UserSettings(BaseModel):
     but can be useful for debugging.
 
     This cannot be changed after the client has been initialized.
+    """
+
+    use_server_cache: bool = True
+    """
+    Toggles caching of server responses, defaults to True
+
+    If True, caches server responses to disk.
+    Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
+    """
+
+    server_cache_size_limit: int = 1_000_000_000
+    """
+    Sets the size limit in bytes for the server cache, defaults to 1GB (1_000_000_000 bytes)
+
+    Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
+    """
+
+    server_cache_dir: Optional[str] = None
+    """
+    Sets the directory for the server cache, defaults to None (temporary cache)
+
+    Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -107,6 +129,18 @@ def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
 
+def use_server_cache() -> bool:
+    return _should("use_server_cache")
+
+
+def server_cache_size_limit() -> int:
+    return _optional_int("server_cache_size_limit") or 1_000_000_000
+
+
+def server_cache_dir() -> Optional[str]:
+    return _optional_str("server_cache_dir")
+
+
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
@@ -139,6 +173,12 @@ def _should(name: str) -> bool:
 def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
+    return _context_vars[name].get()
+
+
+def _optional_str(name: str) -> Optional[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env
     return _context_vars[name].get()
 
 

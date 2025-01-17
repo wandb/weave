@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any, Callable
 
 import diskcache
 
+from weave.trace.settings import (
+    server_cache_dir,
+    server_cache_size_limit,
+    use_server_cache,
+)
 from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
@@ -20,16 +23,23 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
         next_trace_server: tsi.TraceServerInterface,
-        cache_dir: Path | None = None,  # todo make this configurable
-        size_limit: int = 1_000_000_000,  # 1GB - todo make this configurable
+        cache_dir: str | None = None,
+        size_limit: int = 1_000_000_000,
     ):
         self._next_trace_server = next_trace_server
-
         self._cache = diskcache.Cache(cache_dir, size_limit=size_limit)
+
+    @classmethod
+    def from_env(
+        cls, next_trace_server: tsi.TraceServerInterface
+    ) -> CachingMiddlewareTraceServer:
+        cache_dir = server_cache_dir()
+        size_limit = server_cache_size_limit()
+        return cls(next_trace_server, cache_dir, size_limit)
 
     def _safe_cache_get(self, key: str) -> Any:
         try:
-            use_cache = os.getenv("WEAVE_USE_SERVER_CACHE", "true").lower() == "true"
+            use_cache = use_server_cache()
             if not use_cache:
                 return None
             return self._cache.get(key)
