@@ -223,6 +223,7 @@ export interface TraceObjSchema<
   kind: 'op' | 'object';
   base_object_class?: OBC;
   val: T;
+  wb_user_id?: string;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {

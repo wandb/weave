@@ -1010,6 +1010,7 @@ export const convertTraceServerObjectVersionToSchema = <
     baseObjectClass: obj.base_object_class ?? null,
     versionIndex: obj.version_index,
     val: obj.val,
+    userId: obj.wb_user_id,
   };
 };
 
