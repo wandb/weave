@@ -183,7 +183,7 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entityName);
 
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
