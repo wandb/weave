@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 import diskcache
 
@@ -14,6 +14,12 @@ from weave.trace.settings import (
 from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
+
+TReq = TypeVar("TReq", bound=tsi.BaseModel)
+TRes = TypeVar("TRes", bound=tsi.BaseModel)
+
+CACHE_KEY_TYPE = str
+CACHE_VALUE_TYPE = str | bytes
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -27,7 +33,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         size_limit: int = 1_000_000_000,
     ):
         self._next_trace_server = next_trace_server
-        self._cache = diskcache.Cache(cache_dir, size_limit=size_limit)
+        self._cache: diskcache.Cache[CACHE_KEY_TYPE, CACHE_KEY_TYPE] = diskcache.Cache(
+            cache_dir, size_limit=size_limit
+        )
 
     @classmethod
     def from_env(
@@ -62,12 +70,25 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def _with_cache(
         self,
         namespace: str,
-        make_cache_key: Callable[[Any], str],
-        func: Callable[[Any], Any],
-        req: Any,
-        serialize: Callable[[Any], str],
-        deserialize: Callable[[Any], Any],
-    ) -> Any:
+        make_cache_key: Callable[[TReq], CACHE_KEY_TYPE],
+        func: Callable[[TReq], TRes],
+        req: TReq,
+        serialize: Callable[[TRes], CACHE_VALUE_TYPE],
+        deserialize: Callable[[CACHE_VALUE_TYPE], TRes],
+    ) -> TRes:
+        """Cache the result of a function call using the provided serialization methods.
+
+        Args:
+            namespace: Namespace to prefix the cache key with
+            make_cache_key: Function to generate a cache key from the request
+            func: The function to cache results for
+            req: The request object
+            serialize: Function to serialize the response to a string
+            deserialize: Function to deserialize the cached string back to a response
+
+        Returns:
+            The function result, either from cache or from calling func
+        """
         try:
             cache_key = f"{namespace}_{make_cache_key(req)}"
         except Exception as e:
@@ -88,7 +109,22 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception(f"Error caching value: {e}")
         return res
 
-    def _with_cache_generic(self, func, req, res_type: type[tsi.BaseModel]):
+    def _with_cache_generic(
+        self,
+        func: Callable[[TReq], TRes],
+        req: TReq,
+        res_type: type[TRes],
+    ) -> TRes:
+        """Cache the result of a function that takes and returns Pydantic models.
+
+        Args:
+            func: The function to cache results for
+            req: The request object (must be a Pydantic model)
+            res_type: The response type (must be a Pydantic model)
+
+        Returns:
+            The function result, either from cache or from calling func
+        """
         return self._with_cache(
             func.__name__,
             lambda req: req.model_dump_json(),
