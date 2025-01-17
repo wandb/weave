@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 def bedrock_on_finish_converse(
     call: Call, output: Any, exception: Optional[BaseException]
 ) -> None:
-    model_name = str(call.inputs["modelId"]) # get the ref
+    model_name = str(call.inputs["modelId"])  # get the ref
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
