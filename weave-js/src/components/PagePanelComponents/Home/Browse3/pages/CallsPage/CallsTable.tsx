@@ -941,7 +941,6 @@ export const CallsTable: FC<{
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
-        pageSizeOptions={[DEFAULT_PAGE_SIZE]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
