@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional, TypeVar
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     model_validator,
@@ -41,7 +42,7 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    ref: Optional[ObjectRef] = None
+    ref: Optional[ObjectRef] = Field(None, repr=False)
 
     # Allow Op attributes
     model_config = ConfigDict(
