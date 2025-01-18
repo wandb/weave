@@ -1,4 +1,4 @@
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -9,14 +9,14 @@ class Dictifiable(Protocol):
         """Convert the object to a dictionary representation."""
         ...
 
-T = TypeVar('T')
-def try_to_dict(obj: T) -> dict[str, Any] | None:
+
+def try_to_dict(obj: Any) -> dict[str, Any] | None:
     """
     Attempt to convert an object to a dictionary using the Dictifiable protocol.
-    
+
     Args:
         obj: Object to attempt to convert to dictionary
-        
+
     Returns:
         Dictionary representation if object implements Dictifiable protocol, None otherwise
     """
