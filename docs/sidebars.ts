@@ -82,6 +82,16 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
+      label: "🍳 Tutorials", 
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      type: "category",
+      collapsible: true, 
+      collapsed: true, 
+      items: [
+        "guides/cookbooks/bedrock",
+      ],
+    },
+    {
       label: "🔥 Integrations",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       link: { type: "doc", id: "guides/integrations/index" },
