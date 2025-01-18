@@ -305,6 +305,10 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  usePermanentlyDeleteAllDataInProject: (
+    entity: string,
+    project: string
+  ) => () => Promise<traceServerClientTypes.PermanentlyDeleteProjectRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
