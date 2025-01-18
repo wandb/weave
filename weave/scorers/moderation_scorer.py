@@ -32,8 +32,8 @@ class OpenAIModerationScorer(LLMScorer):
         return v
 
     @weave.op
-    def score(self, output: Any) -> dict:
-        response = self.client.moderations.create(
+    async def score(self, output: Any) -> dict:
+        response = await self.client.moderations.create(
             model=self.model_id,
             input=output,
         ).results[0]

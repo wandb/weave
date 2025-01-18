@@ -137,9 +137,9 @@ class HallucinationFreeScorer(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, output: str, context: str) -> HallucinationResponse:
+    async def score(self, output: str, context: str) -> HallucinationResponse:
         output = stringify(output)
-        response = create(
+        response = await create(
             self.client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
