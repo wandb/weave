@@ -1,5 +1,5 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import {Tab} from 'semantic-ui-react';
+import {Tab, TabProps} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 export const LCTDetailView = styled.div`
@@ -20,7 +20,13 @@ export const LCTWrapper = styled.div`
   overflow: hidden;
 `;
 
-export const SimpleTabs = styled(Tab)`
+export const SimpleTabs = styled(
+  Tab as React.ComponentType<TabProps>
+).attrs<TabProps>({
+  menu: {
+    position: 'fixed',
+  },
+})`
   display: flex;
   flex-direction: column;
   border-top: none;

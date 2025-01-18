@@ -24,6 +24,7 @@
     "noErrorTruncation": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
+    "outDir": "./dist",
     "paths": {
       "@wandb/weave/*": ["src/*"],
       "plotly\\.js": ["plotly.js-dist-min"]

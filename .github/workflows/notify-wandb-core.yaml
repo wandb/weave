@@ -27,8 +27,8 @@ jobs:
           yarn install --frozen-lockfile
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version
           yarn generate
-          cp package.json README.md .npmrc src/
-          cd src
+          yarn prepare-publish
+          cd dist
           if [ "${{ github.ref }}" = "refs/heads/master" ]; then
             npm publish
           else
