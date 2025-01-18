@@ -9,9 +9,14 @@ in a fixture for tests.
 """
 
 import base64
-from typing import Optional
+import socket
+import threading
+from contextlib import closing
+from typing import Annotated, Optional
 
-from fastapi import FastAPI, HTTPException
+import uvicorn
+from fastapi import FastAPI, Form, HTTPException
+from fastapi.datastructures import UploadFile
 from fastapi.responses import StreamingResponse
 
 from weave.trace_server import (
@@ -19,6 +24,48 @@ from weave.trace_server import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.remote_http_trace_server import Batch, BatchRes
+
+
+def find_free_port() -> int:
+    """Find and return a free port number."""
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(("", 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+        return port
+
+
+class FastAPIServer:
+    """A wrapper class that runs a FastAPI app in a separate thread."""
+
+    def __init__(
+        self, app: FastAPI, host: str = "127.0.0.1", port: Optional[int] = None
+    ):
+        self.app = app
+        self.host = host
+        self.port = port or find_free_port()
+        self.server = uvicorn.Server(
+            config=uvicorn.Config(app=app, host=host, port=self.port, log_level="error")
+        )
+        self.thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        """Start the server in a separate thread."""
+        self.thread = threading.Thread(target=self.server.run)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self) -> None:
+        """Stop the server."""
+        if self.server:
+            self.server.should_exit = True
+        if self.thread:
+            self.thread.join()
+
+    @property
+    def base_url(self) -> str:
+        """Return the base URL of the server."""
+        return f"http://{self.host}:{self.port}"
 
 
 def build_minimal_blind_authenticating_trace_server(
@@ -76,7 +123,7 @@ def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
     @app.post("/file/create")
     @app.post("/files/create")
     async def file_create(
-        project_id: typing.Annotated[str, Form()],
+        project_id: Annotated[str, Form()],
         file: UploadFile,
     ) -> tsi.FileCreateRes:
         req = tsi.FileCreateReq(

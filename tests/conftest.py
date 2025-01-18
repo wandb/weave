@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.conftest_lib.http_trace_server import (
+    FastAPIServer,
     build_minimal_blind_authenticating_trace_server,
 )
 from tests.trace.util import DummyTestException
@@ -391,7 +392,8 @@ def create_client(
         fast_api_app = build_minimal_blind_authenticating_trace_server(
             sqlite_server, entity
         )
-        webserver = TestClient(fast_api_app, "http://test_trace_server")
+        webserver = FastAPIServer(fast_api_app)
+        webserver.start()
         url = str(webserver.base_url)
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
@@ -401,7 +403,8 @@ def create_client(
         fast_api_app = build_minimal_blind_authenticating_trace_server(
             ch_server, entity
         )
-        webserver = TestClient(fast_api_app, "http://test_trace_server")
+        webserver = FastAPIServer(fast_api_app)
+        webserver.start()
         url = str(webserver.base_url)
     elif weave_server_flag.startswith("http"):
         url = weave_server_flag
@@ -416,7 +419,7 @@ def create_client(
         yield inited_client
     finally:
         if webserver:
-            webserver.close()
+            webserver.stop()
         inited_client.reset()
         autopatch.reset_autopatch()
 
