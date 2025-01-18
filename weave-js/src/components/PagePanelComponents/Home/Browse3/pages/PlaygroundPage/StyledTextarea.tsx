@@ -10,6 +10,7 @@ type TextAreaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   maxHeight?: string | number;
   startHeight?: string | number;
   reset?: boolean;
+  rows?: number;
 };
 
 export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
@@ -80,6 +81,7 @@ export const StyledTextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     return (
       <Tailwind style={{display: 'contents'}}>
         <textarea
+          rows={props.rows}
           ref={element => {
             if (typeof ref === 'function') {
               ref(element);
