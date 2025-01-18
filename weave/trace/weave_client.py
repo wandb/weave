@@ -7,8 +7,11 @@ import logging
 import platform
 import re
 import sys
-from collections.abc import Iterator, Sequence
+import threading
+import time
+from collections.abc import Generator, Iterator, Sequence
 from concurrent.futures import Future
+from contextlib import contextmanager
 from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
@@ -56,6 +59,7 @@ from weave.trace.settings import client_parallelism
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client_status import WeaveClientStatusState
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
@@ -1371,6 +1375,55 @@ class WeaveClient:
         )
         return res.results
 
+    def get_status_state(self) -> WeaveClientStatusState:
+        call_processor_queue_size = 0
+        call_processor_worker_count = 0
+        remote_request_counter = {}
+
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            if self.server.should_batch:
+                call_processor_queue_size = self.server.call_processor.queue.qsize()
+                call_processor_worker_count = 1
+            else:
+                call_processor_queue_size = 0
+                call_processor_worker_count = 1
+            remote_request_counter = self.server.remote_request_counter
+
+        return WeaveClientStatusState(
+            moment=datetime.datetime.now(datetime.timezone.utc),
+            future_exec_queue_size=len(self.future_executor._active_futures),
+            future_exec_worker_count=self.future_executor._executor._max_workers
+            if self.future_executor._executor
+            else 0,
+            call_processor_queue_size=call_processor_queue_size,
+            call_processor_worker_count=call_processor_worker_count,
+            remote_request_counter=remote_request_counter,
+        )
+
+    @contextmanager
+    def live_status(self, sec: int = 1) -> Generator[None, None, None]:
+        """Context manager that prints client status every `sec` seconds in a background thread.
+
+        Args:
+            sec: Number of seconds between status updates
+        """
+        stop_event = threading.Event()
+
+        def _print_status() -> None:
+            while not stop_event.is_set():
+                status = self.get_status_state()
+                print(status.model_dump_json(indent=2))
+                time.sleep(sec)
+
+        thread = threading.Thread(target=_print_status, daemon=True)
+        thread.start()
+
+        try:
+            yield
+        finally:
+            stop_event.set()
+            thread.join()
+
     @trace_sentry.global_trace_sentry.watch()
     def _send_score_call(
         self,
@@ -1765,6 +1818,7 @@ class WeaveClient:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
     def _flush(self) -> None:
+        # TODO: make this an env var
         # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
