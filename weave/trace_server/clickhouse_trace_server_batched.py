@@ -172,7 +172,8 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+    # "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+    "max_memory_usage": 1 * 1024 * 1024,  # 1 MiB
 }
 
 
@@ -1695,24 +1696,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         summary = None
         parameters = _process_parameters(parameters)
-        with self.ch_client.query_rows_stream(
-            query,
-            parameters=parameters,
-            column_formats=column_formats,
-            use_none=True,
-            settings=settings,
-        ) as stream:
-            if isinstance(stream.source, QueryResult):
-                summary = stream.source.summary
-            logger.info(
-                "clickhouse_stream_query",
-                extra={
-                    "query": query,
-                    "parameters": parameters,
-                    "summary": summary,
-                },
-            )
-            yield from stream
+        try:
+            with self.ch_client.query_rows_stream(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            ) as stream:
+                if isinstance(stream.source, QueryResult):
+                    summary = stream.source.summary
+                logger.info(
+                    "clickhouse_stream_query",
+                    extra={
+                        "query": query,
+                        "parameters": parameters,
+                        "summary": summary,
+                    },
+                )
+                yield from stream
+        except Exception as e:
+            # wrap exception with query and parameters
+            extra = {"query": query, "parameters": parameters}
+            raise type(e)(f"{str(e)} - Query: {query}, Parameters: {parameters}") from None
 
     def _query(
         self,
