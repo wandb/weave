@@ -367,6 +367,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 from fastapi.testclient import TestClient
 
 
+@contextlib.contextmanager
 def create_client(
     request, autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None
 ) -> typing.Generator[weave_init.InitializedClient, None, None]:
@@ -378,7 +379,7 @@ def create_client(
     project = "test-project"
 
     if weave_server_flag == "prod":
-        return weave_init.init_weave("dev_testing")
+        yield weave_init.init_weave("dev_testing")
 
     url = ""
     if weave_server_flag == "sqlite":
@@ -391,7 +392,7 @@ def create_client(
             sqlite_server, entity
         )
         webserver = TestClient(fast_api_app, "http://test_trace_server")
-        url = webserver.base_url
+        url = str(webserver.base_url)
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
@@ -401,11 +402,13 @@ def create_client(
             ch_server, entity
         )
         webserver = TestClient(fast_api_app, "http://test_trace_server")
-        url = webserver.base_url
+        url = str(webserver.base_url)
     elif weave_server_flag.startswith("http"):
         url = weave_server_flag
     server = remote_http_trace_server.RemoteHTTPTraceServer(url)
-    client = TestOnlyFlushingWeaveClient(entity, project, make_server_recorder(server))
+    client = TestOnlyFlushingWeaveClient(
+        entity, project, make_server_recorder(server), False
+    )
     inited_client = weave_init.InitializedClient(client)
     autopatch.autopatch(autopatch_settings)
 

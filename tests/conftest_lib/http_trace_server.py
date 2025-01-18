@@ -12,6 +12,7 @@ import base64
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -56,7 +57,11 @@ def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
     app.post("/calls/query")(resolver.calls_query)
     app.post("/completions/create")(resolver.completions_create)
     app.post("/calls/query_stats")(resolver.calls_query_stats)
-    app.post("/calls/stream_query")(resolver.calls_query_stream)
+
+    @app.post("/calls/stream_query")
+    def calls_stream_query(req: tsi.CallsQueryReq) -> StreamingResponse:
+        return StreamingResponse(resolver.calls_query_stream(req))
+
     app.post("/obj/create")(resolver.obj_create)
     app.post("/obj/read")(resolver.obj_read)
     app.post("/objs/query")(resolver.objs_query)
@@ -65,6 +70,40 @@ def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
     app.post("/table/update")(resolver.table_update)
     app.post("/table/query")(resolver.table_query)
     app.post("/table/query_stats")(resolver.table_query_stats)
+
+    app.post("/refs/read_batch")(resolver.refs_read_batch)
+
+    @app.post("/file/create")
+    @app.post("/files/create")
+    async def file_create(
+        project_id: typing.Annotated[str, Form()],
+        file: UploadFile,
+    ) -> tsi.FileCreateRes:
+        req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=file.filename or "<unnamed_file>",
+            content=await file.read(),
+        )
+        return resolver.file_create(req)
+
+    # `/files/content` is "old" but still used in clients. `/file/content` is the new name following
+    # the convention of using singular nouns when operating on a single resource.
+    @app.post("/file/content")
+    @app.post("/files/content")
+    def file_content(
+        req: tsi.FileContentReadReq,
+    ) -> StreamingResponse:
+        res = resolver.file_content_read(req)
+        return StreamingResponse(iter([res.content]))
+
+    app.post("/cost/create")(resolver.cost_create)
+    app.post("/cost/query")(resolver.cost_query)
+    app.post("/cost/purge")(resolver.cost_purge)
+    app.post("/feedback/create")(resolver.feedback_create)
+    app.post("/feedback/query")(resolver.feedback_query)
+    app.post("/feedback/purge")(resolver.feedback_purge)
+    app.post("/feedback/replace")(resolver.feedback_replace)
+    app.post("/actions/execute_batch")(resolver.actions_execute_batch)
 
     return app
 
