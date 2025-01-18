@@ -6,7 +6,6 @@ import subprocess
 import time
 import typing
 import urllib
-from collections.abc import Iterator
 
 import pytest
 import requests
@@ -64,7 +63,7 @@ class ThrowingServer(tsi.TraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         raise DummyTestException("FAILURE - calls_query, req:", req)
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> list[tsi.CallSchema]:
         raise DummyTestException("FAILURE - calls_query_stream, req:", req)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:

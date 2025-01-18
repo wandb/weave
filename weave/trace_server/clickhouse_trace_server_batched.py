@@ -298,7 +298,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             count = rows[0][0]
         return tsi.CallsQueryStatsRes(count=count)
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> list[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
             project_id=req.project_id, include_costs=req.include_costs or False
