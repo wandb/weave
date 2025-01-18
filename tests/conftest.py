@@ -14,8 +14,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.conftest_lib.http_trace_server import (
-    DummyIdConverter,
-    TestOnlyUserInjectingExternalTraceServer,
+    build_minimal_blind_authenticating_trace_server,
 )
 from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
@@ -365,47 +364,56 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
+from fastapi.testclient import TestClient
+
+
 def create_client(
     request, autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None
-) -> weave_init.InitializedClient:
+) -> typing.Generator[weave_init.InitializedClient, None, None]:
     inited_client = None
+    webserver = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+
+    if weave_server_flag == "prod":
+        return weave_init.init_weave("dev_testing")
+
+    url = ""
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
         )
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
-        server = TestOnlyUserInjectingExternalTraceServer(
-            sqlite_server, DummyIdConverter(), entity
+        fast_api_app = build_minimal_blind_authenticating_trace_server(
+            sqlite_server, entity
         )
+        webserver = TestClient(fast_api_app, "http://test_trace_server")
+        url = webserver.base_url
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
-        server = TestOnlyUserInjectingExternalTraceServer(
-            ch_server, DummyIdConverter(), entity
+        fast_api_app = build_minimal_blind_authenticating_trace_server(
+            ch_server, entity
         )
+        webserver = TestClient(fast_api_app, "http://test_trace_server")
+        url = webserver.base_url
     elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
-        )
-        server = remote_server
-    elif weave_server_flag == ("prod"):
-        inited_client = weave_init.init_weave("dev_testing")
+        url = weave_server_flag
+    server = remote_http_trace_server.RemoteHTTPTraceServer(url)
+    client = TestOnlyFlushingWeaveClient(entity, project, make_server_recorder(server))
+    inited_client = weave_init.InitializedClient(client)
+    autopatch.autopatch(autopatch_settings)
 
-    if inited_client is None:
-        client = TestOnlyFlushingWeaveClient(
-            entity, project, make_server_recorder(server)
-        )
-        inited_client = weave_init.InitializedClient(client)
-        autopatch.autopatch(autopatch_settings)
-
-    return inited_client
+    try:
+        yield inited_client
+    finally:
+        if webserver:
+            webserver.close()
 
 
 @pytest.fixture()
