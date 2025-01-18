@@ -414,18 +414,16 @@ def create_client(
     finally:
         if webserver:
             webserver.close()
+        inited_client.reset()
+        autopatch.reset_autopatch()
 
 
 @pytest.fixture()
 def client(request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client = create_client(request)
-    try:
+    with create_client(request) as inited_client:
         yield inited_client.client
-    finally:
-        inited_client.reset()
-        autopatch.reset_autopatch()
 
 
 @pytest.fixture()
@@ -434,12 +432,8 @@ def client_creator(request):
 
     @contextlib.contextmanager
     def client(autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None):
-        inited_client = create_client(request, autopatch_settings)
-        try:
+        with create_client(request, autopatch_settings) as inited_client:
             yield inited_client.client
-        finally:
-            inited_client.reset()
-            autopatch.reset_autopatch()
 
     yield client
 
