@@ -44,6 +44,7 @@ dependencies = [
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",      # Used by scorers for field validation
+  "diskcache==5.6.3",        # Used for data caching
 ]
 
 [project.optional-dependencies]
