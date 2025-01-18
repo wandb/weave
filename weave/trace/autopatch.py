@@ -47,6 +47,7 @@ class AutopatchSettings(BaseModel):
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    # smolagents: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
@@ -70,6 +71,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
 
     if settings is None:
         settings = AutopatchSettings()
@@ -87,6 +89,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
+    get_smolagents_patcher().attempt_patch()
 
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -112,6 +115,7 @@ def reset_autopatch() -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
 
     get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()
@@ -126,6 +130,7 @@ def reset_autopatch() -> None:
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
+    get_smolagents_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
