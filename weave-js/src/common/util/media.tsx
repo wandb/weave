@@ -6,3 +6,8 @@ import {colorN, ROBIN16} from './colors';
 export const boxColor = (id: number) => {
   return colorN(id, ROBIN16);
 };
+
+export enum SliderKeyboardOperation {
+  INCREMENT = 'INCREMENT',
+  DECREMENT = 'DECREMENT',
+}
