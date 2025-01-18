@@ -87,6 +87,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+huggingface = ["huggingface-hub>=0.26.2"]
 vertexai = ["vertexai>=1.70.0"]
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
