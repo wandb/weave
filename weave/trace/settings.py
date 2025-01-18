@@ -61,6 +61,16 @@ class UserSettings(BaseModel):
     may lead to unexpected behaviour.  Make sure this is only set once at the start!
     """
 
+    redact_pii: bool = False
+    """Toggles PII redaction using Microsoft Presidio.
+
+    If True, redacts PII from trace data before sending to the server.
+    Can be overrided with the environment variable `WEAVE_REDACT_PII`
+    
+    WARNING: PII redaction is an experimental feature, and may not always work. 
+    It will also introduce significant performance overhead when redacting large payloads.
+    """
+
     client_parallelism: Optional[int] = None
     """
     Sets the number of workers to use for background operations.
@@ -106,6 +116,8 @@ def should_capture_code() -> bool:
 def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
+def should_redact_pii() -> bool:
+    return _should("redact_pii")
 
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,

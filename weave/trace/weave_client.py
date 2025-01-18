@@ -40,6 +40,7 @@ from weave.trace.object_record import (
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
+from weave.trace.pii_redaction import redact_pii
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -52,7 +53,7 @@ from weave.trace.refs import (
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism
+from weave.trace.settings import client_parallelism, should_redact_pii
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -922,11 +923,17 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
-        if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
+        if should_redact_pii():
+            prepared_inputs = redact_pii(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            prepared_inputs = inputs_sensitive_keys_redacted
+
+        if op.postprocess_inputs:
+            inputs_postprocessed = op.postprocess_inputs(prepared_inputs)
+        else:
+            inputs_postprocessed = prepared_inputs
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1024,10 +1031,15 @@ class WeaveClient:
         call.ended_at = ended_at
         original_output = output
 
-        if op is not None and op.postprocess_output:
-            postprocessed_output = op.postprocess_output(original_output)
+        if should_redact_pii():
+            prepared_output = redact_pii(original_output)
         else:
-            postprocessed_output = original_output
+            prepared_output = original_output
+
+        if op is not None and op.postprocess_output:
+            postprocessed_output = op.postprocess_output(prepared_output)
+        else:
+            postprocessed_output = prepared_output
 
         if _global_postprocess_output:
             postprocessed_output = _global_postprocess_output(postprocessed_output)
