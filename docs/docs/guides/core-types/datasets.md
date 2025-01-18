@@ -11,7 +11,7 @@ This guide will show you how to:
 - Download the latest version
 - Iterate over examples
 
-## Sample code
+## Quickstart
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -66,5 +66,32 @@ This guide will show you how to:
     const exampleLabel = datasetRef.getRow(2).sentence;
     ```
 
+  </TabItem>
+</Tabs>
+
+## Alternate constructors
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+  Datasets can also be constructed from common Weave objects like `list[Call]`, which is useful if you want to run an evaluation on a handful of examples.
+
+```python
+@weave.op
+def model(task: str) -> str:
+    return f"Now working on {task}"
+
+res1, call1 = model.call(task="fetch")
+res2, call2 = model.call(task="parse")
+
+dataset = Dataset.from_calls([call1, call2])
+# Now you can use the dataset to evaluate the model, etc.
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+  
+  ```typescript
+  This feature is not available in TypeScript yet.  Stay tuned!
+  ```
   </TabItem>
 </Tabs>
