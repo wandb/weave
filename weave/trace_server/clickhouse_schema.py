@@ -154,5 +154,6 @@ class SelectableCHObjSchema(BaseModel):
     base_object_class: Optional[str]
     digest: str
     version_index: int
+    version_count: typing.Optional[int]
     is_latest: int
     deleted_at: Optional[datetime.datetime] = None
