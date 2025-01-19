@@ -8,6 +8,7 @@ from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
 )
+from weave.trace_server.types import StreamingCalls
 
 
 class IdConverter:
@@ -153,7 +154,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
         return res
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> StreamingCalls:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:

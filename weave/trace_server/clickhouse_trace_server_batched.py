@@ -118,6 +118,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.types import StreamingCalls
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -298,7 +299,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             count = rows[0][0]
         return tsi.CallsQueryStatsRes(count=count)
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> StreamingCalls:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
             project_id=req.project_id, include_costs=req.include_costs or False

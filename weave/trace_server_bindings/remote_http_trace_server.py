@@ -11,6 +11,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server.types import StreamingCalls
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> StreamingCalls:
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )

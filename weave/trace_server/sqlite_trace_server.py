@@ -45,6 +45,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.types import StreamingCalls
 from weave.trace_server.validation import object_id_validator
 
 MAX_FLUSH_COUNT = 10000
@@ -531,7 +532,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return data
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> StreamingCalls:
         return iter(self.calls_query(req).calls)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
