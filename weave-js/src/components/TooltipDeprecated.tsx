@@ -14,7 +14,7 @@ import {
 
 export const TooltipDeprecated = styled(Popup).attrs({
   basic: true, // This removes the pointing arrow.
-  mouseEnterDelay: 501,
+  mouseEnterDelay: 500,
   popperModifiers: {
     preventOverflow: {
       // Prevent popper from erroneously constraining the popup.
