@@ -54,7 +54,7 @@ class AutopatchSettings(BaseModel):
 def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     if settings is None:
         settings = AutopatchSettings()
-    elif settings.disable_autopatch:
+    if settings.disable_autopatch:
         return
 
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
