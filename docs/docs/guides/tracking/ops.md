@@ -161,7 +161,7 @@ export WEAVE_PRINT_CALL_LINK=false
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    You can call `.delete()` on any op Ref to delete that version of the op.
+    To delete a version of an op, call `.delete()` on the op ref.
 
     ```python
     weave.init('intro-example')
