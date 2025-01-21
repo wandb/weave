@@ -62,11 +62,11 @@ Saving an object with a name will create the first version of that object if it 
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    You can call `.delete()` on any object Ref to delete the object.
+    You can call `.delete()` on any object Ref to delete that version of the object.
 
     ```python
     weave.init('intro-example')
-    cat_names_ref = weave.ref('cat-names')
+    cat_names_ref = weave.ref('cat-names:v1')
     cat_names_ref.delete()
     ```
 
