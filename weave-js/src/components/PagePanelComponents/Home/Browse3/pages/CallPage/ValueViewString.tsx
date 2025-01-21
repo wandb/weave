@@ -45,7 +45,7 @@ const Collapsed = styled.div<{hasScrolling: boolean}>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: ${props => (props.hasScrolling ? 'pointer' : 'default')};
+  cursor: pointer;
 `;
 Collapsed.displayName = 'S.Collapsed';
 
@@ -207,9 +207,5 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
       </Column>
     );
   }
-  return (
-    <Collapsed hasScrolling={hasScrolling || isExpanded} onClick={onClick}>
-      {content}
-    </Collapsed>
-  );
+  return <Collapsed onClick={onClick}>{content}</Collapsed>;
 };
