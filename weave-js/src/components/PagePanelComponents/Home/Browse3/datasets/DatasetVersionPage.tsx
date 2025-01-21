@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useMemo} from 'react';
 
 import {Icon} from '../../../../Icon';
@@ -13,7 +14,8 @@ import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
 } from '../pages/common/SimplePageLayout';
-import {TabUseDataset} from '../pages/TabUseDataset';
+import {DeleteObjectButtonWithModal} from '../pages/ObjectsPage/ObjectDeleteButtons';
+import {TabUseDataset} from '../pages/ObjectsPage/Tabs/TabUseDataset';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {objectVersionKeyToRefUri} from '../pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
@@ -21,7 +23,8 @@ import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatc
 
 export const DatasetVersionPage: React.FC<{
   objectVersion: ObjectVersionSchema;
-}> = ({objectVersion}) => {
+  showDeleteButton?: boolean;
+}> = ({objectVersion, showDeleteButton}) => {
   const {useRootObjectVersions, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -73,7 +76,7 @@ export const DatasetVersionPage: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <ObjectVersionsLink
@@ -106,6 +109,17 @@ export const DatasetVersionPage: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
+            {objectVersion.userId && (
+              <div className="block">
+                <p className="text-moon-500">Created by</p>
+                <UserLink userId={objectVersion.userId} includeName />
+              </div>
+            )}
+            {showDeleteButton && (
+              <div className="ml-auto mr-0">
+                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+              </div>
+            )}
           </div>
         </Tailwind>
       }

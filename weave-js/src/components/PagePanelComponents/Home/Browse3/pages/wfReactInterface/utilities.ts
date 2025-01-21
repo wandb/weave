@@ -287,6 +287,17 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
   return result;
 };
 
+export const isObjDeleteError = (error: Error | null): boolean => {
+  if (error == null) {
+    return false;
+  }
+  const message = JSON.parse(error.message);
+  if ('deleted_at' in message) {
+    return true;
+  }
+  return false;
+};
+
 /// Hooks ///
 
 export const useParentCall = (
