@@ -39,7 +39,7 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const Collapsed = styled.div<{hasScrolling: boolean}>`
+const Collapsed = styled.div`
   min-height: 38px;
   line-height: 38px;
   overflow: hidden;
