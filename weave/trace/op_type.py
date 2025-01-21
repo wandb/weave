@@ -346,7 +346,7 @@ def _get_code_deps(
     warnings: list[str] = []
     if depth > 20:
         warnings = [
-            "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
+            "Recursion depth exceeded in get_code_deps, this may indicate circular dependencies, which are not yet handled."
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 

@@ -44,6 +44,7 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
 import {TabPrompt} from './Tabs/TabPrompt';
+import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
 
@@ -393,6 +394,13 @@ const ObjectVersionPageInner: React.FC<{
                     name={objectName}
                     uri={refUri}
                     projectName={projectName}
+                  />
+                ) : baseObjectClass === 'AnnotationSpec' ? (
+                  <TabUseAnnotationSpec
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
                   />
                 ) : (
                   <TabUseObject name={objectName} uri={refUri} />
