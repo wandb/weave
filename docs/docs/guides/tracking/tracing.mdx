@@ -745,7 +745,7 @@ Calculated Fields:
 
 **Environment Variable:**
 
-In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_TRACING_ENABLED` to `false`.
+In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_DISABLED=true`.
 
 **Client Initialization:**
 
@@ -755,12 +755,12 @@ Sometimes, you may want to conditionally enable tracing for a specific initializ
 import weave
 
 # Initialize the client
-client = weave.init(..., tracing_enabled=False)
+client = weave.init(..., settings={"disabled": True})
 ```
 
 **Context Manager:**
 
-Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be import from `weave.trace.context.call_context`.
+Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be imported from `weave.trace.context.call_context`.
 
 ```python
 import weave
