@@ -2,7 +2,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 import weave
-from weave.flow.annotation_spec import AnnotationSpec
+from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
 
@@ -456,3 +456,60 @@ def test_annotation_spec_validate_return_value():
     # Invalid cases should return False
     assert not enum_spec.value_is_valid("invalid_choice")
     assert not enum_spec.value_is_valid(123)
+
+
+def test_annotation_feedback_sdk(client):
+    number_spec = AnnotationSpec(
+        name="Number Rating",
+        field_schema={
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+        },
+    )
+    ref = weave.publish(number_spec, "number spec")
+    assert ref
+
+    @weave.op()
+    def do_call():
+        return 3
+
+    do_call()
+    do_call()
+
+    calls = do_call.calls()
+    assert len(list(calls)) == 2
+
+    # Add annotation feedback
+    calls[0].feedback.add(
+        "wandb.annotation.number-spec",
+        {"value": 3},
+        annotation_ref=ref.uri(),
+    )
+
+    # Query the feedback
+    feedback = calls[0].feedback.refresh()
+    assert len(feedback) == 1
+    assert feedback[0].payload["value"] == 3
+    assert feedback[0].annotation_ref == ref.uri()
+
+    # no annotation_ref
+    with pytest.raises(ValueError):
+        calls[0].feedback.add("wandb.annotation.number_rating", {"value": 3})
+
+    # empty annotation_ref
+    with pytest.raises(ValueError):
+        calls[0].feedback.add(
+            "wandb.annotation.number_rating", {"value": 3}, annotation_ref=""
+        )
+
+    # invalid annotation_ref
+    with pytest.raises(ValueError):
+        calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref="ssss")
+
+    # no wandb.annotation prefix
+    with pytest.raises(
+        ValueError,
+        match="To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'.",
+    ):
+        calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref=ref.uri())

@@ -24,6 +24,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
 import {useHumanAnnotationSpecs} from '../../feedback/StructuredFeedback/tsHumanFeedback';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -35,17 +36,16 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
-import {CallScoresViewer} from './CallScoresViewer';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
+import {TabUseCall} from './TabUseCall';
 
 export const CallPage: FC<{
   entity: string;
@@ -77,7 +77,6 @@ export const useShowRunnableUI = () => {
 };
 
 const useCallTabs = (call: CallSchema) => {
-  const showScores = useShowRunnableUI();
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -172,6 +171,19 @@ const useCallTabs = (call: CallSchema) => {
       ),
     },
     {
+      label: 'Scores',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <ScorerFeedbackGrid
+            entity={entity}
+            project={project}
+            weaveRef={weaveRef}
+            objectType="call"
+          />
+        </Tailwind>
+      ),
+    },
+    {
       label: 'Summary',
       content: (
         <Tailwind style={{height: '100%', overflow: 'auto'}}>
@@ -179,21 +191,6 @@ const useCallTabs = (call: CallSchema) => {
         </Tailwind>
       ),
     },
-    // For now, we are only showing this tab for W&B admins since the
-    // feature is in active development. We want to be able to get
-    // feedback without enabling for all users.
-    ...(showScores
-      ? [
-          {
-            label: 'Scores',
-            content: (
-              <Tailwind>
-                <CallScoresViewer call={call} />
-              </Tailwind>
-            ),
-          },
-        ]
-      : []),
     {
       label: 'Use',
       content: (

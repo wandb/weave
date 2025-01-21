@@ -18,7 +18,9 @@ OBJECT_METADATA_COLUMNS = [
     "digest",
     "version_index",
     "is_latest",
-    # columns not used in SelectableCHObjSchema():
+    "deleted_at",
+    "wb_user_id",
+    # columns not used in SelectableCHObjSchema:
     "version_count",
     "is_op",
 ]
@@ -102,21 +104,25 @@ class ObjectMetadataQueryBuilder:
         conditions: Optional[list[str]] = None,
         object_id_conditions: Optional[list[str]] = None,
         parameters: Optional[dict[str, Any]] = None,
+        include_deleted: bool = False,
     ):
         self.project_id = project_id
         self.parameters: dict[str, Any] = parameters or {}
         if not self.parameters.get(project_id):
             self.parameters.update({"project_id": project_id})
-
         self._conditions: list[str] = conditions or []
         self._object_id_conditions: list[str] = object_id_conditions or []
         self._limit: Optional[int] = None
         self._offset: Optional[int] = None
         self._sort_by: list[tsi.SortBy] = []
+        self._include_deleted: bool = include_deleted
 
     @property
     def conditions_part(self) -> str:
-        return _make_conditions_part(self._conditions)
+        _conditions = list(self._conditions)
+        if not self._include_deleted:
+            _conditions.append("deleted_at IS NULL")
+        return _make_conditions_part(_conditions)
 
     @property
     def object_id_conditions_part(self) -> str:
@@ -124,6 +130,8 @@ class ObjectMetadataQueryBuilder:
 
     @property
     def sort_part(self) -> str:
+        if not self._sort_by:
+            return "ORDER BY created_at ASC"
         return _make_sort_part(self._sort_by)
 
     @property
@@ -230,6 +238,9 @@ class ObjectMetadataQueryBuilder:
             raise ValueError("Offset can only be set once")
         self._offset = offset
 
+    def set_include_deleted(self, include_deleted: bool) -> None:
+        self._include_deleted = include_deleted
+
     def make_metadata_query(self) -> str:
         columns = ",\n    ".join(OBJECT_METADATA_COLUMNS)
         query = f"""
@@ -240,10 +251,12 @@ FROM (
         project_id,
         object_id,
         created_at,
+        deleted_at,
         kind,
         base_object_class,
         refs,
         digest,
+        wb_user_id,
         is_op,
         row_number() OVER (
             PARTITION BY project_id,
@@ -251,17 +264,25 @@ FROM (
             object_id
             ORDER BY created_at ASC
         ) - 1 AS version_index,
-        count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-        if(version_index + 1 = version_count, 1, 0) AS is_latest
+        count(*) OVER (
+            PARTITION BY project_id, kind, object_id
+        ) as version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+        ) AS row_num,
+        if (row_num = 1, 1, 0) AS is_latest
     FROM (
         SELECT
             project_id,
             object_id,
             created_at,
+            deleted_at,
             kind,
             base_object_class,
             refs,
             digest,
+            wb_user_id,
             if (kind = 'op', 1, 0) AS is_op,
             row_number() OVER (
                 PARTITION BY project_id,

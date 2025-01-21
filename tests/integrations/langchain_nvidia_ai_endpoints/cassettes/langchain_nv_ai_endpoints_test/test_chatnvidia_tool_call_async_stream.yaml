@@ -26,14 +26,14 @@ interactions:
     uri: https://integrate.api.nvidia.com/v1/chat/completions
   response:
     body:
-      string: 'data: {"id":"chat-43c44c15b2274e9e94fec57c04543f80","object":"chat.completion.chunk","created":1734992511,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":318,"completion_tokens":0}}
+      string: 'data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":318,"completion_tokens":0}}
 
 
-        data: {"id":"chat-43c44c15b2274e9e94fec57c04543f80","object":"chat.completion.chunk","created":1734992511,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":null,"tool_calls":[{"id":"chatcmpl-tool-df3daa09595c462297a7253930e4d915","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
-        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 183}"},"index":0}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
+        data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"delta":{"role":null,"content":null,"tool_calls":[{"id":"chatcmpl-tool-110e54e033b14f4da0cc49b633141568","type":"function","function":{"name":"cricket_player_names","arguments":"{\"name\":
+        \"Virat Kohli\", \"team:\": \"India\", \"highest_score\": 254}"},"index":0}]},"logprobs":null,"finish_reason":"tool_calls","stop_reason":null}],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
 
 
-        data: {"id":"chat-43c44c15b2274e9e94fec57c04543f80","object":"chat.completion.chunk","created":1734992511,"model":"meta/llama-3.1-8b-instruct","choices":[],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
+        data: {"id":"chat-b3afc3517360412dac604a174b1ed0ce","object":"chat.completion.chunk","created":1735929363,"model":"meta/llama-3.1-8b-instruct","choices":[],"usage":{"prompt_tokens":318,"total_tokens":348,"completion_tokens":30}}
 
 
         data: [DONE]
@@ -50,9 +50,9 @@ interactions:
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Mon, 23 Dec 2024 22:21:51 GMT
+      - Fri, 03 Jan 2025 18:36:03 GMT
       Nvcf-Reqid:
-      - 43d997a5-3e0a-485d-9567-e16813f1b183
+      - c302f2c3-bcf2-452b-89e9-ac7cffaa7f60
       Nvcf-Status:
       - fulfilled
       Server:

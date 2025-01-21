@@ -7,7 +7,7 @@
  */
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
-export type EvaluationComparisonData = {
+export type EvaluationComparisonSummary = {
   // Entity and Project are constant across all calls
   entity: string;
   project: string;
@@ -23,16 +23,25 @@ export type EvaluationComparisonData = {
     [callId: string]: EvaluationCall;
   };
 
+  // Models are the Weave Objects used to define the model logic and properties.
+  models: {
+    [modelRef: string]: ModelObj | null;
+  };
+
+  // ScoreMetrics define the metrics that are associated on each individual prediction
+  scoreMetrics: MetricDefinitionMap;
+
+  // SummaryMetrics define the metrics that are associated with the evaluation as a whole
+  // often aggregated from the scoreMetrics.
+  summaryMetrics: MetricDefinitionMap;
+};
+
+export type EvaluationComparisonResults = {
   // Inputs are the intersection of all inputs used in the evaluations.
   // Note, we are able to "merge" the same input digest even if it is
   // used in different evaluations.
   inputs: {
     [rowDigest: string]: DatasetRow;
-  };
-
-  // Models are the Weave Objects used to define the model logic and properties.
-  models: {
-    [modelRef: string]: ModelObj;
   };
 
   // ResultRows are the actual results of running the evaluation against
@@ -54,15 +63,7 @@ export type EvaluationComparisonData = {
       };
     };
   };
-
-  // ScoreMetrics define the metrics that are associated on each individual prediction
-  scoreMetrics: MetricDefinitionMap;
-
-  // SummaryMetrics define the metrics that are associated with the evaluation as a whole
-  // often aggregated from the scoreMetrics.
-  summaryMetrics: MetricDefinitionMap;
 };
-
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
  */
@@ -84,6 +85,7 @@ export type EvaluationCall = {
   name: string;
   color: string;
   summaryMetrics: MetricResultMap;
+  traceId: string;
 };
 
 /**

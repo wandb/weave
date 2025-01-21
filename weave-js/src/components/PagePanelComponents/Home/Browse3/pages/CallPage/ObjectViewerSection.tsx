@@ -174,6 +174,9 @@ const ObjectViewerSectionNonEmpty = ({
 
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
+    if (mode === 'hidden' || mode === 'json') {
+      return;
+    }
     const isSimple = isSimpleData(data);
     const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
     if (newMode === 'expanded') {
@@ -189,14 +192,14 @@ const ObjectViewerSectionNonEmpty = ({
       <TitleRow>
         <Title>{title}</Title>
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="row-height-small"
           active={mode === 'collapsed'}
           onClick={onClickCollapsed}
           tooltip="View collapsed"
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
@@ -207,7 +210,7 @@ const ObjectViewerSectionNonEmpty = ({
           }
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="code-alt"
           active={mode === 'json'}
           onClick={() => setMode('json')}
@@ -215,7 +218,7 @@ const ObjectViewerSectionNonEmpty = ({
         />
         {!noHide && (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon="hide-hidden"
             active={mode === 'hidden'}
             onClick={() => setMode('hidden')}

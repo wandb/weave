@@ -529,28 +529,24 @@ function makeCodeText(
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
   includeFeedback: boolean
 ) {
-  let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
-  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
-  codeStr += `   "project_id": "${entity}/${project}",\n`;
-
+  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
+  codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
-      '", "'
-    )}"]},\n`;
+    codeStr += `   filter={"call_ids": ["${filteredCallIds.join('", "')}"]},\n`;
     if (expandColumns.length > 0) {
       const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-      codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+      codeStr += `   expand_columns=${expandColumnsStr},\n`;
     }
     if (includeFeedback) {
-      codeStr += `   "include_feedback": true,\n`;
+      codeStr += `   include_feedback=True,\n`;
     }
     // specifying call_ids ignores other filters, return early
     codeStr += `})`;
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
-    codeStr += `   "filter": {`;
+    codeStr += `    filter={`;
     if (filter.opVersionRefs) {
       codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
     }
@@ -573,21 +569,21 @@ function makeCodeText(
     codeStr += `},\n`;
   }
   if (query) {
-    codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
+    codeStr += `    query=${JSON.stringify(query, null, 0)},\n`;
   }
   if (expandColumns.length > 0) {
     const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-    codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+    codeStr += `    expand_columns=${expandColumnsStr},\n`;
   }
 
   if (sortBy.length > 0) {
-    codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+    codeStr += `    sort_by=${JSON.stringify(sortBy, null, 0)},\n`;
   }
   if (includeFeedback) {
-    codeStr += `   "include_feedback": True,\n`;
+    codeStr += `    include_feedback=True,\n`;
   }
 
-  codeStr += `})`;
+  codeStr += `)`;
 
   return codeStr;
 }
@@ -668,7 +664,7 @@ export const PaginationButtons = () => {
   return (
     <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handlePrevPage}
         disabled={page === 0}
@@ -688,7 +684,7 @@ export const PaginationButtons = () => {
         {start}-{end} of {rowCount}
       </Box>
       <Button
-        variant="quiet"
+        variant="ghost"
         size="medium"
         onClick={handleNextPage}
         disabled={page >= pageCount - 1}
