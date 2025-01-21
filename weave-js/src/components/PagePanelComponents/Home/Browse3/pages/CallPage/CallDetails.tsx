@@ -6,7 +6,11 @@ import styled from 'styled-components';
 
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
-import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  useWeaveflowRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
 import {CallLink} from '../common/Links';
@@ -107,7 +111,7 @@ export const CallDetails: FC<{
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
   );
-  const {baseRouter} = useWeaveflowRouteContext();
+  const baseRouter = useWeaveflowCurrentRouteContext();
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();
 
