@@ -16,8 +16,8 @@ import React, {
 import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
-import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
+import {WFHighLevelObjectVersionFilter} from './pages/ObjectsPage/objectsPageTypes';
+import {WFHighLevelOpVersionFilter} from './pages/OpsPage/opsPageTypes';
 import {useURLSearchParamsDict} from './pages/util';
 import {
   AWL_ROW_EDGE_NAME,

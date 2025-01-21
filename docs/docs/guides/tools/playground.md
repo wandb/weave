@@ -24,6 +24,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
 - [Retry, edit, and delete messages](#retry-edit-and-delete-messages)
 - [Add a new message](#add-a-new-message)
 - [Compare LLMs](#compare-llms)
+- [Adjust the number of trials](#adjust-the-number-of-trials)
 
 ## Prerequisites
 
@@ -222,3 +223,10 @@ Playground allows you to compare LLMs. To perform a comparison, do the following
    - [Adjust parameters](#adjust-llm-parameters)
    - [Add functions](#add-a-function)
 3. In the message box, enter a message that you want to test with both models and press **Send**.
+
+## Adjust the number of trials
+
+Playground allows you to generate multiple outputs for the same input by setting the number of trials. The default setting is `1`. To adjust the number of trials, do the following:
+
+1. In the Playground UI, open the settings sidebar if it is not already open.
+2. Adjust the **Number of trials**.

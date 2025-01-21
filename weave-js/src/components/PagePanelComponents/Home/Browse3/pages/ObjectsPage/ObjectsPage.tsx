@@ -1,7 +1,7 @@
 import React, {useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowCurrentRouteContext} from '../context';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 
 export const ObjectsPage: React.FC<{
   entity: string;

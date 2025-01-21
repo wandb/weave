@@ -22,7 +22,7 @@ aiohttp>=3.8.3
 aiofiles>=22.1.0
 aioprocessing>=2.0.1
 Werkzeug>=3.0.3  # CVE 2024-34069
-janus>=1.0.0
+janus==1.0.0 # 1.2.0 breaks ThreadQueue unit tests and possibly ThreadQueue
 
 # we use this for logger, could probably skip it
 python-json-logger>=2.0.4
@@ -31,7 +31,7 @@ python-json-logger>=2.0.4
 numpy>=1.21
 
 # required for wandb
-wandb>=0.16.4
+wandb>=0.19.2
 graphql-core>3
 gql[requests]>=3.4.1
 # TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not 
