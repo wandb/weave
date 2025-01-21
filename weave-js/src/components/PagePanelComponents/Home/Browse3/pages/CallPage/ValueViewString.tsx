@@ -208,7 +208,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     );
   }
   return (
-    <Collapsed hasScrolling onClick={onClick}>
+    <Collapsed hasScrolling={hasScrolling || isExpanded} onClick={onClick}>
       {content}
     </Collapsed>
   );
