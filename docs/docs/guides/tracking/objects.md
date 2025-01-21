@@ -58,7 +58,7 @@ Saving an object with a name will create the first version of that object if it 
   </TabItem>
 </Tabs>
 
-### Deleting an object
+## Deleting an object
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>

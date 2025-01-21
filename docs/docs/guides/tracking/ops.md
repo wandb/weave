@@ -157,7 +157,7 @@ If you want to suppress the printing of call links during logging, you can set t
 export WEAVE_PRINT_CALL_LINK=false
 ```
 
-### Deleting an op
+## Deleting an op
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
