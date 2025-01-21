@@ -2,7 +2,7 @@
 
 > **The LLM Playground is currently in preview.**
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports OpenAI, Anthropic, Gemini, and Groq.
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With [numerous supported providers](#select-an-llm), prompt editing, message retrying, and model comparison, Playground allows you to quickly test and improve your LLM applications. 
 
 ## Features
 
