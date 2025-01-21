@@ -108,6 +108,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/cohere",
             "guides/integrations/mistral",
             "guides/integrations/azure",
+            "guides/integrations/bedrock",
             "guides/integrations/google-gemini",
             "guides/integrations/together_ai",
             "guides/integrations/groq",

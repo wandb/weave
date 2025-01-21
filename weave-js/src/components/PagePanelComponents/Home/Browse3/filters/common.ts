@@ -75,64 +75,108 @@ export const getFieldType = (field: string): string => {
   return FIELD_TYPE[field] ?? 'text';
 };
 
-const allOperators = [
+export type OperatorGroup = 'string' | 'number' | 'boolean' | 'date' | 'any';
+export type SelectOperatorOption = {
+  label: string;
+  value: string;
+  group: OperatorGroup;
+};
+
+const allOperators: SelectOperatorOption[] = [
   {
     value: '(string): contains',
     label: 'contains',
+    group: 'string',
   },
   {
     value: '(string): equals',
     label: 'equals',
+    group: 'string',
   },
   {
     value: '(string): in',
     label: 'in',
+    group: 'string',
   },
   {
     value: '(number): =',
     label: '=',
+    group: 'number',
   },
   {
     value: '(number): !=',
     label: '≠',
+    group: 'number',
   },
   {
     value: '(number): <',
     label: '<',
+    group: 'number',
   },
   {
     value: '(number): <=',
     label: '≤',
+    group: 'number',
   },
   {
     value: '(number): >',
     label: '>',
+    group: 'number',
   },
   {
     value: '(number): >=',
     label: '≥',
+    group: 'number',
   },
   {
     value: '(bool): is',
     label: 'is',
+    group: 'boolean',
   },
   {
     value: '(date): after',
     label: 'after',
+    group: 'date',
   },
   {
     value: '(date): before',
     label: 'before',
+    group: 'date',
   },
   {
     value: '(any): isEmpty',
     label: 'is empty',
+    group: 'any',
   },
   {
     value: '(any): isNotEmpty',
     label: 'is not empty',
+    group: 'any',
   },
 ];
+
+// Display labels
+const GROUP_LABELS: Record<OperatorGroup, string> = {
+  string: 'Text',
+  number: 'Number',
+  boolean: 'Boolean',
+  date: 'Date',
+  any: 'Other',
+};
+
+export function getGroupedOperatorOptions(
+  field: string
+): OperatorGroupedOption[] {
+  // Get operators / operator groups
+  const availableOperators = getOperatorOptions(field);
+  const groups = [...new Set(availableOperators.map(op => op.group))];
+  // Create grouped options
+  return groups.map(group => ({
+    label: GROUP_LABELS[group],
+    options: availableOperators.filter(op => op.group === group),
+  }));
+}
+
 const operatorLabels: Record<string, string> = allOperators.reduce(
   (acc, operator) => {
     acc[operator.value] = operator.label;
@@ -149,11 +193,6 @@ export const isValuelessOperator = (operator: string) => {
 
 export const isNumericOperator = (operator: string) => {
   return operator.startsWith('(number):');
-};
-
-export type SelectOperatorOption = {
-  value: string;
-  label: string;
 };
 
 export const getOperatorLabel = (operatorValue: string): string => {
@@ -184,10 +223,12 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
       },
       {
         value: '(string): in',
         label: 'in',
+        group: 'string',
       },
     ];
   }
@@ -196,10 +237,12 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(date): after',
         label: 'after',
+        group: 'date',
       },
       {
         value: '(date): before',
         label: 'before',
+        group: 'date',
       },
     ];
   }
@@ -208,10 +251,12 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: 'is',
         label: 'is',
+        group: 'boolean',
       },
       {
         value: 'is not',
         label: 'is not',
+        group: 'boolean',
       },
     ];
   }
@@ -220,6 +265,7 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
       },
     ];
   }
@@ -311,4 +357,9 @@ export const upsertFilter = (
     ...model,
     items,
   };
+};
+
+export type OperatorGroupedOption = {
+  label: string;
+  options: SelectOperatorOption[];
 };
