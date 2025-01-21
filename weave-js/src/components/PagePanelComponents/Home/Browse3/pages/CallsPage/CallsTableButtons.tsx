@@ -648,7 +648,11 @@ type PageSizeOption = {
   readonly label: string;
 };
 
-export const PaginationButtons = () => {
+type PaginationButtonsProps = {
+  hideControls?: boolean;
+};
+
+export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
@@ -719,25 +723,29 @@ export const PaginationButtons = () => {
           icon="chevron-next"
         />
       </Box>
-      <Box
-        sx={{
-          fontSize: '14px',
-          fontWeight: '400',
-          color: MOON_500,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-        Per page:
-        <Select<PageSizeOption>
-          size="small"
-          menuPlacement="top"
-          options={pageSizeOptions}
-          value={pageSizeValue}
-          isSearchable={false}
-          onChange={onPageSizeChange}
-        />
-      </Box>
+      {hideControls ? null : (
+        <Box
+          sx={{
+            fontSize: '14px',
+            fontWeight: '400',
+            color: MOON_500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            // Regrettable hack to appear over Material scrollbar's z-index of 6.
+            zIndex: 7,
+          }}>
+          Per page:
+          <Select<PageSizeOption>
+            size="small"
+            menuPlacement="top"
+            options={pageSizeOptions}
+            value={pageSizeValue}
+            isSearchable={false}
+            onChange={onPageSizeChange}
+          />
+        </Box>
+      )}
     </Box>
   );
 };
