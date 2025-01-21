@@ -127,9 +127,13 @@ const ObjectViewerSectionNonEmpty = ({
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState<Mode>('collapsed');
+  const [isViewerHidden, setIsViewerHidden] = useState(false);
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
+    if (isViewerHidden) {
+      return null;
+    }
     if (isModeCollapsedOrExpanded(mode)) {
       return (
         <ObjectViewer
@@ -153,7 +157,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [mode, apiRef, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds, isViewerHidden]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -220,41 +224,44 @@ const ObjectViewerSectionNonEmpty = ({
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
-        <Title
-          onClick={() => setMode(isModeHidden(mode) ? 'collapsed' : 'hidden')}>
+        <Title onClick={() => setIsViewerHidden(!isViewerHidden)}>
           <Icon
-            name={isModeHidden(mode) ? 'chevron-next' : 'chevron-down'}
+            name={isViewerHidden ? 'chevron-next' : 'chevron-down'}
             width={16}
             height={16}
             style={{marginRight: '8px'}}
           />
           {title}
         </Title>
-        <Button
-          variant="ghost"
-          icon="collapse"
-          onClick={onClickCollapsed}
-          tooltip="Collapse all"
-          active={isModeCollapsed(mode)}
-        />
-        <Button
-          variant="ghost"
-          icon="expand-uncollapse"
-          onClick={onClickExpanded}
-          tooltip={
-            isExpandAllSmall
-              ? 'Expand all'
-              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
-          }
-          active={isModeExpanded(mode)}
-        />
-        <Button
-          variant="ghost"
-          icon="code-alt"
-          active={isModeJson(mode)}
-          onClick={() => setMode('json')}
-          tooltip="View as JSON"
-        />
+        {!isViewerHidden && (
+          <>
+            <Button
+              variant="ghost"
+              icon="collapse"
+              onClick={onClickCollapsed}
+              tooltip="Collapse all"
+              active={isModeCollapsed(mode)}
+            />
+            <Button
+              variant="ghost"
+              icon="expand-uncollapse"
+              onClick={onClickExpanded}
+              tooltip={
+                isExpandAllSmall
+                  ? 'Expand all'
+                  : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+              }
+              active={isModeExpanded(mode)}
+            />
+            <Button
+              variant="ghost"
+              icon="code-alt"
+              active={isModeJson(mode)}
+              onClick={() => setMode('json')}
+              tooltip="View as JSON"
+            />
+          </>
+        )}
       </TitleRow>
       {body}
     </Box>
