@@ -6,15 +6,18 @@ slug: /
 
 Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
 
-- **Track:** Log and analyze LLM application inputs and outputs for debugging and further analysis.
-- **Experiment:** Test and compare models, prompts, inputs, and outputs.
-- **Evaluate:** Track costs, score and annotate model inputs and outputs, and systematically evaluate your application.
-- **Deploy:** Implement safety guardrails such as content moderation or access control, and monitor production systems.
-- **Iterate:** Systematically refine and enhance your application.
+- **Tracing & Monitoring**: [Track your application from input to output](./guides/tracking/) to debug and analyze production systems.
+- **Systematic Iteration**: Refine and iterate on [prompts](./guides/core-types/prompts.md), [datasets](./guides/core-types/datasets.md), and [models](./guides/core-types/models.md).
+- **Experimentation**: Experiment with different models and prompts in the [LLM Playground](./guides/tools/playground.md). 
+- **Evaluation**: Use [pre-built scorers](./guides/evaluation/scorers#predefined-scorers), [object comparison](./guides/tools/comparison.md), and LLM  tools to systematically assess and enhance application performance.
+- **Guardrails**: Protect your application with [pre- and post-safeguards](./guides/evaluation/guardrails_and_monitors.md) for content moderation, prompt safety, and more.
 
-You can interact programmatically with Weave via a [Python SDK](./reference/python-sdk/weave/index.md), [TypeScript SDK](./reference/typescript-sdk/weave/README.md), or the Service API.
+Integrate Weave with your existing development stack via the:
+- [Python SDK](./reference/python-sdk/weave/index.md)
+- [TypeScript SDK](./reference/typescript-sdk/weave/README.md)
+- [Service API](./reference/service-api/call-start-call-start-post)
 
-Weave [integrates](./guides/integrations/index.md) with numerous popular LLM providers, local models, frameworks, and third-party services.
+Weave supports [numerous LLM providers, local models, frameworks, and third-party services](./guides/integrations/index.md).
 
 ## Get started
 
