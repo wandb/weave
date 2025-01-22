@@ -14,12 +14,14 @@ import weave
 # This uniq id ensures that the op is not cached
 uniq_id = datetime.datetime.now().timestamp()
 
+
 @weave.op
 def func(a: int) -> int:
     return a + uniq_id
 
+
 def main() -> None:
-    client = weave.init('test-project')
+    client = weave.init("test-project")
     res = func(42)
 
     client._flush()
@@ -27,7 +29,7 @@ def main() -> None:
 
     assert len(calls) == 1
     assert calls[0].output == res
-    assert calls[0].inputs == {'a': 42}
+    assert calls[0].inputs == {"a": 42}
 
 
 if __name__ == "__main__":
