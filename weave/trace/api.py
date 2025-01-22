@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -27,9 +27,6 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace_server.interface.builtin_object_classes import leaderboard
-
-if TYPE_CHECKING:
-    from weave.flow.obj import Object
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -180,11 +177,11 @@ def _publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     return ref
 
 
-def delete(obj: Object | ObjectRef) -> None:
+def delete(obj: Any) -> None:
     import weave
 
     if not isinstance(obj, (weave.Object, weave.ObjectRef)):
-        raise ValueError("Expected an Object or ObjectRef")  # noqa: TRY004
+        raise TypeError("Expected an Object or ObjectRef")
 
     obj.delete()
 
@@ -337,4 +334,5 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "delete",
 ]

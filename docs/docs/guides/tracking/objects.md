@@ -10,12 +10,25 @@ Weave's serialization layer saves and versions objects.
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
+    To save an object, call `weave.publish` with the object and a name.
+
     ```python
     import weave
     # Initialize tracking to the project 'intro-example'
     weave.init('intro-example')
     # Save a list, giving it the name 'cat-names'
     weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
+    ```
+
+    For builtin weave objects, you can also save in an object-oriented way:
+
+    ```python
+    import weave
+
+    weave.init('intro-example')
+
+    ds = weave.Dataset(rows=[{'x': 1, 'y': 2}, {'x': 3, 'y': 4}])
+    ds.save('my-dataset')
     ```
 
   </TabItem>
@@ -62,7 +75,16 @@ Saving an object with a name will create the first version of that object if it 
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    To delete a version of an object, call `.delete()` on the object ref.
+
+    To delete a version of an object, call `.delete()` on the object :
+
+    ```python
+    weave.init('intro-example')
+    cat_names = weave.ref('cat-names:v1').get()
+    cat_names.delete()
+    ```
+
+    You can also delete directly via the ref:
 
     ```python
     weave.init('intro-example')
