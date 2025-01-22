@@ -4,10 +4,10 @@ import React, {useEffect} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
+import {SliderKeyboardOperation} from '../../util/media';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
-import {SliderKeyboardOperation} from '../../util/media';
 
 export interface SliderInputProps {
   min: number;
@@ -132,7 +132,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
       return () => {
         document.removeEventListener('keydown', stepKeyboardListener, true);
       };
-    }, [keyboardBindings]);
+    }, []);
 
     React.useEffect(() => {
       if (value != null) {
