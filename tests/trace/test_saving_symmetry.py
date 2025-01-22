@@ -1,7 +1,7 @@
 from copy import deepcopy
-from typing import Self
 
 import pytest
+from typing_extensions import Self
 
 import weave
 from weave.trace.objectify import register_object
