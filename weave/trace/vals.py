@@ -345,15 +345,18 @@ class WeaveTable(Traceable):
             return self._known_length
 
         # Condition 1: we already have all the rows in memory
+        if self._prefetched_rows is not None:
+            self._known_length = len(self._prefetched_rows)
+            return self._known_length
+
+        # Condition 2: we have the row digests and they are a list
         if (
             self.table_ref is not None
             and self.table_ref._row_digests is not None
-            and self._prefetched_rows is not None
             and isinstance(self.table_ref._row_digests, list)
         ):
-            if len(self._prefetched_rows) == len(self.table_ref._row_digests):
-                self._known_length = len(self._prefetched_rows)
-                return self._known_length
+            self._known_length = len(self.table_ref._row_digests)
+            return self._known_length
 
         # Condition 2: We don't know the length, in which case we can get it from the server
         if self.table_ref is not None:
