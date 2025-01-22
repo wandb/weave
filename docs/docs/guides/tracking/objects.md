@@ -20,7 +20,7 @@ Weave's serialization layer saves and versions objects.
     weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
     ```
 
-    For builtin weave objects, you can also save in an object-oriented way:
+    For builtin weave objects, you can also publish in an object-oriented way:
 
     ```python
     import weave
@@ -28,7 +28,7 @@ Weave's serialization layer saves and versions objects.
     weave.init('intro-example')
 
     ds = weave.Dataset(rows=[{'x': 1, 'y': 2}, {'x': 3, 'y': 4}])
-    ds.save('my-dataset')
+    ds.publish('my-dataset')
     ```
 
   </TabItem>
