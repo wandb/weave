@@ -22,6 +22,8 @@ from typing import Any, Callable, Optional
 _patched = False
 _original_methods: dict[str, Optional[Callable]] = {"load": None}
 _new_lock_lock = threading.Lock()
+# Global fallback lock for thread-safe image loading when per-instance locking fails
+_fallback_load_lock = threading.Lock()
 
 
 def apply_threadsafe_patch_to_pil_image() -> None:
@@ -57,7 +59,6 @@ def _apply_threadsafe_patch() -> None:
 
         # We use a per-instance lock to allow concurrent loading of different images
         # while preventing concurrent access to the same image.
-        lock = None
         try:
             # Create a new lock for this ImageFile instance if it doesn't exist.
             # The lock creation itself needs to be thread-safe, hence _new_lock_lock.
@@ -72,16 +73,11 @@ def _apply_threadsafe_patch() -> None:
                     if not hasattr(self, "_weave_load_lock"):
                         setattr(self, "_weave_load_lock", threading.Lock())
             lock = getattr(self, "_weave_load_lock")
+
         except Exception:
-            # If we fail to create/get the lock (e.g., due to a frozen/immutable object),
-            # fall back to the original unprotected load method
-            return old_load(self, *args, **kwargs)
-
-        if lock is None:
-            # Defensive programming: if lock is somehow None despite our efforts,
-            # fall back to the original method
-            return old_load(self, *args, **kwargs)
-
+            # If anything goes wrong with the locking mechanism,
+            # fall back to the global lock for safety
+            lock = _fallback_load_lock
         # Acquire the instance-specific lock before loading the image.
         # This ensures thread-safety by preventing concurrent:
         # - Modification of the 'im' property
@@ -89,6 +85,7 @@ def _apply_threadsafe_patch() -> None:
         with lock:
             return old_load(self, *args, **kwargs)
 
+    # Replace the load method with our thread-safe version
     ImageFile.load = new_load  # type: ignore
 
 
