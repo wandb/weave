@@ -3,12 +3,12 @@
 This page provides solutions and guidance for common issues you may encounter. As we continue to expand this guide, more troubleshooting topics will be added to address a broader range of scenarios.
 
 :::tip
-Do you have Weave troubleshooting advice to share with the community?  Click **Edit this page** at the bottom of this guide to contribute directly by submitting a pull request.
+Do you have Weave troubleshooting advice to share with the community? Click **Edit this page** at the bottom of this guide to contribute directly by submitting a pull request.
 :::
 
 ## Trace pages load slowly
 
-If trace pages are loading slowly,  reduce the number of rows displayed to improve load time. You can either reduce the number of rows via the UI, or using query parameters.
+If trace pages are loading slowly, reduce the number of rows displayed to improve load time. You can either reduce the number of rows via the UI, or using query parameters.
 
 ### Adjust via the UI (recommended)
 
