@@ -322,8 +322,8 @@ class WeaveTable(Traceable):
         # problem arising from a remote table clashing with the need to feel like
         # a local list.
         if not isinstance(self.rows, list):
-            self.rows = list(self.rows)
-        return self.rows
+            self._rows = list(iter(self.rows))
+        return typing.cast(list[dict], self.rows)
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
         """Sets the rows to a local cache of rows that can be used to

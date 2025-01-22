@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from threading import Lock
-from typing import TypeVar, overload
+from typing import Any, TypeVar, overload
 
 T = TypeVar("T")
 
 
-class ThreadSafeInMemoryIteratorAsSequence(Sequence[T]):
+class ThreadSafeInMemoryIteratorAsSequence(Sequence[T], Iterable[T]):
     """
     Provides a thread-safe, sequence-like interface to an iterator by caching results in memory.
 
@@ -129,3 +129,14 @@ class ThreadSafeInMemoryIteratorAsSequence(Sequence[T]):
                     i += 1
 
         return _iter()
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Sequence):
+            return False
+        if len(self) != len(other):
+            return False
+        self._seek_to_end()
+        for a, b in zip(self._list, other):
+            if a != b:
+                return False
+        return True
