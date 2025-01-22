@@ -289,6 +289,11 @@ def test_scorer_name_sanitization(scorer_name):
 
 
 def test_evaluate_table_lazy_iter(client):
+    """
+    The intention of this test is to show that an evaluation harness
+    lazily fetches rows from a table rather than eagerly fetching all
+    rows up front.
+    """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     ref = weave.publish(dataset)
     dataset = ref.get()

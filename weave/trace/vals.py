@@ -313,10 +313,14 @@ class WeaveTable(Traceable):
         self._rows = value
         self._mark_dirty()
 
-    def _ensure_rows_are_local_list(self) -> list[dict]:
-        # Any uses of this are signs of a design problem arising
-        # from a remote table clashing with the need to feel like a
-        # local list.
+    def _inefficiently_materialize_rows_as_list(self) -> list[dict]:
+        # This method is named `inefficiently` to warn callers that
+        # it should be avoided. We have this nasty paradigm where sometimes
+        # a WeaveTable needs to act like a list, but it is actually a remote
+        # table. This method will force iteration through the remote data
+        # and materialize it into a list. Any uses of this are signs of a design
+        # problem arising from a remote table clashing with the need to feel like
+        # a local list.
         if not isinstance(self.rows, list):
             self.rows = list(self.rows)
         return self.rows
@@ -356,7 +360,10 @@ class WeaveTable(Traceable):
             self._known_length = self._fetch_remote_length()
             return self._known_length
 
-        rows_as_list = self._ensure_rows_are_local_list()
+        # Finally, if we have no table ref, we can still get the length
+        # by materializing the rows as a list. I actually think this
+        # can never happen, but it is here for completeness.
+        rows_as_list = self._inefficiently_materialize_rows_as_list()
         return len(rows_as_list)
 
     def _fetch_remote_length(self) -> int:
@@ -477,9 +484,10 @@ class WeaveTable(Traceable):
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        # TODO: we should have a better caching strategy that allows
-        # partial iteration over the table.
-        rows = self._ensure_rows_are_local_list()
+        # TODO: ideally we would have some sort of intelligent
+        # LRU style caching that allows us to minimize materialization
+        # of the rows as a list.
+        rows = self._inefficiently_materialize_rows_as_list()
 
         if isinstance(key, (int, slice)):
             return rows[key]
@@ -494,14 +502,14 @@ class WeaveTable(Traceable):
         return iter(self.rows)
 
     def append(self, val: dict) -> None:
-        rows = self._ensure_rows_are_local_list()
+        rows = self._inefficiently_materialize_rows_as_list()
         if not isinstance(val, dict):
             raise TypeError("Can only append dicts to tables")
         self._mark_dirty()
         rows.append(val)
 
     def pop(self, index: int) -> None:
-        rows = self._ensure_rows_are_local_list()
+        rows = self._inefficiently_materialize_rows_as_list()
         self._mark_dirty()
         rows.pop(index)
 

@@ -37,6 +37,10 @@ def test_pythonic_access(client):
 
 
 def test_dataset_laziness(client):
+    """
+    The intention of this test is to show that local construction of
+    a dataset does not trigger any remote operations.
+    """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
@@ -60,6 +64,12 @@ def test_dataset_laziness(client):
 
 
 def test_published_dataset_laziness(client):
+    """
+    The intention of this test is to show that publishing a dataset,
+    then iterating through the "gotten" version of the dataset has
+    minimal remote operations - and importantly delays the fetching
+    of the rows until they are actually needed.
+    """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
@@ -89,6 +99,13 @@ def test_published_dataset_laziness(client):
     i = 0
     for row in dataset:
         log = client.server.attribute_access_log
+        # This is the critical part of the test - ensuring that
+        # the rows are only fetched when they are actually needed.
+        #
+        # In a future improvement, we might eagerly fetch the next
+        # page of results, which would result in this assertion changing
+        # in that there would always be one more "table_query" than
+        # the number of pages.
         assert [l for l in log if not l.startswith("_")] == ["table_query"] * (
             (i // 100) + 1
         )
