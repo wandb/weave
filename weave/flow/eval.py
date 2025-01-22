@@ -321,22 +321,22 @@ class Evaluation(Object):
         return summary
 
     def get_evaluation_results(self) -> dict[str, CallsIter]:
-        # TODO: When refs are available on the Eval object, narrow to just the current
-        # version of evaluation, not all as currently implemented
-
         if not self.evaluate.ref:
             raise ValueError(
                 "Evaluation must be run or published before calling get_evaluation_results"
             )
 
+        res = {}
         eval_calls = self.evaluate.calls()
         wc = weave_client_context.require_weave_client()
-        return {
-            cast(str, call.display_name): wc.get_calls(
-                CallsFilter(parent_ids=[call.id])
-            )
-            for call in eval_calls
-        }
+        for call in eval_calls:
+            if call.display_name and isinstance(call.display_name, str):
+                res[call.display_name] = wc.get_calls(
+                    filter=CallsFilter(
+                        parent_ids=[call.id], input_refs=[self.ref.uri()]
+                    )
+                )
+        return res
 
 
 def evaluate(

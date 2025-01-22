@@ -813,9 +813,9 @@ async def test_evaluation_with_column_map():
 
     # The expected summary should show that 3 out of 4 predictions matched
     expected_results = {"true_count": 3, "true_fraction": 0.75}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results
-    ), "The summary should reflect the correct number of matches"
+    assert eval_out["DummyScorer"]["match"] == expected_results, (
+        "The summary should reflect the correct number of matches"
+    )
 
 
 @pytest.mark.asyncio
@@ -918,9 +918,9 @@ async def test_evaluation_with_multiple_column_maps():
 
     # Assertions for the first scorer
     expected_results_dummy = {"true_count": 1, "true_fraction": 1.0 / 3}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results_dummy
-    ), "All concatenations should match the target"
+    assert eval_out["DummyScorer"]["match"] == expected_results_dummy, (
+        "All concatenations should match the target"
+    )
 
     # Assertions for the second scorer
     # Since input1 == col2, and output is col1 + col2, we check if col2 == (col1 + col2)[::-1]
@@ -930,9 +930,9 @@ async def test_evaluation_with_multiple_column_maps():
     # Third row: col2 = "zyx", output = "xyzzyx", output[::-1] = "xyzzyx" -> "zyx" == "xyzzyx" is False
     # So all matches are False
     expected_results_another_dummy = {"true_count": 0, "true_fraction": 0.0}
-    assert (
-        eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy
-    ), "No matches should be found for AnotherDummyScorer"
+    assert eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy, (
+        "No matches should be found for AnotherDummyScorer"
+    )
 
 
 @pytest.mark.asyncio
@@ -1053,3 +1053,15 @@ async def test_evaluation_with_custom_name(client):
 
     call = calls[0]
     assert call.display_name == "wow-custom!"
+
+
+# @pytest.mark.asyncio
+# async def test_get_evaluation_results(client):
+#     @weave.op
+#     def model(a: int, b: int) -> int:
+#         return a + b
+
+#     ev = weave.Evaluation(dataset=[{"a": 1, "b": 2}])
+#     await ev.evaluate(model)
+#     await ev.evaluate(model)
+#     assert len(ev.get_evaluation_results()) == 1
