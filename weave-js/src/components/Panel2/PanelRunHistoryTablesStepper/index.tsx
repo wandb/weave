@@ -1,0 +1,197 @@
+import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {
+  constFunction,
+  constNumber,
+  constString,
+  isAssignableTo,
+  list,
+  listObjectType,
+  maybe,
+  opDict,
+  opFileTable,
+  opIndex,
+  opMap,
+  opPick,
+  opRunHistory,
+  opTableRows,
+  Type,
+  typedDict,
+  typedDictPropertyTypes,
+} from '@wandb/weave/core';
+import React, {useEffect, useState} from 'react';
+
+import {useNodeValue, useNodeWithServerType} from '../../../react';
+import * as ControlPageStyles from '../ControlPage.styles';
+import * as Panel2 from '../panel';
+import {PanelComp2} from '../PanelComp';
+import {TableSpec} from '../PanelTable/PanelTable';
+
+const CUSTOM_TABLE_TYPE = {
+  type: 'file' as const,
+  wbObjectType: {type: 'table' as const, columnTypes: {}},
+};
+
+const LIST_RUNS_INPUT_TYPE = {
+  type: 'list' as const,
+  objectType: {
+    type: 'union' as const,
+    members: ['none' as const, 'run' as const],
+  },
+};
+
+type PanelRunsHistoryTablesConfigType = {
+  tableHistoryKey: string;
+  tableStep: number | null;
+};
+
+type PanelRunHistoryTablesStepperProps = Panel2.PanelConverterProps<
+  typeof LIST_RUNS_INPUT_TYPE
+  // PanelRunsHistoryTablesConfigType
+>;
+
+const getKeysFromInputType = (
+  inputNodeType?: Type,
+  config?: PanelRunsHistoryTablesConfigType
+) => {
+  if (
+    inputNodeType != null &&
+    isAssignableTo(inputNodeType, list(typedDict({})))
+  ) {
+    const typeMap = typedDictPropertyTypes(listObjectType(inputNodeType));
+    const tableKeys = Object.keys(typeMap)
+      .filter(key => {
+        return isAssignableTo(typeMap[key], maybe(CUSTOM_TABLE_TYPE));
+      })
+      .sort();
+    const value =
+      tableKeys.length > 0 &&
+      config?.tableHistoryKey != null &&
+      tableKeys.indexOf(config?.tableHistoryKey) !== -1
+        ? config.tableHistoryKey
+        : tableKeys?.[0] ?? '';
+    return {tableKeys, value};
+  }
+  return {tableKeys: [], value: ''};
+};
+
+const PanelRunHistoryTablesStepper: React.FC<
+  PanelRunHistoryTablesStepperProps
+> = props => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [steps, setSteps] = useState<number[]>([]);
+
+  const {input, config} = props;
+  const firstRun = opIndex({arr: input, index: constNumber(0)});
+  const runHistoryNode = opRunHistory({run: firstRun as any});
+  const runHistoryRefined = useNodeWithServerType(runHistoryNode);
+  const {value} = getKeysFromInputType(runHistoryRefined.result?.type);
+
+  const tableWithStepsNode = opMap({
+    arr: runHistoryRefined.result,
+    mapFn: constFunction({row: runHistoryRefined.result.type}, ({row}) =>
+      opDict({
+        _step: opPick({obj: row, key: constString('_step')}),
+        table: opPick({obj: row, key: constString(value ?? '')}),
+      })
+    ) as any,
+  });
+
+  const tableIndex = steps.indexOf(currentStep);
+  let defaultNode = null;
+  if (tableIndex !== -1) {
+    defaultNode = opTableRows({
+      table: opFileTable({
+        file: opIndex({
+          arr: opPick({
+            obj: runHistoryNode,
+            key: constString(value ?? ''),
+          }),
+          index: constNumber(tableIndex),
+        }),
+      }),
+    });
+  }
+
+  const stepsNode = opMap({
+    arr: tableWithStepsNode,
+    mapFn: constFunction({row: tableWithStepsNode.type}, ({row}) =>
+      opPick({obj: row, key: constString('_step')})
+    ),
+  });
+
+  const {result: stepsNodeResult, loading: stepsNodeLoading} = useNodeValue(
+    stepsNode,
+    {skip: steps.length > 0}
+  );
+
+  useEffect(() => {
+    if (stepsNodeResult != null) {
+      setSteps(stepsNodeResult);
+      setCurrentStep(stepsNodeResult[0]);
+    }
+  }, [stepsNodeResult, stepsNodeLoading]);
+
+  return (
+    <>
+      {defaultNode != null && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%',
+            padding: '2px',
+          }}>
+          <PanelComp2
+            input={defaultNode}
+            inputType={defaultNode.type}
+            loading={props.loading}
+            panelSpec={TableSpec}
+            configMode={false}
+            config={config}
+            context={props.context}
+            updateConfig={props.updateConfig}
+            updateContext={props.updateContext}
+            updateInput={props.updateInput}
+          />
+          {steps.length > 0 && (
+            <ControlPageStyles.ControlBar>
+              <SliderInput
+                min={steps[0]}
+                max={steps[steps.length - 1]}
+                minLabel={steps[0].toString()}
+                maxLabel={steps[steps.length - 1].toString()}
+                hasInput={true}
+                value={currentStep}
+                step={1}
+                ticks={steps}
+                onChange={setCurrentStep}
+              />
+            </ControlPageStyles.ControlBar>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
+
+export const Spec: Panel2.PanelSpec<PanelRunsHistoryTablesConfigType> = {
+  id: 'run-history-tables-stepper',
+  displayName: 'Run History Tables Stepper',
+  Component: PanelRunHistoryTablesStepper,
+  // ConfigComponent: PanelRunHistoryTablesStepperConfig,
+  inputType: LIST_RUNS_INPUT_TYPE,
+  outputType: () => ({
+    type: 'list' as const,
+    objectType: {
+      type: 'list' as const,
+      objectType: {type: 'typedDict' as const, propertyTypes: {}},
+    },
+  }),
+};
+
+Panel2.registerPanelFunction(
+  Spec.id,
+  LIST_RUNS_INPUT_TYPE,
+  Spec.equivalentTransform!
+);
