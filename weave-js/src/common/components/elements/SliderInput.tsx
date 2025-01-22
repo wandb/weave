@@ -1,6 +1,6 @@
 import classNames from 'classnames';
 import _, {isEmpty} from 'lodash';
-import React, {useEffect} from 'react';
+import React from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
@@ -80,59 +80,65 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
       [ticks, min, max, sliderValue, onChangeDebounced]
     );
 
-    const keyboardOperations = {
-      [SliderKeyboardOperation.INCREMENT]: (_: KeyboardEvent) => {
-        update(sliderValue + 1);
-      },
-      [SliderKeyboardOperation.DECREMENT]: (_: KeyboardEvent) => {
-        update(sliderValue - 1);
-      },
-    };
+    const keyboardOperations = React.useMemo(() => {
+      return {
+        [SliderKeyboardOperation.INCREMENT]: (event: KeyboardEvent) => {
+          update(sliderValue + 1);
+        },
+        [SliderKeyboardOperation.DECREMENT]: (event: KeyboardEvent) => {
+          update(sliderValue - 1);
+        },
+      };
+    }, [sliderValue, update]);
 
-    const getKeyboardOperationHandler = (op: SliderKeyboardOperation) => {
-      return keyboardOperations[op];
-    };
+    const isFormField = React.useCallback(
+      (node?: Element | null | undefined) => {
+        if (!node) {
+          return false;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tagName = node.tagName.toLowerCase();
 
-    function isFormField(node?: Element | null | undefined) {
-      if (!node) {
+          return [
+            'input',
+            'textarea',
+            'select',
+            'button',
+            'datalist',
+            'output',
+          ].includes(tagName);
+        }
+
         return false;
-      }
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const tagName = node.tagName.toLowerCase();
+      },
+      []
+    );
 
-        return [
-          'input',
-          'textarea',
-          'select',
-          'button',
-          'datalist',
-          'output',
-        ].includes(tagName);
-      }
+    const stepKeyboardListener = React.useCallback(
+      (event: KeyboardEvent) => {
+        if (isEmpty(keyboardBindings) || isFormField(document.activeElement)) {
+          return;
+        }
+        const eventKey = event.key;
+        const operation = (keyboardBindings ?? {})[eventKey];
+        if (operation && operation in keyboardOperations) {
+          const handler = keyboardOperations[operation];
+          return handler(event);
+        } else {
+          console.log(`unsupported key combination ${event}`);
+        }
+      },
+      [keyboardOperations, keyboardBindings, isFormField]
+    );
 
-      return false;
-    }
-
-    const stepKeyboardListener = (event: KeyboardEvent) => {
-      if (isEmpty(keyboardBindings) || isFormField(document.activeElement)) {
-        return;
-      }
-      const eventKey = event.key;
-      const operation = (keyboardBindings ?? {})[eventKey];
-      if (operation) {
-        const handler = getKeyboardOperationHandler(operation);
-        return handler(event);
-      }
-    };
-
-    useEffect(() => {
+    React.useEffect(() => {
       if (!isEmpty(keyboardBindings)) {
         document.addEventListener('keydown', stepKeyboardListener, true);
       }
       return () => {
         document.removeEventListener('keydown', stepKeyboardListener, true);
       };
-    }, []);
+    }, [keyboardBindings, stepKeyboardListener]);
 
     React.useEffect(() => {
       if (value != null) {
