@@ -19,7 +19,10 @@ _registry: dict[str, type[Object]] = {}
 
 
 def register_object(cls: type[T_co]) -> type[T_co]:
-    _registry[cls.__name__] = cls
+    cls_name = cls.__name__
+    if (existing_cls := _registry.get(cls_name)) is not None:
+        raise ValueError(f"Class {cls_name} already registered as {existing_cls}")
+    _registry[cls_name] = cls
     return cls
 
 
