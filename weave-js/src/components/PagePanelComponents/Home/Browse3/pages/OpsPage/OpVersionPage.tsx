@@ -73,7 +73,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entity);
 
   return (
     <SimplePageLayoutWithHeader
@@ -201,6 +201,7 @@ const DeleteOpButtonWithModal: React.FC<{
         icon="delete"
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
+        tooltip="Delete this Op version"
       />
       <DeleteModal
         open={deleteModalOpen}
