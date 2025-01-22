@@ -78,7 +78,7 @@ def test_failed_publish_maintains_old_object_ref(client, custom_object, monkeypa
     assert custom_object.ref == old_ref
 
 
-def test_saving_only_for_registered_objects(client, custom_object):
+def test_saving_only_for_registered_objects(client):
     class UnregisteredObject(weave.Object):
         a: int
         b: str
