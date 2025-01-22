@@ -117,6 +117,8 @@ def test_dataset(client):
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri()).get()
     assert list(d2.rows) == list(d2.rows)
+    assert list(d.rows) == list(d2.rows)
+    assert list(d.rows) == list(d.rows)
 
 
 def test_trace_server_call_start_and_end(client):

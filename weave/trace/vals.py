@@ -3,7 +3,7 @@ import inspect
 import logging
 import operator
 import typing
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, Union
 
@@ -37,6 +37,7 @@ from weave.trace_server.trace_server_interface import (
     TableRowFilter,
     TraceServerInterface,
 )
+from weave.utils.iterators import ThreadSafeInMemoryIteratorAsSequence
 
 logger = logging.getLogger(__name__)
 
@@ -263,13 +264,10 @@ class WeaveObject(Traceable):
         return self._val == other
 
 
-ROWS_TYPES = Union[list[dict], Iterator[dict]]
-
-
 class WeaveTable(Traceable):
     filter: TableRowFilter
     _known_length: Optional[int] = None
-    _rows: Optional[ROWS_TYPES] = None
+    _rows: Optional[Sequence[dict]] = None
     # _prefetched_rows is a local cache of rows that can be used to
     # avoid a remote call. Should only be used by internal code.
     _prefetched_rows: Optional[list[dict]] = None
@@ -291,7 +289,7 @@ class WeaveTable(Traceable):
         self.parent = parent
 
     @property
-    def rows(self) -> ROWS_TYPES:
+    def rows(self) -> Sequence[dict]:
         if self._rows is None:
             should_local_iter = (
                 self.ref is not None
@@ -300,13 +298,15 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = iter(self._local_iter_with_remote_fallback())
+                self._rows = ThreadSafeInMemoryIteratorAsSequence(
+                    self._local_iter_with_remote_fallback()
+                )
             else:
-                self._rows = iter(self._remote_iter())
+                self._rows = ThreadSafeInMemoryIteratorAsSequence(self._remote_iter())
         return self._rows
 
     @rows.setter
-    def rows(self, value: ROWS_TYPES) -> None:
+    def rows(self, value: Sequence[dict]) -> None:
         if not all(isinstance(row, dict) for row in value):
             raise ValueError("All table rows must be dicts")
 
