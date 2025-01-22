@@ -16,7 +16,7 @@ uniq_id = datetime.datetime.now().timestamp()
 
 
 @weave.op
-def func(a: int) -> int:
+def func(a: int) -> float:
     return a + uniq_id
 
 
@@ -34,3 +34,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    print("Dry run passed")
