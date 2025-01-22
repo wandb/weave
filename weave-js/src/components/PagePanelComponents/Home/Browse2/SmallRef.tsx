@@ -124,8 +124,8 @@ export const SmallRef: FC<{
       };
     }
   }
-  const objectVersion = useObjectVersion(objVersionKey);
-  const opVersion = useOpVersion(opVersionKey);
+  const objectVersion = useObjectVersion(objVersionKey, true);
+  const opVersion = useOpVersion(opVersionKey, true);
 
   const isDeleted =
     isObjDeleteError(objectVersion?.error) ||
