@@ -297,11 +297,15 @@ def test_evaluate_table_lazy_iter(client):
     async def model_predict(input) -> int:
         return input * 1
 
+    @weave.op()
+    def score_simple(input, output):
+        return input == output
+
     log = client.server.attribute_access_log
     # assert log == []
     evaluation = Evaluation(
         dataset=dataset,
-        scorers=[score],
+        scorers=[score_simple],
     )
     log = client.server.attribute_access_log
     # assert log == []
