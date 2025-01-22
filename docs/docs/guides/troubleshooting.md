@@ -6,6 +6,14 @@ This page provides solutions and guidance for common issues you may encounter. A
 Do you have Weave troubleshooting advice to share with the community?  Click **Edit this page** at the bottom of this guide to contribute directly by submitting a pull request.
 :::
 
-## Reduce the number of trace table rows
+## Trace pages load slowly
 
-To reduce the number of trace table rows retrieved by a query, set the `pageSize` query parameter to a value less than the default value of `100`. 
+If trace pages are loading slowly,  reduce the number of rows displayed to improve load time. You can either reduce the number of rows via the UI, or using query parameters.
+
+### Adjust via the UI (recommended)
+
+Use the **Per page** control at the bottom-right of the Traces page to adjust the number of rows displayed. The default value is `50`, but you can also set to `10`, `25`, or `100`.
+
+### Use query parameters 
+
+If you prefer a manual approach, you can modify the `pageSize` query parameter in your query URL to a value less than the default of `50`.
