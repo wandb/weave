@@ -24,11 +24,7 @@ import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
 
-type Mode = 'hidden' | 'collapsed' | 'expanded' | 'json';
-
-function isModeHidden(mode: Mode): boolean {
-  return mode === 'hidden';
-}
+type Mode = 'collapsed' | 'expanded' | 'json';
 
 function isModeCollapsed(mode: Mode): boolean {
   return mode === 'collapsed';
@@ -208,7 +204,7 @@ const ObjectViewerSectionNonEmpty = ({
 
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
-    if (mode === 'hidden' || mode === 'json') {
+    if (isViewerHidden || isModeJson(mode)) {
       return;
     }
     const isSimple = isSimpleData(data);
