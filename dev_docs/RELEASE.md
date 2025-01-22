@@ -4,7 +4,9 @@ This document outlines how to publish a new Weave release to our public [PyPI pa
 
 1. Verify the head of master is ready for release and announce merge freeze to the Weave team while the release is being published (Either ask an admin on the Weave repo to place a freeze on https://www.mergefreeze.com/ or use the mergefreeze Slack app if it is set up or just post in Slack)
 
-2. You should also run through this [sample notebook](https://colab.research.google.com/drive/1DmkLzhFCFC0OoN-ggBDoG1nejGw2jQZy#scrollTo=29hJrcJQA7jZ) remember to install from master. You can also just run the [quickstart](http://wandb.me/weave_colab).
+2. Manual Verifications:
+   - Run `make prerelease-dry-run` to verify that the dry run script works.
+   - You should also run through this [sample notebook](https://colab.research.google.com/drive/1DmkLzhFCFC0OoN-ggBDoG1nejGw2jQZy#scrollTo=29hJrcJQA7jZ) remember to install from master. You can also just run the [quickstart](http://wandb.me/weave_colab).
 
 3. To prepare a PATCH release, go to GitHub Actions and run the [bump-python-sdk-version](https://github.com/wandb/weave/actions/workflows/bump_version.yaml) workflow on master. This will:
 
