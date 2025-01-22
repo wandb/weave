@@ -5,6 +5,7 @@ import React, {useMemo} from 'react';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Tailwind} from '../../../../Tailwind';
+import {Timestamp} from '../../../../Timestamp';
 import {WeaveCHTableSourceRefContext} from '../pages/CallPage/DataTableView';
 import {ObjectViewerSection} from '../pages/CallPage/ObjectViewerSection';
 import {objectVersionText} from '../pages/common/Links';
@@ -30,6 +31,7 @@ export const DatasetVersionPage: React.FC<{
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
+  const {createdAtMs} = objectVersion;
 
   const objectVersions = useRootObjectVersions(
     entityName,
@@ -76,7 +78,7 @@ export const DatasetVersionPage: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <ObjectVersionsLink
@@ -108,6 +110,12 @@ export const DatasetVersionPage: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <p>
+                <Timestamp value={createdAtMs / 1000} format="relative" />
+              </p>
             </div>
             {objectVersion.userId && (
               <div className="block">

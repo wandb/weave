@@ -7,6 +7,7 @@ import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
+import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -121,7 +122,7 @@ const ObjectVersionPageInner: React.FC<{
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
-  const refExtra = objectVersion.refExtra;
+  const {refExtra, createdAtMs} = objectVersion;
   const objectVersions = useRootObjectVersions(
     entityName,
     projectName,
@@ -231,7 +232,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -265,6 +266,12 @@ const ObjectVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <p>
+                <Timestamp value={createdAtMs / 1000} format="relative" />
+              </p>
             </div>
             {objectVersion.userId && (
               <div className="block">
