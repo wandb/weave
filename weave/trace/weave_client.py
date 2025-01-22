@@ -601,15 +601,22 @@ class Call:
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
-        d = {}
-        for field in dataclasses.fields(self):
-            if field.name.startswith("_"):
-                continue
-            d[field.name] = getattr(self, field.name)
-        d["op_name"] = self.op_name
-        d["display_name"] = self.display_name
-
-        return cast(CallDict, d)
+        return CallDict(
+            op_name=self.op_name,
+            trace_id=self.trace_id,
+            project_id=self.project_id,
+            parent_id=self.parent_id,
+            inputs=self.inputs,
+            id=self.id,
+            output=self.output,
+            exception=self.exception,
+            summary=self.summary,
+            display_name=self.display_name,
+            attributes=self.attributes,
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            deleted_at=self.deleted_at,
+        )
 
 
 def make_client_call(

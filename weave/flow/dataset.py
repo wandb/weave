@@ -55,6 +55,7 @@ class Dataset(Object):
             rows=obj.rows,
         )
 
+    @classmethod
     def from_calls(cls, calls: Iterable[Call]) -> Self:
         rows = [call.to_dict() for call in calls]
         return cls(rows=rows)
