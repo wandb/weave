@@ -36,6 +36,10 @@ def test_dictifiable(client):
     call = func.calls()[0]
 
     assert call.inputs["d"] == {"attr": val}
-    assert call.inputs["nd"].startswith('<test_dictifiable.test_dictifiable.<locals>.NonDictifiable object at')
+    assert call.inputs["nd"].startswith(
+        "<test_dictifiable.test_dictifiable.<locals>.NonDictifiable object at"
+    )
     assert call.output["d"] == {"attr": val}
-    assert call.output["nd"].startswith('<test_dictifiable.test_dictifiable.<locals>.NonDictifiable object at')
+    assert call.output["nd"].startswith(
+        "<test_dictifiable.test_dictifiable.<locals>.NonDictifiable object at"
+    )
