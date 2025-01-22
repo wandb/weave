@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Self
 
 import pytest
@@ -72,7 +73,7 @@ def test_failed_publish_maintains_old_object_ref(client, custom_object, monkeypa
             def fail_publish(*args, **kwargs):
                 raise Exception("Publish failed")  # noqa: TRY002
 
-            m.setattr("weave.publish", fail_publish)
+            m.setattr("weave._publish", fail_publish)
             custom_object.publish()
 
     assert custom_object.ref == old_ref
@@ -87,3 +88,32 @@ def test_saving_only_for_registered_objects(client):
 
     with pytest.raises(NotImplementedError):
         unregistered_object.publish()
+
+
+def test_saving_symmetry(client, custom_object):
+    custom_object2 = deepcopy(custom_object)
+
+    ref = weave.publish(custom_object)
+    ref2 = custom_object2.publish()
+
+    assert ref == ref2
+
+
+def test_delete_symmetry(client, custom_object):
+    # publishing the same object will result in dedupe,
+    # so change a value to test deleting
+    custom_object2 = deepcopy(custom_object)
+    custom_object2.a = 2
+
+    ref = weave.publish(custom_object)
+    ref2 = weave.publish(custom_object2)
+
+    ref.delete()
+    obj2 = ref2.get()
+    obj2.delete()
+
+    with pytest.raises(ObjectDeletedError):
+        ref.get()
+
+    with pytest.raises(ObjectDeletedError):
+        ref2.get()

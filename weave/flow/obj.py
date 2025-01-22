@@ -12,6 +12,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from weave.trace import api
+from weave.trace.api import publish as weave_publish
 from weave.trace.objectify import Objectifyable, is_registered
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
@@ -70,20 +71,7 @@ class Object(BaseModel):
         if not is_registered(cls_name):
             raise NotImplementedError("Publish is not supported for this object!")
 
-        import weave
-
-        if name is None:
-            name = self.name
-
-        old_ref, self.ref = self.ref, None
-        try:
-            new_ref = weave.publish(self, name)
-        except Exception:
-            self.ref = old_ref
-            raise
-
-        self.ref = new_ref
-        return new_ref
+        return weave_publish(self, name)
 
     def delete(self) -> None:
         if self.ref is None:
