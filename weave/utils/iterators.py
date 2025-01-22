@@ -78,7 +78,10 @@ class ThreadSafeInMemoryIteratorAsSequence(Sequence[T]):
             IndexError: If the index is out of range.
         """
         if isinstance(index, slice):
-            self._seek_to_index(index.stop)
+            if index.stop is None:
+                self._seek_to_end()
+            else:
+                self._seek_to_index(index.stop)
             return self._list[index]
         else:
             self._seek_to_index(index)
