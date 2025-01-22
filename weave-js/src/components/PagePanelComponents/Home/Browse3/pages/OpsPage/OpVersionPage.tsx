@@ -1,10 +1,15 @@
 import {Button} from '@wandb/weave/components/Button';
-import React, {useMemo, useState} from 'react';
+import React, {useContext, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {Icon} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
-import {useClosePeek} from '../../context';
+import {
+  useClosePeek,
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {OpCodeViewer} from '../../OpCodeViewer';
 import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
@@ -188,12 +193,31 @@ const DeleteOpButtonWithModal: React.FC<{
 }> = ({opVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const history = useHistory();
   const {opVersionsDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const deleteStr =
     overrideDisplayStr ??
     `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
+
+  const onSuccess = () => {
+    if (isPeeking) {
+      closePeek();
+    } else {
+      history.push(
+        routerContext.opVersionsUIUrl(
+          opVersionSchema.entity,
+          opVersionSchema.project,
+          {
+            opName: opVersionSchema.opId,
+          }
+        )
+      );
+    }
+  };
 
   return (
     <>
@@ -215,7 +239,7 @@ const DeleteOpButtonWithModal: React.FC<{
             [opVersionSchema.versionHash]
           )
         }
-        onSuccess={closePeek}
+        onSuccess={onSuccess}
       />
     </>
   );

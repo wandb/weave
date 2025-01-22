@@ -1608,6 +1608,19 @@ def test_object_version_read(client):
         assert obj_res.obj.val == {"a": i}
         assert obj_res.obj.version_index == i
 
+    # read each object one at a time, check the version, metadata only
+    for i in range(10):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[i].name,
+                digest=refs[i].digest,
+                metadata_only=True,
+            )
+        )
+        assert obj_res.obj.val == {}
+        assert obj_res.obj.version_index == i
+
     # now grab the latest version of the object
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
