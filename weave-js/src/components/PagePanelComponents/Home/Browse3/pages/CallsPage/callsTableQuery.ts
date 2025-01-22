@@ -97,6 +97,7 @@ export const useCallsForQuery = (
   );
 
   const costCols = useMemo(() => ['id'], []);
+  const noCalls = calls.result == null || calls.result.length === 0;
   const costs = useCalls(
     entity,
     project,
@@ -108,7 +109,7 @@ export const useCallsForQuery = (
     costCols,
     expandedColumns,
     {
-      skip: calls.loading,
+      skip: calls.loading || noCalls,
       includeCosts: true,
     }
   );
