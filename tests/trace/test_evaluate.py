@@ -286,3 +286,26 @@ def test_scorer_name_sanitization(scorer_name):
 
     result = asyncio.run(evaluation.evaluate(model))
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
+
+
+def test_evaluate_table_lazy_iter(client):
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    ref = weave.publish(dataset)
+    dataset = ref.get()
+
+    @weave.op()
+    async def model_predict(input) -> int:
+        return input * 1
+
+    log = client.server.attribute_access_log
+    # assert log == []
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score],
+    )
+    log = client.server.attribute_access_log
+    # assert log == []
+
+    result = asyncio.run(evaluation.evaluate(model_predict))
+    log = client.server.attribute_access_log
+    # assert log == []

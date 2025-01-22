@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, Union, cast
+from typing import Any, Callable, Literal, Optional, TypeVar, Union, cast
 
 from pydantic import PrivateAttr, model_validator
 from rich import print
@@ -278,7 +279,7 @@ class Evaluation(Object):
         # with console.status("Evaluating...") as status:
         dataset = self._post_init_dataset
         _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
+        trial_rows = list(repeated_iterable(_rows, self.trials))
         async for example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
@@ -345,3 +346,12 @@ def is_valid_model(model: Any) -> bool:
             and is_op(model.predict)
         )
     )
+
+
+T = TypeVar("T")
+
+
+def repeated_iterable(iterable: Iterable[T], n: int) -> Iterable[T]:
+    for val in iterable:
+        for _ in range(n):
+            yield val

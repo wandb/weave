@@ -1,11 +1,12 @@
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Union
 
 from pydantic import field_validator
 from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
 
@@ -43,7 +44,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: weave.Table
+    rows: Union[weave.Table, WeaveTable]
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -55,11 +56,11 @@ class Dataset(Object):
         )
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> weave.Table:
+    def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:
+        if weave_isinstance(rows, WeaveTable):
+            return rows
         if not isinstance(rows, weave.Table):
             table_ref = getattr(rows, "table_ref", None)
-            if isinstance(rows, WeaveTable):
-                rows = list(rows)
             rows = weave.Table(rows)
             if table_ref:
                 rows.table_ref = table_ref
