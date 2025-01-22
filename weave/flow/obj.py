@@ -12,7 +12,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from weave.trace import api
-from weave.trace.objectify import Objectifyable
+from weave.trace.objectify import Objectifyable, is_registered
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.trace.weave_client import get_ref
@@ -66,11 +66,24 @@ class Object(BaseModel):
 
     def publish(self, name: Union[str, None] = None) -> ObjectRef:
         # I'm using the `publish` term here for now, but ideally we call this `save`.
+        cls_name = self.__class__.__name__
+        if not is_registered(cls_name):
+            raise ValueError("Publish is not supported for this object!")
+
         import weave
 
         if name is None:
             name = self.name
-        return weave.publish(self, name)
+
+        old_ref, self.ref = self.ref, None
+        try:
+            new_ref = weave.publish(self, name)
+        except Exception:
+            self.ref = old_ref
+            raise
+
+        self.ref = new_ref
+        return new_ref
 
     def delete(self) -> None:
         if self.ref is None:
@@ -79,6 +92,7 @@ class Object(BaseModel):
             )
 
         self.ref.delete()
+        self.name = f"DELETED OBJECT: {self.name}"
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
