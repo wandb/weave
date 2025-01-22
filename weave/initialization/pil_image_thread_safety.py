@@ -20,10 +20,14 @@ import threading
 from functools import wraps
 from typing import Any, Callable, Optional
 
+# Global state
+# `_patched` is a boolean that indicates whether the thread-safety patch has been applied
+# `_original_methods` is a dictionary that stores the original methods of the ImageFile class
+# `_new_lock_lock` is a lock that is used to create a new lock for each ImageFile instance
+# `_fallback_load_lock` is a global lock that is used to ensure thread-safe image loading when per-instance locking fails
 _patched = False
 _original_methods: dict[str, Optional[Callable]] = {"load": None}
 _new_lock_lock = threading.Lock()
-# Global fallback lock for thread-safe image loading when per-instance locking fails
 _fallback_load_lock = threading.Lock()
 
 
