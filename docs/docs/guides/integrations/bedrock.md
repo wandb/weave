@@ -1,10 +1,14 @@
 # Amazon Bedrock
 
-Weave automatically tracks and logs LLM calls made via Amazon Bedrock, AWS's fully managed service that offers foundation models from leading AI companies through a unified API.
+Weave automatically tracks and logs LLM calls made via [Amazon Bedrock](https://aws.amazon.com/bedrock/), a fully managed service that offers foundation models from leading AI companies through a unified API.
 
-## Traces
+:::note
+For a full-length tutorial demonstrating both basic and advanced usage of Weave with Amazon Bedrock, try [Working with Amazon Bedrock](/reference/gen_notebooks/bedrock)   
+:::
 
-Weave will automatically capture traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client:
+## Log traces
+
+Weave automatically captures traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client:
 
 ```python
 import weave
@@ -35,7 +39,7 @@ response_dict = json.loads(response.get('body').read())
 print(response_dict["content"][0]["text"])
 ```
 
-of using the `converse` API:
+The following example shows how to use the `converse` API:
 
 ```python
 messages = [{"role": "user", "content": [{"text": "What is the capital of France?"}]}]
@@ -50,7 +54,7 @@ print(response["output"]["message"]["content"][0]["text"])
 
 ```
 
-## Wrapping with your own ops
+## Wrap Bedrock calls with Weave Ops
 
 You can create reusable operations using the `@weave.op()` decorator. Here's an example showing both the `invoke_model` and `converse` APIs:
 
@@ -99,7 +103,7 @@ def call_model_converse(
 
 ## Create a `Model` for easier experimentation
 
-You can create a Weave Model to better organize your experiments and capture parameters. Here's an example using the `converse` API:
+You can create a Weave [Model](../core-types/models.md) to better organize your experiments and capture parameters. Here's an example using the `converse` API:
 
 ```python
 class BedrockLLM(weave.Model):
@@ -133,5 +137,3 @@ model = BedrockLLM(
 result = model.predict("What is the best way to handle errors in Python?")
 print(result)
 ```
-
-This approach allows you to version your experiments and easily track different configurations of your Bedrock-based application.
