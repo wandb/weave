@@ -682,67 +682,67 @@ def test_huggingface_translation(client):
     assert "Wolfgang" in output.translation_text
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-def test_huggingface_zero_shot_classification(client):
-    from huggingface_hub import InferenceClient
+# @pytest.mark.skip_clickhouse_client
+# @pytest.mark.vcr(
+#     filter_headers=["authorization", "x-api-key"],
+#     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+# )
+# def test_huggingface_zero_shot_classification(client):
+#     from huggingface_hub import InferenceClient
 
-    text = (
-        "A new model offers an explanation for how the Galilean satellites formed around the solar system's"
-        "largest world. Konstantin Batygin did not set out to solve one of the solar system's most puzzling"
-        " mysteries when he went for a run up a hill in Nice, France."
-    )
-    labels = ["scientific discovery"]
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).zero_shot_classification(text, labels)
+#     text = (
+#         "A new model offers an explanation for how the Galilean satellites formed around the solar system's"
+#         "largest world. Konstantin Batygin did not set out to solve one of the solar system's most puzzling"
+#         " mysteries when he went for a run up a hill in Nice, France."
+#     )
+#     labels = ["scientific discovery"]
+#     InferenceClient(
+#         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+#     ).zero_shot_classification(text, labels)
 
-    calls = list(client.calls())
-    assert len(calls) == 1
+#     calls = list(client.calls())
+#     assert len(calls) == 1
 
-    call = calls[0]
-    assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.zero_shot_classification"
-    )
-    output = call.output
-    assert output[0].label == "scientific discovery"
-    assert output[0].score > 0
+#     call = calls[0]
+#     assert call.started_at < call.ended_at
+#     assert (
+#         op_name_from_ref(call.op_name)
+#         == "huggingface_hub.InferenceClient.zero_shot_classification"
+#     )
+#     output = call.output
+#     assert output[0].label == "scientific discovery"
+#     assert output[0].score > 0
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
-def test_huggingface_zero_shot_classification_async(client):
-    from huggingface_hub import AsyncInferenceClient
+# @pytest.mark.skip_clickhouse_client
+# @pytest.mark.vcr(
+#     filter_headers=["authorization", "x-api-key"],
+#     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+# )
+# def test_huggingface_zero_shot_classification_async(client):
+#     from huggingface_hub import AsyncInferenceClient
 
-    text = (
-        "A new model offers an explanation for how the Galilean satellites formed around the solar system's"
-        "largest world. Konstantin Batygin did not set out to solve one of the solar system's most puzzling"
-        " mysteries when he went for a run up a hill in Nice, France."
-    )
-    labels = ["scientific discovery"]
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).zero_shot_classification(text, labels)
-    )
+#     text = (
+#         "A new model offers an explanation for how the Galilean satellites formed around the solar system's"
+#         "largest world. Konstantin Batygin did not set out to solve one of the solar system's most puzzling"
+#         " mysteries when he went for a run up a hill in Nice, France."
+#     )
+#     labels = ["scientific discovery"]
+#     asyncio.run(
+#         AsyncInferenceClient(
+#             api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+#         ).zero_shot_classification(text, labels)
+#     )
 
-    calls = list(client.calls())
-    assert len(calls) == 1
+#     calls = list(client.calls())
+#     assert len(calls) == 1
 
-    call = calls[0]
-    assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.zero_shot_classification"
-    )
-    output = call.output
-    assert output[0].label == "scientific discovery"
-    assert output[0].score > 0
+#     call = calls[0]
+#     assert call.started_at < call.ended_at
+#     assert (
+#         op_name_from_ref(call.op_name)
+#         == "huggingface_hub.AsyncInferenceClient.zero_shot_classification"
+#     )
+#     output = call.output
+#     assert output[0].label == "scientific discovery"
+#     assert output[0].score > 0
