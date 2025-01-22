@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, Union
 
 
 class Error(Exception):
@@ -62,7 +62,7 @@ class ClickhouseQueryError(Error):
         message: str,
         query: str,
         parameters: dict[str, Any],
-        summary: dict[str, Any] | None = None,
+        summary: Union[dict[str, Any], None] = None,
     ):
         self.query = query
         self.parameters = parameters
@@ -70,4 +70,4 @@ class ClickhouseQueryError(Error):
         self.message = message
 
     def __repr__(self) -> str:
-        return f"ClickhouseQueryError message:{self.message}\nquery:{self.query}\nparameters:{self.parameters}"
+        return f"ClickhouseQueryError message:{self.message}\nquery:{self.query}\nparameters:{self.parameters}\nsummary:{self.summary}"
