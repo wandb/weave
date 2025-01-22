@@ -280,14 +280,14 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: Optional[list[dict]] = None
+        self._rows: Optional[Iterator[dict]] = None
 
         # _prefetched_rows is a local cache of rows that can be used to
         # avoid a remote call. Should only be used by internal code.
         self._prefetched_rows: Optional[list[dict]] = None
 
     @property
-    def rows(self) -> list[dict]:
+    def rows(self) -> Iterator[dict]:
         if self._rows is None:
             should_local_iter = (
                 self.ref is not None
@@ -296,9 +296,9 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = list(self._local_iter_with_remote_fallback())
+                self._rows = iter(self._local_iter_with_remote_fallback())
             else:
-                self._rows = list(self._remote_iter())
+                self._rows = iter(self._remote_iter())
         return self._rows
 
     @rows.setter

@@ -279,12 +279,14 @@ class Evaluation(Object):
         # with console.status("Evaluating...") as status:
         dataset = self._post_init_dataset
         _rows = dataset.rows
-        trial_rows = list(repeated_iterable(_rows, self.trials))
+        # TODO: This is incorrect
+        num_rows = 10 * self.trials
+        trial_rows = repeated_iterable(_rows, self.trials)
         async for example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            print(f"Evaluated {n_complete} of {num_rows} examples")
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
