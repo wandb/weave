@@ -5,6 +5,7 @@ import TracingCallsMacroImage from '@site/static/img/screenshots/calls_macro.png
 import TracingCallsFilterImage from '@site/static/img/screenshots/calls_filter.png';
 import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
 
+
 # Calls
 
 <DesktopWindow 
@@ -699,17 +700,7 @@ The easiest way to get started is to construct a view in the UI, then learn more
 :::info[Comming Soon]
 ::: */}
 
-## Call FAQ
-
-{/* TODO:
-Common Questions / Variations:
-* Images
-* Ops
-* Cost?
-* General data model
-*/}
-
-#### Call Schema
+### Call Schema
 
 Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
 
@@ -748,4 +739,64 @@ Calculated Fields:
     * Duration
     * Status
 
+## FAQs
+
+### How do I disable tracing?
+
+**Environment Variable:**
+
+In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_DISABLED=true`.
+
+**Client Initialization:**
+
+Sometimes, you may want to conditionally enable tracing for a specific initialization based on some condition. In this case, you can initialize the client with the `disabled` flag in init settings.
+
+```python
+import weave
+
+# Initialize the client
+client = weave.init(..., settings={"disabled": True})
+```
+
+**Context Manager:**
+
+Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be imported from `weave.trace.context.call_context`.
+
+```python
+import weave
+from weave.trace.context.call_context import set_tracing_enabled
+
+client = weave.init(...)
+
+@weave.op
+def my_op():
+    ...
+
+with set_tracing_enabled(False):
+    my_op()
+```
+
+### How do I capture information about a call?
+
+Typically you would call an op directly:
+
+```python
+@weave.op
+def my_op():
+    ...
+
+my_op()
+```
+
+However, you can also get access to the call object directly by invoking the `call` method on the op:
+
+```python
+@weave.op
+def my_op():
+    ...
+
+output, call = my_op.call()
+```
+
+From here, the `call` object will have all the information about the call, including the inputs, outputs, and other metadata.
 

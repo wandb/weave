@@ -189,6 +189,7 @@ export const CallDetails: FC<{
               entity={call.entity}
               project={call.project}
               allowedColumnPatterns={ALLOWED_COLUMN_PATTERNS}
+              paginationModel={isPeeking ? {page: 0, pageSize: 10} : undefined}
             />
           );
           if (isPeeking) {
