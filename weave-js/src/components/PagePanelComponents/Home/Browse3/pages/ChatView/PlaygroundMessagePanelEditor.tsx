@@ -77,7 +77,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
-        <Button variant="quiet" size="medium" onClick={handleCancel}>
+        <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
         <Button

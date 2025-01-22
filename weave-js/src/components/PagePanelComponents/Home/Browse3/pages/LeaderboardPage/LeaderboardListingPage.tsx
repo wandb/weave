@@ -9,7 +9,7 @@ import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {ObjectVersionsTable} from '../ObjectVersionsPage';
+import {ObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,

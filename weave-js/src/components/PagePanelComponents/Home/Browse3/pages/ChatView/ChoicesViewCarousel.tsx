@@ -65,11 +65,11 @@ export const ChoicesViewCarousel = ({
           </div>
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="visible"
             onClick={() => setIsDrawerOpen(true)}
             tooltip="View all choices">
-            Review
+            View trials
           </Button>
         </div>
       }

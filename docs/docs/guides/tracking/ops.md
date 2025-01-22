@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 A Weave op is a versioned function that automatically logs all calls.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     To create an op, decorate a python function with `weave.op()`
 
@@ -53,7 +53,7 @@ A Weave op is a versioned function that automatically logs all calls.
 
 ## Customize display names
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can customize the op's display name by setting the `name` parameter in the `@weave.op` decorator:
 
@@ -73,7 +73,7 @@ A Weave op is a versioned function that automatically logs all calls.
 
 ## Customize logged inputs and outputs
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     If you want to change the data that is logged to weave without modifying the original function (e.g. to hide sensitive data), you can pass `postprocess_inputs` and `postprocess_output` to the op decorator.
 
@@ -118,7 +118,7 @@ A Weave op is a versioned function that automatically logs all calls.
 
 ## Control sampling rate
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can control how frequently an op's calls are traced by setting the `tracing_sample_rate` parameter in the `@weave.op` decorator. This is useful for high-frequency ops where you only need to trace a subset of calls.
 
@@ -149,10 +149,32 @@ A Weave op is a versioned function that automatically logs all calls.
   </TabItem>
 </Tabs>
 
-### Control call link output 
+## Control call link output
 
-If you want to suppress the printing of call links during logging, you can use the `WEAVE_PRINT_CALL_LINK` environment variable to `false`. This can be useful if you want to reduce  output verbosity and reduce clutter in your logs.
+If you want to suppress the printing of call links during logging, you can set the `WEAVE_PRINT_CALL_LINK` environment variable to `false`. This can be useful if you want to reduce output verbosity and reduce clutter in your logs.
 
 ```bash
 export WEAVE_PRINT_CALL_LINK=false
 ```
+
+## Deleting an op
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    To delete a version of an op, call `.delete()` on the op ref.
+
+    ```python
+    weave.init('intro-example')
+    my_op_ref = weave.ref('track_me:v1')
+    my_op_ref.delete()
+    ```
+
+    Trying to access a deleted op will result in an error.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>

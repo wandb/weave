@@ -330,6 +330,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        req.obj.wb_user_id = self._user_id
+        return super().obj_create(req)
+
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():

@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional, Union, cast
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
+from typing_extensions import Self
 
 import weave
 from weave.flow import util
@@ -27,11 +28,10 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
-from weave.scorers.base_scorer import apply_scorer_async
-from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -59,6 +59,7 @@ DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 
 
+@register_object
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -115,6 +116,19 @@ class Evaluation(Object):
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        return cls(
+            name=obj.name,
+            description=obj.description,
+            ref=obj.ref,
+            dataset=obj.dataset,
+            scorers=obj.scorers,
+            preprocess_model_input=obj.preprocess_model_input,
+            trials=obj.trials,
+            evaluation_name=obj.evaluation_name,
+        )
 
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":
@@ -209,22 +223,8 @@ class Evaluation(Object):
         scorers = self._post_init_scorers
 
         for scorer in scorers:
-            apply_scorer_result = await apply_scorer_async(
-                scorer, example, model_output
-            )
+            apply_scorer_result = await model_call.apply_scorer(scorer, example)
             result = apply_scorer_result.result
-            score_call = apply_scorer_result.score_call
-
-            wc = get_weave_client()
-            if wc:
-                scorer_ref_uri = None
-                if weave_isinstance(scorer, Scorer):
-                    # Very important: if the score is generated from a Scorer subclass,
-                    # then scorer_ref_uri will be None, and we will use the op_name from
-                    # the score_call instead.
-                    scorer_ref = get_ref(scorer)
-                    scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-                wc._send_score_call(model_call, score_call, scorer_ref_uri)
             scorer_attributes = get_scorer_attributes(scorer)
             scorer_name = scorer_attributes.scorer_name
             scores[scorer_name] = result

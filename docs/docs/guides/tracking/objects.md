@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 Weave's serialization layer saves and versions objects.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     ```python
@@ -39,7 +39,7 @@ Saving an object with a name will create the first version of that object if it 
 
 ## Getting an object back
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     `weave.publish` returns a Ref. You can call `.get()` on any Ref to get the object back.
 
@@ -49,6 +49,28 @@ Saving an object with a name will create the first version of that object if it 
     weave.init('intro-example')
     cat_names = weave.ref('cat-names').get()
     ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
+## Deleting an object
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    To delete a version of an object, call `.delete()` on the object ref.
+
+    ```python
+    weave.init('intro-example')
+    cat_names_ref = weave.ref('cat-names:v1')
+    cat_names_ref.delete()
+    ```
+
+    Trying to access a deleted object will result in an error. Resolving an object that has a reference to a deleted object will return a `DeletedRef` object in place of the deleted object.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">

@@ -27,7 +27,7 @@ Do you want to test Weave without the setup? Try the Jupyter Notebook.
 
 Install Weave locally:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```bash
     pip install weave
@@ -52,7 +52,7 @@ Calls are similar to spans in the OpenTelemetry data model. A Call can:
 Belong to a Trace (a collection of calls in the same execution context)
 Have parent and child Calls, forming a tree structure
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     1. Import the `weave` library.
