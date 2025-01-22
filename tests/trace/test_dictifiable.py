@@ -18,7 +18,7 @@ def test_dictifiable(client):
             return {"attr": self.attr}
 
     @weave.op
-    def func(d: Dictifiable, nd: NonDictifiable) -> Dictifiable:
+    def func(d: Dictifiable, nd: NonDictifiable) -> dict:
         return {
             "d": Dictifiable(d.attr),
             "nd": NonDictifiable(nd.attr),
