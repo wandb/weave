@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 
 
 class Error(Exception):
@@ -51,3 +52,22 @@ class ObjectDeletedError(Error):
     def __init__(self, message: str, deleted_at: datetime.datetime):
         self.deleted_at = deleted_at
         super().__init__(message)
+
+
+class ClickhouseQueryError(Error):
+    """Raised when a query to Clickhouse fails."""
+
+    def __init__(
+        self,
+        message: str,
+        query: str,
+        parameters: dict[str, Any],
+        summary: dict[str, Any] | None = None,
+    ):
+        self.query = query
+        self.parameters = parameters
+        self.summary = summary
+        self.message = message
+
+    def __repr__(self) -> str:
+        return f"ClickhouseQueryError message:{self.message}\nquery:{self.query}\nparameters:{self.parameters}"
