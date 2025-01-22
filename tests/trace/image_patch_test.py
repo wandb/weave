@@ -18,4 +18,5 @@ def test_patching_import_order():
 
     pil_image_thread_safety.apply_threadsafe_patch_to_pil_image()
     assert pil_image_thread_safety._patched
+
     image.crop((0, 0, 10, 10))

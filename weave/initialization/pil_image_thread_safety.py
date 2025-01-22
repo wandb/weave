@@ -18,28 +18,9 @@ We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensur
 import threading
 from functools import wraps
 from typing import Any, Callable, Optional
-from weakref import WeakKeyDictionary
 
 _patched = False
 _original_methods: dict[str, Optional[Callable]] = {"load": None}
-
-
-class TheadSafeLockLookup:
-    global_lock: threading.Lock
-    lock_map: WeakKeyDictionary[Any, threading.Lock]
-
-    def __init__(self) -> None:
-        self.global_lock = threading.Lock()
-        self.lock_map = WeakKeyDictionary()
-
-    def get_lock(self, obj: Any) -> threading.Lock:
-        with self.global_lock:
-            if obj not in self.lock_map:
-                self.lock_map[obj] = threading.Lock()
-            return self.lock_map[obj]
-
-
-_global_thread_safe_lock_lookup = TheadSafeLockLookup()
 
 
 def apply_threadsafe_patch_to_pil_image() -> None:
@@ -67,23 +48,24 @@ def _apply_threadsafe_patch() -> None:
     # Store original methods
     _original_methods["load"] = ImageFile.load
     old_load = ImageFile.load
+    _new_lock_lock = threading.Lock()
 
     @wraps(old_load)
     def new_load(self: ImageFile, *args: Any, **kwargs: Any) -> Any:
-        # There is an edge case at play here: If the ImageFile is constructed
-        # before patching (ie import weave), then the ImageFile will not have
-        # the _weave_load_lock attribute and this will raise an AttributeError.
-        # To avoid this, we check for the existence of the _weave_load_lock
-        # attribute before acquiring the lock.
-        #
-        # Unfortunately, this means in these cases, the ImageFile will not be
-        # thread-safe.
-        if not hasattr(self, "_weave_load_lock"):
-            self._weave_load_lock = _global_thread_safe_lock_lookup.get_lock(self)  # type: ignore
-        with self._weave_load_lock:  # type: ignore
+        # Get a lock for this specific ImageFile instance using its ID
+        lock = None
+        try:
+            if not hasattr(self, "_weave_load_lock"):
+                with _new_lock_lock:
+                    setattr(self, "_weave_load_lock", threading.Lock())
+            lock = getattr(self, "_weave_load_lock")
+        except Exception:
+            return old_load(self, *args, **kwargs)
+        if lock is None:
+            return old_load(self, *args, **kwargs)
+        with lock:
             return old_load(self, *args, **kwargs)
 
-    # ImageFile.__init__ = new_init  # type: ignore
     ImageFile.load = new_load  # type: ignore
 
 
