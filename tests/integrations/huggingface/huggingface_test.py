@@ -63,28 +63,28 @@ def test_huggingface_chat_completion_stream(client):
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     )
     image_url = "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
-    [
-        r
-        for r in huggingface_client.chat_completion(
-            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": image_url}},
-                        {
-                            "type": "text",
-                            "text": "Describe this image in one sentence.",
-                        },
-                    ],
-                }
-            ],
-            max_tokens=500,
-            seed=42,
-            stream=True,
-        )
-    ]
-
+    result = huggingface_client.chat_completion(
+        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {
+                        "type": "text",
+                        "text": "Describe this image in one sentence.",
+                    },
+                ],
+            }
+        ],
+        max_tokens=500,
+        seed=42,
+        stream=True,
+    )
+    chunks = []
+    for chunk in result:
+        chunks.append(chunk)
+    assert len(chunks) > 0
     calls = list(client.calls())
     assert len(calls) == 1
 
