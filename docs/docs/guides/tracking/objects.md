@@ -92,6 +92,14 @@ Saving an object with a name will create the first version of that object if it 
     cat_names_ref.delete()
     ```
 
+    And you can delete objects imperatively:
+
+    ```python
+    weave.init('intro-example')
+    cat_names_ref = weave.ref('cat-names:v1')
+    weave.delete(cat_names_ref)
+    ```
+
     Trying to access a deleted object will result in an error. Resolving an object that has a reference to a deleted object will return a `DeletedRef` object in place of the deleted object.
 
   </TabItem>
