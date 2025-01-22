@@ -1,7 +1,7 @@
 import {GridPaginationModel} from '@mui/x-data-grid-pro';
 
 const MAX_PAGE_SIZE = 100;
-export const DEFAULT_PAGE_SIZE = 100;
+export const DEFAULT_PAGE_SIZE = 50;
 
 export const getValidPaginationModel = (
   queryPage: string | undefined,
