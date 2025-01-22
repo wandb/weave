@@ -1055,13 +1055,18 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-# @pytest.mark.asyncio
-# async def test_get_evaluation_results(client):
-#     @weave.op
-#     def model(a: int, b: int) -> int:
-#         return a + b
+@pytest.mark.xfail(
+    reason="TODO: This test does not seem to work with the sqlite test server"
+)
+@pytest.mark.asyncio
+async def test_get_evaluation_results(client):
+    @weave.op
+    def model(a: int, b: int) -> int:
+        return a + b
 
-#     ev = weave.Evaluation(dataset=[{"a": 1, "b": 2}])
-#     await ev.evaluate(model)
-#     await ev.evaluate(model)
-#     assert len(ev.get_evaluation_results()) == 1
+    ev = weave.Evaluation(dataset=[{"a": 1, "b": 2}])
+    await ev.evaluate(model)
+    await ev.evaluate(model)
+
+    res = ev.get_evaluation_results()
+    assert len(res) == 2

@@ -56,12 +56,6 @@ class Object(BaseModel):
 
     __str__ = BaseModel.__repr__
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Any time a public attribute is set, the object is "dirty" so we clear the ref."""
-        if name != "ref" and not name.startswith("_"):
-            self.ref = None
-        super().__setattr__(name, value)
-
     @classmethod
     def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
         if not isinstance(cls, Objectifyable):
