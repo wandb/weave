@@ -320,8 +320,8 @@ class Evaluation(Object):
 
         return summary
 
-    def get_evaluation_results(self) -> dict[str, CallsIter]:
-        if not self.evaluate.ref:
+    def get_evaluation_calls(self) -> dict[str, CallsIter]:
+        if not (eval_ref := self.evaluate.ref):
             raise ValueError(
                 "Evaluation must be run or published before calling get_evaluation_results"
             )
@@ -330,10 +330,16 @@ class Evaluation(Object):
         eval_calls = self.evaluate.calls()
         wc = weave_client_context.require_weave_client()
         for call in eval_calls:
-            if call.display_name and isinstance(call.display_name, str):
-                res[call.display_name] = wc.get_calls(
+            display_name = call.display_name
+            if display_name and isinstance(display_name, str):
+                if display_name in res:
+                    logger.warning(
+                        f"Duplicate display name {display_name} found in evaluation results; omitting some results..."
+                    )
+                    continue
+                res[display_name] = wc.get_calls(
                     filter=CallsFilter(
-                        parent_ids=[call.id], input_refs=[self.ref.uri()]
+                        parent_ids=[call.id], input_refs=[eval_ref.uri()]
                     )
                 )
         return res

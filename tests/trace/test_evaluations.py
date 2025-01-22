@@ -1055,18 +1055,21 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-@pytest.mark.xfail(
-    reason="TODO: This test does not seem to work with the sqlite test server"
-)
 @pytest.mark.asyncio
 async def test_get_evaluation_results(client):
     @weave.op
     def model(a: int, b: int) -> int:
         return a + b
 
-    ev = weave.Evaluation(dataset=[{"a": 1, "b": 2}])
+    ev = weave.Evaluation(
+        dataset=[{"a": 1, "b": 2}],
+        # The evaluation name here is a hack for tests and is not required on the prod
+        # trace server.  Sqlite seems to have a memory of the previous calls, and this
+        # was the only way I found to get the evaluation name to be unique in the test.
+        evaluation_name=lambda call: call.id,
+    )
     await ev.evaluate(model)
     await ev.evaluate(model)
+    res = ev.get_evaluation_calls()
 
-    res = ev.get_evaluation_results()
     assert len(res) == 2
