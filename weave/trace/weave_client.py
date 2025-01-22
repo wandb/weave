@@ -601,6 +601,9 @@ class Call:
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
+        if callable(display_name := self.display_name):
+            display_name = "Callable Display Name (not called yet)"
+
         return CallDict(
             op_name=self.op_name,
             trace_id=self.trace_id,
@@ -611,7 +614,7 @@ class Call:
             output=self.output,
             exception=self.exception,
             summary=self.summary,
-            display_name=self.display_name,
+            display_name=display_name,
             attributes=self.attributes,
             started_at=self.started_at,
             ended_at=self.ended_at,
