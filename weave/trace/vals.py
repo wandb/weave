@@ -263,9 +263,16 @@ class WeaveObject(Traceable):
         return self._val == other
 
 
+ROWS_TYPES = Union[list[dict], Iterator[dict]]
+
+
 class WeaveTable(Traceable):
     filter: TableRowFilter
     _known_length: Optional[int] = None
+    _rows: Optional[ROWS_TYPES] = None
+    # _prefetched_rows is a local cache of rows that can be used to
+    # avoid a remote call. Should only be used by internal code.
+    _prefetched_rows: Optional[list[dict]] = None
 
     def __init__(
         self,
@@ -282,14 +289,9 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: Optional[Iterator[dict]] = None
-
-        # _prefetched_rows is a local cache of rows that can be used to
-        # avoid a remote call. Should only be used by internal code.
-        self._prefetched_rows: Optional[list[dict]] = None
 
     @property
-    def rows(self) -> Iterator[dict]:
+    def rows(self) -> ROWS_TYPES:
         if self._rows is None:
             should_local_iter = (
                 self.ref is not None
@@ -304,12 +306,20 @@ class WeaveTable(Traceable):
         return self._rows
 
     @rows.setter
-    def rows(self, value: list[dict]) -> None:
+    def rows(self, value: ROWS_TYPES) -> None:
         if not all(isinstance(row, dict) for row in value):
             raise ValueError("All table rows must be dicts")
 
         self._rows = value
         self._mark_dirty()
+
+    def _ensure_rows_are_local_list(self) -> list[dict]:
+        # Any uses of this are signs of a design problem arising
+        # from a remote table clashing with the need to feel like a
+        # local list.
+        if not isinstance(self.rows, list):
+            self.rows = list(self.rows)
+        return self.rows
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
         """Sets the rows to a local cache of rows that can be used to
@@ -335,6 +345,7 @@ class WeaveTable(Traceable):
             self.table_ref is not None
             and self.table_ref._row_digests is not None
             and self._prefetched_rows is not None
+            and isinstance(self.table_ref._row_digests, list)
         ):
             if len(self._prefetched_rows) == len(self.table_ref._row_digests):
                 self._known_length = len(self._prefetched_rows)
@@ -345,9 +356,13 @@ class WeaveTable(Traceable):
             self._known_length = self._fetch_remote_length()
             return self._known_length
 
-        return len(self.rows)
+        rows_as_list = self._ensure_rows_are_local_list()
+        return len(rows_as_list)
 
     def _fetch_remote_length(self) -> int:
+        if self.table_ref is None:
+            raise ValueError("Cannot fetch remote length of table without table ref")
+
         response = self.server.table_query_stats(
             TableQueryStatsReq(
                 project_id=self.table_ref.project_id, digest=self.table_ref.digest
@@ -462,7 +477,10 @@ class WeaveTable(Traceable):
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        rows = self.rows
+        # TODO: we should have a better caching strategy that allows
+        # partial iteration over the table.
+        rows = self._ensure_rows_are_local_list()
+
         if isinstance(key, (int, slice)):
             return rows[key]
 
@@ -476,14 +494,16 @@ class WeaveTable(Traceable):
         return iter(self.rows)
 
     def append(self, val: dict) -> None:
+        rows = self._ensure_rows_are_local_list()
         if not isinstance(val, dict):
             raise TypeError("Can only append dicts to tables")
         self._mark_dirty()
-        self.rows.append(val)
+        rows.append(val)
 
     def pop(self, index: int) -> None:
+        rows = self._ensure_rows_are_local_list()
         self._mark_dirty()
-        self.rows.pop(index)
+        rows.pop(index)
 
 
 class WeaveList(Traceable, list):

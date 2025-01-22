@@ -302,19 +302,27 @@ def test_evaluate_table_lazy_iter(client):
         return input == output
 
     log = client.server.attribute_access_log
-    # assert log == []
+    assert [l for l in log if not l.startswith("_")] == [
+        "ensure_project_exists",
+        "table_create",
+        "obj_create",
+        "obj_read",
+    ]
+    client.server.attribute_access_log = []
+
     evaluation = Evaluation(
         dataset=dataset,
         scorers=[score_simple],
     )
     log = client.server.attribute_access_log
-    # assert log == []
+    assert [l for l in log if not l.startswith("_")] == []
 
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result["output"] == {"mean": 149.5}
     assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
 
     log = client.server.attribute_access_log
+    log = [l for l in log if not l.startswith("_")]
 
     # Make sure that the length was figured out deterministically
     assert "table_query_stats" in log
@@ -330,4 +338,4 @@ def test_evaluate_table_lazy_iter(client):
     # However, the key part is that we have basically X + 2 splits, with the middle X
     # being equal. We want to ensure that the table_query is not called in sequence,
     # but rather lazily after each batch.
-    assert counts_split_by_table_query == [19, 700, 700, 700, 5]
+    assert counts_split_by_table_query == [13, 700, 700, 700, 5]

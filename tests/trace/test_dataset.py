@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from tests.trace.test_evaluate import Dataset
 
 
 def test_basic_dataset_lifecycle(client):
@@ -33,3 +34,62 @@ def test_pythonic_access(client):
 
     with pytest.raises(IndexError):
         ds[-1]
+
+
+def test_dataset_laziness(client):
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
+    client.server.attribute_access_log = []
+
+    length = len(dataset)
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == []
+
+    length2 = len(dataset)
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == []
+
+    assert length == length2
+
+    i = 0
+    for row in dataset:
+        log = client.server.attribute_access_log
+        assert [l for l in log if not l.startswith("_")] == []
+        i += 1
+
+
+def test_published_dataset_laziness(client):
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
+    client.server.attribute_access_log = []
+
+    ref = weave.publish(dataset)
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == ["table_create", "obj_create"]
+    client.server.attribute_access_log = []
+
+    dataset = ref.get()
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == ["obj_read"]
+    client.server.attribute_access_log = []
+
+    length = len(dataset)
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == ["table_query_stats"]
+    client.server.attribute_access_log = []
+
+    length2 = len(dataset)
+    log = client.server.attribute_access_log
+    assert [l for l in log if not l.startswith("_")] == []
+
+    assert length == length2
+
+    i = 0
+    for row in dataset:
+        log = client.server.attribute_access_log
+        assert [l for l in log if not l.startswith("_")] == ["table_query"] * (
+            (i // 100) + 1
+        )
+        i += 1
