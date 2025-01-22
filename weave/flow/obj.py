@@ -68,7 +68,7 @@ class Object(BaseModel):
         # I'm using the `publish` term here for now, but ideally we call this `save`.
         cls_name = self.__class__.__name__
         if not is_registered(cls_name):
-            raise ValueError("Publish is not supported for this object!")
+            raise NotImplementedError("Publish is not supported for this object!")
 
         import weave
 
