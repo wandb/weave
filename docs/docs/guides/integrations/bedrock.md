@@ -3,7 +3,7 @@
 Weave automatically tracks and logs LLM calls made via [Amazon Bedrock](https://aws.amazon.com/bedrock/), a fully managed service that offers foundation models from leading AI companies through a unified API.
 
 :::note
-For a full-length tutorial demonstrating both basic and advanced usage of Weave with Amazon Bedrock, try [Working with Amazon Bedrock](/reference/gen_notebooks/bedrock)   
+For a full-length tutorial demonstrating both basic and advanced usage of Weave with Amazon Bedrock, try [Working with Amazon Bedrock](../../reference/gen_notebooks/bedrock.md)   
 :::
 
 ## Log traces
