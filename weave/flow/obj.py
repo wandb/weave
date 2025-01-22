@@ -64,13 +64,21 @@ class Object(BaseModel):
             )
         return api.ref(uri).get(objectify=objectify)
 
-    def save(self, name: Union[str, None] = None) -> ObjectRef:
+    def publish(self, name: Union[str, None] = None) -> ObjectRef:
+        # I'm using the `publish` term here for now, but ideally we call this `save`.
+        import weave
+
         if name is None:
             name = self.name
-        return api.save(self, name)
+        return weave.publish(self, name)
 
     def delete(self) -> None:
-        api.delete(self)
+        if self.ref is None:
+            raise ValueError(
+                "Can't delete an object without a ref -- has this object been saved?"
+            )
+
+        self.ref.delete()
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
