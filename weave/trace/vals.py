@@ -33,6 +33,7 @@ from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableQueryStatsReq,
     TableRowFilter,
     TraceServerInterface,
 )
@@ -264,6 +265,7 @@ class WeaveObject(Traceable):
 
 class WeaveTable(Traceable):
     filter: TableRowFilter
+    _known_length: Optional[int] = None
 
     def __init__(
         self,
@@ -324,7 +326,34 @@ class WeaveTable(Traceable):
         self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
+        # This should e a single query
+        if self._known_length is not None:
+            return self._known_length
+
+        # Condition 1: we already have all the rows in memory
+        if (
+            self.table_ref is not None
+            and self.table_ref._row_digests is not None
+            and self._prefetched_rows is not None
+        ):
+            if len(self._prefetched_rows) == len(self.table_ref._row_digests):
+                self._known_length = len(self._prefetched_rows)
+                return self._known_length
+
+        # Condition 2: We don't know the length, in which case we can get it from the server
+        if self.table_ref is not None:
+            self._known_length = self._fetch_remote_length()
+            return self._known_length
+
         return len(self.rows)
+
+    def _fetch_remote_length(self) -> int:
+        response = self.server.table_query_stats(
+            TableQueryStatsReq(
+                project_id=self.table_ref.project_id, digest=self.table_ref.digest
+            )
+        )
+        return response.count
 
     def __eq__(self, other: Any) -> bool:
         return self.rows == other
@@ -332,6 +361,7 @@ class WeaveTable(Traceable):
     def _mark_dirty(self) -> None:
         self.table_ref = None
         self._prefetched_rows = None
+        self._known_length = None
         super()._mark_dirty()
 
     def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:

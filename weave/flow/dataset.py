@@ -84,8 +84,7 @@ class Dataset(Object):
         return iter(self.rows)
 
     def __len__(self) -> int:
-        # TODO: This can be slow for large datasets...
-        return len(list(self.rows))
+        return len(self.rows)
 
     def __getitem__(self, key: int) -> dict:
         if key < 0:
