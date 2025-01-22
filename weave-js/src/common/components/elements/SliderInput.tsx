@@ -124,8 +124,6 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         if (operation && operation in keyboardOperations) {
           const handler = keyboardOperations[operation];
           return handler(event);
-        } else {
-          console.log(`unsupported key combination ${event}`);
         }
       },
       [keyboardOperations, keyboardBindings, isFormField]
