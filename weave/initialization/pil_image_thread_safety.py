@@ -4,15 +4,16 @@ This file exposes functions to make the PIL ImageFile thread-safe and revert tho
 - `undo_threadsafe_patch_to_pil_image`
 
 There is a discussion here: https://github.com/python-pillow/Pillow/issues/4848#issuecomment-671339193 in which
-the author claims that the Pillow library is thread-safe. However, my reasoning leads me to a different conclusion.
+the author claims that the Pillow library is thread-safe. However, empirical evidence suggests otherwise.
 
-Specifically, the `ImageFile.load` method is not thread-safe. This is because `load` will both close and delete
-an open file handler as well as modify properties of the ImageFile object (namely the `im` property which contains
-the underlying image data). Inside of Weave we use threads to parallelize work which may involve Images. This bug
-has presented itself not only in our own persistence layer, but also in user code where they are consuming loaded
-images across threads.
+Specifically, the `ImageFile.load` method is not thread-safe because it:
+1. Closes and deletes an open file handler
+2. Modifies properties of the ImageFile object (namely the `im` property which contains the underlying image data)
 
-We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensure that the ImageFile class is thread-safe.
+Inside Weave, we use threads to parallelize work which may involve Images. This thread-safety issue has manifested
+not only in our persistence layer but also in user code where loaded images are accessed across threads.
+
+We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensure thread-safety for the ImageFile class.
 """
 
 import threading
@@ -27,7 +28,11 @@ _fallback_load_lock = threading.Lock()
 
 
 def apply_threadsafe_patch_to_pil_image() -> None:
-    """Apply thread-safety patch to PIL ImageFile class."""
+    """Apply thread-safety patch to PIL ImageFile class.
+
+    This function is idempotent - calling it multiple times has no additional effect.
+    If PIL is not installed or if patching fails, the function will handle the error gracefully.
+    """
     global _patched
 
     if _patched:
@@ -44,6 +49,12 @@ def apply_threadsafe_patch_to_pil_image() -> None:
 
 
 def _apply_threadsafe_patch() -> None:
+    """Internal function that performs the actual thread-safety patching of PIL ImageFile.
+
+    Raises:
+        ImportError: If PIL is not installed
+        Exception: For any other unexpected errors during patching
+    """
     from PIL.ImageFile import ImageFile
 
     global _original_methods
@@ -92,7 +103,7 @@ def _apply_threadsafe_patch() -> None:
 def undo_threadsafe_patch_to_pil_image() -> None:
     """Revert the thread-safety patch applied to PIL ImageFile class.
 
-    If the patch hasn't been applied, this function does nothing.
+    This function is idempotent - if the patch hasn't been applied, this function does nothing.
     If the patch has been applied but can't be reverted, an error message is printed.
     """
     global _patched
@@ -113,6 +124,12 @@ def undo_threadsafe_patch_to_pil_image() -> None:
 
 
 def _undo_threadsafe_patch() -> None:
+    """Internal function that performs the actual removal of thread-safety patches.
+
+    Raises:
+        ImportError: If PIL is not installed
+        Exception: For any other unexpected errors during unpatching
+    """
     from PIL.ImageFile import ImageFile
 
     global _original_methods
