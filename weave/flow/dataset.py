@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 from pydantic import field_validator
@@ -8,6 +8,7 @@ import weave
 from weave.flow.obj import Object
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
+from weave.trace.weave_client import Call
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -53,6 +54,11 @@ class Dataset(Object):
             ref=obj.ref,
             rows=obj.rows,
         )
+
+    @classmethod
+    def from_calls(cls, calls: Iterable[Call]) -> Self:
+        rows = [call.to_dict() for call in calls]
+        return cls(rows=rows)
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
