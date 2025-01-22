@@ -21,6 +21,7 @@ from typing import Any, Callable, Optional
 
 _patched = False
 _original_methods: dict[str, Optional[Callable]] = {"load": None}
+_new_lock_lock = threading.Lock()
 
 
 def apply_threadsafe_patch_to_pil_image() -> None:
@@ -48,21 +49,43 @@ def _apply_threadsafe_patch() -> None:
     # Store original methods
     _original_methods["load"] = ImageFile.load
     old_load = ImageFile.load
-    _new_lock_lock = threading.Lock()
 
     @wraps(old_load)
     def new_load(self: ImageFile, *args: Any, **kwargs: Any) -> Any:
-        # Get a lock for this specific ImageFile instance using its ID
+        # This function wraps PIL's ImageFile.load method to make it thread-safe
+        # by ensuring only one thread can load an image at a time per ImageFile instance.
+
+        # We use a per-instance lock to allow concurrent loading of different images
+        # while preventing concurrent access to the same image.
         lock = None
         try:
+            # Create a new lock for this ImageFile instance if it doesn't exist.
+            # The lock creation itself needs to be thread-safe, hence _new_lock_lock.
+            # Note: this `_new_lock_lock` is global as opposed to per-instance, else
+            # it would be possible for the same ImageFile to be loaded by multiple threads
+            # thereby creating a race where different threads would be each minting their
+            # own lock for the same ImageFile!
             if not hasattr(self, "_weave_load_lock"):
                 with _new_lock_lock:
-                    setattr(self, "_weave_load_lock", threading.Lock())
+                    # Double-check pattern: verify the attribute still doesn't exist
+                    # after acquiring the lock to prevent race conditions
+                    if not hasattr(self, "_weave_load_lock"):
+                        setattr(self, "_weave_load_lock", threading.Lock())
             lock = getattr(self, "_weave_load_lock")
         except Exception:
+            # If we fail to create/get the lock (e.g., due to a frozen/immutable object),
+            # fall back to the original unprotected load method
             return old_load(self, *args, **kwargs)
+
         if lock is None:
+            # Defensive programming: if lock is somehow None despite our efforts,
+            # fall back to the original method
             return old_load(self, *args, **kwargs)
+
+        # Acquire the instance-specific lock before loading the image.
+        # This ensures thread-safety by preventing concurrent:
+        # - Modification of the 'im' property
+        # - Access to the file handler
         with lock:
             return old_load(self, *args, **kwargs)
 
