@@ -381,7 +381,8 @@ class WeaveTable(Traceable):
         return response.count
 
     def __eq__(self, other: Any) -> bool:
-        return self.rows == other
+        rows = self._inefficiently_materialize_rows_as_list()
+        return rows == other
 
     def _mark_dirty(self) -> None:
         self.table_ref = None
