@@ -16,6 +16,7 @@ import * as JSONNan from '../../util/jsonnan';
 import * as Obj from '../../util/obj';
 import * as String from '../../util/string';
 import * as OpKinds from '../opKinds';
+import {fileArgTypes} from './file';
 import {connectionToNodes} from './util';
 
 const makeRunOp = OpKinds.makeTaggingStandardOp;
@@ -718,7 +719,10 @@ export const opStrRunlink = OpKinds.makeBasicOp({
 
 export const opRunHistoryOfTableWithSteps = makeRunOp({
   name: 'run-history_of_table_with_steps',
-  argTypes: runArgTypes,
+  argTypes: {
+    run: 'run' as const,
+    tableName: 'string' as const,
+  },
   description: '',
   argDescriptions: {},
   returnValueDescription: '',
@@ -726,8 +730,7 @@ export const opRunHistoryOfTableWithSteps = makeRunOp({
   resolver: ({run}) => {
     throw new Error();
   },
-
-  // resolveOutputType: async (inputTypes, node, executableNode, client) => {
-  //   return opRunHistoryResolveOutputType(executableNode, client, 1);
-  // },
+  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+    return opRunHistoryResolveOutputType(executableNode, client, 1);
+  },
 });

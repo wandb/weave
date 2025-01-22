@@ -71,41 +71,23 @@ def history_with_columns(run: wdt.Run, history_cols: list[str]):
     hidden=True,
 )
 def refine_history_of_table_with_steps_type(
-    run: wdt.Run
+    run: wdt.Run,
+    tableName: str
 ) -> types.Type:
     return types.List(
         history_op_common.refine_history_type(
-            run, columns=history_op_common.get_full_columns_prefixed(run, ["table"])
+            run, columns=history_op_common.get_full_columns_prefixed(run, [tableName])
         )
     )
-
-def make_run_history_of_table_with_steps_gql_field(fn, inner) -> str:
-    return f"""
-    historyKeys
-    sampledParquetHistory: parquetHistory(liveKeys: {json.dumps(["_step", "table"])}) {{
-        liveData
-        parquetUrls
-    }}
-    project {{
-        id
-        name
-        entity {{
-            id
-            name
-        }}
-    }}
-    """
 
 @op(
     name="run-history_of_table_with_steps",
     refine_output_type=refine_history_of_table_with_steps_type,
-    plugins=wb_gql_op_plugin(make_run_history_of_table_with_steps_gql_field),
+    plugins=wb_gql_op_plugin(history_op_common.make_run_history_gql_field),
     output_type=types.List(types.TypedDict({})),
 )
-def history_of_table_with_steps(run: wdt.Run):
-    # print("HISTORY: ", _get_history(run, history_op_common.get_full_columns_prefixed(run, ["table"])))
-    
-    return _get_history(run, history_op_common.get_full_columns_prefixed(run, ["table"]))
+def history_of_table_with_steps(run: wdt.Run, tableName: str):    
+    return _get_history(run, history_op_common.get_full_columns_prefixed(run, [tableName]))
 
 
 
