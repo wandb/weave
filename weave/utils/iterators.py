@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Generator, Iterator, Sequence
 from threading import Lock
-from typing import Optional, TypeVar, overload
+from typing import TypeVar, overload
 
 T = TypeVar("T")
 
@@ -24,7 +26,7 @@ class ThreadSafeInMemoryIteratorAsSequence(Sequence[T]):
     _single_use_iterator: Iterator[T]
 
     def __init__(
-        self, single_use_iterator: Iterator[T], known_length: Optional[int] = None
+        self, single_use_iterator: Iterator[T], known_length: int | None = None
     ) -> None:
         self._lock = Lock()
         self._single_use_iterator = single_use_iterator
