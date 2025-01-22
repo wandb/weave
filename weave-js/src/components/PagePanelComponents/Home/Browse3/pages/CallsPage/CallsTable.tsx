@@ -998,7 +998,6 @@ export const CallsTable: FC<{
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
-        pageSizeOptions={[DEFAULT_PAGE_SIZE]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
@@ -1006,6 +1005,7 @@ export const CallsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
+        hideFooter={!callsLoading && callsTotal === 0}
         hideFooterSelectedRowCount
         onColumnWidthChange={handleColumnWidthChange}
         pinnedColumns={pinModelResolved}
@@ -1073,7 +1073,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
-          pagination: PaginationButtons,
+          pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
           columnMenuSortAscendingIcon: IconSortAscending,
           columnMenuHideIcon: IconNotVisible,

@@ -1010,6 +1010,7 @@ export const convertTraceServerObjectVersionToSchema = <
     baseObjectClass: obj.base_object_class ?? null,
     versionIndex: obj.version_index,
     val: obj.val,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -1151,7 +1152,7 @@ const useObjectDeleteFunc = () => {
           path: '',
         });
       });
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity,
           project,
@@ -1166,7 +1167,7 @@ const useObjectDeleteFunc = () => {
   const objectDeleteAllVersions = useCallback(
     (key: ObjectVersionKey) => {
       updateObjectCaches(key);
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
@@ -1188,7 +1189,7 @@ const useObjectDeleteFunc = () => {
           versionHash: digest,
         });
       });
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity,
           project,
@@ -1203,7 +1204,7 @@ const useObjectDeleteFunc = () => {
   const opDeleteAllVersions = useCallback(
     (key: OpVersionKey) => {
       updateOpCaches(key);
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,

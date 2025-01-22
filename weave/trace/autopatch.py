@@ -32,7 +32,8 @@ class IntegrationSettings(BaseModel):
 class AutopatchSettings(BaseModel):
     """Settings for auto-patching integrations."""
 
-    # These will be uncommented as we add support for more integrations.  Note that
+    # If True, other autopatch settings are ignored.
+    disable_autopatch: bool = False
 
     anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -51,6 +52,11 @@ class AutopatchSettings(BaseModel):
 
 @validate_call
 def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
+    if settings is None:
+        settings = AutopatchSettings()
+    if settings.disable_autopatch:
+        return
+
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
@@ -70,9 +76,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-
-    if settings is None:
-        settings = AutopatchSettings()
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()

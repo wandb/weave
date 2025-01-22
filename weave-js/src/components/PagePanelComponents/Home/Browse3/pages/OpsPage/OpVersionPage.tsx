@@ -1,28 +1,28 @@
 import {Button} from '@wandb/weave/components/Button';
 import React, {useMemo, useState} from 'react';
 
-import {Icon} from '../../../../Icon';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {useClosePeek} from '../context';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {OpCodeViewer} from '../OpCodeViewer';
-import {DeleteModal, useShowDeleteButton} from './common/DeleteModal';
+import {Icon} from '../../../../../Icon';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
+import {useClosePeek} from '../../context';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {OpCodeViewer} from '../../OpCodeViewer';
+import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
 import {
   CallsLink,
   opNiceName,
   OpVersionsLink,
   opVersionText,
-} from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,
-} from './common/SimplePageLayout';
-import {TabUseOp} from './TabUseOp';
-import {useWFHooks} from './wfReactInterface/context';
-import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../common/SimplePageLayout';
+import {useWFHooks} from '../wfReactInterface/context';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {TabUseOp} from './Tabs/TabUseOp';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -73,7 +73,7 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entity);
 
   return (
     <SimplePageLayoutWithHeader
@@ -201,6 +201,7 @@ const DeleteOpButtonWithModal: React.FC<{
         icon="delete"
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
+        tooltip="Delete this Op version"
       />
       <DeleteModal
         open={deleteModalOpen}

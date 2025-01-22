@@ -7,6 +7,7 @@ from typing import Any
 
 from weave.trace import object_preparers, serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.utils.invertable_dict import InvertableDict
 
 try:
     from PIL import Image
@@ -16,6 +17,16 @@ else:
     dependencies_met = True
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_FORMAT = "PNG"
+
+pil_format_to_ext = InvertableDict[str, str](
+    {
+        "JPEG": "jpg",
+        "PNG": "png",
+    }
+)
+ext_to_pil_format = pil_format_to_ext.inv
 
 
 class PILImagePreparer:
@@ -35,6 +46,12 @@ class PILImagePreparer:
 
 
 def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
+    fmt = getattr(obj, "format", DEFAULT_FORMAT)
+    ext = pil_format_to_ext.get(fmt)
+    if ext is None:
+        logger.debug(f"Unknown image format {fmt}, defaulting to {DEFAULT_FORMAT}")
+        ext = pil_format_to_ext[DEFAULT_FORMAT]
+
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".
     # There is an extensive internal discussion here:
     # https://weightsandbiases.slack.com/archives/C03BSTEBD7F/p1723670081582949
@@ -49,14 +66,18 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     # using the same artifact. Moreover, since we package the deserialization logic with the
     # object payload, we can always change the serialization logic later without breaking
     # existing payloads.
-    with artifact.new_file("image.png", binary=True) as f:
-        obj.save(f, format="png")  # type: ignore
+    fname = f"image.{ext}"
+    with artifact.new_file(fname, binary=True) as f:
+        obj.save(f, format=ext_to_pil_format[ext])  # type: ignore
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
-    # Note: I am purposely ignoring the `name` here and hard-coding the filename. See comment
-    # on save.
-    path = artifact.path("image.png")
+    # Today, we assume there can only be 1 image in the artifact.
+    filename = next(iter(artifact.path_contents))
+    if not filename.startswith("image."):
+        raise ValueError(f"Expected filename to start with 'image.', got {filename}")
+
+    path = artifact.path(filename)
     return Image.open(path)
 
 
