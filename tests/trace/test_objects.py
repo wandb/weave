@@ -63,7 +63,7 @@ def test_object_lifecycle(client, custom_object):
     assert res.b == "world"
 
 
-def test_fail_publish_persist_ref(client, custom_object, monkeypatch):
+def test_failed_publish_maintains_old_object_ref(client, custom_object, monkeypatch):
     old_ref = custom_object.ref
 
     with pytest.raises(Exception):
@@ -76,3 +76,14 @@ def test_fail_publish_persist_ref(client, custom_object, monkeypatch):
             custom_object.publish()
 
     assert custom_object.ref == old_ref
+
+
+def test_saving_only_for_registered_objects(client, custom_object):
+    class UnregisteredObject(weave.Object):
+        a: int
+        b: str
+
+    unregistered_object = UnregisteredObject(a=1, b="hello")
+
+    with pytest.raises(NotImplementedError):
+        unregistered_object.publish()
