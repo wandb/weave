@@ -256,12 +256,11 @@ export type TraceObjCreateRes = {
 export type TraceObjDeleteReq = {
   project_id: string;
   object_id: string;
-  digests: string[];
+  digests?: string[];
 };
 
 export type TraceObjDeleteRes = {
   num_deleted?: number;
-  detail?: string;
 };
 
 export type TraceRefsReadBatchReq = {
