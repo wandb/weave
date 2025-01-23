@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import weave
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher, NoOpPatcher
+from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from huggingface_hub.inference._generated.types.chat_completion import (
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     )
 
 _huggingface_patcher: Optional[MultiPatcher] = None
+
 
 def huggingface_accumulator(
     acc: Optional[Union["ChatCompletionStreamOutput", "ChatCompletionOutput"]],
@@ -160,7 +161,9 @@ def get_huggingface_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("huggingface_hub"),
                 "InferenceClient.fill_mask",
-                huggingface_wrapper_sync(name="huggingface_hub.InferenceClient.fill_mask"),
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.fill_mask"
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("huggingface_hub"),
