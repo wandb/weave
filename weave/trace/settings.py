@@ -70,6 +70,15 @@ class UserSettings(BaseModel):
     WARNING: PII redaction is an experimental feature, and may not always work. 
     It will also introduce significant performance overhead when redacting large payloads.
     """
+    redact_pii_fields: list[str] = []
+    """List of fields to redact.
+
+    If redact_pii is True, this list of fields will be redacted. 
+    If redact_pii is False, this list is ignored. 
+    If this list is left empty, the default fields will be redacted.
+
+    A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
+    """
 
     client_parallelism: Optional[int] = None
     """
@@ -119,6 +128,9 @@ def client_parallelism() -> Optional[int]:
 def should_redact_pii() -> bool:
     return _should("redact_pii")
 
+def redact_pii_fields() -> list[str]:
+    return _list_str("redact_pii_fields")
+
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
@@ -151,6 +163,11 @@ def _should(name: str) -> bool:
 def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
+    return _context_vars[name].get()
+
+def _list_str(name: str) -> list[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env.split(",")
     return _context_vars[name].get()
 
 
