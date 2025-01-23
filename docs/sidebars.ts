@@ -71,6 +71,7 @@ const sidebars: SidebarsConfig = {
         "guides/tools/playground",
         "guides/core-types/media",
         "guides/core-types/env-vars",
+        "guides/troubleshooting",
         {
           type: "category",
           collapsible: true,
