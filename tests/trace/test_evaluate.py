@@ -343,4 +343,4 @@ def test_evaluate_table_lazy_iter(client):
     # However, the key part is that we have basically X + 2 splits, with the middle X
     # being equal. We want to ensure that the table_query is not called in sequence,
     # but rather lazily after each batch.
-    assert counts_split_by_table_query == [13, 700, 700, 700, 5]
+    assert counts_split_by_table_query == [13, 700, 700, 700, 5], log
