@@ -62,7 +62,7 @@ import {
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
-import {FilterPanel} from '../../filters/FilterPanel';
+import {DateRangeFilterPanel, FilterPanel} from '../../filters/FilterPanel';
 import {defaultDateRangeFilter} from '../../grid/filters';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
@@ -139,36 +139,30 @@ const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   page: 0,
 };
 
-export const CallsTable: FC<{
+type CallsTableProps = {
   entity: string;
   project: string;
   frozenFilter?: WFHighLevelCallFilter;
   initialFilter?: WFHighLevelCallFilter;
-  // Setting this will make the component a controlled component. The parent
-  // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
-
-  hideControls?: boolean; // Hide the entire filter and column bar
-  hideOpSelector?: boolean; // Hide the op selector control
-
+  hideControls?: boolean;
+  hideOpSelector?: boolean;
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
-
   pinModel?: GridPinnedColumnFields;
   setPinModel?: (newModel: GridPinnedColumnFields) => void;
-
   filterModel?: GridFilterModel;
   setFilterModel?: (newModel: GridFilterModel) => void;
-
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
-
   paginationModel?: GridPaginationModel;
   setPaginationModel?: (newModel: GridPaginationModel) => void;
-
-  // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
-}> = ({
+  filterDateRangeModel?: GridFilterModel;
+  setFilterDateRangeModel?: (newModel: GridFilterModel) => void;
+};
+
+export const CallsTable: FC<CallsTableProps> = ({
   entity,
   project,
   initialFilter,
@@ -187,6 +181,8 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  filterDateRangeModel,
+  setFilterDateRangeModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -220,10 +216,6 @@ export const CallsTable: FC<{
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
-
-  useEffect(() => {
-    filterModelResolved.items.push(defaultDateRangeFilter());
-  }, []);
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -770,6 +762,17 @@ export const CallsTable: FC<{
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
             />
+          )}
+          {filterDateRangeModel && setFilterDateRangeModel && (
+            <div className="flex items-center gap-6">
+              <DateRangeFilterPanel
+                filterModel={filterDateRangeModel}
+                columnInfo={filterFriendlyColumnInfo}
+                setFilterModel={setFilterDateRangeModel}
+                selectedCalls={selectedCalls}
+                clearSelectedCalls={clearSelectedCalls}
+              />
+            </div>
           )}
           <div className="flex items-center gap-6">
             <Switch.Root

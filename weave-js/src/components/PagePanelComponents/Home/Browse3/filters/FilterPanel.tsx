@@ -9,6 +9,7 @@ import React from 'react';
 import {AutoSizer} from 'react-virtualized';
 
 import {ColumnInfo} from '../types';
+import {DateRangeFilterBar} from './DateRangeFilterBar';
 import {FilterBar} from './FilterBar';
 
 type FilterPanelProps = {
@@ -31,6 +32,27 @@ export const FilterPanel = (props: FilterPanelProps) => {
           }}>
           {({width, height}) => (
             <FilterBar {...props} width={width} height={height} />
+          )}
+        </AutoSizer>
+      </LocalizationProvider>
+    </div>
+  );
+};
+
+export const DateRangeFilterPanel = (
+  props: FilterPanelProps & {isDateRangeFilter: true}
+) => {
+  return (
+    <div className="min-w-90 flex-auto self-stretch">
+      <LocalizationProvider dateAdapter={AdapterMoment}>
+        <AutoSizer
+          className="ml-2 flex items-center"
+          style={{
+            width: '100%',
+            height: '100%',
+          }}>
+          {({width, height}) => (
+            <DateRangeFilterBar {...props} width={width} height={height} />
           )}
         </AutoSizer>
       </LocalizationProvider>

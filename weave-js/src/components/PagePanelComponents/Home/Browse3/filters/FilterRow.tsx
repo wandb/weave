@@ -19,6 +19,7 @@ import {SelectValue} from './SelectValue';
 type FilterRowProps = {
   item: GridFilterItem;
   options: SelectFieldOption[];
+  isDisabled?: boolean;
   onAddFilter: (field: string) => void;
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
@@ -27,6 +28,7 @@ type FilterRowProps = {
 export const FilterRow = ({
   item,
   options,
+  isDisabled,
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
@@ -63,6 +65,7 @@ export const FilterRow = ({
           options={options}
           value={item.field}
           onSelectField={onSelectField}
+          isDisabled={isDisabled}
         />
       </div>
       <div className="w-[140px]">
