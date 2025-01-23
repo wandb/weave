@@ -2,6 +2,10 @@
 
 Weights & Biases integrates with Microsoft Azure OpenAI services, helping teams to manage, debug, and optimize their Azure AI workflows at scale. This guide introduces the W&B integration, what it means for Weave users, its key features, and how to get started.
 
+:::tip
+For the latest tutorials, visit [Weights & Biases on Microsoft Azure](https://wandb.ai/site/partners/azure).
+:::
+
 ## Key features
 
 - **LLM evaluations**: Evaluate and monitor LLM-powered applications using Weave, optimized for Azure infrastructure.  
