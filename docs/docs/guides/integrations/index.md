@@ -11,7 +11,8 @@ Weave provides automatic logging integrations for popular LLM providers and orch
 LLM providers are the vendors that offer access to large language models for generating predictions. Weave integrates with these providers to log and trace the interactions with their APIs:
 
 - **[OpenAI](/guides/integrations/openai)**
-- **[Anthropic](/guides/integrations/anthropic)**
+- **[Anthropic](/guides/integrations/bedrock)**
+- **[Amazon Bedrock](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
 - **[Cohere](/guides/integrations/cohere)**
 - **[MistralAI](/guides/integrations/mistral)**
