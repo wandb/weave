@@ -2,81 +2,104 @@
 title: Introduction Notebook
 ---
 
+:::tip This is a notebook
 
-:::tip[This is a notebook]
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button">
+  <div>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" />
+    <div>Open in Colab</div>
+  </div>
+</a>
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
-
-<a href="https://github.com/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/./intro_notebook.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button">
+  <div>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in GitHub" height="15px" />
+    <div>View in GitHub</div>
+  </div>
+</a>
 
 :::
 
-
-
 <!--- @wandbcode{intro-colab} -->
 
-# 🏃‍♀️ Quickstart
+# Quickstart
 
 Get started using Weave to:
+
 - Log and debug language model inputs, outputs, and traces
 - Build rigorous, apples-to-apples evaluations for language model use cases
 - Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
 See the full Weave documentation [here](https://wandb.me/weave).
 
-
-## 🪄 Install `weave` library and login
-
+## Install `weave` and log in
 
 Start by installing the library and logging in to your account.
 
-In this example, we're using openai so you should [add an openai API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
-
-
+In this example, we're using OpenAI, so you should [add an OpenAI API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
 
 ```python
 %%capture
 !pip install weave openai set-env-colab-kaggle-dotenv
 ```
 
-
 ```python
 # Set your OpenAI API key
 from set_env import set_env
 
-# Put your OPENAI_API_KEY in the secrets panel to the left 🗝️
+# Put your OPENAI_API_KEY in the secrets panel to the left
 _ = set_env("OPENAI_API_KEY")
 # os.environ["OPENAI_API_KEY"] = "sk-..." # alternatively, put your key here
 
 PROJECT = "weave-intro-notebook"
 ```
 
-# Track inputs & outputs of functions
+## Track inputs and outputs of functions
 
-Weave allows users to track function calls: the code, inputs, outputs, and even LLM tokens & costs! In the following sections we will cover:
+Weave allows users to track function calls: the code, inputs, outputs, and even LLM tokens and costs. The following sections cover:
 
-* Custom Functions
-* Vendor Integrations
-* Nested Function Calling
-* Error Tracking
+- Custom Functions
+- Vendor Integrations
+- Nested Function Calling
+- Error Tracking
 
-Note: in all cases, we will:
+In all cases, start by initializing Weave:
 
 ```python
-import weave                    # import the weave library
-weave.init('project-name')      # initialize tracking for a specific W&B project
+import weave
+
+weave.init('project-name')
 ```
 
-## Track custom functions
+### Track custom functions
 
-Add the @weave.op decorator to the functions you want to track
+Add the `@weave.op` decorator to the functions you want to track.
 
-![](../../media/intro/1.png)
+![Vendor Integrations](../../media/intro/2.png)
 
+```python
+import weave
+
+weave.init(PROJECT)
+
+@weave.op()
+def strip_user_input(user_input):
+    return user_input.strip()
+
+result = strip_user_input("    hello    ")
+print(result)
+```
+
+After adding `@weave.op` and calling the function, visit the link to see it tracked within your project.
+
+### Vendor integrations
+
+Here, we're automatically tracking all calls to OpenAI. We automatically track many LLM libraries, and it's easy to add support for others.
+
+![Custom Functions](../../media/intro/1.png)
 
 ```python
 from openai import OpenAI
-
 import weave
 
 weave.init(PROJECT)
@@ -85,10 +108,7 @@ client = OpenAI()
 response = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[
-        {
-            "role": "system",
-            "content": "You are a grammar checker, correct the following user input.",
-        },
+        {"role": "system", "content": "You are a grammar checker, correct the following user input."},
         {"role": "user", "content": "That was so easy, it was a piece of pie!"},
     ],
     temperature=0,
@@ -97,55 +117,21 @@ generation = response.choices[0].message.content
 print(generation)
 ```
 
-You can find your interactive dashboard by clicking any of the  👆 wandb links above.
+### Track nested functions
 
-## Vendor Integrations (OpenAI, Anthropic, Mistral, etc...)
+Now that you've seen the basics, let's combine all the above and track deeply nested functions alongside LLM calls.
 
-Here, we're automatically tracking all calls to `openai`. We automatically track a lot of LLM libraries, but it's really easy to add support for whatever LLM you're using, as you'll see below. 
-
-![](../../media/intro/2.png)
-
-
-```python
-import weave
-
-weave.init(PROJECT)
-
-
-@weave.op()
-def strip_user_input(user_input):
-    return user_input.strip()
-
-
-result = strip_user_input("    hello    ")
-print(result)
-```
-
-After adding `weave.op` and calling the function, visit the link and see it tracked within your project.
-
-💡 We automatically track your code, have a look at the code tab!
-
-## Track nested functions
-
-Now that you've seen the basics, let's combine all of the above and track some deeply nested functions alongside LLM calls.
-
-
-
-![](../../media/intro/3.png)
-
+![Nested Functions](../../media/intro/3.png)
 
 ```python
 from openai import OpenAI
-
 import weave
 
 weave.init(PROJECT)
 
-
 @weave.op()
 def strip_user_input(user_input):
     return user_input.strip()
-
 
 @weave.op()
 def correct_grammar(user_input):
@@ -155,42 +141,33 @@ def correct_grammar(user_input):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {
-                "role": "system",
-                "content": "You are a grammar checker, correct the following user input.",
-            },
+            {"role": "system", "content": "You are a grammar checker, correct the following user input."},
             {"role": "user", "content": stripped},
         ],
         temperature=0,
     )
     return response.choices[0].message.content
 
-
 result = correct_grammar("   That was so easy, it was a piece of pie!    ")
 print(result)
 ```
 
-## Track Errors
+### Track errors
 
-Whenever your code crashes, weave will highlight what caused the issue. This is especially useful for finding things like JSON parsing issues that can occasionally happen when parsing data from LLM responses.
+When your code crashes, Weave highlights the issue, making it especially useful for debugging JSON parsing issues in LLM responses.
 
-![](../../media/intro/4.png)
-
+![Error Tracking](../../media/intro/4.png)
 
 ```python
 import json
-
 from openai import OpenAI
-
 import weave
 
 weave.init(PROJECT)
 
-
 @weave.op()
 def strip_user_input(user_input):
     return user_input.strip()
-
 
 @weave.op()
 def correct_grammar(user_input):
@@ -200,10 +177,7 @@ def correct_grammar(user_input):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {
-                "role": "system",
-                "content": "You are a grammar checker, correct the following user input.",
-            },
+            {"role": "system", "content": "You are a grammar checker, correct the following user input."},
             {"role": "user", "content": stripped},
         ],
         temperature=0,
@@ -211,35 +185,27 @@ def correct_grammar(user_input):
     )
     return json.loads(response.choices[0].message.content)
 
-
 result = correct_grammar("   That was so easy, it was a piece of pie!    ")
 print(result)
 ```
 
-# Tracking Objects
+## Tracking objects
 
-Organizing experimentation is difficult when there are many moving pieces. You can capture and organize the experimental details of your app like your system prompt or the model you're using within `weave.Objects`. This helps organize and compare different iterations of your app. In this section, we will cover:
+Organizing experimentation is challenging with many moving pieces. Capture and organize experimental details of your app, such as your system prompt or model, within `weave.Objects`. This helps compare different iterations of your app. 
 
-* General Object Tracking
-* Tracking Models
-* Tracking Datasets
+### General object tracking
 
-## General Object Tracking
+Track and version data as you do with code. For example, define a `SystemPrompt(weave.Object)` that can be shared with teammates.
 
-Many times, it is useful to track & version data, just like you track and version code. For example, here we define a `SystemPrompt(weave.Object)` object that can be shared between teammates
-
-![](../../media/intro/5.png)
-
+![Object Tracking](../../media/intro/5.png)
 
 ```python
 import weave
 
 weave.init(PROJECT)
 
-
 class SystemPrompt(weave.Object):
     prompt: str
-
 
 system_prompt = SystemPrompt(
     prompt="You are a grammar checker, correct the following user input."
@@ -247,23 +213,19 @@ system_prompt = SystemPrompt(
 weave.publish(system_prompt)
 ```
 
-## Model Tracking
+### Model tracking
 
-Models are so common of an object type, that we have a special class to represent them: `weave.Model`. The only requirement is that we define a `predict` method.
+Models are common objects, so Weave provides the `weave.Model` class. Define a `predict` method to represent models.
 
-![](../../media/intro/6.png)
-
+![Model Tracking](../../media/intro/6.png)
 
 ```python
 from openai import OpenAI
-
 import weave
 
 weave.init(PROJECT)
 
-
 class OpenAIGrammarCorrector(weave.Model):
-    # Properties are entirely user-defined
     openai_model_name: str
     system_message: str
 
@@ -280,22 +242,20 @@ class OpenAIGrammarCorrector(weave.Model):
         )
         return response.choices[0].message.content
 
-
 corrector = OpenAIGrammarCorrector(
     openai_model_name="gpt-4o-mini",
-    system_message="You are a grammar checker, correct the following user input.",
+    system_message="You are a grammar checker, correct the following user input."
 )
 
 result = corrector.predict("     That was so easy, it was a piece of pie!       ")
 print(result)
 ```
 
-## Dataset Tracking
+### Dataset tracking
 
-Similar to models, a `weave.Dataset` object exists to help track, organize, and operate on datasets
+The `weave.Dataset` object helps track, organize, and operate on datasets.
 
-![](../../media/intro/7.png)
-
+![Dataset Tracking](../../media/intro/7.png)
 
 ```python
 dataset = weave.Dataset(
@@ -316,14 +276,11 @@ dataset = weave.Dataset(
 weave.publish(dataset)
 ```
 
-Notice that we saved a versioned `GrammarCorrector` object that captures the configurations you're experimenting with.
+### Retrieve published objects and operations
 
-## Retrieve Published Objects & Ops
+Publish objects and retrieve them later. You can call functions from your retrieved objects.
 
-You can publish objects and then retrieve them in your code. You can even call functions from your retrieved objects!
-
-![](../../media/intro/8.png)
-
+![Retrieve Published Objects](../../media/intro/8.png)
 
 ```python
 import weave
@@ -332,51 +289,44 @@ weave.init(PROJECT)
 
 corrector = OpenAIGrammarCorrector(
     openai_model_name="gpt-4o-mini",
-    system_message="You are a grammar checker, correct the following user input.",
+    system_message="You are a grammar checker, correct the following user input."
 )
 
 ref = weave.publish(corrector)
 print(ref.uri())
 ```
 
-![](../../media/intro/9.png)
-
+![Published Object Retrieval](../../media/intro/9.png)
 
 ```python
 import weave
 
 weave.init(PROJECT)
 
-# Note: this url is available from the UI after publishing the object!
+# Note: this URL is available in the UI after publishing the object!
 ref_url = f"weave:///{ref.entity}/{PROJECT}/object/{ref.name}:{ref.digest}"
-fetched_collector = weave.ref(ref_url).get()
+fetched_corrector = weave.ref(ref_url).get()
 
-# Notice: this object was loaded from remote location!
-result = fetched_collector.predict("That was so easy, it was a piece of pie!")
+# This object was loaded from a remote location!
+result = fetched_corrector.predict("That was so easy, it was a piece of pie!")
 
 print(result)
 ```
 
-# Evaluation
+## Evaluation
 
-Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class assesses the performance of a `Model` on a `Dataset` or set of examples using scoring functions.
 
-See a preview of the API below:
-
-![](../../media/intro/10.png)
-
+![Evaluation](../../media/intro/10.png)
 
 ```python
 import weave
 from weave import Evaluation
 
-
 # Define any custom scoring function
 @weave.op()
 def exact_match(expected: str, model_output: dict) -> dict:
-    # Here is where you'd define the logic to score the model output
     return {"match": expected == model_output}
-
 
 # Score your examples using scoring functions
 evaluation = Evaluation(
@@ -386,10 +336,11 @@ evaluation = Evaluation(
 
 # Start tracking the evaluation
 weave.init(PROJECT)
+
 # Run the evaluation
 summary = await evaluation.evaluate(corrector)  # can be a model or simple function
 ```
 
 ## What's next?
 
-Follow the [Build an Evaluation pipeline](http://wandb.me/weave_eval_tut) tutorial to learn more about Evaluation and begin iteratively improving your applications.
+Follow the [Build an Evaluation Pipeline](http://wandb.me/weave_eval_tut) tutorial to learn more about evaluation and begin iteratively improving your applications.
