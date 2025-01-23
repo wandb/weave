@@ -15,11 +15,13 @@ if TYPE_CHECKING:
 
 class LiteLLMFilter(logging.Filter):
     """Filter to suppress specific LiteLLM debug messages."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         # Only filter debug messages about GenericAPILogger enterprise feature
         return not (
             record.levelno == logging.DEBUG
-            and "Unable to import GenericAPILogger - LiteLLM Enterprise Feature" in record.getMessage()
+            and "Unable to import GenericAPILogger - LiteLLM Enterprise Feature"
+            in record.getMessage()
         )
 
 
