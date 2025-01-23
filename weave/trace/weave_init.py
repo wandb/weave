@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
+
+# Suppress LiteLLM's debug message about GenericAPILogger
+logging.getLogger("LiteLLM").setLevel(logging.INFO)
 
 
 class InitializedClient:
