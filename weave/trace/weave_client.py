@@ -522,6 +522,18 @@ class Call:
     def get_descendents(
         self, *, nested: bool = False
     ) -> Iterable[WeaveObject] | NestedCallList:
+        """
+        Get the descendents of the call.
+
+        If `nested` is True, then the descendents will be returned as a nested list structure.
+        For a tree like:
+            A
+            ├── B
+            │   ├── C
+            │   └── D
+            └── E
+        Returns: [A, [B, [C], [D]], [E]]
+        """
         wc = weave_client_context.require_weave_client()
         return wc.get_call_descendents(calls=[self], nested=nested)
 
@@ -848,6 +860,14 @@ class WeaveClient:
 
         Args:
             nested: If true, returns a nested list structure.
+            For a tree like:
+                A
+                ├── B
+                │   ├── C
+                │   └── D
+                └── E
+            Returns: [A, [B, [C], [D]], [E]]
+
         """
         if nested:
             warn_once(
@@ -878,8 +898,7 @@ class WeaveClient:
             parent_to_children[call.parent_id].append(call)
 
         def build_nested_list(call: Call) -> NestedCallList:
-            result: NestedCallList = [call]  # Start with the call itself
-            # Add all children as nested lists
+            result: NestedCallList = [call]
             for child in parent_to_children[call.id]:
                 result.append(build_nested_list(child))
             return result
@@ -887,7 +906,7 @@ class WeaveClient:
         root_calls = list(calls)
         if not root_calls:
             return []
-        return build_nested_list(root_calls[0])
+        return build_nested_list(root_calls)
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
