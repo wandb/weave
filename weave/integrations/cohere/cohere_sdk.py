@@ -199,6 +199,16 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
                         billed_units=response.meta.billed_units,
                         warnings=response.meta.warnings,
                     )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "cohere": {
+                            "prompt_tokens": response.meta.billed_units.input_tokens,
+                            "completion_tokens": 0,  # Embeddings don't have completion tokens
+                            "total_tokens": response.meta.billed_units.input_tokens,
+                        }
+                    }
+
                     response = Embeddings(**response_dict)
                 except:
                     pass  # prompt to upgrade cohere sdk
@@ -232,6 +242,16 @@ def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
                         billed_units=response.meta.billed_units,
                         warnings=response.meta.warnings,
                     )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "cohere": {
+                            "prompt_tokens": response.meta.billed_units.input_tokens,
+                            "completion_tokens": 0,  # Embeddings don't have completion tokens
+                            "total_tokens": response.meta.billed_units.input_tokens,
+                        }
+                    }
+
                     response = Embeddings(**response_dict)
                 except:
                     pass  # prompt to upgrade cohere sdk
