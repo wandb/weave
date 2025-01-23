@@ -6,10 +6,10 @@ slug: /
 
 Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
 
-- **Tracing & Monitoring**: [Track your application from input to output](./guides/tracking/) to debug and analyze production systems.
+- **Tracing & Monitoring**: [Track LLM calls and application logic](./guides/tracking/) to debug and analyze production systems.
 - **Systematic Iteration**: Refine and iterate on [prompts](./guides/core-types/prompts.md), [datasets](./guides/core-types/datasets.md), and [models](./guides/core-types/models.md).
 - **Experimentation**: Experiment with different models and prompts in the [LLM Playground](./guides/tools/playground.md). 
-- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/scorers#predefined-scorers), [object comparison](./guides/tools/comparison.md), and LLM  tools to systematically assess and enhance application performance.
+- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/scorers#predefined-scorers) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
 - **Guardrails**: Protect your application with [pre- and post-safeguards](./guides/evaluation/guardrails_and_monitors.md) for content moderation, prompt safety, and more.
 
 Integrate Weave with your existing development stack via the:
