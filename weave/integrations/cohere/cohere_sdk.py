@@ -181,6 +181,29 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     return wrapper
 
 
+def cohere_embed_wrapper(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+        op = weave.op(fn, **op_kwargs)
+        return op
+
+    return wrapper
+
+
+def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        @wraps(fn)
+        async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            response = await fn(*args, **kwargs)
+            return response
+
+        op_kwargs = settings.model_dump()
+        op = weave.op(_wrapper, **op_kwargs)
+        return op
+
+    return wrapper
+
+
 def get_cohere_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -217,6 +240,12 @@ def get_cohere_patcher(
     )
     async_chat_stream_v2_settings = base.model_copy(
         update={"name": base.name or "cohere.AsyncClientV2.chat_stream"}
+    )
+    embed_settings = base.model_copy(
+        update={"name": base.name or "cohere.Client.embed"}
+    )
+    async_embed_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClient.embed"}
     )
 
     _cohere_patcher = MultiPatcher(
@@ -267,6 +296,18 @@ def get_cohere_patcher(
                 lambda: importlib.import_module("cohere"),
                 "AsyncClientV2.chat_stream",
                 cohere_stream_wrapper_v2(async_chat_stream_v2_settings),
+            ),
+            # Add patch for embeddings
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "Client.embed",
+                cohere_embed_wrapper(embed_settings),
+            ),
+            # Add patch for async embeddings
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClient.embed",
+                cohere_embed_wrapper_async(async_embed_settings),
             ),
         ]
     )
