@@ -215,16 +215,16 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
                     )
 
                     # Add usage data in the format Weave expects
-                    response_dict["usage"] = Usage(
-                        billed_units=UsageBilledUnits(
-                            input_tokens=response.meta.billed_units.input_tokens,
-                            output_tokens=0,  # Embeddings don't have output tokens
-                        ),
-                        tokens=UsageTokens(
-                            input_tokens=response.meta.billed_units.input_tokens,
-                            output_tokens=0,  # Embeddings don't have output tokens
-                        ),
-                    )
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                    }
 
                     response = EmbedResponse(**response_dict)
                 except:
@@ -275,16 +275,16 @@ def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
                     )
 
                     # Add usage data in the format Weave expects
-                    response_dict["usage"] = Usage(
-                        billed_units=UsageBilledUnits(
-                            input_tokens=response.meta.billed_units.input_tokens,
-                            output_tokens=0,  # Embeddings don't have output tokens
-                        ),
-                        tokens=UsageTokens(
-                            input_tokens=response.meta.billed_units.input_tokens,
-                            output_tokens=0,  # Embeddings don't have output tokens
-                        ),
-                    )
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                    }
 
                     response = EmbedResponse(**response_dict)
                 except:
