@@ -114,8 +114,8 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
 
 
 def get_huggingface_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
+    settings: Optional[IntegrationSettings] = None,
+) -> Union[MultiPatcher, NoOpPatcher]:
     if settings is None:
         settings = IntegrationSettings()
 
