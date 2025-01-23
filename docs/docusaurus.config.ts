@@ -125,7 +125,7 @@ const config: Config = {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
     navbar: {
-      title: "Weave",
+      title: "W&B Weave",
       logo: {
         alt: "My Site Logo",
         src: "img/logo.svg",
@@ -231,7 +231,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Weave by W&B`,
+      copyright: `Made with ❤️ by Weights & Biases`,
     },
     prism: {
       // theme: prismThemes.nightOwl,

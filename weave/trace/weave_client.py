@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
 import logging
 import platform
 import re
@@ -15,6 +16,7 @@ from typing import (
     Callable,
     Generic,
     Protocol,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -36,6 +38,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
+from weave.trace.objectify import maybe_objectify
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.pii_redaction import redact_pii
@@ -79,6 +82,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateRes,
     ObjCreateReq,
     ObjCreateRes,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
@@ -86,6 +90,7 @@ from weave.trace_server.trace_server_interface import (
     ObjSchemaForInsert,
     Query,
     RefsReadBatchReq,
+    SortBy,
     StartedCallSchemaForInsert,
     TableCreateReq,
     TableCreateRes,
@@ -127,14 +132,22 @@ class PaginatedIterator(Generic[T, R]):
         page_size: int = 1000,
         transform_func: TransformFunc[T, R] | None = None,
         size_func: SizeFunc | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> None:
         self.fetch_func = fetch_func
         self.page_size = page_size
         self.transform_func = transform_func
         self.size_func = size_func
+        self.limit = limit
+        self.offset = offset
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
+        if limit is not None and limit <= 0:
+            raise ValueError("limit must be greater than 0")
+        if offset is not None and offset < 0:
+            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
@@ -147,6 +160,12 @@ class PaginatedIterator(Generic[T, R]):
     def _get_one(self, index: int) -> T | R:
         if index < 0:
             raise IndexError("Negative indexing not supported")
+
+        if self.limit is not None and index >= self.limit + (self.offset or 0):
+            raise IndexError(f"Index {index} out of range")
+
+        if self.offset is not None:
+            index += self.offset
 
         page_index = index // self.page_size
         page_offset = index % self.page_size
@@ -171,6 +190,17 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative stop not supported")
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
+
+        # Apply limit if provided
+        if self.limit is not None:
+            if stop is None or stop > self.limit:
+                stop = self.limit
+
+        # Apply offset if provided
+        if self.offset is not None:
+            start += self.offset
+            if stop is not None:
+                stop += self.offset
 
         i = start
         while stop is None or i < stop:
@@ -216,7 +246,14 @@ def _make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
     filter: CallsFilter,
+    limit_override: int | None = None,
+    offset_override: int | None = None,
+    sort_by: list[SortBy] | None = None,
+    query: Query | None = None,
     include_costs: bool = False,
+    include_feedback: bool = False,
+    columns: list[str] | None = None,
+    expand_columns: list[str] | None = None,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
@@ -226,6 +263,11 @@ def _make_calls_iterator(
                 offset=offset,
                 limit=limit,
                 include_costs=include_costs,
+                include_feedback=include_feedback,
+                query=query,
+                sort_by=sort_by,
+                columns=columns,
+                expand_columns=expand_columns,
             )
         )
         return response.calls
@@ -239,12 +281,19 @@ def _make_calls_iterator(
         response = server.calls_query_stats(
             CallsQueryStatsReq(project_id=project_id, filter=filter)
         )
+        if limit_override is not None:
+            offset = offset_override or 0
+            return min(limit_override, response.count - offset)
+        if offset_override is not None:
+            return response.count - offset_override
         return response.count
 
     return PaginatedIterator(
         fetch_func,
         transform_func=transform_func,
         size_func=size_func,
+        limit=limit_override,
+        offset=offset_override,
     )
 
 
@@ -335,6 +384,23 @@ def map_to_refs(obj: Any) -> Any:
         return map_to_refs(obj._val)
 
     return obj
+
+
+class CallDict(TypedDict):
+    op_name: str
+    trace_id: str
+    project_id: str
+    parent_id: str | None
+    inputs: dict
+    id: str | None
+    output: Any
+    exception: str | None
+    summary: dict | None
+    display_name: str | None
+    attributes: dict | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
 
 
 @dataclasses.dataclass
@@ -535,6 +601,27 @@ class Call:
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
 
+    def to_dict(self) -> CallDict:
+        if callable(display_name := self.display_name):
+            display_name = "Callable Display Name (not called yet)"
+
+        return CallDict(
+            op_name=self.op_name,
+            trace_id=self.trace_id,
+            project_id=self.project_id,
+            parent_id=self.parent_id,
+            inputs=self.inputs,
+            id=self.id,
+            output=self.output,
+            exception=self.exception,
+            summary=self.summary,
+            display_name=display_name,
+            attributes=self.attributes,
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            deleted_at=self.deleted_at,
+        )
+
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
@@ -685,7 +772,7 @@ class WeaveClient:
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(self, ref: ObjectRef) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
@@ -696,8 +783,15 @@ class WeaveClient:
                 )
             )
         except HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            if e.response is not None:
+                if e.response.content:
+                    try:
+                        reason = json.loads(e.response.content).get("reason")
+                        raise ValueError(reason)
+                    except json.JSONDecodeError:
+                        raise ValueError(e.response.content)
+                if e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -728,25 +822,58 @@ class WeaveClient:
             data = read_res.obj.val
 
         val = from_json(data, project_id, self.server)
-
-        return make_trace_obj(val, ref, self.server, None)
+        weave_obj = make_trace_obj(val, ref, self.server, None)
+        if objectify:
+            return maybe_objectify(weave_obj)
+        return weave_obj
 
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
         self,
+        *,
         filter: CallsFilter | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortBy] | None = None,
+        query: Query | None = None,
         include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
     ) -> CallsIter:
+        """
+        Get a list of calls.
+
+        Args:
+            filter: A filter to apply to the calls.
+            limit: The maximum number of calls to return.
+            offset: The number of calls to skip.
+            sort_by: A list of fields to sort the calls by.
+            query: A mongo-like query to filter the calls.
+            include_costs: If true, cost info is included at summary.weave
+            include_feedback: If true, feedback info is included at summary.weave.feedback
+            columns: A list of columns to include in the response. If None,
+               all columns are included. Specifying fewer columns may be more performant.
+               Some columns are always included: id, project_id, trace_id, op_name, started_at
+
+        Returns:
+            An iterator of calls.
+        """
         if filter is None:
             filter = CallsFilter()
 
         return _make_calls_iterator(
             self.server,
             self._project_id(),
-            filter,
-            include_costs,
+            filter=filter,
+            limit_override=limit,
+            offset_override=offset,
+            sort_by=sort_by,
+            query=query,
+            include_costs=include_costs,
+            include_feedback=include_feedback,
+            columns=columns,
         )
 
     @deprecated(new_name="get_calls")
@@ -762,12 +889,30 @@ class WeaveClient:
         self,
         call_id: str,
         include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
     ) -> WeaveObject:
+        """
+        Get a single call by its ID.
+
+        Args:
+            call_id: The ID of the call to get.
+            include_costs: If true, cost info is included at summary.weave
+            include_feedback: If true, feedback info is included at summary.weave.feedback
+            columns: A list of columns to include in the response. If None,
+               all columns are included. Specifying fewer columns may be more performant.
+               Some columns are always included: id, project_id, trace_id, op_name, started_at
+
+        Returns:
+            A call object.
+        """
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
                 filter=CallsFilter(call_ids=[call_id]),
                 include_costs=include_costs,
+                include_feedback=include_feedback,
+                columns=columns,
             )
         )
         if not response.calls:
@@ -1024,6 +1169,26 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_version(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digests=[object.digest],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op_version(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op.name,
+                digests=[op.digest],
             )
         )
 
@@ -1604,7 +1769,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:

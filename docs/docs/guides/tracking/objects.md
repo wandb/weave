@@ -58,6 +58,28 @@ Saving an object with a name will create the first version of that object if it 
   </TabItem>
 </Tabs>
 
+## Deleting an object
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    To delete a version of an object, call `.delete()` on the object ref.
+
+    ```python
+    weave.init('intro-example')
+    cat_names_ref = weave.ref('cat-names:v1')
+    cat_names_ref.delete()
+    ```
+
+    Trying to access a deleted object will result in an error. Resolving an object that has a reference to a deleted object will return a `DeletedRef` object in place of the deleted object.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
 ## Ref styles
 
 A fully qualified weave object ref uri looks like this:

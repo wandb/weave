@@ -1,3 +1,5 @@
+import pytest
+
 import weave
 
 
@@ -21,3 +23,34 @@ def test_dataset_iteration(client):
     # Test that we can iterate multiple times
     rows2 = list(dataset)
     assert rows2 == rows
+
+
+def test_pythonic_access(client):
+    rows = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}, {"a": 5}]
+    ds = weave.Dataset(rows=rows)
+    assert len(ds) == 5
+    assert ds[0] == {"a": 1}
+
+    with pytest.raises(IndexError):
+        ds[-1]
+
+
+def test_dataset_from_calls(client):
+    @weave.op
+    def greet(name: str, age: int) -> str:
+        return f"Hello {name}, you are {age}!"
+
+    greet("Alice", 30)
+    greet("Bob", 25)
+
+    calls = client.get_calls()
+    dataset = weave.Dataset.from_calls(calls)
+    rows = list(dataset.rows)
+
+    assert len(rows) == 2
+    assert rows[0]["inputs"]["name"] == "Alice"
+    assert rows[0]["inputs"]["age"] == 30
+    assert rows[0]["output"] == "Hello Alice, you are 30!"
+    assert rows[1]["inputs"]["name"] == "Bob"
+    assert rows[1]["inputs"]["age"] == 25
+    assert rows[1]["output"] == "Hello Bob, you are 25!"
