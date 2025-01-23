@@ -3238,7 +3238,14 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
-def test_get_call_descendents_flat(client):
+@pytest.mark.parametrize(
+    "descendents_code",
+    [
+        "list(call.get_descendents())",
+        "client.get_call_descendents([call])",
+    ],
+)
+def test_get_call_descendents_flat(client, descendents_code):
     @weave.op
     def fib(n: int) -> int:
         if n <= 1:
@@ -3253,7 +3260,7 @@ def test_get_call_descendents_flat(client):
     #   │     └── fib(0)
     #   └── fib(1)
 
-    descendents = list(call.get_descendents())
+    descendents = eval(descendents_code)
     assert len(descendents) == 5
     assert descendents[0].inputs == {"n": 3}
     assert descendents[0].output == 2
@@ -3267,7 +3274,14 @@ def test_get_call_descendents_flat(client):
     assert descendents[4].output == 1
 
 
-def test_get_call_descendents_nested(client):
+@pytest.mark.parametrize(
+    "descendents_code",
+    [
+        "list(call.get_descendents(nested=True))",
+        "client.get_call_descendents([call], nested=True)",
+    ],
+)
+def test_get_call_descendents_nested(client, descendents_code):
     @weave.op
     def fib(n: int) -> int:
         if n <= 1:
@@ -3282,7 +3296,7 @@ def test_get_call_descendents_nested(client):
     #   │     └── fib(0) (D)
     #   └── fib(1) (E)
 
-    descendents = list(call.get_descendents(nested=True))
+    descendents = eval(descendents_code)
     # There's just 1 call, so outer envelope is a list with 1 item
     assert len(descendents) == 1
 
