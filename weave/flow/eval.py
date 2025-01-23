@@ -30,7 +30,7 @@ from weave.scorers import (
 )
 from weave.trace.context import weave_client_context
 from weave.trace.env import get_weave_parallelism
-from weave.trace.errors import OpCallError
+from weave.trace.errors import MissingRefError, OpCallError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
@@ -320,28 +320,37 @@ class Evaluation(Object):
 
         return summary
 
-    def get_evaluation_calls(self) -> dict[str, CallsIter]:
-        if not (eval_ref := self.evaluate.ref):
-            raise ValueError(
-                "Evaluation must be run or published before calling get_evaluation_results"
+    def get_evaluation_calls(
+        self, *, include_children: bool = False
+    ) -> dict[str, CallsIter]:
+        try:
+            return self._get_evaluation_calls(include_children=include_children)
+        except MissingRefError:
+            raise RuntimeError(
+                "Cannot get evaluation calls: No evaluation results found. "
+                "You must first run evaluation.evaluate(model) before calling get_evaluation_calls."
             )
 
+    def _get_evaluation_calls(
+        self, *, include_children: bool = False
+    ) -> dict[str, CallsIter]:
         res = {}
         eval_calls = self.evaluate.calls()
         wc = weave_client_context.require_weave_client()
         for call in eval_calls:
-            display_name = call.display_name
-            if display_name and isinstance(display_name, str):
-                if display_name in res:
-                    logger.warning(
-                        f"Duplicate display name {display_name} found in evaluation results; omitting some results..."
-                    )
-                    continue
-                res[display_name] = wc.get_calls(
-                    filter=CallsFilter(
-                        parent_ids=[call.id], input_refs=[eval_ref.uri()]
-                    )
+            name = call.display_name
+            if not isinstance(name, str):
+                continue
+            if name in res:
+                logger.warning(
+                    f"Duplicate display name {name} found in evaluation results; omitting some results..."
                 )
+
+            if include_children:
+                res[name] = call.get_all_descendents()
+            else:
+                res[name] = wc.get_calls(filter=CallsFilter(parent_ids=[call.id]))
+
         return res
 
 

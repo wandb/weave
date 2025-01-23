@@ -7,7 +7,7 @@ import logging
 import platform
 import re
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
@@ -26,10 +26,12 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.flow.util import warn_once
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.errors import MissingRefError
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
@@ -511,6 +513,12 @@ class Call:
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
         )
+
+    def get_all_descendents(self) -> Generator[Call, None, None]:
+        warn_once(logger, "get_all_descendents can be slow for deeply nested traces!")
+        for child in self.children():
+            yield child
+            yield from child.get_all_descendents()
 
     def delete(self) -> bool:
         """Delete the call."""
@@ -1753,11 +1761,14 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
+    def _op_calls(self, op: Op, *, filter: CallsFilter | None = None) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
-            raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
+            raise MissingRefError(f"Can't get runs for unpublished op: {op}")
+        if filter is None:
+            filter = CallsFilter()
+        filter.op_names = [op_ref.uri()]
+        return self.get_calls(filter=filter)
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
