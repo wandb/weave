@@ -906,7 +906,7 @@ class WeaveClient:
         root_calls = list(calls)
         if not root_calls:
             return []
-        return build_nested_list(root_calls)
+        return [build_nested_list(root_call) for root_call in root_calls]
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
