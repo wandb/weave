@@ -7,7 +7,7 @@ import {useCallback, useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isValuelessOperator} from '../../filters/common';
-import {addCostsToCallResults} from '../CallPage/cost';
+import {addSummaryToCallResults} from '../CallPage/cost';
 import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
@@ -138,7 +138,7 @@ export const useCallsForQuery = (
       result: calls.loading
         ? []
         : costResults.length > 0
-        ? addCostsToCallResults(callResults, costResults)
+        ? addSummaryToCallResults(callResults, costResults)
         : callResults,
       total,
       refetch,
