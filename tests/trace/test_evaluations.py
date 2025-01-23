@@ -813,9 +813,9 @@ async def test_evaluation_with_column_map():
 
     # The expected summary should show that 3 out of 4 predictions matched
     expected_results = {"true_count": 3, "true_fraction": 0.75}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results
-    ), "The summary should reflect the correct number of matches"
+    assert eval_out["DummyScorer"]["match"] == expected_results, (
+        "The summary should reflect the correct number of matches"
+    )
 
 
 @pytest.mark.asyncio
@@ -918,9 +918,9 @@ async def test_evaluation_with_multiple_column_maps():
 
     # Assertions for the first scorer
     expected_results_dummy = {"true_count": 1, "true_fraction": 1.0 / 3}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results_dummy
-    ), "All concatenations should match the target"
+    assert eval_out["DummyScorer"]["match"] == expected_results_dummy, (
+        "All concatenations should match the target"
+    )
 
     # Assertions for the second scorer
     # Since input1 == col2, and output is col1 + col2, we check if col2 == (col1 + col2)[::-1]
@@ -930,9 +930,9 @@ async def test_evaluation_with_multiple_column_maps():
     # Third row: col2 = "zyx", output = "xyzzyx", output[::-1] = "xyzzyx" -> "zyx" == "xyzzyx" is False
     # So all matches are False
     expected_results_another_dummy = {"true_count": 0, "true_fraction": 0.0}
-    assert (
-        eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy
-    ), "No matches should be found for AnotherDummyScorer"
+    assert eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy, (
+        "No matches should be found for AnotherDummyScorer"
+    )
 
 
 @pytest.mark.asyncio
@@ -1056,20 +1056,25 @@ async def test_evaluation_with_custom_name(client):
 
 
 @pytest.mark.asyncio
-async def test_get_evaluation_results(client):
+async def test_get_evaluation_calls(client):
     @weave.op
     def model(a: int, b: int) -> int:
         return a + b
 
     ev = weave.Evaluation(
-        dataset=[{"a": 1, "b": 2}],
-        # The evaluation name here is a hack for tests and is not required on the prod
-        # trace server.  Sqlite seems to have a memory of the previous calls, and this
-        # was the only way I found to get the evaluation name to be unique in the test.
-        evaluation_name=lambda call: call.id,
+        dataset=[
+            {"a": 1, "b": 2},
+            {"a": 2, "b": 3},
+            {"a": 3, "b": 4},
+        ]
     )
     await ev.evaluate(model)
     await ev.evaluate(model)
-    res = ev.get_evaluation_calls()
 
+    res = ev.get_evaluation_calls()
+    # 2 calls to evaluate
     assert len(res) == 2
+
+    res2 = ev.get_evaluation_calls(include_children=True)
+    # (1x evaluate, 3x predict_and_score, 3x model, 1x summarize) * 2
+    assert len(res2) == 16

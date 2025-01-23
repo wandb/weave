@@ -864,33 +864,30 @@ class WeaveClient:
 
     def _get_call_descendents_nested(self, calls: Iterable[Call]) -> NestedCallList:
         """Get all descendents of the given calls, in a nested list structure.
-
-        The nested list has elements that are either:
-        - A Call object (leaf node); or
-        - A list containing a Call object followed by its nested children
+        For a tree like:
+            A
+            ├── B
+            │   ├── C
+            │   └── D
+            └── E
+        Returns: [A, [B, [C], [D]], [E]]
         """
         # Map parents to child calls
         parent_to_children: defaultdict[str | None, list[Call]] = defaultdict(list)
         for call in self._get_call_descendents_flat(calls):
             parent_to_children[call.parent_id].append(call)
 
-        def build_nested_list(parent_id: str | None) -> NestedCallList:
-            children = parent_to_children[parent_id]
-            result: NestedCallList = []
-
-            for child in children:
-                if child.id in parent_to_children:
-                    # Call has children, create a nested list
-                    child_list: NestedCallList = [child]
-                    child_list.extend(build_nested_list(child.id))
-                    result.append(child_list)
-                else:
-                    # Leaf node
-                    result.append(child)
-
+        def build_nested_list(call: Call) -> NestedCallList:
+            result: NestedCallList = [call]  # Start with the call itself
+            # Add all children as nested lists
+            for child in parent_to_children[call.id]:
+                result.append(build_nested_list(child))
             return result
 
-        return build_nested_list(None)
+        root_calls = list(calls)
+        if not root_calls:
+            return []
+        return build_nested_list(root_calls[0])
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(

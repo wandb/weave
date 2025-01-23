@@ -3236,3 +3236,70 @@ def test_calls_len(client):
 
     assert len(test.calls()) == 2
     assert len(client.get_calls()) == 2
+
+
+def test_get_call_descendents_flat(client):
+    @weave.op
+    def fib(n: int) -> int:
+        if n <= 1:
+            return n
+        return fib(n - 1) + fib(n - 2)
+
+    _, call = fib.call(3)
+    # calls will be:
+    # fib(3)
+    #   ├── fib(2)
+    #   │     ├── fib(1)
+    #   │     └── fib(0)
+    #   └── fib(1)
+
+    descendents = list(call.get_descendents())
+    assert len(descendents) == 5
+    assert descendents[0].inputs == {"n": 3}
+    assert descendents[0].output == 2
+    assert descendents[1].inputs == {"n": 2}
+    assert descendents[1].output == 1
+    assert descendents[2].inputs == {"n": 1}
+    assert descendents[2].output == 1
+    assert descendents[3].inputs == {"n": 0}
+    assert descendents[3].output == 0
+    assert descendents[4].inputs == {"n": 1}
+    assert descendents[4].output == 1
+
+
+def test_get_call_descendents_nested(client):
+    @weave.op
+    def fib(n: int) -> int:
+        if n <= 1:
+            return n
+        return fib(n - 1) + fib(n - 2)
+
+    _, call = fib.call(3)
+    # calls will be:
+    # fib(3) (A)
+    #   ├── fib(2) (B)
+    #   │     ├── fib(1) (C)
+    #   │     └── fib(0) (D)
+    #   └── fib(1) (E)
+
+    descendents = list(call.get_descendents(nested=True))
+    assert len(descendents) == 3  # Node A: (A, B, E)
+    assert len(descendents[1]) == 3  # Node B: (B, C, D)
+    assert len(descendents[1][1]) == 1  # Node C: (C)
+    assert len(descendents[1][2]) == 1  # Node D: (D)
+    assert len(descendents[2]) == 1  # Node E: (E)
+
+    assert descendents[0].inputs == {"n": 3}  # Node A
+    assert descendents[0].output == 2
+
+    assert descendents[1][0].inputs == {"n": 2}  # Node B
+    assert descendents[1][0].output == 1
+
+    assert descendents[1][1][0].inputs == {"n": 1}  # Node C
+    assert descendents[1][1][0].output == 1
+
+    assert descendents[1][2][0].inputs == {"n": 0}  # Node D
+    assert descendents[1][2][0].output == 0
+
+    assert descendents[2][0].inputs == {"n": 1}  # Node E
+    assert descendents[2][0].output == 1

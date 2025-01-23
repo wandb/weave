@@ -323,6 +323,12 @@ class Evaluation(Object):
     def get_evaluation_calls(
         self, *, include_children: bool = False, nested: bool = False
     ) -> Union[Iterable[WeaveObject], NestedCallList]:
+        """Get the calls associated with this evaluation.
+
+        Args:
+            include_children: If true, recursively include the calls of the evaluation's children.
+            nested: If true, return a nested list structure.
+        """
         try:
             return self._get_evaluation_calls(
                 include_children=include_children, nested=nested
