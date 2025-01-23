@@ -238,8 +238,11 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
+        print("summarize", eval_table.rows)
         eval_table_rows = list(eval_table.rows)
+        print("eval_table_rows", eval_table_rows)
         cols = transpose(eval_table_rows)
+        print("cols", cols)
         summary = {}
 
         for name, vals in cols.items():
@@ -249,7 +252,9 @@ class Evaluation(Object):
                     scorer_attributes = get_scorer_attributes(scorer)
                     scorer_name = scorer_attributes.scorer_name
                     summarize_fn = scorer_attributes.summarize_fn
+                    print("vals", scorer_name)
                     scorer_stats = transpose(vals)
+                    print("scorer_stats", scorer_name)
                     score_table = scorer_stats[scorer_name]
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
