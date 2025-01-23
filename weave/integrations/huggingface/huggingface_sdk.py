@@ -6,6 +6,7 @@ import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.serialize import dictify
 
 if TYPE_CHECKING:
     from huggingface_hub.inference._generated.types.chat_completion import (
@@ -14,6 +15,12 @@ if TYPE_CHECKING:
     )
 
 _huggingface_patcher: Optional[MultiPatcher] = None
+
+
+def huggingface_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    if "self" in inputs:
+        inputs["self"] = dictify(inputs["self"])
+    return inputs
 
 
 def huggingface_accumulator(
@@ -68,6 +75,9 @@ def huggingface_accumulator(
 def huggingface_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = huggingface_postprocess_inputs
+
         op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
@@ -89,6 +99,9 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
             return _async_wrapper
 
         op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = huggingface_postprocess_inputs
+
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
