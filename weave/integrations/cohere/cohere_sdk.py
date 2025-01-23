@@ -183,8 +183,32 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
 
 def cohere_embed_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = fn(*args, **kwargs)
+
+                try:
+                    from cohere.responses.embed import Embeddings
+                    from cohere.responses.meta import Meta
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = Meta(
+                        api_version=response.meta.api_version,
+                        billed_units=response.meta.billed_units,
+                        warnings=response.meta.warnings,
+                    )
+                    response = Embeddings(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
         op_kwargs = settings.model_dump()
-        op = weave.op(fn, **op_kwargs)
+        op = weave.op(_post_process_response(fn), **op_kwargs)
         return op
 
     return wrapper
@@ -192,13 +216,32 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
 
 def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        @wraps(fn)
-        async def _wrapper(*args: Any, **kwargs: Any) -> Any:
-            response = await fn(*args, **kwargs)
-            return response
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = await fn(*args, **kwargs)
+
+                try:
+                    from cohere.responses.embed import Embeddings
+                    from cohere.responses.meta import Meta
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = Meta(
+                        api_version=response.meta.api_version,
+                        billed_units=response.meta.billed_units,
+                        warnings=response.meta.warnings,
+                    )
+                    response = Embeddings(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
 
         op_kwargs = settings.model_dump()
-        op = weave.op(_wrapper, **op_kwargs)
+        op = weave.op(_post_process_response(fn), **op_kwargs)
         return op
 
     return wrapper
