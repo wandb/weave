@@ -5,6 +5,7 @@ import {useHistory} from 'react-router-dom';
 import {Icon} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
+import {Timestamp} from '../../../../../Timestamp';
 import {
   useClosePeek,
   useWeaveflowCurrentRouteContext,
@@ -56,7 +57,7 @@ const OpVersionPageInner: React.FC<{
 }> = ({opVersion}) => {
   const {useOpVersions, useCallsStats} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
-  const {entity, project, opId, versionIndex} = opVersion;
+  const {entity, project, opId, versionIndex, createdAtMs} = opVersion;
 
   const opVersions = useOpVersions(
     entity,
@@ -85,7 +86,7 @@ const OpVersionPageInner: React.FC<{
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -121,6 +122,12 @@ const OpVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{versionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <p>
+                <Timestamp value={createdAtMs / 1000} format="relative" />
+              </p>
             </div>
             <div className="block">
               <p className="text-moon-500">Calls:</p>
