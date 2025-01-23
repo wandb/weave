@@ -29,6 +29,8 @@ import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
+const DEBOUNCE_MS = 500;
+
 type FilterBarProps = {
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
@@ -60,7 +62,7 @@ export const FilterBar = ({
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   // local filter model is used to avoid triggering a re-render of the trace
-  // table on every keystroke. debounced 300 ms
+  // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
   useEffect(() => {
     setLocalFilterModel(filterModel);
@@ -169,7 +171,10 @@ export const FilterBar = ({
 
   const debouncedSetFilterModel = useMemo(
     () =>
-      _.debounce((newModel: GridFilterModel) => setFilterModel(newModel), 300),
+      _.debounce(
+        (newModel: GridFilterModel) => setFilterModel(newModel),
+        DEBOUNCE_MS
+      ),
     [setFilterModel]
   );
 
