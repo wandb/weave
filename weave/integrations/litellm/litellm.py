@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
@@ -10,6 +11,22 @@ from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
+
+
+class LiteLLMFilter(logging.Filter):
+    """Filter to suppress specific LiteLLM debug messages."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Only filter debug messages about GenericAPILogger enterprise feature
+        return not (
+            record.levelno == logging.DEBUG
+            and "Unable to import GenericAPILogger - LiteLLM Enterprise Feature" in record.getMessage()
+        )
+
+
+# Add filter to suppress specific LiteLLM debug message
+litellm_logger = logging.getLogger("LiteLLM")
+litellm_logger.addFilter(LiteLLMFilter())
+
 
 _litellm_patcher: MultiPatcher | None = None
 

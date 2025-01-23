@@ -8,19 +8,6 @@ from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
 
 
-class LiteLLMFilter(logging.Filter):
-    """Filter to suppress specific LiteLLM debug messages."""
-    def filter(self, record: logging.LogRecord) -> bool:
-        # Only filter debug messages about GenericAPILogger enterprise feature
-        return not (
-            record.levelno == logging.DEBUG
-            and "Unable to import GenericAPILogger - LiteLLM Enterprise Feature" in record.getMessage()
-        )
-
-
-# Add filter to suppress specific LiteLLM debug message
-litellm_logger = logging.getLogger("LiteLLM")
-litellm_logger.addFilter(LiteLLMFilter())
 
 
 class InitializedClient:
