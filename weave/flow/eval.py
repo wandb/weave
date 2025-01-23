@@ -298,7 +298,9 @@ class Evaluation(Object):
                 scorer_name = scorer_attributes.scorer_name
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
+            print("eval_row", eval_row)
             eval_rows.append(eval_row)
+        print("eval_rows", eval_rows)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
@@ -355,4 +357,5 @@ T = TypeVar("T")
 def repeated_iterable(iterable: Iterable[T], n: int) -> Iterable[T]:
     for val in iterable:
         for _ in range(n):
+            print("yielding", val)
             yield val
