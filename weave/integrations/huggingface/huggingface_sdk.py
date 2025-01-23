@@ -3,8 +3,9 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import weave
+from weave.trace.autopatch import IntegrationSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher, NoOpPatcher
 
 if TYPE_CHECKING:
     from huggingface_hub.inference._generated.types.chat_completion import (
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
         ChatCompletionStreamOutput,
     )
 
+_huggingface_patcher: Optional[MultiPatcher] = None
 
 def huggingface_accumulator(
     acc: Optional[Union["ChatCompletionStreamOutput", "ChatCompletionOutput"]],
@@ -98,187 +100,201 @@ def huggingface_wrapper_async(name: str) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-huggingface_patcher = MultiPatcher(
-    [
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.chat_completion",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.chat_completion"
+def get_huggingface_patcher(
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
+    if settings is None:
+        settings = IntegrationSettings()
+
+    if not settings.enabled:
+        return NoOpPatcher()
+
+    global _huggingface_patcher
+    if _huggingface_patcher is not None:
+        return _huggingface_patcher
+
+    _huggingface_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.chat_completion",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.chat_completion"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.chat_completion",
-            huggingface_wrapper_async(
-                name="huggingface_hub.AsyncInferenceClient.chat_completion"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.chat_completion",
+                huggingface_wrapper_async(
+                    name="huggingface_hub.AsyncInferenceClient.chat_completion"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.document_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.document_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.document_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.document_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.document_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.document_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.document_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.document_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.visual_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.visual_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.visual_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.visual_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.visual_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.visual_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.visual_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.visual_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.fill_mask",
-            huggingface_wrapper_sync(name="huggingface_hub.InferenceClient.fill_mask"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.fill_mask",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.fill_mask"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.fill_mask",
+                huggingface_wrapper_sync(name="huggingface_hub.InferenceClient.fill_mask"),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.fill_mask",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.fill_mask"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.sentence_similarity",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.sentence_similarity"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.sentence_similarity",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.sentence_similarity"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.sentence_similarity",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.sentence_similarity"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.summarization",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.summarization"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.sentence_similarity",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.sentence_similarity"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.summarization",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.summarization"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.summarization",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.summarization"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.table_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.table_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.summarization",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.summarization"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.table_question_answering",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.table_question_answering"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.table_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.table_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.text_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.text_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.table_question_answering",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.table_question_answering"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.text_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.text_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.text_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.text_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.token_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.token_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.text_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.text_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.token_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.token_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.token_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.token_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.translation",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.translation"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.token_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.token_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.translation",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.translation"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.translation",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.translation"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.zero_shot_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.zero_shot_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.translation",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.translation"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.zero_shot_classification",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.zero_shot_classification"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.zero_shot_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.zero_shot_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "InferenceClient.text_to_image",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.InferenceClient.text_to_image"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.zero_shot_classification",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.zero_shot_classification"
+                ),
             ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("huggingface_hub"),
-            "AsyncInferenceClient.text_to_image",
-            huggingface_wrapper_sync(
-                name="huggingface_hub.AsyncInferenceClient.text_to_image"
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "InferenceClient.text_to_image",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.InferenceClient.text_to_image"
+                ),
             ),
-        ),
-    ]
-)
+            SymbolPatcher(
+                lambda: importlib.import_module("huggingface_hub"),
+                "AsyncInferenceClient.text_to_image",
+                huggingface_wrapper_sync(
+                    name="huggingface_hub.AsyncInferenceClient.text_to_image"
+                ),
+            ),
+        ]
+    )
+    return _huggingface_patcher

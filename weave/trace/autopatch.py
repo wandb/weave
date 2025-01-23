@@ -48,6 +48,7 @@ class AutopatchSettings(BaseModel):
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    huggingface: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
@@ -65,7 +66,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.huggingface.huggingface_sdk import huggingface_patcher
+    from weave.integrations.huggingface.huggingface_sdk import get_huggingface_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
         get_nvidia_ai_patcher,
@@ -89,7 +90,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
-    huggingface_patcher.attempt_patch()
+    get_huggingface_patcher(settings.huggingface).attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -101,7 +102,7 @@ def reset_autopatch() -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.huggingface.huggingface_sdk import huggingface_patcher
+    from weave.integrations.huggingface.huggingface_sdk import get_huggingface_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -127,7 +128,7 @@ def reset_autopatch() -> None:
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
+    get_huggingface_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
-    huggingface_patcher.undo_patch()
