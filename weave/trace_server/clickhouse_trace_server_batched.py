@@ -128,7 +128,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-INITIAL_CALLS_STREAM_BATCH_SIZE = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
@@ -593,8 +593,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
         object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
