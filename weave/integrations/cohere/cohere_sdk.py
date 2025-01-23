@@ -189,28 +189,44 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
                 response = fn(*args, **kwargs)
 
                 try:
-                    from cohere.responses.embed import Embeddings
-                    from cohere.responses.meta import Meta
-                    from cohere.responses.usage import Usage
+                    from cohere.types.embed_response import EmbedResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+                    from cohere.types.usage import Usage
+                    from cohere.types.usage_tokens import UsageTokens
+                    from cohere.types.usage_billed_units import UsageBilledUnits
 
                     # Create a new instance with modified `meta`
                     response_dict = response.dict()
-                    response_dict["meta"] = Meta(
-                        api_version=response.meta.api_version,
-                        billed_units=response.meta.billed_units,
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=response.meta.billed_units.output_tokens,
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
                         warnings=response.meta.warnings,
                     )
 
                     # Add usage data in the format Weave expects
                     response_dict["usage"] = Usage(
-                        cohere={
-                            "prompt_tokens": response.meta.billed_units.input_tokens,
-                            "completion_tokens": 0,  # Embeddings don't have completion tokens
-                            "total_tokens": response.meta.billed_units.input_tokens,
-                        }
+                        billed_units=UsageBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Embeddings don't have output tokens
+                        ),
+                        tokens=UsageTokens(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Embeddings don't have output tokens
+                        ),
                     )
 
-                    response = Embeddings(**response_dict)
+                    response = EmbedResponse(**response_dict)
                 except:
                     pass  # prompt to upgrade cohere sdk
 
@@ -233,28 +249,44 @@ def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
                 response = await fn(*args, **kwargs)
 
                 try:
-                    from cohere.responses.embed import Embeddings
-                    from cohere.responses.meta import Meta
-                    from cohere.responses.usage import Usage
+                    from cohere.types.embed_response import EmbedResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+                    from cohere.types.usage import Usage
+                    from cohere.types.usage_tokens import UsageTokens
+                    from cohere.types.usage_billed_units import UsageBilledUnits
 
                     # Create a new instance with modified `meta`
                     response_dict = response.dict()
-                    response_dict["meta"] = Meta(
-                        api_version=response.meta.api_version,
-                        billed_units=response.meta.billed_units,
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=response.meta.billed_units.output_tokens,
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
                         warnings=response.meta.warnings,
                     )
 
                     # Add usage data in the format Weave expects
                     response_dict["usage"] = Usage(
-                        cohere={
-                            "prompt_tokens": response.meta.billed_units.input_tokens,
-                            "completion_tokens": 0,  # Embeddings don't have completion tokens
-                            "total_tokens": response.meta.billed_units.input_tokens,
-                        }
+                        billed_units=UsageBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Embeddings don't have output tokens
+                        ),
+                        tokens=UsageTokens(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Embeddings don't have output tokens
+                        ),
                     )
 
-                    response = Embeddings(**response_dict)
+                    response = EmbedResponse(**response_dict)
                 except:
                     pass  # prompt to upgrade cohere sdk
 
