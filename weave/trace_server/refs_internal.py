@@ -213,7 +213,7 @@ def parse_internal_uri(
         return InternalCallRef(project_id=project_id, id=id_)
     elif kind == "artifact":
         id_ = remaining[0]
-        return InternalArtifactRef(project_id=project_id, id=remaining[0])
+        return InternalArtifactRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 
