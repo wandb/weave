@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Callable, Literal, Optional, Union, cast
 
@@ -35,8 +36,7 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, CallsIter, get_ref
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.trace.weave_client import Call, NestedCallList, get_ref
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -321,10 +321,12 @@ class Evaluation(Object):
         return summary
 
     def get_evaluation_calls(
-        self, *, include_children: bool = False
-    ) -> dict[str, CallsIter]:
+        self, *, include_children: bool = False, nested: bool = False
+    ) -> Union[Iterable[WeaveObject], NestedCallList]:
         try:
-            return self._get_evaluation_calls(include_children=include_children)
+            return self._get_evaluation_calls(
+                include_children=include_children, nested=nested
+            )
         except MissingRefError:
             raise RuntimeError(
                 "Cannot get evaluation calls: No evaluation results found. "
@@ -332,26 +334,15 @@ class Evaluation(Object):
             )
 
     def _get_evaluation_calls(
-        self, *, include_children: bool = False
-    ) -> dict[str, CallsIter]:
-        res = {}
+        self, *, include_children: bool = False, nested: bool = False
+    ) -> Union[Iterable[WeaveObject], NestedCallList]:
         eval_calls = self.evaluate.calls()
-        wc = weave_client_context.require_weave_client()
-        for call in eval_calls:
-            name = call.display_name
-            if not isinstance(name, str):
-                continue
-            if name in res:
-                logger.warning(
-                    f"Duplicate display name {name} found in evaluation results; omitting some results..."
-                )
 
-            if include_children:
-                res[name] = call.get_all_descendents()
-            else:
-                res[name] = wc.get_calls(filter=CallsFilter(parent_ids=[call.id]))
+        if include_children:
+            wc = weave_client_context.require_weave_client()
+            return wc.get_call_descendents(eval_calls, nested=nested)
 
-        return res
+        return eval_calls
 
 
 def evaluate(
