@@ -48,7 +48,7 @@ import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {SortBy} from '../wfReactInterface/traceServerClientTypes';
 
-const RowId = styled.span`
+export const RowId = styled.span`
   font-family: 'Inconsolata', monospace;
 `;
 RowId.displayName = 'S.RowId';
@@ -238,7 +238,7 @@ export const WeaveCHTable: FC<{
   );
 };
 
-type DataTableServerSidePaginationControls = {
+export type DataTableServerSidePaginationControls = {
   paginationModel: GridPaginationModel;
   onPaginationModelChange: (model: GridPaginationModel) => void;
   totalRows: number;
