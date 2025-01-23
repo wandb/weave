@@ -29,7 +29,7 @@ import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
   filterModel: GridFilterModel;
