@@ -872,7 +872,7 @@ class WeaveClient:
         if nested:
             warn_once(
                 logger,
-                "Calling `get_call_descendents` with `nested=True` pulls all calls into"
+                "Calling `get_call_descendents` with `nested=True` pulls all calls into "
                 "memory.  This may take a while!",
             )
             return self._get_call_descendents_nested(calls)
