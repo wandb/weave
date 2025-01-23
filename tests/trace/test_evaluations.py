@@ -1078,3 +1078,13 @@ async def test_get_evaluation_calls(client):
     res2 = ev.get_evaluation_calls(include_children=True)
     # (1x evaluate, 3x predict_and_score, 3x model, 1x summarize) * 2
     assert len(res2) == 16
+
+    # Also test getting from ref
+    ref = ev.ref
+
+    ev2 = ref.get()
+    res3 = ev2.get_evaluation_calls()
+    assert len(res3) == 2
+
+    res4 = ev2.get_evaluation_calls(include_children=True)
+    assert len(res4) == 16
