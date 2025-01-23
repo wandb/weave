@@ -252,7 +252,6 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
@@ -266,7 +265,6 @@ def _make_calls_iterator(
                 query=query,
                 sort_by=sort_by,
                 columns=columns,
-                expand_columns=expand_columns,
             )
         )
         return response.calls
