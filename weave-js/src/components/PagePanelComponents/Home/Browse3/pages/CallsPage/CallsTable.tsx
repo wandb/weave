@@ -63,6 +63,7 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {defaultDateRangeFilter} from '../../grid/filters';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -219,6 +220,10 @@ export const CallsTable: FC<{
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
+
+  useEffect(() => {
+    filterModelResolved.items.push(defaultDateRangeFilter());
+  }, []);
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
