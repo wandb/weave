@@ -17,7 +17,7 @@ import {
   CallFilter,
   CallSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {addCostsToCallResults} from './cost';
+import {addSummaryToCallResults} from './cost';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
@@ -417,7 +417,7 @@ export const useCallFlattenedTraceTree = (
   );
 
   const costResult = useMemo(() => {
-    return addCostsToCallResults(traceCallsResult, costs.result ?? []);
+    return addSummaryToCallResults(traceCallsResult, costs.result ?? []);
   }, [costs.result, traceCallsResult]);
 
   const traceCallMap = useMemo(() => {

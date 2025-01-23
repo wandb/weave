@@ -64,17 +64,13 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
-      includeFeedback: true,
     }
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
     refetchOnDelete: true,
   });
-
-  const callResults = useMemo(() => {
-    return getFeedbackMerged(calls.result ?? []);
-  }, [calls]);
+  const callResults = useMemo(() => calls.result ?? [], [calls]);
 
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
@@ -111,6 +107,7 @@ export const useCallsForQuery = (
     {
       skip: calls.loading || noCalls,
       includeCosts: true,
+      includeFeedback: true,
     }
   );
 

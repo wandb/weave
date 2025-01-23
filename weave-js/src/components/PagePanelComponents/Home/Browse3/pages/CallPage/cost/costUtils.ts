@@ -80,7 +80,7 @@ export const formatTokenCost = (cost: number): string => {
 
 // TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
 // to get this cost uptake out, this function can be removed, once that is fixed
-export const addCostsToCallResults = (
+export const addSummaryToCallResults = (
   callResults: CallSchema[],
   costResults: CallSchema[]
 ) => {
@@ -105,6 +105,8 @@ export const addCostsToCallResults = (
             weave: {
               ...call.traceCall?.summary?.weave,
               costs: costDict[call.callId].traceCall?.summary?.weave?.costs,
+              feedback:
+                costDict[call.callId].traceCall?.summary?.weave?.feedback,
             },
           },
         },
