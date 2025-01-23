@@ -177,6 +177,13 @@ export const FilterBar = ({
       ),
     [setFilterModel]
   );
+  const updateLocalAndDebouncedFilterModel = useCallback(
+    (newModel: GridFilterModel) => {
+      setLocalFilterModel(newModel);
+      debouncedSetFilterModel(newModel);
+    },
+    [debouncedSetFilterModel]
+  );
 
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
@@ -184,9 +191,8 @@ export const FilterBar = ({
       const index = oldItems.findIndex(f => f.id === item.id);
 
       if (index === -1) {
-        const newModel2 = {...localFilterModel, items: [item]};
-        setLocalFilterModel(newModel2);
-        debouncedSetFilterModel(newModel2);
+        const newModel = {...localFilterModel, items: [item]};
+        updateLocalAndDebouncedFilterModel(newModel);
         return;
       }
 
@@ -195,11 +201,10 @@ export const FilterBar = ({
         item,
         ...oldItems.slice(index + 1),
       ];
-      const newModel = {...localFilterModel, items: newItems};
-      setLocalFilterModel(newModel);
-      debouncedSetFilterModel(newModel);
+      const newItemsModel = {...localFilterModel, items: newItems};
+      updateLocalAndDebouncedFilterModel(newItemsModel);
     },
-    [localFilterModel, debouncedSetFilterModel]
+    [localFilterModel, updateLocalAndDebouncedFilterModel]
   );
 
   const onRemoveFilter = useCallback(
