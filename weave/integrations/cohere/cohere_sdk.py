@@ -191,6 +191,7 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
                 try:
                     from cohere.responses.embed import Embeddings
                     from cohere.responses.meta import Meta
+                    from cohere.responses.usage import Usage
 
                     # Create a new instance with modified `meta`
                     response_dict = response.dict()
@@ -201,13 +202,13 @@ def cohere_embed_wrapper(settings: OpSettings) -> Callable:
                     )
 
                     # Add usage data in the format Weave expects
-                    response_dict["usage"] = {
-                        "cohere": {
+                    response_dict["usage"] = Usage(
+                        cohere={
                             "prompt_tokens": response.meta.billed_units.input_tokens,
                             "completion_tokens": 0,  # Embeddings don't have completion tokens
                             "total_tokens": response.meta.billed_units.input_tokens,
                         }
-                    }
+                    )
 
                     response = Embeddings(**response_dict)
                 except:
@@ -234,6 +235,7 @@ def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
                 try:
                     from cohere.responses.embed import Embeddings
                     from cohere.responses.meta import Meta
+                    from cohere.responses.usage import Usage
 
                     # Create a new instance with modified `meta`
                     response_dict = response.dict()
@@ -244,13 +246,13 @@ def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
                     )
 
                     # Add usage data in the format Weave expects
-                    response_dict["usage"] = {
-                        "cohere": {
+                    response_dict["usage"] = Usage(
+                        cohere={
                             "prompt_tokens": response.meta.billed_units.input_tokens,
                             "completion_tokens": 0,  # Embeddings don't have completion tokens
                             "total_tokens": response.meta.billed_units.input_tokens,
                         }
-                    }
+                    )
 
                     response = Embeddings(**response_dict)
                 except:
