@@ -26,7 +26,6 @@ import React, {useEffect, useState} from 'react';
 
 import {useNodeValue, useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
-import * as ControlPageStyles from '../ControlPage.styles';
 import * as Panel2 from '../panel';
 import {PanelComp2} from '../PanelComp';
 import {TableSpec} from '../PanelTable/PanelTable';
@@ -183,6 +182,7 @@ const PanelRunHistoryTablesStepper: React.FC<
             width: '100%',
             height: '100%',
             padding: '2px',
+            overflowY: 'auto',
           }}>
           <PanelComp2
             input={defaultNode}
@@ -197,7 +197,16 @@ const PanelRunHistoryTablesStepper: React.FC<
             updateInput={props.updateInput}
           />
           {steps.length > 0 && (
-            <ControlPageStyles.ControlBar>
+            <div
+              style={{
+                padding: '2px',
+                height: '1.7em',
+                borderTop: '1px solid #ddd',
+                backgroundColor: '#f8f8f8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
               <SliderInput
                 min={steps[0]}
                 max={steps[steps.length - 1]}
@@ -209,7 +218,7 @@ const PanelRunHistoryTablesStepper: React.FC<
                 ticks={steps}
                 onChange={setCurrentStep}
               />
-            </ControlPageStyles.ControlBar>
+            </div>
           )}
         </div>
       )}
