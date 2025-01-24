@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional, Union, cast
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
+from typing_extensions import Self
 
 import weave
 from weave.flow import util
@@ -30,6 +31,7 @@ from weave.scorers import (
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -57,6 +59,7 @@ DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 
 
+@register_object
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -113,6 +116,19 @@ class Evaluation(Object):
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        return cls(
+            name=obj.name,
+            description=obj.description,
+            ref=obj.ref,
+            dataset=obj.dataset,
+            scorers=obj.scorers,
+            preprocess_model_input=obj.preprocess_model_input,
+            trials=obj.trials,
+            evaluation_name=obj.evaluation_name,
+        )
 
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":

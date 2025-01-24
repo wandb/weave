@@ -1,47 +1,51 @@
 import Box from '@mui/material/Box';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
-import {maybePluralizeWord} from '../../../../../core/util/string';
-import {Icon, IconName} from '../../../../Icon';
-import {LoadingDots} from '../../../../LoadingDots';
-import {Tailwind} from '../../../../Tailwind';
-import {Tooltip} from '../../../../Tooltip';
-import {DatasetVersionPage} from '../datasets/DatasetVersionPage';
-import {NotFoundPanel} from '../NotFoundPanel';
-import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
-import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
-import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
-import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
+import {maybePluralizeWord} from '../../../../../../core/util/string';
+import {Icon, IconName} from '../../../../../Icon';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
+import {Tooltip} from '../../../../../Tooltip';
+import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
+import {NotFoundPanel} from '../../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
+import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
+import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
+import {useShowDeleteButton} from '../common/DeleteModal';
 import {
   CallLink,
   CallsLink,
   ObjectVersionsLink,
   objectVersionText,
   OpVersionLink,
-} from './common/Links';
-import {CenteredAnimatedLoader} from './common/Loader';
+} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
-} from './common/SimplePageLayout';
-import {EvaluationLeaderboardTab} from './LeaderboardTab';
-import {TabPrompt} from './TabPrompt';
-import {TabUseModel} from './TabUseModel';
-import {TabUseObject} from './TabUseObject';
-import {TabUsePrompt} from './TabUsePrompt';
-import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
-import {useWFHooks} from './wfReactInterface/context';
+} from '../common/SimplePageLayout';
+import {EvaluationLeaderboardTab} from '../LeaderboardTab';
+import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
 import {
+  isObjDeleteError,
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
-} from './wfReactInterface/utilities';
+} from '../wfReactInterface/utilities';
 import {
   CallSchema,
   KnownBaseObjectClassType,
   ObjectVersionSchema,
-} from './wfReactInterface/wfDataModelHooksInterface';
+} from '../wfReactInterface/wfDataModelHooksInterface';
+import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
+import {TabPrompt} from './Tabs/TabPrompt';
+import {TabUseModel} from './Tabs/TabUseModel';
+import {TabUseObject} from './Tabs/TabUseObject';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -94,7 +98,10 @@ export const ObjectVersionPage: React.FC<{
     path: props.filePath,
     refExtra: props.refExtra,
   });
-  if (objectVersion.loading) {
+  if (isObjDeleteError(objectVersion.error)) {
+    const deletedAtMessage = objectVersion.error?.message ?? 'Object deleted';
+    return <NotFoundPanel title={deletedAtMessage} />;
+  } else if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
@@ -176,6 +183,8 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
+  const showDeleteButton = useShowDeleteButton();
+
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
       typeof viewerData !== 'object' ||
@@ -199,7 +208,12 @@ const ObjectVersionPageInner: React.FC<{
   }
 
   if (isDataset) {
-    return <DatasetVersionPage objectVersion={objectVersion} />;
+    return (
+      <DatasetVersionPage
+        objectVersion={objectVersion}
+        showDeleteButton={showDeleteButton}
+      />
+    );
   }
 
   return (
@@ -216,7 +230,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -251,10 +265,21 @@ const ObjectVersionPageInner: React.FC<{
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
             </div>
+            {objectVersion.userId && (
+              <div className="block">
+                <p className="text-moon-500">Created by</p>
+                <UserLink userId={objectVersion.userId} includeName />
+              </div>
+            )}
             {refExtra && (
               <div className="block">
                 <p className="text-moon-500">Subpath</p>
                 <p>{refExtra}</p>
+              </div>
+            )}
+            {showDeleteButton && (
+              <div className="ml-auto">
+                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
               </div>
             )}
           </div>
