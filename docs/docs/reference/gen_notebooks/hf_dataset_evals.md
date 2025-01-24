@@ -25,6 +25,12 @@ First, we initialize Weave and connect to Weights & Biases for tracking experime
 
 
 ```python
+# Initialize variables
+HUGGINGFACE_DATASET = "wandb/ragbench-test-sample"
+WANDB_KEY = ""
+WEAVE_TEAM = ""
+WEAVE_PROJECT = ""
+
 # Init weave and required libraries
 import wandb
 import weave
@@ -34,8 +40,8 @@ from datasets import load_dataset
 from weave import Evaluation
 
 # Login to wandb and initialize weave
-wandb.login(key="")
-client = weave.init("")
+wandb.login(key=WANDB_KEY)
+client = weave.init(f"{WEAVE_TEAM}/{WEAVE_PROJECT}")
 
 # Apply nest_asyncio to allow nested event loops (needed for some notebook environments)
 nest_asyncio.apply()
@@ -48,19 +54,18 @@ nest_asyncio.apply()
 - This index approach allows us to maintain references to the original dataset.
 
 > **Note:**
-We're using the index here to make it more generalizable, but it would be better to use a unique `id` column in the HF dataset.
-This could also be saved as a pointer back to the HF dataset row, in a Weave dataset.
+> In the index mapping, we encode the `hf_hub_name` along with the `hf_id` to ensure each row has a unique identifier. This unique digest value is used for tracking and referencing specific dataset entries during evaluations.
 
 
 ```python
 # Load the HuggingFace dataset
-ds = load_dataset("wandb/ragbench-sentence-relevance-balanced")
+ds = load_dataset(HUGGINGFACE_DATASET)
 row_count = ds['train'].num_rows
 
 # Create an index mapping for the dataset
 # This creates a list of dictionaries with HF dataset indices
 # Example: [{"hf_id": 0}, {"hf_id": 1}, {"hf_id": 2}, ...]
-hf_index = [{"hf_id": i} for i in range(row_count)]
+hf_index = [{"hf_id": i, "hf_hub_name": HUGGINGFACE_DATASET} for i in range(row_count)]
 ```
 
 ## Define processing and evaluation functions
@@ -82,7 +87,7 @@ def preprocess_example(example):
         Dict containing the prompt from the HF dataset
     """
     hf_row = ds['train'][example['hf_id']]
-    return {"prompt": hf_row['question']}
+    return {"prompt": hf_row['question'], "answer": hf_row['response']}
 
 @weave.op()
 def hf_eval(hf_id: int, output: dict) -> dict:
