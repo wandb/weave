@@ -4,6 +4,7 @@ import logging
 import operator
 import typing
 from collections.abc import Generator, Iterator
+from concurrent.futures import Future
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, Union
 
@@ -262,13 +263,22 @@ class WeaveObject(Traceable):
         return self._val == other
 
 
+class WeaveTableRemoteState:
+    # `ref` is the ref relative to the parent object.
+    ref: RefWithExtra
+    # `table_ref` is the direct table ref.
+    table_ref: TableRef
+    # `row_digests` are the remote row digests
+    row_digests: list[str] | Future[list[str]] | None = None
+
+
 class WeaveTable(Traceable):
     filter: TableRowFilter
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
+        table_ref: TableRef,
+        ref: RefWithExtra,
         server: TraceServerInterface,
         filter: TableRowFilter,
         root: Optional[Traceable],
@@ -276,7 +286,7 @@ class WeaveTable(Traceable):
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
-        self.ref = ref  # type: ignore
+        self.ref = ref
         self.server = server
         self.root = root or self
         self.parent = parent
@@ -616,7 +626,7 @@ class WeaveDict(Traceable, dict):
 
 def make_trace_obj(
     val: Any,
-    new_ref: Optional[RefWithExtra],  # Can this actually be None?
+    new_ref: RefWithExtra,
     server: TraceServerInterface,
     root: Optional[Traceable],
     parent: Any = None,
