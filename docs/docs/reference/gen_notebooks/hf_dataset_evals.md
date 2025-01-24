@@ -53,9 +53,8 @@ nest_asyncio.apply()
 - Create an index mapping to reference the dataset rows.
 - This index approach allows us to maintain references to the original dataset.
 
-> **Note:**
->
-> In the index mapping, we encode the `hf_hub_name` along with the `hf_id` to ensure each row has a unique identifier.\
+> **Note:**<br/>
+In the index, we encode the `hf_hub_name` along with the `hf_id` to ensure each row has a unique identifier.\
 This unique digest value is used for tracking and referencing specific dataset entries during evaluations.
 
 
