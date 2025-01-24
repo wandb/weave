@@ -111,7 +111,6 @@ def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
         def score(self, target, output):
-            print("score", target, output, target == output)
             return target == output
 
     evaluation = Evaluation(
