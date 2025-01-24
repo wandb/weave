@@ -16,6 +16,7 @@ from typing import (
     Callable,
     Generic,
     Protocol,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -384,6 +385,23 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+class CallDict(TypedDict):
+    op_name: str
+    trace_id: str
+    project_id: str
+    parent_id: str | None
+    inputs: dict
+    id: str | None
+    output: Any
+    exception: str | None
+    summary: dict | None
+    display_name: str | None
+    attributes: dict | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -581,6 +599,27 @@ class Call:
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
+
+    def to_dict(self) -> CallDict:
+        if callable(display_name := self.display_name):
+            display_name = "Callable Display Name (not called yet)"
+
+        return CallDict(
+            op_name=self.op_name,
+            trace_id=self.trace_id,
+            project_id=self.project_id,
+            parent_id=self.parent_id,
+            inputs=self.inputs,
+            id=self.id,
+            output=self.output,
+            exception=self.exception,
+            summary=self.summary,
+            display_name=display_name,
+            attributes=self.attributes,
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            deleted_at=self.deleted_at,
+        )
 
 
 def make_client_call(
