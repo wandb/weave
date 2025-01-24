@@ -125,6 +125,11 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     if not isinstance(obj, weave.Object):
         return _publish(obj, name)
 
+    # Unlike WeaveObject, weave.Object (consider disambiguating...) does not have
+    # the dirtying mechanism to track if an object has been mutated.  Instead, we
+    # strip the ref and pretent the object is new.  If the digest is the same, then
+    # the version will stay the same.  Otherwise, a new version will be created.
+    # In case publishing fails, we restore the old ref.
     old_ref, obj.ref = obj.ref, None
     try:
         new_ref = _publish(obj, name)
