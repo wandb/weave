@@ -32,10 +32,10 @@ WEAVE_TEAM = ""
 WEAVE_PROJECT = ""
 
 # Init weave and required libraries
-import wandb
-import weave
 import asyncio
 import nest_asyncio
+import wandb
+import weave
 from datasets import load_dataset
 from weave import Evaluation
 
