@@ -2,9 +2,9 @@ import os
 from contextlib import contextmanager
 from unittest.mock import patch
 
+import pytest
 from litellm.types.utils import ModelResponse
 
-from tests.trace.util import client_is_sqlite
 from weave.trace.settings import _context_vars
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -19,17 +19,13 @@ def with_tracing_disabled():
         _context_vars["disabled"].reset(token)
 
 
+@pytest.mark.skip_sqlite_client
 def test_completions_create(client):
     """
     This test is testing the backend implementation of completions_create. It relies on LiteLLM
     and we don't want to jump through the hoops to add it to the integration sharding. So we are putting
     it here for now. Should be moved to a dedicated client tester that pins to a single python version.
     """
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     model_name = "gpt-4o"
     inputs = {
         "model": model_name,

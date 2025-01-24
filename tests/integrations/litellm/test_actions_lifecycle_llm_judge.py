@@ -13,7 +13,6 @@ import weave
 from tests.integrations.litellm.client_completions_create_test import (
     secret_fetcher_context,
 )
-from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.actions import (
     ActionSpec,
@@ -62,10 +61,8 @@ primitive_mock_response = {
 }
 
 
+@pytest.mark.skip_sqlite_client
 def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
-    if client_is_sqlite(client):
-        return pytest.skip("skipping for sqlite")
-
     action_name = "response_is_mindful"
 
     published_ref = weave.publish(
@@ -147,10 +144,8 @@ structured_mock_response = {
 }
 
 
+@pytest.mark.skip_sqlite_client
 def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
-    if client_is_sqlite(client):
-        return pytest.skip("skipping for sqlite")
-
     action_name = "response_is_mindful"
 
     published_ref = weave.publish(

@@ -3,7 +3,6 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
@@ -175,6 +174,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         )
     )
     assert len(query_res.result) == 1
+    is_sqlite = False
     assert query_res.result[0] == {
         "id": create_res.id,
         "project_id": project_id,
@@ -184,7 +184,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         # Sad - seems like sqlite and clickhouse remote different types here
         "created_at": (
             create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
+            if is_sqlite
             else MatchAnyDatetime()
         ),
         "feedback_type": feedback_type,
@@ -325,6 +325,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
     )
     assert len(query_res.result) == 1
+    is_sqlite = False
     assert query_res.result[0] == {
         "id": create_res.id,
         "project_id": project_id,
@@ -334,7 +335,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         # Sad - seems like sqlite and clickhouse remote different types here
         "created_at": (
             create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
+            if is_sqlite
             else MatchAnyDatetime()
         ),
         "feedback_type": feedback_type,
@@ -377,12 +378,9 @@ async def populate_feedback(client: WeaveClient) -> None:
     return ids, my_scorer, my_model
 
 
+@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
 async def test_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
 
@@ -442,12 +440,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
 
 
+@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
 async def test_filter_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
@@ -516,12 +511,9 @@ class MatchAnyDatetime:
         return isinstance(other, datetime.datetime)
 
 
+@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
 async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(

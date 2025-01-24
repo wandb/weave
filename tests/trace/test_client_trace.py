@@ -20,7 +20,6 @@ from tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
-    client_is_sqlite,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
@@ -35,7 +34,6 @@ from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -722,12 +720,8 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+@pytest.mark.skip_sqlite_client
 def test_trace_call_sort_with_mixed_types(client):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # SQLite does not support sorting over mixed types in a column, so we skip this test
-        return
-
     @weave.op
     def basic_op(in_val: dict) -> dict:
         import time
@@ -768,7 +762,7 @@ def test_trace_call_sort_with_mixed_types(client):
 
 
 def test_trace_call_filter(client):
-    is_sqlite = client_is_sqlite(client)
+    is_sqlite = False
 
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
@@ -2164,12 +2158,8 @@ def test_call_query_stream_columns(client):
     assert calls[0].inputs == {"a": 0, "b": 0}
 
 
+@pytest.mark.skip_sqlite_client
 def test_call_query_stream_columns_with_costs(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
-        # dont run this test for sqlite
-        return
-
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
         return {
@@ -2929,12 +2919,8 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
+@pytest.mark.skip_sqlite_client
 def test_large_keys_are_stripped_call(client, caplog):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to strip in sqlite
-        return
-
     data = {"dictionary": {f"{i}": i for i in range(300_000)}}
 
     @weave.op

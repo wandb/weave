@@ -155,6 +155,7 @@ filterwarnings = [
 addopts = "-v"
 markers = [
   "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
+  "skip_sqlite_client: marks tests as requiring sqlite client to be skipped",
   "weave_client: alias for `client` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
 ]

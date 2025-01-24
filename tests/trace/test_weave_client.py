@@ -33,9 +33,6 @@ from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
-from weave.trace_server.sqlite_trace_server import (
-    SqliteTraceServer,
-)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1369,12 +1366,8 @@ def test_table_partitioning(network_proxy_client):
     )
 
 
+@pytest.mark.skip_sqlite_client
 def test_summary_tokens_cost(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
-        # SQLite does not support costs
-        return
-
     @weave.op()
     def gpt4(text):
         result = "a: " + text
@@ -1507,11 +1500,6 @@ def test_summary_tokens_cost(client):
 
 @pytest.mark.skip_clickhouse_client
 def test_summary_tokens_cost_sqlite(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if not is_sqlite:
-        # only run this test for sqlite
-        return
-
     # ensure that include_costs is a no-op for sqlite
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)

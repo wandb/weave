@@ -305,7 +305,17 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "weave_client and not skip_clickhouse_client" \
             --weave-server=clickhouse
-      - name: Run nox
+      - name: Run nox (Sqlite Only)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "weave_client and not skip_sqlite_client" \
+            --weave-server=sqlite
+      - name: Run nox (Non-client tests)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -318,7 +328,8 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "not weave_client"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
