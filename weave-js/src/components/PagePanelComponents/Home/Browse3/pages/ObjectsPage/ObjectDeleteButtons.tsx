@@ -1,8 +1,13 @@
 import {Button} from '@wandb/weave/components/Button';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
-import {useClosePeek} from '../../context';
+import {
+  useClosePeek,
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {DeleteModal} from '../common/DeleteModal';
 import {useWFHooks} from '../wfReactInterface/context';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -13,12 +18,31 @@ export const DeleteObjectButtonWithModal: React.FC<{
 }> = ({objVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const history = useHistory();
   const {objectVersionsDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const deleteStr =
     overrideDisplayStr ??
     `${objVersionSchema.objectId}:v${objVersionSchema.versionIndex}`;
+
+  const onSuccess = () => {
+    if (isPeeking) {
+      closePeek();
+    } else {
+      history.push(
+        routerContext.objectVersionsUIUrl(
+          objVersionSchema.entity,
+          objVersionSchema.project,
+          {
+            objectName: objVersionSchema.objectId,
+          }
+        )
+      );
+    }
+  };
 
   return (
     <>
@@ -39,7 +63,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
             [objVersionSchema.versionHash]
           )
         }
-        onSuccess={closePeek}
+        onSuccess={onSuccess}
       />
     </>
   );

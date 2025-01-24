@@ -10,12 +10,6 @@ type PILImageImageTypePayload = CustomWeaveTypePayload<
   {'image.jpg': string} | {'image.png': string}
 >;
 
-export const isPILImageImageType = (
-  data: CustomWeaveTypePayload
-): data is PILImageImageTypePayload => {
-  return data.weave_type.type === 'PIL.Image.Image';
-};
-
 export const PILImageImage: React.FC<{
   entity: string;
   project: string;
