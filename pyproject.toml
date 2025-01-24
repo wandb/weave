@@ -111,6 +111,7 @@ test = [
   "pillow",
   "filelock",
   "httpx",
+  "python-multipart",
 ]
 
 [project.scripts]
