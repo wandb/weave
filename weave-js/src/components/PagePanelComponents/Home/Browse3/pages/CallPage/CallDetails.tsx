@@ -103,8 +103,8 @@ export const CallDetails: FC<{
     columns
   );
 
-  const {multipleChildCallOpRefs} = useMemo(
-    () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
+  const childCallOpRefs = useMemo(
+    () => callOpRefs(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
   );
   const {baseRouter} = useWeaveflowRouteContext();
@@ -144,7 +144,7 @@ export const CallDetails: FC<{
           sx={{
             flex: '0 0 auto',
             maxHeight: `calc(100% - ${
-              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+              childCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
             }px)`,
             p: 2,
           }}>
@@ -163,7 +163,7 @@ export const CallDetails: FC<{
             </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
-        {multipleChildCallOpRefs.map(opVersionRef => {
+        {childCallOpRefs.map(opVersionRef => {
           const exampleCall = childCalls.result?.find(
             c => c.opVersionRef === opVersionRef
           )!;
@@ -266,31 +266,11 @@ const getDisplayInputsAndOutput = (call: CallSchema) => {
   return {inputs, output};
 };
 
-const callGrouping = (childCalls: CallSchema[]) => {
-  const sortedChildCalls = childCalls.sort(
-    (a, b) => a.rawSpan.start_time_ms - b.rawSpan.start_time_ms
+const callOpRefs = (calls: CallSchema[]): string[] => {
+  return _.uniq(
+    calls
+      .sort((a, b) => a.rawSpan.start_time_ms - b.rawSpan.start_time_ms)
+      .map(call => call.opVersionRef)
+      .filter((ref): ref is string => ref != null)
   );
-
-  const childCallOpCounts: {[ref: string]: number} = {};
-  sortedChildCalls.forEach(c => {
-    const opRef = c.opVersionRef;
-    if (opRef == null) {
-      return;
-    }
-    childCallOpCounts[opRef] = (childCallOpCounts[opRef] ?? 0) + 1;
-  });
-
-  const singularChildCalls = sortedChildCalls.filter(c => {
-    const opRef = c.opVersionRef;
-    if (opRef == null) {
-      return true;
-    }
-    return childCallOpCounts[opRef] === 1;
-  });
-
-  const multipleChildCallOpRefs = Object.keys(childCallOpCounts).filter(
-    ref => childCallOpCounts[ref] > 1
-  );
-
-  return {singularChildCalls, multipleChildCallOpRefs};
 };
