@@ -10,6 +10,7 @@ export type ToggleOption = {
   value: string;
   icon?: IconName;
   isDisabled?: boolean;
+  iconOnly?: boolean;
 };
 
 export type ToggleButtonGroupProps = {
@@ -54,7 +55,12 @@ export const ToggleButtonGroup = React.forwardRef<
         className="flex gap-px"
         ref={ref}>
         {options.map(
-          ({value: optionValue, icon, isDisabled: optionIsDisabled}) => (
+          ({
+            value: optionValue,
+            icon,
+            isDisabled: optionIsDisabled,
+            iconOnly = false,
+          }) => (
             <ToggleGroup.Item
               key={optionValue}
               value={optionValue}
@@ -81,7 +87,7 @@ export const ToggleButtonGroup = React.forwardRef<
                   'first:rounded-l-sm', // First button rounded left
                   'last:rounded-r-sm' // Last button rounded right
                 )}>
-                {optionValue}
+                {!iconOnly ? optionValue : <></>}
               </Button>
             </ToggleGroup.Item>
           )
