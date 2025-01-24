@@ -129,3 +129,27 @@ async def test_async_foreach_cancellation():
 
     # Check that we got the expected number of results before cancellation
     assert len(results) == 2
+
+
+@pytest.mark.asyncio
+async def test_async_foreach_execution_order():
+    """Test that results are yielded in input sequence order regardless of completion order."""
+    # Create input data with deliberately varying processing times
+    input_data = [(0, 0.3), (1, 0.1), (2, 0.2)]  # (value, delay) pairs
+    calls = []
+    results = []
+
+    async def process(item: tuple[int, float]) -> int:
+        calls.append(item)
+        value, delay = item
+        await asyncio.sleep(delay)  # Different delays to force out-of-order completion
+        return value * 2
+
+    async for item, result in async_foreach(
+        input_data, process, max_concurrent_tasks=3
+    ):
+        results.append((item[0], result))  # Store (original_value, processed_result)
+
+    # Verify results are in original sequence order
+    assert results == [(0, 0), (1, 2), (2, 4)]
+    assert calls == [(0, 0.3), (1, 0.1), (2, 0.2)]
