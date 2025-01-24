@@ -61,7 +61,7 @@ This unique digest value is used for tracking and referencing specific dataset e
 ```python
 # Load the HuggingFace dataset
 ds = load_dataset(HUGGINGFACE_DATASET)
-row_count = ds['train'].num_rows
+row_count = ds["train"].num_rows
 
 # Create an index mapping for the dataset
 # This creates a list of dictionaries with HF dataset indices
@@ -87,8 +87,9 @@ def preprocess_example(example):
     Returns:
         Dict containing the prompt from the HF dataset
     """
-    hf_row = ds['train'][example['hf_id']]
-    return {"prompt": hf_row['question'], "answer": hf_row['response']}
+    hf_row = ds["train"][example["hf_id"]]
+    return {"prompt": hf_row["question"], "answer": hf_row["response"]}
+
 
 @weave.op()
 def hf_eval(hf_id: int, output: dict) -> dict:
@@ -100,8 +101,9 @@ def hf_eval(hf_id: int, output: dict) -> dict:
     Returns:
         Dict containing evaluation scores
     """
-    hf_row = ds['train'][hf_id]
-    return {'scorer_value': True}
+    hf_row = ds["train"][hf_id]
+    return {"scorer_value": True}
+
 
 @weave.op()
 def function_to_evaluate(prompt: str):
@@ -112,7 +114,7 @@ def function_to_evaluate(prompt: str):
     Returns:
         Dict containing model output
     """
-    return {'generated_text': 'testing '}
+    return {"generated_text": "testing "}
 ```
 
 ### Create and run evaluation
@@ -129,12 +131,14 @@ def function_to_evaluate(prompt: str):
 evaluation = Evaluation(
     dataset=hf_index,  # Use our index mapping
     scorers=[hf_eval],  # List of scoring functions
-    preprocess_model_input=preprocess_example  # Function to prepare inputs
+    preprocess_model_input=preprocess_example,  # Function to prepare inputs
 )
+
 
 # Run evaluation asynchronously
 async def main():
     await evaluation.evaluate(function_to_evaluate)
+
 
 asyncio.run(main())
 ```
