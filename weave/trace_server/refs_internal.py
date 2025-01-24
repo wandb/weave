@@ -158,9 +158,14 @@ class InternalArtifactRef:
         return u
 
 
+InternalRef = Union[
+    InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef
+]
+
+
 def parse_internal_uri(
     uri: str,
-) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef]:
+) -> InternalRef:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
