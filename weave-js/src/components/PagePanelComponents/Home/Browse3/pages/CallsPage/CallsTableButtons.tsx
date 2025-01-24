@@ -156,12 +156,10 @@ export const ExportSelector = ({
   };
 
   const pythonText = makeCodeText(
-    callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     filterBy,
-    refColumnsToExpand,
     sortBy,
     includeFeedback
   );
@@ -521,12 +519,10 @@ function makeLeafColumns(visibleColumns: string[]) {
 }
 
 function makeCodeText(
-  entity: string,
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
   query: Query | undefined,
-  expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
   includeFeedback: boolean
 ) {
@@ -535,15 +531,11 @@ function makeCodeText(
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
     codeStr += `   filter={"call_ids": ["${filteredCallIds.join('", "')}"]},\n`;
-    if (expandColumns.length > 0) {
-      const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-      codeStr += `   expand_columns=${expandColumnsStr},\n`;
-    }
     if (includeFeedback) {
       codeStr += `   include_feedback=True,\n`;
     }
     // specifying call_ids ignores other filters, return early
-    codeStr += `})`;
+    codeStr += `)`;
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
@@ -571,10 +563,6 @@ function makeCodeText(
   }
   if (query) {
     codeStr += `    query=${JSON.stringify(query, null, 0)},\n`;
-  }
-  if (expandColumns.length > 0) {
-    const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-    codeStr += `    expand_columns=${expandColumnsStr},\n`;
   }
 
   if (sortBy.length > 0) {
