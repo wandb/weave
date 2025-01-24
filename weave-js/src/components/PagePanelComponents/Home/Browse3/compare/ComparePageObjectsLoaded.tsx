@@ -12,6 +12,7 @@ import {useHistory} from 'react-router-dom';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {TailwindContents} from '../../../../Tailwind';
+import {ToggleButtonGroup} from '../../../../ToggleButtonGroup';
 import {isWeaveRef} from '../filters/common';
 import {mapObject, TraverseContext} from '../pages/CallPage/traverse';
 import {SimplePageLayout} from '../pages/common/SimplePageLayout';
@@ -319,26 +320,25 @@ export const ComparePageObjectsLoaded = ({
                   </label>
                 </div>
                 {hasModes && (
-                  <div>
-                    <Button
-                      size="small"
-                      icon="split"
-                      variant="secondary"
-                      onClick={() => onSetMode('parallel')}
-                      active={checkedMode === 'parallel'}
-                      tooltip="Show double column view">
-                      Side-by-side
-                    </Button>
-                    <Button
-                      size="small"
-                      icon="content-full-width"
-                      variant="secondary"
-                      onClick={() => onSetMode('unified')}
-                      active={checkedMode === 'unified'}
-                      tooltip="Show single column view">
-                      Unified
-                    </Button>
-                  </div>
+                  <ToggleButtonGroup
+                    options={[
+                      {
+                        value: 'parallel',
+                        label: 'Side-by-side',
+                        icon: 'split',
+                        tooltip: 'Show double column view',
+                      },
+                      {
+                        value: 'unified',
+                        label: 'Unified',
+                        icon: 'content-full-width',
+                        tooltip: 'Show single column view',
+                      },
+                    ]}
+                    size="small"
+                    value={checkedMode}
+                    onValueChange={value => onSetMode(value as Mode)}
+                  />
                 )}
                 {tooManyCols && (
                   <div>Viewing first {MAX_OBJECT_COLS} columns only</div>
