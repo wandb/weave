@@ -6,6 +6,10 @@ Weave automatically tracks and logs LLM calls made via Amazon Bedrock, AWS's ful
 For the latest tutorials, visit [Weights & Biases on Amazon Web Services](https://wandb.ai/site/partners/aws/).
 :::
 
+:::note
+Do you want to experiment with Amazon Bedrock models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+:::
+
 ## Traces
 
 Weave will automatically capture traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client:

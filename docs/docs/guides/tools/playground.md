@@ -67,7 +67,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - [OpenAI](#openai)
 - [X.AI](#xai)
 
-### Amazon Bedrock
+### [Amazon Bedrock](../integrations/bedrock.md)
 
 - ai21.j2-mid-v1
 - ai21.j2-ultra-v1
@@ -99,7 +99,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - meta.llama3-1-70b-instruct-v1:0
 - meta.llama3-1-405b-instruct-v1:0
 
-### Anthropic
+### [Anthropic](../integrations/anthropic.md)
 
 - claude-3-5-sonnet-20240620
 - claude-3-5-sonnet-20241022
@@ -107,7 +107,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - claude-3-opus-20240229
 - claude-3-sonnet-20240229
 
-### Google Gemini
+### [Google Gemini](../integrations/google-gemini.md)
 
 - gemini/gemini-1.5-flash-001
 - gemini/gemini-1.5-flash-002
@@ -124,7 +124,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - gemini/gemini-1.5-pro
 - gemini/gemini-pro
 
-### Groq
+### [Groq](../integrations/groq.md)
 
 - groq/gemma-7b-it
 - groq/gemma2-9b-it
@@ -134,7 +134,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - groq/llama3-groq-8b-8192-tool-use-preview
 - groq/mixtral-8x7b-32768
 
-### OpenAI
+### [OpenAI](../integrations/openai.md)
 
 - gpt-4o-mini
 - gpt-3.5-turbo-0125
