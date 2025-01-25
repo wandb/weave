@@ -251,4 +251,6 @@ This is particularly useful when working with external datasets that may have di
 
 We are continuously improving our integrations with third-party services and libraries. 
 
-The following guide shows how to use `preprocess_model_input` to integrate HuggingFace datasets with Weave evaluations. See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals).
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
+
+See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.

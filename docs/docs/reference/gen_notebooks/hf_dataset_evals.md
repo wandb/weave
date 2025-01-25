@@ -15,6 +15,11 @@ title: Using HuggingFace Datasets in evaluations with `preprocess_model_input`
 
 # Using HuggingFace Datasets in evaluations with `preprocess_model_input`
 
+## Note: This is a temporary workaround
+> This guide demonstrates a workaround for using HuggingFace Datasets with Weave evaluations.<br /><br/>
+We are actively working on developing more seamless integrations that will simplify this process.\
+> While this approach works, expect improvements and updates in the near future that will make working with external datasets more straightforward.
+
 ## Setup and imports
 First, we initialize Weave and connect to Weights & Biases for tracking experiments.
 
