@@ -16,18 +16,83 @@ async def async_foreach(
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
 ) -> AsyncIterator[tuple[T, U]]:
+    """Process items from a sequence concurrently with a maximum number of parallel tasks.
+
+    This function loads items from the input sequence lazily to support large or infinite
+    sequences. Items are processed and yielded in the same order as the input sequence.
+
+    Args:
+        sequence: An iterable of items to process. Items are loaded lazily.
+        func: An async function that processes each item from the sequence.
+        max_concurrent_tasks: Maximum number of items to process concurrently.
+
+    Yields:
+        Tuples of (original_item, processed_result) in the same order as the input sequence.
+
+    Example:
+        ```python
+        async def process(x: int) -> str:
+            await asyncio.sleep(1)  # Simulate async work
+            return str(x * 2)
+
+        async for item, result in async_foreach(range(10), process, max_concurrent_tasks=3):
+            print(f"Processed {item} -> {result}")
+        ```
+
+    Notes:
+        - If func raises an exception, it will be propagated to the caller
+        - Memory usage is bounded by max_concurrent_tasks
+        - All pending tasks are properly cleaned up on error or cancellation
+        - Results are yielded in the same order as the input sequence
+    """
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
+    active_tasks: list[asyncio.Task] = []
 
     async def process_item(item: T) -> tuple[T, U]:
+        """Process a single item using the provided function with semaphore control."""
         async with semaphore:
             result = await func(item)
             return item, result
 
-    tasks = [asyncio.create_task(process_item(item)) for item in sequence]
+    def maybe_queue_next_task() -> None:
+        """Attempt to queue the next task from the iterator if available."""
+        try:
+            item = next(iterator)
+            task = asyncio.create_task(process_item(item))
+            active_tasks.append(task)
+        except StopIteration:
+            pass
 
-    for task in asyncio.as_completed(tasks):
-        item, result = await task
-        yield item, result
+    iterator = iter(sequence)
+
+    try:
+        # Prime the initial set of tasks
+        for _ in range(max_concurrent_tasks):
+            maybe_queue_next_task()
+
+        while active_tasks:
+            # Always wait for the first task in the list to complete
+            # This ensures we yield results in order
+            task = active_tasks.pop(0)  # Remove completed task from front of list
+            try:
+                item, result = await task
+                yield item, result
+
+                # Add a new task if there are more items
+                maybe_queue_next_task()
+            except Exception:
+                # Clean up remaining tasks before re-raising
+                for t in active_tasks:
+                    t.cancel()
+                await asyncio.gather(*active_tasks, return_exceptions=True)
+                raise
+
+    except asyncio.CancelledError:
+        # Clean up tasks if the caller cancels this coroutine
+        for task in active_tasks:
+            task.cancel()
+        await asyncio.gather(*active_tasks, return_exceptions=True)
+        raise
 
 
 def _subproc(
