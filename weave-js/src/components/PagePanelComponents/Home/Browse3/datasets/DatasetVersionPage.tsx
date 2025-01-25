@@ -270,6 +270,12 @@ export const DatasetVersionPage: React.FC<{
                   <Timestamp value={createdAtMs / 1000} format="relative" />
                 </p>
               </div>
+              {objectVersion.userId && (
+                <div className="block">
+                  <p className="text-moon-500">Created by</p>
+                  <UserLink userId={objectVersion.userId} includeName />
+                </div>
+              )}
             </div>
             <div className="ml-auto mr-0">
               {isEditing ? (
@@ -283,12 +289,6 @@ export const DatasetVersionPage: React.FC<{
                   icon="pencil-edit"
                   onClick={handleEditClick}
                 />
-              )}
-              {objectVersion.userId && (
-                <div className="block">
-                  <p className="text-moon-500">Created by</p>
-                  <UserLink userId={objectVersion.userId} includeName />
-                </div>
               )}
               {showDeleteButton && !isEditing && (
                 <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
