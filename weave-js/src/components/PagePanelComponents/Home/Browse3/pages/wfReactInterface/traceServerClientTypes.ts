@@ -223,6 +223,7 @@ export interface TraceObjSchema<
   kind: 'op' | 'object';
   base_object_class?: OBC;
   val: T;
+  wb_user_id?: string;
 }
 
 export type TraceObjQueryRes<T extends any = any> = {
@@ -255,12 +256,11 @@ export type TraceObjCreateRes = {
 export type TraceObjDeleteReq = {
   project_id: string;
   object_id: string;
-  digests: string[];
+  digests?: string[];
 };
 
 export type TraceObjDeleteRes = {
   num_deleted?: number;
-  detail?: string;
 };
 
 export type TraceRefsReadBatchReq = {
