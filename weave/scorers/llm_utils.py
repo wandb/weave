@@ -130,7 +130,7 @@ def set_device(device: str = "auto") -> "device":
     import torch
 
     cuda_available = torch.cuda.is_available()
-    if not cuda_available and "cuda" in device:
+    if not cuda_available and "cuda" in str(device):
         # could be `cuda:0`, `cuda:1`, etc.
         raise ValueError("CUDA is not available")
     if device == "auto":
