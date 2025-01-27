@@ -18,6 +18,7 @@ class FluencyScorer(HuggingFacePipelineScorer):
             'flagged': True,
         }
     """
+    task: str = "text-classification"
     model_name_or_path: str = "tcapelle/fluency-scorer" # TODO: replace with an artifact
     device: str = "auto"
 

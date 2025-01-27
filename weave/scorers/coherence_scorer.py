@@ -32,13 +32,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
             return  # Skip local model loading if base_url is provided
 
         # Lazy import of transformers
-        try:
-            from transformers import pipeline
-        except ImportError:
-            print(
-                "The `transformers` package is required to use the CoherenceScorer, please run `pip install transformers`"
-            )
-            return
+        from transformers import pipeline
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         else:
