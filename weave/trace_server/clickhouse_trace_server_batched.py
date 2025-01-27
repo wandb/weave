@@ -326,7 +326,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             filepath = os.path.join(temp_dir, "filtered_calls.csv")
             query = self._construct_query_str_maybe_do_pre_query(cq, pb, filepath)
             count_query_str = f"SELECT count() FROM ({query})"
-            print("Stats query:\n", query)
             if cq.should_do_two_step_query():
                 external_data = ExternalData(
                     file_path=filepath,
@@ -392,7 +391,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         with tempfile.TemporaryDirectory() as temp_dir:
             filepath = os.path.join(temp_dir, "filtered_calls.csv")
             query = self._construct_query_str_maybe_do_pre_query(cq, pb, filepath)
-            # print("Query:\n", query, "\n", pb.get_params(), "\n")
             if cq.should_do_two_step_query():
                 external_data = ExternalData(
                     file_path=filepath,
