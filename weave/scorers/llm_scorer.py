@@ -88,10 +88,6 @@ class HuggingFacePipelineScorer(Scorer):
         task (str): The pipeline task type (e.g., `"text-classification"`).
         model_name_or_path (str): The name or path of the model to use.
         device (str): The device to use for inference. Defaults to `"cpu"`.
-        pipeline_kwargs (dict[str, Any]): Additional keyword arguments for the pipeline. Defaults to `{}`.
-
-    Returns:
-        list[dict[str, Any]]: The pipeline's output after processing the input text.
 
     Example:
         >>> from weave.scorers.moderation_scorer import PipelineScorer
@@ -109,8 +105,7 @@ class HuggingFacePipelineScorer(Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    pipeline_kwargs: dict[str, Any] = Field(default_factory=dict)
-    pipeline: Optional[Any] = None
+    _pipeline: Optional[Any] = None
 
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
@@ -123,8 +118,8 @@ class HuggingFacePipelineScorer(Scorer):
             print(
                 "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
             )
-        if self.pipeline is None:
-            self.set_pipeline()
+        if self._pipeline is None:
+            self.load_pipeline()
 
     def load_pipeline(self) -> None:
         raise NotImplementedError(
