@@ -7,7 +7,6 @@ import logging
 import platform
 import re
 import sys
-from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -28,7 +27,6 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.flow.util import warn_once
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
@@ -519,23 +517,10 @@ class Call:
             CallsFilter(parent_ids=[self.id]),
         )
 
-    def get_descendents(
-        self, *, nested: bool = False
-    ) -> Iterable[WeaveObject] | NestedCallList:
-        """
-        Get the descendents of the call.
-
-        If `nested` is True, then the descendents will be returned as a nested list structure.
-        For a tree like:
-            A
-            ├── B
-            │   ├── C
-            │   └── D
-            └── E
-        Returns: [A, [B, [C], [D]], [E]]
-        """
+    def get_descendents(self) -> Iterable[WeaveObject] | NestedCallList:
+        """Get all descendents of the call."""
         wc = weave_client_context.require_weave_client()
-        return wc.get_call_descendents(calls=[self], nested=nested)
+        return wc.get_call_descendents(calls=[self])
 
     def delete(self) -> bool:
         """Delete the call."""
@@ -854,59 +839,10 @@ class WeaveClient:
     ################ Query API ################
 
     def get_call_descendents(
-        self, calls: Iterable[Call], *, nested: bool = False
+        self, calls: Iterable[Call]
     ) -> Iterable[WeaveObject] | NestedCallList:
-        """Get all descendents of the given calls.
-
-        Args:
-            nested: If true, returns a nested list structure.
-            For a tree like:
-                A
-                ├── B
-                │   ├── C
-                │   └── D
-                └── E
-            Returns: [A, [B, [C], [D]], [E]]
-
-        """
-        if nested:
-            warn_once(
-                logger,
-                "Calling `get_call_descendents` with `nested=True` pulls all calls into "
-                "memory.  This may take a while!",
-            )
-            return self._get_call_descendents_nested(calls)
-        return self._get_call_descendents_flat(calls)
-
-    def _get_call_descendents_flat(self, calls: Iterable[Call]) -> CallsIter:
-        """Get all descendents of the given calls in a flat iterator."""
+        """Get all descendents of the given calls."""
         return self.get_calls(filter=CallsFilter(trace_ids=[c.trace_id for c in calls]))
-
-    def _get_call_descendents_nested(self, calls: Iterable[Call]) -> NestedCallList:
-        """Get all descendents of the given calls, in a nested list structure.
-        For a tree like:
-            A
-            ├── B
-            │   ├── C
-            │   └── D
-            └── E
-        Returns: [A, [B, [C], [D]], [E]]
-        """
-        # Map parents to child calls
-        parent_to_children: defaultdict[str | None, list[Call]] = defaultdict(list)
-        for call in self._get_call_descendents_flat(calls):
-            parent_to_children[call.parent_id].append(call)
-
-        def build_nested_list(call: Call) -> NestedCallList:
-            result: NestedCallList = [call]
-            for child in parent_to_children[call.id]:
-                result.append(build_nested_list(child))
-            return result
-
-        root_calls = list(calls)
-        if not root_calls:
-            return []
-        return [build_nested_list(root_call) for root_call in root_calls]
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
