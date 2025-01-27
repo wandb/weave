@@ -14,6 +14,7 @@ from weave.scorers.classification_scorer import (
 from weave.scorers.coherence_scorer import CoherenceScorer
 from weave.scorers.context_relevance_scorer import ContextRelevanceScorer
 from weave.scorers.faithfulness_scorer import FaithfulnessScorer
+from weave.scorers.fluency_scorer import FluencyScorer
 from weave.scorers.hallucination_scorer import (
     HallucinationFreeScorer,
     HallucinationScorer,
