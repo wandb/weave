@@ -83,37 +83,37 @@ class ConvertSpec(BaseModel):
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
-    and_: typing.List["Operand"] = Field(alias="$and")
+    and_: list["Operand"] = Field(alias="$and")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/or/
 class OrOperation(BaseModel):
-    or_: typing.List["Operand"] = Field(alias="$or")
+    or_: list["Operand"] = Field(alias="$or")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/not/
 class NotOperation(BaseModel):
-    not_: typing.Tuple["Operand"] = Field(alias="$not")
+    not_: tuple["Operand"] = Field(alias="$not")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/eq/
 class EqOperation(BaseModel):
-    eq_: typing.Tuple["Operand", "Operand"] = Field(alias="$eq")
+    eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gt/
 class GtOperation(BaseModel):
-    gt_: typing.Tuple["Operand", "Operand"] = Field(alias="$gt")
+    gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gte/
 class GteOperation(BaseModel):
-    gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
+    gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
 class InOperation(BaseModel):
-    in_: typing.Tuple["Operand", list["Operand"]] = Field(alias="$in")
+    in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
 
 
 # This is not technically in the Mongo spec. Mongo has:
@@ -141,10 +141,7 @@ Operation = typing.Union[
     InOperation,
     ContainsOperation,
 ]
-Operand = typing.Union[
-    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
-]
-
+Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, Operation]
 
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()

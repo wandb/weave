@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import configparser
 import logging
 import netrc
 import os
-from typing import Optional
 from urllib.parse import urlparse
 
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
@@ -62,12 +63,12 @@ def weave_trace_server_url() -> str:
     return os.getenv("WF_TRACE_SERVER_URL", default)
 
 
-def _wandb_api_key_via_env() -> Optional[str]:
+def _wandb_api_key_via_env() -> str | None:
     api_key = os.environ.get("WANDB_API_KEY")
     return api_key
 
 
-def _wandb_api_key_via_netrc() -> Optional[str]:
+def _wandb_api_key_via_netrc() -> str | None:
     for filepath in ("~/.netrc", "~/_netrc"):
         api_key = _wandb_api_key_via_netrc_file(filepath)
         if api_key:
@@ -75,7 +76,7 @@ def _wandb_api_key_via_netrc() -> Optional[str]:
     return None
 
 
-def _wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
+def _wandb_api_key_via_netrc_file(filepath: str) -> str | None:
     netrc_path = os.path.expanduser(filepath)
     if not os.path.exists(netrc_path):
         return None
@@ -87,7 +88,7 @@ def _wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
     return api_key
 
 
-def weave_wandb_api_key() -> Optional[str]:
+def weave_wandb_api_key() -> str | None:
     env_api_key = _wandb_api_key_via_env()
     netrc_api_key = _wandb_api_key_via_netrc()
     if env_api_key and netrc_api_key and env_api_key != netrc_api_key:

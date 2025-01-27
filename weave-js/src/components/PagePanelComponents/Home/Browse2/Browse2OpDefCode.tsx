@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
+import {sanitizeString} from '../../../../util/sanitizeSecrets';
 import {Alert} from '../../../Alert';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
@@ -54,14 +55,15 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     );
   }
 
-  const detectedLanguage = detectLanguage(uri, text.result ?? '');
+  const sanitized = sanitizeString(text.result ?? '');
+  const detectedLanguage = detectLanguage(uri, sanitized);
 
   const inner = (
     <Editor
       height={'100%'}
       defaultLanguage={detectedLanguage}
       loading={text.loading}
-      value={text.result ?? ''}
+      value={sanitized}
       options={{
         readOnly: true,
         minimap: {enabled: false},
@@ -71,7 +73,7 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     />
   );
   if (maxRowsInView) {
-    const totalLines = text.result?.split('\n').length ?? 0;
+    const totalLines = sanitized.split('\n').length ?? 0;
     const showLines = Math.min(totalLines, maxRowsInView);
     const lineHeight = 18;
     const padding = 20;

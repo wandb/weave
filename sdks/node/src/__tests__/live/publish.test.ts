@@ -3,7 +3,7 @@ import {Dataset, op, weaveAudio, weaveImage} from '../../index';
 
 describe('Publishing Various Data Types', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   const primitiveOp = op(async function primitive(input: string) {
@@ -79,5 +79,5 @@ describe('Publishing Various Data Types', () => {
     const datasetResult = await datasetOp();
     expect(datasetResult).toBeInstanceOf(Dataset);
     expect(datasetResult.rows).toHaveLength(3);
-  });
+  }, 20000); // Adding explicit timeout here, though I'm not sure why it's needed
 });

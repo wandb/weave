@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Iterable, Iterator, Optional, TypeVar
+from collections.abc import Iterable, Iterator
+from typing import Any, Generic, Optional, TypeVar
 
 from rich.table import Table
 

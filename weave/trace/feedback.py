@@ -1,13 +1,16 @@
 """Classes for working with feedback on a project or ref level."""
 
+from __future__ import annotations
+
 import json
-from typing import Any, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Any
 
 from rich.table import Table
 
 from weave.trace import util
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.refs import parse_uri
+from weave.trace.refs import parse_object_uri, parse_uri
 from weave.trace.rich import pydantic_util
 from weave.trace.rich.container import AbstractRichContainer
 from weave.trace.rich.refs import Refs
@@ -21,7 +24,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
     show_refs: bool
 
     def __init__(
-        self, show_refs: bool, feedbacks: Optional[Iterable[tsi.Feedback]] = None
+        self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None
     ) -> None:
         super().__init__("Feedback", feedbacks)
         self.show_refs = show_refs
@@ -86,18 +89,18 @@ class FeedbackQuery:
 
     show_refs: bool
     _query: tsi.Query
-    offset: Optional[int]
-    limit: Optional[int]
+    offset: int | None
+    limit: int | None
 
-    feedbacks: Optional[Feedbacks]
+    feedbacks: Feedbacks | None
 
     def __init__(
         self,
         entity: str,
         project: str,
         query: Query,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        offset: int | None = None,
+        limit: int | None = None,
         show_refs: bool = False,
     ):
         self.client = weave_client_context.require_weave_client()
@@ -185,7 +188,11 @@ class RefFeedbackQuery(FeedbackQuery):
         self.weave_ref = ref
 
     def _add(
-        self, feedback_type: str, payload: dict[str, Any], creator: Optional[str]
+        self,
+        feedback_type: str,
+        payload: dict[str, Any],
+        creator: str | None,
+        annotation_ref: str | None = None,
     ) -> str:
         freq = tsi.FeedbackCreateReq(
             project_id=f"{self.entity}/{self.project}",
@@ -194,6 +201,14 @@ class RefFeedbackQuery(FeedbackQuery):
             payload=payload,
             creator=creator,
         )
+        if annotation_ref:
+            try:
+                parse_object_uri(annotation_ref)
+            except TypeError:
+                raise TypeError(
+                    "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
+                )
+            freq.annotation_ref = annotation_ref
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache
         return response.id
@@ -201,8 +216,9 @@ class RefFeedbackQuery(FeedbackQuery):
     def add(
         self,
         feedback_type: str,
-        payload: Optional[dict[str, Any]] = None,
-        creator: Optional[str] = None,
+        payload: dict[str, Any] | None = None,
+        creator: str | None = None,
+        annotation_ref: str | None = None,
         **kwargs: dict[str, Any],
     ) -> str:
         """Add feedback to the ref.
@@ -210,14 +226,13 @@ class RefFeedbackQuery(FeedbackQuery):
         feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
         creator: The name to display for the originator of the feedback.
         """
-        if feedback_type.startswith("wandb."):
-            raise ValueError('Feedback type cannot start with "wandb."')
+        _validate_feedback_type(feedback_type, annotation_ref)
         feedback = {}
         feedback.update(payload or {})
         feedback.update(kwargs)
-        return self._add(feedback_type, feedback, creator)
+        return self._add(feedback_type, feedback, creator, annotation_ref)
 
-    def add_reaction(self, emoji: str, creator: Optional[str] = None) -> str:
+    def add_reaction(self, emoji: str, creator: str | None = None) -> str:
         return self._add(
             "wandb.reaction.1",
             {
@@ -226,7 +241,7 @@ class RefFeedbackQuery(FeedbackQuery):
             creator=creator,
         )
 
-    def add_note(self, note: str, creator: Optional[str] = None) -> str:
+    def add_note(self, note: str, creator: str | None = None) -> str:
         return self._add(
             "wandb.note.1",
             {
@@ -253,6 +268,18 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         self.client.server.feedback_purge(req)
         self.feedbacks = None  # Clear cache
+
+
+def _validate_feedback_type(feedback_type: str, annotation_ref: str | None) -> None:
+    if feedback_type.startswith("wandb.") and not annotation_ref:
+        raise ValueError(
+            'Feedback type cannot start with "wandb", it is reserved for annotation feedback.'
+            "Provide an annotation_ref <entity/project/object/name:digest> to add annotation feedback."
+        )
+    elif not feedback_type.startswith("wandb.annotation.") and annotation_ref:
+        raise ValueError(
+            "To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'."
+        )
 
 
 __docspec__ = [

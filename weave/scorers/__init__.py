@@ -1,6 +1,7 @@
 from weave.scorers.base_scorer import (
     Scorer,
     _has_oldstyle_scorers,
+    _validate_scorer_signature,
     auto_summarize,
     get_scorer_attributes,
 )
@@ -54,4 +55,5 @@ __all__ = [
     "SummarizationScorer",
     "transpose",
     "ValidXMLScorer",
+    "_validate_scorer_signature",
 ]

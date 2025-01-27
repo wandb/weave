@@ -1,11 +1,11 @@
 from collections import defaultdict
-from typing import Optional, Tuple
+from typing import Optional
 
 import weave
 from weave.scorers.base_scorer import Scorer
 
 
-def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
+def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
     # if any denom is zero, then zero. could use NaN instead...
     precision: float = 0
     if tp or fp:

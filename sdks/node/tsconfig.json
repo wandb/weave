@@ -7,18 +7,28 @@
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "./dist",
+    "outDir": "dist",
     "paths": {
       "weave": ["./src/index.ts"]
-    }
-  },
-  "exclude": ["src", "examples", "dist", "node_modules"],
-  "references": [
-    {
-      "path": "./src/tsconfig.src.json"
     },
-    {
-      "path": "./examples/tsconfig.examples.json"
-    }
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "examples",
+    "dist",
+    "node_modules",
+    "src/integrations/checkOpenai.ts"
   ]
+  // "references": [
+  //   {
+  //     "path": "./src/tsconfig.src.json"
+  //   },
+  //   {
+  //     "path": "./examples/tsconfig.examples.json"
+  //   }
+  // ]
 }

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Optional
+from typing import Optional
 
 import pytest
 import yaml
@@ -18,7 +18,7 @@ def model_evals():
 
 
 @pytest.fixture
-def model_datasets(model_evals: Dict[str, EvaluationResults]):
+def model_datasets(model_evals: dict[str, EvaluationResults]):
     model_datasets = {}
     for model, eval_results in model_evals.items():
         table_rows = []
@@ -42,7 +42,6 @@ def preference_id():
     try:
         with open(
             "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
-            "r",
         ) as file:
             cassette = yaml.safe_load(file)
 
@@ -56,7 +55,7 @@ def preference_id():
 @pytest.mark.vcr(filter_headers=["authorization"], decode_compressed_response=True)
 def test_train_router(
     client: WeaveClient,
-    model_evals: Dict[str, EvaluationResults],
+    model_evals: dict[str, EvaluationResults],
     preference_id: Optional[str],
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
@@ -81,7 +80,7 @@ def test_train_router(
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
 def test_evaluate_router(
-    client: WeaveClient, model_datasets: Dict[str, weave.Table], preference_id: str
+    client: WeaveClient, model_datasets: dict[str, weave.Table], preference_id: str
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     best_routed_model, nd_model = evaluate_router(

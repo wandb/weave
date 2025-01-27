@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, TypedDict
+from typing import TypedDict
 
 import requests
 
@@ -24,7 +24,7 @@ class CostDetails(TypedDict):
 
 
 # Grabs the current costs from the file(costs.json)
-def get_current_costs(file_name: str = COST_FILE) -> Dict[str, List[CostDetails]]:
+def get_current_costs(file_name: str = COST_FILE) -> dict[str, list[CostDetails]]:
     if not os.path.isabs(file_name):
         file_path = os.path.join(os.path.dirname(__file__), file_name)
     else:
@@ -35,7 +35,7 @@ def get_current_costs(file_name: str = COST_FILE) -> Dict[str, List[CostDetails]
         return {}
 
     try:
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         print("Failed to parse existing costs file:", e)
@@ -43,7 +43,7 @@ def get_current_costs(file_name: str = COST_FILE) -> Dict[str, List[CostDetails]
 
 
 # Fetches the latest costs from the file(litellm)
-def fetch_new_costs() -> Dict[str, CostDetails]:
+def fetch_new_costs() -> dict[str, CostDetails]:
     try:
         req = requests.get(url)
         req.raise_for_status()
@@ -57,7 +57,7 @@ def fetch_new_costs() -> Dict[str, CostDetails]:
         print("Failed to parse JSON:", e)
         raise
 
-    costs: Dict[str, CostDetails] = {}
+    costs: dict[str, CostDetails] = {}
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for k in raw_costs:
         if (
@@ -77,7 +77,7 @@ def fetch_new_costs() -> Dict[str, CostDetails]:
     return costs
 
 
-def sum_costs(data: Dict[str, List[CostDetails]]) -> int:
+def sum_costs(data: dict[str, list[CostDetails]]) -> int:
     total_costs = 0
     for costs in data.values():
         if isinstance(costs, list):

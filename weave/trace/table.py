@@ -1,10 +1,13 @@
-from typing import Any, Iterator, Optional
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Any
 
 from weave.trace.refs import TableRef
 
 
 class Table:
-    ref: Optional[TableRef]
+    ref: TableRef | None
 
     def __init__(self, rows: list[dict]) -> None:
         if not isinstance(rows, list):
@@ -47,7 +50,7 @@ class Table:
     def append(self, row: dict) -> None:
         """Add a row to the table."""
         if not isinstance(row, dict):
-            raise ValueError("Can only append dicts to tables")
+            raise TypeError("Can only append dicts to tables")
         self.rows.append(row)
 
     def pop(self, index: int) -> None:

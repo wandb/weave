@@ -7,10 +7,10 @@ import pytest
 from PIL import Image
 
 import weave
-from tests.trace.util import AnyIntMatcher
+from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.scorers import Scorer
-from weave.trace.feedback_types.score import SCORE_TYPE_NAME
+from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
@@ -504,8 +504,8 @@ async def test_evaluation_data_topology(client):
             }
         },
         "weave": {
+            "display_name": AnyStrMatcher(),
             "latency_ms": AnyIntMatcher(),
-            "trace_name": "Evaluation.evaluate",
             "status": "success",
         },
     }
@@ -935,6 +935,7 @@ async def test_evaluation_with_multiple_column_maps():
     ), "No matches should be found for AnotherDummyScorer"
 
 
+@pytest.mark.asyncio
 async def test_feedback_is_correctly_linked(client):
     @weave.op
     def predict(text: str) -> str:
@@ -961,7 +962,94 @@ async def test_feedback_is_correctly_linked(client):
     feedbacks = calls.calls[0].summary["weave"]["feedback"]
     assert len(feedbacks) == 1
     feedback = feedbacks[0]
-    assert feedback["feedback_type"] == SCORE_TYPE_NAME
-    assert feedback["payload"]["name"] == "score"
-    assert feedback["payload"]["op_ref"] == get_ref(score).uri()
-    assert feedback["payload"]["results"] == True
+    assert feedback["feedback_type"] == "wandb.runnable.score"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(score).uri()
+    assert (
+        feedback["call_ref"]
+        == CallRef(
+            entity=client.entity,
+            project=client.project,
+            id=list(score.calls())[0].id,
+        ).uri()
+    )
+
+
+@pytest.mark.asyncio
+async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
+    @weave.op
+    def predict(text: str) -> str:
+        return text
+
+    class MyScorer(Scorer):
+        @weave.op
+        def score(self, text, output) -> bool:
+            return text == output
+
+    scorer = MyScorer()
+    eval = weave.Evaluation(
+        dataset=[{"text": "hello"}],
+        scorers=[scorer],
+    )
+    res = await eval.evaluate(predict)
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+        )
+    )
+    assert len(calls.calls) == 1
+    assert calls.calls[0].summary["weave"]["feedback"]
+    feedbacks = calls.calls[0].summary["weave"]["feedback"]
+    assert len(feedbacks) == 1
+    feedback = feedbacks[0]
+    assert feedback["feedback_type"] == "wandb.runnable.MyScorer"
+    assert feedback["payload"] == {"output": True}
+    assert feedback["runnable_ref"] == get_ref(scorer).uri()
+
+
+def test_scorers_with_output_and_model_output_raise_error():
+    class MyScorer(Scorer):
+        @weave.op
+        def score(self, text, output, model_output):
+            return text == output == model_output
+
+    @weave.op
+    def my_second_scorer(text, output, model_output):
+        return text == output == model_output
+
+    ds = [{"text": "hello"}]
+
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
+        scorer = MyScorer()
+
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
+        evaluation = weave.Evaluation(dataset=ds, scorers=[MyScorer()])
+
+    with pytest.raises(
+        ValueError, match="cannot include both `output` and `model_output`"
+    ):
+        evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
+
+
+@pytest.mark.asyncio
+async def test_evaluation_with_custom_name(client):
+    dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
+    evaluation = weave.Evaluation(dataset=dataset, evaluation_name="wow-custom!")
+
+    @weave.op()
+    def model(input: str) -> str:
+        return "hmmm"
+
+    await evaluation.evaluate(model)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.display_name == "wow-custom!"

@@ -8,7 +8,7 @@ import math
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, TypedDict
+from typing import Optional, TypedDict
 
 from clickhouse_connect.driver.client import Client
 
@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 
 def get_current_costs(
     client: Client,
-) -> List[Tuple[str, float, float, datetime]]:
+) -> list[tuple[str, float, float, datetime]]:
     current_costs = client.query(
         """
         SELECT
@@ -45,7 +45,7 @@ class CostDetails(TypedDict):
     created_at: str
 
 
-def load_costs_from_json(file_name: str = COST_FILE) -> Dict[str, List[CostDetails]]:
+def load_costs_from_json(file_name: str = COST_FILE) -> dict[str, list[CostDetails]]:
     if not os.path.isabs(file_name):
         file_path = os.path.join(os.path.dirname(__file__), file_name)
     else:
@@ -53,15 +53,15 @@ def load_costs_from_json(file_name: str = COST_FILE) -> Dict[str, List[CostDetai
 
     data = {}
     try:
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             data = json.load(file)
     except json.JSONDecodeError as e:
-        logger.error("JSON decode error: %s", e)
+        logger.exception("JSON decode error: %s", e)
         raise
     return data
 
 
-def insert_costs_into_db(client: Client, data: Dict[str, List[CostDetails]]) -> None:
+def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> None:
     rows = []
     for llm_id, costs in data.items():
         for cost in costs:
@@ -112,8 +112,8 @@ def insert_costs_into_db(client: Client, data: Dict[str, List[CostDetails]]) -> 
 
 
 def filter_out_current_costs(
-    client: Client, new_costs: Dict[str, List[CostDetails]]
-) -> Dict[str, List[CostDetails]]:
+    client: Client, new_costs: dict[str, list[CostDetails]]
+) -> dict[str, list[CostDetails]]:
     current_costs = get_current_costs(client)
     for (
         llm_id,
@@ -141,7 +141,7 @@ def filter_out_current_costs(
     return new_costs
 
 
-def sum_costs(data: Dict[str, List[CostDetails]]) -> float:
+def sum_costs(data: dict[str, list[CostDetails]]) -> float:
     total_costs = 0
     for costs in data.values():
         total_costs += len(costs)
@@ -154,7 +154,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         new_costs = load_costs_from_json()
     except Exception as e:
-        logger.error("Failed to load costs from json, %s", e)
+        logger.exception("Failed to load costs from json, %s", e)
         return
     logger.info("Loaded %d costs from json", sum_costs(new_costs))
 
@@ -162,7 +162,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         new_costs = filter_out_current_costs(client, new_costs)
     except Exception as e:
-        logger.error("Failed to filter out current costs, %s", e)
+        logger.exception("Failed to filter out current costs, %s", e)
         return
 
     logger.info(
@@ -177,7 +177,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         insert_costs_into_db(client, new_costs)
     except Exception as e:
-        logger.error("Failed to insert costs into db, %s", e)
+        logger.exception("Failed to insert costs into db, %s", e)
         return
     logger.info("Inserted %d costs", sum_costs(new_costs))
 

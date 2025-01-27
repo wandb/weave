@@ -165,7 +165,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
               <Toolbar>
                 <Button
                   size="small"
-                  variant="quiet"
+                  variant="ghost"
                   active={format === 'Text'}
                   icon="text-language"
                   tooltip="Text mode"
@@ -176,7 +176,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
                 />
                 <Button
                   size="small"
-                  variant="quiet"
+                  variant="ghost"
                   active={format === 'Markdown'}
                   icon="markdown"
                   tooltip="Markdown mode"
@@ -187,7 +187,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
                 />
                 <Button
                   size="small"
-                  variant="quiet"
+                  variant="ghost"
                   active={format === 'Code'}
                   icon="code-alt"
                   tooltip="Code mode"

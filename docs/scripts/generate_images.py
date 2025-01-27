@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from playwright.async_api import async_playwright
 
@@ -15,10 +15,10 @@ async def generate_screenshot_from_browser(
     url: str,
     output_path: str,
     selector: Optional[str] = None,
-    viewport_size: Optional[Tuple[int, int]] = None,
-    clicks: Optional[List[str]] = None,
+    viewport_size: Optional[tuple[int, int]] = None,
+    clicks: Optional[list[str]] = None,
     delay: Optional[float] = None,
-    local_storage: Optional[Dict[str, str]] = None,
+    local_storage: Optional[dict[str, str]] = None,
     zoom: Optional[float] = None,
 ) -> None:
     """
@@ -39,7 +39,7 @@ async def generate_screenshot_from_browser(
             before taking the screenshot.
         delay (Optional[float]): The number of seconds to wait before taking the
             screenshot after all other actions are completed.
-        local_storage (Optional[Dict[str, str]]): A dictionary of key-value pairs to set
+        local_storage (Optional[dict[str, str]]): A dictionary of key-value pairs to set
             in local storage before loading the page.
         zoom (Optional[float]): The zoom level to set for the page. If None, uses the default zoom.
 
@@ -58,10 +58,9 @@ async def generate_screenshot_from_browser(
 
         if local_storage:
             await context.add_init_script(
-                """
-                Object.assign(window.localStorage, %s);
+                f"""
+                Object.assign(window.localStorage, {json.dumps(local_storage)});
             """
-                % json.dumps(local_storage)
             )
 
         try:
@@ -86,14 +85,14 @@ async def generate_screenshot_from_browser(
                 if element:
                     await element.screenshot(path=output_path)
                 else:
-                    raise Exception(f"Element with selector '{selector}' not found")
+                    raise ValueError(f"Element with selector '{selector}' not found")
             else:
                 await page.screenshot(path=output_path, full_page=True)
 
             logging.info(f"Screenshot captured successfully: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error capturing screenshot for {url}: {str(e)}")
+            logging.exception(f"Error capturing screenshot for {url}: {str(e)}")
             raise
 
         finally:
@@ -115,15 +114,15 @@ def generate_screenshot(screenshot_spec):
             )
         )
     except Exception as e:
-        logging.error(f"Failed to generate screenshot: {str(e)}")
+        logging.exception(f"Failed to generate screenshot: {str(e)}")
 
 
 def generate_screenshots_from_spec(spec_filepath):
     try:
-        with open(spec_filepath, "r") as f:
+        with open(spec_filepath) as f:
             spec = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logging.error(f"Error reading or parsing spec file: {str(e)}")
+        logging.exception(f"Error reading or parsing spec file: {str(e)}")
         return
 
     with ThreadPoolExecutor() as executor:

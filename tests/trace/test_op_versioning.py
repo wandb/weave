@@ -97,7 +97,7 @@ def test_op_versioning_lotsofstuff():
     @weave.op()
     def versioned_op_lotsofstuff(a: int) -> float:
         j = [x + 1 for x in range(a)]
-        k = map(lambda y: y - 3, j)
+        k = (y - 3 for y in j)
         return np.array(k).mean()
 
 

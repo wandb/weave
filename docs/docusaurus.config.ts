@@ -1,7 +1,7 @@
-import { themes as prismThemes } from "prism-react-renderer";
-import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type {Config} from "@docusaurus/types";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
+import {themes as prismThemes} from "prism-react-renderer";
 
 const config: Config = {
   title: "W&B Weave",
@@ -108,7 +108,7 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
-    'plugin-image-zoom',
+    "plugin-image-zoom",
   ],
 
   themes: [
@@ -125,7 +125,7 @@ const config: Config = {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
     navbar: {
-      title: "Weave",
+      title: "W&B Weave",
       logo: {
         alt: "My Site Logo",
         src: "img/logo.svg",
@@ -152,6 +152,11 @@ const config: Config = {
               type: "docSidebar",
               sidebarId: "pythonSdkSidebar",
               label: "Python SDK",
+            },
+            {
+              type: "docSidebar",
+              sidebarId: "typescriptSdkSidebar",
+              label: "TypeScript SDK",
             },
             {
               type: "docSidebar",
@@ -191,11 +196,15 @@ const config: Config = {
       style: "dark",
       links: [
         {
-          title: "Docs",
+          title: "Learning",
           items: [
             {
               label: "Documentation",
               to: "/quickstart",
+            },
+            {
+              label: "LLM Courses",
+              href: "https://www.wandb.courses/",
             },
           ],
         },
@@ -222,7 +231,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Weave by W&B`,
+      copyright: `Made with ❤️ by Weights & Biases`,
     },
     prism: {
       // theme: prismThemes.nightOwl,
@@ -233,13 +242,13 @@ const config: Config = {
         {
           className: "theme-code-block-highlighted-line",
           line: "highlight-next-line",
-          block: { start: "highlight-start", end: "highlight-end" },
+          block: {start: "highlight-start", end: "highlight-end"},
         },
       ],
     },
     imageZoom: {
       // CSS selector to apply the plugin to
-      selector: 'img.zoomable',
+      selector: "img.zoomable",
       // Optional medium-zoom options
       // see: https://www.npmjs.com/package/medium-zoom#options
       options: {},

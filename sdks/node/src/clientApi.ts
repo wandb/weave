@@ -1,17 +1,12 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {Settings} from './settings';
-import {getUrls, setGlobalDomain} from './urls';
+import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {CallStackEntry, WeaveClient} from './weaveClient';
-
-export interface LoginOptions {
-  apiKey: string;
-  host?: string;
-}
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
@@ -20,16 +15,19 @@ export let globalClient: WeaveClient | null = null;
  * Log in to Weights & Biases (W&B) using the provided API key.
  * This function saves the credentials to your netrc file for future use.
  *
- * @param options - The login options.
- * @param options.apiKey - Your W&B API key.
- * @param options.host - (Optional) The host name (usually only needed if you're using a custom W&B server).
+ * @param {string} apiKey - Your W&B API key.
+ * @param {string} [host] - (Optional) The host name (usually only needed if you're using a custom W&B server).
  * @throws {Error} If the API key is not specified or if the connection to the weave trace server cannot be verified.
  */
-export async function login(options?: LoginOptions) {
-  if (!options?.apiKey) {
-    throw Error('API Key must be specified');
+export async function login(apiKey: string, host?: string) {
+  if (!host) {
+    console.warn('No host provided, using default host:', defaultHost);
+    host = defaultHost;
   }
-  const {traceBaseUrl, domain} = getUrls(options?.host);
+  if (!apiKey) {
+    throw new Error('API key is required for login. Please provide a valid API key.');
+  }
+  const {traceBaseUrl} = getUrls(host);
 
   // Test the connection to the traceServerApi
   const testTraceServerApi = new TraceServerApi({
@@ -37,7 +35,7 @@ export async function login(options?: LoginOptions) {
     baseApiParams: {
       headers: {
         'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-        Authorization: `Basic ${Buffer.from(`api:${options.apiKey}`).toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
       },
     },
   });
@@ -50,9 +48,12 @@ export async function login(options?: LoginOptions) {
   }
 
   const netrc = new Netrc();
-  netrc.setEntry(domain, {login: 'user', password: options.apiKey});
-  netrc.save();
-  console.log(`Successfully logged in.  Credentials saved for ${domain}`);
+  // Only save to netrc if host and a non-empty apiKey are provided
+  if (host && apiKey.trim()) {
+    netrc.setEntry({machine: host, login: 'user', password: apiKey});
+    netrc.save();
+    console.log(`Successfully logged in. Credentials saved for ${host}`);
+  }
 }
 
 /**

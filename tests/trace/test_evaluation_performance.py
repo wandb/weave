@@ -1,7 +1,8 @@
 from collections import Counter
+from collections.abc import Generator
 from contextlib import contextmanager
 from threading import Lock
-from typing import Any, Generator
+from typing import Any
 
 import PIL
 import pytest
@@ -161,7 +162,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server._flush()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     assert len(ag_res) == 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
@@ -174,7 +175,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server._flush()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior.
     # For some reason with high parallelism, some logs are not captured,

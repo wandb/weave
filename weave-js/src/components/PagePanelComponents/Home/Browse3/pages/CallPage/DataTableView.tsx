@@ -1,4 +1,3 @@
-import LinkIcon from '@mui/icons-material/Link';
 import {Box} from '@mui/material';
 import {
   GridColDef,
@@ -27,11 +26,16 @@ import React, {
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  parseRefMaybe,
+} from '../../../../../../react';
+import {Tooltip} from '../../../../../Tooltip';
 import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -39,9 +43,15 @@ import {
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {A} from '../common/Links';
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {SortBy} from '../wfReactInterface/traceServerClientTypes';
+
+export const RowId = styled.span`
+  font-family: 'Inconsolata', monospace;
+`;
+RowId.displayName = 'S.RowId';
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
@@ -142,10 +152,14 @@ export const WeaveCHTable: FC<{
   );
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
+  const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
 
   useEffect(() => {
-    if (!fetchQuery.loading && fetchQuery.result) {
-      setLoadedRows(fetchQuery.result.rows);
+    if (!fetchQuery.loading) {
+      if (fetchQuery.result) {
+        setLoadedRows(fetchQuery.result.rows);
+      }
+      setFetchQueryLoaded(true);
     }
   }, [fetchQuery.loading, fetchQuery.result]);
 
@@ -214,7 +228,7 @@ export const WeaveCHTable: FC<{
       }}>
       <DataTableView
         data={pagedRows}
-        loading={fetchQuery.loading}
+        loading={!fetchQueryLoaded}
         displayKey="val"
         onLinkClick={onClickEnabled ? onClick : undefined}
         fullHeight={props.fullHeight}
@@ -224,7 +238,7 @@ export const WeaveCHTable: FC<{
   );
 };
 
-type DataTableServerSidePaginationControls = {
+export type DataTableServerSidePaginationControls = {
   paginationModel: GridPaginationModel;
   onPaginationModelChange: (model: GridPaginationModel) => void;
   totalRows: number;
@@ -348,18 +362,20 @@ export const DataTableView: FC<{
     if (props.onLinkClick) {
       res.push({
         field: '_row_click',
-        headerName: '',
+        headerName: 'id',
         width: 50,
-        renderCell: params => (
-          <LinkIcon
-            style={{
-              cursor: 'pointer',
-            }}
-            onClick={() =>
-              props.onLinkClick!(propsDataRef.current[params.id as number])
-            }
-          />
-        ),
+        renderCell: params => {
+          const rowId = params.id as number;
+          const dataRefValue = propsDataRef.current[rowId];
+          const {digest} = dataRefValue;
+          const rowLabel = digest ? digest.slice(-4) : rowId;
+          const rowSpan = (
+            <Tooltip trigger={<RowId>{rowLabel}</RowId>} content={digest} />
+          );
+          return (
+            <A onClick={() => props.onLinkClick!(dataRefValue)}>{rowSpan}</A>
+          );
+        },
       });
     }
     return [

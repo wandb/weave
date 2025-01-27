@@ -6,7 +6,6 @@ interface NetrcEntry {
   machine: string;
   login: string;
   password: string;
-  account?: string;
 }
 
 export class Netrc {
@@ -22,35 +21,26 @@ export class Netrc {
   private load(): void {
     try {
       const content = readFileSync(this.path, 'utf8');
-      const lines = content.split('\n');
-      let currentMachine: string | null = null;
       let currentEntry: Partial<NetrcEntry> = {};
 
+      const lines = content.split('\n');
       for (const line of lines) {
         const [key, value] = line.trim().split(/\s+/);
-        switch (key) {
-          case 'machine':
-            if (currentMachine && Object.keys(currentEntry).length) {
-              this.entries.set(currentMachine, currentEntry as NetrcEntry);
-            }
-            currentMachine = value;
-            currentEntry = {machine: value};
-            break;
-          case 'login':
-          case 'password':
-          case 'account':
-            if (currentMachine) {
-              currentEntry[key] = value;
-            }
-            break;
+        if (key === 'machine') {
+          if (currentEntry.machine && currentEntry.login) {
+            this.entries.set(currentEntry.machine, currentEntry as NetrcEntry);
+          }
+          currentEntry = {machine: value};
+        } else if (key === 'login' || key === 'password') {
+          currentEntry[key] = value;
         }
       }
 
-      if (currentMachine && Object.keys(currentEntry).length > 1) {
-        this.entries.set(currentMachine, currentEntry as NetrcEntry);
+      if (currentEntry.machine && currentEntry.login) {
+        this.entries.set(currentEntry.machine, currentEntry as NetrcEntry);
       }
     } catch (error) {
-      // File doesn't exist or can't be read, starting with empty entries
+      console.error('Error parsing netrc file', error);
     }
   }
 
@@ -60,7 +50,6 @@ export class Netrc {
         let str = `machine ${machine}\n`;
         if (entry.login) str += `  login ${entry.login}\n`;
         if (entry.password) str += `  password ${entry.password}\n`;
-        if (entry.account) str += `  account ${entry.account}\n`;
         return str;
       })
       .join('\n');
@@ -72,11 +61,13 @@ export class Netrc {
     return this.entries.get(machine);
   }
 
-  setEntry(machine: string, entry: Partial<NetrcEntry>): void {
-    const existingEntry = this.entries.get(machine) || {machine};
-    const updatedEntry = {...existingEntry, ...entry} as NetrcEntry;
-    this.entries.delete(machine);
-    this.entries.set(machine, updatedEntry);
+  setEntry({machine, ...entryProps}: NetrcEntry): void {
+    if (!machine) {
+      throw new Error('Machine is required');
+    }
+    const existing = this.entries.get(machine) ?? {machine};
+    const updated = {...existing, ...entryProps, machine};
+    this.entries.set(machine, updated);
   }
 
   getLastEntry(): NetrcEntry | undefined {

@@ -18,4 +18,3 @@ gha-creds-*.json
 .nox
 *.log
 */file::memory:?cache=shared
-weave/trace_server/model_providers

@@ -153,22 +153,30 @@ const ObjectViewerSectionNonEmpty = ({
     setMode('collapsed');
     setExpandedIds([]);
   };
+
+  const isExpandAllSmall =
+    !!apiRef?.current?.getAllRowIds &&
+    getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
+
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
-    if (getGroupIds().length > EXPANDED_IDS_LENGTH) {
+    if (isExpandAllSmall) {
+      setExpandedIds(getGroupIds());
+    } else {
       setExpandedIds(
         getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
       );
-    } else {
-      setExpandedIds(getGroupIds());
     }
   };
 
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
+    if (mode === 'hidden' || mode === 'json') {
+      return;
+    }
     const isSimple = isSimpleData(data);
     const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
     if (newMode === 'expanded') {
@@ -180,25 +188,29 @@ const ObjectViewerSectionNonEmpty = ({
   }, [data, isExpanded]);
 
   return (
-    <>
+    <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
         <Title>{title}</Title>
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="row-height-small"
           active={mode === 'collapsed'}
           onClick={onClickCollapsed}
           tooltip="View collapsed"
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip={`Expand next ${EXPANDED_IDS_LENGTH} rows`}
+          tooltip={
+            isExpandAllSmall
+              ? 'Expand all'
+              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+          }
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="code-alt"
           active={mode === 'json'}
           onClick={() => setMode('json')}
@@ -206,7 +218,7 @@ const ObjectViewerSectionNonEmpty = ({
         />
         {!noHide && (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon="hide-hidden"
             active={mode === 'hidden'}
             onClick={() => setMode('hidden')}
@@ -215,7 +227,7 @@ const ObjectViewerSectionNonEmpty = ({
         )}
       </TitleRow>
       {body}
-    </>
+    </Box>
   );
 };
 

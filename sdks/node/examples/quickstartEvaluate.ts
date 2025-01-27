@@ -52,9 +52,9 @@ async function main() {
   const evaluation = new weave.Evaluation({
     dataset: ds,
     scorers: [
-      weave.op(function fruitEqual({modelOutput, datasetItem}) {
+      weave.op(function fruitEqual({modelOutput, datasetRow}) {
         return {
-          correct: modelOutput.fruit == datasetItem.target.fruit,
+          correct: modelOutput.fruit == datasetRow.target.fruit,
         };
       }),
     ],

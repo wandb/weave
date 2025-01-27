@@ -8,6 +8,11 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Model: 'blue',
   Dataset: 'green',
   Evaluation: 'cactus',
+  Leaderboard: 'gold',
+  Scorer: 'purple',
+  ActionSpec: 'sienna',
+  AnnotationSpec: 'magenta',
+  SavedView: 'magenta',
 };
 
 export const TypeVersionCategoryChip: React.FC<{

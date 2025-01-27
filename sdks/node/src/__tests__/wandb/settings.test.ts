@@ -54,6 +54,7 @@ describe('settings', () => {
         apiKey: 'test-api-key',
         baseUrl: expect.stringContaining('api.wandb.ai'),
         traceBaseUrl: expect.stringContaining('https://trace.wandb.ai'),
+        resolvedHost: 'api.wandb.ai',
         domain: expect.any(String),
       });
     });

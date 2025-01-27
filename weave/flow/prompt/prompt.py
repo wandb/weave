@@ -5,17 +5,20 @@ import re
 import textwrap
 from collections import UserList
 from pathlib import Path
-from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, overload
+from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, cast, overload
 
 from pydantic import Field
 from rich.table import Table
+from typing_extensions import Self
 
 from weave.flow.obj import Object
 from weave.flow.prompt.common import ROLE_COLORS, color_role
 from weave.trace.api import publish as weave_publish
+from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
 from weave.trace.rich import pydantic_util
+from weave.trace.vals import WeaveObject
 
 
 class Message(TypedDict):
@@ -73,19 +76,59 @@ def color_content(content: str, values: dict) -> str:
 
 class Prompt(Object):
     def format(self, **kwargs: Any) -> Any:
-        raise NotImplemented
+        raise NotImplementedError("Subclasses must implement format()")
 
 
-class MessagesPrompt(Prompt):
-    def format(self, **kwargs: Any) -> list:
-        raise NotImplemented
-
-
+@register_object
 class StringPrompt(Prompt):
+    content: str = ""
+
+    def __init__(self, content: str):
+        super().__init__()
+        self.content = content
+
     def format(self, **kwargs: Any) -> str:
-        raise NotImplemented
+        return self.content.format(**kwargs)
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        prompt = cls(content=obj.content)
+        prompt.name = obj.name
+        prompt.description = obj.description
+        prompt.ref = cast(ObjectRef, obj.ref)
+        return prompt
 
 
+@register_object
+class MessagesPrompt(Prompt):
+    messages: list[dict] = Field(default_factory=list)
+
+    def __init__(self, messages: list[dict]):
+        super().__init__()
+        self.messages = messages
+
+    def format_message(self, message: dict, **kwargs: Any) -> dict:
+        m = {}
+        for k, v in message.items():
+            if isinstance(v, str):
+                m[k] = v.format(**kwargs)
+            else:
+                m[k] = v
+        return m
+
+    def format(self, **kwargs: Any) -> list:
+        return [self.format_message(m, **kwargs) for m in self.messages]
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        prompt = cls(messages=obj.messages)
+        prompt.name = obj.name
+        prompt.description = obj.description
+        prompt.ref = cast(ObjectRef, obj.ref)
+        return prompt
+
+
+@register_object
 class EasyPrompt(UserList, Prompt):
     data: list = Field(default_factory=list)
     config: dict = Field(default_factory=dict)
@@ -143,7 +186,7 @@ class EasyPrompt(UserList, Prompt):
             for item in item:
                 self.append(item)
         else:
-            raise ValueError(f"Cannot append {item} of type {type(item)} to Prompt")
+            raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
     def __iadd__(self, item: Any) -> "Prompt":
         self.append(item)
@@ -236,13 +279,13 @@ class EasyPrompt(UserList, Prompt):
     # TODO: Any should be Dataset but there is a circular dependency issue
     def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
         rows = dataset if isinstance(dataset, list) else dataset.rows
-        bound: list["Prompt"] = []
+        bound: list[Prompt] = []
         for row in rows:
             bound.append(self.copy().bind(row))
         return bound
 
     @overload
-    def __getitem__(self, index: SupportsIndex) -> Any: ...
+    def __getitem__(self, key: SupportsIndex) -> Any: ...
 
     @overload
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
@@ -384,34 +427,35 @@ class EasyPrompt(UserList, Prompt):
             "messages": list(self),
         }
 
-    @staticmethod
-    def from_obj(obj: Any) -> "EasyPrompt":
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)
         requirements = dict(obj.requirements)
-        return EasyPrompt(
+        return cls(
             name=obj.name,
             description=obj.description,
+            ref=obj.ref,
             messages=messages,
             config=config,
             requirements=requirements,
         )
 
-    @staticmethod
-    def load(fp: IO) -> "EasyPrompt":
+    @classmethod
+    def load(cls, fp: IO) -> Self:
         if isinstance(fp, str):  # Common mistake
-            raise ValueError(
+            raise TypeError(
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
             )
         data = json.load(fp)
         prompt = EasyPrompt(**data)
         return prompt
 
-    @staticmethod
-    def load_file(filepath: Union[str, Path]) -> "Prompt":
+    @classmethod
+    def load_file(cls, filepath: Union[str, Path]) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
-        with open(expanded_path, "r") as f:
+        with open(expanded_path) as f:
             return EasyPrompt.load(f)
 
     def dump(self, fp: IO) -> None:

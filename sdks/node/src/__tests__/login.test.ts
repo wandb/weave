@@ -18,6 +18,7 @@ describe('login', () => {
     (getUrls as jest.Mock).mockReturnValue({
       traceBaseUrl: 'https://api.wandb.ai',
       domain: 'wandb.ai',
+      host: 'api.wandb.ai',
     });
 
     const mockSetEntry = jest.fn();
@@ -33,20 +34,17 @@ describe('login', () => {
       },
     }));
 
-    await login({apiKey: 'test-api-key'});
+    await login('test-api-key');
 
-    expect(mockSetEntry).toHaveBeenCalledWith('wandb.ai', {
+    expect(mockSetEntry).toHaveBeenCalledWith({
+      machine: 'api.wandb.ai',
       login: 'user',
       password: 'test-api-key',
     });
     expect(mockSave).toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith(
-      'Successfully logged in.  Credentials saved for wandb.ai'
+      'Successfully logged in. Credentials saved for api.wandb.ai'
     );
-  });
-
-  it('should throw an error if API key is not provided', async () => {
-    await expect(login()).rejects.toThrow('API Key must be specified');
   });
 
   it('should throw an error if connection verification fails', async () => {
@@ -63,7 +61,7 @@ describe('login', () => {
       },
     }));
 
-    await expect(login({apiKey: 'test-api-key'})).rejects.toThrow(
+    await expect(login('test-api-key')).rejects.toThrow(
       'Unable to verify connection to the weave trace server with given API Key'
     );
   });

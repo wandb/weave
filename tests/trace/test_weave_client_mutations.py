@@ -312,16 +312,16 @@ def test_table_mutation_saving_replace_rows(client):
 
 def test_table_cant_append_bad_data(client):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         t.append(1)
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         t.append([1, 2, 3])
 
     ref = weave.publish(t)
     t2 = ref.get()
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         t2.append(1)
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         t2.append([1, 2, 3])
 
 

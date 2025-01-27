@@ -19,7 +19,7 @@ class ExampleObject extends WeaveObject {
 
 describe('weaveObject', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   test('basic-example', async () => {

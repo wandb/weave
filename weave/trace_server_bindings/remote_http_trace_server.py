@@ -1,7 +1,8 @@
 import io
 import json
 import logging
-from typing import Any, Iterator, List, Optional, Tuple, Type, Union, cast
+from collections.abc import Iterator
+from typing import Any, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -54,14 +55,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         if code_class == 4 and e.response.status_code != 429:
             return False
 
-        # Unknown server error
-        # TODO(np): We need to fix the server to return proper status codes
-        # for downstream 401, 403, 404, etc... Those should propagate back to
-        # the client.
-        if e.response.status_code == 500:
-            return False
-
-    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
+    # Otherwise, retry: 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
@@ -104,7 +98,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
-        self._auth: Optional[Tuple[str, str]] = None
+        self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -122,7 +116,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # that type checking is applied to the constructor.
         return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
 
-    def set_auth(self, auth: Tuple[str, str]) -> None:
+    def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
     @tenacity.retry(
@@ -137,7 +131,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     )
     def _flush_calls(
         self,
-        batch: List,
+        batch: list,
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -218,8 +212,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: Type[BaseModel],
-        res_model: Type[BaseModel],
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
@@ -230,15 +224,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self,
         url: str,
         req: BaseModel,
-        req_model: Type[BaseModel],
-        res_model: Type[BaseModel],
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
     ) -> Iterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req, stream=True)
         for line in r.iter_lines():
             if line:
-                yield res_model.model_validate(json.loads(line))
+                yield res_model.model_validate_json(line)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -265,7 +259,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
+            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
@@ -358,6 +352,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
         )
 
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        return self._generic_request(
+            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
+        )
+
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
@@ -446,8 +445,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         # Need to manually iterate over this until the stram endpoint is built and shipped.
         res = self.table_query(req)
-        for row in res.rows:
-            yield row
+        yield from res.rows
 
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
@@ -527,6 +525,23 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
         )
 
+    def feedback_replace(
+        self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
+    ) -> tsi.FeedbackReplaceRes:
+        return self._generic_request(
+            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+        )
+
+    def actions_execute_batch(
+        self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
+    ) -> tsi.ActionsExecuteBatchRes:
+        return self._generic_request(
+            "/actions/execute_batch",
+            req,
+            tsi.ActionsExecuteBatchReq,
+            tsi.ActionsExecuteBatchRes,
+        )
+
     # Cost API
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]
@@ -547,16 +562,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CostPurgeRes:
         return self._generic_request(
             "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
-        )
-
-    def execute_batch_action(
-        self, req: tsi.ExecuteBatchActionReq
-    ) -> tsi.ExecuteBatchActionRes:
-        return self._generic_request(
-            "/execute/batch_action",
-            req,
-            tsi.ExecuteBatchActionReq,
-            tsi.ExecuteBatchActionRes,
         )
 
     def completions_create(

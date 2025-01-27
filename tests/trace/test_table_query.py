@@ -1,5 +1,5 @@
 import random
-from typing import Iterator
+from collections.abc import Iterator
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -133,7 +133,7 @@ def test_table_query_limit(client: WeaveClient):
 
     assert len(result_vals) == limit
     assert result_digests == row_digests[:limit]
-    assert result_vals == [d for d in data[:limit]]
+    assert result_vals == list(data[:limit])
 
 
 def test_table_query_offset(client: WeaveClient):
@@ -149,7 +149,7 @@ def test_table_query_offset(client: WeaveClient):
 
     assert len(result_vals) == len(data) - offset
     assert result_digests == row_digests[offset:]
-    assert result_vals == [d for d in data[offset:]]
+    assert result_vals == list(data[offset:])
 
 
 def test_table_query_sort_by_column(client: WeaveClient):

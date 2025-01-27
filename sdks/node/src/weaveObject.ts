@@ -9,6 +9,18 @@ export interface WeaveObjectParameters {
   description?: string;
 }
 
+/**
+ * Represents a reference to a saved Weave object.
+ *
+ * Generally, end users will not need to interact with this class directly.
+ *
+ * An ObjectRef contains the project ID, object ID, and digest that uniquely identify
+ * a saved object in Weave's storage system.
+ *
+ * @example
+ * const ref = new ObjectRef('my-project', 'abc123', 'def456');
+ * const uri = ref.uri(); // weave:///my-project/object/abc123:def456
+ */
 export class ObjectRef {
   constructor(
     public projectId: string,

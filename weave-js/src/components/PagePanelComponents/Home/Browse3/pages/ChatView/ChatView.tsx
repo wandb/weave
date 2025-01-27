@@ -1,8 +1,7 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {ChoicesView} from './ChoicesView';
-import {HorizontalRuleWithLabel} from './HorizontalRuleWithLabel';
 import {MessageList} from './MessageList';
 import {Chat} from './types';
 
@@ -15,6 +14,11 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   const chatResult = useDeepMemo(chat.result);
 
+  const scrollLastMessage = useMemo(
+    () => !(outputRef.current && chatResult && chatResult.choices),
+    [chatResult]
+  );
+
   useEffect(() => {
     if (outputRef.current && chatResult && chatResult.choices) {
       outputRef.current.scrollIntoView();
@@ -22,17 +26,24 @@ export const ChatView = ({chat}: ChatViewProps) => {
   }, [chatResult]);
 
   return (
-    <div>
-      <HorizontalRuleWithLabel label="Input" />
-      <MessageList messages={chat.request.messages} />
-      {chatResult && chatResult.choices && (
-        <div className="mt-12" ref={outputRef}>
-          <HorizontalRuleWithLabel label="Output" />
-          <ChoicesView
-            isStructuredOutput={chat.isStructuredOutput}
-            choices={chatResult.choices}
-          />
-        </div>
+    <div className="flex flex-col pb-32">
+      <p className="mb-[8px] text-sm font-semibold text-moon-800">Messages</p>
+      <MessageList
+        messages={chat.request?.messages || []}
+        scrollLastMessage={scrollLastMessage}
+      />
+      {chatResult?.choices && chatResult.choices.length > 0 && (
+        <>
+          <span className="mb-[8px] text-sm font-semibold text-moon-800">
+            Response
+          </span>
+          <div ref={outputRef}>
+            <ChoicesView
+              isStructuredOutput={chat.isStructuredOutput}
+              choices={chatResult.choices}
+            />
+          </div>
+        </>
       )}
     </div>
   );

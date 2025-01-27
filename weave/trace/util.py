@@ -1,9 +1,39 @@
+from __future__ import annotations
+
 import warnings
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, Iterable, Iterator, Optional
+from typing import Any, Callable
+
+LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
+logged_messages = []
+
+
+def log_once(log_method: Callable[[str], None], message: str) -> None:
+    """Logs a message once, suppressing subsequent messages of the same type. This
+    is useful for notifying the user about errors without spamming the logs.
+
+    This is mostly useful for cases where the same error message might occur many times.
+    For example, if an op fails to save, it is likely going to happen every time that op is
+    called. Or, if we have an error in our patched iterator, then it likely happens every time
+    we iterate over the result. This allows use to inform the user about the error without
+    clogging up their logs.
+
+    Args:
+        log_method: The method to use to log the message. This should accept a string argument.
+        message: The message to log.
+
+    Example:
+    ```python
+    log_once(logger.error, "Failed to save op")
+    ```
+    """
+    if message not in logged_messages:
+        log_method(message + LOG_ONCE_MESSAGE_SUFFIX)
+        logged_messages.append(message)
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -31,35 +61,38 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.contexts: list[Context] = []
 
     # ignoring type here for convenience because otherwise you have to write a bunch of overloads
     # for py310+ and py39-
     def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        context = copy_context()
-        self.contexts.append(context)
-
-        wrapped_fn = partial(self._run_with_context, context, fn)
-        return super().submit(wrapped_fn, *args, **kwargs)
+        wrapped_fn = partial(self._run_with_context, fn)
+        return super().submit(wrapped_fn, copy_context(), *args, **kwargs)
 
     def map(
         self,
         fn: Callable,
-        *iterables: Iterable[Iterable],
-        timeout: Optional[float] = None,
+        *iterables: Iterable[Any],
+        timeout: float | None = None,
         chunksize: int = 1,
     ) -> Iterator:
-        contexts = [copy_context() for _ in range(len(list(iterables[0])))]
-        self.contexts.extend(contexts)
+        first_iterable = list(iterables[0])
+        map_len = len(first_iterable)
 
-        wrapped_fn = partial(self._run_with_context, None, fn)
-        return super().map(wrapped_fn, *iterables, timeout=timeout, chunksize=chunksize)
+        # Create a context for each item in the first iterable
+        contexts = [copy_context() for _ in range(map_len)]
+
+        wrapped_fn = partial(self._run_with_context, fn)
+
+        # Convert lists to iterables for map()
+        map_iterables = (contexts, first_iterable, *iterables[1:])
+
+        return super().map(
+            wrapped_fn, *map_iterables, timeout=timeout, chunksize=chunksize
+        )
 
     def _run_with_context(
-        self, context: Context, fn: Callable, *args: Any, **kwargs: Any
+        self, fn: Callable, context: Context, *args: Any, **kwargs: Any
     ) -> Any:
-        if context is None:
-            context = self.contexts.pop(0)
         return context.run(fn, *args, **kwargs)
 
 

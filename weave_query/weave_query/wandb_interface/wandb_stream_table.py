@@ -13,7 +13,6 @@ import uuid
 
 from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
-from wandb.sdk.lib.printer import get_printer
 
 from weave_query import weave_types
 from weave_query import (
@@ -186,11 +185,6 @@ class _StreamTableSync:
             )
             self._artifact = WandbLiveRunFiles(name=uri.name, uri=uri)
             self._artifact.set_file_pusher(self._lite_run.pusher)
-        if print_url:
-            base_url = environment.weave_server_url()
-            url = f"{base_url}/browse/wandb/{self._entity_name}/{self._project_name}/table/{self._table_name}"
-            printer = get_printer(_get_python_type() != "python")
-            # printer.display(f'{printer.emoji("star")} View data at {printer.link(url)}')
         return self._weave_stream_table
 
     def log(self, row_or_rows: ROW_TYPE) -> None:

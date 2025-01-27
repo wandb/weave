@@ -18,7 +18,7 @@ def cli() -> None:
     pass
 
 
-@cli.command(help="Serve weave models.")
+@cli.command(help="Serve weave models.")  # pyright: ignore[reportFunctionMemberAccess]
 @click.argument("model_ref")
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
@@ -37,7 +37,7 @@ def serve(
 ) -> None:
     parsed_ref = parse_uri(model_ref)
     if not isinstance(parsed_ref, ObjectRef):
-        raise ValueError(f"Expected a weave artifact uri, got {parsed_ref}")
+        raise TypeError(f"Expected a weave artifact uri, got {parsed_ref}")
     ref_project = parsed_ref.project
     project_override = project or os.getenv("PROJECT_NAME")
     if project_override:
@@ -54,7 +54,7 @@ def serve(
         )
 
 
-@cli.group(help="Deploy weave models.")
+@cli.group(help="Deploy weave models.")  # pyright: ignore[reportFunctionMemberAccess]
 def deploy() -> None:
     pass
 

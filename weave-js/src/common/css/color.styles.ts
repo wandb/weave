@@ -2,24 +2,24 @@
  * Keep these colors in sync with what is in tailwind.config.js
  */
 export const WHITE = '#FFFFFF';
-export const MOONBEAM = '#EDE8FF';
-export const OBLIVION = '#15181F';
+export const MOONBEAM = '#F1EFF8';
+export const OBLIVION = '#0D0F12';
 
-export const MOON_50 = '#FAFAFA';
-export const MOON_100 = '#F5F6F7';
-export const MOON_150 = '#EDEFF2';
-export const MOON_200 = '#E4E6EB';
-export const MOON_250 = '#DADEE3';
-export const MOON_300 = '#D3D7DE';
-export const MOON_350 = '#C2C6CF';
-export const MOON_400 = '#AEB3BD';
-export const MOON_450 = '#8E949E';
+export const MOON_50 = '#FDFDFD';
+export const MOON_100 = '#F8F8F8';
+export const MOON_150 = '#F0F0F0';
+export const MOON_200 = '#E8E8E9';
+export const MOON_250 = '#DFE0E2';
+export const MOON_300 = '#D4D5D9';
+export const MOON_350 = '#C5C7CC';
+export const MOON_400 = '#B1B4B9';
+export const MOON_450 = '#8F949E';
 export const MOON_500 = '#79808A';
 export const MOON_550 = '#676D78';
 export const MOON_600 = '#565C66';
 export const MOON_650 = '#4B535C';
 export const MOON_700 = '#3F464F';
-export const MOON_750 = '#343A42';
+export const MOON_750 = '#363C44';
 export const MOON_800 = '#2B3038';
 export const MOON_850 = '#20242B';
 export const MOON_900 = '#1A1D24';

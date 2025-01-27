@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Union
-
-from weave.trace.autopatch import autopatch
-
-autopatch()  # ensure both weave patching and instructor patching are applied
+from typing import TYPE_CHECKING, Any, Union
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -23,10 +19,17 @@ if TYPE_CHECKING:
     from google.generativeai import GenerativeModel
     from instructor.patch import InstructorChatCompletionCreate
     from mistralai import Mistral
-    from openai import AsyncOpenAI, OpenAI
+    from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 
     _LLM_CLIENTS = Union[
-        OpenAI, AsyncOpenAI, Anthropic, AsyncAnthropic, Mistral, GenerativeModel
+        OpenAI,
+        AsyncOpenAI,
+        AzureOpenAI,
+        AsyncAzureOpenAI,
+        Anthropic,
+        AsyncAnthropic,
+        Mistral,
+        GenerativeModel,
     ]
 else:
     _LLM_CLIENTS = object
@@ -34,6 +37,8 @@ else:
 _LLM_CLIENTS_NAMES = (
     "OpenAI",
     "AsyncOpenAI",
+    "AzureOpenAI",
+    "AsyncAzureOpenAI",
     "Anthropic",
     "AsyncAnthropic",
     "Mistral",
@@ -41,7 +46,7 @@ _LLM_CLIENTS_NAMES = (
 )
 
 
-def instructor_client(client: _LLM_CLIENTS) -> "instructor.client":
+def instructor_client(client: _LLM_CLIENTS) -> instructor.client:
     try:
         import instructor
     except ImportError:
@@ -75,16 +80,16 @@ def create(
         max_output_tokens = kwargs.pop("max_tokens")
         temperature = kwargs.pop("temperature", None)
         _ = kwargs.pop("model")  # model is baked in the client
-        kwargs["generation_config"] = dict(
-            max_output_tokens=max_output_tokens,
-            temperature=temperature,
-        )
+        kwargs["generation_config"] = {
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+        }
     return client.chat.completions.create(*args, **kwargs)
 
 
 def embed(
-    client: _LLM_CLIENTS, model_id: str, texts: Union[str, List[str]], **kwargs: Any
-) -> List[List[float]]:
+    client: _LLM_CLIENTS, model_id: str, texts: str | list[str], **kwargs: Any
+) -> list[list[float]]:
     client_type = type(client).__name__.lower()
     if "openai" in client_type:
         response = client.embeddings.create(model=model_id, input=texts, **kwargs)

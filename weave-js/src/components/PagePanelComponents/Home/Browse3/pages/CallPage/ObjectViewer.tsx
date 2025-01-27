@@ -7,6 +7,7 @@ import {
   GridRowId,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   Dispatch,
@@ -18,12 +19,17 @@ import React, {
   useState,
 } from 'react';
 
+import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {
+  CustomWeaveTypePayload,
+  isCustomWeaveTypePayload,
+} from '../../typeViews/customWeaveType.types';
+import {getCustomWeaveTypePreferredRowHeight} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -47,6 +53,10 @@ import {
   TraverseContext,
 } from './traverse';
 import {ValueView} from './ValueView';
+
+const DEFAULT_ROW_HEIGHT = 38;
+const CODE_ROW_HEIGHT = 350;
+const TABLE_ROW_HEIGHT = 450;
 
 type Data = Record<string, any> | any[];
 
@@ -73,7 +83,7 @@ type RefValues = Record<string, any>; // ref URI to value
 
 type TruncatedStore = {[key: string]: {values: any; index: number}};
 
-const RESOVLED_REF_KEY = '_ref';
+const RESOLVED_REF_KEY = '_ref';
 
 export const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
@@ -100,9 +110,11 @@ export const ObjectViewer = ({
   const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
 
   // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
-  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
-  // are the paths at which the refs were expanded.
-  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+  // this might contain nested refs not in the `dataRefs` set. The keys are object paths at which the refs were expanded
+  // and the values are the corresponding ref string.
+  const [expandedRefs, setExpandedRefs] = useState<{[path: string]: string}>(
+    {}
+  );
 
   // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
   const addExpandedRef = useCallback((path: string, ref: string) => {
@@ -151,8 +163,13 @@ export const ObjectViewer = ({
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
+      if (!r) {
         // Shouldn't be possible
+        continue;
+      }
+      if (!v) {
+        // Value for ref not found, must be deleted
+        refValues[r] = deletedRefValuePlaceholder(r);
         continue;
       }
       let val = r;
@@ -163,13 +180,13 @@ export const ObjectViewer = ({
         if (typeof val === 'object' && val !== null) {
           val = {
             ...v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         } else {
           // This makes it so that runs pointing to primitives can still be expanded in the table.
           val = {
             '': v,
-            [RESOVLED_REF_KEY]: r,
+            [RESOLVED_REF_KEY]: r,
           };
         }
       }
@@ -182,7 +199,7 @@ export const ObjectViewer = ({
         isWeaveRef(context.value) &&
         refValues[context.value] != null &&
         // Don't expand _ref keys
-        context.path.tail() !== RESOVLED_REF_KEY
+        context.path.tail() !== RESOLVED_REF_KEY
       ) {
         dirty = true;
         return refValues[context.value];
@@ -438,6 +455,47 @@ export const ObjectViewer = ({
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
+  // Per https://mui.com/x/react-data-grid/row-height/#dynamic-row-height, always
+  // memoize the getRowHeight function.
+  const getRowHeight = useCallback((params: GridRowHeightParams) => {
+    const isNonRefString =
+      params.model.valueType === 'string' && !isWeaveRef(params.model.value);
+    const isArray = params.model.valueType === 'array';
+    const isTableRef =
+      isWeaveRef(params.model.value) &&
+      (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+    const {isCode} = params.model;
+    const isCustomWeaveType = isCustomWeaveTypePayload(params.model.value);
+    if (!params.model.isLeaf) {
+      // This is a group header, so we want to use the default height
+      return DEFAULT_ROW_HEIGHT;
+    } else if (isNonRefString) {
+      // This is the only special case where we will allow for dynamic height.
+      // Since strings have special renders that take up different amounts of
+      // space, we will allow for dynamic height.
+      return 'auto';
+    } else if (isCustomWeaveType) {
+      const type = (params.model.value as CustomWeaveTypePayload).weave_type
+        .type;
+      const preferredRowHeight = getCustomWeaveTypePreferredRowHeight(type);
+      if (preferredRowHeight) {
+        return preferredRowHeight;
+      }
+      return DEFAULT_ROW_HEIGHT;
+    } else if ((isArray && USE_TABLE_FOR_ARRAYS) || isTableRef) {
+      // Perfectly enough space for 1 page of data rows
+      return TABLE_ROW_HEIGHT;
+    } else if (isCode) {
+      // Probably will get negative feedback here since code that is < 20 lines
+      // will have some whitespace below the code. However, we absolutely need
+      // to have static height for all cells else the MUI data grid will jump around
+      // when cleaning up virtual rows.
+      return CODE_ROW_HEIGHT;
+    } else {
+      return DEFAULT_ROW_HEIGHT;
+    }
+  }, []);
+
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
@@ -471,31 +529,9 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        autoHeight
         columnHeaderHeight={38}
-        getRowHeight={(params: GridRowHeightParams) => {
-          const isNonRefString =
-            params.model.valueType === 'string' &&
-            !isWeaveRef(params.model.value);
-          const isArray = params.model.valueType === 'array';
-          const isTableRef =
-            isWeaveRef(params.model.value) &&
-            (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-          const {isCode} = params.model;
-          const isCustomWeaveType = isCustomWeaveTypePayload(
-            params.model.value
-          );
-          if (
-            isNonRefString ||
-            (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef ||
-            isCode ||
-            isCustomWeaveType
-          ) {
-            return 'auto';
-          }
-          return 38;
-        }}
+        rowHeight={DEFAULT_ROW_HEIGHT}
+        getRowHeight={getRowHeight}
         hideFooter
         rowSelection={false}
         groupingColDef={groupingColDef}
@@ -515,10 +551,10 @@ export const ObjectViewer = ({
         }}
       />
     );
-  }, [apiRef, rows, columns, groupingColDef, expandedIds]);
+  }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden'}}>{inner}</div>;
+  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
 };
 
 // Helper function to build the base ref for a given path. This function is used
@@ -647,12 +683,12 @@ const ShowMoreButtons = ({
       sx={{
         display: 'flex',
         width: '100%',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
         gap: 1,
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
         <Button
-          variant="quiet"
+          variant="ghost"
           onClick={() => {
             const {newData, store} = updateTruncatedDataFromStore(
               parentPath,
@@ -667,7 +703,7 @@ const ShowMoreButtons = ({
         </Button>
       )}
       <Button
-        variant="quiet"
+        variant="ghost"
         onClick={() => {
           const {newData, store} = updateTruncatedDataFromStore(
             parentPath,
@@ -695,4 +731,19 @@ const useTruncatedData = (data: Data) => {
   }, [data]);
 
   return {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore};
+};
+
+// Placeholder value for deleted refs
+const DELETED_REF_KEY = '_weave_deleted_ref';
+const deletedRefValuePlaceholder = (
+  ref: string
+): {[DELETED_REF_KEY]: string} => {
+  const parsedRef = parseRef(ref);
+  const refString = objectRefDisplayName(parsedRef).label;
+  return {[DELETED_REF_KEY]: refString};
+};
+export const maybeGetDeletedRefValuePlaceholderFromRow = (
+  row: any
+): string | undefined => {
+  return row.value?.[DELETED_REF_KEY];
 };

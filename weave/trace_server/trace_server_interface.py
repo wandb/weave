@@ -1,6 +1,7 @@
 import datetime
+from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Type, Union
+from typing import Any, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -48,7 +49,7 @@ class FeedbackDict(TypedDict, total=False):
     id: str
     feedback_type: str
     weave_ref: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     creator: Optional[str]
     created_at: Optional[datetime.datetime]
     wb_user_id: Optional[str]
@@ -65,12 +66,12 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     trace_name: Optional[str]
     # latency in milliseconds
     latency_ms: Optional[int]
-    costs: Optional[Dict[str, LLMCostSchema]]
-    feedback: Optional[List[FeedbackDict]]
+    costs: Optional[dict[str, LLMCostSchema]]
+    feedback: Optional[list[FeedbackDict]]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
-    usage: Dict[str, LLMUsageSchema]
+    usage: dict[str, LLMUsageSchema]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
@@ -94,10 +95,10 @@ class CallSchema(BaseModel):
     # Start time is required
     started_at: datetime.datetime
     # Attributes: properties of the call
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
 
     # Inputs
-    inputs: Dict[str, Any]
+    inputs: dict[str, Any]
 
     # End time is required if finished
     ended_at: Optional[datetime.datetime] = None
@@ -118,7 +119,7 @@ class CallSchema(BaseModel):
     deleted_at: Optional[datetime.datetime] = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
-    def serialize_typed_dicts(self, v: Dict[str, Any]) -> Dict[str, Any]:
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
 
 
@@ -142,10 +143,10 @@ class StartedCallSchemaForInsert(BaseModel):
     # Start time is required
     started_at: datetime.datetime
     # Attributes: properties of the call
-    attributes: Dict[str, Any]
+    attributes: dict[str, Any]
 
     # Inputs
-    inputs: Dict[str, Any]
+    inputs: dict[str, Any]
 
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -169,7 +170,7 @@ class EndedCallSchemaForInsert(BaseModel):
     summary: SummaryInsertMap
 
     @field_serializer("summary")
-    def serialize_typed_dicts(self, v: Dict[str, Any]) -> Dict[str, Any]:
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
 
 
@@ -185,12 +186,25 @@ class ObjSchema(BaseModel):
     base_object_class: Optional[str]
     val: Any
 
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
-    base_object_class: Optional[str] = None
     val: Any
+    builtin_object_class: Optional[str] = None
+    # Keeping `set_base_object_class` here until it is successfully removed from UI client
+    set_base_object_class: Optional[str] = Field(
+        include=False, default=None, deprecated=True
+    )
+
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    def model_post_init(self, __context: Any) -> None:
+        # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
+        if self.set_base_object_class is not None and self.builtin_object_class is None:
+            self.builtin_object_class = self.set_base_object_class
 
 
 class TableSchemaForInsert(BaseModel):
@@ -227,7 +241,7 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    call_ids: List[str]
+    call_ids: list[str]
 
     # wb_user_id is automatically populated by the server
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -239,30 +253,30 @@ class CallsDeleteRes(BaseModel):
 
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
-    messages: List = []
+    messages: list = []
     timeout: Optional[Union[float, str]] = None
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     n: Optional[int] = None
-    stop: Optional[Union[str, List]] = None
+    stop: Optional[Union[str, list]] = None
     max_completion_tokens: Optional[int] = None
     max_tokens: Optional[int] = None
-    modalities: Optional[List] = None
+    modalities: Optional[list] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
     logit_bias: Optional[dict] = None
     user: Optional[str] = None
     # openai v1.0+ new params
-    response_format: Optional[Union[dict, Type[BaseModel]]] = None
+    response_format: Optional[Union[dict, type[BaseModel]]] = None
     seed: Optional[int] = None
-    tools: Optional[List] = None
+    tools: Optional[list] = None
     tool_choice: Optional[Union[str, dict]] = None
     logprobs: Optional[bool] = None
     top_logprobs: Optional[int] = None
     parallel_tool_calls: Optional[bool] = None
     extra_headers: Optional[dict] = None
     # soon to be deprecated params by OpenAI
-    functions: Optional[List] = None
+    functions: Optional[list] = None
     function_call: Optional[str] = None
     api_version: Optional[str] = None
 
@@ -271,22 +285,26 @@ class CompletionsCreateReq(BaseModel):
     project_id: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: Optional[bool] = Field(
+        True, description="Whether to track this LLM call in the trace server"
+    )
 
 
 class CompletionsCreateRes(BaseModel):
-    response: Dict[str, Any]
+    response: dict[str, Any]
+    weave_call_id: Optional[str] = None
 
 
 class CallsFilter(BaseModel):
-    op_names: Optional[List[str]] = None
-    input_refs: Optional[List[str]] = None
-    output_refs: Optional[List[str]] = None
-    parent_ids: Optional[List[str]] = None
-    trace_ids: Optional[List[str]] = None
-    call_ids: Optional[List[str]] = None
+    op_names: Optional[list[str]] = None
+    input_refs: Optional[list[str]] = None
+    output_refs: Optional[list[str]] = None
+    parent_ids: Optional[list[str]] = None
+    trace_ids: Optional[list[str]] = None
+    call_ids: Optional[list[str]] = None
     trace_roots_only: Optional[bool] = None
-    wb_user_ids: Optional[List[str]] = None
-    wb_run_ids: Optional[List[str]] = None
+    wb_user_ids: Optional[list[str]] = None
+    wb_run_ids: Optional[list[str]] = None
 
 
 class SortBy(BaseModel):
@@ -304,7 +322,7 @@ class CallsQueryReq(BaseModel):
     limit: Optional[int] = None
     offset: Optional[int] = None
     # Sort by multiple fields
-    sort_by: Optional[List[SortBy]] = None
+    sort_by: Optional[list[SortBy]] = None
     query: Optional[Query] = None
     include_costs: Optional[bool] = Field(
         default=False,
@@ -319,9 +337,9 @@ class CallsQueryReq(BaseModel):
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
-    columns: Optional[List[str]] = None
+    columns: Optional[list[str]] = None
     # columns to expand, i.e. refs to other objects, can be nested
-    expand_columns: Optional[List[str]] = Field(
+    expand_columns: Optional[list[str]] = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
@@ -329,7 +347,7 @@ class CallsQueryReq(BaseModel):
 
 
 class CallsQueryRes(BaseModel):
-    calls: List[CallSchema]
+    calls: list[CallSchema]
 
 
 class CallsQueryStatsReq(BaseModel):
@@ -377,7 +395,7 @@ class OpReadRes(BaseModel):
 
 
 class OpVersionFilter(BaseModel):
-    op_names: Optional[List[str]] = None
+    op_names: Optional[list[str]] = None
     latest_only: Optional[bool] = None
 
 
@@ -387,7 +405,7 @@ class OpQueryReq(BaseModel):
 
 
 class OpQueryRes(BaseModel):
-    op_objs: List[ObjSchema]
+    op_objs: list[ObjSchema]
 
 
 class ObjCreateReq(BaseModel):
@@ -403,18 +421,24 @@ class ObjReadReq(BaseModel):
     object_id: str
     digest: str
 
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
+
 
 class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
 class ObjectVersionFilter(BaseModel):
-    base_object_classes: Optional[List[str]] = Field(
+    base_object_classes: Optional[list[str]] = Field(
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
     )
-    object_ids: Optional[List[str]] = Field(
+    object_ids: Optional[list[str]] = Field(
         default=None,
         description="Filter objects by their IDs",
         examples=["my_favorite_model", "my_favorite_dataset"],
@@ -450,7 +474,7 @@ class ObjQueryReq(BaseModel):
         description="Number of results to skip before returning",
         examples=[0],
     )
-    sort_by: Optional[List[SortBy]] = Field(
+    sort_by: Optional[list[SortBy]] = Field(
         default=None,
         description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
         examples=[[SortBy(field="created_at", direction="desc")]],
@@ -462,8 +486,21 @@ class ObjQueryReq(BaseModel):
     )
 
 
+class ObjDeleteReq(BaseModel):
+    project_id: str
+    object_id: str
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the object will be deleted.",
+    )
+
+
+class ObjDeleteRes(BaseModel):
+    num_deleted: int
+
+
 class ObjQueryRes(BaseModel):
-    objs: List[ObjSchema]
+    objs: list[ObjSchema]
 
 
 class TableCreateReq(BaseModel):
@@ -593,7 +630,7 @@ class TableCreateRes(BaseModel):
 
 
 class TableRowFilter(BaseModel):
-    row_digests: Optional[List[str]] = Field(
+    row_digests: Optional[list[str]] = Field(
         default=None,
         description="List of row digests to filter by",
         examples=[
@@ -633,7 +670,7 @@ class TableQueryReq(BaseModel):
         description="Number of rows to skip before starting to return rows",
         examples=[10],
     )
-    sort_by: Optional[List[SortBy]] = Field(
+    sort_by: Optional[list[SortBy]] = Field(
         default=None,
         description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
         examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
@@ -641,7 +678,7 @@ class TableQueryReq(BaseModel):
 
 
 class TableQueryRes(BaseModel):
-    rows: List[TableRowSchema]
+    rows: list[TableRowSchema]
 
 
 class TableQueryStatsReq(BaseModel):
@@ -659,19 +696,11 @@ class TableQueryStatsRes(BaseModel):
 
 
 class RefsReadBatchReq(BaseModel):
-    refs: List[str]
+    refs: list[str]
 
 
 class RefsReadBatchRes(BaseModel):
-    vals: List[Any]
-
-
-class FeedbackPayloadReactionReq(BaseModel):
-    emoji: str
-
-
-class FeedbackPayloadNoteReq(BaseModel):
-    note: str = Field(min_length=1, max_length=1024)
+    vals: list[Any]
 
 
 class FeedbackCreateReq(BaseModel):
@@ -679,12 +708,26 @@ class FeedbackCreateReq(BaseModel):
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
     feedback_type: str = Field(examples=["custom"])
-    payload: Dict[str, Any] = Field(
+    payload: dict[str, Any] = Field(
         examples=[
             {
                 "key": "value",
             }
         ]
+    )
+    # TODO: From Griffin: `it would be nice if we could type this to a kind of ref,
+    # like objectRef, with a pydantic validator and then check its construction in the client.`
+    annotation_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
+    runnable_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/op/name:digest"]
+    )
+    call_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/call/call_id"]
+    )
+    trigger_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
     )
 
     # wb_user_id is automatically populated by the server
@@ -697,7 +740,7 @@ class FeedbackCreateRes(BaseModel):
     id: str
     created_at: datetime.datetime
     wb_user_id: str
-    payload: Dict[str, Any]  # If not empty, replace payload
+    payload: dict[str, Any]  # If not empty, replace payload
 
 
 class Feedback(FeedbackCreateReq):
@@ -713,7 +756,7 @@ class FeedbackQueryReq(BaseModel):
     query: Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    sort_by: Optional[List[SortBy]] = None
+    sort_by: Optional[list[SortBy]] = None
     limit: Optional[int] = Field(default=None, examples=[10])
     offset: Optional[int] = Field(default=None, examples=[0])
 
@@ -729,6 +772,14 @@ class FeedbackPurgeReq(BaseModel):
 
 
 class FeedbackPurgeRes(BaseModel):
+    pass
+
+
+class FeedbackReplaceReq(FeedbackCreateReq):
+    feedback_id: str
+
+
+class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
@@ -776,7 +827,7 @@ class CostCreateInput(BaseModel):
 
 class CostCreateReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
-    costs: Dict[str, CostCreateInput]
+    costs: dict[str, CostCreateInput]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -806,7 +857,7 @@ class CostQueryReq(BaseModel):
     # TODO: From FeedbackQueryReq,
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    sort_by: Optional[List[SortBy]] = None
+    sort_by: Optional[list[SortBy]] = None
     limit: Optional[int] = Field(default=None, examples=[10])
     offset: Optional[int] = Field(default=None, examples=[0])
 
@@ -837,13 +888,14 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ExecuteBatchActionReq(BaseModel):
+class ActionsExecuteBatchReq(BaseModel):
     project_id: str
+    action_ref: str
     call_ids: list[str]
-    configured_action_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ExecuteBatchActionRes(BaseModel):
+class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
@@ -877,6 +929,7 @@ class TraceServerInterface(Protocol):
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
@@ -888,10 +941,12 @@ class TraceServerInterface(Protocol):
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+    def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
+
     # Action API
-    def execute_batch_action(
-        self, req: ExecuteBatchActionReq
-    ) -> ExecuteBatchActionRes: ...
+    def actions_execute_batch(
+        self, req: ActionsExecuteBatchReq
+    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

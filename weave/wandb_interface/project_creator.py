@@ -2,7 +2,7 @@
 # This file should be in the trace SDK dir
 
 import logging
-import typing
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import wandb
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def wandb_logging_disabled() -> typing.Iterator[None]:
+def wandb_logging_disabled() -> Iterator[None]:
     original_termerror = wandb.termerror
     wandb.termerror = lambda *args, **kwargs: None
     original_log_level = wandb_logger.getEffectiveLevel()
@@ -37,14 +37,12 @@ def wandb_logging_disabled() -> typing.Iterator[None]:
     wandb.termerror = original_termerror
 
 
-def ensure_project_exists(entity_name: str, project_name: str) -> typing.Dict[str, str]:
+def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
     with wandb_logging_disabled():
         return _ensure_project_exists(entity_name, project_name)
 
 
-def _ensure_project_exists(
-    entity_name: str, project_name: str
-) -> typing.Dict[str, str]:
+def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
     """
     Ensures that a W&B project exists by trying to access it, returns the project_name,
     which is not guaranteed to be the same if the provided project_name contains invalid

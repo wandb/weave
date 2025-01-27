@@ -57,8 +57,18 @@ def test_completions_create(client):
             "completion_tokens": 9,
             "prompt_tokens": 11,
             "total_tokens": 20,
-            "completion_tokens_details": {"audio_tokens": None, "reasoning_tokens": 0},
-            "prompt_tokens_details": {"audio_tokens": None, "cached_tokens": 0},
+            "completion_tokens_details": {
+                "accepted_prediction_tokens": None,
+                "audio_tokens": None,
+                "reasoning_tokens": 0,
+                "rejected_prediction_tokens": None,
+            },
+            "prompt_tokens_details": {
+                "accepted_prediction_tokens": None,
+                "audio_tokens": None,
+                "cached_tokens": 0,
+                "rejected_prediction_tokens": None,
+            },
         },
         "service_tier": None,
     }

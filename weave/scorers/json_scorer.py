@@ -12,6 +12,7 @@ class ValidJSONScorer(Scorer):
     def score(self, output: Any) -> dict:
         try:
             _ = json.loads(output)
-            return {"json_valid": True}
         except json.JSONDecodeError:
             return {"json_valid": False}
+        else:
+            return {"json_valid": True}

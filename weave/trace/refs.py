@@ -1,9 +1,13 @@
-import dataclasses
+from __future__ import annotations
+
 import urllib
 from concurrent.futures import Future
-from typing import Any, Optional, Union, cast
+from dataclasses import asdict, dataclass, fields
+from datetime import datetime
+from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
+from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -11,21 +15,31 @@ OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
 
-@dataclasses.dataclass(frozen=True)
+class WeaveDigestError(ValueError):
+    """Raised when a digest is invalid."""
+
+
+@dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
     def as_param_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        return asdict(self)
+
+    def __deepcopy__(self, memo: dict) -> Ref:
+        d = {f.name: getattr(self, f.name) for f in fields(self)}
+        res = self.__class__(**d)
+        memo[id(self)] = res
+        return res
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
-    _digest: Union[str, Future[str]]
-    _row_digests: Optional[Union[list[str], Future[list[str]]]] = None
+    _digest: str | Future[str]
+    _row_digests: list[str] | Future[list[str]] | None = None
 
     def as_param_dict(self) -> dict:
         return {
@@ -42,7 +56,7 @@ class TableRef(Ref):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"TableRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"TableRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -56,9 +70,15 @@ class TableRef(Ref):
             self.__dict__["_row_digests"] = self._row_digests.result()
 
         if not isinstance(self._row_digests, list):
-            raise Exception(f"TableRef row_digests is not a list: {self._row_digests}")
+            raise WeaveDigestError(
+                f"TableRef row_digests is not a list: {self._row_digests}"
+            )
 
         return self._row_digests
+
+    @property
+    def project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
 
     def __post_init__(self) -> None:
         if isinstance(self._digest, str):
@@ -69,33 +89,33 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[Union[str, Future[str]], ...]) -> "RefWithExtra":
+    def with_extra(self, extra: tuple[str | Future[str], ...]) -> RefWithExtra:
         params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
-    def with_key(self, key: str) -> "RefWithExtra":
+    def with_key(self, key: str) -> RefWithExtra:
         return self.with_extra((DICT_KEY_EDGE_NAME, key))
 
-    def with_attr(self, attr: str) -> "RefWithExtra":
+    def with_attr(self, attr: str) -> RefWithExtra:
         return self.with_extra((OBJECT_ATTR_EDGE_NAME, attr))
 
-    def with_index(self, index: int) -> "RefWithExtra":
+    def with_index(self, index: int) -> RefWithExtra:
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: Union[str, Future[str]]) -> "RefWithExtra":
+    def with_item(self, item_digest: str | Future[str]) -> RefWithExtra:
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
-    _digest: Union[str, Future[str]]
-    _extra: tuple[Union[str, Future[str]], ...] = ()
+    _digest: str | Future[str]
+    _extra: tuple[str | Future[str], ...] = ()
 
     def as_param_dict(self) -> dict:
         return {
@@ -123,7 +143,7 @@ class ObjectRef(RefWithExtra):
             self.__dict__["_digest"] = self._digest.result()
 
         if not isinstance(self._digest, str):
-            raise Exception(f"ObjectRef digest is not a string: {self._digest}")
+            raise WeaveDigestError(f"ObjectRef digest is not a string: {self._digest}")
 
         refs_internal.validate_no_slashes(self._digest, "digest")
         refs_internal.validate_no_colons(self._digest, "digest")
@@ -144,20 +164,7 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
-    def objectify(self, obj: Any) -> Any:
-        """Convert back to higher level object."""
-        class_name = getattr(obj, "_class_name", None)
-        if "EasyPrompt" == class_name:
-            from weave.flow.prompt.prompt import EasyPrompt
-
-            prompt = EasyPrompt.from_obj(obj)
-            # We want to use the ref on the object (and not self) as it will have had
-            # version number or latest alias resolved to a specific digest.
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
-        return obj
-
-    def get(self) -> Any:
+    def get(self, *, objectify: bool = True) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
@@ -166,7 +173,7 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return self.objectify(gc.get(self))
+            return gc.get(self, objectify=objectify)
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
@@ -176,12 +183,12 @@ class ObjectRef(RefWithExtra):
             f"{self.entity}/{self.project}", ensure_project_exists=False
         )
         try:
-            res = init_client.client.get(self)
+            res = init_client.client.get(self, objectify=objectify)
         finally:
             init_client.reset()
-        return self.objectify(res)
+        return res
 
-    def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
+    def is_descended_from(self, potential_ancestor: ObjectRef) -> bool:
         if self.entity != potential_ancestor.entity:
             return False
         if self.project != potential_ancestor.project:
@@ -197,8 +204,15 @@ class ObjectRef(RefWithExtra):
             for i in range(len(potential_ancestor.extra))
         )
 
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
 
-@dataclasses.dataclass(frozen=True)
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_object_version(self)
+
+
+@dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
@@ -206,13 +220,20 @@ class OpRef(ObjectRef):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
 
-@dataclasses.dataclass(frozen=True)
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_op_version(self)
+
+
+@dataclass(frozen=True)
 class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    _extra: tuple[Union[str, Future[str]], ...] = ()
+    _extra: tuple[str | Future[str], ...] = ()
 
     def as_param_dict(self) -> dict:
         return {
@@ -231,6 +252,19 @@ class CallRef(RefWithExtra):
         if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+
+@dataclass(frozen=True)
+class DeletedRef(Ref):
+    ref: Ref
+    deleted_at: datetime
+    error: ObjectDeletedError
+
+    def __repr__(self) -> str:
+        return f"<DeletedRef {self.uri()}>"
+
+    def uri(self) -> str:
+        return self.ref.uri()
 
 
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
@@ -273,5 +307,11 @@ def parse_uri(uri: str) -> AnyRef:
 
 def parse_op_uri(uri: str) -> OpRef:
     if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise ValueError(f"URI is not for an Op: {uri}")
+        raise TypeError(f"URI is not for an Op: {uri}")
+    return parsed
+
+
+def parse_object_uri(uri: str) -> ObjectRef:
+    if not isinstance(parsed := parse_uri(uri), ObjectRef):
+        raise TypeError(f"URI is not for an Object: {uri}")
     return parsed

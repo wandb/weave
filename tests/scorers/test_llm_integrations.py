@@ -32,7 +32,7 @@ def get_client_and_model(provider, model):
 
     api_key = os.getenv(api_key_env_vars[provider])
     if not api_key:
-        raise EnvironmentError(
+        raise OSError(
             f"API key for {provider} not found. Please set '{api_key_env_vars[provider]}' environment variable."
         )
 

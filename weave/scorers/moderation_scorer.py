@@ -28,7 +28,7 @@ class OpenAIModerationScorer(LLMScorer):
             raise ValueError("Install openai to use this scorer")
 
         if not isinstance(v, (OpenAI, AsyncOpenAI)):
-            raise ValueError("Moderation scoring only works with OpenAI or AsyncOpenAI")
+            raise TypeError("Moderation scoring only works with OpenAI or AsyncOpenAI")
         return v
 
     @weave.op

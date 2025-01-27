@@ -8,9 +8,11 @@ PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "dspy",
     "langchain",
+    "langchain_nvidia_ai_endpoints",
     "litellm",
     "notdiamond",
     "google_ai_studio",
+    "bedrock",
     "scorers_tests",
 ]
 
@@ -25,6 +27,12 @@ def lint(session):
 @nox.parametrize(
     "shard",
     [
+        # The `custom` shard is included if you want to run your own tests.  By default,
+        # no tests are specified, which means ALL tests will run.  To run just your own
+        # subset, you can pass `-- test_your_thing.py` to nox.
+        # For example,
+        #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
+        "custom",
         "trace",
         "trace_server",
         "anthropic",
@@ -34,6 +42,7 @@ def lint(session):
         "google_ai_studio",
         "groq",
         "instructor",
+        "langchain_nvidia_ai_endpoints",
         "langchain",
         "litellm",
         "llamaindex",
@@ -41,6 +50,8 @@ def lint(session):
         "mistral1",
         "notdiamond",
         "openai",
+        "vertexai",
+        "bedrock",
         "scorers_tests",
         "pandas-test",
     ],
@@ -66,6 +77,10 @@ def tests(session, shard):
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
+    # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
+    if shard == "langchain_nvidia_ai_endpoints":
+        env["NVIDIA_API_KEY"] = session.env.get("NVIDIA_API_KEY")
+
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
     if shard == "scorers_tests":
@@ -76,6 +91,7 @@ def tests(session, shard):
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
+        "custom": [],
         "trace": ["trace/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
@@ -91,6 +107,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
+        "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",

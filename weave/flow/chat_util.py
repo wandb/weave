@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from openai.types.chat import (
@@ -20,7 +21,7 @@ class OpenAIStream:
 
     def __init__(self, chunk_iter: Iterator["ChatCompletionChunk"]) -> None:
         self.chunk_iter = chunk_iter
-        self.first_chunk: Optional["ChatCompletionChunk"] = None
+        self.first_chunk: Optional[ChatCompletionChunk] = None
         self.output_choices: list[dict] = []
 
     def __next__(self) -> "ChatCompletionChunk":

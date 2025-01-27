@@ -18,13 +18,14 @@ import {
 } from './constants';
 import {useWFHooks} from './context';
 import {
+  CallSchema,
   KnownBaseObjectClassType,
+  Loadable,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
   OpVersionKey,
 } from './wfDataModelHooksInterface';
-import {CallSchema, Loadable} from './wfDataModelHooksInterface';
 
 type RefUri = string;
 
@@ -284,6 +285,17 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
     result += `#${ov.refExtra}`;
   }
   return result;
+};
+
+export const isObjDeleteError = (error: Error | null): boolean => {
+  if (error == null) {
+    return false;
+  }
+  const message = JSON.parse(error.message);
+  if ('deleted_at' in message) {
+    return true;
+  }
+  return false;
 };
 
 /// Hooks ///

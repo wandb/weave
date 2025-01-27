@@ -165,12 +165,17 @@ export type FeedbackQueryReq = {
 
 export type Feedback = {
   id: string;
+  project_id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
   creator: string | null; // display name
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
+  annotation_ref?: string;
+  runnable_ref?: string;
+  call_ref?: string;
+  trigger_ref?: string;
 };
 
 export type FeedbackQuerySuccess = {
@@ -205,7 +210,10 @@ export type TraceObjQueryReq = {
   metadata_only?: boolean;
 };
 
-export interface TraceObjSchema {
+export interface TraceObjSchema<
+  T extends any = any,
+  OBC extends string = string
+> {
   project_id: string;
   object_id: string;
   created_at: string;
@@ -213,12 +221,15 @@ export interface TraceObjSchema {
   version_index: number;
   is_latest: number;
   kind: 'op' | 'object';
-  base_object_class?: string;
-  val: any;
+  base_object_class?: OBC;
+  val: T;
+  wb_user_id?: string;
 }
-export type TraceObjQueryRes = {
-  objs: TraceObjSchema[];
+
+export type TraceObjQueryRes<T extends any = any> = {
+  objs: Array<TraceObjSchema<T>>;
 };
+
 export type TraceObjReadReq = {
   project_id: string;
   object_id: string;
@@ -227,6 +238,29 @@ export type TraceObjReadReq = {
 
 export type TraceObjReadRes = {
   obj: TraceObjSchema;
+};
+
+export type TraceObjCreateReq<T extends any = any> = {
+  obj: {
+    project_id: string;
+    object_id: string;
+    val: T;
+    builtin_object_class?: string;
+  };
+};
+
+export type TraceObjCreateRes = {
+  digest: string;
+};
+
+export type TraceObjDeleteReq = {
+  project_id: string;
+  object_id: string;
+  digests?: string[];
+};
+
+export type TraceObjDeleteRes = {
+  num_deleted?: number;
 };
 
 export type TraceRefsReadBatchReq = {
@@ -273,6 +307,35 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type CompletionsCreateInputs = {
+  model: string;
+  messages: any[];
+  temperature: number;
+  max_tokens: number;
+
+  // These are optional, depending on the LLM provider some accept these some dont
+  stop?: string[];
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  n?: number;
+  response_format?: {
+    type: string;
+  };
+  tools?: any[];
+};
+
+export type CompletionsCreateReq = {
+  project_id: string;
+  inputs: CompletionsCreateInputs;
+  track_llm_call?: boolean;
+};
+
+export type CompletionsCreateRes = {
+  response: any;
+  weave_call_id?: string;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
@@ -287,4 +350,44 @@ export const fileExtensions = {
   [ContentType.jsonl]: 'jsonl',
   [ContentType.any]: 'jsonl',
   [ContentType.json]: 'json',
+};
+
+export type ActionsExecuteBatchReq = {
+  project_id: string;
+  action_ref: string;
+  call_ids: string[];
+};
+
+export type ActionsExecuteBatchRes = {};
+
+export type TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec;
+
+export interface TableAppendSpec {
+  append: {
+    row: Record<string, any>;
+  };
+}
+
+export interface TablePopSpec {
+  pop: {
+    index: number;
+  };
+}
+
+export interface TableInsertSpec {
+  insert: {
+    index: number;
+    row: Record<string, any>;
+  };
+}
+
+export type TableUpdateReq = {
+  project_id: string;
+  base_digest: string;
+  updates: TableUpdateSpec[];
+};
+
+export type TableUpdateRes = {
+  digest: string;
+  updated_row_digests: string[];
 };

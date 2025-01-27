@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import contextlib
-import io
 import os
 import tempfile
-from typing import Generator, Iterator, Mapping, Optional, Union
+from collections.abc import Generator, Iterator, Mapping
+from io import BytesIO, StringIO
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 
@@ -12,13 +14,13 @@ from weave.trace import op_type  # noqa: F401, Must import this to register op s
 
 
 class MemTraceFilesArtifact:
-    temp_read_dir: Optional[tempfile.TemporaryDirectory]
+    temp_read_dir: tempfile.TemporaryDirectory | None
     path_contents: dict[str, bytes]
 
     def __init__(
         self,
-        path_contents: Optional[Mapping[str, Union[str, bytes]]] = None,
-        metadata: Optional[dict[str, str]] = None,
+        path_contents: Mapping[str, str | bytes] | None = None,
+        metadata: dict[str, str] | None = None,
     ):
         if path_contents is None:
             path_contents = {}
@@ -29,14 +31,12 @@ class MemTraceFilesArtifact:
         self.temp_read_dir = None
 
     @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
-        f: Union[io.StringIO, io.BytesIO]
+    def new_file(self, path: str, binary: bool = False) -> Iterator[StringIO | BytesIO]:
+        f: StringIO | BytesIO
         if binary:
-            f = io.BytesIO()
+            f = BytesIO()
         else:
-            f = io.StringIO()
+            f = StringIO()
         yield f
         self.path_contents[path] = f.getvalue()  # type: ignore
         f.close()
@@ -46,10 +46,8 @@ class MemTraceFilesArtifact:
         return True
 
     @contextlib.contextmanager
-    def open(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
-        f: Union[io.StringIO, io.BytesIO]
+    def open(self, path: str, binary: bool = False) -> Iterator[StringIO | BytesIO]:
+        f: StringIO | BytesIO
         try:
             if binary:
                 val = self.path_contents[path]
@@ -57,10 +55,10 @@ class MemTraceFilesArtifact:
                     raise ValueError(
                         f"Expected binary file, but got string for path {path}"
                     )
-                f = io.BytesIO(val)
+                f = BytesIO(val)
             else:
                 val = self.path_contents[path]
-                f = io.StringIO(val.decode("utf-8"))
+                f = StringIO(val.decode("utf-8"))
         except KeyError:
             raise FileNotFoundError(path)
         yield f

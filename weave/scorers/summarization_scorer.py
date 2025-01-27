@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +55,7 @@ Evaluate the quality of the following <summary> given the <input>:
 
 
 class EntityExtractionResponse(BaseModel):
-    entities: List[str] = Field(
+    entities: list[str] = Field(
         description="A list of unique entities extracted from the text."
     )
 
@@ -109,7 +109,7 @@ class SummarizationScorer(InstructorLLMScorer):
         max_tokens (int): Maximum number of tokens in the LLM's response.
 
     Methods:
-        extract_entities(text: str) -> List[str]:
+        extract_entities(text: str) -> list[str]:
             Uses an LLM to extract unique entities from the text.
 
         evaluate_summary(input: str, summary: str) -> SummarizationEvaluationResponse:
@@ -131,7 +131,7 @@ class SummarizationScorer(InstructorLLMScorer):
     max_tokens: int = 1024
 
     @weave.op
-    def extract_entities(self, text: str) -> List[str]:
+    def extract_entities(self, text: str) -> list[str]:
         """Use an LLM to extract entities"""
         response = create(
             self.client,
@@ -172,7 +172,7 @@ class SummarizationScorer(InstructorLLMScorer):
             max_tokens=self.max_tokens,
         )
 
-    def simple_word_tokenize(self, text: str) -> List[str]:
+    def simple_word_tokenize(self, text: str) -> list[str]:
         """Simple word tokenization"""
         return text.split()
 

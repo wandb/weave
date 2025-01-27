@@ -1,6 +1,7 @@
 """Support for a collection of refs."""
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from typing import Optional
 
 from rich.table import Table
 

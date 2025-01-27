@@ -43,6 +43,7 @@ dependencies = [
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",      # Used by scorers for field validation
 ]
 
 [project.optional-dependencies]
@@ -52,8 +53,11 @@ cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
-groq = ["groq>=0.9.0"]
-instructor = ["instructor>=1.4.3"]
+groq = ["groq>=0.13.0"]
+instructor = [
+  "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
+  "instructor>=1.4.3; python_version > '3.9'",
+]
 langchain = [
   "langchain-core>=0.2.1",
   "langchain-openai>=0.1.7",
@@ -62,16 +66,29 @@ langchain = [
   "pysqlite3",
   "opentelemetry-exporter-otlp",
 ]
+langchain_nvidia_ai_endpoints = [
+  "langchain-core>=0.2.1",
+  "langchain-nvidia-ai-endpoints",
+]
 litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = ["Levenshtein>=0.26.0", "instructor>=1.5.2"]
-scorers_tests = ["instructor>=1.5.2", "Levenshtein>=0.26.0", "openai>=1.0.0", "google-generativeai>=0.8.0", "mistralai>=1.0.3", "anthropic>=0.30.0"]
+scorers_tests = [
+  "instructor>=1.5.2",
+  "Levenshtein>=0.26.0",
+  "openai>=1.0.0",
+  "google-generativeai>=0.8.0",
+  "mistralai>=1.0.3",
+  "anthropic>=0.30.0",
+]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
+vertexai = ["vertexai>=1.70.0"]
+bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
   "nox",
   "pytest>=8.2.0",
@@ -79,13 +96,14 @@ test = [
   "pytest-cov>=5.0.0",
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=12.0",
+  "pytest-rerunfailures>=14.0",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
-  "vcrpy>=6.0.1",
+  "vcrpy>=7.0.0",
 
   # serving tests
   "flask",
@@ -125,7 +143,6 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
-
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
@@ -155,16 +172,24 @@ select = [
   "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",      # https://docs.astral.sh/ruff/rules/#isort-i
-  "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
-  "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+  "W",      # https://docs.astral.sh/ruff/rules/#warning-w
   "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
   "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
+  "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
+  "TRY002", # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
+  "TRY004", # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
+  "TRY300", # https://docs.astral.sh/ruff/rules/try-consider-else/
+  "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "C",      # https://docs.astral.sh/ruff/rules/#convention-c
 ]
 ignore = [
   # we use Google style
   "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
   "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
   "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
+
+  # This is a more involved change, so disabling for now.
+  "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
 exclude = ["weave_query"]
 
@@ -175,6 +200,19 @@ known-third-party = ["wandb", "weave_query"]
 line-length = 88
 show-fixes = true
 exclude = ["weave_query"]
+
+[tool.pyright]
+include = ["weave"]
+exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
+# In cases where we support multiple versions of an integration, some imports can be missing
+reportMissingImports = false
+
+# TODO: Gradually remove as we improve our code!
+reportAttributeAccessIssue = false
+reportPossiblyUnboundVariable = false
+reportOptionalMemberAccess = false
+reportArgumentType = false
+reportCallIssue = false
 
 [tool.mypy]
 warn_unused_configs = true
@@ -192,7 +230,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.18-dev0"
+current_version = "0.51.32-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

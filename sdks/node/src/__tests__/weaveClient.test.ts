@@ -7,6 +7,30 @@ import {WeaveClient} from '../weaveClient';
 jest.mock('../generated/traceServerApi');
 jest.mock('../wandb/wandbServerApi');
 
+function createStreamFromCalls(calls: any[] = []) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      calls.forEach(call => {
+        controller.enqueue(encoder.encode(JSON.stringify(call) + '\n'));
+      });
+      controller.close();
+    },
+  });
+  return stream;
+}
+function mockStreamResponse(
+  api: jest.Mocked<TraceServerApi<any>>,
+  calls: any[]
+) {
+  const stream = createStreamFromCalls(calls);
+  (
+    api.calls.callsQueryStreamCallsStreamQueryPost as jest.Mock
+  ).mockResolvedValue({
+    body: stream,
+  } as any);
+}
+
 describe('WeaveClient', () => {
   let client: WeaveClient;
   let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
@@ -32,21 +56,7 @@ describe('WeaveClient', () => {
         {id: '1', name: 'call1'},
         {id: '2', name: 'call2'},
       ];
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          mockCalls.forEach(call => {
-            controller.enqueue(encoder.encode(JSON.stringify(call) + '\n'));
-          });
-          controller.close();
-        },
-      });
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockResolvedValue({
-        body: stream,
-      } as any);
+      mockStreamResponse(mockTraceServerApi, mockCalls);
 
       // Call the method
       const filter = {};
@@ -98,7 +108,7 @@ describe('WeaveClient', () => {
     beforeEach(() => {
       mockTraceServerApi = {
         call: {
-          callStartBatchCallUpsertBatchPost: jest.fn(),
+          callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
         },
       } as any;
       mockWandbServerApi = {} as any;
@@ -109,6 +119,26 @@ describe('WeaveClient', () => {
       );
       // Speed up tests by reducing batch interval
       (client as any).BATCH_INTERVAL = 10;
+    });
+
+    it('should handle oversized batch items', async () => {
+      const bigPayloadSize = 11 * 1024 * 1024;
+      const smallData = {mode: 'start', data: {id: '2', payload: 'small'}};
+      const bigData = {
+        mode: 'start',
+        data: {id: '1', payload: 'x'.repeat(bigPayloadSize)},
+      };
+      (client as any).callQueue.push(smallData, bigData);
+
+      await (client as any).processBatch();
+
+      expect(
+        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
+      ).toHaveBeenCalledWith({
+        batch: [{mode: 'start', req: smallData.data}],
+      });
+
+      expect((client as any).callQueue).toContain(bigData);
     });
 
     it('should batch multiple calls together', async () => {
@@ -225,6 +255,23 @@ describe('WeaveClient', () => {
 
       expect((client as any).batchProcessingPromises.size).toBe(0);
       expect((client as any).callQueue.length).toBe(0);
+    });
+  });
+
+  describe('getCall', () => {
+    it('should fetch a single call by ID', async () => {
+      const mockCall = {id: 'test-id', name: 'test-call'};
+      mockStreamResponse(mockTraceServerApi, [mockCall]);
+
+      const result = await client.getCall('test-id');
+      expect(result).toEqual(mockCall);
+    });
+
+    it('should throw error when call is not found', async () => {
+      mockStreamResponse(mockTraceServerApi, []);
+      expect(client.getCall('non-existent-id')).rejects.toThrow(
+        'Call not found: non-existent-id'
+      );
     });
   });
 });

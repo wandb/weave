@@ -18,6 +18,18 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {CellValue} from '../../../Browse2/CellValue';
+import {CellValueString} from '../../../Browse2/CellValueString';
+import {
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  convertScorerFeedbackFieldToBackendFilter,
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+  RUNNABLE_FEEDBACK_OUTPUT_PART,
+} from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
@@ -25,6 +37,7 @@ import {
   getCostsFromCellParams,
   getTokensFromCellParams,
 } from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -44,7 +57,11 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
+  'summary.usage',
+  'summary.weave',
+  'feedback',
+];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -220,6 +237,7 @@ function buildCallsTableColumns(
           rowParams.row.display_name ??
           opVersionRefOpName(rowParams.row.op_name) ??
           rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
@@ -229,6 +247,7 @@ function buildCallsTableColumns(
             fullWidth={true}
             preservePath={preservePath}
             color={TEAL_600}
+            isEval={isEval}
           />
         );
       },
@@ -327,6 +346,116 @@ function buildCallsTableColumns(
   );
   cols.push(...newCols);
 
+  // Create special feedback columns with grouping model
+  const annotationColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith('summary.weave.feedback.wandb.annotation') &&
+      c.endsWith('payload.value')
+  );
+  if (annotationColNames.length > 0) {
+    // Add feedback group to grouping model
+    groupingModel.push({
+      groupId: 'feedback',
+      headerName: 'Annotations',
+      children: annotationColNames.map(col => ({
+        field: convertFeedbackFieldToBackendFilter(col),
+      })),
+    });
+
+    // Add feedback columns
+    const annotationColumns: Array<GridColDef<TraceCallSchema>> =
+      annotationColNames.map(c => {
+        const parsed = parseFeedbackType(c);
+        return {
+          field: convertFeedbackFieldToBackendFilter(c),
+          headerName: parsed ? parsed.displayName : `${c}`,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed ? parsed.userDefinedType : c}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            if (typeof params.value === 'boolean') {
+              return <div>{params.value ? 'true' : 'false'}</div>;
+            }
+            if (typeof params.value === 'string') {
+              return <CellValueString value={params.value} />;
+            }
+            return <div>{params.value}</div>;
+          },
+        };
+      });
+    cols.push(...annotationColumns);
+  }
+
+  const scoreColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX) &&
+      c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
+  );
+  if (scoreColNames.length > 0) {
+    // Add feedback group to grouping model
+    const scoreGroup = {
+      groupId: 'scores',
+      headerName: 'Scores',
+      children: [] as any[],
+    };
+    groupingModel.push(scoreGroup);
+
+    // Add feedback columns
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
+      c => {
+        const parsed = parseScorerFeedbackField(c);
+        const field = convertScorerFeedbackFieldToBackendFilter(c);
+        scoreGroup.children.push({
+          field,
+        });
+        if (parsed === null) {
+          return {
+            field,
+            headerName: c,
+            width: 150,
+            renderHeader: () => {
+              return <div> {c}</div>;
+            },
+            valueGetter: (unused: any, row: any) => {
+              return row[c];
+            },
+            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+              return <CellValue value={params.value} />;
+            },
+          };
+        }
+        return {
+          field,
+          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed.scorerName + parsed.scorePath}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            return (
+              <CellFilterWrapper
+                onAddFilter={onAddFilter}
+                field={field}
+                rowId={params.id.toString()}
+                operation={null}
+                value={params.value}>
+                <CellValue value={params.value} />
+              </CellFilterWrapper>
+            );
+          },
+        };
+      }
+    );
+    cols.push(...scoreColumns);
+  }
+
   cols.push({
     field: 'wb_user_id',
     headerName: 'User',
@@ -389,6 +518,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
@@ -411,6 +542,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,

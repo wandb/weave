@@ -3,7 +3,7 @@ import {Dataset} from '../../dataset';
 
 describe('Dataset', () => {
   beforeEach(async () => {
-    await login({apiKey: process.env.WANDB_API_KEY ?? ''});
+    await login(process.env.WANDB_API_KEY ?? '');
   });
 
   test('should save a dataset', async () => {

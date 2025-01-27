@@ -26,8 +26,7 @@ def run_command(command: str) -> str:
     try:
         completed_process = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             shell=True,
         )
