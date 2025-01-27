@@ -360,7 +360,6 @@ class ContextRelevanceScorer(HuggingFaceScorer):
     @weave.op
     def score(
         self,
-        output: str,
         query: str,
         context: Union[str, list[str]],
         verbose: bool = False,
