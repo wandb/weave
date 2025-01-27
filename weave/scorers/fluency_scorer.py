@@ -36,4 +36,4 @@ class FluencyScorer(HuggingFacePipelineScorer):
     @weave.op
     def score(self, output: str):
         pipeline_output = self._pipeline(output)
-        return {"flagged": pipeline_output[0]["label"] == "fluent"}
+        return {"flagged": pipeline_output[0]["label"] == "non-fluent"}
