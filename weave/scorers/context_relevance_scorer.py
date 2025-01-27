@@ -386,7 +386,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        res = {"flagged": final_score > self.threshold}
+        res = {"flagged": final_score < self.threshold}
         extras = {"score": final_score}
         if verbose:
             extras["all_spans"] = all_spans  # type: ignore
