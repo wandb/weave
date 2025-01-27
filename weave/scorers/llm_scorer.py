@@ -110,20 +110,17 @@ class HuggingFacePipelineScorer(Scorer):
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
         try:
-            if find_spec("transformers") is None:
-                print(
-                    "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
-                )
+            import transformers
         except ImportError:
-            print(
+            raise ImportError(
                 "The `transformers` package is required to use PipelineScorer, please run `pip install transformers`"
             )
         if self._pipeline is None:
-            self.load_pipeline()
+            self._load_pipeline()
 
-    def load_pipeline(self) -> None:
+    def _load_pipeline(self) -> None:
         raise NotImplementedError(
-            "Subclasses must implement the `load_pipeline` method."
+            "Subclasses must implement the `_load_pipeline` method."
         )
 
     @weave.op

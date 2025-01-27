@@ -18,11 +18,12 @@ class FluencyScorer(HuggingFacePipelineScorer):
             'flagged': True,
         }
     """
-    model_name_or_path = "tcapelle/fluency-scorer" # TODO: replace with and artifact
+    model_name_or_path = "tcapelle/fluency-scorer" # TODO: replace with an artifact
     device = "auto"
 
     
-    def load_pipeline(self) -> None:
+    def _load_pipeline(self) -> None:
+        """Loads the _pipeline attribute"""
         from transformers import pipeline
         self.device = set_device(self.device)
         self._pipeline = pipeline(
