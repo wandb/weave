@@ -18,8 +18,8 @@ class FluencyScorer(HuggingFacePipelineScorer):
             'flagged': True,
         }
     """
-    model_name_or_path = "tcapelle/fluency-scorer" # TODO: replace with an artifact
-    device = "auto"
+    model_name_or_path: str = "tcapelle/fluency-scorer" # TODO: replace with an artifact
+    device: str = "auto"
 
     
     def _load_pipeline(self) -> None:
