@@ -1,6 +1,6 @@
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.llm_utils import set_device
+from weave.scorers.llm_utils import set_device
 
 
 class FluencyScorer(HuggingFacePipelineScorer):
