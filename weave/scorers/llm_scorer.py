@@ -108,6 +108,18 @@ class HuggingFacePipelineScorer(Scorer):
     device: str = Field(default="auto", description="The device to use for the model")
     _pipeline: Optional[Any] = None
 
+    def model_post_init(self, __context: Any) -> None:
+        self.device = set_device(self.device)
+        from  transformers import pipeline
+
+        if self._pipeline is None:
+            self._load_pipeline()
+
+    def _load_pipeline(self) -> None:
+        raise NotImplementedError(
+            "Subclasses must implement the `_load_pipeline` method."
+        )
+
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
