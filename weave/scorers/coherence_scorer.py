@@ -26,7 +26,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
         "Perfectly Coherent": 4,
     }
 
-    def set_pipeline(self) -> None:
+    def _load_pipeline(self) -> None:
         if self.base_url:
             print(f"Using external API at {self.base_url} for scoring.")
             return  # Skip local model loading if base_url is provided
@@ -44,7 +44,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
         else:
             self._local_model_path = download_model(MODEL_PATHS["coherence_scorer"])
 
-        self.pipeline = pipeline(
+        self._pipeline = pipeline(
             task=self.task,
             model=self._local_model_path,
             device=self.device,
@@ -55,8 +55,8 @@ class CoherenceScorer(HuggingFacePipelineScorer):
     @weave.op
     def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
         """Score a prompt response pair."""
-        assert self.pipeline is not None
-        coherence_output = self.pipeline(inputs={"text": prompt, "text_pair": output})
+        assert self._pipeline is not None
+        coherence_output = self._pipeline(inputs={"text": prompt, "text_pair": output})
         flagged = False
         if "incoherent" in coherence_output["label"].lower():
             flagged = True
