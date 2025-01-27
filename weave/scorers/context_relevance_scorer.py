@@ -263,7 +263,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
     """
 
     base_url: Optional[str] = None
-    threshold: float = 0.7
+    threshold: float = 0.45
     model_max_length: int = 1280
 
     def load_model(self) -> None:
