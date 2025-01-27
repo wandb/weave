@@ -66,7 +66,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
             "extras": {
                 "coherence_label": coherence_output["label"],
                 "coherence_id": self._label2id[coherence_output["label"]],
-                "coherence_score": coherence_output["score"],
+                "score": coherence_output["score"],
             },
         }
 
