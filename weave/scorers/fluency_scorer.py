@@ -8,6 +8,10 @@ class FluencyScorer(HuggingFacePipelineScorer):
     W&B Fluency Scorer
 
     This scorer uses an in-house model to score fluency based on ModernBert.
+
+    Args:
+        threshold (float): The threshold for the non-fluent score. Defaults to 0.5.
+        device (str): The device to use for inference. Defaults to "auto".
     
     Example:
         >>> from weave.scorers.fluency_scorer import FluencyScorer
@@ -21,6 +25,7 @@ class FluencyScorer(HuggingFacePipelineScorer):
     task: str = "text-classification"
     model_name_or_path: str = "tcapelle/fluency-scorer" # TODO: replace with an artifact
     device: str = "auto"
+    threshold: float = 0.5
 
     
     def _load_pipeline(self) -> None:
@@ -30,10 +35,14 @@ class FluencyScorer(HuggingFacePipelineScorer):
         self._pipeline = pipeline(
             "text-classification", 
             model=self.model_name_or_path,
-            device=self.device
+            device=self.device,
+            top_k=2,
         )
     
     @weave.op
     def score(self, output: str):
-        pipeline_output = self._pipeline(output)
-        return {"flagged": pipeline_output[0]["label"] == "non-fluent"}
+        pipeline_output = self._pipeline(output)[0]
+        non_fluent_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'non-fluent')
+        if non_fluent_score > self.threshold:
+            return {"flagged": True, "extras": pipeline_output}
+        return {"flagged": False, "extras": pipeline_output}
