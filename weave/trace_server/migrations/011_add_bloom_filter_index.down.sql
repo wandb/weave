@@ -3,3 +3,6 @@ ALTER TABLE calls_merged
 
 ALTER TABLE calls_merged
     DROP INDEX bf_output_dump;
+
+ALTER TABLE calls_merged
+    DROP INDEX reverse_id_idx;
