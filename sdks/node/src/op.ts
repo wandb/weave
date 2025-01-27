@@ -127,8 +127,8 @@ export function op<T extends (...args: any[]) => any>(
       });
 
       if (options?.streamReducer && Symbol.asyncIterator in result) {
-        const {initialState, reduceFn} = options.streamReducer;
-        let state = initialState;
+        const {initialStateFn, reduceFn} = options.streamReducer;
+        let state = initialStateFn();
 
         const wrappedIterator = {
           [Symbol.asyncIterator]: async function* () {
