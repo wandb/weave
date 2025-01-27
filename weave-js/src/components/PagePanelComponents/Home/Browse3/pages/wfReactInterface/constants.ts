@@ -28,4 +28,5 @@ export const KNOWN_BASE_OBJECT_CLASSES = [
   'Scorer',
   'ActionSpec',
   'AnnotationSpec',
+  'SavedView',
 ] as const;
