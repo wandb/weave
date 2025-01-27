@@ -87,13 +87,14 @@ class HuggingFacePipelineScorer(Scorer):
     Args:
         task (str): The pipeline task type (e.g., `"text-classification"`).
         model_name_or_path (str): The name or path of the model to use.
-        device (str): The device to use for inference. Defaults to `"cpu"`.
+        device (str): The device to use for inference. Defaults to `"auto"`.
 
     Example:
         >>> from weave.scorers.moderation_scorer import PipelineScorer
         >>> scorer = PipelineScorer(
         ...     task="text-classification",
-        ...     model_name_or_path="distilbert-base-uncased-finetuned-sst-2-english"
+        ...     model_name_or_path="distilbert-base-uncased-finetuned-sst-2-english",
+        ...     device="auto"
         ... )
         >>> output = scorer.pipe("This is a great movie!")
         >>> print(output)
