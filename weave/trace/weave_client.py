@@ -842,7 +842,11 @@ class WeaveClient:
         self, calls: Iterable[Call]
     ) -> Iterable[WeaveObject] | NestedCallList:
         """Get all descendents of the given calls."""
-        return self.get_calls(filter=CallsFilter(trace_ids=[c.trace_id for c in calls]))
+        return self.get_calls(
+            filter=CallsFilter(
+                trace_ids=[c.trace_id for c in calls],
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
