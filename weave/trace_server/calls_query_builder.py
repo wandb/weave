@@ -83,6 +83,10 @@ class CallsMergedAggField(CallsMergedField):
         inner = super().as_sql(pb, table_alias)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
+    def as_sql_no_agg(self, pb: ParamBuilder, table_alias: str) -> str:
+        inner = super().as_sql(pb, table_alias)
+        return clickhouse_cast(inner)
+
 
 class CallsMergedDynamicField(CallsMergedAggField):
     extra_path: Optional[list[str]] = None
@@ -249,11 +253,12 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str, raw: bool = False) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            raw=raw,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -574,22 +579,32 @@ class CallsQuery(BaseModel):
         )
 
         having_filter_sql = ""
-        having_conditions_sql: list[str] = []
+        having_light_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
-            having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
+            having_light_conditions_sql.extend(
+                c.as_sql(pb, table_alias)
+                for c in self.query_conditions
+                if not c.is_heavy()
             )
             for query_condition in self.query_conditions:
                 for field in query_condition._get_consumed_fields():
                     if isinstance(field, CallsMergedFeedbackPayloadField):
                         needs_feedback = True
         if self.hardcoded_filter is not None:
-            having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
-
-        if len(having_conditions_sql) > 0:
-            having_filter_sql = "HAVING " + combine_conditions(
-                having_conditions_sql, "AND"
+            having_light_conditions_sql.append(
+                self.hardcoded_filter.as_sql(pb, table_alias)
             )
+
+        if len(having_light_conditions_sql) > 0:
+            having_filter_sql = "HAVING " + combine_conditions(
+                having_light_conditions_sql, "AND"
+            )
+
+        heavy_filter_sql = ""
+        for condition in self.query_conditions:
+            if not condition.is_heavy():
+                continue
+            heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -642,6 +657,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {heavy_filter_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -701,6 +717,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    raw: bool = False,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -769,7 +786,10 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            if isinstance(structured_field, CallsMergedAggField) and raw:
+                field = structured_field.as_sql_no_agg(param_builder, table_alias)
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
