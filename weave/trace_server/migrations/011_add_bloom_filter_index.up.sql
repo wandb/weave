@@ -11,5 +11,8 @@ ALTER TABLE calls_merged
     MATERIALIZE INDEX bf_output_dump;
 
 ALTER TABLE calls_merged
-    ADD INDEX min_max_id_idx (project_id, id) TYPE minmax;
+    ADD INDEX minmax_id_idx (project_id, id) TYPE minmax;
+
+ALTER TABLE calls_merged
+    MATERIALIZE INDEX minmax_id_idx;
 
