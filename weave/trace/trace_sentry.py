@@ -211,7 +211,12 @@ class Sentry:
         return watch_dec
 
     # Not in the original WandB Sentry module
-    def track_event(self, event_name: str, tags: dict[str, Any] | None = None, username: str | None = None) -> None:
+    def track_event(
+        self,
+        event_name: str,
+        tags: dict[str, Any] | None = None,
+        username: str | None = None,
+    ) -> None:
         """Track an event to Sentry."""
         assert self.hub is not None
 

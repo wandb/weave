@@ -22,7 +22,7 @@ DEFAULT_REDACTED_FIELDS = [
     "ES_NIF",
     "IN_AADHAAR",
     "IN_PAN",
-    "FI_PERSONAL_IDENTITY_CODE"
+    "FI_PERSONAL_IDENTITY_CODE",
 ]
 
 
@@ -34,7 +34,7 @@ def redact_pii(data):
         if isinstance(value, str):
             fields = redact_pii_fields()
             entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
-            results = analyzer.analyze(text=value, language='en', entities=entities)
+            results = analyzer.analyze(text=value, language="en", entities=entities)
             redacted = anonymizer.anonymize(text=value, analyzer_results=results)
             return redacted.text
         elif isinstance(value, dict):

@@ -125,11 +125,14 @@ def should_capture_code() -> bool:
 def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
+
 def should_redact_pii() -> bool:
     return _should("redact_pii")
 
+
 def redact_pii_fields() -> list[str]:
     return _list_str("redact_pii_fields")
+
 
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
@@ -164,6 +167,7 @@ def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
     return _context_vars[name].get()
+
 
 def _list_str(name: str) -> list[str]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):

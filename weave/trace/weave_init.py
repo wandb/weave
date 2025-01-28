@@ -129,7 +129,9 @@ def init_weave(
 
     # This is a temporary event to track the number of users who have enabled PII redacting.
     if should_redact_pii():
-        trace_sentry.global_trace_sentry.track_event("pii_redaction_enabled", {
+        trace_sentry.global_trace_sentry.track_event(
+            "pii_redaction_enabled",
+            {
                 "entity_name": entity_name,
                 "project_name": project_name,
             },
