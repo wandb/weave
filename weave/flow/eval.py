@@ -202,8 +202,8 @@ class Evaluation(Object):
                 )
         return cast(list[Union[Op, Scorer]], self.scorers)
 
-    @weave.op()
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+    @weave.op
+    async def predict(self, model: Union[Op, Model], example: dict) -> dict:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input
         )
@@ -211,16 +211,20 @@ class Evaluation(Object):
         if isinstance(apply_model_result, ApplyModelError):
             return {
                 self._output_key: None,
-                "scores": {},
                 "model_latency": apply_model_result.model_latency,
             }
 
-        model_output = apply_model_result.model_output
-        model_call = apply_model_result.model_call
-        model_latency = apply_model_result.model_latency
+        return {
+            self._output_key: apply_model_result.model_output,
+            "model_call": apply_model_result.model_call,
+            "model_latency": apply_model_result.model_latency,
+        }
 
+    @weave.op
+    async def score(self, prediction: dict, example: dict) -> dict:
         scores = {}
         scorers = self._post_init_scorers
+        model_call = prediction["model_call"]
 
         for scorer in scorers:
             apply_scorer_result = await model_call.apply_scorer(scorer, example)
@@ -230,10 +234,21 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            self._output_key: model_output,
+            self._output_key: prediction[self._output_key],
             "scores": scores,
-            "model_latency": model_latency,
+            "model_latency": prediction["model_latency"],
         }
+
+    @weave.op()
+    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+        prediction = await self.predict(model, example)
+        if prediction[self._output_key] is None:
+            return {
+                self._output_key: None,
+                "scores": {},
+                "model_latency": prediction["model_latency"],
+            }
+        return await self.score(prediction, example)
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
