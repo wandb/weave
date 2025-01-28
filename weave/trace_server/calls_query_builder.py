@@ -73,6 +73,7 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
+    use_agg_fn: bool = True
 
     def as_sql(
         self,
@@ -81,11 +82,9 @@ class CallsMergedAggField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if not self.use_agg_fn:
+            return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
-
-    def as_sql_no_agg(self, pb: ParamBuilder, table_alias: str) -> str:
-        inner = super().as_sql(pb, table_alias)
-        return clickhouse_cast(inner)
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
@@ -276,6 +275,12 @@ class Condition(BaseModel):
     def is_heavy(self) -> bool:
         for field in self._get_consumed_fields():
             if field.is_heavy():
+                return True
+        return False
+
+    def is_feedback(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
 
@@ -584,7 +589,7 @@ class CallsQuery(BaseModel):
             having_light_conditions_sql.extend(
                 c.as_sql(pb, table_alias)
                 for c in self.query_conditions
-                if not c.is_heavy()
+                if not c.is_heavy() or c.is_feedback()
             )
             for query_condition in self.query_conditions:
                 for field in query_condition._get_consumed_fields():
@@ -602,7 +607,7 @@ class CallsQuery(BaseModel):
 
         heavy_filter_sql = ""
         for condition in self.query_conditions:
-            if not condition.is_heavy():
+            if not condition.is_heavy() or condition.is_feedback():
                 continue
             heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
 
@@ -787,9 +792,8 @@ def process_query_to_conditions(
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedAggField) and raw:
-                field = structured_field.as_sql_no_agg(param_builder, table_alias)
-            else:
-                field = structured_field.as_sql(param_builder, table_alias)
+                structured_field.use_agg_fn = False
+            field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
