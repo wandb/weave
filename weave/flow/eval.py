@@ -283,53 +283,7 @@ class Evaluation(Object):
                 return _create_empty_eval_row()
 
         def _create_empty_eval_row() -> dict:
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
             return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-                return {self._output_key: None, "scores": {}}
-            return eval_row
-            return {self._output_key: None, "scores": {}}
-            return eval_row
 
         trial_rows = list(self._post_init_dataset.rows) * self.trials
         eval_rows = []
