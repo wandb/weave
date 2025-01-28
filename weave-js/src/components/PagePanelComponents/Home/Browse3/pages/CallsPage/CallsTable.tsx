@@ -55,6 +55,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -92,6 +93,7 @@ import {
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
+  BulkAddToDatasetButton,
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
@@ -137,6 +139,12 @@ const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
 };
+
+// Add this near your other interfaces
+interface CallData {
+  digest: string;
+  val: any;
+}
 
 export const CallsTable: FC<{
   entity: string;
@@ -676,6 +684,25 @@ export const CallsTable: FC<{
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
+  const [selectedCallObjects, setSelectedCallObjects] = useState<CallData[]>(
+    []
+  );
+
+  // Update selected call objects whenever rows data changes
+  useEffect(() => {
+    if (callsResult) {
+      const selectedObjects = callsResult
+        .filter(
+          call => call.traceCall && selectedCalls.includes(call.traceCall.id)
+        )
+        .map(call => ({
+          digest: call.traceCall!.id,
+          val: call.traceCall,
+        }));
+      setSelectedCallObjects(selectedObjects);
+    }
+  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -855,6 +882,20 @@ export const CallsTable: FC<{
                   onDeleteCallback={() => {
                     setSelectedCalls([]);
                   }}
+                />
+              </div>
+              <ButtonDivider />
+              <div className="flex-none">
+                <BulkAddToDatasetButton
+                  onClick={() => setAddToDatasetModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <AddToDatasetDrawer
+                  entity={entity}
+                  project={project}
+                  open={addToDatasetModalOpen}
+                  onClose={() => setAddToDatasetModalOpen(false)}
+                  selectedCalls={selectedCallObjects}
                 />
               </div>
               <ButtonDivider />

@@ -1,0 +1,333 @@
+import {Box, Paper, Stack, Typography} from '@mui/material';
+import React, {useEffect, useState} from 'react';
+
+import {WeaveLoader} from '../../../../../common/components/WeaveLoader';
+import {parseRef} from '../../../../../react';
+import {Select} from '../../../../Form/Select';
+import {Icon} from '../../../../Icon';
+import {CopyableId} from '../pages/common/Id';
+import {useWFHooks} from '../pages/wfReactInterface/context';
+import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRef} from '../smallRef/SmallRef';
+import {
+  CallData,
+  extractSourceSchema,
+  FieldMapping,
+  inferSchema,
+  SchemaField,
+  suggestMappings,
+} from './schemaUtils';
+
+export interface SchemaMappingStepProps {
+  selectedDataset: ObjectVersionSchema;
+  selectedCalls: CallData[];
+  entity: string;
+  project: string;
+  onMappingChange: (mappings: FieldMapping[]) => void;
+  onDatasetObjectLoaded: (obj: any) => void;
+  fieldMappings?: FieldMapping[];
+  datasetObject?: any;
+}
+
+const typographyStyle = {fontFamily: 'Source Sans Pro'};
+
+export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
+  selectedDataset,
+  selectedCalls,
+  entity,
+  project,
+  onMappingChange,
+  onDatasetObjectLoaded,
+  fieldMappings,
+}) => {
+  const [sourceSchema, setSourceSchema] = useState<SchemaField[]>([]);
+  const [targetSchema, setTargetSchema] = useState<SchemaField[]>([]);
+  const [localFieldMappings, setLocalFieldMappings] = useState<FieldMapping[]>(
+    fieldMappings || []
+  );
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const {useObjectVersion, useTableRowsQuery} = useWFHooks();
+
+  // Extract schema from calls data
+  useEffect(() => {
+    if (selectedCalls.length > 0) {
+      setSourceSchema(extractSourceSchema(selectedCalls));
+    }
+  }, [selectedCalls]);
+
+  const selectedDatasetObjectVersion = useObjectVersion(
+    selectedDataset
+      ? {
+          scheme: 'weave',
+          weaveKind: 'object',
+          entity: selectedDataset.entity,
+          project: selectedDataset.project,
+          objectId: selectedDataset.objectId,
+          versionHash: selectedDataset.versionHash,
+          path: selectedDataset.path,
+        }
+      : null,
+    undefined
+  );
+
+  useEffect(() => {
+    if (selectedDatasetObjectVersion.result?.val) {
+      onDatasetObjectLoaded(selectedDatasetObjectVersion.result.val);
+    }
+  }, [selectedDatasetObjectVersion.result, onDatasetObjectLoaded]);
+
+  const tableDigest = selectedDatasetObjectVersion.result?.val?.rows
+    ?.split('/')
+    ?.pop();
+
+  const tableRowsQuery = useTableRowsQuery(
+    entity || '',
+    project || '',
+    tableDigest || ''
+  );
+
+  useEffect(() => {
+    if (tableRowsQuery.result) {
+      const schema = inferSchema(
+        tableRowsQuery.result.rows.map(row => row.val)
+      );
+      setTargetSchema(schema);
+
+      setLocalFieldMappings(prev =>
+        suggestMappings(sourceSchema, schema, prev)
+      );
+    }
+  }, [tableRowsQuery.result, sourceSchema]);
+
+  useEffect(() => {
+    onMappingChange(localFieldMappings);
+  }, [localFieldMappings, onMappingChange]);
+
+  const handleMappingChange = (
+    targetField: string,
+    sourceField: string | null
+  ) => {
+    setLocalFieldMappings(prev => {
+      const newMappings = prev.filter(m => m.targetField !== targetField);
+      if (sourceField) {
+        newMappings.push({sourceField, targetField});
+      }
+      return newMappings;
+    });
+  };
+
+  // Sync local state with provided prop whenever it changes (e.g. when navigating back)
+  useEffect(() => {
+    if (fieldMappings) {
+      setLocalFieldMappings(fieldMappings);
+    }
+  }, [fieldMappings]);
+
+  if (
+    tableRowsQuery.loading ||
+    selectedDatasetObjectVersion.loading ||
+    !targetSchema.length
+  ) {
+    return (
+      <Stack spacing={3} sx={{mt: 3}}>
+        <Typography sx={{...typographyStyle, fontWeight: 600}}>
+          Field Mapping
+        </Typography>
+        <Paper sx={{p: 2, minHeight: '200px'}}>
+          <WeaveLoader />
+        </Paper>
+      </Stack>
+    );
+  }
+
+  if (!selectedCalls.length || !tableRowsQuery.result?.rows?.length) {
+    return (
+      <Stack spacing={3} sx={{mt: 4}}>
+        <Typography sx={typographyStyle}>
+          No data available to extract schema from.
+        </Typography>
+      </Stack>
+    );
+  }
+
+  if (!sourceSchema.length || !targetSchema.length) {
+    return (
+      <Stack spacing={3} sx={{mt: 4}}>
+        <Typography sx={typographyStyle}>
+          No schema could be extracted from the data.
+        </Typography>
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack spacing={3} sx={{mt: 3}}>
+      <Typography sx={{...typographyStyle, fontWeight: 600}}>
+        Field Mapping
+      </Typography>
+      <Paper sx={{p: 2}}>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Box
+            sx={{
+              position: 'relative',
+              width: '300px',
+              minWidth: '300px',
+              display: 'flex',
+              alignItems: 'center',
+            }}>
+            <Box
+              ref={scrollRef}
+              display="flex"
+              gap={1}
+              sx={{
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': {
+                  display: 'none',
+                },
+                msOverflowStyle: 'none',
+              }}>
+              {Object.entries(
+                selectedCalls.reduce((acc, call) => {
+                  const opName = call.val.op_name;
+                  if (!acc[opName]) {
+                    acc[opName] = [];
+                  }
+                  acc[opName].push(call);
+                  return acc;
+                }, {} as Record<string, CallData[]>)
+              ).map(([opName, calls]) => (
+                <Box
+                  key={opName}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}>
+                  {(() => {
+                    try {
+                      return <SmallRef objRef={parseRef(opName)} />;
+                    } catch (e) {
+                      return (
+                        <Typography
+                          sx={{
+                            ...typographyStyle,
+                            color: 'text.secondary',
+                            fontSize: '14px',
+                          }}>
+                          error
+                        </Typography>
+                      );
+                    }
+                  })()}
+                  {calls.map(call => (
+                    <CopyableId key={call.digest} id={call.digest} />
+                  ))}
+                </Box>
+              ))}
+            </Box>
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '32px',
+              }}
+            />
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: '32px',
+              }}
+            />
+          </Box>
+          <Box
+            sx={{
+              width: '40px',
+              display: 'flex',
+              justifyContent: 'center',
+            }}>
+            <Icon name="forward-next" />
+          </Box>
+          <Box sx={{width: '200px'}}>
+            <SmallRef
+              objRef={{
+                scheme: 'weave',
+                weaveKind: 'object',
+                entityName: selectedDataset.entity,
+                projectName: selectedDataset.project,
+                artifactName: selectedDataset.objectId,
+                artifactVersion: selectedDataset.versionHash,
+              }}
+            />
+          </Box>
+        </Box>
+      </Paper>
+      <Paper variant="outlined" sx={{p: 2}}>
+        <Stack spacing={2}>
+          {targetSchema.map(targetField => {
+            const currentMapping = localFieldMappings.find(
+              m => m.targetField === targetField.name
+            );
+
+            return (
+              <Box
+                key={targetField.name}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  height: '40px',
+                }}>
+                <Box sx={{width: '300px'}}>
+                  <Select
+                    placeholder="Select column"
+                    value={
+                      currentMapping
+                        ? {
+                            label: currentMapping.sourceField,
+                            value: currentMapping.sourceField,
+                          }
+                        : null
+                    }
+                    options={[
+                      {label: '-- None --', value: ''},
+                      ...sourceSchema.map(field => ({
+                        label: field.name,
+                        value: field.name,
+                      })),
+                    ]}
+                    onChange={option =>
+                      handleMappingChange(
+                        targetField.name,
+                        option?.value ?? null
+                      )
+                    }
+                  />
+                </Box>
+                <Box
+                  sx={{
+                    width: '40px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                  }}>
+                  <Icon name="forward-next" />
+                </Box>
+                <Box sx={{width: '200px'}}>
+                  <Typography sx={{...typographyStyle}}>
+                    {targetField.name}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Paper>
+    </Stack>
+  );
+};

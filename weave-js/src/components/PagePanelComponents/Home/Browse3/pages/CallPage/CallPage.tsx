@@ -384,7 +384,6 @@ const CallPageInnerVertical: FC<{
           </div>
         </Tailwind>
       }
-      tabs={callTabs}
-    />
+      tabs={callTabs}></SimplePageLayoutWithHeader>
   );
 };

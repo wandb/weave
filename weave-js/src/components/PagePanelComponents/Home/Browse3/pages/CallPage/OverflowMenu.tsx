@@ -8,13 +8,18 @@ import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
+import {
+  IconDelete,
+  IconPencilEdit,
+  IconTable,
+} from '@wandb/weave/components/Icon';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useClosePeek} from '../../context';
+import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {isEvaluateOp} from '../common/heuristics';
 import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -25,6 +30,7 @@ export const OverflowMenu: FC<{
   setIsRenaming: (isEditing: boolean) => void;
 }> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
 
   const menuOptions = [
     [
@@ -34,6 +40,15 @@ export const OverflowMenu: FC<{
         icon: <IconPencilEdit style={{marginRight: '4px'}} />,
         onClick: () => setIsRenaming(true),
         disabled: selectedCalls.length !== 1,
+      },
+    ],
+    [
+      {
+        key: 'addToDataset',
+        text: 'Add to dataset',
+        icon: <IconTable style={{marginRight: '4px'}} />,
+        onClick: () => setAddToDatasetModalOpen(true),
+        disabled: selectedCalls.length === 0,
       },
     ],
     [
@@ -56,6 +71,16 @@ export const OverflowMenu: FC<{
           setConfirmDelete={setConfirmDelete}
         />
       )}
+      <AddToDatasetDrawer
+        entity={selectedCalls[0]?.entity ?? ''}
+        project={selectedCalls[0]?.project ?? ''}
+        open={addToDatasetModalOpen}
+        onClose={() => setAddToDatasetModalOpen(false)}
+        selectedCalls={selectedCalls.map(call => ({
+          digest: call.callId,
+          val: call.traceCall,
+        }))}
+      />
       <PopupDropdown
         sections={menuOptions}
         trigger={
@@ -67,7 +92,7 @@ export const OverflowMenu: FC<{
             style={{marginLeft: '4px'}}
           />
         }
-        offset="-78px, -16px"
+        offset="-178px, -16px"
       />
     </>
   );
