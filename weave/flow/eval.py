@@ -39,11 +39,6 @@ from weave.trace.weave_client import Call, get_ref
 console = Console()
 logger = logging.getLogger(__name__)
 
-INVALID_MODEL_ERROR = (
-    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
-    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
-)
-
 
 def default_evaluation_display_name(call: Call) -> str:
     date = datetime.now().strftime("%Y-%m-%d")
@@ -252,30 +247,30 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
-        eval_table_rows = list(eval_table.rows)
-        cols = transpose(eval_table_rows)
+        cols = transpose(list(eval_table.rows))
         summary = {}
+
+        if "scores" in cols:
+            score_data = transpose(cols["scores"])
+            for scorer in self._post_init_scorers:
+                attrs = get_scorer_attributes(scorer)
+                score_table = score_data[attrs.scorer_name]
+                summary[attrs.scorer_name] = attrs.summarize_fn(score_table)
 
         for name, vals in cols.items():
             if name == "scores":
-                scorers = self._post_init_scorers
-                for scorer in scorers:
-                    scorer_attributes = get_scorer_attributes(scorer)
-                    scorer_name = scorer_attributes.scorer_name
-                    summarize_fn = scorer_attributes.summarize_fn
-                    scorer_stats = transpose(vals)
-                    score_table = scorer_stats[scorer_name]
-                    scored = summarize_fn(score_table)
-                    summary[scorer_name] = scored
-            else:
-                model_output_summary = auto_summarize(vals)
-                if model_output_summary:
-                    summary[name] = model_output_summary
+                continue
+            if summary_result := auto_summarize(vals):
+                summary[name] = summary_result
+
         return summary
 
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
-            raise ValueError(INVALID_MODEL_ERROR)
+            raise ValueError(
+                "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+                "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+            )
         eval_rows = []
 
         async def eval_example(example: dict) -> dict:
@@ -290,7 +285,6 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        # with console.status("Evaluating...") as status:
         dataset = self._post_init_dataset
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
@@ -299,9 +293,6 @@ class Evaluation(Object):
         ):
             n_complete += 1
             print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
