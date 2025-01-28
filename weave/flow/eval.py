@@ -337,36 +337,34 @@ class Evaluation(Object):
         return summary
 
 
-InputType = TypeVar("InputType", bound=dict[str, Any])
-OutputType = TypeVar("OutputType")
-ScoreType = TypeVar("ScoreType")
+I = TypeVar("I", bound=dict[str, Any])
+O = TypeVar("O")
+ScoreT = TypeVar("ScoreT")
 ScorerName = TypeVar("ScorerName", bound=str)
 
 
-# ScoreType alternative (more permissive)
+# ScoreT alternative (more permissive)
 class ScoreDict(TypedDict):
     score: float
     metadata: NotRequired[dict[str, Any]]
 
 
-# ScoreType alternative 2 (more constrained)
+# ScoreT alternative 2 (more constrained)
 class ScorePydantic(BaseModel):
     score: Annotated[float, Field(gte=0, lte=1)]
     metadata: Optional[dict[str, Any]] = None
 
 
-class ScorerProtocol(Protocol[OutputType]):
+class ScorerProtocol(Protocol[O]):
     """Scorers are anything that return ScoreDict"""
 
-    async def __call__(
-        self, output: OutputType, *args: Any, **kwargs: Any
-    ) -> ScoreDict: ...
+    async def __call__(self, output: O, *args: Any, **kwargs: Any) -> ScoreDict: ...
 
 
 @dataclass
-class ScoringTask(Generic[OutputType]):
-    scorer: ScorerProtocol[OutputType]
-    output: OutputType
+class ScoringTask(Generic[O]):
+    scorer: ScorerProtocol[O]
+    output: O
     metadata: dict[str, Any]
 
 
@@ -380,33 +378,28 @@ class ScoringResult(TypedDict):
     scores: dict
 
 
-class ModelProtocol(Protocol[InputType, OutputType]):
-    async def __call__(self, input: InputType) -> OutputType: ...
+class ModelProtocol(Protocol[I, O]):
+    async def __call__(self, input: I) -> O: ...
 
 
-class PredictorOutputDict(TypedDict, Generic[InputType, OutputType]):
-    input: InputType
-    output: OutputType
+class PredictorOutputDict(TypedDict, Generic[O]):
+    output: O
     metadata: NotRequired[dict[str, Any]]
 
 
-class PredictorProtocol(Protocol[InputType, OutputType]):
+class PredictorProtocol(Protocol[I, O]):
     """Unsure about this one.  The intent is to wrap a model with metadata that is created at runtime."""
 
-    async def __call__(
-        self, input: InputType
-    ) -> PredictorOutputDict[InputType, OutputType]: ...
+    async def __call__(self, input: I) -> PredictorOutputDict[O]: ...
 
 
 class BasicPredictor:
     """A basic predictor that wraps a model output to include latency and success/error info"""
 
-    def __init__(self, model: ModelProtocol[InputType, OutputType]):
+    def __init__(self, model: ModelProtocol[I, O]):
         self.model = model
 
-    async def __call__(
-        self, input: InputType
-    ) -> PredictorOutputDict[InputType, OutputType]:
+    async def __call__(self, input: I) -> PredictorOutputDict[O]:
         start_time = time.time()
         try:
             output = await self.model(input)
@@ -426,17 +419,17 @@ class BasicPredictor:
         return PredictorOutputDict(input=input, output=output, metadata=metadata)
 
 
-class Evaluation2(Object, Generic[InputType, OutputType, ScoreType]):
-    dataset: Sequence[InputType]
-    scorers: Sequence[ScorerProtocol[ScoreType]]
+class Evaluation2(Object, Generic[I, O, ScoreT]):
+    dataset: Sequence[I]
+    scorers: Sequence[ScorerProtocol[ScoreT]]
     preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
 
     async def evaluate(
         self,
         *,
-        model: Optional[ModelProtocol[InputType, OutputType]] = None,
-        predictions: Optional[Sequence[OutputType]] = None,
+        model: Optional[ModelProtocol[I, O]] = None,
+        predictions: Optional[Sequence[O]] = None,
     ) -> dict:
         if not model and not predictions:
             raise ValueError("Must provide a model or predictions")
@@ -449,22 +442,20 @@ class Evaluation2(Object, Generic[InputType, OutputType, ScoreType]):
     async def predict(
         self,
         *,
-        model: ModelProtocol[InputType, OutputType],
-        predictor_cls: PredictorProtocol[InputType, OutputType] = BasicPredictor,
-    ) -> Sequence[PredictorOutputDict[InputType, OutputType]]:
-        predictor_rows = []
-
-        async for _, predictor_row in util.async_foreach(
-            self.dataset, predictor_cls(model), get_weave_parallelism()
-        ):
-            predictor_rows.append(predictor_row)
-
-        return predictor_rows
+        model: ModelProtocol[I, O],
+        predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
+    ) -> Sequence[PredictorOutputDict[O]]:
+        return [
+            predictor_row
+            async for _, predictor_row in util.async_foreach(
+                self.dataset, predictor_cls(model), get_weave_parallelism()
+            )
+        ]
 
     async def score(
         self,
         *,
-        predictions: Sequence[PredictorOutputDict[InputType, OutputType]],
+        predictions: Sequence[PredictorOutputDict[O]],
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
     ) -> Sequence[dict[ScorerName, list[ScoreDict]]]:
         if extra_metadata is None:
@@ -475,9 +466,7 @@ class Evaluation2(Object, Generic[InputType, OutputType, ScoreType]):
                 f"Number of predictions ({len(predictions)}) must match dataset size ({len(self.dataset)}) times trials ({self.trials})"
             )
 
-        scores: dict[ScorerName, list[ScoreDict]] = {
-            get_callable_name(scorer): [] for scorer in self.scorers
-        }
+        scores = {get_callable_name(scorer): [] for scorer in self.scorers}
 
         def scoring_tasks() -> Generator[ScoringTask, None, None]:
             for pred, meta_dict in zip(predictions, extra_metadata):
