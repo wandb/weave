@@ -27,7 +27,7 @@ def test_human_feedback_basic(client):
     col2 = AnnotationSpec(
         name="Text field #1",
         field_schema={"type": "string", "maxLength": 100},
-        op_scope=["weave:///entity/project/op/name:digest"],
+        op_scope=[f"weave:///{client.project}/op/name:digest"],
     )
     ref2 = weave.publish(col2, "my text spec")
     assert ref2
@@ -51,7 +51,9 @@ def test_human_feedback_basic(client):
     )
     assert not objects.objs[1].val["description"]
     assert not objects.objs[0].val["op_scope"]
-    assert objects.objs[1].val["op_scope"] == ["weave:///entity/project/op/name:digest"]
+    assert objects.objs[1].val["op_scope"] == [
+        f"weave:///{client.project}/op/name:digest"
+    ]
     assert objects.objs[0].val["field_schema"] == {
         "type": "number",
         "minimum": -1,
@@ -67,7 +69,7 @@ def test_human_feedback_basic(client):
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "weave_ref": "weave:///entity/project/call/name:digest",
+                "weave_ref": f"weave:///{client.project}/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref1.name,
                 "annotation_ref": ref1.uri(),
                 "payload": {"value": 0},
@@ -80,7 +82,7 @@ def test_human_feedback_basic(client):
             FeedbackCreateReq.model_validate(
                 {
                     "project_id": client._project_id(),
-                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "weave_ref": f"weave:///{client.project}/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref1.name,
                     "annotation_ref": ref1.uri(),
                     "payload": {"value": 42},
@@ -147,7 +149,7 @@ def test_field_schema_with_pydantic_model(client):
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "weave_ref": "weave:///entity/project/call/name:digest",
+                "weave_ref": f"weave:///{client.project}/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref.name,
                 "annotation_ref": ref.uri(),
                 "payload": {
@@ -166,7 +168,7 @@ def test_field_schema_with_pydantic_model(client):
             FeedbackCreateReq.model_validate(
                 {
                     "project_id": client._project_id(),
-                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "weave_ref": f"weave:///{client.project}/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref.name,
                     "annotation_ref": ref.uri(),
                     "payload": {

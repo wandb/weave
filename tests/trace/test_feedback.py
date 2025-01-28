@@ -378,8 +378,8 @@ async def populate_feedback(client: WeaveClient) -> None:
     return ids, my_scorer, my_model
 
 
-@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
+@pytest.mark.skip_sqlite_client
 async def test_sort_by_feedback(client: WeaveClient) -> None:
     """Test sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
@@ -440,8 +440,8 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
 
 
-@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
+@pytest.mark.skip_sqlite_client
 async def test_filter_by_feedback(client: WeaveClient) -> None:
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
@@ -511,8 +511,8 @@ class MatchAnyDatetime:
         return isinstance(other, datetime.datetime)
 
 
-@pytest.mark.skip_sqlite_client
 @pytest.mark.asyncio
+@pytest.mark.skip_sqlite_client
 async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)

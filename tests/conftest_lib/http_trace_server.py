@@ -146,11 +146,20 @@ def make_minimal_fastapi_app(resolver: tsi.TraceServerInterface):
     app.post("/cost/create")(resolver.cost_create)
     app.post("/cost/query")(resolver.cost_query)
     app.post("/cost/purge")(resolver.cost_purge)
-    app.post("/feedback/create")(resolver.feedback_create)
+
+    @app.post("/feedback/create")
+    def feedback_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        return resolver.feedback_create(req)
+
     app.post("/feedback/query")(resolver.feedback_query)
     app.post("/feedback/purge")(resolver.feedback_purge)
     app.post("/feedback/replace")(resolver.feedback_replace)
-    app.post("/actions/execute_batch")(resolver.actions_execute_batch)
+
+    @app.post("/actions/execute_batch")
+    def actions_execute_batch(
+        req: tsi.ActionsExecuteBatchReq,
+    ) -> tsi.ActionsExecuteBatchRes:
+        return resolver.actions_execute_batch(req)
 
     return app
 
