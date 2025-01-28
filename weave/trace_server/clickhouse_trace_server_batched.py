@@ -309,9 +309,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
             columns = list(set(required_call_columns + req.columns))
-            # TODO: add support for json extract fields
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in columns]
 
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)

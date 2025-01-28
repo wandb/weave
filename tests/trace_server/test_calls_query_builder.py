@@ -690,3 +690,30 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             "pb_6": "project",
         },
     )
+
+
+def test_query_with_simple_json_select() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs.param.val")
+    cq.add_field("inputs.param2")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            JSONExtractKeysAndValuesRaw(calls_merged.inputs_dump, {pb_1:String}, {pb_2:String}) AS inputs_dump
+        FROM
+            calls_merged
+        WHERE
+            calls_merged.project_id = {pb_0:String}
+        GROUP BY
+            (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "param.val",
+            "pb_2": "param2",
+        },
+    )
