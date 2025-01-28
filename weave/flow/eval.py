@@ -376,6 +376,10 @@ class ScoringTaskResult:
     score: ScoreDict
 
 
+class ScoringResult(TypedDict):
+    scores: dict
+
+
 class ModelProtocol(Protocol[InputType, OutputType]):
     async def __call__(self, input: InputType) -> OutputType: ...
 
@@ -462,7 +466,7 @@ class Evaluation2(Object, Generic[InputType, OutputType, ScoreType]):
         *,
         predictions: Sequence[PredictorOutputDict[InputType, OutputType]],
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
-    ) -> dict[ScorerName, list[ScoreDict]]:
+    ) -> Sequence[dict[ScorerName, list[ScoreDict]]]:
         if extra_metadata is None:
             extra_metadata = [{} for _ in predictions]
 
@@ -493,6 +497,30 @@ class Evaluation2(Object, Generic[InputType, OutputType, ScoreType]):
             scores[res.name].append(res.score)
 
         return scores
+
+    async def aggregate_results(self): ...
+
+    def summarize(self, results: Sequence[ScoringResult]) -> dict[str, Any]:
+        rows = list(results)
+        summary = {}
+
+        if not rows:
+            return summary
+
+        score_by_name = {}
+        for row in rows:
+            for name, score in row["scores"].items():
+                score_by_name.setdefault(name, [])
+                score_by_name[name].append(score)
+
+        for scorer in self.scorers:
+            attrs = get_scorer_attributes(scorer)
+            summary.setdefault(attrs.scorer_name, [])
+            summary[attrs.scorer_name].append(
+                attrs.summarize_fn(score_by_name[attrs.scorer_name])
+            )
+
+        return summary
 
 
 def evaluate(
