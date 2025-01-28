@@ -1,6 +1,5 @@
 import {Box} from '@mui/material';
 import React from 'react';
-import styled from 'styled-components';
 
 import {parseRef} from '../../../../react';
 import {isWeaveRef} from '../Browse3/filters/common';
@@ -20,16 +19,6 @@ import {SmallRef} from './SmallRef';
 type CellValueProps = {
   value: any;
 };
-
-const Collapsed = styled.div<{hasScrolling: boolean}>`
-  min-height: 38px;
-  line-height: 38px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: ${props => (props.hasScrolling ? 'pointer' : 'default')};
-`;
-Collapsed.displayName = 'S.Collapsed';
 
 export const CellValue = ({value}: CellValueProps) => {
   if (value === undefined) {
