@@ -271,37 +271,81 @@ class Evaluation(Object):
                 "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
                 "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
             )
-        eval_rows = []
 
         async def eval_example(example: dict) -> dict:
             try:
-                eval_row = await self.predict_and_score(model, example)
+                return await self.predict_and_score(model, example)
             except OpCallError as e:
                 raise e
             except Exception:
                 print("Predict and score failed")
                 traceback.print_exc()
+                return _create_empty_eval_row()
+
+        def _create_empty_eval_row() -> dict:
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
                 return {self._output_key: None, "scores": {}}
             return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}}
+            return eval_row
+            return {self._output_key: None, "scores": {}}
+            return eval_row
 
-        n_complete = 0
-        dataset = self._post_init_dataset
-        _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
+        trial_rows = list(self._post_init_dataset.rows) * self.trials
+        eval_rows = []
+
+        async for _, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
-            n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            print(f"Evaluated {len(eval_rows)} of {len(trial_rows)} examples")
             if eval_row is None:
-                eval_row = {self._output_key: None, "scores": {}}
+                eval_row = _create_empty_eval_row()
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
-            for scorer in self._post_init_scorers:
-                scorer_attributes = get_scorer_attributes(scorer)
-                scorer_name = scorer_attributes.scorer_name
-                if scorer_name not in eval_row["scores"]:
-                    eval_row["scores"][scorer_name] = {}
+                for scorer in self._post_init_scorers:
+                    attrs = get_scorer_attributes(scorer)
+                    scorer_name = attrs.scorer_name
+                    eval_row["scores"].setdefault(scorer_name, {})
             eval_rows.append(eval_row)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
