@@ -210,6 +210,22 @@ class Sentry:
 
         return watch_dec
 
+    # Not in the original WandB Sentry module
+    def track_event(self, event_name: str, tags: dict[str, Any] | None = None, username: str | None = None) -> None:
+        """Track an event to Sentry."""
+        assert self.hub is not None
+
+        event_data: sentry_sdk.Event = {
+            "message": event_name,
+            "level": "info",
+            "tags": tags or {},
+            "user": {
+                "username": username,
+            },
+        }
+
+        self.hub.capture_event(event_data)
+
 
 def _is_local_dev_install(module: Any) -> bool:
     # Check if the __file__ attribute exists

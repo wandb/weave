@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.settings import should_redact_pii
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server_bindings import remote_http_trace_server
 
@@ -125,6 +126,16 @@ def init_weave(
     autopatch.autopatch(autopatch_settings)
 
     username = get_username()
+
+    # This is a temporary event to track the number of users who have enabled PII redacting.
+    if should_redact_pii():
+        trace_sentry.global_trace_sentry.track_event("pii_redaction_enabled", {
+                "entity_name": entity_name,
+                "project_name": project_name,
+            },
+            username,
+        )
+
     try:
         min_required_version = (
             remote_server.server_info().min_required_weave_python_version
