@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeAlias, TypeVar
 
 import diskcache
 
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 TReq = TypeVar("TReq", bound=tsi.BaseModel)
 TRes = TypeVar("TRes", bound=tsi.BaseModel)
 
-CACHE_KEY_TYPE = str
-CACHE_VALUE_TYPE = str | bytes
+CACHE_KEY_TYPE: TypeAlias = str
+CACHE_VALUE_TYPE: TypeAlias = str | bytes
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
