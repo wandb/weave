@@ -3236,3 +3236,59 @@ def test_calls_len(client):
 
     assert len(test.calls()) == 2
     assert len(client.get_calls()) == 2
+
+
+def test_calls_stream_heavy_condition_aggregation_parts(client):
+    def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
+        query = {
+            "$in": [
+                {"$getField": field},
+                [{"$literal": value}],
+            ]
+        }
+        res = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
+            )
+        )
+        return list(res)
+
+    call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        op_name="test_name",
+        trace_id=trace_id,
+        parent_id=parent_id,
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"param": {"value1": "hello"}},
+    )
+    client.server.call_start(tsi.CallStartReq(start=start))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert not res[0].output
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"c": 5},
+        output={"d": 5},
+    )
+    client.server.call_end(tsi.CallEndReq(end=end))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+
+    # Does the query return the output?
+    assert res[0].output["d"] == 5
