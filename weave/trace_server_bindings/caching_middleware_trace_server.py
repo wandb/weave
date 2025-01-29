@@ -6,6 +6,7 @@ from typing import Any, Callable, TypedDict, TypeVar
 
 import diskcache
 
+from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
@@ -24,6 +25,27 @@ class CacheRecorder(TypedDict):
     misses: int
     errors: int
     skips: int
+
+
+def digest_is_cacheable(digest: str) -> bool:
+    """
+    Check if a digest is cachable.
+
+    Examples:
+    - v1 -> True, 1
+    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> False, -1
+    """
+    # If it looks like a version, it is not cachable
+    if digest.startswith("v"):
+        try:
+            int(digest[1:])
+            return False  # noqa: TRY300
+        except ValueError:
+            return True
+    elif digest == "latest":
+        return False
+
+    return True
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -166,11 +188,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.obj_read(req)
         return self._with_cache_generic(
             self._next_trace_server.obj_read, req, tsi.ObjReadRes
         )
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.table_query(req)
         return self._with_cache_generic(
             self._next_trace_server.table_query, req, tsi.TableQueryRes
         )
@@ -182,6 +208,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._next_trace_server.table_query_stream(req)
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.table_query_stats(req)
         return self._with_cache_generic(
             self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
         )
@@ -217,7 +245,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             for i, val in zip(needed_indices, needed_results.vals):
                 final_results[i] = val
                 try:
-                    self._safe_cache_set(ref, val)
+                    parsed_ref = parse_uri(ref)
+                    if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
+                        parsed_ref.digest
+                    ):
+                        self._safe_cache_set(ref, val)
                 except Exception as e:
                     logger.exception(f"Error caching values: {e}")
 
