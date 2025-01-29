@@ -172,6 +172,7 @@ export const MessagePanel = ({
             {isOverflowing && !hasToolCalls && !editorHeight && (
               <ShowMoreButton
                 isUser={isUser}
+                isSystemPrompt={isSystemPrompt}
                 isShowingMore={isShowingMore}
                 setIsShowingMore={setIsShowingMore}
               />
