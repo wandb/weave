@@ -27,9 +27,9 @@ import {useHistory} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
 
 import {isWeaveObjectRef, parseRef, parseRefMaybe} from '../../../../../react';
-import {flattenObjectPreservingWeaveTypes} from '../../Browse2/browse2Util';
 import {CellValue} from '../../Browse2/CellValue';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {flattenObjectPreservingWeaveTypes} from '../flattenObject';
 import {WeaveCHTableSourceRefContext} from '../pages/CallPage/DataTableView';
 import {TABLE_ID_EDGE_NAME} from '../pages/wfReactInterface/constants';
 import {useWFHooks} from '../pages/wfReactInterface/context';

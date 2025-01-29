@@ -9,7 +9,7 @@ import {
 import {hexToRGB} from '../../../../../../../../common/css/utils';
 import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Icon, IconNames} from '../../../../../../../Icon';
-import {objectRefDisplayName, SmallRef} from '../../../../../Browse2/SmallRef';
+import {objectRefDisplayName, SmallRef} from '../../../../smallRef/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {isObjDeleteError} from '../../../wfReactInterface/utilities';

@@ -322,9 +322,9 @@ const isRefPrefixedString = (value: any): boolean => {
 
 /**
  * `isWeaveRef` is a very conservative check that will ensure the passed
- * in value is a valid ref string - capabable of being safely parsed into
+ * in value is a valid ref string - capable of being safely parsed into
  * a Weave ref object. It ensures that the value is a string with the correct
- * prefix, is parsible, and matches the latest "weave trace" style refs. It
+ * prefix, is parsable, and matches the latest "weave trace" style refs. It
  * should be used as the appropriate type guard before parsing a ref.
  */
 export const isWeaveRef = (value: any): value is WeaveRefString => {
