@@ -446,8 +446,10 @@ class CallsQuery(BaseModel):
         )
         SELECT {SELECT_FIELDS}
         FROM calls_merged
+        FINAL                                   -- optional, if heavy filter conditions
         WHERE project_id = {PROJECT_ID}
         AND id IN filtered_calls
+        AND {HEAVY_FILTER_CONDITIONS}           -- optional heavy filter conditions
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
@@ -583,6 +585,8 @@ class CallsQuery(BaseModel):
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
 
+        table_sql = "calls_merged"
+
         having_filter_sql = ""
         having_light_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
@@ -610,6 +614,7 @@ class CallsQuery(BaseModel):
             if not condition.is_heavy() or condition.is_feedback():
                 continue
             heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
+            table_sql += " FINAL"
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -656,7 +661,7 @@ class CallsQuery(BaseModel):
 
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
+        FROM {table_sql}
         {feedback_join_sql}
         WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
         {feedback_where_sql}
