@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
 import diskcache
+from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave.trace.refs import ObjectRef, parse_uri
@@ -17,8 +18,8 @@ from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 
-TReq = TypeVar("TReq", bound=tsi.BaseModel)
-TRes = TypeVar("TRes", bound=tsi.BaseModel)
+TReq = TypeVar("TReq", bound=BaseModel)
+TRes = TypeVar("TRes", bound=BaseModel)
 
 
 class CacheRecorder(TypedDict):

@@ -152,10 +152,18 @@ def test_server_cache_size_limit(client):
         # Assert that the WAL file is removed when the server is deleted
         del caching_server
         sizes = get_cache_sizes(temp_dir)
-        assert len(sizes) == 3
-        assert sizes["cache.db-shm"] <= 50000
-        assert sizes["cache.db-wal"] == 0
-        assert sizes["cache.db"] <= limit * 1.1
+        # depending on the OS, we could be in 1 of two cases.
+        # Case 1: only the db file remains
+        if len(sizes) == 1:
+            assert sizes["cache.db"] <= limit * 1.1
+        elif len(sizes) == 3:
+            assert sizes["cache.db-shm"] <= 50000
+            assert sizes["cache.db-wal"] == 0
+            assert sizes["cache.db"] <= limit * 1.1
+        else:
+            raise ValueError(
+                f"Unexpected number of files in cache directory: {len(sizes)}"
+            )
 
 
 def test_server_cache_latency(client):
