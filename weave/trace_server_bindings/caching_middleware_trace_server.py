@@ -32,16 +32,16 @@ def digest_is_cacheable(digest: str) -> bool:
     Check if a digest is cachable.
 
     Examples:
-    - v1 -> True, 1
-    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> False, -1
+    - v1 -> False
+    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> True
     """
     # If it looks like a version, it is not cachable
     if digest.startswith("v"):
         try:
             int(digest[1:])
-            return False  # noqa: TRY300
         except ValueError:
             return True
+        return False
     elif digest == "latest":
         return False
 
@@ -105,19 +105,21 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         Returns:
             The cached value if found, None otherwise
         """
-        try:
-            if use_server_cache():
-                res = self._cache.get(key)
-                if res is not None:
-                    self._cache_recorder["hits"] += 1
-                else:
-                    self._cache_recorder["misses"] += 1
-                return res
+        if not use_server_cache():
             self._cache_recorder["skips"] += 1
+            return None
+
+        try:
+            res = self._cache.get(key)
         except Exception as e:
             logger.exception(f"Error getting cached value: {e}")
             self._cache_recorder["errors"] += 1
-        return None
+            return None
+        if res is not None:
+            self._cache_recorder["hits"] += 1
+        else:
+            self._cache_recorder["misses"] += 1
+        return res
 
     def _safe_cache_set(self, key: str, value: Any) -> None:
         """Safely store a value in cache, handling errors.
@@ -126,22 +128,26 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             key: The cache key
             value: The value to cache
         """
+        if not use_server_cache():
+            return None
         try:
-            if use_server_cache():
-                self._cache.set(key, value)
+            self._cache.set(key, value)
         except Exception as e:
             logger.exception(f"Error caching value: {e}")
         return None
 
     def _safe_cache_delete(self, key: str) -> None:
+        if not use_server_cache():
+            return None
         try:
-            if use_server_cache():
-                self._cache.delete(key)
+            self._cache.delete(key)
         except Exception as e:
             logger.exception(f"Error deleting cached value: {e}")
         return None
 
     def _safe_cache_delete_prefix(self, prefix: str) -> None:
+        if not use_server_cache():
+            return None
         try:
             for key in self._cache.iterkeys():
                 if key.startswith(prefix):
