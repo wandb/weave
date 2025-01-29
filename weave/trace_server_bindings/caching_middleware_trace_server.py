@@ -148,7 +148,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         if not use_server_cache():
             return None
         try:
-            for key in self._cache.iterkeys():
+            for key in self._cache:
                 if key.startswith(prefix):
                     self._safe_cache_delete(key)
         except Exception as e:
@@ -156,10 +156,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def _with_cache(
         self,
-        namespace: str,
-        make_cache_key: Callable[[TReq], str],
         func: Callable[[TReq], TRes],
         req: TReq,
+        namespace: str,
+        make_cache_key: Callable[[TReq], str],
         serialize: Callable[[TRes], str | bytes],
         deserialize: Callable[[str | bytes], TRes],
     ) -> TRes:
@@ -219,10 +219,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             The function result, either from cache or from calling func
         """
         return self._with_cache(
-            func.__name__,
-            lambda req: req.model_dump_json(),
             func,
             req,
+            func.__name__,
+            lambda req: req.model_dump_json(),
             lambda res: res.model_dump_json(),
             lambda json_value: res_type.model_validate_json(json_value),
         )
@@ -328,10 +328,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
-            "file_content_read",
-            lambda req: req.model_dump_json(),
             self._next_trace_server.file_content_read,
             req,
+            "file_content_read",
+            lambda req: req.model_dump_json(),
             lambda res: res.content,
             lambda content: tsi.FileContentReadRes(content=content),
         )
