@@ -55,12 +55,15 @@ export const ToggleButtonGroup = React.forwardRef<
         className="flex gap-px"
         ref={ref}>
         {options.map(
-          ({
-            value: optionValue,
-            icon,
-            isDisabled: optionIsDisabled,
-            iconOnly = false,
-          }) => (
+          (
+            {
+              value: optionValue,
+              icon,
+              isDisabled: optionIsDisabled,
+              iconOnly = false,
+            },
+            i
+          ) => (
             <ToggleGroup.Item
               key={optionValue}
               value={optionValue}
@@ -70,6 +73,7 @@ export const ToggleButtonGroup = React.forwardRef<
                 icon={icon}
                 size={size}
                 className={twMerge(
+                  'night-aware',
                   size === 'small' &&
                     (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
                   size === 'medium' &&
@@ -82,10 +86,13 @@ export const ToggleButtonGroup = React.forwardRef<
                       : 'px-12 py-8 text-base'),
                   (isDisabled || optionIsDisabled) && 'cursor-auto opacity-35',
                   value === optionValue
-                    ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
-                    : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
-                  'first:rounded-l-sm', // First button rounded left
-                  'last:rounded-r-sm' // Last button rounded right
+                    ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48] dark:bg-teal-700/[0.48] dark:text-teal-400'
+                    : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800 dark:bg-moonbeam/[0.05] hover:dark:bg-teal-700/[0.48] hover:dark:text-teal-400',
+                  i == 0
+                    ? 'rounded-l-sm rounded-r-none' // First button rounded left
+                    : i == options.length - 1
+                    ? 'rounded-l-none rounded-r-sm' // Last button rounded right
+                    : 'rounded-none'
                 )}>
                 {!iconOnly ? optionValue : <></>}
               </Button>
