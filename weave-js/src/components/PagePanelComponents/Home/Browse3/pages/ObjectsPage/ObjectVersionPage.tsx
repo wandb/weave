@@ -7,7 +7,9 @@ import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
+import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
+import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -44,6 +46,7 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
 import {TabPrompt} from './Tabs/TabPrompt';
+import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
 
@@ -59,6 +62,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   Scorer: 'type-number-alt',
   ActionSpec: 'rocket-launch',
   AnnotationSpec: 'forum-chat-bubble',
+  SavedView: 'view-glasses',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -120,7 +124,7 @@ const ObjectVersionPageInner: React.FC<{
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
-  const refExtra = objectVersion.refExtra;
+  const {refExtra, createdAtMs} = objectVersion;
   const objectVersions = useRootObjectVersions(
     entityName,
     projectName,
@@ -183,7 +187,7 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entityName);
 
   const viewerDataAsObject = useMemo(() => {
     const dataIsPrimitive =
@@ -209,10 +213,12 @@ const ObjectVersionPageInner: React.FC<{
 
   if (isDataset) {
     return (
-      <DatasetVersionPage
-        objectVersion={objectVersion}
-        showDeleteButton={showDeleteButton}
-      />
+      <DatasetEditProvider>
+        <DatasetVersionPage
+          objectVersion={objectVersion}
+          showDeleteButton={showDeleteButton}
+        />
+      </DatasetEditProvider>
     );
   }
 
@@ -230,7 +236,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -264,6 +270,12 @@ const ObjectVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{objectVersionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <p>
+                <Timestamp value={createdAtMs / 1000} format="relative" />
+              </p>
             </div>
             {objectVersion.userId && (
               <div className="block">
@@ -393,6 +405,13 @@ const ObjectVersionPageInner: React.FC<{
                     name={objectName}
                     uri={refUri}
                     projectName={projectName}
+                  />
+                ) : baseObjectClass === 'AnnotationSpec' ? (
+                  <TabUseAnnotationSpec
+                    name={objectName}
+                    uri={refUri}
+                    projectName={projectName}
+                    data={viewerDataAsObject}
                   />
                 ) : (
                   <TabUseObject name={objectName} uri={refUri} />

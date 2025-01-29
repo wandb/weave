@@ -400,7 +400,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           },
         }}
         slots={{
-          pagination: PaginationButtons,
+          pagination: () => <PaginationButtons />,
         }}
       />
     </Box>

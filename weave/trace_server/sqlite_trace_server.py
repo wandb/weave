@@ -732,6 +732,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             include_deleted=True,
+            metadata_only=req.metadata_only,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")

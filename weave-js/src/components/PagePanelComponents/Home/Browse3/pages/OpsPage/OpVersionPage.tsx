@@ -1,10 +1,16 @@
 import {Button} from '@wandb/weave/components/Button';
-import React, {useMemo, useState} from 'react';
+import React, {useContext, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {Icon} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Tailwind} from '../../../../../Tailwind';
-import {useClosePeek} from '../../context';
+import {Timestamp} from '../../../../../Timestamp';
+import {
+  useClosePeek,
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {OpCodeViewer} from '../../OpCodeViewer';
 import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
@@ -51,7 +57,7 @@ const OpVersionPageInner: React.FC<{
 }> = ({opVersion}) => {
   const {useOpVersions, useCallsStats} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
-  const {entity, project, opId, versionIndex} = opVersion;
+  const {entity, project, opId, versionIndex, createdAtMs} = opVersion;
 
   const opVersions = useOpVersions(
     entity,
@@ -73,14 +79,14 @@ const OpVersionPageInner: React.FC<{
     // that data available yet.
     return true;
   }, []);
-  const showDeleteButton = useShowDeleteButton();
+  const showDeleteButton = useShowDeleteButton(entity);
 
   return (
     <SimplePageLayoutWithHeader
       title={opVersionText(opId, versionIndex)}
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -116,6 +122,12 @@ const OpVersionPageInner: React.FC<{
             <div className="block">
               <p className="text-moon-500">Version</p>
               <p>{versionIndex}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <p>
+                <Timestamp value={createdAtMs / 1000} format="relative" />
+              </p>
             </div>
             <div className="block">
               <p className="text-moon-500">Calls:</p>
@@ -188,6 +200,9 @@ const DeleteOpButtonWithModal: React.FC<{
 }> = ({opVersionSchema, overrideDisplayStr}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const history = useHistory();
   const {opVersionsDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
@@ -195,12 +210,29 @@ const DeleteOpButtonWithModal: React.FC<{
     overrideDisplayStr ??
     `${opVersionSchema.opId}:v${opVersionSchema.versionIndex}`;
 
+  const onSuccess = () => {
+    if (isPeeking) {
+      closePeek();
+    } else {
+      history.push(
+        routerContext.opVersionsUIUrl(
+          opVersionSchema.entity,
+          opVersionSchema.project,
+          {
+            opName: opVersionSchema.opId,
+          }
+        )
+      );
+    }
+  };
+
   return (
     <>
       <Button
         icon="delete"
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
+        tooltip="Delete this Op version"
       />
       <DeleteModal
         open={deleteModalOpen}
@@ -214,7 +246,7 @@ const DeleteOpButtonWithModal: React.FC<{
             [opVersionSchema.versionHash]
           )
         }
-        onSuccess={closePeek}
+        onSuccess={onSuccess}
       />
     </>
   );

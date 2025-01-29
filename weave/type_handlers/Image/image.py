@@ -49,7 +49,7 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
     fmt = getattr(obj, "format", DEFAULT_FORMAT)
     ext = pil_format_to_ext.get(fmt)
     if ext is None:
-        logger.warning(f"Unknown image format {fmt}, defaulting to {DEFAULT_FORMAT}")
+        logger.debug(f"Unknown image format {fmt}, defaulting to {DEFAULT_FORMAT}")
         ext = pil_format_to_ext[DEFAULT_FORMAT]
 
     # Note: I am purposely ignoring the `name` here and hard-coding the filename to "image.png".

@@ -180,6 +180,7 @@ jobs:
           yarn tslint
           yarn prettier
           yarn run tsc
+          yarn testci
 
   # ==== Trace Jobs ====
   lint:
@@ -235,6 +236,7 @@ jobs:
             "trace",
             "trace_server",
             "anthropic",
+            "bedrock",
             "cerebras",
             "cohere",
             "dspy",

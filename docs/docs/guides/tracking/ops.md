@@ -156,3 +156,25 @@ If you want to suppress the printing of call links during logging, you can set t
 ```bash
 export WEAVE_PRINT_CALL_LINK=false
 ```
+
+## Deleting an op
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    To delete a version of an op, call `.delete()` on the op ref.
+
+    ```python
+    weave.init('intro-example')
+    my_op_ref = weave.ref('track_me:v1')
+    my_op_ref.delete()
+    ```
+
+    Trying to access a deleted op will result in an error.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
