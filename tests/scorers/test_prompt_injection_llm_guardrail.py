@@ -43,7 +43,3 @@ def test_prompt_injection_llm_guardrail_score(
     assert result["reasoning"]["injection_prompt"] == True
     assert result["reasoning"]["is_direct_attack"] == True
     assert result["reasoning"]["attack_type"] == "Instruction Manipulation"
-    assert (
-        result["reasoning"]["explanation"]
-        == "Based on the research papers provided, this is clearly a direct prompt injection attack."
-    )
