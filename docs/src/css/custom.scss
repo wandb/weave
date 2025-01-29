@@ -15,14 +15,24 @@
   --ifm-color-primary-lighter: #359962;
   --ifm-color-primary-lightest: #3cad6e; */
   --ifm-color-primary: #0096ad;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary-dark: #0085a0;
+  --ifm-color-primary-darker: #007a93;
+  --ifm-color-primary-darkest: #006f86;
+  --ifm-color-primary-light: #00a7ba;
+  --ifm-color-primary-lighter: #00b2c7;
+  --ifm-color-primary-lightest: #00bdd4;
   --ifm-code-font-size: 85%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.07);
+  
+  /* Custom design tokens */
+  --font-family-display: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --sidebar-item-spacing: 2px;
+  --sidebar-category-spacing: 20px;
+  --transition-default: 120ms ease-out;
+  
+  /* Custom colors */
+  --color-subtle-border: rgba(0, 0, 0, 0.1);
+  --color-subtle-bg: rgba(0, 0, 0, 0.03);
+  --color-indent-guide: rgba(0, 0, 0, 0.07);
 
   /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
   --ifm-transition-fast: 100ms;
@@ -35,14 +45,17 @@ h2 { font-size: 1.5rem !important; }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-color-primary: #00bdd4;
+  --ifm-color-primary-dark: #00aac0;
+  --ifm-color-primary-darker: #0097ac;
+  --ifm-color-primary-darkest: #008498;
+  --ifm-color-primary-light: #00d0e8;
+  --ifm-color-primary-lighter: #00e3fc;
+  --ifm-color-primary-lightest: #1ae6ff;
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
+  --color-subtle-border: rgba(255, 255, 255, 0.1);
+  --color-subtle-bg: rgba(255, 255, 255, 0.03);
+  --color-indent-guide: rgba(255, 255, 255, 0.07);
 }
 /* Custom styles for Homepage */
 .hero--primary {
@@ -69,26 +82,30 @@ h2 { font-size: 1.5rem !important; }
 
 /* This customizes "section headers". */
 li.sidebar-section-title {
+  margin-top: var(--sidebar-category-spacing);
+  
   > div.menu__list-item-collapsible {
-      font-weight: bold; 
-      color: var(--ifm-color-primary-contrast-foreground);
+    font-family: var(--font-family-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--ifm-color-emphasis-700);
+    padding: 6px 12px;
+    margin-bottom: 4px;
+    
+    &:hover {
+      background: transparent;
+    }
+  }
 
-      /* We don't want any click interaction effects here */
-      &:hover {
-        background-color: transparent;
-      }
-  }
-  &:first-child > div.menu__list-item-collapsible {
-    margin-top: 0.5em;
-  }
-  &:not(:first-child) > div.menu__list-item-collapsible {
-    margin-top: 1em;
+  &:first-child {
+    margin-top: 8px;
   }
 }
 
 nav.menu {
-  /* Adds equal padding on all sides (right side missing in default) */
-  padding: 0.5em;
+  padding: 6px 12px 12px 12px;
 }
 
 .clean-btn.menu__caret {
@@ -98,13 +115,76 @@ nav.menu {
   }
   &:before {
     /* reduces the default caret size to be less invasive */
-    background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+    background: var(--ifm-menu-link-sublist-icon) 50% / 1.5rem 1.5rem;
+    opacity: 0.5;
   }
 }
 
 .menu__link--sublist-caret:after {
-  /* reduces the default caret size to be less invasive */
-  background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+  background: var(--ifm-menu-link-sublist-icon) 50% / 1.5rem 1.5rem;
+  opacity: 0.5;
+  transition: opacity var(--transition-default),
+              transform var(--transition-default);
+}
+
+// .menu__list-item--collapsed .menu__link--sublist:after {
+//   transform: rotateZ(-90deg);
+// }
+
+.menu__link--sublist:hover:after {
+  opacity: 0.8;
+}
+
+/* Nested items refinement */
+.menu__list-item .menu__list {
+  position: relative;
+  padding-left: 16px;
+  margin: 2px 0 2px 3px;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--color-indent-guide);
+  }
+  
+  .menu__link {
+    font-size: 13.5px;
+    padding: 4px 12px;
+    margin: 2px 0;
+  }
+}
+
+/* Menu list spacing adjustments */
+.menu__list {
+  padding: 0;
+  
+  .menu__list-item {
+    margin: var(--sidebar-item-spacing) 0;
+    
+    .menu__link {
+      border-radius: 6px;
+      transition: all var(--transition-default);
+      line-height: 1.4;
+      font-weight: 400;
+      padding: 6px 12px;
+      margin: 2px 0;
+      
+      &:hover {
+        background: var(--color-subtle-bg);
+        color: var(--ifm-color-primary);
+      }
+      
+      &.menu__link--active {
+        font-weight: 500;
+        color: var(--ifm-color-primary);
+        background: var(--color-subtle-bg);
+      }
+    }
+  }
 }
 
 .notebook-cta-button {
@@ -116,3 +196,10 @@ nav.menu {
       align-items: center;
   }
 }
+/* Sidebar refinements */
+.theme-doc-sidebar-container {
+  border-right: 1px solid var(--color-subtle-border);
+  background: var(--ifm-background-color);
+  font-size: 14px;
+}
+
