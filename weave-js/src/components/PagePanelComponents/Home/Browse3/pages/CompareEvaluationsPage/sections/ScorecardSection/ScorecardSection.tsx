@@ -14,8 +14,8 @@ import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
-import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../../Browse2/SmallRef';
+import {NotApplicable} from '../../../../NotApplicable';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
   buildCompositeMetricsMap,
