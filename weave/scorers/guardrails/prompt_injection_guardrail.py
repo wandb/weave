@@ -8,7 +8,7 @@ from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_client, _LLM_CLIENTS
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class PromptInjectionLLMGuardrail(Scorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
-    _client: Optional["Instructor"] = None
+    _client: Union["Instructor", None] = None
 
     def model_post_init(self, __context: Any) -> None:
         import instructor
