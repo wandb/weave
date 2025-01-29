@@ -88,9 +88,9 @@ export const ToggleButtonGroup = React.forwardRef<
                   value === optionValue
                     ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48] dark:bg-teal-700/[0.48] dark:text-teal-400'
                     : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800 dark:bg-moonbeam/[0.05] hover:dark:bg-teal-700/[0.48] hover:dark:text-teal-400',
-                  i == 0
+                  i === 0
                     ? 'rounded-l-sm rounded-r-none' // First button rounded left
-                    : i == options.length - 1
+                    : i === options.length - 1
                     ? 'rounded-l-none rounded-r-sm' // Last button rounded right
                     : 'rounded-none'
                 )}>
