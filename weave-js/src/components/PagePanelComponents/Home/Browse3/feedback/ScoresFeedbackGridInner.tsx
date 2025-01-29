@@ -6,9 +6,9 @@ import React from 'react';
 import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {CellValue} from '../../Browse2/CellValue';
-import {SmallRef} from '../../Browse2/SmallRef';
 import {CallRefLink} from '../pages/common/Links';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
+import {SmallRef} from '../smallRef/SmallRef';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 

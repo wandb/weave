@@ -12,17 +12,17 @@ import {
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
 
-import {hexToRGB, MOON_300} from '../../../../common/css/globals.styles';
-import {Icon, IconName, IconNames} from '../../../Icon';
-import {useWeaveflowRouteContext} from '../Browse3/context';
-import {Link} from '../Browse3/pages/common/Links';
-import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
-import {isObjDeleteError} from '../Browse3/pages/wfReactInterface/utilities';
+import {hexToRGB, MOON_300} from '../../../../../common/css/globals.styles';
+import {Icon, IconName, IconNames} from '../../../../Icon';
+import {fetchArtifactRefPageUrl} from '../artifactRegistry';
+import {useWeaveflowRouteContext} from '../context';
+import {Link} from '../pages/common/Links';
+import {useWFHooks} from '../pages/wfReactInterface/context';
+import {isObjDeleteError} from '../pages/wfReactInterface/utilities';
 import {
   ObjectVersionKey,
   OpVersionKey,
-} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {fetchArtifactRefPageUrl} from './url';
+} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 
 const getRootType = (t: Type): Type => {
   if (
