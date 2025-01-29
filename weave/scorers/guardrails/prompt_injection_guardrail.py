@@ -12,7 +12,7 @@ from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_cli
 from weave.scorers.utils import stringify
 
 if TYPE_CHECKING:
-    import instructor
+    from instructor import Instructor
     from openai import OpenAI
 
 
@@ -33,7 +33,7 @@ class PromptInjectionLLMGuardrail(Scorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
-    _client: Optional[Union[instructor.Instructor, OpenAI]] = None
+    _client: Optional[Union[Instructor, OpenAI]] = None
 
     def model_post_init(self, __context) -> None:
         import instructor
