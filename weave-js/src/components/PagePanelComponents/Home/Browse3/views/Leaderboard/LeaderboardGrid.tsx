@@ -13,9 +13,9 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRefMaybe} from '../../../../../../react';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowRouteContext} from '../../context';
+import {NotApplicable} from '../../NotApplicable';
 import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_LEADERBOARD} from '../../pages/common/EmptyContent';

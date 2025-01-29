@@ -1,7 +1,7 @@
 import isEqual from 'lodash/isEqual';
 import React, {createContext, useCallback, useContext, useState} from 'react';
 
-import {flattenObjectPreservingWeaveTypes} from '../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../flattenObject';
 
 export interface DatasetRow {
   [key: string]: any;
