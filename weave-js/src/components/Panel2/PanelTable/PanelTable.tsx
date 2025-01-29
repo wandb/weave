@@ -227,6 +227,22 @@ const PanelTableInnerConfigSetter: React.FC<
     return {...config, tableState: tableState ?? autoTable};
   }, [config, tableState, autoTable]);
 
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    const defineColumnVariables = (tableState: Table.TableState) => {
+      return Object.keys(tableState.columns).reduce(
+        (acc: {[key: string]: NodeOrVoidNode}, colId) => {
+          const columnName =
+            tableState.columnNames[colId] || colId.replace(/-/g, '');
+          acc[columnName] = tableState.columnSelectFunctions[colId];
+          return acc;
+        },
+        {}
+      );
+    };
+
+    return defineColumnVariables(config.tableState ?? tableState ?? autoTable);
+  }, [config.tableState, tableState, autoTable]);
+
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
 
   if (!hasLoadedOnce) {
@@ -234,14 +250,16 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <PanelTableInner
-      {...props}
-      config={protectedConfig}
-      autoTable={autoTable}
-      updateConfig={protectedUpdateConfig}
-      showColumnSelect={showColumnSelect}
-      setShowColumnSelect={setShowColumnSelect}
-    />
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelTableInner
+        {...props}
+        config={protectedConfig}
+        autoTable={autoTable}
+        updateConfig={protectedUpdateConfig}
+        showColumnSelect={showColumnSelect}
+        setShowColumnSelect={setShowColumnSelect}
+      />
+    </PanelContextProvider>
   );
 };
 
@@ -288,30 +306,6 @@ const PanelTableInner: React.FC<
       tableIsPanelVariableVal ? rowControlsWidthWide : rowControlsWidthSmall,
     [tableIsPanelVariableVal]
   );
-  const [originalStack, setOriginalStack] = useState<Stack | null>(null);
-
-  useEffect(() => {
-    if (originalStack == null) {
-      setOriginalStack(stack);
-    }
-  }, [stack, originalStack]);
-
-  useEffect(() => {
-    for (let i = stack.length - 1; i >= 0; i--) {
-      if (!originalStack?.includes(stack[i])) {
-        stack.splice(i, 1);
-      }
-    }
-
-    Object.keys(tableState.columns)
-      .map(colId => {
-        return {
-          name: (tableState.columnNames[colId] || colId).replace(/-/g, ''),
-          value: tableState.columnSelectFunctions[colId],
-        };
-      })
-      .forEach(col => stack.push(col));
-  }, [originalStack, stack, tableState]);
 
   const countColumnExists = Object.keys(tableState.columnNames).includes(
     'groupCount'
