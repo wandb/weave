@@ -61,6 +61,12 @@ class UserSettings(BaseModel):
     may lead to unexpected behaviour.  Make sure this is only set once at the start!
     """
 
+    capture_client_info: bool = True
+    """Toggles capture of client information (Python version, SDK version) for ops."""
+
+    capture_system_info: bool = True
+    """Toggles capture of system information (OS name and version) for ops."""
+
     client_parallelism: Optional[int] = None
     """
     Sets the number of workers to use for background operations.
@@ -101,6 +107,14 @@ def should_print_call_link() -> bool:
 
 def should_capture_code() -> bool:
     return _should("capture_code")
+
+
+def should_capture_client_info() -> bool:
+    return _should("capture_client_info")
+
+
+def should_capture_system_info() -> bool:
+    return _should("capture_system_info")
 
 
 def client_parallelism() -> Optional[int]:
