@@ -41,7 +41,6 @@ def lint(session):
         "dspy",
         "google_ai_studio",
         "groq",
-        "guardrails",
         "instructor",
         "langchain_nvidia_ai_endpoints",
         "langchain",
@@ -90,9 +89,6 @@ def tests(session, shard):
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
         env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
 
-    if shard == "guardrails":
-        env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
-
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
@@ -101,7 +97,6 @@ def tests(session, shard):
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers_tests": ["scorers/"],
-        "guardrails": ["guardrails/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
