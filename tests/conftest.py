@@ -477,7 +477,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
             if name == "attribute_access_log":
                 return access_log
             attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
+            if name != "attribute_access_log" and not name.startswith("_"):
                 access_log.append(name)
             return attr
 
@@ -520,7 +520,7 @@ def create_client(
     if inited_client is None:
         # This is disabled by default, but we explicitly enable it here for testing
         os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
-        server = CachingMiddlewareTraceServer.from_env(server)
+        server = CachingMiddlewareTraceServer.from_env(make_server_recorder(server))
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)
         )

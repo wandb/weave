@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypedDict, TypeVar
 
 import diskcache
 
@@ -19,6 +19,13 @@ TReq = TypeVar("TReq", bound=tsi.BaseModel)
 TRes = TypeVar("TRes", bound=tsi.BaseModel)
 
 
+class CacheRecorder(TypedDict):
+    hits: int
+    misses: int
+    errors: int
+    skips: int
+
+
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     _next_trace_server: tsi.TraceServerInterface
     _cache_prefix: str
@@ -33,6 +40,12 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
         )
+        self._cache_recorder: CacheRecorder = {
+            "hits": 0,
+            "misses": 0,
+            "errors": 0,
+            "skips": 0,
+        }
 
     @classmethod
     def from_env(
@@ -44,25 +57,34 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def _safe_cache_get(self, key: str) -> Any:
         try:
-            use_cache = use_server_cache()
-            if not use_cache:
-                return None
-            return self._cache.get(key)
+            if use_server_cache():
+                res = self._cache.get(key)
+                if res is not None:
+                    self._cache_recorder["hits"] += 1
+                else:
+                    self._cache_recorder["misses"] += 1
+                return res
+            self._cache_recorder["skips"] += 1
         except Exception as e:
             logger.exception(f"Error getting cached value: {e}")
-            return None
+            self._cache_recorder["errors"] += 1
+        return None
 
     def _safe_cache_set(self, key: str, value: Any) -> None:
         try:
-            return self._cache.set(key, value)
+            if use_server_cache():
+                self._cache.set(key, value)
         except Exception as e:
             logger.exception(f"Error caching value: {e}")
+        return None
 
     def _safe_cache_delete(self, key: str) -> None:
         try:
-            self._cache.delete(key)
+            if use_server_cache():
+                self._cache.delete(key)
         except Exception as e:
             logger.exception(f"Error deleting cached value: {e}")
+        return None
 
     def _with_cache(
         self,
@@ -130,6 +152,17 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda res: res.model_dump_json(),
             lambda json_value: res_type.model_validate_json(json_value),
         )
+
+    def reset_cache_recorder(self) -> None:
+        self._cache_recorder = {
+            "hits": 0,
+            "misses": 0,
+            "errors": 0,
+            "skips": 0,
+        }
+
+    def get_cache_recorder(self) -> CacheRecorder:
+        return self._cache_recorder.copy()
 
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:

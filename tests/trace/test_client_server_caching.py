@@ -1,8 +1,10 @@
+import os
 import random
 
 import PIL
 
 import weave
+from tests.conftest import CachingMiddlewareTraceServer
 
 
 def create_random_pil_image():
@@ -38,6 +40,33 @@ def test_server_caching(client):
     dataset = weave.Dataset(rows=create_dataset_rows(5))
     ref = weave.publish(dataset)
 
+    recording_caching_server = client.server
+    caching_server: CachingMiddlewareTraceServer = recording_caching_server.server
+    caching_server.reset_cache_recorder()
     compare_datasets(client.get(ref), dataset)
+    assert caching_server.get_cache_recorder() == {
+        "hits": 1,
+        "misses": 7,
+        "errors": 0,
+        "skips": 0,
+    }
+
+    caching_server.reset_cache_recorder()
     compare_datasets(client.get(ref), dataset)
+    assert caching_server.get_cache_recorder() == {
+        "hits": 8,
+        "misses": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+
+    caching_server.reset_cache_recorder()
+    os.environ["WEAVE_USE_SERVER_CACHE"] = "false"
     compare_datasets(client.get(ref), dataset)
+    os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
+        "misses": 0,
+        "errors": 0,
+        "skips": 8,
+    }
