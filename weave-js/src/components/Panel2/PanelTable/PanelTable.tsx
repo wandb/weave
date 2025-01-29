@@ -228,12 +228,12 @@ const PanelTableInnerConfigSetter: React.FC<
   }, [config, tableState, autoTable]);
 
   const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
-    const defineColumnVariables = (tableState: Table.TableState) => {
-      return Object.keys(tableState.columns).reduce(
+    const defineColumnVariables = (currentTableState: Table.TableState) => {
+      return Object.keys(currentTableState.columns).reduce(
         (acc: {[key: string]: NodeOrVoidNode}, colId) => {
           const columnName =
-            tableState.columnNames[colId] || colId.replace(/-/g, '');
-          acc[columnName] = tableState.columnSelectFunctions[colId];
+            currentTableState.columnNames[colId] || colId.replace(/-/g, '');
+          acc[columnName] = currentTableState.columnSelectFunctions[colId];
           return acc;
         },
         {}
