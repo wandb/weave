@@ -108,6 +108,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception(f"Error deleting cached value: {e}")
         return None
 
+    def _safe_cache_delete_prefix(self, prefix: str) -> None:
+        try:
+            for key in self._cache.iterkeys():
+                if key.startswith(prefix):
+                    self._safe_cache_delete(key)
+        except Exception as e:
+            logger.exception(f"Error deleting cached values with prefix: {e}")
+
     def _with_cache(
         self,
         namespace: str,
@@ -193,6 +201,19 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._with_cache_generic(
             self._next_trace_server.obj_read, req, tsi.ObjReadRes
         )
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        if req.digests:
+            for digest in req.digests:
+                try:
+                    cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}","digest":"{digest}"'
+                    self._safe_cache_delete_prefix(cache_key_prefix)
+                except Exception as e:
+                    logger.exception(f"Error deleting cached value: {e}")
+        else:
+            cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
+            self._safe_cache_delete_prefix(cache_key_prefix)
+        return self._next_trace_server.obj_delete(req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
@@ -318,9 +339,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         return self._next_trace_server.objs_query(req)
-
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        return self._next_trace_server.obj_delete(req)
 
     # Table API
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
