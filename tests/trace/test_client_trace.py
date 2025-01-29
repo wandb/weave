@@ -3238,14 +3238,7 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
-@pytest.mark.parametrize(
-    "descendents_code",
-    [
-        "list(call.get_descendents())",
-        "client.get_call_descendents([call])",
-    ],
-)
-def test_get_call_descendents_flat(client, descendents_code):
+def test_get_call_descendents_flat_object_oriented(client):
     @weave.op
     def fib(n: int) -> int:
         if n <= 1:
@@ -3260,7 +3253,36 @@ def test_get_call_descendents_flat(client, descendents_code):
     #   │     └── fib(0)
     #   └── fib(1)
 
-    descendents = eval(descendents_code)
+    descendents = list(call.get_descendents())
+    assert len(descendents) == 5
+    assert descendents[0].inputs == {"n": 3}
+    assert descendents[0].output == 2
+    assert descendents[1].inputs == {"n": 2}
+    assert descendents[1].output == 1
+    assert descendents[2].inputs == {"n": 1}
+    assert descendents[2].output == 1
+    assert descendents[3].inputs == {"n": 0}
+    assert descendents[3].output == 0
+    assert descendents[4].inputs == {"n": 1}
+    assert descendents[4].output == 1
+
+
+def test_get_calls_descendents_flat_imperative(client):
+    @weave.op
+    def fib(n: int) -> int:
+        if n <= 1:
+            return n
+        return fib(n - 1) + fib(n - 2)
+
+    _, call = fib.call(3)
+    # calls will be:
+    # fib(3)
+    #   ├── fib(2)
+    #   │     ├── fib(1)
+    #   │     └── fib(0)
+    #   └── fib(1)
+
+    descendents = client.get_call_descendents([call])
     assert len(descendents) == 5
     assert descendents[0].inputs == {"n": 3}
     assert descendents[0].output == 2
