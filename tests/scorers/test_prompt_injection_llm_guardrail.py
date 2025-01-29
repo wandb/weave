@@ -27,10 +27,10 @@ def mock_create(monkeypatch):
 @pytest.fixture
 def prompt_injection_llm_guardrail(mock_create):
     return PromptInjectionLLMGuardrail(
-        client=OpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-4o",
         temperature=0.7,
         max_tokens=4096,
+        _client=OpenAI(api_key="DUMMY_API_KEY"),
     )
 
 

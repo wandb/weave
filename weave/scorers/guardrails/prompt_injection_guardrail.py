@@ -1,15 +1,21 @@
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
 import weave
-from weave.guardrails.prompts import (
+from weave.scorers import Scorer
+from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.llm_scorer import InstructorLLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_client
 from weave.scorers.utils import stringify
+
+try:
+    import instructor
+    from openai import OpenAI
+except ImportError:
+    raise ImportError("`openai` and `instructor` are required to use this scorer.")
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -24,11 +30,20 @@ class LLMGuardrailResponse(BaseModel):
     reasoning: LLMGuardrailReasoning
 
 
-class PromptInjectionLLMGuardrail(InstructorLLMScorer):
+class PromptInjectionLLMGuardrail(Scorer):
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
+    _client: Optional[Union[instructor.Instructor, OpenAI]] = None
+
+    def model_post_init(self, __context) -> None:
+        if self.model_id not in ["gpt-4o", "gpt-4o-mini"]:
+            raise ValueError(f"Model {self.model_id} is not supported for this scorer.")
+        if isinstance(self._client, OpenAI):
+            self._client = instructor_client(self._client)
+        else:
+            self._client = instructor_client(OpenAI())
 
     @weave.op
     def score(self, prompt: str) -> LLMGuardrailResponse:
@@ -44,7 +59,7 @@ You are given the following user prompt that you are suppossed to assess whether
 """
         )
         response: LLMGuardrailReasoning = create(
-            self.client,
+            self._client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
