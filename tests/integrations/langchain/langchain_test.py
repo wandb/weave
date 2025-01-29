@@ -60,7 +60,7 @@ def test_simple_chain_invoke(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
     long_str = (
@@ -95,7 +95,7 @@ async def test_simple_chain_ainvoke(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -121,7 +121,7 @@ def test_simple_chain_stream(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -150,7 +150,7 @@ async def test_simple_chain_astream(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -198,7 +198,7 @@ def test_simple_chain_batch(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -226,7 +226,7 @@ async def test_simple_chain_abatch(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -275,7 +275,7 @@ def test_simple_chain_batch_inside_op(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -370,7 +370,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
     from langchain_core.runnables import RunnablePassthrough
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-    loader = TextLoader("integrations/langchain/test_data/paul_graham_essay.txt")
+    loader = TextLoader("tests/integrations/langchain/test_data/paul_graham_essay.txt")
     docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -392,7 +392,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
     )
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
 
     def format_docs(documents: list[Document]) -> str:
@@ -474,7 +474,7 @@ def test_agent_run_with_tools(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
 
     tools = [calculator]
@@ -592,7 +592,7 @@ def test_agent_run_with_function_call(
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
     )
 
     tools = [calculator]
@@ -647,3 +647,33 @@ def test_agent_run_with_function_call(
     )
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_agent_with_function_call(calls)
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_weave_attributes_in_call(client: WeaveClient) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0
+    )
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    with weave.attributes({"call_attr": 1}):
+        _ = llm_chain.invoke({"number": 2})
+
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call_attrs = calls[0].attributes
+    assert call_attrs["call_attr"] == 1
+    assert "lc_id" in call_attrs
+    assert "parent_run_id" in call_attrs
+    assert "lc_name" in call_attrs
