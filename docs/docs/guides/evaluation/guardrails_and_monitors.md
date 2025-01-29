@@ -20,8 +20,16 @@ The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - 
 - **As Guardrails**: Block or modify unsafe content before it reaches users
 - **As Monitors**: Track quality metrics over time to identify trends and improvements
 
-:::tip
-Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
+
+:::tip Ready-to-Use Scorers
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./scorers.md#predefined-scorers) that you can use right away, including:
+- Toxicity detection
+- Prompt injection detection
+- Response quality evaluation
+- Factual consistency checking
+- And more!
+
+Check out our [predefined scorers list](./scorers.md#predefined-scorers) to get started quickly with production-ready evaluation.
 :::
 
 ### Using the `.call()` Method
@@ -37,13 +45,9 @@ result, call = generate_text.call(input)  # Now you can use the call object with
 ```
 
 :::tip Why Use `.call()`?
-The Call object is essential for:
-- Applying scorers to the operation
-- Accessing tracking information
-- Querying historical results
-- Analyzing trends over time
+The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
 
-For more details about Call objects, see our [Ops Guide](../../guides/tracking/ops.md#getting-a-handle-to-the-call-object).
+For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ### Guardrails vs. Monitors: When to Use Each
@@ -63,6 +67,10 @@ For example, a toxicity scorer could be used to:
 - 🛡️ **As a Guardrail**: Block toxic content immediately
 - 📊 **As a Monitor**: Track toxicity levels over time
 
+:::tip
+Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
+:::
+
 ## Getting Started with Scorers
 
 ### Basic Example
@@ -70,6 +78,18 @@ For example, a toxicity scorer could be used to:
 Here's a simple example showing how to use `.call()` with a scorer:
 
 ```python
+import weave
+from weave import Scorer
+
+class LengthScorer(Scorer):
+    @weave.op
+    def score(self, output: str) -> dict:
+        """A simple scorer that checks output length."""
+        return {
+            "length": len(output),
+            "is_short": len(output) < 100
+        }
+
 @weave.op()
 def generate_text(prompt: str) -> str:
     return "Hello, world!"
@@ -78,7 +98,7 @@ def generate_text(prompt: str) -> str:
 result, call = generate_text.call("Say hello")
 
 # Now you can apply scorers
-await call.apply_scorer(MyScorer())
+await call.apply_scorer(LengthScorer())
 ```
 
 ## Using Scorers as Guardrails
@@ -218,28 +238,14 @@ Sometimes your scorer's parameter names might not match your function's paramete
 def generate_text(user_input: str):  # Uses 'user_input'
     return process(user_input)
 
-class MyScorer(Scorer):
+class QualityScorer(Scorer):
     @weave.op
     def score(self, output: str, prompt: str):  # Expects 'prompt'
-        return {"score": self._evaluate(prompt, output)}
-```
+        """Evaluate response quality."""
+        return {"quality_score": evaluate_quality(prompt, output)}
 
-You can handle this mismatch using `column_map`:
-
-```python
-class MyScorer(Scorer):
-    def __init__(self):
-        # Map scorer parameters to function parameters
-        self.column_map = {
-            "prompt": "user_input"  # map prompt → user_input
-        }
-    
-    @weave.op
-    def score(self, output: str, prompt: str):
-        return {"score": self._evaluate(prompt, output)}
-
-# Now it works!
-scorer = MyScorer()
+# Map 'prompt' parameter to 'user_input'
+scorer = QualityScorer(column_map={"prompt": "user_input"})
 await call.apply_scorer(scorer)
 ```
 
@@ -247,14 +253,29 @@ Common use cases for `column_map`:
 - Different naming conventions between functions and scorers
 - Reusing scorers across different functions
 - Using third-party scorers with your function names
+:::
 
-You can also provide additional parameters not present in your function:
+:::info Adding Additional Parameters
+Sometimes scorers need extra parameters that aren't part of your function. You can provide these using `additional_scorer_kwargs`:
+
 ```python
+class ReferenceScorer(Scorer):
+    @weave.op
+    def score(self, output: str, reference_answer: str):
+        """Compare output to a reference answer."""
+        similarity = compute_similarity(output, reference_answer)
+        return {"matches_reference": similarity > 0.8}
+
+# Provide the reference answer as an additional parameter
 await call.apply_scorer(
-    scorer,
-    additional_scorer_kwargs={"reference_text": "Expected output"}
+    ReferenceScorer(),
+    additional_scorer_kwargs={
+        "reference_answer": "The Earth orbits around the Sun."
+    }
 )
 ```
+
+This is useful when your scorer needs context or configuration that isn't part of the original function call.
 :::
 
 ### Using Scorers: Two Approaches
