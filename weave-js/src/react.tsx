@@ -561,15 +561,15 @@ export const parseRefMaybe = (s: string): ObjectRef | null => {
 
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
-  let splitLimit: number;
+  let maxSplitsToMake: number;
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
-    splitLimit = 4;
+    maxSplitsToMake = 3;
   } else if (isLocalArtifact) {
-    splitLimit = 2;
+    maxSplitsToMake = 2;
   } else if (isWeaveRef) {
     return parseWeaveRef(ref);
   } else {
@@ -579,22 +579,22 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (splitUri.length !== splitLimit) {
+  if (maxSplitsToMake !== splitUri.length) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
   if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    const [entityName, projectName, artifactName] = splitUri;
+    const [artifactCollection, artifactVersion] = artifactName.split(':', 2);
     return {
       scheme: 'wandb-artifact',
       entityName,
       projectName,
-      artifactName: artifactNamePart,
+      artifactName: artifactCollection,
       artifactVersion,
-      artifactPath: artifactPathPart,
+      artifactPath: ref,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
   }
