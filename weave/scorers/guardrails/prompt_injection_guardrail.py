@@ -33,7 +33,7 @@ class PromptInjectionLLMGuardrail(Scorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
-    _client: Optional[Union[Instructor, OpenAI]] = None
+    _client: Optional[Union["Instructor", "OpenAI"]] = None
 
     def model_post_init(self, __context: Any) -> None:
         from openai import OpenAI
