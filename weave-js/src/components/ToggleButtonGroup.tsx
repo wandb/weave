@@ -53,7 +53,6 @@ export const ToggleButtonGroup = React.forwardRef<
       <ToggleGroup.Root
         type="single" // supports single selection only
         value={value}
-        onValueChange={handleValueChange}
         className="flex gap-px"
         ref={ref}>
         {options.map(
@@ -68,6 +67,7 @@ export const ToggleButtonGroup = React.forwardRef<
               <Button
                 icon={icon}
                 size={size}
+                onClick={() => handleValueChange(optionValue)}
                 className={twMerge(
                   'night-aware',
                   size === 'small' &&
