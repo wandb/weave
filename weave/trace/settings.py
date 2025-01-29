@@ -70,6 +70,7 @@ class UserSettings(BaseModel):
     WARNING: PII redaction is an experimental feature, and may not always work.
     It will also introduce significant performance overhead when redacting large payloads.
     """
+
     redact_pii_fields: list[str] = []
     """List of fields to redact.
 
@@ -79,6 +80,12 @@ class UserSettings(BaseModel):
 
     A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
     """
+
+    capture_client_info: bool = True
+    """Toggles capture of client information (Python version, SDK version) for ops."""
+
+    capture_system_info: bool = True
+    """Toggles capture of system information (OS name and version) for ops."""
 
     client_parallelism: Optional[int] = None
     """
@@ -120,6 +127,14 @@ def should_print_call_link() -> bool:
 
 def should_capture_code() -> bool:
     return _should("capture_code")
+
+
+def should_capture_client_info() -> bool:
+    return _should("capture_client_info")
+
+
+def should_capture_system_info() -> bool:
+    return _should("capture_system_info")
 
 
 def client_parallelism() -> Optional[int]:

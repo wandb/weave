@@ -54,7 +54,12 @@ from weave.trace.refs import (
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism, should_redact_pii
+from weave.trace.settings import (
+    client_parallelism,
+    should_capture_client_info,
+    should_capture_system_info,
+    should_redact_pii,
+)
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -994,12 +999,14 @@ class WeaveClient:
             attributes = {}
 
         attributes = AttributesDict(**attributes)
-        attributes._set_weave_item("client_version", version.VERSION)
-        attributes._set_weave_item("source", "python-sdk")
-        attributes._set_weave_item("os_name", platform.system())
-        attributes._set_weave_item("os_version", platform.version())
-        attributes._set_weave_item("os_release", platform.release())
-        attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_client_info():
+            attributes._set_weave_item("client_version", version.VERSION)
+            attributes._set_weave_item("source", "python-sdk")
+            attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_system_info():
+            attributes._set_weave_item("os_name", platform.system())
+            attributes._set_weave_item("os_version", platform.version())
+            attributes._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
