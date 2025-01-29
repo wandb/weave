@@ -73,9 +73,9 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    use_server_cache: bool = True
+    use_server_cache: bool = False
     """
-    Toggles caching of server responses, defaults to True
+    Toggles caching of server responses, defaults to False
 
     If True, caches server responses to disk.
     Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
@@ -83,7 +83,8 @@ class UserSettings(BaseModel):
 
     server_cache_size_limit: int = 1_000_000_000
     """
-    Sets the size limit in bytes for the server cache, defaults to 1GB (1_000_000_000 bytes)
+    Sets the size limit in bytes for the server cache, defaults to 1GB (1_000_000_000 bytes).
+    Required if `use_server_cache` is True.
 
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
     """
@@ -91,6 +92,7 @@ class UserSettings(BaseModel):
     server_cache_dir: Optional[str] = None
     """
     Sets the directory for the server cache, defaults to None (temporary cache)
+    Required if `use_server_cache` is True.
 
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
     """

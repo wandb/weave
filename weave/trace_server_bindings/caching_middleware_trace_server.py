@@ -9,7 +9,6 @@ import diskcache
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
-    use_server_cache,
 )
 from weave.trace_server import trace_server_interface as tsi
 
@@ -44,9 +43,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def _safe_cache_get(self, key: str) -> Any:
         try:
-            use_cache = use_server_cache()
-            if not use_cache:
-                return None
             return self._cache.get(key)
         except Exception as e:
             logger.exception(f"Error getting cached value: {e}")
