@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {LoadingDots} from '../../../../../LoadingDots';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
