@@ -37,7 +37,7 @@ def mock_create(monkeypatch):
         return MockChat()
 
     monkeypatch.setattr(
-        "weave.scorers.guardrails.prompt_injection_guardrail.instructor.from_litellm",
+        "instructor.from_litellm",
         mock_from_litellm,
     )
 
