@@ -6,6 +6,7 @@ from weave.scorers.guardrails.prompt_injection_guardrail import (
     LLMGuardrailResponse,
     PromptInjectionLLMGuardrail,
 )
+from weave.scorers.llm_utils import instructor_client
 
 
 # mock the create function
@@ -26,12 +27,13 @@ def mock_create(monkeypatch):
 
 @pytest.fixture
 def prompt_injection_llm_guardrail(mock_create):
-    return PromptInjectionLLMGuardrail(
+    guardrail = PromptInjectionLLMGuardrail(
         model_id="gpt-4o",
         temperature=0.7,
         max_tokens=4096,
-        _client=OpenAI(api_key="DUMMY_API_KEY"),
     )
+    guardrail._client = instructor_client(OpenAI(api_key="DUMMY_API_KEY"))
+    return guardrail
 
 
 def test_prompt_injection_llm_guardrail_score(
