@@ -214,5 +214,3 @@ def test_images_in_load_of_dataset(client):
         assert isinstance(gotten_row["img"], Image.Image)
         assert gotten_row["img"].size == local_row["img"].size
         assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
-
-    return ref
