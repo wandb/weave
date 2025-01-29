@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypeAlias, TypeVar
+from typing import Any, Callable, TypeVar
 
 import diskcache
+from typing_extensions import TypeAlias
 
 from weave.trace.settings import (
     server_cache_dir,
