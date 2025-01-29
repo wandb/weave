@@ -317,11 +317,46 @@ Scorer results are stored with their associated calls and can be accessed throug
 
 For detailed information about querying calls and their scorer results, see our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
 
+### 5. Initialize Guards Efficiently
+
+For optimal performance, especially with locally-run models, initialize your guards outside of the main function:
+
+```python
+# Initialize guards once at module level
+toxicity_guard = ToxicityScorer()
+quality_guard = QualityScorer()
+
+@weave.op()
+def generate_text(prompt: str) -> str:
+    """Generate text using an LLM."""
+    return "Generated response..."
+
+async def generate_safe_response(prompt: str) -> str:
+    # Use pre-initialized guards
+    result, call = generate_text.call(prompt)
+    
+    # Reuse the same guard instance
+    safety = await call.apply_scorer(toxicity_guard)
+    if safety.score["flagged"]:
+        return f"I cannot generate that content: {safety.score['reason']}"
+    
+    # Monitor quality with pre-initialized scorer
+    await call.apply_scorer(quality_guard)
+    return result
+```
+
+This pattern is particularly important when:
+- Your scorers load ML models
+- You're using local LLMs where latency is critical
+- Your scorers maintain network connections
+- You have high-traffic applications
+
 :::caution Performance Tips
 For Guardrails:
 - Keep logic simple and fast
 - Consider caching common results
 - Avoid heavy external API calls
+- Initialize guards outside of your main functions to avoid repeated initialization costs
 
 For Monitors:
 - Use sampling to reduce load
