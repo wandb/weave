@@ -17,3 +17,47 @@ Use the **Per page** control at the bottom-right of the Traces page to adjust th
 ### Use query parameters 
 
 If you prefer a manual approach, you can modify the `pageSize` query parameter in your query URL to a value less than the maximum of `100`.
+
+## Server Response Caching (Experimental)
+
+If you're experiencing performance issues with repeated queries or have limited network bandwidth, you can enable server response caching. 
+
+:::note
+This feature is currently experimental and will become the default once stabilized.
+:::
+
+### When to Use Caching
+
+Consider enabling caching when:
+- You frequently run the same queries
+- You have limited network bandwidth
+- You're working in an environment with high latency
+- You're developing offline and want to cache responses for later use
+
+This feature is specifically useful when running repeated evaluations on a dataset in order to cache the dataset between runs.
+
+### How to Enable Caching
+
+To enable caching, you can set the following environment variables:
+
+```bash
+# Enable server response caching
+export WEAVE_USE_SERVER_CACHE=true
+
+# Set cache size limit (default is 1GB)
+export WEAVE_SERVER_CACHE_SIZE_LIMIT=1000000000
+
+# Set cache directory (optional, defaults to temporary directory)
+export WEAVE_SERVER_CACHE_DIR=/path/to/cache
+```
+
+### Caching Behavior
+
+Technically, this feature will cache idempotent requests against the server. Specifically, we cache:
+
+- `obj_read`
+- `table_query`
+- `table_query_stats`
+- `refs_read_batch`
+- `file_content_read`
+
