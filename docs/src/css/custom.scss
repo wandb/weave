@@ -15,33 +15,83 @@
   --ifm-color-primary-lighter: #359962;
   --ifm-color-primary-lightest: #3cad6e; */
   --ifm-color-primary: #0096ad;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary-dark: #0085a0;
+  --ifm-color-primary-darker: #007a93;
+  --ifm-color-primary-darkest: #006f86;
+  --ifm-color-primary-light: #00a7ba;
+  --ifm-color-primary-lighter: #00b2c7;
+  --ifm-color-primary-lightest: #00bdd4;
+  
+  /* Typography */
+  --ifm-font-size-base: 15px;
   --ifm-code-font-size: 85%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.07);
-
-  /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
-  --ifm-transition-fast: 100ms;
-  --ifm-transition-slow: 100ms;
-
+  --ifm-font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-family-display: var(--ifm-font-family-base);
+  
+  /* Spacing & Layout */
+  --content-padding: 3rem;
+  --sidebar-item-spacing: 2px;
+  --sidebar-category-spacing: 20px;
+  --section-spacing: 3rem;
+  
+  /* Animation */
+  --transition-default: 120ms ease-out;
+  --ifm-transition-fast: var(--transition-default);
+  --ifm-transition-slow: var(--transition-default);
+  
+  /* Colors */
+  --color-subtle-border: rgba(0, 0, 0, 0.1);
+  --color-subtle-bg: rgba(0, 0, 0, 0.03);
+  --color-indent-guide: rgba(0, 0, 0, 0.07);
+  --color-text-subtle: rgba(0, 0, 0, 0.6);
+  
+  /* Component Specific */
+  --ifm-navbar-shadow: 0 1px 0 0 var(--color-subtle-border);
+  --ifm-toc-border-color: var(--color-subtle-border);
+  --ifm-footer-background-color: var(--ifm-background-surface-color);
 }
 
-h1 { font-size: 2rem !important; }
-h2 { font-size: 1.5rem !important; }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-display);
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+h1 { 
+  font-size: 2rem !important;
+  margin-bottom: 1.5rem;
+}
+
+h2 { 
+  font-size: 1.5rem !important;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+  margin-top: 2rem;
+}
+
+p {
+  line-height: 1.6;
+}
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-color-primary: #00bdd4;
+  --ifm-color-primary-dark: #00aac0;
+  --ifm-color-primary-darker: #0097ac;
+  --ifm-color-primary-darkest: #008498;
+  --ifm-color-primary-light: #00d0e8;
+  --ifm-color-primary-lighter: #00e3fc;
+  --ifm-color-primary-lightest: #1ae6ff;
+  
+  /* Dark theme colors */
+  --color-subtle-border: rgba(255, 255, 255, 0.1);
+  --color-subtle-bg: rgba(255, 255, 255, 0.03);
+  --color-indent-guide: rgba(255, 255, 255, 0.07);
+  --color-text-subtle: rgba(255, 255, 255, 0.6);
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
 }
 /* Custom styles for Homepage */
@@ -69,26 +119,30 @@ h2 { font-size: 1.5rem !important; }
 
 /* This customizes "section headers". */
 li.sidebar-section-title {
+  margin-top: var(--sidebar-category-spacing);
+  
   > div.menu__list-item-collapsible {
-      font-weight: bold; 
-      color: var(--ifm-color-primary-contrast-foreground);
+    font-family: var(--font-family-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--ifm-color-emphasis-700);
+    padding: 6px 12px;
+    margin-bottom: 4px;
+    
+    &:hover {
+      background: transparent;
+    }
+  }
 
-      /* We don't want any click interaction effects here */
-      &:hover {
-        background-color: transparent;
-      }
-  }
-  &:first-child > div.menu__list-item-collapsible {
-    margin-top: 0.5em;
-  }
-  &:not(:first-child) > div.menu__list-item-collapsible {
-    margin-top: 1em;
+  &:first-child {
+    margin-top: 8px;
   }
 }
 
 nav.menu {
-  /* Adds equal padding on all sides (right side missing in default) */
-  padding: 0.5em;
+  padding: 6px 12px 12px 12px;
 }
 
 .clean-btn.menu__caret {
@@ -98,13 +152,76 @@ nav.menu {
   }
   &:before {
     /* reduces the default caret size to be less invasive */
-    background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+    background: var(--ifm-menu-link-sublist-icon) 50% / 1.5rem 1.5rem;
+    opacity: 0.5;
   }
 }
 
 .menu__link--sublist-caret:after {
-  /* reduces the default caret size to be less invasive */
-  background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+  background: var(--ifm-menu-link-sublist-icon) 50% / 1.5rem 1.5rem;
+  opacity: 0.5;
+  transition: opacity var(--transition-default),
+              transform var(--transition-default);
+}
+
+// .menu__list-item--collapsed .menu__link--sublist:after {
+//   transform: rotateZ(-90deg);
+// }
+
+.menu__link--sublist:hover:after {
+  opacity: 0.8;
+}
+
+/* Nested items refinement */
+.menu__list-item .menu__list {
+  position: relative;
+  padding-left: 16px;
+  margin: 2px 0 2px 3px;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--color-indent-guide);
+  }
+  
+  .menu__link {
+    font-size: 13.5px;
+    padding: 4px 12px;
+    margin: 2px 0;
+  }
+}
+
+/* Menu list spacing adjustments */
+.menu__list {
+  padding: 0;
+  
+  .menu__list-item {
+    margin: var(--sidebar-item-spacing) 0;
+    
+    .menu__link {
+      border-radius: 6px;
+      transition: all var(--transition-default);
+      line-height: 1.4;
+      font-weight: 400;
+      padding: 6px 12px;
+      margin: 2px 0;
+      
+      &:hover {
+        background: var(--color-subtle-bg);
+        color: var(--ifm-color-primary);
+      }
+      
+      &.menu__link--active {
+        font-weight: 500;
+        color: var(--ifm-color-primary);
+        background: var(--color-subtle-bg);
+      }
+    }
+  }
 }
 
 .notebook-cta-button {
@@ -114,5 +231,118 @@ nav.menu {
       display: flex;
       gap: 7px;
       align-items: center;
+  }
+}
+
+/* Sidebar refinements */
+.theme-doc-sidebar-container {
+  border-right: 1px solid var(--color-subtle-border);
+  background: var(--ifm-background-color);
+  font-size: 14px;
+}
+
+/* Navbar Refinements */
+.navbar {
+  border-bottom: 1px solid var(--color-subtle-border);
+  
+  &__brand {
+    font-family: var(--font-family-display);
+    font-weight: 600;
+  }
+  
+  &__link {
+    font-weight: 500;
+  }
+  
+  &__item {
+    padding: 0.5rem 1rem;
+  }
+}
+
+/* Main Content Refinements */
+.main-wrapper {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--content-padding);
+}
+
+article {
+  max-width: 48rem;
+  
+  > * + * {
+    margin-top: 1.5rem;
+  }
+}
+
+/* Code Block Refinements */
+.theme-code-block {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  margin: 1.5rem 0;
+  
+  pre {
+    font-size: 14px;
+  }
+}
+
+/* Table Refinements */
+table {
+  display: table;
+  width: 100%;
+  margin: 2rem 0;
+  font-size: 0.9375rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-subtle-border);
+  border-radius: 8px;
+  
+  th {
+    font-weight: 600;
+    text-align: left;
+    background: var(--color-subtle-bg);
+  }
+  
+  th, td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-subtle-border);
+  }
+  
+  tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+/* Card/Admonition Refinements */
+.alert {
+  border: 1px solid var(--color-subtle-border);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  
+  &--info {
+    border-left: 4px solid var(--ifm-color-primary);
+  }
+}
+
+/* Footer Refinements */
+.footer {
+  border-top: 1px solid var(--color-subtle-border);
+  padding: 2rem var(--content-padding);
+  font-size: 0.875rem;
+  color: var(--color-text-subtle);
+  
+  &__link-item {
+    opacity: 0.8;
+    transition: opacity var(--transition-default);
+    
+    &:hover {
+      opacity: 1;
+      text-decoration: none;
+    }
+  }
+  
+  &__copyright {
+    font-size: 0.8125rem;
   }
 }
