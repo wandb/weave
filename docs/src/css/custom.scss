@@ -19,6 +19,9 @@
   /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
   --ifm-transition-fast: 100ms;
   --ifm-transition-slow: 100ms;
+
+  /* Footer */
+  --ifm-footer-padding-vertical: 1.125rem;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
