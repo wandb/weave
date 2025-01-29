@@ -4,6 +4,7 @@ from weave.trace import autopatch, errors, init_message, trace_sentry, weave_cli
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import use_server_cache
 from weave.trace_server import sqlite_trace_server
+from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
@@ -105,7 +106,8 @@ def init_weave(
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
 
-    server = init_weave_get_server(api_key)
+    remote_server = init_weave_get_server(api_key)
+    server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 

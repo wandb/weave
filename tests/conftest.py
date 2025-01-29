@@ -519,6 +519,7 @@ def create_client(
 
     if inited_client is None:
         # This is disabled by default, but we explicitly enable it here for testing
+        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
         server = CachingMiddlewareTraceServer.from_env(server)
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)
