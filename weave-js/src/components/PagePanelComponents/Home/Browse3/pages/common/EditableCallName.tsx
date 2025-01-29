@@ -45,6 +45,10 @@ export const EditableCallName: React.FC<{
         const newHeight = el.scrollHeight;
         el.style.height = `${newHeight}px`;
         el.style.overflowY = 'hidden';
+        // Focus and move the cursor to the end of the text content
+        el.focus();
+        const textLength = el.value.length;
+        el.setSelectionRange(textLength, textLength);
       }, 0);
     }
   }, [isEditing, onEditingChange]);
