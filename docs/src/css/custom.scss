@@ -33,6 +33,14 @@
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
 }
 
+/* Typography Scale */
+h1 { font-size: 2rem !important; }
+h2 { font-size: 1.5rem !important; }
+h3 { font-size: 1.25rem !important; }
+h4 { font-size: 1.125rem !important; }
+h5 { font-size: 1rem !important; }
+h6 { font-size: 0.875rem !important; }
+
 /* Sidebar styling */
 .theme-doc-sidebar-container {
   /* This customizes "section headers". */
@@ -93,4 +101,20 @@
 .vertical-align-colab-button {
   vertical-align: middle;
   line-height: 16px;
+}
+
+/* Table of Contents */
+.table-of-contents {
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  position: sticky;
+  top: var(--wb-space-4);
+
+  &__link {
+    display: block;
+    padding: var(--wb-space-1) 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
