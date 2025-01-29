@@ -78,9 +78,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             cache_dir: Directory to store the disk cache. If None, uses system temp dir
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
-        if size_limit < 50_000:
-            raise ValueError("Size limit must be at least 50KB")
-
         self._next_trace_server = next_trace_server
         self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit

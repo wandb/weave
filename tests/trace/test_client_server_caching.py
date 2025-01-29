@@ -122,15 +122,15 @@ def test_server_cache_size_limit(client):
     limit = 50000
     with tempfile.TemporaryDirectory() as temp_dir:
         caching_server = CachingMiddlewareTraceServer(
-            next_trace_server=MockServer(1), cache_dir=temp_dir, size_limit=50000
+            next_trace_server=MockServer("a" * 1000),
+            cache_dir=temp_dir,
+            size_limit=50000,
         )
 
-        # I suspect these values might change on different machines, but they should be close to 50KB
-        # As of this writing, the db initialization is about 32kb for both shm and db
         sizes = get_cache_sizes(temp_dir)
         assert len(sizes) == 3
         assert sizes["cache.db-shm"] <= 50000
-        assert sizes["cache.db-wal"] == 0
+        assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
         assert sizes["cache.db"] <= 50000
 
         for i in range(count):
@@ -144,9 +144,18 @@ def test_server_cache_size_limit(client):
             # Allows us to test the on-disk size
             sizes = get_cache_sizes(temp_dir)
             assert len(sizes) == 3
-            assert sizes["cache.db-shm"] <= limit * 1.1
-            assert sizes["cache.db-wal"] <= limit * 1.1
+            assert sizes["cache.db-shm"] <= 50000
+            assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
             assert sizes["cache.db"] <= limit * 1.1
+            print(sizes)
+
+        # Assert that the WAL file is removed when the server is deleted
+        del caching_server
+        sizes = get_cache_sizes(temp_dir)
+        assert len(sizes) == 3
+        assert sizes["cache.db-shm"] <= 50000
+        assert sizes["cache.db-wal"] == 0
+        assert sizes["cache.db"] <= limit * 1.1
 
 
 def test_server_cache_latency(client):

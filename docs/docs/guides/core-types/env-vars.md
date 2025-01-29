@@ -27,7 +27,7 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 | `WEAVE_PARALLELISM` | `int` | `20` | In evaluations, controls the number of examples to evaluate in parallel. Set to `1` to run examples sequentially. |
 | `WEAVE_TRACE_LANGCHAIN` | `bool` | `true` | Controls global tracing for LangChain. Set to `false` to explicitly disable LangChain tracing. |
 | `WEAVE_USE_SERVER_CACHE` | `bool` | `false` | Enables server response caching. When enabled, responses from the server are cached to disk to improve performance for repeated queries. |
-| `WEAVE_SERVER_CACHE_SIZE_LIMIT` | `int` | `1000000000` | Sets the maximum size limit for the server cache in bytes. When the cache reaches this size, older entries are automatically removed to make space for new ones. |
+| `WEAVE_SERVER_CACHE_SIZE_LIMIT` | `int` | `1000000000` | Sets the maximum size limit for the server cache in bytes. When the cache reaches this size, older entries are automatically removed to make space for new ones. Important: the underlying implementation uses SQLite which has a Write Ahead Log (WAL) that will grow to 4MB regardless of this setting. This WAL will be removed when the program exits. |
 | `WEAVE_SERVER_CACHE_DIR` | `str` | `None` | Specifies the directory where cache files should be stored. If not set, a temporary directory is used. |
 
 :::note

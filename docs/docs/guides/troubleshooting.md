@@ -57,3 +57,18 @@ Technically, this feature will cache idempotent requests against the server. Spe
 - `refs_read_batch`
 - `file_content_read`
 
+### Cache Size and Storage Details
+
+The cache size is controlled by `WEAVE_SERVER_CACHE_SIZE_LIMIT` (in bytes). The actual disk space used consists of three components:
+
+1. A constant 32KB checksum file
+2. A Write-Ahead Log (WAL) file up to ~4MB per running client (automatically removed when the program exits)
+3. The main database file, which is at least 32KB and at most `WEAVE_SERVER_CACHE_SIZE_LIMIT`
+
+Total disk space used:
+- While running >= 32KB + ~4MB + cache size
+- After exit >= 32KB + cache size
+
+For example, with the a 5MB cache limit:
+- While running: ~9MB maximum
+- After exit: ~5MB maximum
