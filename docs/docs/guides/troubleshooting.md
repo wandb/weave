@@ -18,23 +18,19 @@ Use the **Per page** control at the bottom-right of the Traces page to adjust th
 
 If you prefer a manual approach, you can modify the `pageSize` query parameter in your query URL to a value less than the maximum of `100`.
 
-## Server Response Caching (Experimental)
+## Server Response Caching
 
-If you're experiencing performance issues with repeated queries or have limited network bandwidth, you can enable server response caching. 
-
-:::note
-This feature is currently experimental and will become the default once stabilized.
-:::
+Weave provides server response caching to improve performance when making repeated queries or working with limited network bandwidth. While currently disabled by default, this feature is expected to become the default behavior in a future release.
 
 ### When to Use Caching
 
-Consider enabling caching when:
+Server response caching is particularly beneficial when:
 - You frequently run the same queries
 - You have limited network bandwidth
 - You're working in an environment with high latency
 - You're developing offline and want to cache responses for later use
 
-This feature is specifically useful when running repeated evaluations on a dataset in order to cache the dataset between runs.
+This feature is especially useful when running repeated evaluations on a dataset, as it allows caching the dataset between runs.
 
 ### How to Enable Caching
 
