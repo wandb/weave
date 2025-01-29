@@ -1,10 +1,20 @@
+import datetime
 import os
 import random
+import tempfile
+import time
+from typing import Any
 
 import PIL
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
+from weave.trace_server.trace_server_interface import (
+    ObjReadReq,
+    ObjReadRes,
+    ObjSchema,
+    TraceServerInterface,
+)
 
 
 def create_random_pil_image():
@@ -78,3 +88,86 @@ def test_server_caching(client):
         "errors": 0,
         "skips": 8,
     }
+
+
+class MockServer(TraceServerInterface):
+    def __init__(self, mock_val: Any):
+        self.mock_val = mock_val
+
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
+        return ObjReadRes(
+            obj=ObjSchema(
+                project_id=req.project_id,
+                object_id=req.object_id,
+                created_at=datetime.datetime.now(),
+                deleted_at=None,
+                digest=req.digest,
+                version_index=0,
+                is_latest=1,
+                kind="object",
+                base_object_class=None,
+                val=self.mock_val,
+            )
+        )
+
+
+def get_cache_sizes(cache_dir: str) -> dict[str, int]:
+    return {
+        f: os.path.getsize(os.path.join(cache_dir, f)) for f in os.listdir(cache_dir)
+    }
+
+
+def test_server_cache_size_limit(client):
+    count = 500
+    limit = 50000
+    with tempfile.TemporaryDirectory() as temp_dir:
+        caching_server = CachingMiddlewareTraceServer(
+            next_trace_server=MockServer(1), cache_dir=temp_dir, size_limit=50000
+        )
+
+        # I suspect these values might change on different machines, but they should be close to 50KB
+        # As of this writing, the db initialization is about 32kb for both shm and db
+        sizes = get_cache_sizes(temp_dir)
+        assert len(sizes) == 3
+        assert sizes["cache.db-shm"] <= 50000
+        assert sizes["cache.db-wal"] == 0
+        assert sizes["cache.db"] <= 50000
+
+        for i in range(count):
+            caching_server.obj_read(
+                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+            )
+
+            # Internally, the cache estimates it's own size
+            assert caching_server._cache.volume() <= limit * 1.1
+
+            # Allows us to test the on-disk size
+            sizes = get_cache_sizes(temp_dir)
+            assert len(sizes) == 3
+            assert sizes["cache.db-shm"] <= limit * 1.1
+            assert sizes["cache.db-wal"] <= limit * 1.1
+            assert sizes["cache.db"] <= limit * 1.1
+
+
+def test_server_cache_latency(client):
+    count = 500
+
+    base_server = MockServer("a" * 1000)
+    caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
+
+    def get_latency_for_server(server: TraceServerInterface, count: int):
+        start = time.time()
+        for i in range(count):
+            server.obj_read(
+                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+            )
+        end = time.time()
+        return (end - start) / count
+
+    latency_without_cache = get_latency_for_server(base_server, count)
+    latency_with_cache = get_latency_for_server(caching_server, count)
+
+    added_latency = latency_with_cache - latency_without_cache
+    print(f"Added latency: {added_latency}")
+
+    assert added_latency < 0.001
