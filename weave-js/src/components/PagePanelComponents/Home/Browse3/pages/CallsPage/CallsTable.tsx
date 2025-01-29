@@ -50,7 +50,6 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   useWeaveflowCurrentRouteContext,
@@ -63,6 +62,7 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
