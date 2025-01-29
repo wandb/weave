@@ -20,6 +20,7 @@
   --ifm-transition-fast: 100ms;
   --ifm-transition-slow: 100ms;
 
+
   /* Footer */
   --ifm-footer-padding-vertical: 1.125rem;
 }
@@ -46,30 +47,45 @@ h6 { font-size: 1rem !important; }
 
 /* Sidebar styling */
 .theme-doc-sidebar-container {
-  /* This customizes "section headers". */
+  /* Section Headers */
   li.sidebar-section-title {
     > div.menu__list-item-collapsible {
-        font-weight: bold; 
-        color: var(--ifm-color-primary-contrast-foreground);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 0.5rem 0.75rem;
 
-        /* We don't want any click interaction effects here */
-        &:hover {
-          background-color: transparent;
-        }
+      &:hover {
+        background-color: transparent;
+      }
     }
+
     &:first-child > div.menu__list-item-collapsible {
-      margin-top: 0.5em;
-    }
-    &:not(:first-child) > div.menu__list-item-collapsible {
-      margin-top: 1em;
+      margin-top: 0;
     }
   }
 
+  /* Menu Items */
   nav.menu {
-    /* Adds equal padding on all sides (right side missing in default) */
-    padding: 0.5em;
+    .menu__link {
+      font-size: 0.9375rem;
+      margin: 0.125rem 0;
+    }
   }
 
+  /* Nested Items */
+  .menu__list-item {
+    .menu__list {
+      margin: 0.125rem 0 0.125rem 0.5rem;
+
+      .menu__link {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
+
+  /* Carets */
   .clean-btn.menu__caret {
     &:hover {
       /* eliminates the double hover effect causing ugly carets */
