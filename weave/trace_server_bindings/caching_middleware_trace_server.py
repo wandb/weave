@@ -49,6 +49,18 @@ def digest_is_cacheable(digest: str) -> bool:
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
+    """A middleware trace server that provides caching functionality.
+
+    This server wraps another trace server and caches responses to improve performance.
+    It uses diskcache to store responses on disk and implements caching for read-only
+    operations like obj_read, table_query, etc.
+
+    Attributes:
+        _next_trace_server: The underlying trace server being wrapped
+        _cache: The disk cache instance used to store responses
+        _cache_recorder: Metrics tracking cache hits, misses, errors and skips
+    """
+
     _next_trace_server: tsi.TraceServerInterface
     _cache_prefix: str
 
@@ -58,6 +70,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         cache_dir: str | None = None,
         size_limit: int = 1_000_000_000,
     ):
+        """Initialize the caching middleware.
+
+        Args:
+            next_trace_server: The trace server to wrap with caching
+            cache_dir: Directory to store the disk cache. If None, uses system temp dir
+            size_limit: Maximum size in bytes for the cache (default 1GB)
+        """
         self._next_trace_server = next_trace_server
         self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
@@ -78,6 +97,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return cls(next_trace_server, cache_dir, size_limit)
 
     def _safe_cache_get(self, key: str) -> Any:
+        """Safely retrieve a value from cache, handling errors and recording metrics.
+
+        Args:
+            key: The cache key to look up
+
+        Returns:
+            The cached value if found, None otherwise
+        """
         try:
             if use_server_cache():
                 res = self._cache.get(key)
@@ -93,6 +120,12 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_set(self, key: str, value: Any) -> None:
+        """Safely store a value in cache, handling errors.
+
+        Args:
+            key: The cache key
+            value: The value to cache
+        """
         try:
             if use_server_cache():
                 self._cache.set(key, value)
@@ -127,13 +160,16 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     ) -> TRes:
         """Cache the result of a function call using the provided serialization methods.
 
+        This is the core caching implementation that handles serialization/deserialization
+        of cached values and error handling.
+
         Args:
             namespace: Namespace to prefix the cache key with
             make_cache_key: Function to generate a cache key from the request
             func: The function to cache results for
             req: The request object
-            serialize: Function to serialize the response to a string
-            deserialize: Function to deserialize the cached string back to a response
+            serialize: Function to serialize the response to a string/bytes
+            deserialize: Function to deserialize the cached value back to a response
 
         Returns:
             The function result, either from cache or from calling func
@@ -165,6 +201,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         res_type: type[TRes],
     ) -> TRes:
         """Cache the result of a function that takes and returns Pydantic models.
+
+        This is a convenience wrapper around _with_cache that handles Pydantic model
+        serialization automatically.
 
         Args:
             func: The function to cache results for
@@ -236,14 +275,20 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         )
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        # This is a special case because we want to cache individual refs and only
-        # query for the ones that are not in the cache.
+        """Read multiple refs, utilizing cache for individual refs.
 
-        # 1. Find the refs that are not in the cache
-        # 2. Query for the refs that are not in the cache
-        # 3. Cache the refs that are not in the cache
-        # 4. Return the re-composed response.
+        This method implements special caching logic to:
+        1. Check cache for each individual ref
+        2. Only query the underlying server for refs not in cache
+        3. Cache newly retrieved refs
+        4. Combine cached and new results
 
+        Args:
+            req: Request containing list of refs to read
+
+        Returns:
+            Response containing values for all requested refs
+        """
         final_results = [None] * len(req.refs)
         needed_refs: list[str] = []
         needed_indices: list[int] = []
