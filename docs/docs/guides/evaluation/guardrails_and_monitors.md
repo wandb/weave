@@ -96,50 +96,28 @@ def generate_text(prompt: str) -> str:
     return "Generated response..."
 
 class ToxicityScorer(Scorer):
-    def __init__(self):
-        # Initialize any expensive resources (models, API clients, etc.)
-        self.model = load_toxicity_model()  # Example initialization
-    
     @weave.op
     def score(self, output: str) -> dict:
-        """Evaluate content for toxic language."""
+        """
+        Evaluate content for toxic language.
+        """
+        # Your toxicity detection logic here
         return {
             "flagged": False,  # True if content is toxic
             "reason": None     # Optional explanation if flagged
         }
 
-# Initialize scorers once, outside of the function - this is useful if
-# scorer contains expensive initialization logic
-toxicity_guard = ToxicityScorer()
-coherence_guard = CoherenceScorer()
-
 async def generate_safe_response(prompt: str) -> str:
     # Get result and Call object
     result, call = generate_text.call(prompt)
     
-    # Apply pre-initialized scorers
-    safety = await call.apply_scorer(toxicity_guard)
-    coherence = await call.apply_scorer(coherence_guard)
-    
+    # Check safety
+    safety = await call.apply_scorer(ToxicityScorer())
     if safety.score["flagged"]:
         return f"I cannot generate that content: {safety.score['reason']}"
     
-    if coherence.score["score"] < 0.5:
-        return "Generated content did not meet coherence requirements"
-    
     return result
 ```
-
-:::tip Scorer Initialization
-For better performance:
-- Initialize scorers outside of your main functions
-- Reuse scorer instances across multiple calls
-- This is especially important for scorers that:
-  - Load ML models
-  - Set up API clients
-  - Maintain network connections
-  - Have expensive initialization steps
-:::
 
 :::note Scorer Timing
 When applying scorers:
@@ -228,6 +206,53 @@ async def generate_and_score():
 - Parameter types should match the function's type hints
 :::
 
+:::info Handling Parameter Name Mismatches
+Sometimes your scorer's parameter names might not match your function's parameter names exactly. For example:
+
+```python
+@weave.op()
+def my_function(user_input: str):  # Uses 'user_input'
+    return process(user_input)
+
+class MyScorer(Scorer):
+    @weave.op
+    def score(self, output: str, prompt: str):  # Expects 'prompt'
+        return {"score": self._evaluate(prompt, output)}
+```
+
+You can handle this mismatch using `column_map`:
+
+```python
+class MyScorer(Scorer):
+    def __init__(self):
+        # Map scorer parameters to function parameters
+        self.column_map = {
+            "prompt": "user_input"  # map prompt → user_input
+        }
+    
+    @weave.op
+    def score(self, output: str, prompt: str):
+        return {"score": self._evaluate(prompt, output)}
+
+# Now it works!
+scorer = MyScorer()
+await call.apply_scorer(scorer)
+```
+
+Common use cases for `column_map`:
+- Different naming conventions between functions and scorers
+- Reusing scorers across different functions
+- Using third-party scorers with your function names
+
+You can also provide additional parameters not present in your function:
+```python
+await call.apply_scorer(
+    scorer,
+    additional_scorer_kwargs={"reference_text": "Expected output"}
+)
+```
+:::
+
 ### Using Scorers: Two Approaches
 
 1. **With Weave's Op System** (Recommended)
@@ -253,25 +278,19 @@ score = scorer.score(output="some text")
 
 ## Production Best Practices
 
-### 1. Initialize Scorers Efficiently
+### 1. Set Appropriate Sampling Rates
 ```python
-# Initialize scorers once at startup
-content_safety = ContentSafetyScorer()
-relevance = RelevanceScorer()
-quality = QualityScorer()
-
 @weave.op()
 def my_llm_function(prompt: str) -> str:
     return generate_response(prompt)
 
-async def generate_with_monitoring(prompt: str) -> str:
+async def generate_with_sampling(prompt: str) -> str:
     result, call = my_llm_function.call(prompt)
     
-    # Use pre-initialized scorers
-    if random.random() < 0.1:  # Sample 10% of calls
-        await call.apply_scorer(content_safety)
-        await call.apply_scorer(relevance)
-        await call.apply_scorer(quality)
+    # Only monitor 10% of calls
+    if random.random() < 0.1:
+        await call.apply_scorer(ToxicityScorer())
+        await call.apply_scorer(QualityScorer())
     
     return result
 ```
@@ -279,12 +298,10 @@ async def generate_with_monitoring(prompt: str) -> str:
 ### 2. Monitor Multiple Aspects
 ```python
 async def evaluate_comprehensively(call):
-    # Use pre-initialized scorers from above
-    await call.apply_scorer(content_safety)
-    await call.apply_scorer(quality)
-    await call.apply_scorer(relevance)
+    await call.apply_scorer(ToxicityScorer())
+    await call.apply_scorer(QualityScorer())
+    await call.apply_scorer(LatencyScorer())
 ```
-
 ### 3. Analyze and Improve
 - Review trends in the Weave Dashboard
 - Look for patterns in low-scoring outputs
@@ -302,8 +319,7 @@ For detailed information about querying calls and their scorer results, see our 
 
 :::caution Performance Tips
 For Guardrails:
-- Initialize scorers once at startup
-- Keep evaluation logic simple and fast
+- Keep logic simple and fast
 - Consider caching common results
 - Avoid heavy external API calls
 
@@ -317,4 +333,4 @@ For Monitors:
 
 - Explore [Available Scorers](./scorers.md)
 - Learn about [Weave Ops](../../guides/tracking/ops.md)
-- Join our [Discord Community](https://discord.gg/wandb) for help and updates
+
