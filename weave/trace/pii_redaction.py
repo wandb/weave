@@ -1,4 +1,5 @@
 import json
+from typing import Any, Union
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
@@ -11,6 +12,7 @@ DEFAULT_REDACTED_FIELDS = [
     "EMAIL_ADDRESS",
     "IBAN_CODE",
     "IP_ADDRESS",
+    "LOCATION",
     "PERSON",
     "PHONE_NUMBER",
     "US_SSN",
@@ -26,21 +28,23 @@ DEFAULT_REDACTED_FIELDS = [
 ]
 
 
-def redact_pii(data):
+def redact_pii(
+    data: Union[str, dict[str, Any], list[Any]],
+) -> Union[str, dict[str, Any], list[Any]]:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
+    fields = redact_pii_fields()
+    entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
 
-    def redact_value(value):
+    def redact_recursive(value: Any) -> Any:
         if isinstance(value, str):
-            fields = redact_pii_fields()
-            entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
             results = analyzer.analyze(text=value, language="en", entities=entities)
             redacted = anonymizer.anonymize(text=value, analyzer_results=results)
             return redacted.text
         elif isinstance(value, dict):
-            return {k: redact_value(v) for k, v in value.items()}
+            return {k: redact_recursive(v) for k, v in value.items()}
         elif isinstance(value, list):
-            return [redact_value(item) for item in value]
+            return [redact_recursive(item) for item in value]
         else:
             return value
 
@@ -48,6 +52,6 @@ def redact_pii(data):
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            return redact_value(data)
+            pass
 
-    return {k: redact_value(v) for k, v in data.items()}
+    return redact_recursive(data)

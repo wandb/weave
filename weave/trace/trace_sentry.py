@@ -220,7 +220,7 @@ class Sentry:
         """Track an event to Sentry."""
         assert self.hub is not None
 
-        event_data: sentry_sdk.Event = {
+        event_data = {
             "message": event_name,
             "level": "info",
             "tags": tags or {},
