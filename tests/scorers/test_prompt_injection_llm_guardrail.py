@@ -1,10 +1,10 @@
 import pytest
 from openai import OpenAI
 
-from weave.guardrails import PromptInjectionLLMGuardrail
-from weave.guardrails.prompt_injection_guardrail import (
+from weave.scorers.guardrails.prompt_injection_guardrail import (
     LLMGuardrailReasoning,
     LLMGuardrailResponse,
+    PromptInjectionLLMGuardrail,
 )
 
 
