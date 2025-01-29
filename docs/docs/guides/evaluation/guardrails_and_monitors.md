@@ -41,6 +41,46 @@ For example, a toxicity scorer could be used to:
 - 🛡️ **As a Guardrail**: Block toxic content immediately
 - 📊 **As a Monitor**: Track toxicity levels over time
 
+## Getting Started with Scorers
+
+### Understanding the `.call()` Method
+
+When using scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
+
+```python
+# Instead of calling the op directly:
+result = my_op(input)  # This works but doesn't give access to the Call object
+
+# Use the .call() method to get both result and Call object:
+result, call = my_op.call(input)  # Now you can use the call object with scorers
+```
+
+:::tip Why Use `.call()`?
+The Call object is essential for:
+- Applying scorers to the operation
+- Accessing tracking information
+- Querying historical results
+- Analyzing trends over time
+
+For more details about Call objects, see our [Ops Guide](../../guides/tracking/ops.md#getting-a-handle-to-the-call-object).
+:::
+
+### Basic Example
+
+Here's a simple example showing how to use `.call()` with a scorer:
+
+```python
+@weave.op()
+def generate_text(prompt: str) -> str:
+    return "Hello, world!"
+
+# Get both result and Call object
+result, call = generate_text.call("Say hello")
+
+# Now you can apply scorers
+await call.apply_scorer(MyScorer())
+```
+
 ## Using Scorers as Guardrails
 
 Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
@@ -56,29 +96,58 @@ def generate_text(prompt: str) -> str:
     return "Generated response..."
 
 class ToxicityScorer(Scorer):
+    def __init__(self):
+        # Initialize any expensive resources (models, API clients, etc.)
+        self.model = load_toxicity_model()  # Example initialization
+    
     @weave.op
     def score(self, output: str) -> dict:
-        """
-        Evaluate content for toxic language.
-        Returns scores between 0 (safe) and 1 (toxic).
-        """
-        # Your toxicity detection logic here
+        """Evaluate content for toxic language."""
         return {
-            "toxicity_score": 0.1,
-            "profanity_score": 0.0
+            "flagged": False,  # True if content is toxic
+            "reason": None     # Optional explanation if flagged
         }
 
+# Initialize scorers once, outside of the function - this is useful if
+# scorer contains expensive initialization logic
+toxicity_guard = ToxicityScorer()
+coherence_guard = CoherenceScorer()
+
 async def generate_safe_response(prompt: str) -> str:
-    # Get result and tracking information
+    # Get result and Call object
     result, call = generate_text.call(prompt)
     
-    # Check safety
-    safety = await call.apply_scorer(ToxicityScorer())
-    if safety.score["toxicity_score"] > 0.7:
-        return "I cannot generate that content."
+    # Apply pre-initialized scorers
+    safety = await call.apply_scorer(toxicity_guard)
+    coherence = await call.apply_scorer(coherence_guard)
+    
+    if safety.score["flagged"]:
+        return f"I cannot generate that content: {safety.score['reason']}"
+    
+    if coherence.score["score"] < 0.5:
+        return "Generated content did not meet coherence requirements"
     
     return result
 ```
+
+:::tip Scorer Initialization
+For better performance:
+- Initialize scorers outside of your main functions
+- Reuse scorer instances across multiple calls
+- This is especially important for scorers that:
+  - Load ML models
+  - Set up API clients
+  - Maintain network connections
+  - Have expensive initialization steps
+:::
+
+:::note Scorer Timing
+When applying scorers:
+- The main operation (`generate_text`) completes and is marked as finished in the UI
+- Scorers run asynchronously after the main operation
+- Scorer results are attached to the call once they complete
+- You can view scorer results in the UI or query them via the API
+:::
 
 ## Using Scorers as Monitors
 
@@ -120,7 +189,7 @@ Here's a comprehensive example:
 @weave.op()
 def generate_styled_text(prompt: str, style: str, temperature: float) -> str:
     """Generate text in a specific style."""
-    return "Generated text..."
+    return "Generated text in requested style..."
 
 class StyleScorer(Scorer):
     @weave.op
@@ -132,13 +201,24 @@ class StyleScorer(Scorer):
             output: The generated text (automatically provided)
             prompt: Original prompt (matched from function input)
             style: Requested style (matched from function input)
-            
-        Note: We don't need temperature, so we don't include it
         """
         return {
             "style_match": 0.9,  # How well it matches requested style
             "prompt_relevance": 0.8  # How relevant to the prompt
         }
+
+# Example usage
+async def generate_and_score():
+    # Generate text with style
+    result, call = generate_styled_text.call(
+        prompt="Write a story",
+        style="noir",
+        temperature=0.7
+    )
+    
+    # Score the result
+    score = await call.apply_scorer(StyleScorer())
+    print(f"Style match score: {score.score['style_match']}")
 ```
 
 :::tip Parameter Matching Rules
@@ -173,19 +253,25 @@ score = scorer.score(output="some text")
 
 ## Production Best Practices
 
-### 1. Set Appropriate Sampling Rates
+### 1. Initialize Scorers Efficiently
 ```python
+# Initialize scorers once at startup
+content_safety = ContentSafetyScorer()
+relevance = RelevanceScorer()
+quality = QualityScorer()
+
 @weave.op()
 def my_llm_function(prompt: str) -> str:
     return generate_response(prompt)
 
-async def generate_with_sampling(prompt: str) -> str:
+async def generate_with_monitoring(prompt: str) -> str:
     result, call = my_llm_function.call(prompt)
     
-    # Only monitor 10% of calls
-    if random.random() < 0.1:
-        await call.apply_scorer(ToxicityScorer())
-        await call.apply_scorer(QualityScorer())
+    # Use pre-initialized scorers
+    if random.random() < 0.1:  # Sample 10% of calls
+        await call.apply_scorer(content_safety)
+        await call.apply_scorer(relevance)
+        await call.apply_scorer(quality)
     
     return result
 ```
@@ -193,9 +279,10 @@ async def generate_with_sampling(prompt: str) -> str:
 ### 2. Monitor Multiple Aspects
 ```python
 async def evaluate_comprehensively(call):
-    await call.apply_scorer(ToxicityScorer())
-    await call.apply_scorer(QualityScorer())
-    await call.apply_scorer(LatencyScorer())
+    # Use pre-initialized scorers from above
+    await call.apply_scorer(content_safety)
+    await call.apply_scorer(quality)
+    await call.apply_scorer(relevance)
 ```
 
 ### 3. Analyze and Improve
@@ -205,18 +292,18 @@ async def evaluate_comprehensively(call):
 - Set up alerts for concerning patterns (coming soon)
 
 ### 4. Access Historical Data
-```python
-# Query results through API
-calls = my_llm_function.calls()
 
-# Access through Python SDK
-call = client.get_call(call_id)
-feedback_data = call.feedback
-```
+Scorer results are stored with their associated calls and can be accessed through:
+- The Call object's `feedback` field
+- The Weave Dashboard
+- Our query APIs
+
+For detailed information about querying calls and their scorer results, see our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
 
 :::caution Performance Tips
 For Guardrails:
-- Keep logic simple and fast
+- Initialize scorers once at startup
+- Keep evaluation logic simple and fast
 - Consider caching common results
 - Avoid heavy external API calls
 
@@ -230,3 +317,4 @@ For Monitors:
 
 - Explore [Available Scorers](./scorers.md)
 - Learn about [Weave Ops](../../guides/tracking/ops.md)
+- Join our [Discord Community](https://discord.gg/wandb) for help and updates
