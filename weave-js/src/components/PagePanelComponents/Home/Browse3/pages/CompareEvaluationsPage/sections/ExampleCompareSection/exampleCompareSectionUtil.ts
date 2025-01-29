@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
-import {flattenObjectPreservingWeaveTypes} from '../../../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
