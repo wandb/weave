@@ -18,7 +18,7 @@ def mock_create(monkeypatch):
             explanation="Based on the research papers provided, this is clearly a direct prompt injection attack.",
         )
 
-    monkeypatch.setattr("weave.scorers.scorers.llm_utils.create", _mock_create)
+    monkeypatch.setattr("weave.scorers.llm_utils.create", _mock_create)
 
 
 @pytest.fixture
