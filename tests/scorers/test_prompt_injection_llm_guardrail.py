@@ -20,7 +20,7 @@ def mock_create(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "weave.guardrails.prompt_injection_guardrail.create", _mock_create
+        "weave.scorers.guardrails.prompt_injection_guardrail.create", _mock_create
     )
 
 
