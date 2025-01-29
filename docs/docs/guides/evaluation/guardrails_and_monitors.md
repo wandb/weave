@@ -447,6 +447,8 @@ async def main():
     )
     print(f"Styled response: {response}")
 
+```
+
 This example demonstrates:
 - Proper scorer initialization and error handling
 - Combined use of guardrails and monitors
