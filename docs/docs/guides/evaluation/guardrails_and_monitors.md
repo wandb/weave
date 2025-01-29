@@ -20,6 +20,9 @@ The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - 
 - **As Guardrails**: Block or modify unsafe content before it reaches users
 - **As Monitors**: Track quality metrics over time to identify trends and improvements
 
+:::note Terminology
+Throughout this guide, we'll refer to functions decorated with `@weave.op` as "ops". These are regular Python functions that have been enhanced with Weave's tracking capabilities.
+:::
 
 :::tip Ready-to-Use Scorers
 While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./scorers.md#predefined-scorers) that you can use right away, including:
@@ -30,24 +33,6 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 - And more!
 
 Check out our [predefined scorers list](./scorers.md#predefined-scorers) to get started quickly with production-ready evaluation.
-:::
-
-### Using the `.call()` Method
-
-To use scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
-
-```python
-# Instead of calling the op directly:
-result = generate_text(input)  # Primary way to call the op but doesn't give access to the Call object
-
-# Use the .call() method to get both result and Call object:
-result, call = generate_text.call(input)  # Now you can use the call object with scorers
-```
-
-:::tip Why Use `.call()`?
-The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
-
-For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ### Guardrails vs. Monitors: When to Use Each
@@ -69,6 +54,24 @@ For example, a toxicity scorer could be used to:
 
 :::tip
 Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
+:::
+
+### Using the `.call()` Method
+
+To use scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
+
+```python
+# Instead of calling the op directly:
+result = generate_text(input)  # Primary way to call the op but doesn't give access to the Call object
+
+# Use the .call() method to get both result and Call object:
+result, call = generate_text.call(input)  # Now you can use the call object with scorers
+```
+
+:::tip Why Use `.call()`?
+The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
+
+For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ## Getting Started with Scorers
@@ -376,11 +379,6 @@ import asyncio
 import random
 from typing import Optional
 
-# Initialize scorers at module level (optional optimization)
-toxicity_guard = ToxicityScorer()
-quality_monitor = QualityScorer()
-relevance_monitor = RelevanceScorer()
-
 class ToxicityScorer(Scorer):
     def __init__(self):
         # Initialize any expensive resources here
@@ -409,6 +407,11 @@ class QualityScorer(Scorer):
             "relevance": evaluate_relevance(output, prompt),
             "grammar": evaluate_grammar(output)
         }
+
+# Initialize scorers at module level (optional optimization)
+toxicity_guard = ToxicityScorer()
+quality_monitor = QualityScorer()
+relevance_monitor = RelevanceScorer()
 
 @weave.op()
 def generate_text(
