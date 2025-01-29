@@ -8,7 +8,7 @@ from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
 from weave.scorers.utils import stringify
 
 if TYPE_CHECKING:
@@ -53,7 +53,8 @@ You are given the following user prompt that you are suppossed to assess whether
 </input_prompt>
 """
         )
-        response: LLMGuardrailReasoning = self._client.chat.completions.create(
+        response: LLMGuardrailReasoning = create(
+            self._client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
