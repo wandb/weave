@@ -1,4 +1,4 @@
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel
 
@@ -35,9 +35,9 @@ class PromptInjectionLLMGuardrail(Scorer):
     max_tokens: int = 4096
     _client: Optional[Union[Instructor, OpenAI]] = None
 
-    def model_post_init(self, __context) -> None:
-        import instructor
+    def model_post_init(self, __context: Any) -> None:
         from openai import OpenAI
+
         if self.model_id not in ["gpt-4o", "gpt-4o-mini"]:
             raise ValueError(f"Model {self.model_id} is not supported for this scorer.")
         if isinstance(self._client, OpenAI):
