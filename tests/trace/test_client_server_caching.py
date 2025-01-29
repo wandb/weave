@@ -42,6 +42,8 @@ def test_server_caching(client):
 
     recording_caching_server = client.server
     caching_server: CachingMiddlewareTraceServer = recording_caching_server.server
+
+    # First call should miss
     caching_server.reset_cache_recorder()
     compare_datasets(client.get(ref), dataset)
     assert caching_server.get_cache_recorder() == {
@@ -51,6 +53,7 @@ def test_server_caching(client):
         "skips": 0,
     }
 
+    # Second call should hit
     caching_server.reset_cache_recorder()
     compare_datasets(client.get(ref), dataset)
     assert caching_server.get_cache_recorder() == {
@@ -60,6 +63,7 @@ def test_server_caching(client):
         "skips": 0,
     }
 
+    # Third call should skip
     caching_server.reset_cache_recorder()
     os.environ["WEAVE_USE_SERVER_CACHE"] = "false"
     compare_datasets(client.get(ref), dataset)
