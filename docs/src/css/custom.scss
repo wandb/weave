@@ -6,14 +6,6 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  
-  /* --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e; */
   --ifm-color-primary: #0096ad;
   --ifm-color-primary-dark: #29784c;
   --ifm-color-primary-darker: #277148;
@@ -27,11 +19,7 @@
   /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
   --ifm-transition-fast: 100ms;
   --ifm-transition-slow: 100ms;
-
 }
-
-h1 { font-size: 2rem !important; }
-h2 { font-size: 1.5rem !important; }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
@@ -44,69 +32,53 @@ h2 { font-size: 1.5rem !important; }
   --ifm-color-primary-lightest: #4fddbf;
   --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
 }
-/* Custom styles for Homepage */
-.hero--primary {
-  background-color: transparent; /* Removes green background */
-}
 
-.hero__title,
-.hero__subtitle {
-  color: #000; /* Changes text color to black */
-}
+/* Sidebar styling */
+.theme-doc-sidebar-container {
+  /* This customizes "section headers". */
+  li.sidebar-section-title {
+    > div.menu__list-item-collapsible {
+        font-weight: bold; 
+        color: var(--ifm-color-primary-contrast-foreground);
 
-.padding-top--md {
-  padding-top: 2rem !important;
-}
-
-.pagination-nav {
-  display: none;
-}
-
-.vertical-align-colab-button {
-  vertical-align: middle;
-  line-height: 16px;
-}
-
-/* This customizes "section headers". */
-li.sidebar-section-title {
-  > div.menu__list-item-collapsible {
-      font-weight: bold; 
-      color: var(--ifm-color-primary-contrast-foreground);
-
-      /* We don't want any click interaction effects here */
-      &:hover {
-        background-color: transparent;
-      }
+        /* We don't want any click interaction effects here */
+        &:hover {
+          background-color: transparent;
+        }
+    }
+    &:first-child > div.menu__list-item-collapsible {
+      margin-top: 0.5em;
+    }
+    &:not(:first-child) > div.menu__list-item-collapsible {
+      margin-top: 1em;
+    }
   }
-  &:first-child > div.menu__list-item-collapsible {
-    margin-top: 0.5em;
-  }
-  &:not(:first-child) > div.menu__list-item-collapsible {
-    margin-top: 1em;
-  }
-}
 
-nav.menu {
-  /* Adds equal padding on all sides (right side missing in default) */
-  padding: 0.5em;
-}
-
-.clean-btn.menu__caret {
-  &:hover {
-    /* eliminates the double hover effect causing ugly carets */
-    background-color: transparent;
+  nav.menu {
+    /* Adds equal padding on all sides (right side missing in default) */
+    padding: 0.5em;
   }
-  &:before {
+
+  .clean-btn.menu__caret {
+    &:hover {
+      /* eliminates the double hover effect causing ugly carets */
+      background-color: transparent;
+    }
+    &:before {
+      /* reduces the default caret size to be less invasive */
+      background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+    }
+  }
+
+  .menu__link--sublist-caret:after {
     /* reduces the default caret size to be less invasive */
     background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
   }
 }
 
-.menu__link--sublist-caret:after {
-  /* reduces the default caret size to be less invasive */
-  background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
-}
+/* Specific element styling */
 
+/* Custom styling for the Notebook CTA button */
 .notebook-cta-button {
   text-decoration: none;
 
@@ -115,4 +87,10 @@ nav.menu {
       gap: 7px;
       align-items: center;
   }
+}
+
+/* Custom styling for colab button */
+.vertical-align-colab-button {
+  vertical-align: middle;
+  line-height: 16px;
 }
