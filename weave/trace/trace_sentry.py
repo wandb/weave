@@ -21,7 +21,7 @@ import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import ExcInfo
+    from sentry_sdk._types import Event, ExcInfo
 
 
 import sentry_sdk  # type: ignore
@@ -220,7 +220,7 @@ class Sentry:
         """Track an event to Sentry."""
         assert self.hub is not None
 
-        event_data = {
+        event_data: Event = {
             "message": event_name,
             "level": "info",
             "tags": tags or {},

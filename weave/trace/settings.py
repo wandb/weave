@@ -66,15 +66,15 @@ class UserSettings(BaseModel):
 
     If True, redacts PII from trace data before sending to the server.
     Can be overrided with the environment variable `WEAVE_REDACT_PII`
-    
-    WARNING: PII redaction is an experimental feature, and may not always work. 
+
+    WARNING: PII redaction is an experimental feature, and may not always work.
     It will also introduce significant performance overhead when redacting large payloads.
     """
     redact_pii_fields: list[str] = []
     """List of fields to redact.
 
-    If redact_pii is True, this list of fields will be redacted. 
-    If redact_pii is False, this list is ignored. 
+    If redact_pii is True, this list of fields will be redacted.
+    If redact_pii is False, this list is ignored.
     If this list is left empty, the default fields will be redacted.
 
     A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/

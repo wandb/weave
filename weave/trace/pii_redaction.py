@@ -1,5 +1,5 @@
 import json
-from typing import Any, Union
+from typing import Any
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
@@ -29,8 +29,8 @@ DEFAULT_REDACTED_FIELDS = [
 
 
 def redact_pii(
-    data: Union[str, dict[str, Any], list[Any]],
-) -> Union[str, dict[str, Any], list[Any]]:
+    data: dict[str, Any],
+) -> dict[str, Any]:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     fields = redact_pii_fields()
