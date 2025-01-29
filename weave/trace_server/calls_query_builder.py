@@ -585,8 +585,6 @@ class CallsQuery(BaseModel):
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
 
-        table_sql = "calls_merged"
-
         having_filter_sql = ""
         having_light_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
@@ -614,7 +612,6 @@ class CallsQuery(BaseModel):
             if not condition.is_heavy() or condition.is_feedback():
                 continue
             heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
-            table_sql += " FINAL"
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -658,6 +655,9 @@ class CallsQuery(BaseModel):
             LEFT JOIN feedback
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
             """
+
+        # Force merge before query if pushing heavy filters before aggregation
+        table_sql = "calls_merged FINAL" if heavy_filter_sql else "calls_merged"
 
         raw_sql = f"""
         SELECT {select_fields_sql}
