@@ -104,6 +104,8 @@ def tests(session, shard):
     # seems to resolve ci issues
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
+    if shard == "trace":
+        session.posargs.insert(0, "-n4")
 
     session.run(
         "pytest",
