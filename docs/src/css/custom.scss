@@ -6,54 +6,172 @@
 
 /* You can override the default Infima variables here. */
 :root {
+  /* Modern primary colors */
+  --ifm-color-primary: #2563eb;
+  --ifm-color-primary-dark: #1d4ed8;
+  --ifm-color-primary-darker: #1e40af;
+  --ifm-color-primary-darkest: #1e3a8a;
+  --ifm-color-primary-light: #3b82f6;
+  --ifm-color-primary-lighter: #60a5fa;
+  --ifm-color-primary-lightest: #93c5fd;
   
-  /* --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e; */
-  --ifm-color-primary: #0096ad;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 85%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.07);
-
-  /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
-  --ifm-transition-fast: 100ms;
-  --ifm-transition-slow: 100ms;
-
+  /* Base colors */
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f8fafc;
+  
+  /* Typography */
+  --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --ifm-font-size-base: 16px;
+  --ifm-code-font-size: 90%;
+  
+  /* Transitions */
+  --ifm-transition-fast: 200ms;
+  --ifm-transition-timing-default: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-h1 { font-size: 2rem !important; }
-h2 { font-size: 1.5rem !important; }
-
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* Dark theme */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
-}
-/* Custom styles for Homepage */
-.hero--primary {
-  background-color: transparent; /* Removes green background */
+  --ifm-color-primary: #60a5fa;
+  --ifm-color-primary-dark: #3b82f6;
+  --ifm-color-primary-darker: #2563eb;
+  --ifm-color-primary-darkest: #1d4ed8;
+  --ifm-color-primary-light: #93c5fd;
+  --ifm-color-primary-lighter: #bfdbfe;
+  --ifm-color-primary-lightest: #dbeafe;
+  --ifm-background-color: #0f172a;
+  --ifm-background-surface-color: #1e293b;
+  --ifm-font-color-base: #f8fafc;
 }
 
-.hero__title,
-.hero__subtitle {
-  color: #000; /* Changes text color to black */
+/* Typography */
+h1, h2, h3 {
+  letter-spacing: -0.025em;
+  color: var(--ifm-heading-color);
 }
 
+h1 { 
+  font-size: 2.5rem !important;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+h2 { 
+  font-size: 1.875rem !important;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+h3 {
+  font-weight: 600;
+}
+
+/* Modern sidebar styling */
+.menu {
+  padding: 0.5rem;
+  
+  /* Section headers with emojis */
+  .menu__list-item-collapsible {
+    margin: 0.75rem 0 0.25rem 0;
+    
+    .menu__link {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--ifm-color-emphasis-700);
+      padding: 0.375rem 0.75rem;
+      
+      &:hover {
+        background: transparent;
+      }
+    }
+  }
+
+  /* Regular menu items */
+  .menu__link {
+    border-radius: 0.375rem;
+    margin: 0.125rem 0;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+    
+    &:hover {
+      background: var(--ifm-color-emphasis-100);
+      color: var(--ifm-color-primary);
+      transform: translateX(2px);
+    }
+
+    /* Active/selected item */
+    &.menu__link--active {
+      font-weight: 600;
+      color: var(--ifm-color-primary);
+      background: var(--ifm-color-primary-contrast-background);
+      box-shadow: inset 0 0 0 1px var(--ifm-color-primary-lighter);
+    }
+  }
+
+  /* Nested menu items */
+  .menu__list .menu__list {
+    padding-left: 0.75rem;
+    margin-left: 0.75rem;
+    position: relative;
+    
+    &:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--ifm-color-emphasis-200);
+    }
+
+    .menu__link {
+      font-size: 0.8125rem;
+      padding: 0.25rem 0.75rem;
+    }
+  }
+}
+
+/* Clean caret styling */
+.clean-btn.menu__caret {
+  padding: 0.375rem 0.4rem;
+  
+  &:hover {
+    background: transparent;
+  }
+
+  &:before {
+    background: var(--ifm-menu-link-sublist-icon) 50% / 1.25rem 1.25rem;
+    opacity: 0.5;
+    transition: opacity var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+  }
+
+  &:hover:before {
+    opacity: 0.8;
+  }
+}
+
+/* Container styling */
+.markdown img,
+.prism-code,
+table,
+.admonition {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Image styling */
+.markdown img {
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem 0;
+  display: block;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+/* Utility classes */
 .padding-top--md {
   padding-top: 2rem !important;
 }
@@ -67,52 +185,203 @@ h2 { font-size: 1.5rem !important; }
   line-height: 16px;
 }
 
-/* This customizes "section headers". */
-li.sidebar-section-title {
-  > div.menu__list-item-collapsible {
-      font-weight: bold; 
-      color: var(--ifm-color-primary-contrast-foreground);
-
-      /* We don't want any click interaction effects here */
-      &:hover {
-        background-color: transparent;
-      }
-  }
-  &:first-child > div.menu__list-item-collapsible {
-    margin-top: 0.5em;
-  }
-  &:not(:first-child) > div.menu__list-item-collapsible {
-    margin-top: 1em;
-  }
+/* Hero section with better contrast */
+.hero--primary {
+  background: linear-gradient(135deg, var(--ifm-color-primary-darkest) 0%, var(--ifm-color-primary) 100%);
+  position: relative;
+  overflow: hidden;
 }
 
-nav.menu {
-  /* Adds equal padding on all sides (right side missing in default) */
-  padding: 0.5em;
+.hero--primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
 }
 
-.clean-btn.menu__caret {
+.hero__title,
+.hero__subtitle {
+  color: #ffffff;
+  position: relative;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Category headers (like "EVALUATION") */
+.menu__link--sublist {
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em;
+  color: var(--ifm-color-emphasis-700) !important;
+  padding: 0.5rem 0.75rem !important;
+  margin-top: 0.25rem;
+  
   &:hover {
-    /* eliminates the double hover effect causing ugly carets */
-    background-color: transparent;
+    background: transparent !important;
+    transform: none !important;
   }
-  &:before {
-    /* reduces the default caret size to be less invasive */
-    background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+
+  &.menu__link--active {
+    color: var(--ifm-color-emphasis-700) !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }
 
-.menu__link--sublist-caret:after {
-  /* reduces the default caret size to be less invasive */
-  background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+/* Button styling */
+.button {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: all var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+  
+  &:hover {
+    transform: translateY(-1px);
+  }
 }
 
+/* Primary button - only for specific CTAs */
+.button--primary {
+  background: var(--ifm-color-primary);
+  color: white;
+  
+  &:hover {
+    background: var(--ifm-color-primary-dark);
+  }
+}
+
+/* Secondary button - default style */
+.button--secondary {
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-color-emphasis-700);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  
+  &:hover {
+    background: var(--ifm-color-emphasis-100);
+    color: var(--ifm-color-primary);
+    border-color: var(--ifm-color-primary);
+  }
+}
+
+/* Notebook CTA button - specific styling */
 .notebook-cta-button {
   text-decoration: none;
-
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  
   > div {
-      display: flex;
-      gap: 7px;
-      align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  &:hover {
+    text-decoration: none;
+    color: var(--ifm-color-primary);
+  }
+}
+
+/* Navigation elements */
+.navbar {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Footer styling with enhanced contrast */
+.footer {
+  background-color: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  padding: 2rem 0;
+
+  .footer__title {
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  .footer__item {
+    color: var(--ifm-font-color-base);
+  }
+
+  .footer__link-item {
+    color: var(--ifm-color-primary);
+    transition: color var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+    
+    &:hover {
+      color: var(--ifm-color-primary-lighter);
+      text-decoration: none;
+    }
+  }
+
+  .footer__copyright {
+    font-size: 0.875rem;
+    margin-top: 2rem;
+  }
+}
+
+/* Dark theme image adjustments */
+[data-theme='dark'] .markdown img {
+  border-color: #334155;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Screenshots get enhanced styling */
+.markdown img[src*="screenshot"] {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transition: transform 200ms ease-in-out;
+}
+
+.markdown img[src*="screenshot"]:hover {
+  transform: scale(1.01);
+}
+
+/* Image captions */
+.markdown img + em {
+  display: block;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ifm-color-emphasis-700);
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .markdown img {
+    margin: 1rem 0;
+  }
+}
+
+/* Zoom modal for images */
+.zoom-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  
+  img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+  }
+  
+  &.active {
+    display: flex;
   }
 }

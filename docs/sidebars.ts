@@ -90,7 +90,7 @@ const sidebars: SidebarsConfig = {
         {
           type: "category",
           collapsible: true,
-          collapsed: true,
+          collapsed: false,
           label: "LLM Providers",
           items: [
             "guides/integrations/bedrock",
