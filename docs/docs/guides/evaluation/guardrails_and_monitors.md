@@ -30,10 +30,10 @@ To use scorers with Weave ops, you'll need access to both the operation's result
 
 ```python
 # Instead of calling the op directly:
-result = my_op(input)  # This works but doesn't give access to the Call object
+result = generate_text(input)  # Primary way to call the op but doesn't give access to the Call object
 
 # Use the .call() method to get both result and Call object:
-result, call = my_op.call(input)  # Now you can use the call object with scorers
+result, call = generate_text.call(input)  # Now you can use the call object with scorers
 ```
 
 :::tip Why Use `.call()`?
@@ -135,6 +135,10 @@ Monitors help track quality metrics over time without blocking operations. This 
 - Gathering data for model improvements
 
 ```python
+import weave
+from weave import Scorer
+import random
+
 @weave.op()
 def generate_text(prompt: str) -> str:
     """Generate text using an LLM."""
@@ -211,7 +215,7 @@ Sometimes your scorer's parameter names might not match your function's paramete
 
 ```python
 @weave.op()
-def my_function(user_input: str):  # Uses 'user_input'
+def generate_text(user_input: str):  # Uses 'user_input'
     return process(user_input)
 
 class MyScorer(Scorer):
@@ -257,7 +261,7 @@ await call.apply_scorer(
 
 1. **With Weave's Op System** (Recommended)
 ```python
-result, call = my_op.call(input)
+result, call = generate_text.call(input)
 score = await call.apply_scorer(MyScorer())
 ```
 
@@ -281,11 +285,11 @@ score = scorer.score(output="some text")
 ### 1. Set Appropriate Sampling Rates
 ```python
 @weave.op()
-def my_llm_function(prompt: str) -> str:
+def generate_text(prompt: str) -> str:
     return generate_response(prompt)
 
 async def generate_with_sampling(prompt: str) -> str:
-    result, call = my_llm_function.call(prompt)
+    result, call = generate_text.call(prompt)
     
     # Only monitor 10% of calls
     if random.random() < 0.1:
@@ -319,37 +323,13 @@ For detailed information about querying calls and their scorer results, see our 
 
 ### 5. Initialize Guards Efficiently
 
-For optimal performance, especially with locally-run models, initialize your guards outside of the main function:
-
-```python
-# Initialize guards once at module level
-toxicity_guard = ToxicityScorer()
-quality_guard = QualityScorer()
-
-@weave.op()
-def generate_text(prompt: str) -> str:
-    """Generate text using an LLM."""
-    return "Generated response..."
-
-async def generate_safe_response(prompt: str) -> str:
-    # Use pre-initialized guards
-    result, call = generate_text.call(prompt)
-    
-    # Reuse the same guard instance
-    safety = await call.apply_scorer(toxicity_guard)
-    if safety.score["flagged"]:
-        return f"I cannot generate that content: {safety.score['reason']}"
-    
-    # Monitor quality with pre-initialized scorer
-    await call.apply_scorer(quality_guard)
-    return result
-```
-
-This pattern is particularly important when:
+For optimal performance, especially with locally-run models, initialize your guards outside of the main function. This pattern is particularly important when:
 - Your scorers load ML models
 - You're using local LLMs where latency is critical
 - Your scorers maintain network connections
 - You have high-traffic applications
+
+See the Complete Example section below for a demonstration of this pattern.
 
 :::caution Performance Tips
 For Guardrails:
@@ -363,6 +343,115 @@ For Monitors:
 - Can use more complex logic
 - Can make external API calls
 :::
+
+## Complete Example
+
+Here's a comprehensive example that brings together all the concepts we've covered:
+
+```python
+import weave
+from weave import Scorer
+import asyncio
+import random
+from typing import Optional
+
+# Initialize scorers at module level (optional optimization)
+toxicity_guard = ToxicityScorer()
+quality_monitor = QualityScorer()
+relevance_monitor = RelevanceScorer()
+
+class ToxicityScorer(Scorer):
+    def __init__(self):
+        # Initialize any expensive resources here
+        self.model = load_toxicity_model()
+    
+    @weave.op
+    async def score(self, output: str) -> dict:
+        """Check content for toxic language."""
+        try:
+            result = await self.model.evaluate(output)
+            return {
+                "flagged": result.is_toxic,
+                "reason": result.explanation if result.is_toxic else None
+            }
+        except Exception as e:
+            # Log error and default to conservative behavior
+            print(f"Toxicity check failed: {e}")
+            return {"flagged": True, "reason": "Safety check unavailable"}
+
+class QualityScorer(Scorer):
+    @weave.op
+    async def score(self, output: str, prompt: str) -> dict:
+        """Evaluate response quality and relevance."""
+        return {
+            "coherence": evaluate_coherence(output),
+            "relevance": evaluate_relevance(output, prompt),
+            "grammar": evaluate_grammar(output)
+        }
+
+@weave.op()
+def generate_text(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate an LLM response."""
+    # Your LLM generation logic here
+    return "Generated response..."
+
+async def generate_safe_response(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate a response with safety checks and quality monitoring."""
+    try:
+        # Generate initial response
+        result, call = generate_text.call(
+            prompt=prompt,
+            style=style,
+            temperature=temperature
+        )
+
+        # Apply safety check (guardrail)
+        safety = await call.apply_scorer(toxicity_guard)
+        if safety.score["flagged"]:
+            return f"I cannot generate that content: {safety.score['reason']}"
+
+        # Sample quality monitoring (10% of requests)
+        if random.random() < 0.1:
+            # Run quality checks in parallel
+            await asyncio.gather(
+                call.apply_scorer(quality_monitor),
+                call.apply_scorer(relevance_monitor)
+            )
+        
+        return result
+
+    except Exception as e:
+        # Log error and return user-friendly message
+        print(f"Generation failed: {e}")
+        return "I'm sorry, I encountered an error. Please try again."
+
+# Example usage
+async def main():
+    # Basic usage
+    response = await generate_safe_response("Tell me a story")
+    print(f"Basic response: {response}")
+    
+    # Advanced usage with all parameters
+    response = await generate_safe_response(
+        prompt="Tell me a story",
+        style="noir",
+        temperature=0.8
+    )
+    print(f"Styled response: {response}")
+
+This example demonstrates:
+- Proper scorer initialization and error handling
+- Combined use of guardrails and monitors
+- Async operation with parallel scoring
+- Production-ready error handling and logging
 
 ## Next Steps
 
