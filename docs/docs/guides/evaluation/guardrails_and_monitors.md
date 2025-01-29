@@ -24,28 +24,9 @@ The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - 
 Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
 :::
 
-### Guardrails vs. Monitors: When to Use Each
+### Using the `.call()` Method
 
-While scorers power both guardrails and monitors, they serve different purposes:
-
-| Aspect | Guardrails | Monitors |
-|--------|------------|----------|
-| **Purpose** | Active intervention to prevent issues | Passive observation for analysis |
-| **Timing** | Real-time, before output reaches users | Can be asynchronous or batched |
-| **Performance** | Must be fast (affects response time) | Can be slower, run in background |
-| **Sampling** | Usually every request | Often sampled (e.g., 10% of calls) |
-| **Control Flow** | Can block/modify outputs | No impact on application flow |
-| **Resource Usage** | Must be efficient | Can use more resources if needed |
-
-For example, a toxicity scorer could be used to:
-- 🛡️ **As a Guardrail**: Block toxic content immediately
-- 📊 **As a Monitor**: Track toxicity levels over time
-
-## Getting Started with Scorers
-
-### Understanding the `.call()` Method
-
-When using scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
+To use scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
 
 ```python
 # Instead of calling the op directly:
@@ -64,6 +45,25 @@ The Call object is essential for:
 
 For more details about Call objects, see our [Ops Guide](../../guides/tracking/ops.md#getting-a-handle-to-the-call-object).
 :::
+
+### Guardrails vs. Monitors: When to Use Each
+
+While scorers power both guardrails and monitors, they serve different purposes:
+
+| Aspect | Guardrails | Monitors |
+|--------|------------|----------|
+| **Purpose** | Active intervention to prevent issues | Passive observation for analysis |
+| **Timing** | Real-time, before output reaches users | Can be asynchronous or batched |
+| **Performance** | Must be fast (affects response time) | Can be slower, run in background |
+| **Sampling** | Usually every request | Often sampled (e.g., 10% of calls) |
+| **Control Flow** | Can block/modify outputs | No impact on application flow |
+| **Resource Usage** | Must be efficient | Can use more resources if needed |
+
+For example, a toxicity scorer could be used to:
+- 🛡️ **As a Guardrail**: Block toxic content immediately
+- 📊 **As a Monitor**: Track toxicity levels over time
+
+## Getting Started with Scorers
 
 ### Basic Example
 
