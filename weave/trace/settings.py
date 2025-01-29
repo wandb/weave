@@ -90,7 +90,7 @@ class UserSettings(BaseModel):
     server_cache_size_limit: int = 1_000_000_000
     """
     Sets the size limit in bytes for the server cache, defaults to 1GB (1_000_000_000 bytes).
-    Required if `use_server_cache` is True.
+    Ignored if `use_server_cache` is False.
 
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
     """
@@ -98,7 +98,7 @@ class UserSettings(BaseModel):
     server_cache_dir: Optional[str] = None
     """
     Sets the directory for the server cache, defaults to None (temporary cache)
-    Required if `use_server_cache` is True.
+    Ignored if `use_server_cache` is False.
 
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
     """

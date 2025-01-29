@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypedDict, TypeVar
+from typing import Any, Callable, Self, TypedDict, TypeVar
 
 import diskcache
 
@@ -91,7 +91,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     @classmethod
     def from_env(
         cls, next_trace_server: tsi.TraceServerInterface
-    ) -> CachingMiddlewareTraceServer:
+    ) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
         return cls(next_trace_server, cache_dir, size_limit)
@@ -200,7 +200,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception(f"Error caching value: {e}")
         return res
 
-    def _with_cache_generic(
+    def _with_cache_pydantic(
         self,
         func: Callable[[TReq], TRes],
         req: TReq,
@@ -243,7 +243,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.obj_read(req)
-        return self._with_cache_generic(
+        return self._with_cache_pydantic(
             self._next_trace_server.obj_read, req, tsi.ObjReadRes
         )
 
@@ -263,7 +263,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query(req)
-        return self._with_cache_generic(
+        return self._with_cache_pydantic(
             self._next_trace_server.table_query, req, tsi.TableQueryRes
         )
 
@@ -276,7 +276,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
-        return self._with_cache_generic(
+        return self._with_cache_pydantic(
             self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
         )
 
