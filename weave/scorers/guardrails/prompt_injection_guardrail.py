@@ -8,12 +8,11 @@ from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_client
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_client, _LLM_CLIENTS
 from weave.scorers.utils import stringify
 
 if TYPE_CHECKING:
     from instructor import Instructor
-    from openai import OpenAI
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -33,17 +32,13 @@ class PromptInjectionLLMGuardrail(Scorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
-    _client: Optional[Union["Instructor", "OpenAI"]] = None
+    _client: Optional["Instructor"] = None
 
     def model_post_init(self, __context: Any) -> None:
-        from openai import OpenAI
+        import instructor
+        from litellm import completion
 
-        if self.model_id not in ["gpt-4o", "gpt-4o-mini"]:
-            raise ValueError(f"Model {self.model_id} is not supported for this scorer.")
-        if isinstance(self._client, OpenAI):
-            self._client = instructor_client(self._client)
-        else:
-            self._client = instructor_client(OpenAI())
+        self._client = instructor.from_litellm(completion)
 
     @weave.op
     def score(self, prompt: str) -> LLMGuardrailResponse:
@@ -58,8 +53,7 @@ You are given the following user prompt that you are suppossed to assess whether
 </input_prompt>
 """
         )
-        response: LLMGuardrailReasoning = create(
-            self._client,
+        response: LLMGuardrailReasoning = self._client.chat.completions.create(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
