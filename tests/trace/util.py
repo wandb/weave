@@ -6,7 +6,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 def client_is_sqlite(client):
     return isinstance(
-        client.server._next_trace_server.server._internal_trace_server,
+        client.server._next_trace_server._internal_trace_server,
         SqliteTraceServer,
     )
 
