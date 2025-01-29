@@ -11,8 +11,6 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
 import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
-import {CollapseHeader} from '../../../../Browse2/CollapseHeader';
-import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {
   CellFilterWrapper,
@@ -36,6 +34,8 @@ import {
   makeRefExpandedPayload,
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {buildTree} from './buildTree';
+import {CollapseHeader} from './CollapseHeader';
+import {ExpandHeader} from './ExpandHeader';
 
 /**
  * This function is responsible for taking the raw data and flattening it
