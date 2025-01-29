@@ -98,7 +98,7 @@ export const ToggleButtonGroup = React.forwardRef<
                   disabled={isDisabled}
                   asChild>
                   {tooltip ? (
-                    <Tooltip content={tooltip} trigger={button} size={size} />
+                    <Tooltip content={tooltip} trigger={button} size="small" />
                   ) : (
                     button
                   )}
