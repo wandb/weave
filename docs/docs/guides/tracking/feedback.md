@@ -75,7 +75,7 @@ You can also get additional information for each feedback object in `client.get_
 - `feedback_type`: The type of feedback (reaction, note, custom).
 - `payload`: The feedback payload
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -115,7 +115,7 @@ You can add feedback to a call using the call's UUID. To use the UUID to get a p
 - `call.feedback.add_note("<note>")`: Add a note.
 - `call.feedback.add("<label>", <object>)`: Add a custom feedback `<object>` specified by `<label>`.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -154,7 +154,7 @@ For scenarios where you need to add feedback immediately after a call, you can r
 
 To retrieve the UUID during call execution, get the current call, and return the ID.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
 
@@ -183,7 +183,7 @@ To retrieve the UUID during call execution, get the current call, and return the
 
 Alternatively, you can use `call()` method to execute the operation and retrieve the ID after call execution:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -210,7 +210,7 @@ Alternatively, you can use `call()` method to execute the operation and retrieve
 
 You can delete feedback from a particular call by specifying a UUID.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     call.feedback.purge("<feedback_uuid>")
@@ -275,7 +275,7 @@ Human annotation scorers can also be created through the API.  Each scorer is it
 
 In the following example, two scorers are created. The first scorer, `Temperature`, is used to score the perceived temperature of the LLM call. The second scorer, `Tone`, is used to score the tone of the LLM response. Each scorer is created using `save` with an associated object ID (`temperature-scorer` and `tone-scorer`).
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave
@@ -318,7 +318,7 @@ Expanding on [creating a human annotation scorer using the API](#create-a-human-
 
 > You can view human annotation scorer object history in the **Scorers** tab under **Human annotations**.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave

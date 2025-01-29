@@ -32,8 +32,6 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -72,16 +70,14 @@ import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/Com
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
-import {ObjectPage} from './Browse3/pages/ObjectPage';
-import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
-import {
-  ObjectVersionsPage,
-  WFHighLevelObjectVersionFilter,
-} from './Browse3/pages/ObjectVersionsPage';
-import {OpPage} from './Browse3/pages/OpPage';
-import {OpsPage} from './Browse3/pages/OpsPage';
-import {OpVersionPage} from './Browse3/pages/OpVersionPage';
-import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
+import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
+import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
+import {ObjectVersionsPage} from './Browse3/pages/ObjectsPage/ObjectVersionsPage';
+import {OpPage} from './Browse3/pages/OpsPage/OpPage';
+import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
+import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
+import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
@@ -237,19 +233,6 @@ const Browse3Mounted: FC<{
         ) : (
           <Empty {...EMPTY_NO_TRACE_SERVER} />
         )}
-
-        <Route>
-          <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Switch>
-              <Route path={`/${URL_BROWSE3}/:entity`}>
-                <Browse2EntityPage />
-              </Route>
-              <Route path={`/${URL_BROWSE3}`}>
-                <Browse2HomePage />
-              </Route>
-            </Switch>
-          </Box>
-        </Route>
       </Switch>
     </Box>
   );

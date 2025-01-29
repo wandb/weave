@@ -128,7 +128,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-INITIAL_CALLS_STREAM_BATCH_SIZE = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
@@ -541,7 +541,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         op = objs[0]
         if op.deleted_at is not None:
             raise ObjectDeletedError(
-                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}"
+                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
+                deleted_at=op.deleted_at,
             )
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
@@ -572,6 +573,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
+            wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
             refs=extract_refs_from_values(processed_val),
@@ -591,15 +593,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
         object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         obj = objs[0]
         if obj.deleted_at is not None:
             raise ObjectDeletedError(
-                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}"
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
             )
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
@@ -675,6 +679,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     refs=obj.refs,
                     base_object_class=obj.base_object_class,
                     deleted_at=now,
+                    wb_user_id=obj.wb_user_id,
                     # Keep the original created_at timestamp
                     created_at=original_created_at,
                 )
@@ -1040,6 +1045,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
                     parameters=parameters,
+                    include_deleted=True,
                 )
                 objs = self._select_objs_query(object_query_builder)
                 found_digests = {obj.digest for obj in objs}
@@ -1047,7 +1053,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise NotFoundError(
                         f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
                     )
-                for obj in objs:
+                # filter out deleted objects
+                valid_objects = [obj for obj in objs if obj.deleted_at is None]
+                for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
             return [
@@ -1957,6 +1965,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,

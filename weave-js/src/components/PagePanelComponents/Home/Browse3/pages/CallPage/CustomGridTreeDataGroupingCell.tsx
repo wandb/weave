@@ -1,4 +1,3 @@
-import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import Box from '@mui/material/Box';
 import MuiButton from '@mui/material/Button';
@@ -8,7 +7,7 @@ import React, {FC, MouseEvent, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
-import {IconParentBackUp} from '../../../../../Icon';
+import {Icon, IconParentBackUp} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
 import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -157,7 +156,9 @@ export const CustomGridTreeDataGroupingCell: FC<
               color: TREE_COLOR,
               marginTop: '8px',
             }}>
-            {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
+            <Icon
+              name={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
+            />
           </MuiButton>
         ) : (
           <Box

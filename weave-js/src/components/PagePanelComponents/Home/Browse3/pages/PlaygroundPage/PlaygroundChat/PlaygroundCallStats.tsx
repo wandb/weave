@@ -63,7 +63,7 @@ export const PlaygroundCallStats = ({call}: {call: TraceCallSchema}) => {
         {callLink && (
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="open-new-tab"
             onClick={() => {
               history.push(callLink);

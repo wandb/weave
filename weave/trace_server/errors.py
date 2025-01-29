@@ -1,3 +1,6 @@
+import datetime
+
+
 class Error(Exception):
     """Base class for exceptions in this module."""
 
@@ -45,4 +48,6 @@ class NotFoundError(Error):
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
-    pass
+    def __init__(self, message: str, deleted_at: datetime.datetime):
+        self.deleted_at = deleted_at
+        super().__init__(message)

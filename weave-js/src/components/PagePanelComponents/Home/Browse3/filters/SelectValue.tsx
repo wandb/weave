@@ -7,7 +7,7 @@ import React from 'react';
 
 import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
-import {SmallRef} from '../../Browse2/SmallRef';
+import {SmallRef} from '../smallRef/SmallRef';
 import {StyledDateTimePicker} from '../StyledDateTimePicker';
 import {
   getFieldType,

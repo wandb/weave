@@ -25,7 +25,7 @@ export type EvaluationComparisonSummary = {
 
   // Models are the Weave Objects used to define the model logic and properties.
   models: {
-    [modelRef: string]: ModelObj;
+    [modelRef: string]: ModelObj | null;
   };
 
   // ScoreMetrics define the metrics that are associated on each individual prediction

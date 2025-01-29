@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     Scorers are passed to a `weave.Evaluation` object during evaluation. There are two types of Scorers in weave:
 
@@ -26,7 +26,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
 ### Function-based Scorers
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
 
@@ -68,7 +68,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
 ### Class-based Scorers
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators, or make multiple function calls, you can use the `Scorer` class.
 
@@ -139,7 +139,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
 ### Scorer Keyword Arguments
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     Scorers can access both the output from your AI system and the input data from the dataset row.
 
@@ -256,7 +256,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
 ### Final summarization of the scorer
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     During evaluation, the scorer will be computed for each row of your dataset. To provide a final score for the evaluation we provide an `auto_summarize` depending on the returning type of the output.
     - Averages are computed for numerical columns
@@ -305,7 +305,7 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 
 ## Predefined Scorers
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     **Installation**
 

@@ -137,7 +137,7 @@ export const MetricsSelector: React.FC<{
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="hide-hidden"
                 disabled={filteredCols.length === 0}
                 onClick={() => {
@@ -152,7 +152,7 @@ export const MetricsSelector: React.FC<{
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="show-visible"
                 disabled={filteredCols.length === 0}
                 onClick={() => {

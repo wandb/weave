@@ -835,6 +835,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "mistral/mistral-large-2402": [
@@ -1711,6 +1717,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-large@2407": [
@@ -1719,6 +1731,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-nemo@latest": [
@@ -1727,6 +1745,12 @@
       "input": 3e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/jamba-1.5-mini@001": [
@@ -1783,6 +1807,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/codestral@2405": [
@@ -1791,6 +1821,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "text-embedding-004": [
@@ -5273,6 +5309,278 @@
       "input": 1.00002e-06,
       "output": 2.99999e-06,
       "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "omni-moderation-latest": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-latest-intents": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-2024-09-26": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gpt-4o-audio-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "azure/o1": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/mistral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-latest": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-chat": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-coder": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-8b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-70b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gemini/gemini-2.0-flash-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large@2411-001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large-2411": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "command-r7b-12-2024": [
+    {
+      "provider": "cohere_chat",
+      "input": 1.5e-07,
+      "output": 3.75e-08,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/deepseek/deepseek-chat": [
+    {
+      "provider": "openrouter",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/openai/o1": [
+    {
+      "provider": "openrouter",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-v3": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-large": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3": [
+    {
+      "provider": "voyage",
+      "input": 6e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-code-3": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-multimodal-3": [
+    {
+      "provider": "voyage",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2": [
+    {
+      "provider": "voyage",
+      "input": 5e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1e-07,
+      "output": 2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-1B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-3B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 8e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1.5e-06,
+      "output": 3e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Qwen2.5-72B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 2e-06,
+      "output": 4e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ]
 }

@@ -111,6 +111,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
                 object_id TEXT,
+                wb_user_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
@@ -617,7 +618,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
-        project_id, object_id = req.obj.project_id, req.obj.object_id
+        project_id, object_id, wb_user_id = (
+            req.obj.project_id,
+            req.obj.object_id,
+            req.obj.wb_user_id,
+        )
 
         # Validate
         object_id_validator(object_id)
@@ -641,8 +646,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     is_latest,
-                    deleted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    deleted_at,
+                    wb_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
                     kind = excluded.kind,
@@ -665,6 +671,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index,
                     1,
                     None,
+                    wb_user_id,
                 ),
             )
             conn.commit()
@@ -725,12 +732,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             include_deleted=True,
+            metadata_only=req.metadata_only,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
-                f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}"
+                f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}",
+                deleted_at=objs[0].deleted_at,
             )
         return tsi.ObjReadRes(obj=objs[0])
 
@@ -1040,10 +1049,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             objs = self._select_objs_query(
                 r.project_id,
                 conditions=conds,
+                include_deleted=True,
             )
             if len(objs) == 0:
                 raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
+            if obj.deleted_at is not None:
+                return None
             val = obj.val
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
@@ -1278,7 +1290,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 digest,
                 version_index,
                 is_latest,
-                deleted_at
+                deleted_at,
+                wb_user_id
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1323,6 +1336,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index=row[7],
                     is_latest=row[8],
                     deleted_at=row[9],
+                    wb_user_id=row[10],
                 )
             )
         return result

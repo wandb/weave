@@ -224,7 +224,7 @@ export const SaveableDrawer: FC<SaveableDrawerProps> = ({
           <Box>
             <Button
               size="large"
-              variant="quiet"
+              variant="ghost"
               icon="close"
               onClick={onClose}
             />

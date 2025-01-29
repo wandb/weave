@@ -5,6 +5,7 @@
 import React from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {TargetBlank} from '../../../../../common/util/links';
 import {Empty} from '../pages/common/Empty';
 import {
   getParamArray,
@@ -56,7 +57,6 @@ export const ComparePage = ({entity, project}: ComparePageProps) => {
     );
   }
 
-  // TODO: Link to docs if we make them
   // Currently nothing links to this state but query parameters
   // are sometimes dropped during dev reloading.
   return (
@@ -64,7 +64,15 @@ export const ComparePage = ({entity, project}: ComparePageProps) => {
       icon="baseline-alt"
       heading="Compare objects or calls"
       description="This page allows you to compare objects or calls."
-      moreInformation=""
+      moreInformation={
+        <>
+          Learn how to{' '}
+          <TargetBlank href="http://wandb.me/weave_compare">
+            compare versions
+          </TargetBlank>{' '}
+          in Weave.
+        </>
+      }
     />
   );
 };
