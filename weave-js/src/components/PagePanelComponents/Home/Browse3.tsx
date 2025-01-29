@@ -32,8 +32,6 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -235,19 +233,6 @@ const Browse3Mounted: FC<{
         ) : (
           <Empty {...EMPTY_NO_TRACE_SERVER} />
         )}
-
-        <Route>
-          <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Switch>
-              <Route path={`/${URL_BROWSE3}/:entity`}>
-                <Browse2EntityPage />
-              </Route>
-              <Route path={`/${URL_BROWSE3}`}>
-                <Browse2HomePage />
-              </Route>
-            </Switch>
-          </Box>
-        </Route>
       </Switch>
     </Box>
   );
