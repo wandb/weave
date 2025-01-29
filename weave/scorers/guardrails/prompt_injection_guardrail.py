@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -11,11 +11,9 @@ from weave.scorers.guardrails.prompts import (
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create, instructor_client
 from weave.scorers.utils import stringify
 
-try:
+if TYPE_CHECKING:
     import instructor
     from openai import OpenAI
-except ImportError:
-    raise ImportError("`openai` and `instructor` are required to use this scorer.")
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -38,6 +36,8 @@ class PromptInjectionLLMGuardrail(Scorer):
     _client: Optional[Union[instructor.Instructor, OpenAI]] = None
 
     def model_post_init(self, __context) -> None:
+        import instructor
+        from openai import OpenAI
         if self.model_id not in ["gpt-4o", "gpt-4o-mini"]:
             raise ValueError(f"Model {self.model_id} is not supported for this scorer.")
         if isinstance(self._client, OpenAI):
