@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, Self, TypedDict, TypeVar
+from typing import Any, Callable, TypedDict, TypeVar
 
 import diskcache
+from typing_extensions import Self
 
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
@@ -89,9 +90,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         }
 
     @classmethod
-    def from_env(
-        cls, next_trace_server: tsi.TraceServerInterface
-    ) -> Self:
+    def from_env(cls, next_trace_server: tsi.TraceServerInterface) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
         return cls(next_trace_server, cache_dir, size_limit)

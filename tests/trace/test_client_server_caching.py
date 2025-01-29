@@ -45,13 +45,17 @@ def test_server_caching(client):
 
     # First call should miss
     caching_server.reset_cache_recorder()
-    compare_datasets(client.get(ref), dataset)
+    gotten_dataset = client.get(ref)
     assert caching_server.get_cache_recorder() == {
-        "hits": 1,
+        "hits": 0,
+        # 1 obj read for the dataset
+        # 1 table read for the rows
+        # 5 images
         "misses": 7,
         "errors": 0,
         "skips": 0,
     }
+    compare_datasets(gotten_dataset, dataset)
 
     # Second call should hit
     caching_server.reset_cache_recorder()
