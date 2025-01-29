@@ -5,7 +5,6 @@ from collections.abc import Iterator
 from typing import Any, Callable, TypeVar
 
 import diskcache
-from typing_extensions import TypeAlias
 
 from weave.trace.settings import (
     server_cache_dir,
@@ -19,9 +18,6 @@ logger = logging.getLogger(__name__)
 TReq = TypeVar("TReq", bound=tsi.BaseModel)
 TRes = TypeVar("TRes", bound=tsi.BaseModel)
 
-CACHE_KEY_TYPE: TypeAlias = str
-CACHE_VALUE_TYPE: TypeAlias = str | bytes
-
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     _next_trace_server: tsi.TraceServerInterface
@@ -34,7 +30,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         size_limit: int = 1_000_000_000,
     ):
         self._next_trace_server = next_trace_server
-        self._cache: diskcache.Cache[CACHE_KEY_TYPE, CACHE_KEY_TYPE] = diskcache.Cache(
+        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
         )
 
@@ -71,11 +67,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def _with_cache(
         self,
         namespace: str,
-        make_cache_key: Callable[[TReq], CACHE_KEY_TYPE],
+        make_cache_key: Callable[[TReq], str],
         func: Callable[[TReq], TRes],
         req: TReq,
-        serialize: Callable[[TRes], CACHE_VALUE_TYPE],
-        deserialize: Callable[[CACHE_VALUE_TYPE], TRes],
+        serialize: Callable[[TRes], str | bytes],
+        deserialize: Callable[[str | bytes], TRes],
     ) -> TRes:
         """Cache the result of a function call using the provided serialization methods.
 
