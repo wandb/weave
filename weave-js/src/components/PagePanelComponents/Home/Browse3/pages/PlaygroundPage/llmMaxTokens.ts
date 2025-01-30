@@ -181,21 +181,6 @@ export const LLM_MAX_TOKENS = {
     provider: 'azure',
     supports_function_calling: true,
   },
-  'azure/mistral-large-latest': {
-    max_tokens: 32000,
-    provider: 'azure',
-    supports_function_calling: true,
-  },
-  'azure/mistral-large-2402': {
-    max_tokens: 32000,
-    provider: 'azure',
-    supports_function_calling: true,
-  },
-  'azure/command-r-plus': {
-    max_tokens: 4096,
-    provider: 'azure',
-    supports_function_calling: true,
-  },
 
   // Gemini models
   'gemini/gemini-1.5-flash-001': {
