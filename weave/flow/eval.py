@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import logging
 import traceback
-from collections.abc import Generator, Sequence
+from collections.abc import AsyncGenerator, Generator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
@@ -459,7 +459,8 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
     @model_validator(mode="before")
     def _convert_dataset(cls, values: dict) -> dict:
         if "dataset" in values:
-            values["dataset"] = Dataset(rows=values["dataset"])
+            if not isinstance(values["dataset"], Dataset):
+                values["dataset"] = Dataset(rows=values["dataset"])
         return values
 
     async def evaluate(
@@ -468,9 +469,16 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         model: ModelProtocol[I, O] | None = None,
         predictions: Sequence[O] | None = None,
     ) -> dict:
+        """Evaluate a model or a set of predictions.
+
+        This runs both predict and score concurrently!"""
         if not model and not predictions:
             raise ValueError("Must provide a model or predictions")
 
+        # TODO: Each step does an async_foreach, but must collect results back into
+        # a list before returning.  This is not efficient!  Evaluate should instead
+        # have a more optimized version that does everything in one step.  That
+        # implementation is TBD.
         if not predictions:
             predictions = await self.predict(model=model)
 
@@ -481,30 +489,34 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         *,
         model: ModelProtocol[I, O],
         predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
-        # ) -> Sequence[PredictorOutputDict[O]]:
     ) -> Dataset:
+        new_rows = []
+        async for row in self._predict(model, predictor_cls):
+            new_rows.append(row)
+        return Dataset(rows=new_rows)
+
+    async def _predict(
+        self,
+        model: ModelProtocol[I, O],
+        predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
+        # ) -> Sequence[PredictorOutputDict[O]]:
+    ) -> AsyncGenerator[dict, None, None]:
         # At the end of this method, the user should have the same thing as `Dataset.from_calls(...)`
 
         async def predict_row(row: Any) -> dict:
+            # TODO: Suppress call donut messages here
             if is_async_callable(model):
                 _, call = await model.call(**row)
             else:
                 _, call = model.call(**row)
 
-            print(f"{call=}")
             return call
-            # return await predictor_cls(model)(row)
 
-        new_rows = []
         async for _, prediction in util.async_foreach(
             self.dataset, predict_row, get_weave_parallelism()
         ):
-            # TODO: Should we basically be doing a model.call() and saving
-            # the call object here?
-            new_rows.append(prediction.to_dict())
-
-        # return Dataset(rows=new_rows)
-        return new_rows
+            # TODO: Instead of dictify, it would be nice if we could link to the actual call
+            yield prediction.to_dict()
 
     async def score(
         self,
@@ -512,6 +524,16 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         predictions: Sequence[PredictorOutputDict[O]],
         extra_metadata: Sequence[dict[str, Any]] | None = None,
     ) -> Sequence[dict[ScorerName, list[ScoreDict]]]:
+        scores = {get_callable_name(scorer): [] for scorer in self.scorers}
+        async for res in self._score(predictions, extra_metadata):
+            scores[res.name].append(res.score)
+        return scores
+
+    async def _score(
+        self,
+        predictions: Sequence[PredictorOutputDict[O]],
+        extra_metadata: Sequence[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[ScoringTaskResult, None, None]:
         if extra_metadata is None:
             extra_metadata = [{} for _ in predictions]
 
@@ -520,48 +542,52 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
                 f"Number of predictions ({len(predictions)}) must match dataset size ({len(self.dataset)}) times trials ({self.trials})"
             )
 
-        scores = {get_callable_name(scorer): [] for scorer in self.scorers}
-
         def scoring_tasks() -> Generator[ScoringTask, None, None]:
             for pred, meta_dict in zip(predictions, extra_metadata):
-                combined_metadata = {**pred.metadata, **meta_dict}
+                combined_metadata = {**pred.get("metadata", {}), **meta_dict}
                 for scorer in self.scorers:
-                    yield ScoringTask(scorer, pred.output, combined_metadata)
+                    yield ScoringTask(scorer, pred["output"], combined_metadata)
 
         async def run_scorer(task: ScoringTask) -> ScoringTaskResult:
+            try:
+                if is_async_callable(task.scorer):
+                    score = await task.scorer(task.output, **task.metadata)
+                else:
+                    score = task.scorer(task.output, **task.metadata)
+            except Exception as e:
+                score = None
+                metadata = {"error": str(e)}
+            else:
+                metadata = {}
+
             return ScoringTaskResult(
                 name=get_callable_name(task.scorer),
-                score=await task.scorer(task.output, **task.metadata),
+                score={"score": score, "metadata": metadata},
             )
 
         async for _, res in util.async_foreach(
             scoring_tasks(), run_scorer, get_weave_parallelism()
         ):
-            scores[res.name].append(res.score)
-
-        return scores
+            yield res
 
     async def aggregate_results(self): ...
 
     def summarize(self, results: Sequence[ScoringResult]) -> dict[str, Any]:
-        rows = list(results)
+        cols = transpose(list(results))
         summary = {}
 
-        if not rows:
-            return summary
+        if "scores" in cols:
+            score_data = transpose(cols["scores"])
+            for scorer in self._post_init_scorers:
+                attrs = get_scorer_attributes(scorer)
+                score_table = score_data[attrs.scorer_name]
+                summary[attrs.scorer_name] = attrs.summarize_fn(score_table)
 
-        score_by_name = {}
-        for row in rows:
-            for name, score in row["scores"].items():
-                score_by_name.setdefault(name, [])
-                score_by_name[name].append(score)
-
-        for scorer in self.scorers:
-            attrs = get_scorer_attributes(scorer)
-            summary.setdefault(attrs.scorer_name, [])
-            summary[attrs.scorer_name].append(
-                attrs.summarize_fn(score_by_name[attrs.scorer_name])
-            )
+        for name, vals in cols.items():
+            if name == "scores":
+                continue
+            if summary_result := auto_summarize(vals):
+                summary[name] = summary_result
 
         return summary
 
