@@ -55,7 +55,7 @@ def lite_llm_completion(
 
 def get_bedrock_credentials(
     model_name: str,
-) -> tuple[Optional[str], Optional[str], Optional[str]]:
+) -> tuple[str, str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
         raise InvalidRequest(
@@ -96,7 +96,7 @@ def get_bedrock_credentials(
     return aws_access_key_id, aws_secret_access_key, aws_region_name
 
 
-def get_azure_credentials(model_name: str) -> tuple[Optional[str], Optional[str]]:
+def get_azure_credentials(model_name: str) -> tuple[str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
         raise InvalidRequest(
