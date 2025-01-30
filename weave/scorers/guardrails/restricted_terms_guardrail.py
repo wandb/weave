@@ -49,6 +49,8 @@ class RestrictedTermsAnalysis(BaseModel):
 
 
 class RestrictedTermsRecognitionResponse(BaseModel):
+    """Response from the `RestrictedTermsLLMGuardrail`"""
+
     safe: bool
     detected_entities: list[TermMatch]
     reasoning: str

@@ -21,7 +21,9 @@ def mock_create(monkeypatch):
                     explanation="The term 'Microsoft' is an exact match to the restricted term 'Microsoft'.",
                 )
             ],
-            explanation="The text contains the restricted term 'Microsoft' as an exact match. No other restricted terms or their variations were detected.",
+            explanation="""Restricted terms detected:
+
+- Microsoft: Microsoft (EXACT)""",
             anonymized_text="Hello, my name is [RESTRICTED_TERM].",
         )
 
@@ -43,6 +45,8 @@ def test_restricted_terms_guardrail_score(
     assert result["safe"] == False
     assert (
         result["reasoning"]
-        == "The text contains the restricted term 'Microsoft' as an exact match. No other restricted terms or their variations were detected."
+        == """Restricted terms detected:
+
+- Microsoft: Microsoft (EXACT)"""
     )
     assert result["anonymized_text"] == "Hello, my name is [RESTRICTED_TERM]."
