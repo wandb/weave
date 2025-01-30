@@ -14,13 +14,15 @@ Or use as a GitHub Action.
 # ]
 # ///
 
+from __future__ import annotations
+
 import argparse
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import pytz
 import urllib3
@@ -174,7 +176,7 @@ class GitHubDigest:
         self.local_mode = local_mode
         self.progress = None
 
-    def _get_progress(self) -> Optional[Progress]:
+    def _get_progress(self) -> Progress | None:
         """Get progress indicator if in local mode."""
         if not self.local_mode:
             return None
@@ -219,8 +221,8 @@ class GitHubDigest:
         return f"+{additions}/-{deletions}"
 
     def process_items_parallel(
-        self, items: List[Any], processor, description: str
-    ) -> List[Tuple[Any, Exception]]:
+        self, items: list[Any], processor, description: str
+    ) -> list[tuple[Any, Exception | None]]:
         """Process items in parallel using a thread pool.
 
         Args:
@@ -231,26 +233,30 @@ class GitHubDigest:
         Returns:
             List of (processed_item, exception) tuples. Exception is None if successful
         """
-        results = []
+        results: list[tuple[Any, Exception | None]] = []
+        cpu_count = os.cpu_count()
+        max_workers = min(
+            32, (cpu_count or 1) * 4
+        )  # Handle case where cpu_count is None
 
-        with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() * 4)) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(processor, item): item for item in items}
 
-            with self._get_progress() as progress:
-                if progress:
-                    task = progress.add_task(description, total=len(items))
+            progress = self._get_progress()
+            if progress is not None:
+                task = progress.add_task(description, total=len(items))
 
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        results.append((result, None))
-                    except Exception as e:
-                        original_item = futures[future]
-                        results.append((original_item, e))
-                        logger.warning(f"Error processing item: {e}")
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append((result, None))
+                except Exception as e:
+                    original_item = futures[future]
+                    results.append((original_item, e))
+                    logger.warning(f"Error processing item: {e}")
 
-                    if progress:
-                        progress.update(task, advance=1)
+                if progress is not None:
+                    progress.update(task, advance=1)
 
         return results
 
@@ -307,7 +313,7 @@ class GitHubDigest:
         )
 
         for processed, error in results:
-            if error:
+            if error is not None:
                 logger.warning(f"Skipping commit due to error: {error}")
                 continue
 
@@ -353,7 +359,7 @@ class GitHubDigest:
         )
 
         for processed, error in results:
-            if error:
+            if error is not None:
                 logger.warning(f"Skipping PR due to error: {error}")
                 continue
 
