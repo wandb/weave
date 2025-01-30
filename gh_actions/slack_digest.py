@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -26,7 +27,7 @@ from typing import Any
 
 import pytz
 import urllib3
-from github import Github
+from github import Github, GithubException, RateLimitExceededException
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -169,7 +170,7 @@ class GitHubDigest:
         """
         # Configure connection pool for parallel requests
         self.pool_manager = urllib3.PoolManager(maxsize=32)
-        self.github = Github(token, pool_size=32)
+        self.github = Github(token, pool_size=32, retry=3)
         self.repo = self.github.get_repo(repo)
         self.days = days
         self.branch = branch
@@ -190,6 +191,18 @@ class GitHubDigest:
                 console=console,
             )
         return self.progress
+
+    def _handle_rate_limit(self):
+        """Handle GitHub API rate limit by waiting if needed."""
+        rate_limit = self.github.get_rate_limit()
+        if rate_limit.core.remaining == 0:
+            reset_timestamp = rate_limit.core.reset.timestamp()
+            sleep_time = reset_timestamp - time.time() + 1  # Add 1 second buffer
+            if sleep_time > 0:
+                logger.warning(
+                    f"Rate limit reached. Waiting {sleep_time:.1f} seconds..."
+                )
+                time.sleep(sleep_time)
 
     def analyze_paths(self, files) -> ChangeCategories:
         """Analyze file paths to determine which categories were modified."""
@@ -223,24 +236,26 @@ class GitHubDigest:
     def process_items_parallel(
         self, items: list[Any], processor, description: str
     ) -> list[tuple[Any, Exception | None]]:
-        """Process items in parallel using a thread pool.
-
-        Args:
-            items: List of items to process
-            processor: Function that processes a single item
-            description: Description for progress bar
-
-        Returns:
-            List of (processed_item, exception) tuples. Exception is None if successful
-        """
+        """Process items in parallel using a thread pool."""
         results: list[tuple[Any, Exception | None]] = []
         cpu_count = os.cpu_count()
-        max_workers = min(
-            32, (cpu_count or 1) * 4
-        )  # Handle case where cpu_count is None
+        max_workers = min(32, (cpu_count or 1) * 4)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(processor, item): item for item in items}
+            futures = {}
+
+            # Submit items with rate limit handling
+            for item in items:
+                try:
+                    self._handle_rate_limit()
+                    futures[executor.submit(processor, item)] = item
+                except RateLimitExceededException:
+                    self._handle_rate_limit()
+                    # Retry once after waiting
+                    futures[executor.submit(processor, item)] = item
+                except GithubException as e:
+                    logger.exception(f"GitHub API error while submitting item: {e}")
+                    results.append((item, e))
 
             progress = self._get_progress()
             if progress is not None:
@@ -250,10 +265,27 @@ class GitHubDigest:
                 try:
                     result = future.result()
                     results.append((result, None))
+                except RateLimitExceededException:
+                    # Handle rate limit during processing
+                    original_item = futures[future]
+                    try:
+                        self._handle_rate_limit()
+                        # Retry the item
+                        result = processor(original_item)
+                        results.append((result, None))
+                    except Exception as e:
+                        results.append((original_item, e))
+                        logger.exception(
+                            f"Error processing item after rate limit retry: {e}"
+                        )
+                except GithubException as e:
+                    original_item = futures[future]
+                    results.append((original_item, e))
+                    logger.exception(f"GitHub API error: {e}")
                 except Exception as e:
                     original_item = futures[future]
                     results.append((original_item, e))
-                    logger.warning(f"Error processing item: {e}")
+                    logger.exception(f"Unexpected error: {e}")
 
                 if progress is not None:
                     progress.update(task, advance=1)
@@ -395,13 +427,31 @@ class GitHubDigest:
         """Generate a digest of recent GitHub activity."""
         since_date = datetime.now(pytz.UTC) - timedelta(days=self.days)
 
-        # Get recent activity
-        commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
-        prs = [
-            pr
-            for pr in self.repo.get_pulls(state="open")
-            if pr.updated_at >= since_date
-        ]
+        try:
+            # Get recent activity with rate limit handling
+            self._handle_rate_limit()
+            commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
+
+            self._handle_rate_limit()
+            prs = [
+                pr
+                for pr in self.repo.get_pulls(state="open")
+                if pr.updated_at >= since_date
+            ]
+
+        except RateLimitExceededException:
+            logger.exception("Rate limit exceeded while fetching initial data")
+            self._handle_rate_limit()
+            # Retry once after waiting
+            commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
+            prs = [
+                pr
+                for pr in self.repo.get_pulls(state="open")
+                if pr.updated_at >= since_date
+            ]
+        except GithubException as e:
+            logger.exception(f"GitHub API error: {e}")
+            raise
 
         if self.local_mode:
             # Generate rich tables for local display
