@@ -36,7 +36,6 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
-from rich.table import Table
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -333,101 +332,121 @@ class GitHubDigest:
             "draft": pr.draft,
         }
 
-    def create_commit_table(self, commits, title: str) -> Table:
-        """Create a rich table for displaying commit information."""
-        table = Table(title=title)
-        table.add_column("Date", style="cyan")
-        table.add_column("Author", style="green")
-        table.add_column("Message", style="white")
-        table.add_column("Line Diff", style="yellow")
-        table.add_column("Files", style="yellow")
-        for cat in CATEGORIES.values():
-            table.add_column(f"{cat.emoji} {cat.name}", justify="center")
-        table.add_column("Link", style="blue")
-
+    def create_commit_table(self, commits, title: str) -> str:
+        """Create an ASCII table for displaying commit information."""
         # Process commits in parallel
         results = self.process_items_parallel(
             commits, self.process_commit, "Processing commits..."
         )
 
+        # Format as ASCII table
+        table = [title, ""]  # Title and blank line
+
+        # Headers
+        headers = ["Date", "Author", "Message", "Line Diff", "Files", "Categories", "Link"]
+        # Create header separator
+        widths = [12, 15, 50, 12, 6, 12, 50]  # Adjust these as needed
+        row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+
+        table.append(row_format.format(*headers))
+        table.append("|" + "|".join("-" * (w + 2) for w in widths) + "|")
+
+        # Data rows
         for processed, error in results:
             if error is not None:
                 logger.warning(f"Skipping commit due to error: {error}")
                 continue
 
             categories = processed["categories"]
+            indicators = []
+            if categories.docs:   indicators.append("📚")
+            if categories.server: indicators.append("🤖")
+            if categories.ts_sdk: indicators.append("📦")
+            if categories.tests:  indicators.append("🧪")
+            if categories.ui:     indicators.append("🎨")
+            if categories.py_sdk: indicators.append("🐍")
+
+            cat_str = " ".join(indicators) if indicators else ""
+
             row = [
                 processed["date"],
                 processed["author"],
-                processed["message"],
+                processed["message"][:47] + "..." if len(processed["message"]) > 50 else processed["message"],
                 processed["line_diff"],
                 processed["files"],
-                "📚" if categories.docs else "",
-                "🧪" if categories.tests else "",
-                "🤖" if categories.server else "",
-                "🎨" if categories.ui else "",
-                "📦" if categories.ts_sdk else "",
-                "🐍" if categories.py_sdk else "",
-                f"[link={processed['url']}]View[/link]",
+                cat_str,
+                processed["url"],
             ]
-            table.add_row(*row)
+            table.append(row_format.format(*row))
 
-        return table
+        return "\n".join(table)
 
-    def create_pr_tables(self, prs, title_prefix: str) -> tuple[Table, Table]:
-        """Create tables for pull requests."""
-        ready_table = Table(title=f"{title_prefix} - Ready for Review")
-        draft_table = Table(title=f"{title_prefix} - In Progress")
-
-        for table in [ready_table, draft_table]:
-            table.add_column("Updated", style="cyan")
-            table.add_column("Author", style="green")
-            table.add_column("Title", style="white")
-            table.add_column("Line Diff", style="yellow")
-            table.add_column("Files", style="yellow")
-            for cat in CATEGORIES.values():
-                table.add_column(f"{cat.emoji} {cat.name}", justify="center")
-            table.add_column("Link", style="blue")
-
-        sorted_prs = sorted(prs, key=lambda x: x.updated_at, reverse=True)
-
+    def create_pr_tables(self, prs, title_prefix: str) -> tuple[str, str]:
+        """Create ASCII tables for pull requests."""
         # Process PRs in parallel
         results = self.process_items_parallel(
-            sorted_prs, self.process_pr, "Processing pull requests..."
+            sorted(prs, key=lambda x: x.updated_at, reverse=True),
+            self.process_pr,
+            "Processing pull requests..."
         )
 
+        # Headers
+        headers = ["Date", "Author", "Title", "Line Diff", "Files", "Categories", "Link"]
+        widths = [12, 15, 50, 12, 6, 12, 50]  # Adjust these as needed
+        row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+
+        # Create header rows
+        header_row = row_format.format(*headers)
+        separator = "|" + "|".join("-" * (w + 2) for w in widths) + "|"
+
+        # Prepare tables
+        ready_rows = [
+            f"{title_prefix} - Ready for Review",
+            "",
+            header_row,
+            separator
+        ]
+        draft_rows = [
+            f"{title_prefix} - In Progress",
+            "",
+            header_row,
+            separator
+        ]
+
+        # Process results
         for processed, error in results:
             if error is not None:
                 logger.warning(f"Skipping PR due to error: {error}")
                 continue
 
             categories = processed["categories"]
+            indicators = []
+            if categories.docs:   indicators.append("📚")
+            if categories.server: indicators.append("🤖")
+            if categories.ts_sdk: indicators.append("📦")
+            if categories.tests:  indicators.append("🧪")
+            if categories.ui:     indicators.append("🎨")
+            if categories.py_sdk: indicators.append("🐍")
+
+            cat_str = " ".join(indicators) if indicators else ""
+
             row = [
                 processed["date"],
                 processed["author"],
-                processed["title"],
+                processed["title"][:47] + "..." if len(processed["title"]) > 50 else processed["title"],
                 processed["line_diff"],
                 processed["files"],
-                "📚" if categories.docs else "",
-                "🧪" if categories.tests else "",
-                "🤖" if categories.server else "",
-                "🎨" if categories.ui else "",
-                "📦" if categories.ts_sdk else "",
-                "🐍" if categories.py_sdk else "",
-                f"[link={processed['url']}]View[/link]",
+                cat_str,
+                processed["url"],
             ]
+            formatted_row = row_format.format(*row)
 
-            target_table = draft_table if processed["draft"] else ready_table
-            target_table.add_row(*row)
+            if processed["draft"]:
+                draft_rows.append(formatted_row)
+            else:
+                ready_rows.append(formatted_row)
 
-        return ready_table, draft_table
-
-    def create_legend(self) -> Table:
-        """Create a table explaining the category indicators."""
-        legend = Table(title="Change Categories", show_header=False)
-        for cat in CATEGORIES.values():
-            legend.add_row(cat.emoji, f"Changes in {cat.path}")
-        return legend
+        return "\n".join(ready_rows), "\n".join(draft_rows)
 
     def generate_digest(self) -> str:
         """Generate a digest of recent GitHub activity."""
@@ -439,72 +458,40 @@ class GitHubDigest:
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
 
             self._handle_rate_limit()
-            prs = [
-                pr
-                for pr in self.repo.get_pulls(state="open")
-                if pr.updated_at >= since_date
-            ]
+            prs = [pr for pr in self.repo.get_pulls(state="open")
+                   if pr.updated_at >= since_date]
 
         except RateLimitExceededException:
             logger.exception("Rate limit exceeded while fetching initial data")
             self._handle_rate_limit()
             # Retry once after waiting
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
-            prs = [
-                pr
-                for pr in self.repo.get_pulls(state="open")
-                if pr.updated_at >= since_date
-            ]
+            prs = [pr for pr in self.repo.get_pulls(state="open")
+                   if pr.updated_at >= since_date]
         except GithubException as e:
             logger.exception(f"GitHub API error: {e}")
             raise
 
-        if self.local_mode:
-            with self._get_progress() as progress:
-                # Generate rich tables for local display
-                commit_table = self.create_commit_table(
-                    commits, f"Recent Commits (Last {self.days} days)"
-                )
-                ready_table, draft_table = self.create_pr_tables(prs, "Open Pull Requests")
+        # Format all content
+        sections = [
+            f"Activity Report for {self.repo.full_name} (Last {self.days} days)",
+            "",
+            "```",
+            self.create_commit_table(commits, "Recent Commits"),
+            "```",
+            "",
+            "```",
+            self.create_pr_tables(prs, "Open Pull Requests")[0],  # Ready PRs
+            "```",
+            "",
+            "```",
+            self.create_pr_tables(prs, "Open Pull Requests")[1],  # Draft PRs
+            "```",
+            "",
+            "Legend: 📚 Docs, 🧪 Tests, 🤖 Server, 🎨 UI, 📦 TS SDK, 🐍 Python SDK"
+        ]
 
-                # Print formatted tables
-                console.print(commit_table)
-                console.print("\n")
-                console.print(ready_table)
-                console.print("\n")
-                console.print(draft_table)
-                console.print("\n")
-                console.print(self.create_legend())
-            return ""  # Console output already handled
-        else:
-            return self._generate_slack_digest(commits, prs)
-
-    def _generate_slack_digest(self, commits, prs) -> str:
-        """Generate a plain text digest suitable for Slack."""
-        digest = (
-            f"*Activity Report for {self.repo.full_name} (Last {self.days} days)*\n\n"
-        )
-
-        # Add commit summary
-        digest += f"*Recent Commits ({len(commits)}):*\n"
-        for commit in commits[-5:]:  # Show last 5 commits
-            author = commit.author.login if commit.author else "Unknown"
-            message = commit.commit.message.split("\n")[0]
-            digest += f"• {author}: {message}\n"
-
-        # Add PR summary
-        ready_prs = [pr for pr in prs if not pr.draft]
-        draft_prs = [pr for pr in prs if pr.draft]
-
-        digest += f"\n*Open PRs Ready for Review ({len(ready_prs)}):*\n"
-        for pr in ready_prs:
-            digest += f"• {pr.user.login}: {pr.title}\n"
-
-        digest += f"\n*PRs In Progress ({len(draft_prs)}):*\n"
-        for pr in draft_prs:
-            digest += f"• {pr.user.login}: {pr.title}\n"
-
-        return digest
+        return "\n".join(sections)
 
 
 def main():
@@ -549,14 +536,7 @@ def main():
             digest.generate_digest()
         else:
             # Get Slack message content
-            message = digest._generate_slack_digest(
-                list(digest.repo.get_commits(
-                    since=datetime.now(pytz.UTC) - timedelta(days=digest.days),
-                    sha=digest.branch
-                )),
-                [pr for pr in digest.repo.get_pulls(state="open")
-                 if pr.updated_at >= datetime.now(pytz.UTC) - timedelta(days=digest.days)]
-            )
+            message = digest.generate_digest()
 
             if args.mode == "dry-run":
                 # Preview mode - show what would be sent
