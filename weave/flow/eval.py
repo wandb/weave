@@ -65,6 +65,7 @@ class EvaluationResults(Object):
     rows: weave.Table
 
 
+# TODO: These should become protocols
 DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 
@@ -119,7 +120,7 @@ class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
 
 
 @register_object
-class Evaluation(Object):
+class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
 
@@ -164,6 +165,9 @@ class Evaluation(Object):
     ```
     """
 
+    # TODO: Update these types... roughly:
+    # dataset: Dataset | Sequence[InputsT]
+    # scorers: list[Scorer] | Sequence[ScorerProtocol[OutputT, ScoreT]]
     dataset: DatasetLike
     scorers: Optional[list[ScorerLike]] = None
     preprocess_model_input: Optional[PreprocessModelInput] = None
