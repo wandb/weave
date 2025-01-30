@@ -8,9 +8,11 @@ PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "dspy",
     "langchain",
+    "langchain_nvidia_ai_endpoints",
     "litellm",
     "notdiamond",
     "google_ai_studio",
+    "bedrock",
     "scorers_tests",
 ]
 
@@ -40,6 +42,7 @@ def lint(session):
         "google_ai_studio",
         "groq",
         "instructor",
+        "langchain_nvidia_ai_endpoints",
         "langchain",
         "litellm",
         "llamaindex",
@@ -48,6 +51,7 @@ def lint(session):
         "notdiamond",
         "openai",
         "vertexai",
+        "bedrock",
         "scorers_tests",
         "pandas-test",
     ],
@@ -72,6 +76,10 @@ def tests(session, shard):
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
+
+    # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
+    if shard == "langchain_nvidia_ai_endpoints":
+        env["NVIDIA_API_KEY"] = session.env.get("NVIDIA_API_KEY")
 
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers

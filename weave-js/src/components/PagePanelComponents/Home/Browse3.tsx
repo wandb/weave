@@ -32,8 +32,6 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -71,16 +69,15 @@ import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
-import {ObjectPage} from './Browse3/pages/ObjectPage';
-import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
-import {
-  ObjectVersionsPage,
-  WFHighLevelObjectVersionFilter,
-} from './Browse3/pages/ObjectVersionsPage';
-import {OpPage} from './Browse3/pages/OpPage';
-import {OpsPage} from './Browse3/pages/OpsPage';
-import {OpVersionPage} from './Browse3/pages/OpVersionPage';
-import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
+import {ModsPage} from './Browse3/pages/ModsPage';
+import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
+import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
+import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
+import {ObjectVersionsPage} from './Browse3/pages/ObjectsPage/ObjectVersionsPage';
+import {OpPage} from './Browse3/pages/OpsPage/OpPage';
+import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
+import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
+import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
@@ -146,6 +143,7 @@ const tabOptions = [
   'leaderboards',
   'boards',
   'tables',
+  'mods',
   'scorers',
 ];
 const tabs = tabOptions.join('|');
@@ -235,19 +233,6 @@ const Browse3Mounted: FC<{
         ) : (
           <Empty {...EMPTY_NO_TRACE_SERVER} />
         )}
-
-        <Route>
-          <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Switch>
-              <Route path={`/${URL_BROWSE3}/:entity`}>
-                <Browse2EntityPage />
-              </Route>
-              <Route path={`/${URL_BROWSE3}`}>
-                <Browse2HomePage />
-              </Route>
-            </Switch>
-          </Box>
-        </Route>
       </Switch>
     </Box>
   );
@@ -483,6 +468,11 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        {/* MODS */}
+        <Route
+          path={[`${projectRoot}/mods/:itemName`, `${projectRoot}/:tab(mods)`]}>
+          <ModsPageBinding />
         </Route>
         {/* PLAYGROUND */}
         <Route
@@ -990,6 +980,17 @@ const BoardsPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <BoardsPage entity={params.entity} project={params.project} />;
+};
+
+const ModsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
+  return (
+    <ModsPage
+      entity={params.entity}
+      project={params.project}
+      itemName={params.itemName}
+    />
+  );
 };
 
 const TablesPageBinding = () => {

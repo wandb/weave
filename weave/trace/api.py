@@ -18,7 +18,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.op import as_op, op
+from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
     UserSettings,
@@ -28,12 +28,17 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
+_global_postprocess_inputs: PostprocessInputsFunc | None = None
+_global_postprocess_output: PostprocessOutputFunc | None = None
+
 
 def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -45,11 +50,26 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases project to log to.
+        settings: Configuration for the Weave client generally.
+        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
+        global_postprocess_output: A function that will be applied to all outputs of all ops.
+
+    NOTE: Global postprocessing settings are applied to all ops after each op's own
+    postprocessing.  The order is always:
+    1. Op-specific postprocessing
+    2. Global postprocessing
 
     Returns:
         A Weave client.
     """
     parse_and_apply_settings(settings)
+
+    global _global_postprocess_inputs
+    global _global_postprocess_output
+
+    _global_postprocess_inputs = global_postprocess_inputs
+    _global_postprocess_output = global_postprocess_output
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client

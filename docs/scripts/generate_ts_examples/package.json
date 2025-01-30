@@ -1,0 +1,21 @@
+{
+  "name": "weave-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start-intro-notebook": "ts-node src/intro-notebook.ts",
+    "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts",
+  },
+  "dependencies": {
+    "@types/node": "^22.10.2",
+    "dotenv": "^16.4.7",
+    "openai": "^4.76.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "weave": "^0.7.3"
+  },
+  "devDependencies": {
+    "ts-node-dev": "^2.0.0"
+  }
+}

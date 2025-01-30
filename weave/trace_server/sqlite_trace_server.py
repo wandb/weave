@@ -15,7 +15,11 @@ import emoji
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    NotFoundError,
+    ObjectDeletedError,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -45,10 +49,6 @@ from weave.trace_server.validation import object_id_validator
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
-
-
-class NotFoundError(Exception):
-    pass
 
 
 _conn_cursor: contextvars.ContextVar[
@@ -111,6 +111,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
                 object_id TEXT,
+                wb_user_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
@@ -617,25 +618,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
+        project_id, object_id, wb_user_id = (
+            req.obj.project_id,
+            req.obj.object_id,
+            req.obj.wb_user_id,
+        )
 
         # Validate
-        object_id_validator(req.obj.object_id)
+        object_id_validator(object_id)
 
-        # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
-            cursor.execute("BEGIN TRANSACTION")
-            # Mark all existing objects with such id as not latest
-            cursor.execute(
-                """UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req.obj.object_id),
-            )
-            # first get version count
-            cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req.obj.object_id),
-            )
-            version_index = cursor.fetchone()[0]
+            if self._obj_exists(cursor, project_id, object_id, digest):
+                return tsi.ObjCreateRes(digest=digest)
 
+            cursor.execute("BEGIN TRANSACTION")
+            self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
+            version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
@@ -647,11 +645,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val_dump,
                     digest,
                     version_index,
-                    is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    is_latest,
+                    deleted_at,
+                    wb_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
+                    created_at = excluded.created_at,
+                    kind = excluded.kind,
+                    base_object_class = excluded.base_object_class,
+                    refs = excluded.refs,
+                    val_dump = excluded.val_dump,
+                    version_index = excluded.version_index,
+                    is_latest = excluded.is_latest,
+                    deleted_at = excluded.deleted_at
+                """,
                 (
-                    req.obj.project_id,
-                    req.obj.object_id,
+                    project_id,
+                    object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
                     processed_result["base_object_class"],
@@ -660,28 +670,77 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     1,
+                    None,
+                    wb_user_id,
                 ),
             )
             conn.commit()
         return tsi.ObjCreateRes(digest=digest)
 
+    def _obj_exists(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
+    ) -> bool:
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL",
+            (project_id, object_id, digest),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return False
+        return return_row[0] > 0
+
+    def _mark_existing_objects_as_not_latest(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> None:
+        """Mark all existing objects with such id as not latest.
+        We are creating a new object with the same id, all existing ones are no longer latest.
+        """
+        cursor.execute(
+            "UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+
+    def _get_obj_version_index(
+        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    ) -> int:
+        """Get the version index for a new object with such id."""
+        cursor.execute(
+            "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
+            (project_id, object_id),
+        )
+        return_row = cursor.fetchone()
+        if return_row is None:
+            return 0
+        return return_row[0]
+
+    @staticmethod
+    def _make_digest_condition(digest: str) -> str:
+        if digest == "latest":
+            return "is_latest = 1"
+        else:
+            (is_version, version_index) = digest_is_version_like(digest)
+            if is_version:
+                return f"version_index = '{version_index}'"
+            else:
+                return f"digest = '{digest}'"
+
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [f"object_id = '{req.object_id}'"]
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = digest_is_version_like(req.digest)
-            if is_version:
-                conds.append(f"version_index = '{version_index}'")
-            else:
-                conds.append(f"digest = '{req.digest}'")
+        digest_condition = self._make_digest_condition(req.digest)
+        conds.append(digest_condition)
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            include_deleted=True,
+            metadata_only=req.metadata_only,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}",
+                deleted_at=objs[0].deleted_at,
+            )
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -715,6 +774,60 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=objs)
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
+        # First, select the objects that match the query
+        select_query = """
+            SELECT digest FROM objects
+            WHERE project_id = ? AND
+                object_id = ? AND
+                deleted_at IS NULL
+        """
+        parameters = [req.project_id, req.object_id]
+        if req.digests:
+            digest_conditions = [
+                self._make_digest_condition(digest) for digest in req.digests
+            ]
+            digest_conditions_str = " OR ".join(digest_conditions)
+            select_query += f"AND ({digest_conditions_str})"
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(select_query, parameters)
+        matching_objects = cursor.fetchall()
+
+        if len(matching_objects) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+        found_digests = {obj[0] for obj in matching_objects}
+        if req.digests:
+            given_digests = set(req.digests)
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        # Create a delete query that will set the deleted_at field to now
+        delete_query = """
+            UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+            WHERE project_id = ? AND
+                object_id = ? AND
+                digest IN ({})
+        """.format(", ".join("?" * len(found_digests)))
+        delete_parameters = [req.project_id, req.object_id] + list(found_digests)
+
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            cursor.execute(delete_query, delete_parameters)
+            conn.commit()
+
+        return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -936,10 +1049,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             objs = self._select_objs_query(
                 r.project_id,
                 conditions=conds,
+                include_deleted=True,
             )
             if len(objs) == 0:
                 raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
+            if obj.deleted_at is not None:
+                return None
             val = obj.val
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
@@ -1151,11 +1267,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parameters: Optional[dict[str, Any]] = None,
         metadata_only: Optional[bool] = False,
         limit: Optional[int] = None,
+        include_deleted: bool = False,
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
-        pred = " AND ".join(conditions or ["1 = 1"])
+        conditions = conditions or []
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
+        if not conditions:
+            conditions.append("1 = 1")
+        pred = " AND ".join(conditions)
         val_dump_part = "'{}' as val_dump" if metadata_only else "val_dump"
         query = f"""
             SELECT
@@ -1167,10 +1289,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 {val_dump_part},
                 digest,
                 version_index,
-                is_latest
+                is_latest,
+                deleted_at,
+                wb_user_id
             FROM objects
-            WHERE deleted_at IS NULL AND
-                project_id = ? AND {pred}
+            WHERE project_id = ? AND {pred}
         """
 
         if sort_by:
@@ -1212,6 +1335,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest=row[6],
                     version_index=row[7],
                     is_latest=row[8],
+                    deleted_at=row[9],
+                    wb_user_id=row[10],
                 )
             )
         return result

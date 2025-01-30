@@ -1,4 +1,5 @@
 * @wandb/weave-team
+/docs/ @wandb/docs-team @wandb/weave-team
 weave-js/src/common @wandb/fe-infra-reviewers
 weave-js/src/components @wandb/fe-infra-reviewers @wandb/weave-team
 weave-js/src/assets @wandb/fe-infra-reviewers @wandb/weave-team

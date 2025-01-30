@@ -59,6 +59,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
+    ObjDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -68,6 +69,8 @@ from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
+    ObjectDeletedError,
     RequestTooLarge,
 )
 from weave.trace_server.feedback import (
@@ -125,12 +128,8 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-INITIAL_CALLS_STREAM_BATCH_SIZE = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-
-class NotFoundError(Exception):
-    pass
 
 
 CallCHInsertable = Union[
@@ -533,12 +532,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder.add_is_op_condition(True)
         object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.name], "op_name")
+        object_query_builder.set_include_deleted(include_deleted=True)
 
         objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
+        op = objs[0]
+        if op.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
+                deleted_at=op.deleted_at,
+            )
+
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -566,6 +573,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
+            wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
             refs=extract_refs_from_values(processed_val),
@@ -584,12 +592,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
+        object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
+            )
+
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -617,10 +634,77 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for sort in req.sort_by:
                 object_query_builder.add_order(sort.field, sort.direction)
         metadata_only = req.metadata_only or False
-
+        object_query_builder.set_include_deleted(include_deleted=False)
         objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        """
+        Delete object versions by digest, belonging to given object_id.
+        All deletion in this method is "soft". Deletion occurs by inserting
+        a new row into the object_versions table with the deleted_at field set.
+        Inserted rows share identical primary keys (order by) with original rows,
+        and will be combined by the ReplacingMergeTree engine at database merge
+        time.
+        If no digests are provided all versions will have their data overwritten with
+        an empty val_dump.
+        """
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        metadata_only = True
+        if req.digests:
+            object_query_builder.add_digests_conditions(*req.digests)
+            metadata_only = False
+
+        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+
+        delete_insertables = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for obj in object_versions:
+            original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
+            delete_insertables.append(
+                ObjDeleteCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    digest=obj.digest,
+                    kind=obj.kind,
+                    val_dump=obj.val_dump,
+                    refs=obj.refs,
+                    base_object_class=obj.base_object_class,
+                    deleted_at=now,
+                    wb_user_id=obj.wb_user_id,
+                    # Keep the original created_at timestamp
+                    created_at=original_created_at,
+                )
+            )
+
+        if len(delete_insertables) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+
+        if req.digests:
+            given_digests = set(req.digests)
+            found_digests = {obj.digest for obj in delete_insertables}
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        data = [list(obj.model_dump().values()) for obj in delete_insertables]
+        column_names = list(delete_insertables[0].model_fields.keys())
+
+        self._insert("object_versions", data=data, column_names=column_names)
+        num_deleted = len(delete_insertables)
+
+        return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -927,6 +1011,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds: list[str] = []
             object_id_conds: list[str] = []
             parameters: dict[str, Union[str, int]] = {}
+            ref_digests: set[str] = set()
 
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
@@ -951,7 +1036,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_id_conds.append(f"object_id = {{{object_id_param_key}: String}}")
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
-
+                ref_digests.add(ref.version)
             if len(conds) > 0:
                 conditions = [combine_conditions(conds, "OR")]
                 object_id_conditions = [combine_conditions(object_id_conds, "OR")]
@@ -960,9 +1045,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     conditions=conditions,
                     object_id_conditions=object_id_conditions,
                     parameters=parameters,
+                    include_deleted=True,
                 )
                 objs = self._select_objs_query(object_query_builder)
-                for obj in objs:
+                found_digests = {obj.digest for obj in objs}
+                if len(ref_digests) != len(found_digests):
+                    raise NotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    )
+                # filter out deleted objects
+                valid_objects = [obj for obj in objs if obj.deleted_at is None]
+                for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
             return [
@@ -1777,6 +1870,15 @@ def _ensure_datetimes_have_tz(
     return dt
 
 
+def _ensure_datetimes_have_tz_strict(
+    dt: datetime.datetime,
+) -> datetime.datetime:
+    res = _ensure_datetimes_have_tz(dt)
+    if res is None:
+        raise ValueError(f"Datetime is None: {dt}")
+    return res
+
+
 def _nullable_dict_dump_to_dict(
     val: Optional[str],
 ) -> Optional[dict[str, Any]]:
@@ -1863,6 +1965,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,

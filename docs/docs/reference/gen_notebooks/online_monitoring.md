@@ -1,6 +1,6 @@
-
-## title: Integrating with Weave - Production Dashboard
-
+---
+title: Integrating with Weave - Production Dashboard
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{cod-notebook} -->
 
 

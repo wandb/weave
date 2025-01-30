@@ -1,10 +1,9 @@
 {
   "name": "@wandb/weave",
-  "version": "0.0.1",
+  "version": "0.0.7",
   "description": "Weave JS Library",
   "type": "module",
-  "license": "No license",
-  "private": true,
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "yarn generate && NODE_OPTIONS='--max-http-header-size=10248012' PORT=3000 vite",
     "build": "yarn generate && rm -rf build && NODE_OPTIONS=--max-old-space-size=16384 vite build",
@@ -22,7 +21,15 @@
     "direct-prettier": "prettier",
     "lint": "yarn eslint & yarn tslint & yarn prettier & wait",
     "lint-fix": "yarn eslint-fix & yarn tslint-fix & yarn prettier-fix & wait",
-    "generate-schemas": "bash scripts/generate-schemas.sh"
+    "generate-schemas": "bash scripts/generate-schemas.sh",
+    "postpublish": "rm package.json README.md"
+  },
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com",
+    "directory": "src"
   },
   "dependencies": {
     "@apollo/client": "^3.8.4",
@@ -59,13 +66,14 @@
     "@types/query-string": "^6.3.0",
     "@types/react-hook-mousetrap": "^2.0.2",
     "@types/react-syntax-highlighter": "^15.5.7",
-    "@wandb/semantic": "file:./wandb-semantic-v0.0.1.tgz",
-    "@wandb/ui": "file:./wandb-ui-0.1.0.tgz",
+    "@wandb/semantic": "^0.0.1",
+    "@wandb/ui": "^0.1.0",
     "ansi_up": "^3.0.0",
     "body-scroll-lock": "^2.6.4",
     "classnames": "^2.2.6",
     "copy-to-clipboard": "^3.0.8",
     "cytoscape-dagre": "^2.2.2",
+    "detect-browser": "^5.3.0",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
     "emoji-picker-react": "^4.9.3",
@@ -202,7 +210,6 @@
     "autoprefixer": "^10.4.13",
     "babel-eslint": "^10.1.0",
     "concurrently": "^7.5.0",
-    "detect-browser": "^5.2.1",
     "esbuild": "^0.17.15",
     "eslint": "^8.40.0",
     "eslint-config-prettier": "^2.3.0",

@@ -232,7 +232,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = self._generic_request_executor(url, req, stream=True)
         for line in r.iter_lines():
             if line:
-                yield res_model.model_validate(json.loads(line))
+                yield res_model.model_validate_json(line)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -350,6 +350,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ObjQueryRes:
         return self._generic_request(
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
+        )
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        return self._generic_request(
+            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
 
     def table_create(

@@ -24,6 +24,7 @@ from weave.trace.ipython import (
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace_server.trace_server_interface_util import str_digest
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
@@ -345,7 +346,7 @@ def _get_code_deps(
     warnings: list[str] = []
     if depth > 20:
         warnings = [
-            "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
+            "Recursion depth exceeded in get_code_deps, this may indicate circular dependencies, which are not yet handled."
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
@@ -445,17 +446,21 @@ def _get_code_deps(
 
                     from weave.trace.serialize import to_json
 
-                    json_val = to_json(var_value, client._project_id(), client)
+                    # Redact sensitive values
+                    if should_redact(var_name):
+                        json_val = REDACTED_VALUE
+                    else:
+                        json_val = to_json(var_value, client._project_id(), client)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
                     )
                 else:
-                    code_paragraph = (
-                        f"{var_name} = "
-                        + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
-                        + "\n"
-                    )
+                    if should_redact(var_name):
+                        json_str = f'"{REDACTED_VALUE}"'
+                    else:
+                        json_str = json.dumps(json_val, cls=RefJSONEncoder, indent=4)
+                    code_paragraph = f"{var_name} = " + json_str + "\n"
                     code_paragraph = code_paragraph.replace(
                         f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
                     )

@@ -7,6 +7,7 @@ import {
   GridRowId,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   Dispatch,
@@ -22,6 +23,7 @@ import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {isWeaveRef} from '../../filters/common';
+import {objectRefDisplayName} from '../../smallRef/SmallWeaveRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
   CustomWeaveTypePayload,
@@ -161,8 +163,13 @@ export const ObjectViewer = ({
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
+      if (!r) {
         // Shouldn't be possible
+        continue;
+      }
+      if (!v) {
+        // Value for ref not found, must be deleted
+        refValues[r] = deletedRefValuePlaceholder(r);
         continue;
       }
       let val = r;
@@ -681,7 +688,7 @@ const ShowMoreButtons = ({
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
         <Button
-          variant="quiet"
+          variant="ghost"
           onClick={() => {
             const {newData, store} = updateTruncatedDataFromStore(
               parentPath,
@@ -696,7 +703,7 @@ const ShowMoreButtons = ({
         </Button>
       )}
       <Button
-        variant="quiet"
+        variant="ghost"
         onClick={() => {
           const {newData, store} = updateTruncatedDataFromStore(
             parentPath,
@@ -724,4 +731,19 @@ const useTruncatedData = (data: Data) => {
   }, [data]);
 
   return {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore};
+};
+
+// Placeholder value for deleted refs
+const DELETED_REF_KEY = '_weave_deleted_ref';
+const deletedRefValuePlaceholder = (
+  ref: string
+): {[DELETED_REF_KEY]: string} => {
+  const parsedRef = parseRef(ref);
+  const refString = objectRefDisplayName(parsedRef).label;
+  return {[DELETED_REF_KEY]: refString};
+};
+export const maybeGetDeletedRefValuePlaceholderFromRow = (
+  row: any
+): string | undefined => {
+  return row.value?.[DELETED_REF_KEY];
 };

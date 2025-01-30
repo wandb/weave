@@ -155,7 +155,7 @@ export const PlaygroundChat = ({
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>
                             editMessage(idx, messageIndex, newMessage),
-                          deleteChoice: choiceIndex =>
+                          deleteChoice: (messageIndex, choiceIndex) =>
                             deleteChoice(idx, choiceIndex),
                           addMessage: newMessage => addMessage(idx, newMessage),
                           editChoice: (choiceIndex, newChoice) =>

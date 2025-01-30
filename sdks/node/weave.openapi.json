@@ -1,9 +1,7 @@
 {
   "openapi": "3.1.0",
-  "info": {
-    "title": "FastAPI",
-    "version": "0.1.0"
-  },
+  "info": {"title": "FastAPI", "version": "0.1.0"},
+  "servers": [{"url": "https://api.wandb.ai"}],
   "paths": {
     "/health": {
       "get": {
@@ -13,11 +11,7 @@
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "content": {"application/json": {"schema": {}}}
           }
         }
       }
@@ -32,9 +26,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServerInfoRes"
-                }
+                "schema": {"$ref": "#/components/schemas/ServerInfoRes"}
               }
             }
           }
@@ -49,9 +41,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallStartReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallStartReq"}
             }
           },
           "required": true
@@ -61,9 +51,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallStartRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallStartRes"}
               }
             }
           },
@@ -71,18 +59,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/call/end": {
@@ -93,9 +75,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallEndReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallEndReq"}
             }
           },
           "required": true
@@ -105,9 +85,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallEndRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallEndRes"}
               }
             }
           },
@@ -115,18 +93,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/call/upsert_batch": {
@@ -137,9 +109,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallCreateBatchReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallCreateBatchReq"}
             }
           },
           "required": true
@@ -149,9 +119,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallCreateBatchRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallCreateBatchRes"}
               }
             }
           },
@@ -159,18 +127,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/calls/delete": {
@@ -181,9 +143,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallsDeleteReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallsDeleteReq"}
             }
           },
           "required": true
@@ -193,9 +153,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallsDeleteRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallsDeleteRes"}
               }
             }
           },
@@ -203,18 +161,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/call/update": {
@@ -225,9 +177,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallUpdateReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallUpdateReq"}
             }
           },
           "required": true
@@ -237,9 +187,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallUpdateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallUpdateRes"}
               }
             }
           },
@@ -247,18 +195,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/call/read": {
@@ -269,9 +211,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallReadReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallReadReq"}
             }
           },
           "required": true
@@ -281,9 +221,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallReadRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallReadRes"}
               }
             }
           },
@@ -291,18 +229,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/calls/query_stats": {
@@ -313,9 +245,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallsQueryStatsReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallsQueryStatsReq"}
             }
           },
           "required": true
@@ -325,9 +255,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallsQueryStatsRes"
-                }
+                "schema": {"$ref": "#/components/schemas/CallsQueryStatsRes"}
               }
             }
           },
@@ -335,18 +263,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/calls/stream_query": {
@@ -354,11 +276,7 @@
         "tags": ["Calls"],
         "summary": "Calls Query Stream",
         "operationId": "calls_query_stream_calls_stream_query_post",
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ],
+        "security": [{"HTTPBasic": []}],
         "parameters": [
           {
             "name": "accept",
@@ -375,28 +293,20 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallsQueryReq"
-              }
+              "schema": {"$ref": "#/components/schemas/CallsQueryReq"}
             }
           }
         },
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "content": {"application/json": {"schema": {}}}
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
@@ -411,9 +321,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ObjCreateReq"
-              }
+              "schema": {"$ref": "#/components/schemas/ObjCreateReq"}
             }
           },
           "required": true
@@ -423,9 +331,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjCreateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/ObjCreateRes"}
               }
             }
           },
@@ -433,18 +339,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/obj/read": {
@@ -455,9 +355,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ObjReadReq"
-              }
+              "schema": {"$ref": "#/components/schemas/ObjReadReq"}
             }
           },
           "required": true
@@ -467,9 +365,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjReadRes"
-                }
+                "schema": {"$ref": "#/components/schemas/ObjReadRes"}
               }
             }
           },
@@ -477,18 +373,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/objs/query": {
@@ -499,9 +389,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ObjQueryReq"
-              }
+              "schema": {"$ref": "#/components/schemas/ObjQueryReq"}
             }
           },
           "required": true
@@ -511,9 +399,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjQueryRes"
-                }
+                "schema": {"$ref": "#/components/schemas/ObjQueryRes"}
               }
             }
           },
@@ -521,18 +407,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/table/create": {
@@ -543,9 +423,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TableCreateReq"
-              }
+              "schema": {"$ref": "#/components/schemas/TableCreateReq"}
             }
           },
           "required": true
@@ -555,9 +433,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TableCreateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/TableCreateRes"}
               }
             }
           },
@@ -565,18 +441,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/table/update": {
@@ -587,9 +457,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TableUpdateReq"
-              }
+              "schema": {"$ref": "#/components/schemas/TableUpdateReq"}
             }
           },
           "required": true
@@ -599,9 +467,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TableUpdateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/TableUpdateRes"}
               }
             }
           },
@@ -609,18 +475,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/table/query": {
@@ -631,9 +491,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TableQueryReq"
-              }
+              "schema": {"$ref": "#/components/schemas/TableQueryReq"}
             }
           },
           "required": true
@@ -643,9 +501,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TableQueryRes"
-                }
+                "schema": {"$ref": "#/components/schemas/TableQueryRes"}
               }
             }
           },
@@ -653,18 +509,46 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
+        "security": [{"HTTPBasic": []}]
+      }
+    },
+    "/table/query_stats": {
+      "post": {
+        "tags": ["Tables"],
+        "summary": "Table Query Stats",
+        "operationId": "table_query_stats_table_query_stats_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/TableQueryStatsReq"}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TableQueryStatsRes"}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
+              }
+            }
           }
-        ]
+        },
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/refs/read_batch": {
@@ -675,9 +559,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefsReadBatchReq"
-              }
+              "schema": {"$ref": "#/components/schemas/RefsReadBatchReq"}
             }
           },
           "required": true
@@ -687,9 +569,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RefsReadBatchRes"
-                }
+                "schema": {"$ref": "#/components/schemas/RefsReadBatchRes"}
               }
             }
           },
@@ -697,18 +577,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/file/create": {
@@ -731,9 +605,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileCreateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/FileCreateRes"}
               }
             }
           },
@@ -741,18 +613,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/file/content": {
@@ -763,9 +629,37 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FileContentReadReq"
+              "schema": {"$ref": "#/components/schemas/FileContentReadReq"}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
+            }
+          }
+        },
+        "security": [{"HTTPBasic": []}]
+      }
+    },
+    "/cost/create": {
+      "post": {
+        "tags": ["Costs"],
+        "summary": "Cost Create",
+        "operationId": "cost_create_cost_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CostCreateReq"}
             }
           },
           "required": true
@@ -775,7 +669,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {"$ref": "#/components/schemas/CostCreateRes"}
               }
             }
           },
@@ -783,18 +677,80 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
+        "security": [{"HTTPBasic": []}]
+      }
+    },
+    "/cost/query": {
+      "post": {
+        "tags": ["Costs"],
+        "summary": "Cost Query",
+        "operationId": "cost_query_cost_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CostQueryReq"}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CostQueryRes"}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
+              }
+            }
           }
-        ]
+        },
+        "security": [{"HTTPBasic": []}]
+      }
+    },
+    "/cost/purge": {
+      "post": {
+        "tags": ["Costs"],
+        "summary": "Cost Purge",
+        "operationId": "cost_purge_cost_purge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CostPurgeReq"}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CostPurgeRes"}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
+              }
+            }
+          }
+        },
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/feedback/create": {
@@ -806,9 +762,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackCreateReq"
-              }
+              "schema": {"$ref": "#/components/schemas/FeedbackCreateReq"}
             }
           },
           "required": true
@@ -818,9 +772,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedbackCreateRes"
-                }
+                "schema": {"$ref": "#/components/schemas/FeedbackCreateRes"}
               }
             }
           },
@@ -828,18 +780,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/feedback/query": {
@@ -851,9 +797,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackQueryReq"
-              }
+              "schema": {"$ref": "#/components/schemas/FeedbackQueryReq"}
             }
           },
           "required": true
@@ -863,9 +807,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedbackQueryRes"
-                }
+                "schema": {"$ref": "#/components/schemas/FeedbackQueryRes"}
               }
             }
           },
@@ -873,18 +815,12 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
+        "security": [{"HTTPBasic": []}]
       }
     },
     "/feedback/purge": {
@@ -896,9 +832,7 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackPurgeReq"
-              }
+              "schema": {"$ref": "#/components/schemas/FeedbackPurgeReq"}
             }
           },
           "required": true
@@ -908,9 +842,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedbackPurgeRes"
-                }
+                "schema": {"$ref": "#/components/schemas/FeedbackPurgeRes"}
               }
             }
           },
@@ -918,18 +850,46 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
               }
             }
           }
         },
-        "security": [
-          {
-            "HTTPBasic": []
+        "security": [{"HTTPBasic": []}]
+      }
+    },
+    "/feedback/replace": {
+      "post": {
+        "tags": ["Feedback"],
+        "summary": "Feedback Replace",
+        "operationId": "feedback_replace_feedback_replace_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/FeedbackReplaceReq"}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/FeedbackReplaceRes"}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
+              }
+            }
           }
-        ]
+        },
+        "security": [{"HTTPBasic": []}]
       }
     }
   },
@@ -940,39 +900,17 @@
           "$and": {
             "items": {
               "anyOf": [
-                {
-                  "$ref": "#/components/schemas/LiteralOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GetFieldOperator"
-                },
-                {
-                  "$ref": "#/components/schemas/ConvertOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/AndOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/OrOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/NotOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/EqOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GtOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GteOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/InOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/ContainsOperation"
-                }
+                {"$ref": "#/components/schemas/LiteralOperation"},
+                {"$ref": "#/components/schemas/GetFieldOperator"},
+                {"$ref": "#/components/schemas/ConvertOperation"},
+                {"$ref": "#/components/schemas/AndOperation"},
+                {"$ref": "#/components/schemas/OrOperation"},
+                {"$ref": "#/components/schemas/NotOperation"},
+                {"$ref": "#/components/schemas/EqOperation"},
+                {"$ref": "#/components/schemas/GtOperation"},
+                {"$ref": "#/components/schemas/GteOperation"},
+                {"$ref": "#/components/schemas/InOperation"},
+                {"$ref": "#/components/schemas/ContainsOperation"}
               ]
             },
             "type": "array",
@@ -985,15 +923,8 @@
       },
       "Body_file_create_file_create_post": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "file": {
-            "type": "string",
-            "format": "binary",
-            "title": "File"
-          }
+          "project_id": {"type": "string", "title": "Project Id"},
+          "file": {"type": "string", "format": "binary", "title": "File"}
         },
         "type": "object",
         "required": ["project_id", "file"],
@@ -1001,14 +932,8 @@
       },
       "CallBatchEndMode": {
         "properties": {
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "default": "end"
-          },
-          "req": {
-            "$ref": "#/components/schemas/CallEndReq"
-          }
+          "mode": {"type": "string", "title": "Mode", "default": "end"},
+          "req": {"$ref": "#/components/schemas/CallEndReq"}
         },
         "type": "object",
         "required": ["req"],
@@ -1016,14 +941,8 @@
       },
       "CallBatchStartMode": {
         "properties": {
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "default": "start"
-          },
-          "req": {
-            "$ref": "#/components/schemas/CallStartReq"
-          }
+          "mode": {"type": "string", "title": "Mode", "default": "start"},
+          "req": {"$ref": "#/components/schemas/CallStartReq"}
         },
         "type": "object",
         "required": ["req"],
@@ -1034,12 +953,8 @@
           "batch": {
             "items": {
               "anyOf": [
-                {
-                  "$ref": "#/components/schemas/CallBatchStartMode"
-                },
-                {
-                  "$ref": "#/components/schemas/CallBatchEndMode"
-                }
+                {"$ref": "#/components/schemas/CallBatchStartMode"},
+                {"$ref": "#/components/schemas/CallBatchEndMode"}
               ]
             },
             "type": "array",
@@ -1055,12 +970,8 @@
           "res": {
             "items": {
               "anyOf": [
-                {
-                  "$ref": "#/components/schemas/CallStartRes"
-                },
-                {
-                  "$ref": "#/components/schemas/CallEndRes"
-                }
+                {"$ref": "#/components/schemas/CallStartRes"},
+                {"$ref": "#/components/schemas/CallEndRes"}
               ]
             },
             "type": "array",
@@ -1073,38 +984,19 @@
       },
       "CallEndReq": {
         "properties": {
-          "end": {
-            "$ref": "#/components/schemas/EndedCallSchemaForInsert"
-          }
+          "end": {"$ref": "#/components/schemas/EndedCallSchemaForInsert"}
         },
         "type": "object",
         "required": ["end"],
         "title": "CallEndReq"
       },
-      "CallEndRes": {
-        "properties": {},
-        "type": "object",
-        "title": "CallEndRes"
-      },
+      "CallEndRes": {"properties": {}, "type": "object", "title": "CallEndRes"},
       "CallReadReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
+          "id": {"type": "string", "title": "Id"},
           "include_costs": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
             "title": "Include Costs",
             "default": false
           }
@@ -1117,12 +1009,8 @@
         "properties": {
           "call": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/CallSchema"
-              },
-              {
-                "type": "null"
-              }
+              {"$ref": "#/components/schemas/CallSchema"},
+              {"type": "null"}
             ]
           }
         },
@@ -1132,42 +1020,16 @@
       },
       "CallSchema": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "op_name": {
-            "type": "string",
-            "title": "Op Name"
-          },
+          "id": {"type": "string", "title": "Id"},
+          "project_id": {"type": "string", "title": "Project Id"},
+          "op_name": {"type": "string", "title": "Op Name"},
           "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Display Name"
           },
-          "trace_id": {
-            "type": "string",
-            "title": "Trace Id"
-          },
+          "trace_id": {"type": "string", "title": "Trace Id"},
           "parent_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Parent Id"
           },
           "started_at": {
@@ -1175,93 +1037,52 @@
             "format": "date-time",
             "title": "Started At"
           },
-          "attributes": {
-            "type": "object",
-            "title": "Attributes"
-          },
-          "inputs": {
-            "type": "object",
-            "title": "Inputs"
-          },
+          "attributes": {"type": "object", "title": "Attributes"},
+          "inputs": {"type": "object", "title": "Inputs"},
           "ended_at": {
             "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
+              {"type": "string", "format": "date-time"},
+              {"type": "null"}
             ],
             "title": "Ended At"
           },
           "exception": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Exception"
           },
-          "output": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output"
-          },
-          "summary": {
-            "type": "object"
-          },
+          "output": {"anyOf": [{}, {"type": "null"}], "title": "Output"},
+          "summary": {"type": "object"},
           "wb_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb User Id"
           },
           "wb_run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb Run Id"
           },
           "deleted_at": {
             "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
+              {"type": "string", "format": "date-time"},
+              {"type": "null"}
             ],
             "title": "Deleted At"
           }
         },
         "type": "object",
-        "required": ["id", "project_id", "op_name", "trace_id", "started_at", "attributes", "inputs"],
+        "required": [
+          "id",
+          "project_id",
+          "op_name",
+          "trace_id",
+          "started_at",
+          "attributes",
+          "inputs"
+        ],
         "title": "CallSchema"
       },
       "CallStartReq": {
         "properties": {
-          "start": {
-            "$ref": "#/components/schemas/StartedCallSchemaForInsert"
-          }
+          "start": {"$ref": "#/components/schemas/StartedCallSchemaForInsert"}
         },
         "type": "object",
         "required": ["start"],
@@ -1269,14 +1090,8 @@
       },
       "CallStartRes": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "trace_id": {
-            "type": "string",
-            "title": "Trace Id"
-          }
+          "id": {"type": "string", "title": "Id"},
+          "trace_id": {"type": "string", "title": "Trace Id"}
         },
         "type": "object",
         "required": ["id", "trace_id"],
@@ -1284,34 +1099,14 @@
       },
       "CallUpdateReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "call_id": {
-            "type": "string",
-            "title": "Call Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
+          "call_id": {"type": "string", "title": "Call Id"},
           "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Display Name"
           },
           "wb_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb User Id",
             "description": "Do not set directly. Server will automatically populate this field."
           }
@@ -1327,26 +1122,14 @@
       },
       "CallsDeleteReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
           "call_ids": {
-            "items": {
-              "type": "string"
-            },
+            "items": {"type": "string"},
             "type": "array",
             "title": "Call Ids"
           },
           "wb_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb User Id",
             "description": "Do not set directly. Server will automatically populate this field."
           }
@@ -1364,124 +1147,61 @@
         "properties": {
           "op_names": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Op Names"
           },
           "input_refs": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Input Refs"
           },
           "output_refs": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Output Refs"
           },
           "parent_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Parent Ids"
           },
           "trace_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Trace Ids"
           },
           "call_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Call Ids"
           },
           "trace_roots_only": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
             "title": "Trace Roots Only"
           },
           "wb_user_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Wb User Ids"
           },
           "wb_run_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Wb Run Ids"
           }
@@ -1491,103 +1211,57 @@
       },
       "CallsQueryReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
           "filter": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/CallsFilter"
-              },
-              {
-                "type": "null"
-              }
+              {"$ref": "#/components/schemas/CallsFilter"},
+              {"type": "null"}
             ]
           },
           "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Limit"
           },
           "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Offset"
           },
           "sort_by": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/SortBy"
-                },
+                "items": {"$ref": "#/components/schemas/SortBy"},
                 "type": "array"
               },
-              {
-                "type": "null"
-              }
+              {"type": "null"}
             ],
             "title": "Sort By"
           },
           "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Query"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "anyOf": [{"$ref": "#/components/schemas/Query"}, {"type": "null"}]
           },
           "include_costs": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
             "title": "Include Costs",
+            "description": "Beta, subject to change. If true, the response will include any model costs for each call.",
+            "default": false
+          },
+          "include_feedback": {
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+            "title": "Include Feedback",
+            "description": "Beta, subject to change. If true, the response will include feedback for each call.",
             "default": false
           },
           "columns": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Columns"
           },
           "expand_columns": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Expand Columns",
             "description": "Columns to expand, i.e. refs to other objects",
@@ -1600,29 +1274,15 @@
       },
       "CallsQueryStatsReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
           "filter": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/CallsFilter"
-              },
-              {
-                "type": "null"
-              }
+              {"$ref": "#/components/schemas/CallsFilter"},
+              {"type": "null"}
             ]
           },
           "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Query"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "anyOf": [{"$ref": "#/components/schemas/Query"}, {"type": "null"}]
           }
         },
         "type": "object",
@@ -1630,21 +1290,14 @@
         "title": "CallsQueryStatsReq"
       },
       "CallsQueryStatsRes": {
-        "properties": {
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          }
-        },
+        "properties": {"count": {"type": "integer", "title": "Count"}},
         "type": "object",
         "required": ["count"],
         "title": "CallsQueryStatsRes"
       },
       "ContainsOperation": {
         "properties": {
-          "$contains": {
-            "$ref": "#/components/schemas/ContainsSpec"
-          }
+          "$contains": {"$ref": "#/components/schemas/ContainsSpec"}
         },
         "type": "object",
         "required": ["$contains"],
@@ -1654,89 +1307,38 @@
         "properties": {
           "input": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/LiteralOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GetFieldOperator"
-              },
-              {
-                "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/AndOperation"
-              },
-              {
-                "$ref": "#/components/schemas/OrOperation"
-              },
-              {
-                "$ref": "#/components/schemas/NotOperation"
-              },
-              {
-                "$ref": "#/components/schemas/EqOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/InOperation"
-              },
-              {
-                "$ref": "#/components/schemas/ContainsOperation"
-              }
+              {"$ref": "#/components/schemas/LiteralOperation"},
+              {"$ref": "#/components/schemas/GetFieldOperator"},
+              {"$ref": "#/components/schemas/ConvertOperation"},
+              {"$ref": "#/components/schemas/AndOperation"},
+              {"$ref": "#/components/schemas/OrOperation"},
+              {"$ref": "#/components/schemas/NotOperation"},
+              {"$ref": "#/components/schemas/EqOperation"},
+              {"$ref": "#/components/schemas/GtOperation"},
+              {"$ref": "#/components/schemas/GteOperation"},
+              {"$ref": "#/components/schemas/InOperation"},
+              {"$ref": "#/components/schemas/ContainsOperation"}
             ],
             "title": "Input"
           },
           "substr": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/LiteralOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GetFieldOperator"
-              },
-              {
-                "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/AndOperation"
-              },
-              {
-                "$ref": "#/components/schemas/OrOperation"
-              },
-              {
-                "$ref": "#/components/schemas/NotOperation"
-              },
-              {
-                "$ref": "#/components/schemas/EqOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/InOperation"
-              },
-              {
-                "$ref": "#/components/schemas/ContainsOperation"
-              }
+              {"$ref": "#/components/schemas/LiteralOperation"},
+              {"$ref": "#/components/schemas/GetFieldOperator"},
+              {"$ref": "#/components/schemas/ConvertOperation"},
+              {"$ref": "#/components/schemas/AndOperation"},
+              {"$ref": "#/components/schemas/OrOperation"},
+              {"$ref": "#/components/schemas/NotOperation"},
+              {"$ref": "#/components/schemas/EqOperation"},
+              {"$ref": "#/components/schemas/GtOperation"},
+              {"$ref": "#/components/schemas/GteOperation"},
+              {"$ref": "#/components/schemas/InOperation"},
+              {"$ref": "#/components/schemas/ContainsOperation"}
             ],
             "title": "Substr"
           },
           "case_insensitive": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
             "title": "Case Insensitive",
             "default": false
           }
@@ -1747,9 +1349,7 @@
       },
       "ConvertOperation": {
         "properties": {
-          "$convert": {
-            "$ref": "#/components/schemas/ConvertSpec"
-          }
+          "$convert": {"$ref": "#/components/schemas/ConvertSpec"}
         },
         "type": "object",
         "required": ["$convert"],
@@ -1759,39 +1359,17 @@
         "properties": {
           "input": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/LiteralOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GetFieldOperator"
-              },
-              {
-                "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/AndOperation"
-              },
-              {
-                "$ref": "#/components/schemas/OrOperation"
-              },
-              {
-                "$ref": "#/components/schemas/NotOperation"
-              },
-              {
-                "$ref": "#/components/schemas/EqOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/InOperation"
-              },
-              {
-                "$ref": "#/components/schemas/ContainsOperation"
-              }
+              {"$ref": "#/components/schemas/LiteralOperation"},
+              {"$ref": "#/components/schemas/GetFieldOperator"},
+              {"$ref": "#/components/schemas/ConvertOperation"},
+              {"$ref": "#/components/schemas/AndOperation"},
+              {"$ref": "#/components/schemas/OrOperation"},
+              {"$ref": "#/components/schemas/NotOperation"},
+              {"$ref": "#/components/schemas/EqOperation"},
+              {"$ref": "#/components/schemas/GtOperation"},
+              {"$ref": "#/components/schemas/GteOperation"},
+              {"$ref": "#/components/schemas/InOperation"},
+              {"$ref": "#/components/schemas/ContainsOperation"}
             ],
             "title": "Input"
           },
@@ -1805,44 +1383,232 @@
         "required": ["input", "to"],
         "title": "ConvertSpec"
       },
-      "EndedCallSchemaForInsert": {
+      "CostCreateInput": {
+        "properties": {
+          "prompt_token_cost": {"type": "number", "title": "Prompt Token Cost"},
+          "completion_token_cost": {
+            "type": "number",
+            "title": "Completion Token Cost"
+          },
+          "prompt_token_cost_unit": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Prompt Token Cost Unit",
+            "description": "The unit of the cost for the prompt tokens",
+            "default": "USD"
+          },
+          "completion_token_cost_unit": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Completion Token Cost Unit",
+            "description": "The unit of the cost for the completion tokens",
+            "default": "USD"
+          },
+          "effective_date": {
+            "anyOf": [
+              {"type": "string", "format": "date-time"},
+              {"type": "null"}
+            ],
+            "title": "Effective Date",
+            "description": "The date after which the cost is effective for, will default to the current date if not provided"
+          },
+          "provider_id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Provider Id",
+            "description": "The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'"
+          }
+        },
+        "type": "object",
+        "required": ["prompt_token_cost", "completion_token_cost"],
+        "title": "CostCreateInput"
+      },
+      "CostCreateReq": {
         "properties": {
           "project_id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Project Id",
+            "examples": ["entity/project"]
           },
-          "id": {
+          "costs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CostCreateInput"
+            },
+            "type": "object",
+            "title": "Costs"
+          },
+          "wb_user_id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "costs"],
+        "title": "CostCreateReq"
+      },
+      "CostCreateRes": {
+        "properties": {
+          "ids": {
+            "items": {
+              "prefixItems": [{"type": "string"}, {"type": "string"}],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": ["ids"],
+        "title": "CostCreateRes"
+      },
+      "CostPurgeReq": {
+        "properties": {
+          "project_id": {
             "type": "string",
-            "title": "Id"
+            "title": "Project Id",
+            "examples": ["entity/project"]
           },
+          "query": {"$ref": "#/components/schemas/Query"}
+        },
+        "type": "object",
+        "required": ["project_id", "query"],
+        "title": "CostPurgeReq"
+      },
+      "CostPurgeRes": {
+        "properties": {},
+        "type": "object",
+        "title": "CostPurgeRes"
+      },
+      "CostQueryOutput": {
+        "properties": {
+          "id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Id",
+            "examples": ["2341-asdf-asdf"]
+          },
+          "llm_id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Llm Id",
+            "examples": ["gpt4"]
+          },
+          "prompt_token_cost": {
+            "anyOf": [{"type": "number"}, {"type": "null"}],
+            "title": "Prompt Token Cost",
+            "examples": [1.0]
+          },
+          "completion_token_cost": {
+            "anyOf": [{"type": "number"}, {"type": "null"}],
+            "title": "Completion Token Cost",
+            "examples": [1.0]
+          },
+          "prompt_token_cost_unit": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Prompt Token Cost Unit",
+            "examples": ["USD"]
+          },
+          "completion_token_cost_unit": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Completion Token Cost Unit",
+            "examples": ["USD"]
+          },
+          "effective_date": {
+            "anyOf": [
+              {"type": "string", "format": "date-time"},
+              {"type": "null"}
+            ],
+            "title": "Effective Date",
+            "examples": ["2024-01-01T00:00:00Z"]
+          },
+          "provider_id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Provider Id",
+            "examples": ["openai"]
+          }
+        },
+        "type": "object",
+        "title": "CostQueryOutput"
+      },
+      "CostQueryReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "examples": ["entity/project"]
+          },
+          "fields": {
+            "anyOf": [
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
+            ],
+            "title": "Fields",
+            "examples": [
+              [
+                "id",
+                "llm_id",
+                "prompt_token_cost",
+                "completion_token_cost",
+                "prompt_token_cost_unit",
+                "completion_token_cost_unit",
+                "effective_date",
+                "provider_id"
+              ]
+            ]
+          },
+          "query": {
+            "anyOf": [{"$ref": "#/components/schemas/Query"}, {"type": "null"}]
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "items": {"$ref": "#/components/schemas/SortBy"},
+                "type": "array"
+              },
+              {"type": "null"}
+            ],
+            "title": "Sort By"
+          },
+          "limit": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Limit",
+            "examples": [10]
+          },
+          "offset": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Offset",
+            "examples": [0]
+          }
+        },
+        "type": "object",
+        "required": ["project_id"],
+        "title": "CostQueryReq"
+      },
+      "CostQueryRes": {
+        "properties": {
+          "results": {
+            "items": {"$ref": "#/components/schemas/CostQueryOutput"},
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": ["results"],
+        "title": "CostQueryRes"
+      },
+      "EndedCallSchemaForInsert": {
+        "properties": {
+          "project_id": {"type": "string", "title": "Project Id"},
+          "id": {"type": "string", "title": "Id"},
           "ended_at": {
             "type": "string",
             "format": "date-time",
             "title": "Ended At"
           },
           "exception": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Exception"
           },
-          "output": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output"
-          },
-          "summary": {
-            "$ref": "#/components/schemas/SummaryInsertMap"
-          }
+          "output": {"anyOf": [{}, {"type": "null"}], "title": "Output"},
+          "summary": {"$ref": "#/components/schemas/SummaryInsertMap"}
         },
         "type": "object",
         "required": ["project_id", "id", "ended_at", "summary"],
@@ -1854,76 +1620,32 @@
             "prefixItems": [
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               },
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               }
             ],
@@ -1950,14 +1672,7 @@
             "examples": ["weave:///entity/project/object/name:digest"]
           },
           "creator": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Creator",
             "examples": ["Jane Smith"]
           },
@@ -1969,21 +1684,30 @@
           "payload": {
             "type": "object",
             "title": "Payload",
-            "examples": [
-              {
-                "key": "value"
-              }
-            ]
+            "examples": [{"key": "value"}]
+          },
+          "annotation_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Annotation Ref",
+            "examples": ["weave:///entity/project/object/name:digest"]
+          },
+          "runnable_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Runnable Ref",
+            "examples": ["weave:///entity/project/op/name:digest"]
+          },
+          "call_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Call Ref",
+            "examples": ["weave:///entity/project/call/call_id"]
+          },
+          "trigger_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Trigger Ref",
+            "examples": ["weave:///entity/project/object/name:digest"]
           },
           "wb_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb User Id",
             "description": "Do not set directly. Server will automatically populate this field."
           }
@@ -1994,23 +1718,14 @@
       },
       "FeedbackCreateRes": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
+          "id": {"type": "string", "title": "Id"},
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
           },
-          "wb_user_id": {
-            "type": "string",
-            "title": "Wb User Id"
-          },
-          "payload": {
-            "type": "object",
-            "title": "Payload"
-          }
+          "wb_user_id": {"type": "string", "title": "Wb User Id"},
+          "payload": {"type": "object", "title": "Payload"}
         },
         "type": "object",
         "required": ["id", "created_at", "wb_user_id", "payload"],
@@ -2023,9 +1738,7 @@
             "title": "Project Id",
             "examples": ["entity/project"]
           },
-          "query": {
-            "$ref": "#/components/schemas/Query"
-          }
+          "query": {"$ref": "#/components/schemas/Query"}
         },
         "type": "object",
         "required": ["project_id", "query"],
@@ -2045,64 +1758,32 @@
           },
           "fields": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
             "title": "Fields",
             "examples": [["id", "feedback_type", "payload.note"]]
           },
           "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Query"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "anyOf": [{"$ref": "#/components/schemas/Query"}, {"type": "null"}]
           },
           "sort_by": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/SortBy"
-                },
+                "items": {"$ref": "#/components/schemas/SortBy"},
                 "type": "array"
               },
-              {
-                "type": "null"
-              }
+              {"type": "null"}
             ],
             "title": "Sort By"
           },
           "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Limit",
             "examples": [10]
           },
           "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Offset",
             "examples": [0]
           }
@@ -2114,9 +1795,7 @@
       "FeedbackQueryRes": {
         "properties": {
           "result": {
-            "items": {
-              "type": "object"
-            },
+            "items": {"type": "object"},
             "type": "array",
             "title": "Result"
           }
@@ -2125,39 +1804,102 @@
         "required": ["result"],
         "title": "FeedbackQueryRes"
       },
-      "FileContentReadReq": {
+      "FeedbackReplaceReq": {
         "properties": {
           "project_id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Project Id",
+            "examples": ["entity/project"]
           },
-          "digest": {
+          "weave_ref": {
             "type": "string",
-            "title": "Digest"
-          }
+            "title": "Weave Ref",
+            "examples": ["weave:///entity/project/object/name:digest"]
+          },
+          "creator": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Creator",
+            "examples": ["Jane Smith"]
+          },
+          "feedback_type": {
+            "type": "string",
+            "title": "Feedback Type",
+            "examples": ["custom"]
+          },
+          "payload": {
+            "type": "object",
+            "title": "Payload",
+            "examples": [{"key": "value"}]
+          },
+          "annotation_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Annotation Ref",
+            "examples": ["weave:///entity/project/object/name:digest"]
+          },
+          "runnable_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Runnable Ref",
+            "examples": ["weave:///entity/project/op/name:digest"]
+          },
+          "call_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Call Ref",
+            "examples": ["weave:///entity/project/call/call_id"]
+          },
+          "trigger_ref": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Trigger Ref",
+            "examples": ["weave:///entity/project/object/name:digest"]
+          },
+          "wb_user_id": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          },
+          "feedback_id": {"type": "string", "title": "Feedback Id"}
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "weave_ref",
+          "feedback_type",
+          "payload",
+          "feedback_id"
+        ],
+        "title": "FeedbackReplaceReq"
+      },
+      "FeedbackReplaceRes": {
+        "properties": {
+          "id": {"type": "string", "title": "Id"},
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "wb_user_id": {"type": "string", "title": "Wb User Id"},
+          "payload": {"type": "object", "title": "Payload"}
+        },
+        "type": "object",
+        "required": ["id", "created_at", "wb_user_id", "payload"],
+        "title": "FeedbackReplaceRes"
+      },
+      "FileContentReadReq": {
+        "properties": {
+          "project_id": {"type": "string", "title": "Project Id"},
+          "digest": {"type": "string", "title": "Digest"}
         },
         "type": "object",
         "required": ["project_id", "digest"],
         "title": "FileContentReadReq"
       },
       "FileCreateRes": {
-        "properties": {
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          }
-        },
+        "properties": {"digest": {"type": "string", "title": "Digest"}},
         "type": "object",
         "required": ["digest"],
         "title": "FileCreateRes"
       },
       "GetFieldOperator": {
-        "properties": {
-          "$getField": {
-            "type": "string",
-            "title": "$Getfield"
-          }
-        },
+        "properties": {"$getField": {"type": "string", "title": "$Getfield"}},
         "type": "object",
         "required": ["$getField"],
         "title": "GetFieldOperator"
@@ -2168,76 +1910,32 @@
             "prefixItems": [
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               },
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               }
             ],
@@ -2257,76 +1955,32 @@
             "prefixItems": [
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               },
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               }
             ],
@@ -2343,9 +1997,7 @@
       "HTTPValidationError": {
         "properties": {
           "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
+            "items": {"$ref": "#/components/schemas/ValidationError"},
             "type": "array",
             "title": "Detail"
           }
@@ -2359,77 +2011,33 @@
             "prefixItems": [
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               },
               {
                 "items": {
                   "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/LiteralOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/GetFieldOperator"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ConvertOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/AndOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/OrOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/NotOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/EqOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/GtOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/GteOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ContainsOperation"
-                    }
+                    {"$ref": "#/components/schemas/LiteralOperation"},
+                    {"$ref": "#/components/schemas/GetFieldOperator"},
+                    {"$ref": "#/components/schemas/ConvertOperation"},
+                    {"$ref": "#/components/schemas/AndOperation"},
+                    {"$ref": "#/components/schemas/OrOperation"},
+                    {"$ref": "#/components/schemas/NotOperation"},
+                    {"$ref": "#/components/schemas/EqOperation"},
+                    {"$ref": "#/components/schemas/GtOperation"},
+                    {"$ref": "#/components/schemas/GteOperation"},
+                    {"$ref": "#/components/schemas/InOperation"},
+                    {"$ref": "#/components/schemas/ContainsOperation"}
                   ]
                 },
                 "type": "array"
@@ -2448,69 +2056,27 @@
       "LLMUsageSchema": {
         "properties": {
           "prompt_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Prompt Tokens"
           },
           "input_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Input Tokens"
           },
           "completion_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Completion Tokens"
           },
           "output_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Output Tokens"
           },
           "requests": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Requests"
           },
           "total_tokens": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
             "title": "Total Tokens"
           }
         },
@@ -2521,18 +2087,10 @@
         "properties": {
           "$literal": {
             "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
+              {"type": "string"},
+              {"type": "integer"},
+              {"type": "number"},
+              {"type": "boolean"},
               {
                 "additionalProperties": {
                   "$ref": "#/components/schemas/LiteralOperation"
@@ -2540,14 +2098,10 @@
                 "type": "object"
               },
               {
-                "items": {
-                  "$ref": "#/components/schemas/LiteralOperation"
-                },
+                "items": {"$ref": "#/components/schemas/LiteralOperation"},
                 "type": "array"
               },
-              {
-                "type": "null"
-              }
+              {"type": "null"}
             ],
             "title": "$Literal"
           }
@@ -2562,39 +2116,17 @@
             "prefixItems": [
               {
                 "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/LiteralOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GetFieldOperator"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AndOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/OrOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/NotOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/EqOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GtOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/GteOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/InOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ContainsOperation"
-                  }
+                  {"$ref": "#/components/schemas/LiteralOperation"},
+                  {"$ref": "#/components/schemas/GetFieldOperator"},
+                  {"$ref": "#/components/schemas/ConvertOperation"},
+                  {"$ref": "#/components/schemas/AndOperation"},
+                  {"$ref": "#/components/schemas/OrOperation"},
+                  {"$ref": "#/components/schemas/NotOperation"},
+                  {"$ref": "#/components/schemas/EqOperation"},
+                  {"$ref": "#/components/schemas/GtOperation"},
+                  {"$ref": "#/components/schemas/GteOperation"},
+                  {"$ref": "#/components/schemas/InOperation"},
+                  {"$ref": "#/components/schemas/ContainsOperation"}
                 ]
               }
             ],
@@ -2610,21 +2142,14 @@
       },
       "ObjCreateReq": {
         "properties": {
-          "obj": {
-            "$ref": "#/components/schemas/ObjSchemaForInsert"
-          }
+          "obj": {"$ref": "#/components/schemas/ObjSchemaForInsert"}
         },
         "type": "object",
         "required": ["obj"],
         "title": "ObjCreateReq"
       },
       "ObjCreateRes": {
-        "properties": {
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          }
-        },
+        "properties": {"digest": {"type": "string", "title": "Digest"}},
         "type": "object",
         "required": ["digest"],
         "title": "ObjCreateRes"
@@ -2633,17 +2158,49 @@
         "properties": {
           "project_id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Project Id",
+            "description": "The ID of the project to query",
+            "examples": ["user/project"]
           },
           "filter": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/ObjectVersionFilter"
-              },
-              {
-                "type": "null"
-              }
+              {"$ref": "#/components/schemas/ObjectVersionFilter"},
+              {"type": "null"}
+            ],
+            "description": "Filter criteria for the query. See `ObjectVersionFilter`",
+            "examples": [
+              {"latest_only": true, "object_ids": ["my_favorite_model"]}
             ]
+          },
+          "limit": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Limit",
+            "description": "Maximum number of results to return",
+            "examples": [100]
+          },
+          "offset": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Offset",
+            "description": "Number of results to skip before returning",
+            "examples": [0]
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "items": {"$ref": "#/components/schemas/SortBy"},
+                "type": "array"
+              },
+              {"type": "null"}
+            ],
+            "title": "Sort By",
+            "description": "Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
+            "examples": [[{"direction": "desc", "field": "created_at"}]]
+          },
+          "metadata_only": {
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+            "title": "Metadata Only",
+            "description": "If true, the `val` column is not read from the database and is empty.All other fields are returned.",
+            "default": false
           }
         },
         "type": "object",
@@ -2653,9 +2210,7 @@
       "ObjQueryRes": {
         "properties": {
           "objs": {
-            "items": {
-              "$ref": "#/components/schemas/ObjSchema"
-            },
+            "items": {"$ref": "#/components/schemas/ObjSchema"},
             "type": "array",
             "title": "Objs"
           }
@@ -2666,43 +2221,24 @@
       },
       "ObjReadReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "object_id": {
-            "type": "string",
-            "title": "Object Id"
-          },
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          }
+          "project_id": {"type": "string", "title": "Project Id"},
+          "object_id": {"type": "string", "title": "Object Id"},
+          "digest": {"type": "string", "title": "Digest"}
         },
         "type": "object",
         "required": ["project_id", "object_id", "digest"],
         "title": "ObjReadReq"
       },
       "ObjReadRes": {
-        "properties": {
-          "obj": {
-            "$ref": "#/components/schemas/ObjSchema"
-          }
-        },
+        "properties": {"obj": {"$ref": "#/components/schemas/ObjSchema"}},
         "type": "object",
         "required": ["obj"],
         "title": "ObjReadRes"
       },
       "ObjSchema": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "object_id": {
-            "type": "string",
-            "title": "Object Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
+          "object_id": {"type": "string", "title": "Object Id"},
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2710,46 +2246,20 @@
           },
           "deleted_at": {
             "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
+              {"type": "string", "format": "date-time"},
+              {"type": "null"}
             ],
             "title": "Deleted At"
           },
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          },
-          "version_index": {
-            "type": "integer",
-            "title": "Version Index"
-          },
-          "is_latest": {
-            "type": "integer",
-            "title": "Is Latest"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
-          },
+          "digest": {"type": "string", "title": "Digest"},
+          "version_index": {"type": "integer", "title": "Version Index"},
+          "is_latest": {"type": "integer", "title": "Is Latest"},
+          "kind": {"type": "string", "title": "Kind"},
           "base_object_class": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Base Object Class"
           },
-          "val": {
-            "title": "Val"
-          }
+          "val": {"title": "Val"}
         },
         "type": "object",
         "required": [
@@ -2767,16 +2277,17 @@
       },
       "ObjSchemaForInsert": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
+          "project_id": {"type": "string", "title": "Project Id"},
+          "object_id": {"type": "string", "title": "Object Id"},
+          "val": {"title": "Val"},
+          "builtin_object_class": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Builtin Object Class"
           },
-          "object_id": {
-            "type": "string",
-            "title": "Object Id"
-          },
-          "val": {
-            "title": "Val"
+          "set_base_object_class": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Set Base Object Class",
+            "deprecated": true
           }
         },
         "type": "object",
@@ -2787,53 +2298,33 @@
         "properties": {
           "base_object_classes": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
-            "title": "Base Object Classes"
+            "title": "Base Object Classes",
+            "description": "Filter objects by their base classes",
+            "examples": [["Model"], ["Dataset"]]
           },
           "object_ids": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
-            "title": "Object Ids"
+            "title": "Object Ids",
+            "description": "Filter objects by their IDs",
+            "examples": ["my_favorite_model", "my_favorite_dataset"]
           },
           "is_op": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Op"
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+            "title": "Is Op",
+            "description": "Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
+            "examples": [true, false, null]
           },
           "latest_only": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Only"
+            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+            "title": "Latest Only",
+            "description": "If True, return only the latest version of each object. `False` and `None` will return all versions",
+            "examples": [true, false]
           }
         },
         "type": "object",
@@ -2844,39 +2335,17 @@
           "$or": {
             "items": {
               "anyOf": [
-                {
-                  "$ref": "#/components/schemas/LiteralOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GetFieldOperator"
-                },
-                {
-                  "$ref": "#/components/schemas/ConvertOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/AndOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/OrOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/NotOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/EqOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GtOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/GteOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/InOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/ContainsOperation"
-                }
+                {"$ref": "#/components/schemas/LiteralOperation"},
+                {"$ref": "#/components/schemas/GetFieldOperator"},
+                {"$ref": "#/components/schemas/ConvertOperation"},
+                {"$ref": "#/components/schemas/AndOperation"},
+                {"$ref": "#/components/schemas/OrOperation"},
+                {"$ref": "#/components/schemas/NotOperation"},
+                {"$ref": "#/components/schemas/EqOperation"},
+                {"$ref": "#/components/schemas/GtOperation"},
+                {"$ref": "#/components/schemas/GteOperation"},
+                {"$ref": "#/components/schemas/InOperation"},
+                {"$ref": "#/components/schemas/ContainsOperation"}
               ]
             },
             "type": "array",
@@ -2891,30 +2360,14 @@
         "properties": {
           "$expr": {
             "anyOf": [
-              {
-                "$ref": "#/components/schemas/AndOperation"
-              },
-              {
-                "$ref": "#/components/schemas/OrOperation"
-              },
-              {
-                "$ref": "#/components/schemas/NotOperation"
-              },
-              {
-                "$ref": "#/components/schemas/EqOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/InOperation"
-              },
-              {
-                "$ref": "#/components/schemas/ContainsOperation"
-              }
+              {"$ref": "#/components/schemas/AndOperation"},
+              {"$ref": "#/components/schemas/OrOperation"},
+              {"$ref": "#/components/schemas/NotOperation"},
+              {"$ref": "#/components/schemas/EqOperation"},
+              {"$ref": "#/components/schemas/GtOperation"},
+              {"$ref": "#/components/schemas/GteOperation"},
+              {"$ref": "#/components/schemas/InOperation"},
+              {"$ref": "#/components/schemas/ContainsOperation"}
             ],
             "title": "$Expr"
           }
@@ -2926,9 +2379,7 @@
       "RefsReadBatchReq": {
         "properties": {
           "refs": {
-            "items": {
-              "type": "string"
-            },
+            "items": {"type": "string"},
             "type": "array",
             "title": "Refs"
           }
@@ -2938,13 +2389,7 @@
         "title": "RefsReadBatchReq"
       },
       "RefsReadBatchRes": {
-        "properties": {
-          "vals": {
-            "items": {},
-            "type": "array",
-            "title": "Vals"
-          }
-        },
+        "properties": {"vals": {"items": {}, "type": "array", "title": "Vals"}},
         "type": "object",
         "required": ["vals"],
         "title": "RefsReadBatchRes"
@@ -2962,10 +2407,7 @@
       },
       "SortBy": {
         "properties": {
-          "field": {
-            "type": "string",
-            "title": "Field"
-          },
+          "field": {"type": "string", "title": "Field"},
           "direction": {
             "type": "string",
             "enum": ["asc", "desc"],
@@ -2978,56 +2420,22 @@
       },
       "StartedCallSchemaForInsert": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Id"
           },
-          "op_name": {
-            "type": "string",
-            "title": "Op Name"
-          },
+          "op_name": {"type": "string", "title": "Op Name"},
           "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Display Name"
           },
           "trace_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Trace Id"
           },
           "parent_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Parent Id"
           },
           "started_at": {
@@ -3035,40 +2443,26 @@
             "format": "date-time",
             "title": "Started At"
           },
-          "attributes": {
-            "type": "object",
-            "title": "Attributes"
-          },
-          "inputs": {
-            "type": "object",
-            "title": "Inputs"
-          },
+          "attributes": {"type": "object", "title": "Attributes"},
+          "inputs": {"type": "object", "title": "Inputs"},
           "wb_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb User Id",
             "description": "Do not set directly. Server will automatically populate this field."
           },
           "wb_run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "anyOf": [{"type": "string"}, {"type": "null"}],
             "title": "Wb Run Id"
           }
         },
         "type": "object",
-        "required": ["project_id", "op_name", "started_at", "attributes", "inputs"],
+        "required": [
+          "project_id",
+          "op_name",
+          "started_at",
+          "attributes",
+          "inputs"
+        ],
         "title": "StartedCallSchemaForInsert"
       },
       "SummaryInsertMap": {
@@ -3087,30 +2481,21 @@
       },
       "TableAppendSpec": {
         "properties": {
-          "append": {
-            "$ref": "#/components/schemas/TableAppendSpecPayload"
-          }
+          "append": {"$ref": "#/components/schemas/TableAppendSpecPayload"}
         },
         "type": "object",
         "required": ["append"],
         "title": "TableAppendSpec"
       },
       "TableAppendSpecPayload": {
-        "properties": {
-          "row": {
-            "type": "object",
-            "title": "Row"
-          }
-        },
+        "properties": {"row": {"type": "object", "title": "Row"}},
         "type": "object",
         "required": ["row"],
         "title": "TableAppendSpecPayload"
       },
       "TableCreateReq": {
         "properties": {
-          "table": {
-            "$ref": "#/components/schemas/TableSchemaForInsert"
-          }
+          "table": {"$ref": "#/components/schemas/TableSchemaForInsert"}
         },
         "type": "object",
         "required": ["table"],
@@ -3118,9 +2503,12 @@
       },
       "TableCreateRes": {
         "properties": {
-          "digest": {
-            "type": "string",
-            "title": "Digest"
+          "digest": {"type": "string", "title": "Digest"},
+          "row_digests": {
+            "items": {"type": "string"},
+            "type": "array",
+            "title": "Row Digests",
+            "description": "The digests of the rows that were created"
           }
         },
         "type": "object",
@@ -3129,9 +2517,7 @@
       },
       "TableInsertSpec": {
         "properties": {
-          "insert": {
-            "$ref": "#/components/schemas/TableInsertSpecPayload"
-          }
+          "insert": {"$ref": "#/components/schemas/TableInsertSpecPayload"}
         },
         "type": "object",
         "required": ["insert"],
@@ -3139,14 +2525,8 @@
       },
       "TableInsertSpecPayload": {
         "properties": {
-          "index": {
-            "type": "integer",
-            "title": "Index"
-          },
-          "row": {
-            "type": "object",
-            "title": "Row"
-          }
+          "index": {"type": "integer", "title": "Index"},
+          "row": {"type": "object", "title": "Row"}
         },
         "type": "object",
         "required": ["index", "row"],
@@ -3154,21 +2534,14 @@
       },
       "TablePopSpec": {
         "properties": {
-          "pop": {
-            "$ref": "#/components/schemas/TablePopSpecPayload"
-          }
+          "pop": {"$ref": "#/components/schemas/TablePopSpecPayload"}
         },
         "type": "object",
         "required": ["pop"],
         "title": "TablePopSpec"
       },
       "TablePopSpecPayload": {
-        "properties": {
-          "index": {
-            "type": "integer",
-            "title": "Index"
-          }
-        },
+        "properties": {"index": {"type": "integer", "title": "Index"}},
         "type": "object",
         "required": ["index"],
         "title": "TablePopSpecPayload"
@@ -3177,43 +2550,56 @@
         "properties": {
           "project_id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Project Id",
+            "description": "The ID of the project",
+            "examples": ["my_entity/my_project"]
           },
           "digest": {
             "type": "string",
-            "title": "Digest"
+            "title": "Digest",
+            "description": "The digest of the table to query",
+            "examples": [
+              "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"
+            ]
           },
           "filter": {
             "anyOf": [
+              {"$ref": "#/components/schemas/TableRowFilter"},
+              {"type": "null"}
+            ],
+            "description": "Optional filter to apply to the query. See `TableRowFilter` for more details.",
+            "examples": [
               {
-                "$ref": "#/components/schemas/TableRowFilter"
-              },
-              {
-                "type": "null"
+                "row_digests": [
+                  "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                  "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"
+                ]
               }
             ]
           },
           "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit"
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Limit",
+            "description": "Maximum number of rows to return",
+            "examples": [100]
           },
           "offset": {
+            "anyOf": [{"type": "integer"}, {"type": "null"}],
+            "title": "Offset",
+            "description": "Number of rows to skip before starting to return rows",
+            "examples": [10]
+          },
+          "sort_by": {
             "anyOf": [
               {
-                "type": "integer"
+                "items": {"$ref": "#/components/schemas/SortBy"},
+                "type": "array"
               },
-              {
-                "type": "null"
-              }
+              {"type": "null"}
             ],
-            "title": "Offset"
+            "title": "Sort By",
+            "description": "List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
+            "examples": [[{"field": "col_a.prop_b", "order": "desc"}]]
           }
         },
         "type": "object",
@@ -3223,9 +2609,7 @@
       "TableQueryRes": {
         "properties": {
           "rows": {
-            "items": {
-              "$ref": "#/components/schemas/TableRowSchema"
-            },
+            "items": {"$ref": "#/components/schemas/TableRowSchema"},
             "type": "array",
             "title": "Rows"
           }
@@ -3234,21 +2618,48 @@
         "required": ["rows"],
         "title": "TableQueryRes"
       },
+      "TableQueryStatsReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The ID of the project",
+            "examples": ["my_entity/my_project"]
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the table to query",
+            "examples": [
+              "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "digest"],
+        "title": "TableQueryStatsReq"
+      },
+      "TableQueryStatsRes": {
+        "properties": {"count": {"type": "integer", "title": "Count"}},
+        "type": "object",
+        "required": ["count"],
+        "title": "TableQueryStatsRes"
+      },
       "TableRowFilter": {
         "properties": {
           "row_digests": {
             "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
+              {"items": {"type": "string"}, "type": "array"},
+              {"type": "null"}
             ],
-            "title": "Row Digests"
+            "title": "Row Digests",
+            "description": "List of row digests to filter by",
+            "examples": [
+              [
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
+                "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -3256,13 +2667,8 @@
       },
       "TableRowSchema": {
         "properties": {
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          },
-          "val": {
-            "title": "Val"
-          }
+          "digest": {"type": "string", "title": "Digest"},
+          "val": {"title": "Val"}
         },
         "type": "object",
         "required": ["digest", "val"],
@@ -3270,14 +2676,9 @@
       },
       "TableSchemaForInsert": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
           "rows": {
-            "items": {
-              "type": "object"
-            },
+            "items": {"type": "object"},
             "type": "array",
             "title": "Rows"
           }
@@ -3288,26 +2689,14 @@
       },
       "TableUpdateReq": {
         "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "base_digest": {
-            "type": "string",
-            "title": "Base Digest"
-          },
+          "project_id": {"type": "string", "title": "Project Id"},
+          "base_digest": {"type": "string", "title": "Base Digest"},
           "updates": {
             "items": {
               "anyOf": [
-                {
-                  "$ref": "#/components/schemas/TableAppendSpec"
-                },
-                {
-                  "$ref": "#/components/schemas/TablePopSpec"
-                },
-                {
-                  "$ref": "#/components/schemas/TableInsertSpec"
-                }
+                {"$ref": "#/components/schemas/TableAppendSpec"},
+                {"$ref": "#/components/schemas/TablePopSpec"},
+                {"$ref": "#/components/schemas/TableInsertSpec"}
               ]
             },
             "type": "array",
@@ -3320,9 +2709,12 @@
       },
       "TableUpdateRes": {
         "properties": {
-          "digest": {
-            "type": "string",
-            "title": "Digest"
+          "digest": {"type": "string", "title": "Digest"},
+          "updated_row_digests": {
+            "items": {"type": "string"},
+            "type": "array",
+            "title": "Updated Row Digests",
+            "description": "The digests of the rows that were updated"
           }
         },
         "type": "object",
@@ -3332,38 +2724,18 @@
       "ValidationError": {
         "properties": {
           "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
+            "items": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
             "type": "array",
             "title": "Location"
           },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          }
+          "msg": {"type": "string", "title": "Message"},
+          "type": {"type": "string", "title": "Error Type"}
         },
         "type": "object",
         "required": ["loc", "msg", "type"],
         "title": "ValidationError"
       }
     },
-    "securitySchemes": {
-      "HTTPBasic": {
-        "type": "http",
-        "scheme": "basic"
-      }
-    }
+    "securitySchemes": {"HTTPBasic": {"type": "http", "scheme": "basic"}}
   }
 }

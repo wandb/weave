@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
-from weave.trace.sanitize import REDACT_KEYS, REDACTED_VALUE
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -57,6 +58,14 @@ def to_json(
             and not has_custom_repr(obj)
         ):
             return dictify(obj)
+
+        # TODO: I would prefer to only have this once in dictify? Maybe dictify and to_json need to be merged?
+        # However, even if dictify is false, i still want to try to convert to dict
+        elif as_dict := try_to_dict(obj):
+            return {
+                k: to_json(v, project_id, client, use_dictify)
+                for k, v in as_dict.items()
+            }
         return fallback_encode(obj)
     result = _build_result_from_encoded(encoded, project_id, client)
 
@@ -148,7 +157,7 @@ def dictify(
     elif isinstance(obj, dict):
         dict_result = {}
         for k, v in obj.items():
-            if k in REDACT_KEYS:
+            if isinstance(k, str) and should_redact(k):
                 dict_result[k] = REDACTED_VALUE
             else:
                 dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
@@ -160,7 +169,7 @@ def dictify(
             if isinstance(as_dict, dict):
                 to_dict_result = {}
                 for k, v in as_dict.items():
-                    if k in REDACT_KEYS:
+                    if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
                         to_dict_result[k] = dictify(v, maxdepth, depth + 1)
@@ -187,7 +196,7 @@ def dictify(
         for attr in dir(obj):
             if attr.startswith("_"):
                 continue
-            if attr in REDACT_KEYS:
+            if should_redact(attr):
                 result[attr] = REDACTED_VALUE
                 continue
             try:

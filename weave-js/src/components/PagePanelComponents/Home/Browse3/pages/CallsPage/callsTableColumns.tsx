@@ -18,10 +18,18 @@ import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
+import {CellValue} from '../../../Browse2/CellValue';
+import {CellValueString} from '../../../Browse2/CellValueString';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  convertScorerFeedbackFieldToBackendFilter,
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+  RUNNABLE_FEEDBACK_OUTPUT_PART,
+} from '../../feedback/HumanFeedback/tsScorerFeedback';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../filters/common';
@@ -372,11 +380,80 @@ function buildCallsTableColumns(
             if (typeof params.value === 'boolean') {
               return <div>{params.value ? 'true' : 'false'}</div>;
             }
+            if (typeof params.value === 'string') {
+              return <CellValueString value={params.value} />;
+            }
             return <div>{params.value}</div>;
           },
         };
       });
     cols.push(...annotationColumns);
+  }
+
+  const scoreColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX) &&
+      c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
+  );
+  if (scoreColNames.length > 0) {
+    // Add feedback group to grouping model
+    const scoreGroup = {
+      groupId: 'scores',
+      headerName: 'Scores',
+      children: [] as any[],
+    };
+    groupingModel.push(scoreGroup);
+
+    // Add feedback columns
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
+      c => {
+        const parsed = parseScorerFeedbackField(c);
+        const field = convertScorerFeedbackFieldToBackendFilter(c);
+        scoreGroup.children.push({
+          field,
+        });
+        if (parsed === null) {
+          return {
+            field,
+            headerName: c,
+            width: 150,
+            renderHeader: () => {
+              return <div> {c}</div>;
+            },
+            valueGetter: (unused: any, row: any) => {
+              return row[c];
+            },
+            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+              return <CellValue value={params.value} />;
+            },
+          };
+        }
+        return {
+          field,
+          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed.scorerName + parsed.scorePath}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            return (
+              <CellFilterWrapper
+                onAddFilter={onAddFilter}
+                field={field}
+                rowId={params.id.toString()}
+                operation={null}
+                value={params.value}>
+                <CellValue value={params.value} />
+              </CellFilterWrapper>
+            );
+          },
+        };
+      }
+    );
+    cols.push(...scoreColumns);
   }
 
   cols.push({
@@ -441,6 +518,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
@@ -463,6 +542,8 @@ function buildCallsTableColumns(
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,

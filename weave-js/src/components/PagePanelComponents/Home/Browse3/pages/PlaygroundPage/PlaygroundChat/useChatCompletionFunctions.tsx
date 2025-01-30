@@ -218,7 +218,9 @@ const appendChoiceToMessages = (
       updatedState.traceCall.inputs.messages.push(
         updatedState.traceCall.output.choices[choiceIndex].message
       );
-    } else {
+    } else if (
+      updatedState.traceCall.output.choices[updatedState.selectedChoiceIndex]
+    ) {
       updatedState.traceCall.inputs.messages.push(
         updatedState.traceCall.output.choices[updatedState.selectedChoiceIndex]
           .message
