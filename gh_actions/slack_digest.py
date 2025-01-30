@@ -521,9 +521,10 @@ def main():
     )
     parser.add_argument("--branch", default="master", help="Branch to analyze")
     parser.add_argument(
-        "--action",
-        action="store_true",
-        help="Run in GitHub Action mode (sends to Slack)",
+        "--mode",
+        choices=["local", "slack", "dry-run"],
+        default="local",
+        help="Run mode: local (rich tables), slack (send to Slack), or dry-run (preview Slack message)",
     )
 
     args = parser.parse_args()
@@ -540,22 +541,36 @@ def main():
             repo=args.repo,
             days=args.days,
             branch=args.branch,
-            local_mode=not args.action,  # Local mode is default
+            local_mode=args.mode == "local",  # Only use rich output in local mode
         )
 
-        message = digest.generate_digest()
-
-        if args.action:
-            # In action mode, send to Slack
-            slack_token = os.getenv("SLACK_TOKEN")
-            if not slack_token:
-                raise ValueError("SLACK_TOKEN environment variable is required")
-
-            notifier = SlackNotifier(slack_token)
-            notifier.send_message(args.channel, message)
+        if args.mode == "local":
+            # Local mode - show rich tables
+            digest.generate_digest()
         else:
-            # In local mode (default), just print to console
-            console.print(message)
+            # Get Slack message content
+            message = digest._generate_slack_digest(
+                list(digest.repo.get_commits(
+                    since=datetime.now(pytz.UTC) - timedelta(days=digest.days),
+                    sha=digest.branch
+                )),
+                [pr for pr in digest.repo.get_pulls(state="open")
+                 if pr.updated_at >= datetime.now(pytz.UTC) - timedelta(days=digest.days)]
+            )
+
+            if args.mode == "dry-run":
+                # Preview mode - show what would be sent
+                console.print("\n[bold]Preview of Slack message:[/bold]\n")
+                console.print(message)
+                console.print(f"\n[dim]Would be sent to channel: #{args.channel}[/dim]")
+            else:
+                # Slack mode - actually send it
+                slack_token = os.getenv("SLACK_TOKEN")
+                if not slack_token:
+                    raise ValueError("SLACK_TOKEN environment variable is required")
+
+                notifier = SlackNotifier(slack_token)
+                notifier.send_message(args.channel, message)
 
     except Exception as e:
         logger.exception(f"Error: {str(e)}")
