@@ -113,12 +113,12 @@ const PanelRunHistoryTablesStepper: React.FC<
       const nonNullTables = tablesWithStepsNodeResult.filter(
         (row: any) => row.table != null
       );
-      const steps = nonNullTables.map((row: any) => row._step);
-      const tables = nonNullTables.map((row: any) => row.table);
-      setSteps(steps);
-      setCurrentStep(steps[0]);
+      const newSteps = nonNullTables.map((row: any) => row._step);
+      const newTables = nonNullTables.map((row: any) => row.table);
+      setSteps(newSteps);
+      setCurrentStep(newSteps[0]);
       setCurrentTableHistoryKey(value);
-      setTables(tables);
+      setTables(newTables);
     }
   }, [tablesWithStepsNodeResult, tablesWithStepsNodeLoading, value]);
 
