@@ -3,7 +3,7 @@
  */
 
 import {GridFilterItem} from '@mui/x-data-grid-pro';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import {Button} from '../../../../Button';
 import {
@@ -35,8 +35,11 @@ export const FilterRow = ({
     if (item.id == null) {
       onAddFilter(field);
     } else {
-      // TODO: May need to get new operator or value?
-      onUpdateFilter({...item, field});
+      // If this is an additional filter, we need to get new operator
+      // because the default is string
+      const newOperatorOptions = getGroupedOperatorOptions(field);
+      const operator = newOperatorOptions[0].options[0].value;
+      onUpdateFilter({...item, field, operator});
     }
   };
 
