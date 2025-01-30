@@ -137,4 +137,4 @@ class RestrictedTermsLLMGuardrail(Scorer):
             detected_entities=analysis.detected_matches,
             reasoning=reasoning,
             anonymized_text=anonymized_text,
-        )
+        ).model_dump()
