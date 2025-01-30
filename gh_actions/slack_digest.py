@@ -70,7 +70,7 @@ class SlackNotifier:
 
 def main():
     parser = argparse.ArgumentParser(description="Send notifications to Slack")
-    parser.add_argument("--channel", default="weave-dev", help="Slack channel name")
+    parser.add_argument("--channel", default="weave-dev-digest", help="Slack channel name")
 
     args = parser.parse_args()
 
