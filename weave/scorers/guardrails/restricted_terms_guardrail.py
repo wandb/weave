@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, TYPE_CHECKING, Union, Any
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class RestrictedTermsAnalysis(BaseModel):
     contains_restricted_terms: bool = Field(
         description="Whether any restricted terms were detected"
     )
-    detected_matches: List[TermMatch] = Field(
+    detected_matches: list[TermMatch] = Field(
         default_factory=list,
         description="List of detected term matches with their variations",
     )
@@ -50,7 +50,7 @@ class RestrictedTermsAnalysis(BaseModel):
 
 class RestrictedTermsRecognitionResponse(BaseModel):
     safe: bool
-    detected_entities: List[TermMatch]
+    detected_entities: list[TermMatch]
     reasoning: str
     anonymized_text: Optional[str] = None
 
@@ -61,7 +61,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
     temperature: float = 0.1
     max_tokens: int = 4096
     should_anonymize: bool = True
-    custom_terms: List[str] = [
+    custom_terms: list[str] = [
         "Microsoft",
         "Amazon Web Services",
         "Facebook",
@@ -108,9 +108,11 @@ class RestrictedTermsLLMGuardrail(Scorer):
         else:
             reasoning = "No restricted terms detected."
         return reasoning
-    
+
     @weave.op
-    def get_anonymized_text(self, prompt: str, analysis: RestrictedTermsAnalysis) -> Union[str, None]:
+    def get_anonymized_text(
+        self, prompt: str, analysis: RestrictedTermsAnalysis
+    ) -> Union[str, None]:
         anonymized_text = None
         if self.should_anonymize and analysis.contains_restricted_terms:
             anonymized_text = prompt
@@ -124,7 +126,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
                     match.matched_text, replacement
                 )
         return anonymized_text
-    
+
     @weave.op
     def score(self, prompt: str) -> RestrictedTermsRecognitionResponse:
         analysis: RestrictedTermsAnalysis = self.analyse_restricted_terms(prompt)
