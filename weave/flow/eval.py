@@ -71,6 +71,11 @@ DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
 ModelLike = Union[Op, Model]
 
+InputsT = TypeVar("InputsT", bound=dict[str, Any])
+OutputT = TypeVar("OutputT")
+ScoreT = TypeVar("ScoreT")
+ScorerName = TypeVar("ScorerName", bound=str)
+
 
 @register_object
 class Evaluation(Object):
@@ -339,12 +344,6 @@ class Evaluation(Object):
         return summary
 
 
-I = TypeVar("I", bound=dict[str, Any])
-O = TypeVar("O")
-ScoreT = TypeVar("ScoreT")
-ScorerName = TypeVar("ScorerName", bound=str)
-
-
 # ScoreT alternative (more permissive)
 class ScoreDict(TypedDict):
     score: float
@@ -358,16 +357,18 @@ class ScorePydantic(BaseModel):
 
 
 @runtime_checkable
-class ScorerProtocol(Protocol[O]):
+class ScorerProtocol(Protocol[OutputT]):
     """Scorers are anything that return ScoreDict"""
 
-    async def __call__(self, output: O, *args: Any, **kwargs: Any) -> ScoreDict: ...
+    async def __call__(
+        self, output: OutputT, *args: Any, **kwargs: Any
+    ) -> ScoreDict: ...
 
 
 @dataclass
-class ScoringTask(Generic[O]):
-    scorer: ScorerProtocol[O]
-    output: O
+class ScoringTask(Generic[OutputT]):
+    scorer: ScorerProtocol[OutputT]
+    output: OutputT
     metadata: dict[str, Any]
 
 
@@ -382,25 +383,25 @@ class ScoringResult(TypedDict):
 
 
 @runtime_checkable
-class ModelProtocol(Protocol[I, O]):
-    def __call__(self, input: I) -> O: ...
+class ModelProtocol(Protocol[InputsT, OutputT]):
+    def __call__(self, input: InputsT) -> OutputT: ...
 
 
 @runtime_checkable
-class AsyncModelProtocol(Protocol[I, O]):
-    async def __call__(self, input: I) -> O: ...
+class AsyncModelProtocol(Protocol[InputsT, OutputT]):
+    async def __call__(self, input: InputsT) -> OutputT: ...
 
 
-class PredictorOutputDict(TypedDict, Generic[O]):
-    output: O
+class PredictorOutputDict(TypedDict, Generic[OutputT]):
+    output: OutputT
     metadata: NotRequired[dict[str, Any]]
 
 
 @runtime_checkable
-class PredictorProtocol(Protocol[I, O]):
+class PredictorProtocol(Protocol[InputsT, OutputT]):
     """Unsure about this one.  The intent is to wrap a model with metadata that is created at runtime."""
 
-    async def __call__(self, input: I) -> PredictorOutputDict[O]: ...
+    async def __call__(self, input: InputsT) -> PredictorOutputDict[OutputT]: ...
 
 
 def is_async_callable(obj: Any) -> bool:
@@ -416,11 +417,14 @@ def is_async_callable(obj: Any) -> bool:
 class BasicPredictor:
     """A basic predictor that wraps a model output to include latency and success/error info"""
 
-    def __init__(self, model: ModelProtocol[I, O] | AsyncModelProtocol[I, O]):
+    def __init__(
+        self,
+        model: ModelProtocol[InputsT, OutputT] | AsyncModelProtocol[InputsT, OutputT],
+    ):
         self.model = model
 
     # async def __call__(self, input: I) -> PredictorOutputDict[O]:
-    async def __call__(self, input: I) -> Call:
+    async def __call__(self, input: InputsT) -> Call:
         if is_async_callable(self.model):
             return await self.model(**input)
         return self.model(**input)
@@ -450,23 +454,60 @@ class BasicPredictor:
         return call
 
 
-class Evaluation2(Object, Generic[I, O, ScoreT]):
-    dataset: Dataset | Sequence[I]  # TODO: Dataset can also be parameterized
-    scorers: list[Scorer] | Sequence[ScorerProtocol[ScoreT]]
+class EvaluationResult2(Object, Generic[InputsT, OutputT, ScoreT]):
+    dataset: Dataset
+    predictions: Sequence[OutputT]
+    scores: Sequence[dict[ScorerName, list[ScoreDict]]] | None = None
+
+    @classmethod
+    def from_calls(
+        cls,
+        prediction_calls: Sequence[Call],
+        *,
+        scorer_calls: Sequence[Call] | None = None,
+    ) -> Self:
+        inputs = []
+        predictions = []
+        scores = []
+
+        for model_call in prediction_calls:
+            inputs.append(model_call.inputs)
+            predictions.append(model_call.output)
+
+        if scorer_calls:
+            for scorer_call in scorer_calls:
+                scores.append(scorer_call.output)
+        else:
+            scores = None
+
+        return cls(
+            dataset=Dataset(rows=inputs),
+            predictions=predictions,
+            scores=scores,
+        )
+
+
+class Evaluation2(Object, Generic[InputsT, OutputT, ScoreT]):
+    dataset: Dataset | Sequence[InputsT]  # TODO: Dataset can also be parameterized
+    scorers: list[Scorer] | Sequence[ScorerProtocol[ScoreT]] = Field(
+        default_factory=list
+    )
     preprocess_model_input: PreprocessModelInput | None = None
     trials: int = 1
 
     @model_validator(mode="before")
     def _convert_types(cls, values: dict) -> dict:
-        values["dataset"] = _datasetify(values["dataset"])
-        values["scorers"] = [_scorerify(scorer) for scorer in values["scorers"]]
+        if dataset := values.get("dataset"):
+            values["dataset"] = _datasetify(dataset)
+        if scorers := values.get("scorers"):
+            values["scorers"] = [_scorerify(scorer) for scorer in scorers]
         return values
 
     async def evaluate(
         self,
         *,
-        model: ModelProtocol[I, O] | None = None,
-        predictions: Sequence[O] | None = None,
+        model: ModelProtocol[InputsT, OutputT] | None = None,
+        predictions: Sequence[OutputT] | None = None,
     ) -> dict:
         """Evaluate a model or a set of predictions.
 
@@ -483,72 +524,82 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
 
         return await self.score(predictions=predictions)
 
+    # NOTE: I prefer predict returning a Dataset with an annotated output column.
+    # Ideally the result of this method is equivalent to creating a Dataset from
+    # a list of calls, which would be very common when users are prototyping or
+    # taking call data from prod.
+    #
+    # The use of EvaluationResult2 here is a compromise to provide structured output
+    # while not changing the Evaluation or Dataset types.
     async def predict(
         self,
         *,
-        model: ModelProtocol[I, O],
-        predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
-    ) -> Dataset:
-        new_rows = []
-        async for row in self._predict(model, predictor_cls):
-            new_rows.append(row)
-        return Dataset(rows=new_rows)
+        model: ModelProtocol[InputsT, OutputT],
+        predictor_cls: PredictorProtocol[InputsT, OutputT] = BasicPredictor,
+    ) -> EvaluationResult2[InputsT, OutputT, ScoreT]:
+        predictions: list[OutputT] = []
+        async for output in self._predict(model, predictor_cls):
+            predictions.append(output)
+        return EvaluationResult2(dataset=self.dataset, predictions=predictions)
 
     async def _predict(
         self,
-        model: ModelProtocol[I, O],
-        predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
+        model: ModelProtocol[InputsT, OutputT],
+        predictor_cls: PredictorProtocol[InputsT, OutputT] = BasicPredictor,
         # ) -> Sequence[PredictorOutputDict[O]]:
-    ) -> AsyncGenerator[dict, None, None]:
+    ) -> AsyncGenerator[OutputT, None, None]:
         # At the end of this method, the user should have the same thing as `Dataset.from_calls(...)`
 
         # TODO: This needs to work with all Callables
         model = _opify(model)
 
-        async def predict_row(row: Any) -> dict:
+        async def predict_row(row: InputsT) -> OutputT:
             # TODO: Suppress call donut messages here
-            if is_async_callable(model):
-                _, call = await model.call(**row)
-            else:
-                _, call = model.call(**row)
+            if self.preprocess_model_input:
+                row = self.preprocess_model_input(row)
 
-            return call
+            if is_async_callable(model):
+                return await model(**row)
+            return model(**row)
 
         async for _, prediction in util.async_foreach(
             self.dataset, predict_row, get_weave_parallelism()
         ):
-            # TODO: Instead of dictify, it would be nice if we could link to the actual call
-            yield prediction.to_dict()
+            yield prediction
 
     async def score(
         self,
         *,
-        predictions: Sequence[PredictorOutputDict[O]],
+        eval_result: EvaluationResult2[InputsT, OutputT, ScoreT],
         extra_metadata: Sequence[dict[str, Any]] | None = None,
     ) -> Sequence[dict[ScorerName, list[ScoreDict]]]:
         scores = {get_callable_name(scorer): [] for scorer in self.scorers}
-        async for res in self._score(predictions, extra_metadata):
+        async for res in self._score(eval_result, extra_metadata):
             scores[res.name].append(res.score)
         return scores
 
     async def _score(
         self,
-        predictions: Sequence[PredictorOutputDict[O]],
+        eval_result: EvaluationResult2[InputsT, OutputT, ScoreT],
         extra_metadata: Sequence[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[ScoringTaskResult, None, None]:
-        if extra_metadata is None:
-            extra_metadata = [{} for _ in predictions]
+        if not eval_result.predictions:
+            raise ValueError("Predictions are required to score!")
 
-        if not (len(predictions) == len(self.dataset) == len(extra_metadata)):
+        if extra_metadata is None:
+            extra_metadata = [{} for _ in eval_result.predictions]
+
+        if not (
+            len(eval_result.predictions) == len(self.dataset) == len(extra_metadata)
+        ):
             raise ValueError(
-                f"Number of predictions ({len(predictions)}) must match dataset size ({len(self.dataset)}) times trials ({self.trials})"
+                "Number of predictions must match dataset size and extra metadata"
             )
 
         def scoring_tasks() -> Generator[ScoringTask, None, None]:
-            for pred, meta_dict in zip(predictions, extra_metadata):
-                combined_metadata = {**pred.get("metadata", {}), **meta_dict}
+            for pred, metadata in zip(eval_result.predictions, extra_metadata):
                 for scorer in self.scorers:
-                    yield ScoringTask(scorer, pred["output"], combined_metadata)
+                    yield ScoringTask(scorer, pred, metadata)
 
         async def run_scorer(task: ScoringTask) -> ScoringTaskResult:
             try:
@@ -582,10 +633,11 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         # Summarize scores
         for scorer in self.scorers:
             attrs = get_scorer_attributes(scorer)
-            for name, scores in scores.items():
+            print(f"{scores=}")
+            for name, data in scores.items():
                 # TODO: Make this dict look nicer before returning.
                 # The autosummary needs to be cleaner
-                summary[name] = attrs.summarize_fn(scores)
+                summary[name] = attrs.summarize_fn(data)
 
         # TODO: Summarize remaining columns (do we need this?)
 
