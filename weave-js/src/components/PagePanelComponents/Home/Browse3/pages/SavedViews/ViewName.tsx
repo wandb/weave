@@ -1,3 +1,4 @@
+import {Icon} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React from 'react';
 
@@ -12,8 +13,16 @@ export const ViewName = ({value, onEditNameStart, tooltip}: ViewNameProps) => {
     onEditNameStart();
   };
   const body = (
-    <div className="hover:cursor-pointer hover:bg-moon-100" onClick={onClick}>
+    <div
+      className="group flex cursor-pointer items-center px-8 py-4 rounded-md w-max hover:bg-moon-100"
+      onClick={onClick}>
       {value}
+      <Icon
+        name="pencil-edit"
+        width={16}
+        height={16}
+        className="ml-8 min-w-[16px] text-moon-500 opacity-0 group-hover:opacity-100"
+      />
     </div>
   );
   if (tooltip) {
