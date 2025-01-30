@@ -32,7 +32,7 @@ def mock_create(monkeypatch):
 
 @pytest.fixture
 def restricted_terms_recognition_llm_guardrail(mock_create):
-    return RestrictedTermsLLMGuardrail()
+    return RestrictedTermsRecognitionResponse()
 
 
 def test_restricted_terms_guardrail_score(
