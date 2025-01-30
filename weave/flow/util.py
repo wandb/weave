@@ -3,7 +3,13 @@ import logging
 import multiprocessing
 import random
 from collections.abc import AsyncIterator, Awaitable, Iterable
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
+
+if TYPE_CHECKING:
+    from weave.flow.dataset import Dataset
+    from weave.trace.op import Op
+    from weave.trace.scorer import Scorer
+
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -233,3 +239,50 @@ def make_memorable_name() -> str:
     adj = random.choice(adjectives)
     noun = random.choice(nouns)
     return f"{adj}-{noun}"
+
+
+class CoerceError(Exception):
+    """An error that occurs when coercing an object to the target type"""
+
+
+def _datasetify(obj: Any) -> Dataset:
+    if isinstance(obj, Dataset):
+        return obj
+
+    try:
+        return Dataset(rows=obj)
+    except Exception:
+        raise CoerceError("Unable to coerce to dataset")
+
+
+# TODO: Not clear if scorers need a summarize anymore
+def _scorerify(obj: Any) -> Scorer:
+    if isinstance(obj, Scorer):
+        return obj
+
+    from weave.trace.op import is_op
+
+    if is_op(obj):
+        return obj
+
+    if callable(obj):
+        import weave
+
+        try:
+            return weave.op(obj)
+        except Exception:
+            raise CoerceError("Unable to coerce to scorer")
+
+    raise CoerceError("Unable to coerce to scorer")
+
+
+# TODO: These funcs could use better naming/consistency
+def _opify(obj: Any) -> Op:
+    from weave.trace.op import is_op
+
+    if is_op(obj):
+        return obj
+
+    import weave
+
+    return weave.op(obj)

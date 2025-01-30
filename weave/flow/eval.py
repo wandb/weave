@@ -68,6 +68,7 @@ class EvaluationResults(Object):
 # TODO: These should become protocols
 DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
+ModelLike = Union[Op, Model]
 
 
 class ScoreDict(TypedDict):
