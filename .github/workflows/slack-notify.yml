@@ -10,6 +10,10 @@ on:
         description: 'Slack channel to post to'
         required: false
         default: 'weave-digest'
+      extra_args:
+        description: 'Extra arguments to pass to the script (make this concrete after testing)'
+        required: false
+        default: ''
 
 jobs:
   notify:
@@ -31,4 +35,5 @@ jobs:
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
         run: |
           uv run gh_actions/slack_digest/notify.py \
-            --channel "${{ github.event.inputs.channel || 'weave-digest' }}"
+            --channel "${{ github.event.inputs.channel || 'weave-digest' }}" \
+            --extra-args "${{ github.event.inputs.extra_args || '' }}"
