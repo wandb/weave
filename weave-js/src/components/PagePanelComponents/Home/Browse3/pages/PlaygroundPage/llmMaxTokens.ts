@@ -197,6 +197,102 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
 
+  // Azure AI models
+  'azure_ai/jamba-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+    mode: 'chat',
+  },
+  'azure_ai/mistral-large': {
+    max_tokens: 8191,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/mistral-small': {
+    max_tokens: 8191,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/mistral-large-2407': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/ministral-3b': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/Llama-3.2-11B-Vision-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/Llama-3.3-70B-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/Llama-3.2-90B-Vision-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+    supports_function_calling: true,
+  },
+  'azure_ai/Meta-Llama-3-70B-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+    mode: 'chat',
+  },
+  'azure_ai/Meta-Llama-3.1-8B-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Meta-Llama-3.1-70B-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Meta-Llama-3.1-405B-Instruct': {
+    max_tokens: 2048,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3.5-mini-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3.5-vision-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3.5-MoE-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3-mini-4k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3-mini-128k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3-small-8k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3-small-128k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+  'azure_ai/Phi-3-medium-4k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+    mode: 'chat',
+  },
+  'azure_ai/Phi-3-medium-128k-instruct': {
+    max_tokens: 4096,
+    provider: 'azure_ai',
+  },
+
   // Gemini models
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
