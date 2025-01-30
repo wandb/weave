@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import warnings
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
@@ -169,6 +170,30 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
         return wrapper
 
     return deco
+
+
+def get_callable_name(obj: Any) -> str:
+    if not callable(obj):
+        raise TypeError(f"Object {obj} is not callable")
+
+    if inspect.isfunction(obj):
+        return obj.__name__
+    elif inspect.ismethod(obj):
+        cls_name = obj.__self__.__class__.__name__
+        method_name = obj.__name__
+        return f"{cls_name}.{method_name}"
+    elif hasattr(obj, "__class__"):
+        return obj.__class__.__name__
+
+
+def is_async_callable(obj: Any) -> bool:
+    if inspect.iscoroutinefunction(obj):
+        return True
+
+    if hasattr(obj, "__call__") and inspect.iscoroutinefunction(obj.__call__):
+        return True
+
+    return False
 
 
 # rename for cleaner export
