@@ -185,6 +185,8 @@ def get_callable_name(obj: Any) -> str:
     elif hasattr(obj, "__class__"):
         return obj.__class__.__name__
 
+    return str(obj)
+
 
 def is_async_callable(obj: Any) -> bool:
     if inspect.iscoroutinefunction(obj):

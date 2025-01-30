@@ -8,7 +8,6 @@ from typing import (
     Callable,
     Generic,
     Literal,
-    NotRequired,
     Optional,
     TypeVar,
     Union,
@@ -18,7 +17,7 @@ from typing import (
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
-from typing_extensions import Self, TypedDict
+from typing_extensions import NotRequired, Self, TypedDict
 
 import weave
 from weave.flow import util
@@ -92,14 +91,15 @@ ScoreT = TypeVar("ScoreT")
 class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
     dataset: Dataset  # TODO: Should be Dataset[InputsT]
     predictions: Sequence[OutputT]
-    scores: Sequence[dict[str, list[ScoreDict]]] | None = None
+    scores: Optional[Sequence[dict[str, list[ScoreDict]]]] = None
 
     @classmethod
     def from_calls(
         cls,
         prediction_calls: Iterable[Call[InputsT, OutputT]],
         *,
-        scorer_calls: Iterable[Call[OutputT, ScoreT]] | None = None,
+        # TODO: some weird typing issue here
+        scorer_calls: Iterable[Call[OutputT, ScoreT]] | None = None,  # type: ignore
     ) -> Self:
         inputs = []
         predictions = []

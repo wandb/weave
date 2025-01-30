@@ -393,7 +393,7 @@ InputsT = TypeVar("InputsT", bound=dict[str, Any])
 OutputT = TypeVar("OutputT")
 
 
-class CallDict(TypedDict):
+class CallDict(TypedDict, Generic[InputsT, OutputT]):
     op_name: str
     trace_id: str
     project_id: str
@@ -636,7 +636,7 @@ def make_client_call(
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
-    call = Call(
+    call: Call[dict[str, Any], Any] = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
@@ -1007,7 +1007,7 @@ class WeaveClient:
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
         call_id = generate_id()
-        call = Call(
+        call: Call[dict[str, Any], Any] = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
             trace_id=trace_id,
