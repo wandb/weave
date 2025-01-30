@@ -8,10 +8,14 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  TableUpdateReq,
+  TableUpdateRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceObjCreateReq,
   TraceObjCreateRes,
+  TraceObjDeleteReq,
+  TraceObjDeleteRes,
   TraceRefsReadBatchReq,
   TraceRefsReadBatchRes,
 } from './traceServerClientTypes';
@@ -115,6 +119,10 @@ export class TraceServerClient extends CachingTraceServerClient {
     return res;
   }
 
+  public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
+    return super.tableUpdate(req);
+  }
+
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
       const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
@@ -132,6 +140,14 @@ export class TraceServerClient extends CachingTraceServerClient {
         listeners.forEach(listener => listener());
       }
       return purgeRes;
+    });
+    return res;
+  }
+
+  public objDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+    const res = super.objDelete(req).then(r => {
+      this.onObjectListeners.forEach(listener => listener());
+      return r;
     });
     return res;
   }

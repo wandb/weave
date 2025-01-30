@@ -1,6 +1,8 @@
 import {AsyncLocalStorage} from 'async_hooks';
+import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
+import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {Dataset} from './dataset';
 import {computeDigest} from './digest';
 import {
@@ -31,6 +33,8 @@ import {Table, TableRef, TableRowRef} from './table';
 import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
+
+const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 
 export type CallStackEntry = {
   callId: string;
@@ -71,6 +75,9 @@ class CallStack {
 type CallStartParams = StartedCallSchemaForInsert;
 type CallEndParams = EndedCallSchemaForInsert;
 
+// We count characters item by item, and try to limit batches to about this size.
+const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
+
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
@@ -78,6 +85,8 @@ export class WeaveClient {
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
   private readonly BATCH_INTERVAL: number = 200;
+  private errorCount = 0;
+  private readonly MAX_ERRORS = 10;
 
   constructor(
     public traceServerApi: TraceServerApi<any>,
@@ -114,24 +123,42 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    // We count characters item by item, and try to limit batches to about
-    // this size.
-    const maxBatchSizeChars = 5 * 1024 * 1024;
-
     let batchToProcess = [];
     let currentBatchSize = 0;
 
-    while (this.callQueue.length > 0 && currentBatchSize < maxBatchSizeChars) {
-      const item = this.callQueue[0];
-      const itemSize = JSON.stringify(item).length;
+    while (
+      this.callQueue.length > 0 &&
+      currentBatchSize < MAX_BATCH_SIZE_CHARS
+    ) {
+      const item = this.callQueue.shift();
+      if (item === undefined) {
+        throw new Error('Call queue is empty');
+      }
 
-      if (currentBatchSize + itemSize <= maxBatchSizeChars) {
-        batchToProcess.push(this.callQueue.shift()!);
+      const itemSize = JSON.stringify(item).length;
+      if (itemSize > MAX_BATCH_SIZE_CHARS) {
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Item size ${itemSize} exceeds max batch size ${MAX_BATCH_SIZE_CHARS}.  Item: ${JSON.stringify(item)}\n`
+        );
+      }
+
+      if (currentBatchSize + itemSize <= MAX_BATCH_SIZE_CHARS) {
+        batchToProcess.push(item);
         currentBatchSize += itemSize;
       } else {
+        // doesn't fit, put it back
+        this.callQueue.unshift(item);
         break;
       }
     }
+
+    if (batchToProcess.length === 0) {
+      this.batchProcessTimeout = null;
+      return;
+    }
+
+    this.isBatchProcessing = true;
 
     const batchReq = {
       batch: batchToProcess.map(item => ({
@@ -146,8 +173,20 @@ export class WeaveClient {
       );
     } catch (error) {
       console.error('Error processing batch:', error);
+      this.errorCount++;
+      fs.appendFileSync(
+        WEAVE_ERRORS_LOG_FNAME,
+        `Error processing batch: ${error}\n`
+      );
+
       // Put failed items back at the front of the queue
       this.callQueue.unshift(...batchToProcess);
+
+      // Exit if we have too many errors
+      if (this.errorCount > this.MAX_ERRORS) {
+        console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
+        process.exit(1);
+      }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
@@ -348,7 +387,7 @@ export class WeaveClient {
       const classChain = getClassChain(obj);
       const className = classChain[0];
       if (!objId) {
-        objId = obj.id;
+        objId = sanitizeObjectName(obj.id);
       }
 
       let saveAttrs = obj.saveAttrs();
@@ -372,7 +411,6 @@ export class WeaveClient {
         },
       });
       const ref = new ObjectRef(this.projectId, objId, response.data.digest);
-      // console.log(`Saved object: ${ref.ui_url()}`);
       return ref;
     })();
 
@@ -734,7 +772,9 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
       if (typeof leftValue === 'number' && typeof result[key] === 'number') {
         result[key] = leftValue + result[key];
       } else if (
+        leftValue != null &&
         typeof leftValue === 'object' &&
+        result[key] != null &&
         typeof result[key] === 'object'
       ) {
         result[key] = mergeSummaries(leftValue, result[key]);
@@ -788,4 +828,24 @@ async function maybeFormatCode(code: string) {
   //     // prettier not available or formatting failed, just use the original string
   //     return code;
   //   }
+}
+
+function sanitizeObjectName(name: string): string {
+  // Replaces any non-alphanumeric characters with a single dash and removes
+  // any leading or trailing dashes. This is more restrictive than the DB
+  // constraints and can be relaxed if needed.
+  let res = name.replace(/[^\w._]+/g, '-'); // non-words
+  res = res.replace(/([._-]{2,})+/g, '-'); // multiple separators
+  res = res.replace(/^[-_]+|[-_]+$/g, ''); // leading/trailing separators
+
+  if (!res) {
+    throw new Error(`Invalid object name: ${name}`);
+  }
+
+  // Truncate if too long
+  if (res.length > MAX_OBJECT_NAME_LENGTH) {
+    res = res.slice(0, MAX_OBJECT_NAME_LENGTH);
+  }
+
+  return res;
 }

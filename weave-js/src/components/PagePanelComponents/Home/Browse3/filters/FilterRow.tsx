@@ -6,7 +6,12 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../Button';
-import {FilterId, getFieldType, getOperatorOptions, isWeaveRef} from './common';
+import {
+  FilterId,
+  getFieldType,
+  getGroupedOperatorOptions,
+  isWeaveRef,
+} from './common';
 import {SelectField, SelectFieldOption} from './SelectField';
 import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';
@@ -30,13 +35,16 @@ export const FilterRow = ({
     if (item.id == null) {
       onAddFilter(field);
     } else {
-      // TODO: May need to get new operator or value?
-      onUpdateFilter({...item, field});
+      // If this is an additional filter, we need to get new operator
+      // because the default is string
+      const newOperatorOptions = getGroupedOperatorOptions(field);
+      const operator = newOperatorOptions[0].options[0].value;
+      onUpdateFilter({...item, field, operator});
     }
   };
 
   const operatorOptions = useMemo(
-    () => getOperatorOptions(item.field),
+    () => getGroupedOperatorOptions(item.field),
     [item.field]
   );
 
@@ -84,7 +92,7 @@ export const FilterRow = ({
         {item.id != null && (
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="delete"
             tooltip="Remove this filter"
             onClick={() => onRemoveFilter(item.id)}

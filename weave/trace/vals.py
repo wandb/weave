@@ -22,12 +22,14 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
     ObjectRef,
     RefWithExtra,
     TableRef,
 )
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
+from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
@@ -636,15 +638,22 @@ def make_trace_obj(
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra
-        read_res = server.obj_read(
-            ObjReadReq(
-                project_id=f"{val.entity}/{val.project}",
-                object_id=val.name,
-                digest=val.digest,
+        try:
+            project_id = f"{val.entity}/{val.project}"
+            read_res = server.obj_read(
+                ObjReadReq(
+                    project_id=project_id,
+                    object_id=val.name,
+                    digest=val.digest,
+                )
             )
-        )
-        val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
-        prepare_obj(val)
+            val = from_json(read_res.obj.val, project_id, server)
+            prepare_obj(val)
+        except ObjectDeletedError as e:
+            # encountered a deleted object, return DeletedRef, warn and continue
+            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
+            logger.warning(f"Could not read deleted object: {new_ref}")
+
     if isinstance(val, Table):
         val_ref = val.ref
         if not isinstance(val_ref, TableRef):
@@ -752,7 +761,7 @@ def make_trace_obj(
 
         pass
     else:
-        if hasattr(box_val, "ref"):
+        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
             setattr(box_val, "ref", new_ref)
     return box_val
 

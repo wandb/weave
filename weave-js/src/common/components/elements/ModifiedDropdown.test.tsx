@@ -53,6 +53,18 @@ describe('testing simple search', () => {
       key: '_step',
     },
     {
+      icon: 'wbic-ic-up-arrow',
+      text: 'Stepperoni',
+      value: '_stepperoni',
+      key: '_stepperoni',
+    },
+    {
+      icon: 'wbic-ic-up-arrow',
+      text: '99',
+      value: 99,
+      key: '_99',
+    },
+    {
       icon: 'calendar',
       text: 'Relative Time (Wall)',
       value: '_absolute_runtime',
@@ -135,6 +147,40 @@ describe('testing simple search', () => {
   it('simpleSearch matches case-insensitive non-regex strings', () => {
     const results = simpleSearch(options, 'LOSS');
     expect(results.every(r => (r.value as string).includes('loss'))).toBe(true);
+  });
+
+  it('simpleSearch matches case-insensitive regex strings', () => {
+    const results = simpleSearch(options, 'LOSS', {
+      allowRegexSearch: true,
+    });
+    expect(results.every(r => (r.value as string).includes('loss'))).toBe(true);
+  });
+
+  it('simpleSearch matches case-insensitive regex strings', () => {
+    const results = simpleSearch(options, 'tep$', {
+      allowRegexSearch: true,
+    });
+    expect(results.length).toBe(1);
+    expect(results.every(r => (r.value as string).includes('_step'))).toBe(
+      true
+    );
+  });
+
+  it('simpleSearch matches options with number values', () => {
+    const results = simpleSearch(options, '99$', {
+      allowRegexSearch: true,
+    });
+    expect(results.length).toBe(1);
+    results.forEach(r => {
+      expect(r.value).toEqual(99);
+    });
+  });
+
+  it('simpleSearch matches all results on * regex string', () => {
+    const results = simpleSearch(options, '*', {
+      allowRegexSearch: true,
+    });
+    expect(results.length).toBe(options.length);
   });
 
   it('simpleSearch can disallow matching regex patterns', () => {

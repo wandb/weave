@@ -44,9 +44,9 @@ export const ComparisonDefinitionSection: React.FC<{
     return callIds.map(callId => ({
       key: 'evaluations',
       value: callId,
-      label: props.state.data.evaluationCalls[callId]?.name ?? callId,
+      label: props.state.summary.evaluationCalls[callId]?.name ?? callId,
     }));
-  }, [callIds, props.state.data.evaluationCalls]);
+  }, [callIds, props.state.summary.evaluationCalls]);
 
   const onSetBaseline = (value: string | null) => {
     if (!value) {
@@ -130,8 +130,8 @@ const AddEvaluationButton: React.FC<{
 
   // Calls query for just evaluations
   const evaluationsFilter = useEvaluationsFilter(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
   const page = useMemo(
     () => ({
@@ -144,8 +144,8 @@ const AddEvaluationButton: React.FC<{
   // Don't query for output here, re-queried in tsDataModelHooksEvaluationComparison.ts
   const columns = useMemo(() => ['inputs', 'display_name'], []);
   const calls = useCallsForQuery(
-    props.state.data.entity,
-    props.state.data.project,
+    props.state.summary.entity,
+    props.state.summary.project,
     evaluationsFilter,
     DEFAULT_FILTER_CALLS,
     page,

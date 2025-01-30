@@ -16,7 +16,7 @@ LLM-powered applications can contain multiple LLMs calls and additional data pro
 
 Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     ```python
@@ -147,7 +147,7 @@ Tracking metadata can be done easily by using the `weave.attributes` context man
 
 Continuing our example from above:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import weave

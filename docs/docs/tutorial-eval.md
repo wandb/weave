@@ -9,7 +9,7 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 
 ## 1. Build a `Model`
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
@@ -99,7 +99,7 @@ Checkout the [Models](/guides/core-types/models) guide to learn more.
 
 ## 2. Collect some examples
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
     ```python
@@ -149,7 +149,7 @@ Checkout the [Models](/guides/core-types/models) guide to learn more.
 
 ## 3. Evaluate a `Model`
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
 `Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.scorer.Scorer` classes.
@@ -224,7 +224,7 @@ In some applications we want to create custom `Scorer` classes - where for examp
 
 ## 4. Pulling it all together
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
   
     ```python

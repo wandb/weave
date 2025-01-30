@@ -24,6 +24,9 @@ from weave.trace_server import (
 from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -330,6 +333,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        req.obj.wb_user_id = self._user_id
+        return super().obj_create(req)
+
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
 def get_test_name():
@@ -511,6 +518,9 @@ def create_client(
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
+        # This is disabled by default, but we explicitly enable it here for testing
+        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+        server = CachingMiddlewareTraceServer.from_env(server)
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)
         )

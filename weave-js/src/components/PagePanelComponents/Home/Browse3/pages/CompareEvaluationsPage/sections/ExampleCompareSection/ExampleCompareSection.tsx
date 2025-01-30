@@ -1,5 +1,5 @@
 import {Box, Tooltip} from '@material-ui/core';
-import {Circle, WarningAmberOutlined} from '@mui/icons-material';
+import {WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -16,10 +16,11 @@ import {
   WeaveObjectRef,
 } from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
+import {Icon} from '../../../../../../../Icon';
 import {CellValue} from '../../../../../Browse2/CellValue';
-import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
+import {NotApplicable} from '../../../../NotApplicable';
+import {SmallRef} from '../../../../smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
@@ -31,7 +32,7 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
 import {MetricDefinition, MetricValueType} from '../../ecpTypes';
 import {
@@ -229,15 +230,15 @@ export const ExampleCompareSection: React.FC<{
   }>({});
 
   const onScorerClick = usePeekCall(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
 
   const compositeScoreMetrics = useMemo(
-    () => buildCompositeMetricsMap(props.state.data, 'score'),
-    [props.state.data]
+    () => buildCompositeMetricsMap(props.state.summary, 'score'),
+    [props.state.summary]
   );
 
   if (target == null) {
@@ -261,7 +262,7 @@ export const ExampleCompareSection: React.FC<{
   const numEvals = numTrials.length;
   // Get derived scores, then filter out any not in the selected metrics
   const derivedScores = Object.values(
-    getMetricIds(props.state.data, 'score', 'derived')
+    getMetricIds(props.state.summary, 'score', 'derived')
   ).filter(
     score => props.state.selectedMetrics?.[flattenedDimensionPath(score)]
   );
@@ -483,7 +484,7 @@ export const ExampleCompareSection: React.FC<{
       trialPredict?.op_name ?? ''
     )?.artifactName;
     const trialCallId = trialPredict?.id;
-    const evaluationCall = props.state.data.evaluationCalls[currEvalCallId];
+    const evaluationCall = props.state.summary.evaluationCalls[currEvalCallId];
     if (trialEntity && trialProject && trialOpName && trialCallId) {
       return (
         <Box
@@ -495,14 +496,7 @@ export const ExampleCompareSection: React.FC<{
             projectName={trialProject}
             opName={trialOpName}
             callId={trialCallId}
-            icon={
-              <Circle
-                sx={{
-                  color: evaluationCall.color,
-                  height: CIRCLE_SIZE,
-                }}
-              />
-            }
+            icon={<Icon name="filled-circle" color={evaluationCall.color} />}
             color={MOON_800}
           />
         </Box>

@@ -99,12 +99,12 @@ const SingleDimensionFilter: React.FC<{
   dimensionIndex: number;
 }> = props => {
   const compositeMetricsMap = useMemo(() => {
-    return buildCompositeMetricsMap(props.state.data, 'score');
-  }, [props.state.data]);
+    return buildCompositeMetricsMap(props.state.summary, 'score');
+  }, [props.state.summary]);
 
   const {setComparisonDimensions} = useCompareEvaluationsState();
   const baselineCallId = getBaselineCallId(props.state);
-  const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
+  const compareCallId = Object.keys(props.state.summary.evaluationCalls).find(
     callId => callId !== baselineCallId
   )!;
 
@@ -112,14 +112,14 @@ const SingleDimensionFilter: React.FC<{
     props.state.comparisonDimensions?.[props.dimensionIndex];
 
   const targetDimension = targetComparisonDimension
-    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    ? props.state.summary.scoreMetrics[targetComparisonDimension.metricId]
     : undefined;
 
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
 
-  const xColor = props.state.data.evaluationCalls[baselineCallId].color;
-  const yColor = props.state.data.evaluationCalls[compareCallId].color;
+  const xColor = props.state.summary.evaluationCalls[baselineCallId].color;
+  const yColor = props.state.summary.evaluationCalls[compareCallId].color;
 
   const {filteredRows} = useFilteredAggregateRows(props.state);
   const filteredDigest = useMemo(() => {
@@ -141,7 +141,9 @@ const SingleDimensionFilter: React.FC<{
       );
 
       if (baselineTargetDimension != null && compareTargetDimension != null) {
-        Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
+        Object.entries(
+          props.state.loadableComparisonResults.result?.resultRows ?? {}
+        ).forEach(([digest, row]) => {
           const xVals: number[] = [];
           const yVals: number[] = [];
           Object.values(
@@ -230,7 +232,7 @@ const SingleDimensionFilter: React.FC<{
     compareCallId,
     compositeMetricsMap,
     filteredDigest,
-    props.state.data.resultRows,
+    props.state.loadableComparisonResults.result?.resultRows,
     targetDimension,
   ]);
 
@@ -281,15 +283,15 @@ const SingleDimensionFilter: React.FC<{
         yIsPercentage={yIsPercentage}
         xTitle={
           'Baseline: ' +
-          props.state.data.evaluationCalls[baselineCallId].name +
+          props.state.summary.evaluationCalls[baselineCallId].name +
           ' ' +
-          props.state.data.evaluationCalls[baselineCallId].callId.slice(-4)
+          props.state.summary.evaluationCalls[baselineCallId].callId.slice(-4)
         }
         yTitle={
           'Challenger: ' +
-          props.state.data.evaluationCalls[compareCallId].name +
+          props.state.summary.evaluationCalls[compareCallId].name +
           ' ' +
-          props.state.data.evaluationCalls[compareCallId].callId.slice(-4)
+          props.state.summary.evaluationCalls[compareCallId].callId.slice(-4)
         }
       />
     </VerticalBox>
@@ -303,11 +305,11 @@ const DimensionPicker: React.FC<{
     props.state.comparisonDimensions?.[props.dimensionIndex];
 
   const currDimension = targetComparisonDimension
-    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    ? props.state.summary.scoreMetrics[targetComparisonDimension.metricId]
     : undefined;
   const {setComparisonDimensions} = useCompareEvaluationsState();
 
-  const dimensionMap = props.state.data.scoreMetrics;
+  const dimensionMap = props.state.summary.scoreMetrics;
 
   return (
     <FormControl

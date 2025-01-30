@@ -81,11 +81,16 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
@@ -160,7 +165,10 @@ jobs:
       - uses: actions/setup-node@v1
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         with:
-          node-version: '18.x'
+          node-version: "18.x"
+      - name: Configure npm for GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
       - name: Run WeaveJS Lint and Compile
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         run: |
@@ -172,6 +180,7 @@ jobs:
           yarn tslint
           yarn prettier
           yarn run tsc
+          yarn testci
 
   # ==== Trace Jobs ====
   lint:
@@ -209,40 +218,41 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version-major: ['3']
+        python-version-major: ["3"]
         python-version-minor: [
-            '9',
-            '10',
-            '11',
-            '12',
-            '13',
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
             #
           ]
         nox-shard:
           [
-            'trace',
-            'trace_server',
-            'anthropic',
-            'cerebras',
-            'cohere',
-            'dspy',
-            'groq',
-            'google_ai_studio',
-            'instructor',
-            'langchain',
-            'litellm',
-            'llamaindex',
-            'mistral0',
-            'mistral1',
-            'notdiamond',
-            'openai',
-            'vertexai',
-            'scorers_tests',
-            'pandas-test',
+            "trace",
+            "trace_server",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "dspy",
+            "groq",
+            "google_ai_studio",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral0",
+            "mistral1",
+            "notdiamond",
+            "openai",
+            "vertexai",
+            "scorers_tests",
+            "pandas-test",
           ]
       fail-fast: false
     services:
@@ -254,19 +264,28 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
-          - '8123:8123'
+          - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Enable debug logging
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install SQLite dev package
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -293,6 +312,7 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}

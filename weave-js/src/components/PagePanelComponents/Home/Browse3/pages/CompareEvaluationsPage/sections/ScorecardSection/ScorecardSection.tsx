@@ -14,8 +14,8 @@ import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
-import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
+import {NotApplicable} from '../../../../NotApplicable';
+import {SmallRef} from '../../../../smallRef/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
   buildCompositeMetricsMap,
@@ -78,7 +78,7 @@ export const ScorecardSection: React.FC<{
     [props.state]
   );
   const datasetRefs = useMemo(
-    () => Object.values(props.state.data.evaluations).map(e => e.datasetRef),
+    () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
     [props.state]
   );
   const evalCallIds = useMemo(
@@ -89,26 +89,26 @@ export const ScorecardSection: React.FC<{
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
-      Object.keys(model.properties).forEach(prop => {
+      const model = props.state.summary.models[ref];
+      Object.keys(model?.properties ?? {}).forEach(prop => {
         if (!propsRes[prop]) {
           propsRes[prop] = {};
         }
-        propsRes[prop][ref] = model.properties[prop];
+        propsRes[prop][ref] = model?.properties?.[prop];
       });
     });
 
     // Make sure predict op is last
     modelRefs.forEach(ref => {
-      const model = props.state.data.models[ref];
+      const model = props.state.summary.models[ref];
       if (!propsRes.predict) {
         propsRes.predict = {};
       }
-      propsRes.predict[ref] = model.predictOpRef;
+      propsRes.predict[ref] = model?.predictOpRef;
     });
 
     return propsRes;
-  }, [modelRefs, props.state.data.models]);
+  }, [modelRefs, props.state.summary.models]);
   const propsWithDifferences = useMemo(() => {
     return Object.keys(modelProps).filter(prop => {
       const values = Object.values(modelProps[prop]);
@@ -119,15 +119,15 @@ export const ScorecardSection: React.FC<{
 
   const compositeSummaryMetrics = useMemo(() => {
     return buildCompositeMetricsMap(
-      props.state.data,
+      props.state.summary,
       'summary',
       props.state.selectedMetrics
     );
   }, [props.state]);
 
   const onCallClick = usePeekCall(
-    props.state.data.entity,
-    props.state.data.project
+    props.state.summary.entity,
+    props.state.summary.project
   );
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
@@ -295,7 +295,7 @@ export const ScorecardSection: React.FC<{
               </GridCell>
               {evalCallIds.map((evalCallId, mNdx) => {
                 const model =
-                  props.state.data.evaluationCalls[evalCallId].modelRef;
+                  props.state.summary.evaluationCalls[evalCallId].modelRef;
                 const parsed = parseRefMaybe(
                   modelProps[prop][model]
                 ) as WeaveObjectRef;
@@ -560,7 +560,7 @@ const resolveSummaryMetricResult = (
   const baseline = baselineDimension
     ? resolveSummaryMetricResultForEvaluateCall(
         baselineDimension,
-        state.data.evaluationCalls[evalCallId]
+        state.summary.evaluationCalls[evalCallId]
       )
     : undefined;
   return baseline;

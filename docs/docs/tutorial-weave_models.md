@@ -30,7 +30,7 @@ When you change the class attributes or the code that defines your model, **thes
 
 In the example below, the **model name, temperature and system prompt will be tracked and versioned**:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     import json
@@ -84,7 +84,7 @@ In the example below, the **model name, temperature and system prompt will be tr
 
 Now you can instantiate and call the model with `invoke`:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     weave.init('jurassic-park')
@@ -138,7 +138,7 @@ In the Weave UI you can get the Model ref for a particular version
 **Using the Model**
 Once you have the URI of the Model object, you can export and re-use it. Note that the exported model is already initialised and ready to use:
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
     # the exported weave model is already initialised and ready to be called

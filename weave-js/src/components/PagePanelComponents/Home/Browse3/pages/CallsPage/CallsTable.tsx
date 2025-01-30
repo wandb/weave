@@ -50,7 +50,6 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   useWeaveflowCurrentRouteContext,
@@ -63,6 +62,7 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -651,7 +651,7 @@ export const CallsTable: FC<{
     if (!needsUpdate) {
       return;
     }
-    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+    const hiddenColumnVisibilityFalse = hiddenColumns.reduce((acc, col) => {
       // Only add columns=false when not already in the model
       if (columnVisibilityModel[col] === undefined) {
         acc[col] = false;
@@ -661,7 +661,7 @@ export const CallsTable: FC<{
 
     setColumnVisibilityModel({
       ...columnVisibilityModel,
-      ...hiddenColumnVisiblityFalse,
+      ...hiddenColumnVisibilityFalse,
     });
   }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
@@ -1049,7 +1049,6 @@ export const CallsTable: FC<{
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
-        pageSizeOptions={[DEFAULT_PAGE_SIZE]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
@@ -1057,6 +1056,7 @@ export const CallsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
+        hideFooter={!callsLoading && callsTotal === 0}
         hideFooterSelectedRowCount
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
@@ -1130,7 +1130,7 @@ export const CallsTable: FC<{
             );
           },
           columnMenu: CallsCustomColumnMenu,
-          pagination: PaginationButtons,
+          pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
           columnMenuSortAscendingIcon: IconSortAscending,
           columnMenuHideIcon: IconNotVisible,

@@ -870,9 +870,7 @@ const PanelTableInner: React.FC<
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
                       onClick={() => setRowSize(RowSize[rowSize])}
                       active={config.rowSize === RowSize[rowSize]}
-                      variant={
-                        config.rowSize === RowSize[rowSize] ? 'ghost' : 'quiet'
-                      }
+                      variant="ghost"
                       size="small"
                     />
                   }
@@ -885,7 +883,7 @@ const PanelTableInner: React.FC<
           <div
             style={{flex: '0 0 auto', display: 'flex', alignItems: 'center'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="back"
               tooltip="First page"
@@ -894,7 +892,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-back"
               tooltip="Previous page"
@@ -941,7 +939,7 @@ const PanelTableInner: React.FC<
                 : totalRowCountUse.result - (useOneBasedIndex ? 0 : 1)}
             </span>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-next"
               tooltip="Next page"
@@ -951,7 +949,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="forward-next"
               tooltip="Last page"
@@ -966,7 +964,7 @@ const PanelTableInner: React.FC<
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 downloadDataAsCSV();
@@ -978,7 +976,7 @@ const PanelTableInner: React.FC<
               trigger={
                 <Button
                   data-test="select-columns"
-                  variant="quiet"
+                  variant="ghost"
                   size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
@@ -1008,7 +1006,7 @@ const PanelTableInner: React.FC<
             </Modal>
             <Button
               data-test="auto-columns"
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 
 import {Button} from '../../../../../Button';
 import {ChoiceView} from './ChoiceView';
@@ -28,11 +28,22 @@ export const ChoicesViewCarousel = ({
     setSelectedChoiceIndex(newStep);
   };
 
+  useEffect(() => {
+    if (selectedChoiceIndex >= choices.length) {
+      setSelectedChoiceIndex(choices.length - 1);
+    }
+  }, [selectedChoiceIndex, choices, setSelectedChoiceIndex]);
+
+  const choiceIndex =
+    selectedChoiceIndex >= choices.length
+      ? choices.length - 1
+      : selectedChoiceIndex;
+
   return (
     <ChoiceView
-      choice={choices[selectedChoiceIndex]}
+      choice={choices[choiceIndex]}
       isStructuredOutput={isStructuredOutput}
-      choiceIndex={selectedChoiceIndex}
+      choiceIndex={choiceIndex}
       messageHeader={
         <div className="mb-8 flex items-center gap-4">
           <div className="flex items-center gap-12">
@@ -54,11 +65,11 @@ export const ChoicesViewCarousel = ({
           </div>
           <Button
             size="small"
-            variant="quiet"
+            variant="ghost"
             icon="visible"
             onClick={() => setIsDrawerOpen(true)}
             tooltip="View all choices">
-            Review
+            View trials
           </Button>
         </div>
       }

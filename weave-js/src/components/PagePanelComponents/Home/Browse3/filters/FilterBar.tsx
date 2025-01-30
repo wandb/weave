@@ -4,7 +4,8 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import React, {useCallback, useRef} from 'react';
+import _ from 'lodash';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
@@ -27,6 +28,8 @@ import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
+
+const DEBOUNCE_MS = 700;
 
 type FilterBarProps = {
   filterModel: GridFilterModel;
@@ -57,6 +60,14 @@ export const FilterBar = ({
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  // local filter model is used to avoid triggering a re-render of the trace
+  // table on every keystroke. debounced DEBOUNCE_MS ms
+  const [localFilterModel, setLocalFilterModel] = useState(filterModel);
+  useEffect(() => {
+    setLocalFilterModel(filterModel);
+  }, [filterModel]);
+
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : refBar.current);
   };
@@ -143,29 +154,45 @@ export const FilterBar = ({
     (field: string) => {
       const defaultOperator = getOperatorOptions(field)[0].value;
       const newModel = {
-        ...filterModel,
+        ...localFilterModel,
         items: [
-          ...filterModel.items,
+          ...localFilterModel.items,
           {
-            id: filterModel.items.length,
+            id: localFilterModel.items.length,
             field,
             operator: defaultOperator,
           },
         ],
       };
-      setFilterModel(newModel);
+      setLocalFilterModel(newModel);
     },
-    [filterModel, setFilterModel]
+    [localFilterModel]
+  );
+
+  const debouncedSetFilterModel = useMemo(
+    () =>
+      _.debounce(
+        (newModel: GridFilterModel) => setFilterModel(newModel),
+        DEBOUNCE_MS
+      ),
+    [setFilterModel]
+  );
+  const updateLocalAndDebouncedFilterModel = useCallback(
+    (newModel: GridFilterModel) => {
+      setLocalFilterModel(newModel);
+      debouncedSetFilterModel(newModel);
+    },
+    [debouncedSetFilterModel]
   );
 
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
-      const oldItems = filterModel.items;
+      const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
       if (index === -1) {
-        const newModel2 = {...filterModel, items: [item]};
-        setFilterModel(newModel2);
+        const newModel = {...localFilterModel, items: [item]};
+        updateLocalAndDebouncedFilterModel(newModel);
         return;
       }
 
@@ -174,45 +201,46 @@ export const FilterBar = ({
         item,
         ...oldItems.slice(index + 1),
       ];
-      const newModel = {...filterModel, items: newItems};
-      setFilterModel(newModel);
+      const newItemsModel = {...localFilterModel, items: newItems};
+      updateLocalAndDebouncedFilterModel(newItemsModel);
     },
-    [filterModel, setFilterModel]
+    [localFilterModel, updateLocalAndDebouncedFilterModel]
   );
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
-      const items = filterModel.items.filter(f => f.id !== filterId);
-      const newModel = {...filterModel, items};
+      const items = localFilterModel.items.filter(f => f.id !== filterId);
+      const newModel = {...localFilterModel, items};
+      setLocalFilterModel(newModel);
       setFilterModel(newModel);
     },
-    [filterModel, setFilterModel]
+    [localFilterModel, setFilterModel]
   );
 
   const onSetSelected = useCallback(() => {
     const newFilter =
       selectedCalls.length === 1
         ? {
-            id: filterModel.items.length,
+            id: localFilterModel.items.length,
             field: 'id',
             operator: '(string): equals',
             value: selectedCalls[0],
           }
         : {
-            id: filterModel.items.length,
+            id: localFilterModel.items.length,
             field: 'id',
             operator: '(string): in',
             value: selectedCalls,
           };
     const newModel = upsertFilter(
-      filterModel,
+      localFilterModel,
       newFilter,
       f => f.field === 'id'
     );
     setFilterModel(newModel);
     clearSelectedCalls();
     setAnchorEl(null);
-  }, [filterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
+  }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
@@ -221,7 +249,9 @@ export const FilterBar = ({
   const labelW = refLabel.current?.offsetWidth ?? 0;
   const availableWidth = width - outlineW - paddingW - iconW - labelW - gapW;
 
-  const completeItems = filterModel.items.filter(f => !isFilterIncomplete(f));
+  const completeItems = localFilterModel.items.filter(
+    f => !isFilterIncomplete(f)
+  );
 
   return (
     <>
@@ -273,14 +303,14 @@ export const FilterBar = ({
               <div className="handle flex items-center pb-12">
                 <div className="flex-auto font-semibold">Filters</div>
                 {selectedCalls.length > 0 && (
-                  <Button size="small" variant="quiet" onClick={onSetSelected}>
+                  <Button size="small" variant="ghost" onClick={onSetSelected}>
                     {`Selected rows (${selectedCalls.length})`}
                   </Button>
                 )}
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {filterModel.items.map(item => (
+              {localFilterModel.items.map(item => (
                 <FilterRow
                   key={item.id}
                   item={item}
@@ -291,7 +321,7 @@ export const FilterBar = ({
                 />
               ))}
             </div>
-            {filterModel.items.length === 0 && (
+            {localFilterModel.items.length === 0 && (
               <FilterRow
                 item={{
                   id: undefined,
@@ -308,18 +338,18 @@ export const FilterBar = ({
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="add-new"
-                disabled={filterModel.items.length === 0}
+                disabled={localFilterModel.items.length === 0}
                 onClick={() => onAddFilter('')}>
                 Add filter
               </Button>
               <div className="flex-auto" />
               <Button
                 size="small"
-                variant="quiet"
+                variant="ghost"
                 icon="delete"
-                disabled={filterModel.items.length === 0}
+                disabled={localFilterModel.items.length === 0}
                 onClick={onRemoveAll}>
                 Remove all
               </Button>

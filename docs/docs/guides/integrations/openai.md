@@ -3,11 +3,15 @@ import TabItem from '@theme/TabItem';
 
 # OpenAI
 
+:::note
+Do you want to experiment with OpenAI models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+:::
+
 ## Tracing
 
 It’s important to store traces of LLM applications in a central database, both during development and in production. You’ll use these traces for debugging and to help build a dataset of tricky examples to evaluate against while improving your application.
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     Weave can automatically capture traces for the [openai python library](https://platform.openai.com/docs/libraries/python-library).
 
@@ -79,7 +83,7 @@ It’s important to store traces of LLM applications in a central database, both
 
 ## Track your own ops
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
@@ -249,7 +253,7 @@ Wrapping a function with `weave.op` starts capturing inputs, outputs and app log
 
 ## Create a `Model` for easier experimentation
 
-<Tabs groupId="programming-language">
+<Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app.
 

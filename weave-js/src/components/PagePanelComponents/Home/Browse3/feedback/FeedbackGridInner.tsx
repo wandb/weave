@@ -1,4 +1,8 @@
-import {GridColDef, GridRowHeightParams} from '@mui/x-data-grid-pro';
+import {
+  GridColDef,
+  GridRenderCellParams,
+  GridRowHeightParams,
+} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
@@ -9,15 +13,21 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
+import {
+  getHumanAnnotationNameFromFeedbackType,
+  isHumanAnnotationType,
+} from './StructuredFeedback/humanAnnotationTypes';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
   currentViewerId: string | null;
+  showAnnotationName?: boolean;
 };
 
 export const FeedbackGridInner = ({
   feedback,
   currentViewerId,
+  showAnnotationName,
 }: FeedbackGridInnerProps) => {
   const columns: GridColDef[] = [
     {
@@ -30,6 +40,25 @@ export const FeedbackGridInner = ({
         </div>
       ),
     },
+    ...(showAnnotationName
+      ? [
+          {
+            field: 'annotation_name',
+            headerName: 'Name',
+            flex: 1,
+            renderCell: (params: GridRenderCellParams) => {
+              const feedbackType = params.row.feedback_type;
+              const annotationName = isHumanAnnotationType(feedbackType)
+                ? getHumanAnnotationNameFromFeedbackType(feedbackType)
+                : null;
+              if (!annotationName) {
+                return null;
+              }
+              return <CellValueString value={annotationName} />;
+            },
+          },
+        ]
+      : []),
     {
       field: 'payload',
       headerName: 'Feedback',
@@ -44,7 +73,10 @@ export const FeedbackGridInner = ({
             <span className="night-aware">{params.row.payload.emoji}</span>
           );
         }
-        if (params.row.feedback_type.startsWith('wandb.annotation.')) {
+        if (isHumanAnnotationType(params.row.feedback_type)) {
+          if (typeof params.row.payload.value === 'string') {
+            return <CellValueString value={params.row.payload.value} />;
+          }
           return (
             <CellValueString
               value={JSON.stringify(params.row.payload.value ?? null)}
@@ -57,8 +89,8 @@ export const FeedbackGridInner = ({
     {
       field: 'created_at',
       headerName: 'Timestamp',
-      minWidth: 120,
-      width: 120,
+      minWidth: 105,
+      width: 105,
       renderCell: params => (
         <Timestamp value={params.row.created_at} format="relative" />
       ),
@@ -66,7 +98,8 @@ export const FeedbackGridInner = ({
     {
       field: 'id',
       headerName: 'ID',
-      width: 50,
+      width: 48,
+      minWidth: 48,
       display: 'flex',
       renderCell: params => <CopyableId id={params.row.id} type="Feedback" />,
     },
@@ -94,7 +127,8 @@ export const FeedbackGridInner = ({
     {
       field: 'actions',
       headerName: '',
-      width: 50,
+      width: 36,
+      minWidth: 36,
       filterable: false,
       sortable: false,
       resizable: false,
@@ -143,16 +177,16 @@ export const FeedbackGridInner = ({
       }}
       columnHeaderHeight={40}
       getRowHeight={(params: GridRowHeightParams) => {
-        if (
-          params.model.feedback_type !== 'wandb.reaction.1' &&
-          params.model.feedback_type !== 'wandb.note.1'
-        ) {
-          return 'auto';
+        if (isWandbFeedbackType(params.model.feedback_type)) {
+          return 38;
         }
-        return 38;
+        return 'auto';
       }}
       columns={columns}
       disableRowSelectionOnClick
     />
   );
 };
+
+const isWandbFeedbackType = (feedbackType: string) =>
+  feedbackType.startsWith('wandb.');
