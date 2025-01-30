@@ -349,7 +349,76 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         include_feedback = req.include_feedback or False
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+            # combine dynamic sub columns (inputs_dump, outputs, attributes, summary)
+            # into their root columns
+            # Example inputs.key.value, inputs.key.b -> {"key": {"value": "value", "b": "b"}}
+            inputs_dump: dict[str, Any] = {}
+            outputs_dump: dict[str, Any] = {}
+            summary_dump: dict[str, Any] = {}
+            attributes_dump: dict[str, Any] = {}
+
+            for i, col in enumerate(select_columns):
+                if col.startswith("inputs_dump") and col.count(".") > 0:
+                    # Skip the root "inputs_dump" prefix
+                    path = col[len("inputs_dump.") :].split(".")
+                    current = inputs_dump
+                    # Build nested dict structure
+                    for part in path[:-1]:
+                        current = current.setdefault(part, {})
+                    current[path[-1]] = row[i]
+                elif col.startswith("output_dump") and col.count(".") > 0:
+                    path = col[len("output_dump.") :].split(".")
+                    current = outputs_dump
+                    for part in path[:-1]:
+                        current = current.setdefault(part, {})
+                    current[path[-1]] = row[i]
+                elif col.startswith("attributes_dump") and col.count(".") > 0:
+                    path = col[len("attributes_dump.") :].split(".")
+                    current = attributes_dump
+                    for part in path[:-1]:
+                        current = current.setdefault(part, {})
+                    current[path[-1]] = row[i]
+                elif col.startswith("summary_dump") and col.count(".") > 0:
+                    path = col[len("summary_dump.") :].split(".")
+                    current = summary_dump
+                    for part in path[:-1]:
+                        current = current.setdefault(part, {})
+                    current[path[-1]] = row[i]
+
+            # Create the call dict with the rolled up nested fields
+            call_dict = {}
+            for i, col in enumerate(select_columns):
+                # Skip the nested columns we already processed
+                if any(
+                    col.startswith(prefix) and col.count(".") > 0
+                    for prefix in [
+                        "inputs_dump",
+                        "output_dump",
+                        "attributes_dump",
+                        "summary_dump",
+                    ]
+                ):
+                    continue
+
+                # Handle the root columns
+                if col == "inputs_dump":
+                    call_dict[col] = json.dumps(inputs_dump) if inputs_dump else row[i]
+                elif col == "output_dump":
+                    call_dict[col] = (
+                        json.dumps(outputs_dump) if outputs_dump else row[i]
+                    )
+                elif col == "attributes_dump":
+                    call_dict[col] = (
+                        json.dumps(attributes_dump) if attributes_dump else row[i]
+                    )
+                elif col == "summary_dump":
+                    call_dict[col] = (
+                        json.dumps(summary_dump) if summary_dump else row[i]
+                    )
+                else:
+                    call_dict[col] = row[i]
+
+            return _ch_call_dict_to_call_schema_dict(call_dict)
 
         if not expand_columns and not include_feedback:
             for row in raw_res:
