@@ -97,11 +97,10 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        res = super().as_sql(pb, table_alias)
         if self.extra_path:
-            raise NotImplementedError(
-                "Dynamic fields cannot be selected directly, yet - implement me!"
-            )
-        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+            return f"JSONExtractRaw({res}, '{self.extra_path[0]}')"
+        return f"{res} AS {self.field}"
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
         extra_path = [*(self.extra_path or [])]
@@ -569,9 +568,26 @@ class CallsQuery(BaseModel):
         id_subquery_name: Optional[str] = None,
     ) -> str:
         needs_feedback = False
-        select_fields_sql = ", ".join(
-            field.as_select_sql(pb, table_alias) for field in self.select_fields
+        dynamic_select_fields, simple_select_fields = [], []
+        dynamic_select_fields_indexes = []
+        for i, field in enumerate(self.select_fields):
+            if field.is_heavy() and field.extra_path is not None:
+                dynamic_select_fields.append(field)
+                dynamic_select_fields_indexes.append(i)
+            else:
+                simple_select_fields.append(field)
+
+        # add back in dynamic fields in the right order
+        dynamic_select_fields_tuples = make_dynamic_select_fields_sql(
+            pb, table_alias, dynamic_select_fields
         )
+        select_fields_sql_list = [
+            field.as_select_sql(pb, table_alias) for field in simple_select_fields
+        ]
+        for i, sql in zip(dynamic_select_fields_indexes, dynamic_select_fields_tuples):
+            select_fields_sql_list.insert(i, sql)
+
+        select_fields_sql = ", ".join(select_fields_sql_list)
 
         having_filter_sql = ""
         having_conditions_sql: list[str] = []
@@ -650,6 +666,42 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
+
+
+def make_dynamic_select_fields_sql(
+    pb: ParamBuilder,
+    table_alias: str,
+    dynamic_select_fields: list[CallsMergedDynamicField],
+) -> list[str]:
+    # Dynamic field roots: attributes_dump, inputs_dump, output_dump, summary_dump
+    # We want to group by the root field and then aggregate the dynamic fields
+    # into a json selectable statement
+    # Example: 'inputs.a', 'inputs.b' ->
+    # 'toJSONString(map('inputs', map('a', simpleJSONExtractRaw(any(inputs_dump), 'a'), 'b', simpleJSONExtractRaw(any(inputs_dump), 'b')))) as 'inputs_dump'
+
+    groups: dict[str, list[CallsMergedDynamicField]] = {}
+    for field in dynamic_select_fields:
+        root = field.field.split(".")[0]
+        root_no_dump = root.split("_dump")[0]
+        if root_no_dump not in groups:
+            groups[root_no_dump] = []
+        groups[root_no_dump].append(field)
+
+    dynamic_select_fields_list = []
+
+    for root_no_dump, fields in groups.items():
+        sql = "toJSONString("
+        for i, field in enumerate(fields):
+            extra_path = field.extra_path
+            if extra_path is None:
+                raise ValueError(f"Dynamic field {field.field} has no extra path")
+            sql += f"map('{extra_path[0]}', {field.as_select_sql(pb, table_alias)})"
+            if i < len(fields) - 1:
+                sql += ","
+        sql += f") as {root_no_dump}_dump"
+        dynamic_select_fields_list.append(sql)
+
+    return dynamic_select_fields_list
 
 
 ALLOWED_CALL_FIELDS = {
