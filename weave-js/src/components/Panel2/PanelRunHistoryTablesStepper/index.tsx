@@ -110,8 +110,11 @@ const PanelRunHistoryTablesStepper: React.FC<
     }
 
     if (tablesWithStepsNodeResult != null) {
-      const steps = tablesWithStepsNodeResult.map((row: any) => row._step);
-      const tables = tablesWithStepsNodeResult.map((row: any) => row.table);
+      const nonNullTables = tablesWithStepsNodeResult.filter(
+        (row: any) => row.table != null
+      );
+      const steps = nonNullTables.map((row: any) => row._step);
+      const tables = nonNullTables.map((row: any) => row.table);
       setSteps(steps);
       setCurrentStep(steps[0]);
       setCurrentTableHistoryKey(value);
@@ -121,7 +124,7 @@ const PanelRunHistoryTablesStepper: React.FC<
 
   const tableIndex = steps.indexOf(currentStep);
   let defaultNode: NodeOrVoidNode = voidNode();
-  if (tableIndex !== -1) {
+  if (tableIndex !== -1 && tables[tableIndex] != null) {
     defaultNode = opTableRows({
       table: opFileTable({
         file: constNodeUnsafe(
