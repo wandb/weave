@@ -16,6 +16,7 @@ def lite_llm_completion(
     provider: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
+    azure_api_base, azure_api_version = None, None
     if provider == "bedrock" or provider == "bedrock_converse":
         aws_access_key_id, aws_secret_access_key, aws_region_name = (
             get_bedrock_credentials(inputs.model)
@@ -27,6 +28,8 @@ def lite_llm_completion(
     # XAI models don't support response_format
     elif provider == "xai":
         inputs.response_format = None
+    elif provider == "azure" or provider == "azure_ai":
+        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
     import litellm
 
@@ -40,6 +43,8 @@ def lite_llm_completion(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             aws_region_name=aws_region_name,
+            api_base=azure_api_base,
+            api_version=azure_api_version,
         )
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
@@ -89,3 +94,33 @@ def get_bedrock_credentials(
         )
 
     return aws_access_key_id, aws_secret_access_key, aws_region_name
+
+
+def get_azure_credentials(model_name: str) -> tuple[Optional[str], Optional[str]]:
+    secret_fetcher = _secret_fetcher_context.get()
+    if not secret_fetcher:
+        raise InvalidRequest(
+            f"No secret fetcher found, cannot fetch API key for model {model_name}"
+        )
+
+    azure_api_base = (
+        secret_fetcher.fetch("AZURE_API_BASE").get("secrets", {}).get("AZURE_API_BASE")
+    )
+    if not azure_api_base:
+        raise MissingLLMApiKeyError(
+            f"No Azure API base found for model {model_name}",
+            api_key_name="AZURE_API_BASE",
+        )
+
+    azure_api_version = (
+        secret_fetcher.fetch("AZURE_API_VERSION")
+        .get("secrets", {})
+        .get("AZURE_API_VERSION")
+    )
+    if not azure_api_version:
+        raise MissingLLMApiKeyError(
+            f"No Azure API version found for model {model_name}",
+            api_key_name="AZURE_API_VERSION",
+        )
+
+    return azure_api_base, azure_api_version
