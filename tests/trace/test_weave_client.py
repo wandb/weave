@@ -15,6 +15,7 @@ from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
+    client_is_sqlite,
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
@@ -32,9 +33,6 @@ from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
-)
-from weave.trace_server.sqlite_trace_server import (
-    SqliteTraceServer,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1370,8 +1368,7 @@ def test_table_partitioning(network_proxy_client):
 
 
 def test_summary_tokens_cost(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # SQLite does not support costs
         return
 
@@ -1507,8 +1504,7 @@ def test_summary_tokens_cost(client):
 
 @pytest.mark.skip_clickhouse_client
 def test_summary_tokens_cost_sqlite(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if not is_sqlite:
+    if not client_is_sqlite(client):
         # only run this test for sqlite
         return
 
