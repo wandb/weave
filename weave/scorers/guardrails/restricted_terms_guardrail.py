@@ -43,10 +43,6 @@ class RestrictedTermsAnalysis(BaseModel):
         description="Text with restricted terms replaced with category tags",
     )
 
-    @property
-    def safe(self) -> bool:
-        return not self.contains_restricted_terms
-
 
 class RestrictedTermsRecognitionResponse(BaseModel):
     """Response from the `RestrictedTermsLLMGuardrail`"""
