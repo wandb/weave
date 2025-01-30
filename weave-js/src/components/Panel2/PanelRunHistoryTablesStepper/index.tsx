@@ -5,10 +5,6 @@ import {
   constNumber,
   constString,
   file,
-  isAssignableTo,
-  list,
-  listObjectType,
-  maybe,
   NodeOrVoidNode,
   opDict,
   opFileTable,
@@ -17,9 +13,6 @@ import {
   opPick,
   opRunHistory,
   opTableRows,
-  Type,
-  typedDict,
-  typedDictPropertyTypes,
   voidNode,
 } from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
@@ -95,12 +88,12 @@ const PanelRunHistoryTablesStepper: React.FC<
     config?.tableHistoryKey
   );
   const tableWithStepsNode = opMap({
-    arr: runHistoryRefined.result,
+    arr: runHistoryRefined.result as any,
     mapFn: constFunction({row: runHistoryRefined.result.type}, ({row}) =>
       opDict({
         _step: opPick({obj: row, key: constString('_step')}),
         table: opPick({obj: row, key: constString(value ?? '')}),
-      })
+      } as any)
     ) as any,
   });
 
@@ -117,8 +110,8 @@ const PanelRunHistoryTablesStepper: React.FC<
     }
 
     if (tablesWithStepsNodeResult != null) {
-      const steps = tablesWithStepsNodeResult.map(row => row._step);
-      const tables = tablesWithStepsNodeResult.map(row => row.table);
+      const steps = tablesWithStepsNodeResult.map((row: any) => row._step);
+      const tables = tablesWithStepsNodeResult.map((row: any) => row.table);
       setSteps(steps);
       setCurrentStep(steps[0]);
       setCurrentTableHistoryKey(value);
