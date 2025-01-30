@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
+import inspect
 import logging
 import traceback
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from time import time
 from typing import (
     Annotated,
     Any,
@@ -22,7 +24,7 @@ from typing import (
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from rich import print
-from typing_extensions import Self
+from typing_extensions import Self, runtime_checkable
 
 import weave
 from weave.flow import util
@@ -142,7 +144,7 @@ class Evaluation(Object):
         )
 
     @model_validator(mode="after")
-    def _update_display_name(self) -> "Evaluation":
+    def _update_display_name(self) -> Evaluation:
         if self.evaluation_name:
             # Treat user-specified `evaluation_name` as the name for `Evaluation.evaluate`
             eval_op = as_op(self.evaluate)
@@ -355,6 +357,7 @@ class ScorePydantic(BaseModel):
     metadata: Optional[dict[str, Any]] = None
 
 
+@runtime_checkable
 class ScorerProtocol(Protocol[O]):
     """Scorers are anything that return ScoreDict"""
 
@@ -378,7 +381,13 @@ class ScoringResult(TypedDict):
     scores: dict
 
 
+@runtime_checkable
 class ModelProtocol(Protocol[I, O]):
+    def __call__(self, input: I) -> O: ...
+
+
+@runtime_checkable
+class AsyncModelProtocol(Protocol[I, O]):
     async def __call__(self, input: I) -> O: ...
 
 
@@ -387,49 +396,77 @@ class PredictorOutputDict(TypedDict, Generic[O]):
     metadata: NotRequired[dict[str, Any]]
 
 
+@runtime_checkable
 class PredictorProtocol(Protocol[I, O]):
     """Unsure about this one.  The intent is to wrap a model with metadata that is created at runtime."""
 
     async def __call__(self, input: I) -> PredictorOutputDict[O]: ...
 
 
+def is_async_callable(obj: Any) -> bool:
+    if inspect.iscoroutinefunction(obj):
+        return True
+
+    if hasattr(obj, "__call__") and inspect.iscoroutinefunction(obj.__call__):
+        return True
+
+    return False
+
+
 class BasicPredictor:
     """A basic predictor that wraps a model output to include latency and success/error info"""
 
-    def __init__(self, model: ModelProtocol[I, O]):
+    def __init__(self, model: ModelProtocol[I, O] | AsyncModelProtocol[I, O]):
         self.model = model
 
-    async def __call__(self, input: I) -> PredictorOutputDict[O]:
-        start_time = time.time()
-        try:
-            output = await self.model(input)
-        except Exception as e:
-            output = None
-            metadata = {
-                "latency": time.time() - start_time,
-                "success": False,
-                "error": str(e),
-            }
-        else:
-            metadata = {
-                "latency": time.time() - start_time,
-                "success": True,
-            }
+    # async def __call__(self, input: I) -> PredictorOutputDict[O]:
+    async def __call__(self, input: I) -> Call:
+        if is_async_callable(self.model):
+            return await self.model(**input)
+        return self.model(**input)
 
-        return PredictorOutputDict(input=input, output=output, metadata=metadata)
+        # start_time = time()
+        # try:
+        #     if is_async_callable(self.model):
+        #         # output = await self.model(**input)
+        #         _, call = await self.model.call(**input)
+        #     else:
+        #         # output = self.model(**input)
+        #         _, call = self.model.call(**input)
+        # except Exception as e:
+        #     output = None
+        #     metadata = {
+        #         "latency": time() - start_time,
+        #         "success": False,
+        #         "error": str(e),
+        #     }
+        # else:
+        #     metadata = {
+        #         "latency": time() - start_time,
+        #         "success": True,
+        #     }
+
+        # return PredictorOutputDict(input=input, output=output, metadata=metadata)
+        return call
 
 
 class Evaluation2(Object, Generic[I, O, ScoreT]):
-    dataset: Sequence[I]
-    scorers: Sequence[ScorerProtocol[ScoreT]]
-    preprocess_model_input: Optional[PreprocessModelInput] = None
+    dataset: Dataset | Sequence[I]  # TODO: Dataset can also be parameterized
+    scorers: list[Scorer] | Sequence[ScorerProtocol[ScoreT]]
+    preprocess_model_input: PreprocessModelInput | None = None
     trials: int = 1
+
+    @model_validator(mode="before")
+    def _convert_dataset(cls, values: dict) -> dict:
+        if "dataset" in values:
+            values["dataset"] = Dataset(rows=values["dataset"])
+        return values
 
     async def evaluate(
         self,
         *,
-        model: Optional[ModelProtocol[I, O]] = None,
-        predictions: Optional[Sequence[O]] = None,
+        model: ModelProtocol[I, O] | None = None,
+        predictions: Sequence[O] | None = None,
     ) -> dict:
         if not model and not predictions:
             raise ValueError("Must provide a model or predictions")
@@ -444,19 +481,36 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         *,
         model: ModelProtocol[I, O],
         predictor_cls: PredictorProtocol[I, O] = BasicPredictor,
-    ) -> Sequence[PredictorOutputDict[O]]:
-        return [
-            predictor_row
-            async for _, predictor_row in util.async_foreach(
-                self.dataset, predictor_cls(model), get_weave_parallelism()
-            )
-        ]
+        # ) -> Sequence[PredictorOutputDict[O]]:
+    ) -> Dataset:
+        # At the end of this method, the user should have the same thing as `Dataset.from_calls(...)`
+
+        async def predict_row(row: Any) -> dict:
+            if is_async_callable(model):
+                _, call = await model.call(**row)
+            else:
+                _, call = model.call(**row)
+
+            print(f"{call=}")
+            return call
+            # return await predictor_cls(model)(row)
+
+        new_rows = []
+        async for _, prediction in util.async_foreach(
+            self.dataset, predict_row, get_weave_parallelism()
+        ):
+            # TODO: Should we basically be doing a model.call() and saving
+            # the call object here?
+            new_rows.append(prediction.to_dict())
+
+        # return Dataset(rows=new_rows)
+        return new_rows
 
     async def score(
         self,
         *,
         predictions: Sequence[PredictorOutputDict[O]],
-        extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
+        extra_metadata: Sequence[dict[str, Any]] | None = None,
     ) -> Sequence[dict[ScorerName, list[ScoreDict]]]:
         if extra_metadata is None:
             extra_metadata = [{} for _ in predictions]
