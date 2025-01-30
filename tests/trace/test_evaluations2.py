@@ -46,24 +46,27 @@ def dataset(request):
 
 @pytest.fixture
 def scorers(request):
-    @weave.op
     def valid_sync_scorer(output: int) -> bool:
         return output > 5
 
-    @weave.op
     def invalid_sync_scorer(output: str) -> bool:
         return "substring" in output
 
-    @weave.op
     async def valid_async_scorer(output: int) -> bool:
         return output > 8
 
-    @weave.op
     async def invalid_async_scorer(output: str) -> bool:
         return output + "text" == f"{output}text"
 
+    valid_sync_scorer_op = weave.op(valid_sync_scorer)
+    invalid_sync_scorer_op = weave.op(invalid_sync_scorer)
+    valid_async_scorer_op = weave.op(valid_async_scorer)
+    invalid_async_scorer_op = weave.op(invalid_async_scorer)
+
     sync_scorers = [valid_sync_scorer, invalid_sync_scorer]
     async_scorers = [valid_async_scorer, invalid_async_scorer]
+    sync_scorer_ops = [valid_sync_scorer_op, invalid_sync_scorer_op]
+    async_scorer_ops = [valid_async_scorer_op, invalid_async_scorer_op]
 
     if request.param == "sync":
         return sync_scorers
@@ -71,33 +74,20 @@ def scorers(request):
         return async_scorers
     elif request.param == "combo":
         return sync_scorers + async_scorers
+    elif request.param == "combo_ops":
+        return sync_scorer_ops + async_scorer_ops
     raise ValueError(f"Invalid scorers type: {request.param}")
 
 
-@pytest.mark.parametrize("model", ["op"], indirect=True)
-@pytest.mark.parametrize("dataset", ["list", "dataset"], indirect=True)
-@pytest.mark.parametrize(
-    "scorers",
-    [
-        "sync",
-        "async",
-        "combo",
-    ],
-    indirect=True,
-)
-@pytest.mark.asyncio
-async def test_evaluation_starting_with_model(client, model, dataset, scorers):
-    ev = Evaluation2(dataset=dataset, scorers=scorers)
-
-    predictions = await ev.predict(model=model)
+def check_predictions(predictions):
     assert len(predictions) == 3
     assert predictions[0]["output"] == 3
     assert predictions[1]["output"] == 7
     assert predictions[2]["output"] == 11
 
-    scores = await ev.score(predictions=predictions)
+
+def check_scores(scores, scorers):
     assert len(scores) == len(scorers)
-    print(f"{scores=}")
     if valid_async_score := scores.get("valid_async_scorer"):
         assert valid_async_score[0]["score"] == False
         assert valid_async_score[1]["score"] == False
@@ -118,14 +108,49 @@ async def test_evaluation_starting_with_model(client, model, dataset, scorers):
         assert invalid_sync_score[1]["score"] == None
         assert invalid_sync_score[2]["score"] == None
 
-    # summary = ev.summarize(scores)
-    # assert summary["valid_sync_scorer"] == [True, True, True]
-    # assert summary["invalid_sync_scorer"] == [False, False, False]
-    # assert summary["valid_async_scorer"] == [True, True, True]
-    # assert summary["invalid_async_scorer"] == [False, False, False]
 
-    ...
-    # ev = Evaluation2(dataset=[{"a": 1, "b": 2}, {"a": 3, "b": 4}], scorers=[model])
+def check_summary(summary, scorers):
+    assert len(summary) == len(scorers)
+    if valid_async_scorer_summary := summary.get("valid_async_scorer"):
+        assert valid_async_scorer_summary["score"]["true_count"] == 1
+        assert valid_async_scorer_summary["score"]["true_fraction"] == 1 / 3
+
+    if invalid_async_scorer_summary := summary.get("invalid_async_scorer"):
+        assert invalid_async_scorer_summary["score"]["true_count"] == 0
+        assert invalid_async_scorer_summary["score"]["true_fraction"] == 0
+
+    if valid_sync_scorer_summary := summary.get("valid_sync_scorer"):
+        assert valid_sync_scorer_summary["score"]["true_count"] == 2
+        assert valid_sync_scorer_summary["score"]["true_fraction"] == 2 / 3
+
+    if invalid_sync_scorer_summary := summary.get("invalid_sync_scorer"):
+        assert invalid_sync_scorer_summary["score"]["true_count"] == 0
+        assert invalid_sync_scorer_summary["score"]["true_fraction"] == 0
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "op",
+        "function",
+        "callable_class",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("dataset", ["list", "dataset"], indirect=True)
+@pytest.mark.parametrize("scorers", ["sync", "async", "combo"], indirect=True)
+@pytest.mark.asyncio
+async def test_evaluation_starting_with_model(client, model, dataset, scorers):
+    ev = Evaluation2(dataset=dataset, scorers=scorers)
+
+    predictions = await ev.predict(model=model)
+    check_predictions(predictions)
+
+    scores = await ev.score(predictions=predictions)
+    check_scores(scores, scorers)
+
+    summary = await ev.summarize(scores)
+    check_summary(summary, scorers)
 
 
 # def test_evaluation_starting_with_predictions(client): ...

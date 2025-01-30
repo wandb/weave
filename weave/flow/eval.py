@@ -457,10 +457,9 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
     trials: int = 1
 
     @model_validator(mode="before")
-    def _convert_dataset(cls, values: dict) -> dict:
-        if "dataset" in values:
-            if not isinstance(values["dataset"], Dataset):
-                values["dataset"] = Dataset(rows=values["dataset"])
+    def _convert_types(cls, values: dict) -> dict:
+        values["dataset"] = _datasetify(values["dataset"])
+        values["scorers"] = [_scorerify(scorer) for scorer in values["scorers"]]
         return values
 
     async def evaluate(
@@ -502,6 +501,9 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         # ) -> Sequence[PredictorOutputDict[O]]:
     ) -> AsyncGenerator[dict, None, None]:
         # At the end of this method, the user should have the same thing as `Dataset.from_calls(...)`
+
+        # TODO: This needs to work with all Callables
+        model = _opify(model)
 
         async def predict_row(row: Any) -> dict:
             # TODO: Suppress call donut messages here
@@ -570,33 +572,31 @@ class Evaluation2(Object, Generic[I, O, ScoreT]):
         ):
             yield res
 
-    async def aggregate_results(self): ...
-
-    def summarize(self, results: Sequence[ScoringResult]) -> dict[str, Any]:
-        cols = transpose(list(results))
+    async def summarize(
+        self, scores: dict[str, Sequence[ScoringResult]]
+    ) -> dict[str, Any]:
+        # TODO: There is no need for this func to be async, but it makes the API more consitent
+        # Consider making this not async...
         summary = {}
 
-        if "scores" in cols:
-            score_data = transpose(cols["scores"])
-            for scorer in self._post_init_scorers:
-                attrs = get_scorer_attributes(scorer)
-                score_table = score_data[attrs.scorer_name]
-                summary[attrs.scorer_name] = attrs.summarize_fn(score_table)
+        # Summarize scores
+        for scorer in self.scorers:
+            attrs = get_scorer_attributes(scorer)
+            for name, scores in scores.items():
+                # TODO: Make this dict look nicer before returning.
+                # The autosummary needs to be cleaner
+                summary[name] = attrs.summarize_fn(scores)
 
-        for name, vals in cols.items():
-            if name == "scores":
-                continue
-            if summary_result := auto_summarize(vals):
-                summary[name] = summary_result
+        # TODO: Summarize remaining columns (do we need this?)
 
         return summary
 
 
 def evaluate(
-    dataset: Union[Dataset, list],
-    model: Union[Op, Model],
-    scorers: Optional[list[Union[Callable, Scorer]]] = None,
-    preprocess_model_input: Optional[PreprocessModelInput] = None,
+    dataset: Dataset | list,
+    model: Op | Model,
+    scorers: list[Scorer] | list[Callable] | None = None,
+    preprocess_model_input: PreprocessModelInput | None = None,
 ) -> dict:
     ev = Evaluation(
         dataset=dataset,
@@ -620,3 +620,42 @@ def is_valid_model(model: Any) -> bool:
             and is_op(model.predict)
         )
     )
+
+
+class CoerceError(Exception):
+    """An error that occurs when coercing an object to the target type"""
+
+
+def _datasetify(obj: Any) -> Dataset:
+    if isinstance(obj, Dataset):
+        return obj
+
+    try:
+        return Dataset(rows=obj)
+    except Exception:
+        raise CoerceError("Unable to coerce to dataset")
+
+
+# TODO: Not clear if scorers need a summarize anymore
+def _scorerify(obj: Any) -> ScorerProtocol:
+    if isinstance(obj, Scorer):
+        return obj
+
+    if is_op(obj):
+        return obj
+
+    if callable(obj):
+        try:
+            return weave.op(obj)
+        except Exception:
+            raise CoerceError("Unable to coerce to scorer")
+
+    raise CoerceError("Unable to coerce to scorer")
+
+
+# TODO: Naming here is bad.  We already have "as_op" -- streamline this
+def _opify(obj: Any) -> Op:
+    if is_op(obj):
+        return obj
+
+    return weave.op(obj)
