@@ -82,6 +82,7 @@ scorers_tests = [
   "google-generativeai>=0.8.0",
   "mistralai>=1.0.3",
   "anthropic>=0.30.0",
+  "litellm>=1.58.2",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
@@ -230,7 +231,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.32-dev0"
+current_version = "0.51.33-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
