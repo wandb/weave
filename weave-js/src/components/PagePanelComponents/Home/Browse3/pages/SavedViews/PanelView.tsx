@@ -50,11 +50,8 @@ export const PanelView = ({
 
   return (
     <div
-      className="flex w-full cursor-pointer gap-10 px-10 py-6 hover:bg-moon-100"
+      className="flex w-full cursor-pointer gap-10 px-16 py-8 hover:bg-moon-100"
       onClick={onClick}>
-      <div>
-        <IconViewGlasses />
-      </div>
       <div className="flex-auto">
         <div>
           {resolvedName} ({view.object_id})

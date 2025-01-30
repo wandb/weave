@@ -27,7 +27,7 @@ export const DropdownViewActions = ({
           <Button active={isOpen} variant="ghost" icon="overflow-horizontal" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content align="start">
+          <DropdownMenu.Content align="end">
             <DropdownMenu.Item onClick={savedViewsInfo.onSaveNewView}>
               <Icon name="add-new" /> Save as new view
             </DropdownMenu.Item>
