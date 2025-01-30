@@ -34,12 +34,12 @@ import {
   parseRefMaybe,
 } from '../../../../../../react';
 import {Tooltip} from '../../../../../Tooltip';
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -48,7 +48,7 @@ import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {SortBy} from '../wfReactInterface/traceServerClientTypes';
 
-const RowId = styled.span`
+export const RowId = styled.span`
   font-family: 'Inconsolata', monospace;
 `;
 RowId.displayName = 'S.RowId';
@@ -238,7 +238,7 @@ export const WeaveCHTable: FC<{
   );
 };
 
-type DataTableServerSidePaginationControls = {
+export type DataTableServerSidePaginationControls = {
   paginationModel: GridPaginationModel;
   onPaginationModelChange: (model: GridPaginationModel) => void;
   totalRows: number;

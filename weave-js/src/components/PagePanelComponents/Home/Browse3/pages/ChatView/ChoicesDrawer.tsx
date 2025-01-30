@@ -1,10 +1,11 @@
-import {Box, Drawer} from '@mui/material';
+import {Box} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
-import {Tag} from '@wandb/weave/components/Tag';
+import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 
 import {Button} from '../../../../../Button';
+import {ResizableDrawer} from '../common/ResizableDrawer';
 import {ChoiceView} from './ChoiceView';
 import {Choice} from './types';
 
@@ -25,21 +26,38 @@ export const ChoicesDrawer = ({
   selectedChoiceIndex,
   setSelectedChoiceIndex,
 }: ChoicesDrawerProps) => {
+  const [width, setWidth] = useState(784);
+  const [maxAllowedWidth, setMaxAllowedWidth] = useState(
+    window.innerWidth - 73
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      const newMaxWidth = window.innerWidth - 73;
+      setMaxAllowedWidth(newMaxWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleFullScreen = useCallback(() => {
+    const newWidth = width === maxAllowedWidth ? 784 : maxAllowedWidth;
+    setWidth(newWidth);
+  }, [width, maxAllowedWidth]);
+
   return (
-    <Drawer
+    <ResizableDrawer
       open={isDrawerOpen}
       onClose={() => setIsDrawerOpen(false)}
-      title="Choices"
-      anchor="right"
-      sx={{
-        '& .MuiDrawer-paper': {mt: '60px', width: '400px'},
-      }}>
+      defaultWidth={width}
+      setWidth={setWidth}>
       <Box
         sx={{
           position: 'sticky',
           top: 0,
-          zIndex: 1,
-          px: 2,
+          zIndex: 20,
+          pl: '16px',
+          pr: '8px',
           height: 44,
           width: '100%',
           borderBottom: `1px solid ${MOON_200}`,
@@ -57,37 +75,52 @@ export const ChoicesDrawer = ({
             fontWeight: 600,
             fontSize: '1.25rem',
           }}>
-          Responses
+          Trials
         </Box>
-        <Button
-          size="medium"
-          variant="ghost"
-          icon="close"
-          onClick={() => setIsDrawerOpen(false)}
-          tooltip="Close"
-        />
+        <Box sx={{display: 'flex', gap: 1}}>
+          <Button
+            size="medium"
+            variant="ghost"
+            icon="full-screen-mode-expand"
+            onClick={handleFullScreen}
+            tooltip={
+              width === maxAllowedWidth ? 'Exit full screen' : 'Full screen'
+            }
+          />
+          <Button
+            size="medium"
+            variant="ghost"
+            icon="close"
+            onClick={() => setIsDrawerOpen(false)}
+            tooltip="Close"
+          />
+        </Box>
       </Box>
       <Tailwind>
-        <div className="flex flex-col p-12">
+        <div className="mb-[72px] flex flex-col px-[16px] pb-[16px] pt-[8px]">
           {choices.map((c, index) => (
             <div key={index}>
-              <div className="flex items-center gap-4 font-semibold">
-                <Tag color="moon" label={`Response ${index + 1}`} />
+              <div className="sticky top-[44px] z-10 flex items-center bg-white py-[8px]">
+                <p className="mr-[8px] text-[14px] font-semibold">
+                  Trial {index + 1}
+                </p>
                 {index === selectedChoiceIndex ? (
-                  <Button
-                    className="text-green-500"
-                    size="small"
-                    variant="ghost"
-                    icon="checkmark">
-                    <span className="text-moon-500">Response selected</span>
-                  </Button>
+                  <div className="flex items-center gap-[2px]">
+                    <Icon
+                      name="checkmark"
+                      className="ml-[4px] w-[16px] text-green-500"
+                    />
+                    <span className="text-sm font-semibold">
+                      Response selected
+                    </span>
+                  </div>
                 ) : (
                   <Button
                     size="small"
-                    variant="ghost"
-                    icon="boolean"
+                    variant="secondary"
+                    icon="checkmark"
                     onClick={() => setSelectedChoiceIndex(index)}>
-                    <span className="text-moon-500">Select response</span>
+                    Select response
                   </Button>
                 )}
               </div>
@@ -95,12 +128,11 @@ export const ChoicesDrawer = ({
                 choice={c}
                 isStructuredOutput={isStructuredOutput}
                 choiceIndex={index}
-                isNested
               />
             </div>
           ))}
         </div>
       </Tailwind>
-    </Drawer>
+    </ResizableDrawer>
   );
 };

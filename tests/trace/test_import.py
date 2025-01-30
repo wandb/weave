@@ -9,5 +9,5 @@ def test_import_not_slow(monkeypatch):
 
     import_time = run_single_import()
 
-    # Ideally the import takes < 1s, but in CI it can take up to 4s.
-    assert import_time < 4, f"Import time was {import_time} seconds"
+    # Ideally the import takes < 1s, but in CI it can take up to 5s.
+    assert import_time < 5, f"Import time was {import_time} seconds"

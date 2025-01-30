@@ -414,6 +414,9 @@ const fetchEvaluationSummaryData = async (
       const ref = modelRefs[objNdx];
       const parsed = parseRef(ref) as WeaveObjectRef;
       const objData = objVal;
+      if (objData == null) {
+        return [ref, null];
+      }
       return [
         ref,
         {
@@ -497,25 +500,28 @@ const fetchEvaluationComparisonResults = async (
     });
 
   // 3.5 Populate the inputs
-  // We only ned 1 since we are going to effectively do an inner join on the rowDigest
+  // We only need 1 since we are going to effectively do an inner join on the rowDigest
   const datasetRef = Object.values(summaryData.evaluations)[0]
     .datasetRef as string;
   const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
-  const rowsRef = datasetObjRes.vals[0].rows;
-  const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
-  const rowsQuery = await traceServerClient.tableQuery({
-    project_id: projectIdFromParts({
-      entity: parsedRowsRef.entityName,
-      project: parsedRowsRef.projectName,
-    }),
-    digest: parsedRowsRef.artifactVersion,
-  });
-  rowsQuery.rows.forEach(row => {
-    result.inputs[row.digest] = {
-      digest: row.digest,
-      val: row.val,
-    };
-  });
+  // If the dataset has not been deleted, fetch rows
+  if (datasetObjRes.vals[0] != null) {
+    const rowsRef = datasetObjRes.vals[0].rows;
+    const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
+    const rowsQuery = await traceServerClient.tableQuery({
+      project_id: projectIdFromParts({
+        entity: parsedRowsRef.entityName,
+        project: parsedRowsRef.projectName,
+      }),
+      digest: parsedRowsRef.artifactVersion,
+    });
+    rowsQuery.rows.forEach(row => {
+      result.inputs[row.digest] = {
+        digest: row.digest,
+        val: row.val,
+      };
+    });
+  }
 
   // 4. Populate the predictions and scores
   const evalTraceRes = await evalTraceResProm;

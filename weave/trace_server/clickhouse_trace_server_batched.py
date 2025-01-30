@@ -128,7 +128,7 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-INITIAL_CALLS_STREAM_BATCH_SIZE = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
@@ -573,6 +573,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
+            wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
             refs=extract_refs_from_values(processed_val),
@@ -592,8 +593,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder.add_digests_conditions(req.digest)
         object_query_builder.add_object_ids_condition([req.object_id])
         object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
@@ -677,6 +679,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     refs=obj.refs,
                     base_object_class=obj.base_object_class,
                     deleted_at=now,
+                    wb_user_id=obj.wb_user_id,
                     # Keep the original created_at timestamp
                     created_at=original_created_at,
                 )
@@ -1962,6 +1965,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,

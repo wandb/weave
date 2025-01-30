@@ -15,6 +15,7 @@ from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
+    client_is_sqlite,
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
@@ -25,15 +26,13 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
-)
-from weave.trace_server.sqlite_trace_server import (
-    SqliteTraceServer,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -296,7 +295,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -355,6 +354,182 @@ def test_calls_query(client):
     client.finish_call(call0, None)
 
 
+def test_get_calls_complete(client):
+    obj = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
+    ref = client.save(obj, "my-dataset")
+
+    call0 = client.create_call(
+        "x", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call0"
+    )
+    call1 = client.create_call(
+        "x", {"a": 6, "b": 11, "dataset": ref, "s": "str"}, display_name="call1"
+    )
+    call2 = client.create_call(
+        "y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2"
+    )
+
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "inputs.s"},
+                    "substr": {"$literal": "str"},
+                }
+            }
+        }
+    )
+
+    # use all the parameters to get_calls
+    client_result = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(op_names=[call1.op_name]),
+            limit=1,
+            offset=0,
+            query=query,
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            include_feedback=True,
+            columns=["inputs.dataset.rows"],
+        )
+    )
+    assert len(client_result) == 1
+    assert client_result[0].inputs["b"] == 11
+    assert client_result[0].inputs["dataset"].rows == [{"a": 1}, {"a": 2}, {"a": 3}]
+
+    # what should be an identical query using the trace_server interface
+    server_result = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id="shawn/test-project",
+                filter=tsi.CallsFilter(op_names=[call1.op_name]),
+                limit=1,
+                offset=0,
+                query=query,
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+                include_feedback=True,
+                columns=["inputs.dataset"],
+                expand_columns=["inputs.dataset"],
+            )
+        ).calls
+    )
+    for call1, call2 in zip(client_result, server_result):
+        assert call1.id == call2.id
+        assert call1.op_name == call2.op_name
+        assert call1.project_id == call2.project_id
+        assert call1.trace_id == call2.trace_id
+        assert call1.parent_id == call2.parent_id
+        assert call1.started_at == call2.started_at
+        assert call1.display_name == call2.display_name
+        assert call1.summary == call2.summary
+        assert call1.inputs["a"] == call2.inputs["a"]
+        assert call1.inputs["b"] == call2.inputs["b"]
+        assert call1.inputs["s"] == call2.inputs["s"]
+
+    # add a simple query
+    client_result = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            query=query,
+            include_costs=True,
+            include_feedback=True,
+        )
+    )
+    server_result = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id="shawn/test-project",
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+                query=query,
+                include_costs=True,
+                include_feedback=True,
+                columns=["inputs.dataset", "display_name", "parent_id"],
+                expand_columns=["inputs.dataset"],
+            )
+        ).calls
+    )
+    for call1, call2 in zip(client_result, server_result):
+        assert call1.id == call2.id
+        assert call1.op_name == call2.op_name
+        assert call1.project_id == call2.project_id
+        assert call1.trace_id == call2.trace_id
+        assert call1.started_at == call2.started_at
+        assert call1.display_name == call2.display_name
+        assert call1.parent_id == call2.parent_id
+        assert call1.summary == call2.summary
+        assert call1.inputs["a"] == call2.inputs["a"]
+        assert call1.inputs["b"] == call2.inputs["b"]
+        assert call1.inputs["s"] == call2.inputs["s"]
+
+
+def test_get_calls_len(client):
+    for i in range(10):
+        client.create_call("x", {"a": i})
+
+    # test len first
+    calls = client.get_calls()
+    assert len(calls) == 10
+
+    calls = client.get_calls(limit=5)
+    assert len(calls) == 5
+
+    calls = client.get_calls(limit=5, offset=5)
+    assert len(calls) == 5
+
+    calls = client.get_calls(offset=10)
+    assert len(calls) == 0
+
+    calls = client.get_calls(offset=10, limit=10)
+    assert len(calls) == 0
+
+    with pytest.raises(ValueError):
+        client.get_calls(limit=-1)
+
+    with pytest.raises(ValueError):
+        client.get_calls(limit=0)
+
+    with pytest.raises(ValueError):
+        client.get_calls(offset=-1)
+
+
+def test_get_calls_limit_offset(client):
+    for i in range(10):
+        client.create_call("x", {"a": i})
+
+    calls = client.get_calls(limit=3)
+    assert len(calls) == 3
+    for i, call in enumerate(calls):
+        assert call.inputs["a"] == i
+
+    calls = client.get_calls(limit=5, offset=5)
+    assert len(calls) == 5
+
+    for i, call in enumerate(calls):
+        assert call.inputs["a"] == i + 5
+
+    calls = client.get_calls(offset=9)
+    assert len(calls) == 1
+    assert calls[0].inputs["a"] == 9
+
+    # now test indexing
+    calls = client.get_calls()
+    assert calls[0].inputs["a"] == 0
+    assert calls[1].inputs["a"] == 1
+    assert calls[2].inputs["a"] == 2
+    assert calls[3].inputs["a"] == 3
+    assert calls[4].inputs["a"] == 4
+
+    calls = client.get_calls(offset=5)
+    assert calls[0].inputs["a"] == 5
+    assert calls[1].inputs["a"] == 6
+    assert calls[2].inputs["a"] == 7
+    assert calls[3].inputs["a"] == 8
+    assert calls[4].inputs["a"] == 9
+
+    # slicing
+    calls = client.get_calls(offset=5)
+    for i, call in enumerate(calls[2:]):
+        assert call.inputs["a"] == 7 + i
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
@@ -363,16 +538,16 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
     client.delete_call(call0_child1)
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
 
-    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 0
 
     # no-op if already deleted
@@ -470,7 +645,7 @@ def test_dataset_calls(client):
         call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
 
-    calls = list(client.get_calls({"op_name": "x"}))
+    calls = list(client.get_calls(filter={"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
 
@@ -555,7 +730,7 @@ def test_stable_dataset_row_refs(client):
     dataset2 = client.get(dataset2_ref)
     call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
     client.finish_call(call, "call2")
-    x = client.get_calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
+    x = client.get_calls(filter={"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2
 
@@ -1193,8 +1368,7 @@ def test_table_partitioning(network_proxy_client):
 
 
 def test_summary_tokens_cost(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # SQLite does not support costs
         return
 
@@ -1252,13 +1426,13 @@ def test_summary_tokens_cost(client):
 
     callsWithCost = list(
         client.get_calls(
-            weave_client.CallsFilter(op_names=[call.op_name]),
+            filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
     callsNoCost = list(
         client.get_calls(
-            weave_client.CallsFilter(op_names=[call.op_name]),
+            filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
     )
@@ -1330,8 +1504,7 @@ def test_summary_tokens_cost(client):
 
 @pytest.mark.skip_clickhouse_client
 def test_summary_tokens_cost_sqlite(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if not is_sqlite:
+    if not client_is_sqlite(client):
         # only run this test for sqlite
         return
 
@@ -1429,6 +1602,19 @@ def test_object_version_read(client):
             )
         )
         assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
+
+    # read each object one at a time, check the version, metadata only
+    for i in range(10):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[i].name,
+                digest=refs[i].digest,
+                metadata_only=True,
+            )
+        )
+        assert obj_res.obj.val == {}
         assert obj_res.obj.version_index == i
 
     # now grab the latest version of the object
@@ -1544,3 +1730,116 @@ def test_long_display_names_are_elided(client):
     calls = list(func.calls())
     call = calls[0]
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
+
+
+def test_object_deletion(client):
+    # Simple case, delete a single version of an object
+    obj = {"a": 5}
+    weave_obj = weave.publish(obj, "my-obj")
+    assert client.get(weave_obj) == obj
+
+    client.delete_object_version(weave_obj)
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_obj)
+
+    # create 3 versions of the object
+    obj["a"] = 6
+    weave_ref2 = weave.publish(obj, "my-obj")
+    obj["a"] = 7
+    weave_ref3 = weave.publish(obj, "my-obj")
+    obj["a"] = 8
+    weave_ref4 = weave.publish(obj, "my-obj")
+
+    # delete weave_obj3 with class method
+    weave_ref3.delete()
+
+    # make sure we can't get the deleted object
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(weave_ref3)
+
+    # make sure we can still get the existing object versions
+    assert client.get(weave_ref4)
+    assert client.get(weave_ref2)
+
+    # count the number of versions of the object
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
+        )
+    )
+    assert len(versions.objs) == 2
+
+    # iterate over the versions, confirm the indexes are correct
+    assert versions.objs[0].version_index == 3
+    assert versions.objs[1].version_index == 1
+
+    weave_ref4.delete()
+    weave_ref2.delete()
+
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+        )
+    )
+    assert len(versions.objs) == 0
+
+
+def test_recursive_object_deletion(client):
+    # Create a bunch of objects that refer to each other
+    obj1 = {"a": 5}
+    obj1_ref = weave.publish(obj1, "obj1")
+
+    obj2 = {"b": obj1_ref}
+    obj2_ref = weave.publish(obj2, "obj2")
+
+    obj3 = {"c": obj2_ref}
+    obj3_ref = weave.publish(obj3, "obj3")
+
+    # Delete obj1
+    obj1_ref.delete()
+
+    # Make sure we can't get obj1
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        obj1_ref.get()
+
+    # Make sure we can get obj2, but the ref to object 1 should return None
+    obj_2 = obj2_ref.get()
+
+    assert isinstance(obj_2["b"], DeletedRef)
+    assert obj_2["b"].deleted_at == DatetimeMatcher()
+    assert obj_2["b"].ref == obj1_ref
+    assert isinstance(obj_2["b"].error, weave.trace_server.errors.ObjectDeletedError)
+
+    # Object2 should store the ref to object2, as instantiated
+    assert obj3_ref.get() == {"c": obj2}
+
+
+def test_delete_op_version(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    my_op(1)
+
+    op_ref = weave.publish(my_op, "my-op")
+    op_ref.delete()
+
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        op_ref.get()
+
+    # lets get the calls
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+
+    # call the deleted op, this should still work (?)
+    my_op(1)
+
+    calls = list(my_op.calls())
+    assert len(calls) == 2
+
+    # but the ref is still deleted
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        op_ref.get()

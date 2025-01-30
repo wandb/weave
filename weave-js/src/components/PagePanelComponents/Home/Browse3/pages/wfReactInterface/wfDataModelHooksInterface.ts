@@ -112,6 +112,7 @@ export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   baseObjectClass: string | null;
   createdAtMs: number;
   val: T;
+  userId?: string;
 };
 
 export type ObjectVersionFilter = {
@@ -220,7 +221,10 @@ export type WFDataModelHooksInterface = {
     val: any,
     baseObjectClass?: string
   ) => Promise<string>;
-  useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
+  useOpVersion: (
+    key: OpVersionKey | null,
+    metadataOnly?: boolean
+  ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
     project: string,
@@ -230,8 +234,9 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
-    key: ObjectVersionKey | null
-  ) => Loadable<ObjectVersionSchema | null>;
+    key: ObjectVersionKey | null,
+    metadataOnly?: boolean
+  ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
     project: string,
@@ -256,6 +261,26 @@ export type WFDataModelHooksInterface = {
     metadataOnly?: boolean,
     opts?: {skip?: boolean; noAutoRefresh?: boolean}
   ) => LoadableWithError<ObjectVersionSchema[]>;
+  useObjectDeleteFunc: () => {
+    objectVersionsDelete: (
+      entity: string,
+      project: string,
+      objectId: string,
+      digests: string[]
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    objectDeleteAllVersions: (
+      key: ObjectVersionKey
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    opVersionsDelete: (
+      entity: string,
+      project: string,
+      opId: string,
+      digests: string[]
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+    opDeleteAllVersions: (
+      key: OpVersionKey
+    ) => Promise<traceServerClientTypes.TraceObjDeleteRes>;
+  };
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB

@@ -174,6 +174,9 @@ const ObjectViewerSectionNonEmpty = ({
 
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
+    if (mode === 'hidden' || mode === 'json') {
+      return;
+    }
     const isSimple = isSimpleData(data);
     const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
     if (newMode === 'expanded') {

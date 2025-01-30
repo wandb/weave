@@ -11,6 +11,7 @@ from typing import Any, Union
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
+ARTIFACT_REF_SCHEME = "wandb-artifact"
 
 DICT_KEY_EDGE_NAME = "key"
 LIST_INDEX_EDGE_NAME = "index"
@@ -143,9 +144,28 @@ class InternalCallRef:
         return u
 
 
+@dataclasses.dataclass(frozen=True)
+class InternalArtifactRef:
+    project_id: str
+    id: str
+
+    def __post_init__(self) -> None:
+        # not validating no slashes in project_id because we aren't converting to internal project_id
+        validate_no_slashes(self.id, "id")
+
+    def uri(self) -> str:
+        u = f"{ARTIFACT_REF_SCHEME}:///{self.project_id}/{self.id}"
+        return u
+
+
+InternalRef = Union[
+    InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef
+]
+
+
 def parse_internal_uri(
     uri: str,
-) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef]:
+) -> InternalRef:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
@@ -161,9 +181,19 @@ def parse_internal_uri(
         entity, project, kind = parts[:3]
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
+    elif uri.startswith(f"{ARTIFACT_REF_SCHEME}:///"):
+        path = uri[len(f"{ARTIFACT_REF_SCHEME}:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
+        entity, project = parts[:2]
+        project_id = f"{entity}/{project}"
+        kind = "artifact"
+        remaining = parts[2:]
     else:
         raise InvalidInternalRef(
-            f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:///"
+            f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:/// "
+            f"or {ARTIFACT_REF_SCHEME}:///"
         )
     if kind == "table":
         return InternalTableRef(project_id=project_id, digest=remaining[0])
@@ -186,6 +216,9 @@ def parse_internal_uri(
     elif kind == "call":
         id_ = remaining[0]
         return InternalCallRef(project_id=project_id, id=id_)
+    elif kind == "artifact":
+        id_ = remaining[0]
+        return InternalArtifactRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 

@@ -205,7 +205,6 @@ export class Evaluation<
       maxConcurrency
     )) {
       const {scores} = result;
-      console.log('>>>result', result);
       results.push({
         model_success: result.model_success,
         model_output: result.model_output,
