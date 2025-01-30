@@ -159,15 +159,7 @@ class GitHubDigest:
         branch: str = "master",
         local_mode: bool = True,
     ):
-        """Initialize GitHub digest generator.
-
-        Args:
-            token: GitHub personal access token
-            repo: Repository name (owner/repo format)
-            days: Number of days to look back
-            branch: Branch to analyze
-            local_mode: Whether to run in local mode with rich progress indicators (default: True)
-        """
+        """Initialize GitHub digest generator."""
         # Configure connection pool for parallel requests
         self.pool_manager = urllib3.PoolManager(maxsize=32)
         self.github = Github(token, pool_size=32, retry=3)
@@ -176,6 +168,8 @@ class GitHubDigest:
         self.branch = branch
         self.local_mode = local_mode
         self.progress = None
+        self._last_rate_check = 0
+        self._rate_limit_remaining = None
 
     def _get_progress(self) -> Progress | None:
         """Get progress indicator if in local mode."""
@@ -192,9 +186,24 @@ class GitHubDigest:
             )
         return self.progress
 
+    def _should_check_rate_limit(self) -> bool:
+        """Determine if we should check rate limit again."""
+        now = time.time()
+        # Only check rate limit every 60 seconds unless we know we're low
+        if self._rate_limit_remaining is None or self._rate_limit_remaining < 100:
+            # Check more frequently if we're running low
+            return (now - self._last_rate_check) > 5
+        return (now - self._last_rate_check) > 60
+
     def _handle_rate_limit(self):
         """Handle GitHub API rate limit by waiting if needed."""
+        if not self._should_check_rate_limit():
+            return
+
+        self._last_rate_check = time.time()
         rate_limit = self.github.get_rate_limit()
+        self._rate_limit_remaining = rate_limit.core.remaining
+
         if rate_limit.core.remaining == 0:
             reset_timestamp = rate_limit.core.reset.timestamp()
             sleep_time = reset_timestamp - time.time() + 1  # Add 1 second buffer
@@ -203,6 +212,7 @@ class GitHubDigest:
                     f"Rate limit reached. Waiting {sleep_time:.1f} seconds..."
                 )
                 time.sleep(sleep_time)
+                self._rate_limit_remaining = None  # Force a recheck after waiting
 
     def analyze_paths(self, files) -> ChangeCategories:
         """Analyze file paths to determine which categories were modified."""
@@ -244,14 +254,11 @@ class GitHubDigest:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {}
 
-            # Submit items with rate limit handling
+            # Submit all items at once, only checking rate limit periodically
             for item in items:
                 try:
-                    self._handle_rate_limit()
-                    futures[executor.submit(processor, item)] = item
-                except RateLimitExceededException:
-                    self._handle_rate_limit()
-                    # Retry once after waiting
+                    if len(futures) % 10 == 0:  # Check rate limit every 10 items
+                        self._handle_rate_limit()
                     futures[executor.submit(processor, item)] = item
                 except GithubException as e:
                     logger.exception(f"GitHub API error while submitting item: {e}")
@@ -266,7 +273,6 @@ class GitHubDigest:
                     result = future.result()
                     results.append((result, None))
                 except RateLimitExceededException:
-                    # Handle rate limit during processing
                     original_item = futures[future]
                     try:
                         self._handle_rate_limit()
@@ -454,24 +460,23 @@ class GitHubDigest:
             raise
 
         if self.local_mode:
-            # Generate rich tables for local display
-            commit_table = self.create_commit_table(
-                commits, f"Recent Commits (Last {self.days} days)"
-            )
-            ready_table, draft_table = self.create_pr_tables(prs, "Open Pull Requests")
+            with self._get_progress() as progress:
+                # Generate rich tables for local display
+                commit_table = self.create_commit_table(
+                    commits, f"Recent Commits (Last {self.days} days)"
+                )
+                ready_table, draft_table = self.create_pr_tables(prs, "Open Pull Requests")
 
-            # Return formatted tables for console display
-            console.print(commit_table)
-            console.print("\n")
-            console.print(ready_table)
-            console.print("\n")
-            console.print(draft_table)
-            console.print("\n")
-            console.print(self.create_legend())
+                # Print formatted tables
+                console.print(commit_table)
+                console.print("\n")
+                console.print(ready_table)
+                console.print("\n")
+                console.print(draft_table)
+                console.print("\n")
+                console.print(self.create_legend())
             return ""  # Console output already handled
         else:
-            # Generate plain text for Slack
-            # ... existing Slack message formatting code ...
             return self._generate_slack_digest(commits, prs)
 
     def _generate_slack_digest(self, commits, prs) -> str:
