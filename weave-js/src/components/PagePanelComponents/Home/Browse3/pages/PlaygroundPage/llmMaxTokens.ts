@@ -125,6 +125,78 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
 
+  // Azure models
+  'azure/o1-mini': {
+    provider: 'azure',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'azure/o1-mini-2024-09-12': {
+    provider: 'azure',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'azure/o1': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-preview': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/o1-preview-2024-09-12': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o': {
+    provider: 'azure',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-08-06': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-11-20': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-05-13': {
+    provider: 'azure',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-mini': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-mini-2024-07-18': {
+    max_tokens: 16384,
+    provider: 'azure',
+    supports_function_calling: true,
+  },
+  'azure/mistral-large-latest': {
+    max_tokens: 32000,
+    provider: 'azure',
+    supports_function_calling: true,
+  },
+  'azure/mistral-large-2402': {
+    max_tokens: 32000,
+    provider: 'azure',
+    supports_function_calling: true,
+  },
+  'azure/command-r-plus': {
+    max_tokens: 4096,
+    provider: 'azure',
+    supports_function_calling: true,
+  },
+
   // Gemini models
   'gemini/gemini-1.5-flash-001': {
     provider: 'gemini',
@@ -398,6 +470,8 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
 export const LLM_PROVIDERS = [
   'openai',
   'anthropic',
+  'azure',
+  'azure_ai',
   'gemini',
   'groq',
   'bedrock',
@@ -410,6 +484,8 @@ export const LLM_PROVIDER_LABELS: Record<
 > = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
+  azure: 'Azure AI',
+  azure_ai: 'Azure',
   gemini: 'Google Gemini',
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
