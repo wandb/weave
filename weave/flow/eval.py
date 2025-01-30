@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import traceback
-from collections.abc import Iterable, Sequence
+from collections.abc import AsyncGenerator, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
@@ -265,6 +265,43 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
                     f"Expected all elements in self.scorers to be an instance of Op or Scorer in `model_post_init`. Found {str(type(scorer))}"
                 )
         return cast(list[Union[Op, Scorer]], self.scorers)
+
+    ###########################################################
+
+    async def predict(
+        self, *, model: ModelLike
+    ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
+        pass
+
+    async def _predict(self, model: ModelLike) -> AsyncGenerator[OutputT, None]:
+        pass
+
+    async def score(
+        self,
+        *,
+        eval_result: EvaluationResults2[InputsT, OutputT, ScoreT],
+        extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
+    ) -> Sequence[dict[str, list[ScoreDict]]]:
+        pass
+
+    async def _score(
+        self,
+        *,
+        eval_result: EvaluationResults2[InputsT, OutputT, ScoreT],
+        extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
+    ) -> AsyncGenerator[dict[str, list[ScoreDict]], None]:
+        pass
+
+    # TODO: This doesn't need to be async, but is done for consistency.
+    async def summarize(
+        self, eval_result: EvaluationResults2[InputsT, OutputT, ScoreT]
+    ) -> dict[str, Any]:
+        pass
+
+    async def evaluate(self, model: ModelLike) -> dict[str, Any]:
+        pass
+
+    ###########################################################
 
     @weave.op()
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
