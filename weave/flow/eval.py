@@ -389,7 +389,7 @@ def evaluate(
     scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> dict:
-    eval = Evaluation(
+    eval: Evaluation[dict[str, Any], Any, Any] = Evaluation(
         dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
