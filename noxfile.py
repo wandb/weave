@@ -14,6 +14,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "google_ai_studio",
     "bedrock",
     "scorers_tests",
+    "llm_api_live",
 ]
 
 
@@ -53,6 +54,7 @@ def lint(session):
         "vertexai",
         "bedrock",
         "scorers_tests",
+        "llm_api_live",
         "pandas-test",
     ],
 )
@@ -81,9 +83,8 @@ def tests(session, shard):
     if shard == "langchain_nvidia_ai_endpoints":
         env["NVIDIA_API_KEY"] = session.env.get("NVIDIA_API_KEY")
 
-    # we are doing some integration test in test_llm_integrations.py that requires
-    # setting some environment variables for the LLM providers
-    if shard == "scorers_tests":
+    # Add environment variables for LLM API live tests
+    if shard == "llm_api_live":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
         env["ANTHROPIC_API_KEY"] = session.env.get("ANTHROPIC_API_KEY")
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
@@ -97,6 +98,7 @@ def tests(session, shard):
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers_tests": ["scorers/"],
+        "llm_api_live": ["llm_api_live/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
