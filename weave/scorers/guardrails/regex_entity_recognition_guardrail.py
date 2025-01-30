@@ -1,9 +1,9 @@
 import re
 from typing import Any, Optional, Union
 
-import weave
 from pydantic import BaseModel
 
+import weave
 from weave.flow.model import Model
 from weave.scorers import Scorer
 
