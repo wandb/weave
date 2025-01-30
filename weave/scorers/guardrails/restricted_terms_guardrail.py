@@ -58,7 +58,22 @@ class RestrictedTermsRecognitionResponse(BaseModel):
 
 
 class RestrictedTermsLLMGuardrail(Scorer):
+    """A guardrail to detect and analyze restricted terms and their variations in a given
+    text prompt using an LLM.
+
+    Attributes:
+        system_prompt (str): The prompt describing the task of detecting restricted terms.
+        user_prompt (str): The prompt template to pass the input and output data. The template must
+            contain placeholders for both `{text}` and `{custom_terms}`.
+        model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
+        temperature (float): LLM temperature setting.
+        max_tokens (int): Maximum number of tokens in the LLM's response.
+        should_anonymize (bool): Whether to anonymize the text.
+        custom_terms (list[str]): The list of custom terms to detect.
+    """
+
     system_prompt: str = RESTRICTED_TERMS_GUARDRAIL_SYSTEM_PROMPT
+    user_prompt: str = RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.1
     max_tokens: int = 4096
@@ -83,14 +98,16 @@ class RestrictedTermsLLMGuardrail(Scorer):
 
     @weave.op
     def analyse_restricted_terms(self, prompt: str) -> RestrictedTermsAnalysis:
-        user_prompt = RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT.format(
-            text=prompt, custom_terms=", ".join(self.custom_terms)
-        )
         return create(
             self._client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_prompt},
+                {
+                    "role": "user",
+                    "content": self.user_prompt.format(
+                        text=prompt, custom_terms=", ".join(self.custom_terms)
+                    ),
+                },
             ],
             model=self.model_id,
             response_model=RestrictedTermsAnalysis,
