@@ -409,7 +409,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
-            <Box sx={{marginLeft: '8px'}}>
+            <Box sx={{marginLeft: '8px', height: '100%'}}>
               <CellValue value={params.value} />
             </Box>
           );
