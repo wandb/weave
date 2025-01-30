@@ -22,7 +22,7 @@ The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - 
 Throughout this guide, we'll refer to functions decorated with `@weave.op` as "ops". These are regular Python functions that have been enhanced with Weave's tracking capabilities.
 :::
 
-:::tip Ready-to-Use Scorers
+#### Ready-to-Use Scorers
 While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./scorers.md#predefined-scorers) that you can use right away, including:
 - [Hallucination detection](./scorers.md#hallucinationfreescorer)
 - [Summarization quality](./scorers.md#summarizationscorer)
@@ -30,8 +30,6 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 - [Relevancy evaluation](./scorers.md#ragas---contextrelevancyscorer)
 - And more!
 
-Check out our [predefined scorers list](./scorers.md#predefined-scorers) to get started quickly with production-ready evaluation.
-:::
 
 ### Guardrails vs. Monitors: When to Use Each
 
@@ -50,7 +48,7 @@ For example, a toxicity scorer could be used:
 - 🛡️ **As a Guardrail**: Block toxic content immediately
 - 📊 **As a Monitor**: Track toxicity levels over time
 
-:::tip
+:::note
 Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
 :::
 
@@ -224,14 +222,16 @@ async def generate_and_score():
     print(f"Style match score: {score.result['style_match']}")
 ```
 
-:::tip Parameter Matching Rules
+### Score Parameters
+
+#### Parameter Matching Rules
 - The `output` parameter is special and always contains the function's result
 - Other parameters must match the function's parameter names exactly
 - Scorers can use any subset of the function's parameters
 - Parameter types should match the function's type hints
-:::
 
-:::info Handling Parameter Name Mismatches
+#### Handling Parameter Name Mismatches
+
 Sometimes your scorer's parameter names might not match your function's parameter names exactly. For example:
 
 ```python
@@ -256,9 +256,10 @@ Common use cases for `column_map`:
 - Different naming conventions between functions and scorers
 - Reusing scorers across different functions
 - Using third-party scorers with your function names
-:::
 
-:::info Adding Additional Parameters
+
+#### Adding Additional Parameters
+
 Sometimes scorers need extra parameters that aren't part of your function. You can provide these using `additional_scorer_kwargs`:
 
 ```python
@@ -279,7 +280,7 @@ await call.apply_scorer(
 ```
 
 This is useful when your scorer needs context or configuration that isn't part of the original function call.
-:::
+
 
 ### Using Scorers: Two Approaches
 
