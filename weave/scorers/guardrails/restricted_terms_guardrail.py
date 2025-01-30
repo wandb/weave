@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 class TermMatch(BaseModel):
     """Represents a matched term and its variations"""
-
     original_term: str
     matched_text: str
     match_type: str = Field(
@@ -133,7 +132,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
         reasoning = self.frame_guardrail_reasoning(analysis)
         anonymized_text = self.get_anonymized_text(prompt, analysis)
         return RestrictedTermsRecognitionResponse(
-            safe=analysis.contains_restricted_terms,
+            safe=not analysis.contains_restricted_terms,
             detected_entities=analysis.detected_matches,
             reasoning=reasoning,
             anonymized_text=anonymized_text,
