@@ -3,7 +3,7 @@
  */
 
 import {GridFilterItem} from '@mui/x-data-grid-pro';
-import React, {useCallback, useMemo} from 'react';
+import React, {useMemo} from 'react';
 
 import {Button} from '../../../../Button';
 import {
