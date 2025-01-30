@@ -39,7 +39,7 @@ def test_restricted_terms_guardrail_score(
     result = restricted_terms_recognition_llm_guardrail.score(
         "Hello, my name is Microsoft."
     )
-    result = RestrictedTermsRecognitionResponse.model_validate(result)
+    _ = RestrictedTermsRecognitionResponse.model_validate(result)
     assert result["safe"] == False
     assert (
         result["reasoning"]
