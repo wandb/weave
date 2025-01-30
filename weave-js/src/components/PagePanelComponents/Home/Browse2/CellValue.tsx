@@ -9,12 +9,12 @@ import {
   ValueViewNumberTimestamp,
 } from '../Browse3/pages/CallPage/ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
+import {SmallRef} from '../Browse3/smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
-import {SmallRef} from './SmallRef';
 
 type CellValueProps = {
   value: any;

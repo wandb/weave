@@ -548,7 +548,7 @@ export const CallsTable: FC<{
     if (!needsUpdate) {
       return;
     }
-    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+    const hiddenColumnVisibilityFalse = hiddenColumns.reduce((acc, col) => {
       // Only add columns=false when not already in the model
       if (columnVisibilityModel[col] === undefined) {
         acc[col] = false;
@@ -558,7 +558,7 @@ export const CallsTable: FC<{
 
     setColumnVisibilityModel({
       ...columnVisibilityModel,
-      ...hiddenColumnVisiblityFalse,
+      ...hiddenColumnVisibilityFalse,
     });
   }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 

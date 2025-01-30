@@ -15,7 +15,6 @@ import {StateInspector} from 'reinspect';
 import {makeGorillaApolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
-import {Browse2} from './components/PagePanelComponents/Home/Browse2';
 import {Browse3} from './components/PagePanelComponents/Home/Browse3';
 import {OptionalTraceServerClientContextProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
@@ -29,7 +28,6 @@ import {
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
-  URL_BROWSE2,
   URL_BROWSE3,
   URL_LOCAL,
   URL_RECENT,
@@ -183,11 +181,6 @@ ReactDOM.render(
         </Route>
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
-        </Route>
-        <Route path={`/${URL_BROWSE2}`}>
-          <BrowseWrapper>
-            <Browse2 basename={`/${URL_BROWSE2}`} />
-          </BrowseWrapper>
         </Route>
         <Route path={`/${URL_BROWSE3}`}>
           <BrowseWrapper>
