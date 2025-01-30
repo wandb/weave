@@ -409,13 +409,6 @@ export const CompareEvaluationsTableButton: FC<{
   tooltipText?: string;
   selectedCount: number;
 }> = ({onClick, disabled, tooltipText, selectedCount}) => {
-  const buttonText =
-    selectedCount === 0
-      ? 'Compare evals'
-      : selectedCount === 1
-      ? 'Compare evals'
-      : `Compare ${selectedCount} evals`;
-
   const defaultTooltip =
     selectedCount === 1 ? 'Select more than one eval to compare' : undefined;
 
@@ -433,7 +426,7 @@ export const CompareEvaluationsTableButton: FC<{
         onClick={onClick}
         icon="chart-scatterplot"
         tooltip={tooltipText ?? defaultTooltip}>
-        {buttonText}
+        Compare
       </Button>
     </Box>
   );
@@ -445,13 +438,6 @@ export const CompareTracesTableButton: FC<{
   tooltipText?: string;
   selectedCount: number;
 }> = ({onClick, disabled, tooltipText, selectedCount}) => {
-  const buttonText =
-    selectedCount === 0
-      ? 'Compare traces'
-      : selectedCount === 1
-      ? 'Compare traces'
-      : `Compare ${selectedCount} traces`;
-
   const defaultTooltip =
     selectedCount === 1 ? 'Select more than one trace to compare' : undefined;
 
@@ -469,7 +455,7 @@ export const CompareTracesTableButton: FC<{
         onClick={onClick}
         icon="chart-scatterplot"
         tooltip={tooltipText ?? defaultTooltip}>
-        {buttonText}
+        Compare
       </Button>
     </Box>
   );
@@ -492,8 +478,9 @@ export const BulkDeleteButton: FC<{
         disabled={disabled}
         onClick={onClick}
         tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
+        icon="delete">
+        Delete
+      </Button>
     </Box>
   );
 };

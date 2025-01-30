@@ -893,6 +893,31 @@ export const CallsTable: FC<{
                   onClick={() => calls.refetch()}
                   disabled={callsLoading}
                 />
+                {/* Metrics Button */}
+                {!hideOpSelector && (
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-6">
+                      <div className="flex-none">
+                        <Button
+                          icon="chart-vertical-bars"
+                          variant="ghost"
+                          active={isMetricsChecked}
+                          onClick={() => setMetricsChecked(!isMetricsChecked)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Column Visibility Button */}
+                {columnVisibilityModel && setColumnVisibilityModel && (
+                  <div className="flex-none">
+                    <ManageColumnsButton
+                      columnInfo={columns}
+                      columnVisibilityModel={columnVisibilityModel}
+                      setColumnVisibilityModel={setColumnVisibilityModel}
+                    />
+                  </div>
+                )}
                 {!hideOpSelector && (
                   <OpSelector
                     frozenFilter={frozenFilter}
@@ -948,32 +973,6 @@ export const CallsTable: FC<{
                       });
                     }}
                   />
-                )}
-                {/* Column Visibility Button */}
-                {columnVisibilityModel && setColumnVisibilityModel && (
-                  <div className="flex-none">
-                    <ManageColumnsButton
-                      columnInfo={columns}
-                      columnVisibilityModel={columnVisibilityModel}
-                      setColumnVisibilityModel={setColumnVisibilityModel}
-                    />
-                  </div>
-                )}
-                {/* Metrics Button */}
-                {!hideOpSelector && (
-                  <div className="flex items-center gap-8">
-                    <ButtonDivider />
-                    <div className="flex items-center gap-6">
-                      <div className="flex-none">
-                        <Button
-                          icon="chart-vertical-bars"
-                          variant="ghost"
-                          active={isMetricsChecked}
-                          onClick={() => setMetricsChecked(!isMetricsChecked)}
-                        />
-                      </div>
-                    </div>
-                  </div>
                 )}
               </div>
 

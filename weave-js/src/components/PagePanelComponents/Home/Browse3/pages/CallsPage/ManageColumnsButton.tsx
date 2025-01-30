@@ -90,7 +90,6 @@ export const ManageColumnsButton = ({
           variant="ghost"
           icon="column"
           onClick={onClick}>
-          Columns
         </Button>
       </span>
       <Popover
@@ -99,11 +98,11 @@ export const ManageColumnsButton = ({
         anchorEl={anchorEl}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         slotProps={{
           paper: {
