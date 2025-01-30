@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class TermMatch(BaseModel):
     """Represents a matched term and its variations"""
+
     original_term: str
     matched_text: str
     match_type: str = Field(
