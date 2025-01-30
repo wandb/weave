@@ -156,6 +156,8 @@ Monitors help track quality metrics over time without blocking operations. This 
 ```python
 import weave
 from weave import Scorer
+from weave.scorers import ValidJSONScorer, ValidXMLScorer
+
 import random
 
 @weave.op
@@ -170,8 +172,8 @@ async def generate_with_monitoring(prompt: str) -> str:
     # Sample monitoring (only monitor 10% of calls)
     if random.random() < 0.1:
         # Monitor multiple aspects asynchronously
-        await call.apply_scorer(QualityScorer())
-        await call.apply_scorer(RelevanceScorer())
+        await call.apply_scorer(ValidJSONScorer())
+        await call.apply_scorer(ValidXMLScorer())
     
     return result
 ```
