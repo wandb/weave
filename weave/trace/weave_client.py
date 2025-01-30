@@ -389,14 +389,18 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+InputsT = TypeVar("InputsT", bound=dict[str, Any])
+OutputT = TypeVar("OutputT")
+
+
 class CallDict(TypedDict):
     op_name: str
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: InputsT
     id: str | None
-    output: Any
+    output: OutputT
     exception: str | None
     summary: dict | None
     display_name: str | None
@@ -407,16 +411,16 @@ class CallDict(TypedDict):
 
 
 @dataclasses.dataclass
-class Call:
+class Call(Generic[InputsT, OutputT]):
     """A Call represents a single operation that was executed as part of a trace."""
 
     _op_name: str | Future[str]
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: InputsT
     id: str | None = None
-    output: Any = None
+    output: OutputT | None = None
     exception: str | None = None
     summary: dict | None = None
     _display_name: str | Callable[[Call], str] | None = None
