@@ -24,58 +24,22 @@ import {
 } from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
 
+import {LIST_RUNS_TYPE} from '../../../common/types/run';
+import {getTableKeysFromNodeType} from '../../../common/util/table';
 import {useNodeValue, useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {PanelComp2} from '../PanelComp';
 import {TableSpec} from '../PanelTable/PanelTable';
 
-const CUSTOM_TABLE_TYPE = {
-  type: 'file' as const,
-  wbObjectType: {type: 'table' as const, columnTypes: {}},
-};
-
-const LIST_RUNS_INPUT_TYPE = {
-  type: 'list' as const,
-  objectType: {
-    type: 'union' as const,
-    members: ['none' as const, 'run' as const],
-  },
-};
-
 type PanelRunsHistoryTablesConfigType = {
   tableHistoryKey: string;
 };
 
 type PanelRunHistoryTablesStepperProps = Panel2.PanelProps<
-  typeof LIST_RUNS_INPUT_TYPE,
+  typeof LIST_RUNS_TYPE,
   PanelRunsHistoryTablesConfigType
 >;
-
-const getKeysFromInputType = (
-  inputNodeType?: Type,
-  config?: PanelRunsHistoryTablesConfigType
-) => {
-  if (
-    inputNodeType != null &&
-    isAssignableTo(inputNodeType, list(typedDict({})))
-  ) {
-    const typeMap = typedDictPropertyTypes(listObjectType(inputNodeType));
-    const tableKeys = Object.keys(typeMap)
-      .filter(key => {
-        return isAssignableTo(typeMap[key], maybe(CUSTOM_TABLE_TYPE));
-      })
-      .sort();
-    const value =
-      tableKeys.length > 0 &&
-      config?.tableHistoryKey != null &&
-      tableKeys.indexOf(config?.tableHistoryKey) !== -1
-        ? config.tableHistoryKey
-        : tableKeys?.[0] ?? '';
-    return {tableKeys, value};
-  }
-  return {tableKeys: [], value: ''};
-};
 
 const PanelRunHistoryTablesStepperConfig: React.FC<
   PanelRunHistoryTablesStepperProps
@@ -83,9 +47,9 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
   const firstRun = opIndex({arr: props.input, index: constNumber(0)});
   const runHistoryNode = opRunHistory({run: firstRun as any});
   const runHistoryRefined = useNodeWithServerType(runHistoryNode);
-  const {tableKeys, value} = getKeysFromInputType(
+  const {tableKeys, value} = getTableKeysFromNodeType(
     runHistoryRefined.result?.type,
-    props.config
+    props.config?.tableHistoryKey
   );
   const options = tableKeys.map(key => ({text: key, value: key}));
   const updateConfig = props.updateConfig;
@@ -126,7 +90,10 @@ const PanelRunHistoryTablesStepper: React.FC<
   const firstRun = opIndex({arr: input, index: constNumber(0)});
   const runHistoryNode = opRunHistory({run: firstRun as any});
   const runHistoryRefined = useNodeWithServerType(runHistoryNode);
-  const {value} = getKeysFromInputType(runHistoryRefined.result?.type, config);
+  const {value} = getTableKeysFromNodeType(
+    runHistoryRefined.result?.type,
+    config?.tableHistoryKey
+  );
   const tableWithStepsNode = opMap({
     arr: runHistoryRefined.result,
     mapFn: constFunction({row: runHistoryRefined.result.type}, ({row}) =>
@@ -231,7 +198,7 @@ export const Spec: Panel2.PanelSpec<PanelRunsHistoryTablesConfigType> = {
   displayName: 'Run History Tables Stepper',
   Component: PanelRunHistoryTablesStepper,
   ConfigComponent: PanelRunHistoryTablesStepperConfig,
-  inputType: LIST_RUNS_INPUT_TYPE,
+  inputType: LIST_RUNS_TYPE,
   outputType: () => ({
     type: 'list' as const,
     objectType: {
@@ -243,6 +210,6 @@ export const Spec: Panel2.PanelSpec<PanelRunsHistoryTablesConfigType> = {
 
 Panel2.registerPanelFunction(
   Spec.id,
-  LIST_RUNS_INPUT_TYPE,
+  Spec.inputType,
   Spec.equivalentTransform!
 );
