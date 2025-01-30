@@ -58,6 +58,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
     text prompt using an LLM.
 
     Attributes:
+        custom_terms (list[str]): The list of custom terms to detect.
         system_prompt (str): The prompt describing the task of detecting restricted terms.
         user_prompt (str): The prompt template to pass the input and output data. The template must
             contain placeholders for both `{text}` and `{custom_terms}`.
@@ -65,24 +66,15 @@ class RestrictedTermsLLMGuardrail(Scorer):
         temperature (float): LLM temperature setting.
         max_tokens (int): Maximum number of tokens in the LLM's response.
         should_anonymize (bool): Whether to anonymize the text.
-        custom_terms (list[str]): The list of custom terms to detect.
     """
 
+    custom_terms: list[str]
     system_prompt: str = RESTRICTED_TERMS_GUARDRAIL_SYSTEM_PROMPT
     user_prompt: str = RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.1
     max_tokens: int = 4096
     should_anonymize: bool = True
-    custom_terms: list[str] = [
-        "Microsoft",
-        "Amazon Web Services",
-        "Facebook",
-        "Meta",
-        "Google",
-        "Salesforce",
-        "Oracle",
-    ]
     aggregate_redaction: bool = True
     _client: Union["Instructor", None] = None
 
