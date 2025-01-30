@@ -196,11 +196,13 @@ const PILImageImageLoaded = ({
             maxWidth: previewWidth,
             maxHeight: previewHeight,
             margin: 'auto',
+            overflow: 'hidden',
           }}>
           <img
             style={{
               maxWidth: '100%',
               maxHeight: '100%',
+              objectFit: 'contain',
             }}
             src={url}
             alt="Custom"
