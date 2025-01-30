@@ -24,8 +24,9 @@ export const PanelSwitchView = ({
 
   const {views} = savedViewsInfo;
   // Filter views based on search term
-  const filteredViews = views.filter(view => 
-    view.val.label?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
+  const filteredViews = views.filter(
+    view =>
+      view.val.label?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
   );
   // Sort filtered views by creation date
   // TODO: should we sort currentViewId to top? That wouldn't match Workspaces
@@ -45,7 +46,7 @@ export const PanelSwitchView = ({
           placeholder="Search saved views..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          className="w-full pl-[44px] pr-16 pt-8 pb-12 border-b border-moon-200 focus:outline-none"
+          className="w-full border-b border-moon-200 pb-12 pl-[44px] pr-16 pt-8 focus:outline-none"
         />
       </div>
       <div className="flex items-center rounded-[4px] px-16 py-8">

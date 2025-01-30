@@ -3,7 +3,7 @@
  */
 import React from 'react';
 
-import {IconCheckmark, IconViewGlasses} from '../../../../../Icon';
+import {IconCheckmark} from '../../../../../Icon';
 import {UserName} from '../../../../../UserName';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 
