@@ -1,13 +1,24 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Literal,
+    NotRequired,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from pydantic import PrivateAttr, model_validator
 from rich import print
 from rich.console import Console
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict
 
 import weave
 from weave.flow import util
@@ -34,7 +45,7 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, get_ref
+from weave.trace.weave_client import Call, InputsT, OutputT, get_ref
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -57,6 +68,54 @@ class EvaluationResults(Object):
 
 DatasetLike = Union[Dataset, list[dict]]
 ScorerLike = Union[Callable, Op, Scorer]
+
+
+class ScoreDict(TypedDict):
+    score: float
+    metadata: NotRequired[dict[str, Any]]
+
+
+class ScoringTask(TypedDict, Generic[OutputT]):
+    scorer: Scorer
+    output: OutputT
+    metadata: dict[str, Any]
+
+
+class ScoringTaskResult(TypedDict):
+    name: str
+    score: ScoreDict
+
+
+ScoreT = TypeVar("ScoreT")
+
+
+class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
+    dataset: Dataset  # TODO: Should be Dataset[InputsT]
+    predictions: Sequence[OutputT]
+    scores: Sequence[dict[str, list[ScoreDict]]] | None = None
+
+    @classmethod
+    def from_calls(
+        cls,
+        prediction_calls: Iterable[Call[InputsT, OutputT]],
+        *,
+        scorer_calls: Iterable[Call[OutputT, ScoreT]] | None = None,
+    ) -> Self:
+        inputs = []
+        predictions = []
+        scores = []
+
+        for pred_call in prediction_calls:
+            inputs.append(pred_call.inputs)
+            predictions.append(pred_call.output)
+
+        if scorer_calls:
+            for scorer_call in scorer_calls:
+                scores.append(scorer_call.output)
+        else:
+            scores = []
+
+        return cls(dataset=inputs, predictions=predictions, scores=scores)
 
 
 @register_object
