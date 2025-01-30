@@ -91,7 +91,6 @@ export const ErrorPanelSmall = ({
   const subtitle2Str = subtitle2 ?? DEFAULT_SUBTITLE2;
   return (
     <Tooltip
-      position="top center"
       trigger={
         <Circle $size={22} $hoverHighlight={true}>
           <Icon name="warning" width={16} height={16} />
