@@ -471,7 +471,6 @@ export const LLM_PROVIDERS = [
   'openai',
   'anthropic',
   'azure',
-  'azure_ai',
   'gemini',
   'groq',
   'bedrock',
@@ -484,8 +483,7 @@ export const LLM_PROVIDER_LABELS: Record<
 > = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
-  azure: 'Azure AI',
-  azure_ai: 'Azure',
+  azure: 'Azure',
   gemini: 'Google Gemini',
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
