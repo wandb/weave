@@ -196,6 +196,16 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 8192,
     supports_function_calling: true,
   },
+  'gemini/gemini-2.0-flash-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
 
   // Groq models
   'groq/gemma-7b-it': {
@@ -383,6 +393,21 @@ export const LLM_MAX_TOKENS = {
 
   // xAI models
   'xai/grok-beta': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
+  'xai/grok-2-1212': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
+  'xai/grok-2': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
+  'xai/grok-2-latest': {
     max_tokens: 131072,
     provider: 'xai',
     supports_function_calling: true,
