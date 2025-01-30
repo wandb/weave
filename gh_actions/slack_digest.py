@@ -99,52 +99,25 @@ CATEGORIES = {
 
 class SlackNotifier:
     def __init__(self, token: str):
-        """Initialize Slack notifier with authentication token.
-
-        Args:
-            token: Slack API token for authentication
-        """
+        """Initialize Slack notifier with authentication token."""
         self.client = WebClient(token=token)
 
     def validate_channel(self, channel: str) -> str:
-        """Validate and format Slack channel name.
-
-        Args:
-            channel: Channel name with or without '#' prefix
-
-        Returns:
-            Properly formatted channel name
-
-        Raises:
-            ValueError: If channel name is invalid
-        """
+        """Validate and format Slack channel name."""
         if not channel:
             raise ValueError("Channel name cannot be empty")
-
-        # Ensure channel starts with #
         return f"#{channel.lstrip('#')}"
 
     def send_message(self, channel: str, message: str) -> bool:
-        """Send message to specified Slack channel.
-
-        Args:
-            channel: Target Slack channel
-            message: Message content to send
-
-        Returns:
-            bool: True if message was sent successfully
-
-        Raises:
-            SlackApiError: If message sending fails
-        """
+        """Send a single message to specified Slack channel."""
+        channel = self.validate_channel(channel)
         try:
-            channel = self.validate_channel(channel)
-            response = self.client.chat_postMessage(channel=channel, text=message)
-            logger.info(f"Message sent successfully to {channel}")
+            self.client.chat_postMessage(channel=channel, text=message)
+            logger.info(f"Message sent to {channel}")
+            return True
         except SlackApiError as e:
             logger.exception(f"Failed to send message: {e.response['error']}")
             raise
-        return True
 
 
 class GitHubDigest:
@@ -238,9 +211,73 @@ class GitHubDigest:
 
         return cats
 
+    def get_display_width(self, text: str) -> int:
+        """Get the display width of text, counting our known emojis as double-width."""
+        width = 0
+        # Our known emojis
+        emoji_chars = {"📚", "🤖", "📦", "🧪", "🎨", "🐍"}
+
+        i = 0
+        while i < len(text):
+            # Check for our known emojis first
+            found_emoji = False
+            for emoji in emoji_chars:
+                if text[i:].startswith(emoji):
+                    width += 2  # Emojis take 2 spaces
+                    i += len(emoji)  # Skip the entire emoji
+                    found_emoji = True
+                    break
+
+            if not found_emoji:
+                width += 1
+                i += 1
+
+        return width
+
+    def truncate_text(self, text: str, width: int) -> str:
+        """Truncate text to width, adding ellipsis if needed."""
+        if self.get_display_width(text) <= width:
+            return text
+
+        # Truncate considering emoji widths
+        result = ""
+        current_width = 0
+        i = 0
+        while i < len(text):
+            if current_width >= width - 3:  # Leave room for ellipsis
+                break
+
+            # Check for our known emojis
+            found_emoji = False
+            for emoji in {"📚", "🤖", "📦", "🧪", "🎨", "🐍"}:
+                if text[i:].startswith(emoji):
+                    if current_width + 2 > width - 3:
+                        break
+                    result += emoji
+                    current_width += 2
+                    i += len(emoji)
+                    found_emoji = True
+                    break
+
+            if not found_emoji:
+                result += text[i]
+                current_width += 1
+                i += 1
+
+        return result + "..."
+
     def format_line_diff(self, additions: int, deletions: int) -> str:
         """Format the line differences in a compact way."""
-        return f"+{additions}/-{deletions}"
+        def format_number(n: int) -> str:
+            """Format a number compactly using K/M suffixes."""
+            if n >= 1_000_000:
+                return f"{n/1_000_000:.0f}M"  # Remove decimal for millions
+            elif n >= 1_000:
+                return f"{n/1_000:.0f}K"  # Remove decimal for thousands
+            return str(n)
+
+        # Format with no space between +/- to save space
+        return f"+{format_number(additions)}/-{format_number(deletions)}"
 
     def process_items_parallel(
         self, items: list[Any], processor, description: str
@@ -332,6 +369,34 @@ class GitHubDigest:
             "draft": pr.draft,
         }
 
+    def format_categories(self, categories: ChangeCategories) -> str:
+        """Format category indicators in a fixed-width space."""
+        indicators = []
+        if categories.docs:   indicators.append("📚")
+        if categories.server: indicators.append("🤖")
+        if categories.ts_sdk: indicators.append("📦")
+        if categories.tests:  indicators.append("🧪")
+        if categories.ui:     indicators.append("🎨")
+        if categories.py_sdk: indicators.append("🐍")
+
+        # Join with no space to save width, since emojis have their own spacing
+        result = "".join(indicators)
+
+        # Ensure we don't exceed the column width
+        if self.get_display_width(result) > 12:  # Categories column width
+            # If too many categories, show first few and add "..."
+            truncated = ""
+            current_width = 0
+            for indicator in indicators:
+                if current_width + 2 > 9:  # Leave room for "..."
+                    truncated += "..."
+                    break
+                truncated += indicator
+                current_width += 2
+            result = truncated
+
+        return result
+
     def create_commit_table(self, commits, title: str) -> str:
         """Create an ASCII table for displaying commit information."""
         # Process commits in parallel
@@ -342,14 +407,16 @@ class GitHubDigest:
         # Format as ASCII table
         table = [title, ""]  # Title and blank line
 
-        # Headers
+        # Headers and their widths - adjusted for content
         headers = ["Date", "Author", "Message", "Line Diff", "Files", "Categories", "Link"]
-        # Create header separator
-        widths = [12, 15, 50, 12, 6, 12, 50]  # Adjust these as needed
+        widths = [16, 12, 45, 12, 6, 12, 40]  # Increased Line Diff width to 12
+
+        # Create format strings with proper padding
         row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+        sep_format = "|-" + "-|-".join("-" * w for w in widths) + "-|"
 
         table.append(row_format.format(*headers))
-        table.append("|" + "|".join("-" * (w + 2) for w in widths) + "|")
+        table.append(sep_format)
 
         # Data rows
         for processed, error in results:
@@ -357,25 +424,14 @@ class GitHubDigest:
                 logger.warning(f"Skipping commit due to error: {error}")
                 continue
 
-            categories = processed["categories"]
-            indicators = []
-            if categories.docs:   indicators.append("📚")
-            if categories.server: indicators.append("🤖")
-            if categories.ts_sdk: indicators.append("📦")
-            if categories.tests:  indicators.append("🧪")
-            if categories.ui:     indicators.append("🎨")
-            if categories.py_sdk: indicators.append("🐍")
-
-            cat_str = " ".join(indicators) if indicators else ""
-
             row = [
                 processed["date"],
-                processed["author"],
-                processed["message"][:47] + "..." if len(processed["message"]) > 50 else processed["message"],
+                self.truncate_text(processed["author"], widths[1]),
+                self.truncate_text(processed["message"], widths[2]),
                 processed["line_diff"],
                 processed["files"],
-                cat_str,
-                processed["url"],
+                self.format_categories(processed["categories"]),
+                self.truncate_text(processed["url"], widths[6]),
             ]
             table.append(row_format.format(*row))
 
@@ -390,28 +446,21 @@ class GitHubDigest:
             "Processing pull requests..."
         )
 
-        # Headers
+        # Headers and their widths - adjusted for content
         headers = ["Date", "Author", "Title", "Line Diff", "Files", "Categories", "Link"]
-        widths = [12, 15, 50, 12, 6, 12, 50]  # Adjust these as needed
+        widths = [16, 12, 45, 12, 6, 12, 40]  # Increased Line Diff width to 12
+
+        # Create format strings with proper padding
         row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+        sep_format = "|-" + "-|-".join("-" * w for w in widths) + "-|"
 
         # Create header rows
         header_row = row_format.format(*headers)
-        separator = "|" + "|".join("-" * (w + 2) for w in widths) + "|"
+        separator = sep_format
 
         # Prepare tables
-        ready_rows = [
-            f"{title_prefix} - Ready for Review",
-            "",
-            header_row,
-            separator
-        ]
-        draft_rows = [
-            f"{title_prefix} - In Progress",
-            "",
-            header_row,
-            separator
-        ]
+        ready_rows = [f"{title_prefix} - Ready for Review", "", header_row, separator]
+        draft_rows = [f"{title_prefix} - In Progress", "", header_row, separator]
 
         # Process results
         for processed, error in results:
@@ -419,25 +468,14 @@ class GitHubDigest:
                 logger.warning(f"Skipping PR due to error: {error}")
                 continue
 
-            categories = processed["categories"]
-            indicators = []
-            if categories.docs:   indicators.append("📚")
-            if categories.server: indicators.append("🤖")
-            if categories.ts_sdk: indicators.append("📦")
-            if categories.tests:  indicators.append("🧪")
-            if categories.ui:     indicators.append("🎨")
-            if categories.py_sdk: indicators.append("🐍")
-
-            cat_str = " ".join(indicators) if indicators else ""
-
             row = [
                 processed["date"],
-                processed["author"],
-                processed["title"][:47] + "..." if len(processed["title"]) > 50 else processed["title"],
+                self.truncate_text(processed["author"], widths[1]),
+                self.truncate_text(processed["title"], widths[2]),
                 processed["line_diff"],
                 processed["files"],
-                cat_str,
-                processed["url"],
+                self.format_categories(processed["categories"]),
+                self.truncate_text(processed["url"], widths[6]),
             ]
             formatted_row = row_format.format(*row)
 
@@ -476,23 +514,41 @@ class GitHubDigest:
         sections = [
             f"Activity Report for {self.repo.full_name} (Last {self.days} days)",
             "",
-            "```",
             self.create_commit_table(commits, "Recent Commits"),
-            "```",
             "",
-            "```",
             self.create_pr_tables(prs, "Open Pull Requests")[0],  # Ready PRs
-            "```",
             "",
-            "```",
             self.create_pr_tables(prs, "Open Pull Requests")[1],  # Draft PRs
-            "```",
             "",
             "Legend: 📚 Docs, 🧪 Tests, 🤖 Server, 🎨 UI, 📦 TS SDK, 🐍 Python SDK"
         ]
 
         return "\n".join(sections)
 
+
+def send_digest_to_slack(digest: str, channel: str, slack_token: str):
+    """Send digest to Slack, splitting into appropriate chunks."""
+    MAX_LINES_PER_BLOCK = 23
+    notifier = SlackNotifier(slack_token)
+
+    # Split digest into lines
+    lines = digest.split('\n')
+
+    # Process lines in chunks
+    current_chunk = []
+    for line in lines:
+        current_chunk.append(line)
+
+        # When we hit the size limit or a table boundary, send the chunk
+        if len(current_chunk) >= MAX_LINES_PER_BLOCK or (line.strip() == '' and current_chunk):
+            message = "```\n" + "\n".join(current_chunk) + "\n```"
+            notifier.send_message(channel, message)
+            current_chunk = []
+
+    # Send any remaining lines
+    if current_chunk:
+        message = "```\n" + "\n".join(current_chunk) + "\n```"
+        notifier.send_message(channel, message)
 
 def main():
     """Main entry point for both CLI and Action modes."""
@@ -533,16 +589,18 @@ def main():
         message = digest.generate_digest()
 
         if args.slack:
-            # Send to Slack
+            # Send to Slack in chunks
             slack_token = os.getenv("SLACK_TOKEN")
             if not slack_token:
                 raise ValueError("SLACK_TOKEN environment variable is required")
 
-            notifier = SlackNotifier(slack_token)
-            notifier.send_message(args.channel, message)
+            send_digest_to_slack(message, args.channel, slack_token)
         else:
             # Print to console (default)
+            # Wrap in code block for consistent display
+            console.print("```")
             console.print(message)
+            console.print("```")
 
     except Exception as e:
         logger.exception(f"Error: {str(e)}")
