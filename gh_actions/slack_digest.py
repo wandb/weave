@@ -508,10 +508,9 @@ def main():
     )
     parser.add_argument("--branch", default="master", help="Branch to analyze")
     parser.add_argument(
-        "--mode",
-        choices=["local", "slack", "dry-run"],
-        default="local",
-        help="Run mode: local (rich tables), slack (send to Slack), or dry-run (preview Slack message)",
+        "--slack",
+        action="store_true",
+        help="Send digest to Slack (default: print to console)",
     )
 
     args = parser.parse_args()
@@ -528,29 +527,22 @@ def main():
             repo=args.repo,
             days=args.days,
             branch=args.branch,
-            local_mode=args.mode == "local",  # Only use rich output in local mode
+            local_mode=True,  # Always use progress bars
         )
 
-        if args.mode == "local":
-            # Local mode - show rich tables
-            digest.generate_digest()
+        message = digest.generate_digest()
+
+        if args.slack:
+            # Send to Slack
+            slack_token = os.getenv("SLACK_TOKEN")
+            if not slack_token:
+                raise ValueError("SLACK_TOKEN environment variable is required")
+
+            notifier = SlackNotifier(slack_token)
+            notifier.send_message(args.channel, message)
         else:
-            # Get Slack message content
-            message = digest.generate_digest()
-
-            if args.mode == "dry-run":
-                # Preview mode - show what would be sent
-                console.print("\n[bold]Preview of Slack message:[/bold]\n")
-                console.print(message)
-                console.print(f"\n[dim]Would be sent to channel: #{args.channel}[/dim]")
-            else:
-                # Slack mode - actually send it
-                slack_token = os.getenv("SLACK_TOKEN")
-                if not slack_token:
-                    raise ValueError("SLACK_TOKEN environment variable is required")
-
-                notifier = SlackNotifier(slack_token)
-                notifier.send_message(args.channel, message)
+            # Print to console (default)
+            console.print(message)
 
     except Exception as e:
         logger.exception(f"Error: {str(e)}")

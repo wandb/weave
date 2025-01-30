@@ -10,6 +10,10 @@ on:
         description: 'Slack channel to post to'
         required: false
         default: 'weave-dev-digest'
+      days:
+        description: 'Number of days to look back'
+        required: false
+        default: '7'
       extra_args:
         description: 'Extra arguments to pass to the script (make this concrete after testing)'
         required: false
@@ -35,6 +39,7 @@ jobs:
           SLACK_TOKEN: ${{ secrets.WEAVE_DEV_BOT_SLACK_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run gh_actions/slack_digest.py \
+          uv run gh_actions/slack_digest.py --slack \
             --channel "${{ github.event.inputs.channel || 'weave-dev-digest' }}" \
+            --days "${{ github.event.inputs.days || '7' }}" \
             --extra-args "${{ github.event.inputs.extra_args || '' }}"
