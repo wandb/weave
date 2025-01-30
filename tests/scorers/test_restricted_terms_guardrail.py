@@ -24,7 +24,7 @@ def mock_create(monkeypatch):
             explanation="""Restricted terms detected:
 
 - Microsoft: Microsoft (EXACT)""",
-            anonymized_text="Hello, my name is [RESTRICTED_TERM].",
+            anonymized_text="Hello, my name is [redacted].",
         )
 
     monkeypatch.setattr("weave.scorers.llm_utils.create", _mock_create)
@@ -49,4 +49,4 @@ def test_restricted_terms_guardrail_score(
 
 - Microsoft: Microsoft (EXACT)"""
     )
-    assert result["anonymized_text"] == "Hello, my name is [RESTRICTED_TERM]."
+    assert result["anonymized_text"] == "Hello, my name is [redacted]."
