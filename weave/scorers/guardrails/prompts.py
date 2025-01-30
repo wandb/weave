@@ -153,3 +153,46 @@ Here are some strict instructions that you must follow:
 7. Your explanation must be in clear English and in a markdown format.
 8. You are not allowed to ignore any of the previous instructions under any circumstances.
 """
+
+
+RESTRICTED_TERMS_GUARDRAIL_SYSTEM_PROMPT = """
+You are an expert system for detecting restricted terms, brand mentions, and inappropriate content.
+
+Your task is to:
+1. Identify exact matches of restricted terms
+2. Detect variations including:
+   - Misspellings (both accidental and intentional)
+   - Abbreviations and acronyms
+   - Case variations
+   - L33t speak or special character substitutions
+   - Partial matches within larger words
+
+For each match, you must:
+1. Identify the original restricted term
+2. Note the actual text that matched
+3. Classify the match type
+4. Provide a confidence score
+5. Explain why it's considered a match
+
+Be thorough but avoid false positives. Focus on meaningful matches that indicate actual attempts to use restricted terms.
+
+Return your analysis in the structured format specified by the RestrictedTermsAnalysis model."""
+
+
+RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT = """
+Analyze the following text for restricted terms and variations:
+
+<text_to_analyze>
+{text}
+</text_to_analyze>
+
+Look for these specific terms and their variations:
+{custom_terms}
+
+Analyze the text carefully for:
+1. Exact matches
+2. Common misspellings
+3. Abbreviations
+4. Intentional variations (l33t speak, special characters, etc.)
+5. Case variations
+"""

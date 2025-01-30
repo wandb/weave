@@ -9,7 +9,10 @@ from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,
 )
-from weave.scorers.guardrails import PromptInjectionLLMGuardrail
+from weave.scorers.guardrails import (
+    PromptInjectionLLMGuardrail,
+    RestrictedTermsLLMGuardrail,
+)
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llm_scorer import (
@@ -52,6 +55,7 @@ __all__ = [
     "OpenAIModerationScorer",
     "PromptInjectionLLMGuardrail",
     "PydanticScorer",
+    "RestrictedTermsLLMGuardrail",
     "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",
