@@ -381,7 +381,9 @@ class GitHubDigest:
             return title
         return title[: max_length - 3] + "..."
 
-    def _get_base_row_data(self, item: Any, date_field: str, stats_source: Any = None) -> dict:
+    def _get_base_row_data(
+        self, item: Any, date_field: str, stats_source: Any = None
+    ) -> dict:
         """Extract common row data from a GitHub item (commit or PR).
 
         Args:
@@ -394,7 +396,7 @@ class GitHubDigest:
         """
         # Handle nested attribute access for date field
         current = item
-        for attr in date_field.split('.'):
+        for attr in date_field.split("."):
             current = getattr(current, attr)
         date = current.strftime("%Y-%m-%d %H:%M")
 
@@ -461,10 +463,10 @@ class GitHubDigest:
 
     def process_commit(self, commit):
         """Process a single commit into row data.
-        
+
         Args:
             commit: GitHub Commit object
-            
+
         Returns:
             Dictionary containing processed commit data
         """
@@ -472,13 +474,15 @@ class GitHubDigest:
         base_data = self._get_base_row_data(
             commit.commit,  # GitCommit object for author/date
             "author.date",
-            stats_source=commit  # Outer commit object for stats
+            stats_source=commit,  # Outer commit object for stats
         )
-        base_data.update({
-            "author": commit.author.login if commit.author else "Unknown",
-            "message": self.truncate_title(commit.commit.message.split("\n")[0]),
-            "categories": FileCategories.analyze(commit.files),
-        })
+        base_data.update(
+            {
+                "author": commit.author.login if commit.author else "Unknown",
+                "message": self.truncate_title(commit.commit.message.split("\n")[0]),
+                "categories": FileCategories.analyze(commit.files),
+            }
+        )
         return base_data
 
     def process_pr(self, pr):
@@ -559,9 +563,7 @@ class GitHubDigest:
         )
 
         draft_section = Section(
-            title="Open Pull Requests - In Progress",
-            headers=headers,
-            rows=draft_rows
+            title="Open Pull Requests - In Progress", headers=headers, rows=draft_rows
         )
 
         return ready_section, draft_section
@@ -569,6 +571,7 @@ class GitHubDigest:
     def collect_sections(self) -> list[Section]:
         """Collect all sections with their data."""
         since_date = datetime.now(pytz.UTC) - timedelta(days=self.days)
+        end_date = datetime.now(pytz.UTC)
 
         try:
             # Get recent activity with rate limit handling
@@ -596,9 +599,9 @@ class GitHubDigest:
             logger.exception(f"GitHub API error: {e}")
             raise
 
-        # Create header section
+        # Create header section with date range and bold formatting
         header = Section(
-            title=f"Activity Report for {self.repo.full_name} (Last {self.days} days)",
+            title=f"**Activity Report for {self.repo.full_name}**\n{since_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} (Last {self.days} days)",
             headers=[],
             rows=[],
         )
@@ -744,26 +747,37 @@ class SlackOutput:
 
     This class handles splitting large messages into appropriate chunks
     and ensures proper formatting is maintained across message boundaries.
+    Respects both Slack's character limit (4000) and line limit for readability.
     """
 
-    def __init__(self, token: str, channel: str, max_lines_per_block: int = 23):
+    def __init__(
+        self,
+        token: str,
+        channel: str,
+        max_lines_per_block: int = 25,
+        max_chars_per_block: int = 4000,
+    ):
         """Initialize Slack output handler.
 
         Args:
             token: Slack API token
             channel: Target Slack channel
-            max_lines_per_block: Maximum lines per message block (default: 23)
+            max_lines_per_block: Maximum lines per message block (default: 25)
+            max_chars_per_block: Maximum characters per message block (default: 4000)
         """
         self.notifier = SlackNotifier(token)
         self.channel = channel
         self.MAX_LINES_PER_BLOCK = max_lines_per_block
+        self.MAX_CHARS_PER_BLOCK = max_chars_per_block
 
     def send(self, content: str) -> None:
         """Send content to Slack, splitting into appropriate chunks.
 
-        The content is split into chunks that respect table boundaries and
-        Slack's message size limits. Tables are wrapped in code blocks for
-        proper formatting.
+        The content is split into chunks that respect:
+        1. Table boundaries (don't split in middle of table)
+        2. Slack's character limit (4000)
+        3. Line limit for readability (25)
+        Tables are wrapped in code blocks for proper formatting.
 
         Args:
             content: Formatted digest content to send
@@ -773,21 +787,28 @@ class SlackOutput:
         """
         lines = content.split("\n")
         current_chunk: list[str] = []
+        current_char_count = 0
         in_table = False
 
         for line in lines:
             is_table_line = bool(line.strip()) and line.strip()[0] in "|+-"
+            line_length = len(line) + 1  # +1 for newline
 
             # Start new chunk if:
-            # 1. Current chunk is too long, or
-            # 2. We're transitioning between table and non-table content
-            if len(current_chunk) >= self.MAX_LINES_PER_BLOCK or (
-                current_chunk and is_table_line != in_table
+            # 1. Current chunk is too long (lines), or
+            # 2. Adding this line would exceed character limit, or
+            # 3. We're transitioning between table and non-table content
+            if (
+                len(current_chunk) >= self.MAX_LINES_PER_BLOCK
+                or current_char_count + line_length > self.MAX_CHARS_PER_BLOCK
+                or (current_chunk and is_table_line != in_table)
             ):
                 self._send_chunk(current_chunk, in_table)
                 current_chunk = []
+                current_char_count = 0
 
             current_chunk.append(line)
+            current_char_count += line_length
             in_table = is_table_line
 
         if current_chunk:
@@ -809,6 +830,12 @@ class SlackOutput:
         content = "\n".join(lines)
         if is_table:
             content = f"```\n{content}\n```"
+
+        # Verify final size is within limits (including code block markers if table)
+        if len(content) > self.MAX_CHARS_PER_BLOCK:
+            logger.warning(
+                f"Chunk exceeds character limit ({len(content)} > {self.MAX_CHARS_PER_BLOCK})"
+            )
 
         self.notifier.send_message(self.channel, content)
 
