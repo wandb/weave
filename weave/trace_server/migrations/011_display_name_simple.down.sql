@@ -1,14 +1,8 @@
 ALTER TABLE calls_merged
-    DROP COLUMN display_name;
-
-ALTER TABLE calls_merged
-    ADD COLUMN display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
+    MODIFY COLUMN display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
 
 ALTER TABLE calls_merged_stats
-    DROP COLUMN display_name;
-
-ALTER TABLE calls_merged_stats
-    ADD COLUMN display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
+    MODIFY COLUMN display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,

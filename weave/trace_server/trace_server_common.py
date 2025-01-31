@@ -70,7 +70,7 @@ def hydrate_calls_with_feedback(
 
 def make_derived_summary_fields(
     summary: dict[str, Any],
-    op_name: str,
+    op_name: Optional[str],
     started_at: Optional[datetime.datetime] = None,
     ended_at: Optional[datetime.datetime] = None,
     exception: Optional[str] = None,
@@ -101,7 +101,7 @@ def make_derived_summary_fields(
 
     if display_name:
         weave_summary["display_name"] = display_name
-    else:
+    elif op_name:
         if ri.string_will_be_interpreted_as_ref(op_name):
             op = ri.parse_internal_uri(op_name)
             if isinstance(op, ri.InternalObjectRef):

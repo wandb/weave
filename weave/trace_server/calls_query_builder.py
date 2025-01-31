@@ -672,10 +672,11 @@ class CallsQuery(BaseModel):
         )
 
         where_filter_sql = combine_conditions(
-            having_conditions_sql
-            + [c.as_sql(pb, table_alias, no_agg=True) for c in self.query_conditions],
+            [c.as_sql(pb, table_alias, no_agg=True) for c in self.query_conditions],
             "AND",
         )
+        if where_filter_sql:
+            where_filter_sql = "AND " + where_filter_sql
 
         order_by_sql_no_agg = ""
         if len(self.order_fields) > 0:
