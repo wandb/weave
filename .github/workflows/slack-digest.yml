@@ -14,10 +14,6 @@ on:
         description: 'Number of days to look back'
         required: false
         default: '7'
-      extra_args:
-        description: 'Extra arguments to pass to the script (make this concrete after testing)'
-        required: false
-        default: ''
 
 jobs:
   notify:
@@ -41,5 +37,4 @@ jobs:
         run: |
           uv run gh_actions/slack_digest.py --slack \
             --channel "${{ github.event.inputs.channel || 'weave-dev-digest' }}" \
-            --days "${{ github.event.inputs.days || '7' }}" \
-            --extra-args "${{ github.event.inputs.extra_args || '' }}"
+            --days "${{ github.event.inputs.days || '7' }}"

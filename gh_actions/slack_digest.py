@@ -859,7 +859,7 @@ def main():
         help="Send digest to Slack (default: print to console)",
     )
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     # Get required tokens
     github_token = os.getenv("GITHUB_TOKEN")
