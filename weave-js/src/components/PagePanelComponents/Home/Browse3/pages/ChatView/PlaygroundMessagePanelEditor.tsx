@@ -4,7 +4,7 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
-import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
+import {StyledTextArea} from '../../StyledTextarea';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
