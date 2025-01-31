@@ -1,20 +1,20 @@
 # W&B Weave Self-managed
 
-This document will guide you through deploying all components necessary to enable W&B Weave in a self-managed environment.
+This install guide outlines the process of deploying all the components necessary to enable W&B Weave in a self-managed environment.
 
 :::important
-This is a tech-preview and not recommended to be in production.
-The W&B team is working to deliver enterprise grade in the next weeks.
-We recommend to use the [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud) deployment where the Weave is Generaly Available for production environments.
+Note that, Weave on self-managed is currently in Private Preview (PrPr). 
+To deploy a fully production grade instance, please reach out to support@wandb.com
+W&B also strongly recommends using the [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud) option where Weave is Generally Available for production environments included.
 :::
 
-One of the main componentes to deploy the W&B Weave is the database used by the application, in our case the ClickHouseDB.
-Most of this document will describe how you can deploy the ClickHouseDB to support the W&B Weave.
-Although a fully functional ClickHouseDB installation is deployed, many measures to ensure a more reliable and available installation are not fully covered, which will be part of the final documentation.
+One of the key components required to deploy W&B Weave is the ClickHouseDB used by Weave application backend.
+
+While the deployment results in a fully functional ClickHouseDB installation, there may be additional measures needed to improve reliability and availability in a fully production-ready environment.
 
 ## Requirements
 
-* **W&B Platform Installed(https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/)**
+* **W&B Operator Installation (https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/)**
 * **Bitnami's ClickHouse Helm chart**
 * **S3 Bucket:**
   * A pre-configured S3 bucket for ClickHouse storage (see the **Providing S3 Credentials** section for configuring credentials)  
@@ -22,11 +22,12 @@ Although a fully functional ClickHouseDB installation is deployed, many measures
   * CPU: 8  
   * RAM: 64  
   * Disk: 200GB+
+A more detailed reference architecture is available here (https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/#models-and-weave)
 
 ## Deploy ClickHouse
 
-The ClickHouse deployment for this document will use the [Bitnami ClickHouse](https://bitnami.com/stack/clickhouse) package.
-This Helm has a good support for the basic functionalities of ClickHouse, especially the usage of [ClickHouse Keeper](https://clickhouse.com/docs/en/guides/sre/keeper/clickhouse-keeper).
+To install Clickhouse, we use the [Bitnami ClickHouse](https://bitnami.com/stack/clickhouse) package.
+This Helm chart provides strong support for ClickHouse's core functionalities, particularly the use of ClickHouse Keeper.
 
 ### Configure Helm repository
 
@@ -34,17 +35,24 @@ Add the Bitnami Helm repository:
 
 `helm repo add bitnami https://charts.bitnami.com/bitnami` 
 
-Udate the repository
+Update the repository
 
 `helm repo update`
 
 
 ### Create Helm Configuration
 
-The following is an example `values.yaml` file with parameters that you can customize based on your needs.
-The critical part in this document is the ClickHouse configuation in `XML` format. 
-To facilitate the configuration we added comments in the relevante configuration parts in the following format `<!-- COMMENT -->`
-For this configuration, we recommend you modify the `clusterName`, `auth.username`, `auth.password` and some configurations for the S3 bucket.
+Below is an example values.yaml file with customizable parameters to suit your needs.
+
+The most critical part of this document is the ClickHouse configuration, which is provided in XML format.
+To make the configuration process easier, we have added comments in the relevant sections using the format <!-- COMMENT -->.
+
+For this setup, we recommend modifying the following parameters:
+
+- clusterName
+- auth.username
+- auth.password
+- S3 bucket-related configurations
 
 ```yaml
 # Stable version
@@ -245,15 +253,15 @@ You can specify credentials for accessing an S3 bucket in two ways:
 
    `<use_environment_credentials>true</use_environment_credentials>`  
    
-   More details at [ClickHouse: Separation of Storage and Compute](https://clickhouse.com/docs/en/guides/separation-storage-compute).
+   You can find more details on this at [ClickHouse: Separation of Storage and Compute](https://clickhouse.com/docs/en/guides/separation-storage-compute).
 
 ### Install ClickHouse
 
-With the reposiories prepared and `values.yaml` ready, the next step is deploy ClickHouse.
+With the repositories set up and the `values.yaml` file prepared, the next step is to deploy ClickHouse.
 ```
 helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
 ```
-* If you don't want to create namespace or install in a specific namespace, remove he argunments `--create-namespace --namespace <NAMESPACE>`
+* If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments --create-namespace --namespace <NAMESPACE>.
 
 #### Confirm Clickhouse deployment
 
@@ -263,7 +271,7 @@ kubectl get pods -n <NAMESPACE>
 
 ## Deploy W&B Weave
 
-Weave is already available for automatic deployment via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator). With the W&B Platform installed, the next steps are:
+Weave is already available for automatic deployment via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator). With the W&B Platform installed, the next steps would be as follows:
 
 1. Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform
 2. Add the Weave configuration.
@@ -279,7 +287,7 @@ Use the service information from Kubernetes to configure Weave Trace:
 - **Username** set in the `values.yaml`
 - **Password** also set in the `values.yaml`
 
-With the information above, reconfigure the W&B Platform CR, and ad the following configuration 
+With the information above, reconfigure the W&B Platform CR, and add the following configuration 
 
 ```yaml
 apiVersion: apps.wandb.com/v1
@@ -358,11 +366,12 @@ spec:
       install: true
 ```
 
-With the CR ready, simply apply the new configuration
+With the Custom Resource (CR) prepared, apply the new configuration
 
 `kubectl apply -n <NAMESPACE> -f wandb.yaml`
 
 :::tip
-Ensure the license has the Weave Trace enable
+For Weave to be functional, you'll need a Weave enabled license from W&B.
+To request a license, please reach out to support@wandb.com
 :::
 
