@@ -50,6 +50,8 @@ async def perform_scorer_tests(
     we will likely implement a better query at the service layer and we want to ensure that the high
     level api continues to work correctly. We don't really want users to manually write the mongo
     query, so that part of these tests are just here for correctness.
+
+    The only user-facing api we really want to maintain is the param `scored_by` on the client.
     """
 
     @weave.op
@@ -70,8 +72,13 @@ async def perform_scorer_tests(
     _, call_scored_by_s0_v1 = predict.call(4)
     await call_scored_by_s0_v1.apply_scorer(s0_v1)
 
+    s0_v0_uri = s0_v0.ref.uri()
     s0_v0_name = s0_v0.ref.name
+
+    s0_v1_uri = s0_v1.ref.uri()
     s0_v1_name = s0_v1.ref.name
+
+    s1_v0_uri = s1_v0.ref.uri()
     s1_v0_name = s1_v0.ref.name
 
     # This is required for the test to work
@@ -120,32 +127,30 @@ async def perform_scorer_tests(
     assert call_ids(calls_high_level) == expected_ids
 
     # 2. Query for calls that have been scored by s0:v0
-    # calls = client.server.calls_query(
-    #     CallsQueryReq(
-    #         project_id=client._project_id(),
-    #         query={
-    #             "$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v0_uri)
-    #         }
-    #     )
-    # )
-    # calls_high_level = client.get_calls(
-    #     scored_by=["s0_v0_uri"]
-    # )
-    # assert [c.id for c in calls.calls] == [call_scored_by_s0_v0.id, call_scored_by_s0_v0_and_s1_v0.id]
+    # TODO: THIS IS FAILING
+    expected_ids = call_ids([call_scored_by_s0_v0, call_scored_by_s0_v0_and_s1_v0])
+    calls_low_level = client.server.calls_query(
+        CallsQueryReq(
+            project_id=client._project_id(),
+            query={"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v0_uri)},
+        )
+    ).calls
+    calls_high_level = client.get_calls(scored_by=[s0_v0_uri])
+    assert call_ids(calls_low_level) == expected_ids
+    assert call_ids(calls_high_level) == expected_ids
 
     # 3. Query for calls that have been scored by s0:v1
-    # calls = client.server.calls_query(
-    #     CallsQueryReq(
-    #         project_id=client._project_id(),
-    #         query={
-    #             "$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0.ref.uri())
-    #         }
-    #     )
-    # )
-    # calls_high_level = client.get_calls(
-    #     scored_by=[s0.ref.uri()]
-    # )
-    # assert [c.id for c in calls.calls] == [call_scored_by_s0_v1.id]
+    # TODO: THIS IS FAILING
+    expected_ids = call_ids([call_scored_by_s0_v1])
+    calls_low_level = client.server.calls_query(
+        CallsQueryReq(
+            project_id=client._project_id(),
+            query={"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v1_uri)},
+        )
+    ).calls
+    calls_high_level = client.get_calls(scored_by=[s0_v1_uri])
+    assert call_ids(calls_low_level) == expected_ids
+    assert call_ids(calls_high_level) == expected_ids
 
     # 4. Query for calls that have been scored by s1:*
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
@@ -160,18 +165,17 @@ async def perform_scorer_tests(
     assert call_ids(calls_high_level) == expected_ids
 
     # 5. Query for calls that have been scored by s1:v0
-    # calls = client.server.calls_query(
-    #     CallsQueryReq(
-    #         project_id=client._project_id(),
-    #         query={
-    #             "$expr": eq_expr(runnable_ref_field_for_name(s1_name), s1.ref.uri())
-    #         }
-    #     )
-    # )
-    # calls_high_level = client.get_calls(
-    #     scored_by=[s1.ref.uri()]
-    # )
-    # assert [c.id for c in calls.calls] == [call_scored_by_s1_v0.id, call_scored_by_s0_v0_and_s1_v0.id]
+    # TODO: THIS IS FAILING
+    expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
+    calls_low_level = client.server.calls_query(
+        CallsQueryReq(
+            project_id=client._project_id(),
+            query={"$expr": eq_expr(runnable_ref_field_for_name(s1_name), s1_v0_uri)},
+        )
+    ).calls
+    calls_high_level = client.get_calls(scored_by=[s1_v0_uri])
+    assert call_ids(calls_low_level) == expected_ids
+    assert call_ids(calls_high_level) == expected_ids
 
 
 @pytest.mark.asyncio
@@ -195,7 +199,7 @@ async def test_scorer_query_op(client: WeaveClient):
 
 
 @pytest.mark.asyncio
-async def test_scorer_obj_query(client: WeaveClient):
+async def test_scorer_query_obj(client: WeaveClient):
     class MyScorer0(weave.Scorer):
         offset: int
 
