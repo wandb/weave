@@ -11,7 +11,7 @@ from typing_extensions import Self
 
 import weave
 from weave.flow import util
-from weave.flow.casting import DatasetLike, ScorerLike
+from weave.flow.casting import DatasetLike, ScorerLike, TableLike
 from weave.flow.dataset import Dataset
 from weave.flow.model import (
     ApplyModelError,
@@ -51,7 +51,7 @@ def default_evaluation_display_name(call: Call) -> str:
 
 
 class EvaluationResults(Object):
-    rows: weave.Table
+    rows: TableLike
 
 
 @register_object
