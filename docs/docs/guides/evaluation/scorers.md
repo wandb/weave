@@ -357,12 +357,7 @@ For more information on how to use the `.call()` method, see the [Calling Ops](.
 
 ## Score Analysis
 
-| Analysis Type | API Access | UI Access |
-|--------------|------------|-----------|
-| [Single Call's Scores](#analyze-a-single-calls-scores) | [API](#single-call-api) | [UI](#single-call-ui) |
-| [Multiple Calls' Scores](#analyze-multiple-calls-scores) | [API](#multiple-calls-api) | [UI](#multiple-calls-ui) |
-| [All Calls by Scorer](#analyze-all-calls-scored-by-a-specific-scorer) | [API](#all-calls-by-scorer-api) | [UI](#all-calls-by-scorer-ui) |
-
+In this section, we'll show you how to analyze the scores for a single call, multiple calls, and all calls scored by a specific scorer.
 
 ### Analyze a single Call's Scores
 
