@@ -10,7 +10,6 @@ import React from 'react';
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
 import {CellValue} from '../../../../Browse2/CellValue';
-import {SmallRef} from '../../../../Browse2/SmallRef';
 import {
   CellFilterWrapper,
   OnAddFilter,
@@ -18,6 +17,7 @@ import {
 import {isWeaveRef} from '../../../filters/common';
 import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
 import {NotApplicable} from '../../../NotApplicable';
+import {SmallRef} from '../../../smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {

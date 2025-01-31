@@ -3253,6 +3253,12 @@
       "input": 1.63e-06,
       "output": 5.51e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 2.4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-instant-v1": [
@@ -5221,6 +5227,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "us.anthropic.claude-3-5-haiku-20241022-v1:0": [
@@ -5229,6 +5241,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "eu.anthropic.claude-3-5-haiku-20241022-v1:0": [
@@ -5237,6 +5255,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "us.meta.llama3-1-8b-instruct-v1:0": [
@@ -5581,6 +5605,158 @@
       "input": 2e-06,
       "output": 4e-06,
       "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-reasoner": [
+    {
+      "provider": "deepseek",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-vision-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini/gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "openrouter/deepseek/deepseek-r1": [
+    {
+      "provider": "openrouter",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-large-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-mini-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.5e-08,
+      "output": 1.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8e-07,
+      "output": 3.2e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 8.8e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free": [
+    {
+      "provider": "together_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p1-8b-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-30 08:14:14"
     }
   ]
 }
