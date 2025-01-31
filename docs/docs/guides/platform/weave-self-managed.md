@@ -263,7 +263,10 @@ kubectl get pods -n <NAMESPACE>
 
 ## Deploy W&B Weave
 
-The W&B Weave is already available to be deployed automatically via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator), so considering you have the W&B Platform installed, the next step is edit the the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform and add the W&B Weave configuration.
+Weave is already available for automatic deployment via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator). With the W&B Platform installed, the next steps are:
+
+1. Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform
+2. Add the Weave configuration.
 
 ### Gathering information
 
