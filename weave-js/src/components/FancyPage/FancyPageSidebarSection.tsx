@@ -190,7 +190,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
               key={item.name}
               content={<span>{item.nameTooltip}</span>}
               trigger={wrapper}
-              position="right center"
+              side="right"
             />
           );
         }

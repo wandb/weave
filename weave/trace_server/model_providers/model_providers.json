@@ -1,4 +1,16 @@
 {
+  "omni-moderation-latest": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "omni-moderation-latest-intents": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "omni-moderation-2024-09-26": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -8,6 +20,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-audio-preview": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-4o-audio-preview-2024-12-17": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -271,11 +287,327 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "azure/tts-1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/tts-1-hd": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/whisper-1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o1-mini-2024-09-12": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o1-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o1-preview-2024-09-12": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-2024-08-06": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-2024-11-20": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-2024-05-13": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/global-standard/gpt-4o-2024-08-06": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/global-standard/gpt-4o-2024-11-20": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/global-standard/gpt-4o-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-mini-2024-07-18": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-turbo-2024-04-09": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-0125-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-1106-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-0613": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-32k-0613": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-32k": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-turbo": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4-turbo-vision-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-16k-0613": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-1106": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-0613": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-0301": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-0125": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo-16k": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-35-turbo": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/mistral-large-latest": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/mistral-large-2402": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/command-r-plus": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/ada": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/text-embedding-ada-002": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/text-embedding-3-large": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/text-embedding-3-small": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/standard/1024-x-1024/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/hd/1024-x-1024/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/standard/1024-x-1792/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/standard/1792-x-1024/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/hd/1024-x-1792/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/hd/1792-x-1024/dall-e-3": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/standard/1024-x-1024/dall-e-2": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/jamba-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/mistral-large": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/mistral-small": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/mistral-large-2407": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/ministral-3b": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Llama-3.2-11B-Vision-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Llama-3.3-70B-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Llama-3.2-90B-Vision-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Meta-Llama-3-70B-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Meta-Llama-3.1-8B-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Meta-Llama-3.1-70B-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Meta-Llama-3.1-405B-Instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3.5-mini-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3.5-vision-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3.5-MoE-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-mini-4k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-mini-128k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-small-8k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-small-128k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-medium-4k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Phi-3-medium-128k-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/cohere-rerank-v3-multilingual": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/cohere-rerank-v3-english": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Cohere-embed-v3-english": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/Cohere-embed-v3-multilingual": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "claude-instant-1": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
   "xai/grok-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2-vision-1212": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2-vision-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2-vision": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-vision-beta": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2-1212": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-2-latest": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
@@ -391,6 +723,14 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "gemini/gemini-2.0-flash-exp": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GOOGLE_API_KEY"
+  },
+  "gemini/gemini-2.0-flash-thinking-exp": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GOOGLE_API_KEY"
+  },
   "gemini/gemini-1.5-flash-002": {
     "litellm_provider": "gemini",
     "api_key_name": "GOOGLE_API_KEY"
@@ -483,6 +823,14 @@
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "ai21.jamba-1-5-large-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "ai21.jamba-1-5-mini-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "amazon.titan-text-lite-v1": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
@@ -567,11 +915,23 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "us.amazon.nova-micro-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "amazon.nova-lite-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "us.amazon.nova-lite-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "amazon.nova-pro-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "us.amazon.nova-pro-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
@@ -895,6 +1255,10 @@
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "meta.llama3-3-70b-instruct-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "meta.llama2-13b-chat-v1": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
@@ -1059,7 +1423,23 @@
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "stability.sd3-5-large-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-core-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-core-v1:1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "stability.stable-image-ultra-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-ultra-v1:1": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   }
