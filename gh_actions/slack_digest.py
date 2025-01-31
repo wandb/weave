@@ -646,7 +646,7 @@ class DigestFormatter(Protocol):
         Returns:
             Formatted section string
         """
-        pass
+        ...
 
     def format_digest(self, sections: list[Section]) -> str:
         """Format the complete digest.
@@ -657,7 +657,7 @@ class DigestFormatter(Protocol):
         Returns:
             Complete formatted digest string
         """
-        pass
+        ...
 
 
 class TabulateFormatter:
