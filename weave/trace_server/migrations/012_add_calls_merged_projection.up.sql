@@ -1,26 +1,21 @@
-ALTER TABLE calls_merged
-ADD PROJECTION reverse_timestamp
-(
-    SELECT
-        project_id,
-        id,
-        wb_run_id,
-        wb_user_id,
-        trace_id,
-        parent_id,
-        op_name,
-        started_at,
-        attributes_dump,
-        inputs_dump,
-        output_dump,
-        summary_dump,
-        exception,
-        output_refs,
-        input_refs,
-        ended_at,
-        deleted_at,
-        display_name
-    ORDER BY (project_id, -toUnixTimestamp64Milli(started_at))
-);
-ALTER TABLE calls_merged MATERIALIZE PROJECTION reverse_timestamp;
-
+CREATE MATERIALIZED VIEW calls_merged_view_ordered TO calls_merged AS
+SELECT project_id,
+    id,
+    anySimpleState(wb_run_id) as wb_run_id,
+    anySimpleState(wb_user_id) as wb_user_id,
+    anySimpleState(trace_id) as trace_id,
+    anySimpleState(parent_id) as parent_id,
+    anySimpleState(op_name) as op_name,
+    anySimpleState(started_at) as started_at,
+    anySimpleState(attributes_dump) as attributes_dump,
+    anySimpleState(inputs_dump) as inputs_dump,
+    array_concat_aggSimpleState(input_refs) as input_refs,
+    anySimpleState(ended_at) as ended_at,
+    anySimpleState(output_dump) as output_dump,
+    anySimpleState(summary_dump) as summary_dump,
+    anySimpleState(exception) as exception,
+    array_concat_aggSimpleState(output_refs) as output_refs
+FROM call_parts
+GROUP BY project_id,
+    id
+ORDER BY (project_id, started_at)
