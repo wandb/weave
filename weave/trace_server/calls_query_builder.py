@@ -234,7 +234,7 @@ class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str, no_agg: bool = False) -> str:
         options: list[tuple[Optional[tsi_query.CastTo], str]]
         if isinstance(
             self.field,
@@ -256,7 +256,7 @@ class OrderField(BaseModel):
         for index, (cast, direction) in enumerate(options):
             if index > 0:
                 res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+            res += f"{self.field.as_sql(pb, table_alias, cast, no_agg)} {direction}"
         return res
 
 
@@ -573,7 +573,7 @@ class CallsQuery(BaseModel):
 
         else:
             raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", no_agg=True)}
             """
 
         return _safely_format_sql(raw_sql)
@@ -583,6 +583,7 @@ class CallsQuery(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         id_subquery_name: Optional[str] = None,
+        no_agg: bool = False,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -676,23 +677,28 @@ class CallsQuery(BaseModel):
             "AND",
         )
 
+        order_by_sql_no_agg = ""
+        if len(self.order_fields) > 0:
+            order_by_sql_no_agg = "ORDER BY " + ", ".join(
+                [
+                    order_field.as_sql(pb, table_alias, no_agg=True)
+                    for order_field in self.order_fields
+                ]
+            )
+
         no_agg_sql = f"""
         SELECT {select_fields_raw_sql}
-        FROM calls_merged_2
-        WHERE calls_merged_2.project_id = {_param_slot(project_param, 'String')}
+        FROM calls_merged
+        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
         {id_mask_sql}
         {id_subquery_sql}
         {where_filter_sql}
-        {order_by_sql}
+        {order_by_sql_no_agg}
         {limit_sql}
         {offset_sql}
         """
-
-        print(">>>>> NO AGG SQL <<<<<\n")
-        print(no_agg_sql)
-        print("\n\n")
-
-        logger.info(">>>>> NO AGG SQL <<<<<\n", extra={"no_agg_sql": no_agg_sql})
+        if no_agg:
+            return _safely_format_sql(no_agg_sql)
 
         return _safely_format_sql(raw_sql)
 

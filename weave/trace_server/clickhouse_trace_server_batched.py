@@ -342,6 +342,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
+        print(">>>>> SQL <<<<<\n")
+        print(cq.as_sql(pb))
+        print("\n\n")
+        logger.info("nooooooooooooooooooooooo aggggg", extra={"sql": cq.as_sql(pb)})
+
         raw_res = self._query_stream(
             cq.as_sql(pb),
             pb.get_params(),
