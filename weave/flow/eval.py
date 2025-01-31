@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, TypedDict, Union
 
 from pydantic import PrivateAttr
 from rich import print
@@ -52,6 +52,16 @@ def default_evaluation_display_name(call: Call) -> str:
 
 class EvaluationResults(Object):
     rows: weave.Table
+
+
+class PredictionResult(TypedDict):
+    output_key: str
+    model_call: Optional[Call]
+    model_latency: float
+
+
+class ScoreResult(TypedDict):
+    scores: dict[str, Any]
 
 
 @register_object
@@ -142,36 +152,56 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
-    @weave.op()
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+    # @weave.op
+    async def predict_one(
+        self, model: Union[Op, Model], example: dict
+    ) -> PredictionResult:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input
         )
-
         if isinstance(apply_model_result, ApplyModelError):
-            return {
-                self._output_key: None,
-                "scores": {},
-                "model_latency": apply_model_result.model_latency,
-            }
+            return PredictionResult(
+                output_key=self._output_key,
+                model_call=None,
+                model_latency=apply_model_result.model_latency,
+            )
+        return PredictionResult(
+            output_key=self._output_key,
+            model_call=apply_model_result.model_call,
+            model_latency=apply_model_result.model_latency,
+        )
 
-        model_output = apply_model_result.model_output
-        model_call = apply_model_result.model_call
-        model_latency = apply_model_result.model_latency
-
+    # @weave.op
+    async def score_one(
+        self, example: dict, prediction: PredictionResult
+    ) -> ScoreResult:
         scores = {}
-        if scorers := self.scorers:
-            for scorer in scorers:
+        model_call = prediction.get("model_call")
+
+        if not self.scorers:
+            return scores
+
+        for scorer in self.scorers:
+            attrs = get_scorer_attributes(scorer)
+            name = attrs.scorer_name
+
+            res = None
+            if model_call:
                 apply_scorer_result = await model_call.apply_scorer(scorer, example)
-                result = apply_scorer_result.result
-                scorer_attributes = get_scorer_attributes(scorer)
-                scorer_name = scorer_attributes.scorer_name
-                scores[scorer_name] = result
+                res = apply_scorer_result.result
+
+            scores[name] = res
+        return scores
+
+    @weave.op()
+    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+        predict_res = await self.predict_one(model, example)
+        score_res = await self.score_one(example, predict_res)
 
         return {
-            self._output_key: model_output,
-            "scores": scores,
-            "model_latency": model_latency,
+            self._output_key: predict_res["model_call"].output,
+            "scores": score_res,
+            "model_latency": predict_res["model_latency"],
         }
 
     @weave.op()
