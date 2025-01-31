@@ -160,14 +160,13 @@ class Evaluation(Object):
             model, example, self.preprocess_model_input
         )
         if isinstance(apply_model_result, ApplyModelError):
-            return PredictionResult(
-                output_key=self._output_key,
-                model_call=None,
-                model_latency=apply_model_result.model_latency,
-            )
+            model_call = None
+        else:
+            model_call = apply_model_result.model_call
+
         return PredictionResult(
             output_key=self._output_key,
-            model_call=apply_model_result.model_call,
+            model_call=model_call,
             model_latency=apply_model_result.model_latency,
         )
 
@@ -176,7 +175,7 @@ class Evaluation(Object):
         self, example: dict, prediction: PredictionResult
     ) -> ScoreResult:
         scores = {}
-        model_call = prediction.get("model_call")
+        model_call = prediction["model_call"]
 
         if not self.scorers:
             return scores
@@ -206,67 +205,56 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
-        eval_table_rows = list(eval_table.rows)
-        cols = transpose(eval_table_rows)
+        cols = transpose(eval_table.rows)
         summary = {}
 
         for name, vals in cols.items():
-            if name == "scores":
-                if scorers := self.scorers:
-                    for scorer in scorers:
-                        scorer_attributes = get_scorer_attributes(scorer)
-                        scorer_name = scorer_attributes.scorer_name
-                        summarize_fn = scorer_attributes.summarize_fn
-                        scorer_stats = transpose(vals)
-                        score_table = scorer_stats[scorer_name]
-                        scored = summarize_fn(score_table)
-                        summary[scorer_name] = scored
-            else:
-                model_output_summary = auto_summarize(vals)
-                if model_output_summary:
-                    summary[name] = model_output_summary
+            if name == "scores" and self.scorers:
+                scorer_stats = transpose(vals)
+                for scorer in self.scorers:
+                    attrs = get_scorer_attributes(scorer)
+                    score_table = scorer_stats[attrs.scorer_name]
+                    summary[attrs.scorer_name] = attrs.summarize_fn(score_table)
+
+            elif model_output_summary := auto_summarize(vals):
+                summary[name] = model_output_summary
+
         return summary
 
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
-        eval_rows = []
 
         async def eval_example(example: dict) -> dict:
             try:
-                eval_row = await self.predict_and_score(model, example)
-            except OpCallError as e:
-                raise e
+                return await self.predict_and_score(model, example)
+            except OpCallError:
+                raise
             except Exception:
                 print("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
-            return eval_row
 
-        n_complete = 0
-        # with console.status("Evaluating...") as status:
-        dataset = self.dataset
-        _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
+        trial_rows = list(self.dataset) * self.trials
+        eval_rows = []
+
+        async for _, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
-            n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
+            print(f"Evaluated {len(eval_rows) + 1} of {len(trial_rows)} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
-            else:
-                eval_row["scores"] = eval_row.get("scores", {})
-            if self.scorers:
-                for scorer in self.scorers:
-                    scorer_attributes = get_scorer_attributes(scorer)
-                    scorer_name = scorer_attributes.scorer_name
-                    if scorer_name not in eval_row["scores"]:
-                        eval_row["scores"][scorer_name] = {}
+            eval_row.setdefault("scores", {})
+
+            if not self.scorers:
+                continue
+            for scorer in self.scorers:
+                attrs = get_scorer_attributes(scorer)
+                name = attrs.scorer_name
+                eval_row["scores"].setdefault(name, {})
+
             eval_rows.append(eval_row)
+
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
