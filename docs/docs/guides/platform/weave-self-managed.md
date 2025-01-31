@@ -1,6 +1,6 @@
 # W&B Weave Self-managed
 
-This document will guide you to deploy all componentes to enable the Weave in a self-managed environmnent.
+This document will guide you through deploying all components necessary to enable W&B Weave in a self-managed environment.
 
 :::important
 This is a tech-preview and not recommended to be in production.
