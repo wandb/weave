@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 import multiprocessing
@@ -247,7 +245,7 @@ class CoerceError(Exception):
     """An error that occurs when coercing an object to the target type"""
 
 
-def _datasetify(obj: Any) -> Dataset:
+def _datasetify(obj: Any) -> "Dataset":
     from weave.flow.dataset import Dataset
 
     if isinstance(obj, Dataset):
@@ -260,7 +258,7 @@ def _datasetify(obj: Any) -> Dataset:
 
 
 # TODO: Not clear if scorers need a summarize anymore
-def _scorerify(obj: Any) -> Scorer:
+def _scorerify(obj: Any) -> "Scorer":
     if isinstance(obj, Scorer):
         return obj
 
@@ -281,7 +279,7 @@ def _scorerify(obj: Any) -> Scorer:
 
 
 # TODO: These funcs could use better naming/consistency
-def _opify(obj: Any) -> Op:
+def _opify(obj: Any) -> "Op":
     from weave.trace.op import is_op
 
     if is_op(obj):

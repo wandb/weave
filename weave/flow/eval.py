@@ -90,18 +90,18 @@ class ScoringTaskResult(TypedDict):
 ScoreT = TypeVar("ScoreT")
 
 
-class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
+class EvaluationResults2(Object):
     dataset: Dataset  # TODO: Should be Dataset[InputsT]
-    predictions: Sequence[OutputT]
-    scores: Optional[dict[str, list[ScoreT]]] = None
+    predictions: Sequence
+    scores: Optional[dict[str, list]] = None
 
     @classmethod
     def from_calls(
         cls,
-        prediction_calls: Iterable[Call[InputsT, OutputT]],
+        prediction_calls: Iterable[Call],
         *,
         # TODO: some weird typing issue here
-        scorer_calls: Iterable[Call[OutputT, ScoreT]] | None = None,  # type: ignore
+        scorer_calls: Iterable[Call] | None = None,  # type: ignore
     ) -> Self:
         inputs = []
         predictions = []
@@ -112,7 +112,7 @@ class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
             predictions.append(pred_call.output)
 
         if scorer_calls:
-            scores: dict[str, list[ScoreT]] = {}
+            scores: dict[str, list] = {}
             for scorer_call in scorer_calls:
                 name = parse_op_name_from_uri(scorer_call.op_name)
                 scores.setdefault(name, [])
@@ -274,9 +274,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
     ###########################################################
 
     @weave.op
-    async def predict(
-        self, *, model: ModelLike
-    ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
+    async def predict(self, *, model: ModelLike) -> EvaluationResults2:
         preds = [output async for output in self._predict(model)]
         return EvaluationResults2(
             dataset=self.dataset,
@@ -304,9 +302,9 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
     async def score(
         self,
         *,
-        eval_results: EvaluationResults2[InputsT, OutputT, ScoreT],
+        eval_results: EvaluationResults2,
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
-    ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
+    ) -> EvaluationResults2:
         # scores = {}
         # for scorer in self.scorers:
         #     # TODO: This check should be moved somewhere else
@@ -327,7 +325,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
 
     async def _score(
         self,
-        eval_results: EvaluationResults2[InputsT, OutputT, ScoreT],
+        eval_results: EvaluationResults2,
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
     ) -> AsyncGenerator[ScoringTaskResult, None]:
         if not eval_results.predictions:
@@ -380,9 +378,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
 
     # TODO: This doesn't need to be async, but is done for consistency.
     @weave.op
-    async def summarize(
-        self, eval_results: EvaluationResults2[InputsT, OutputT, ScoreT]
-    ) -> dict[str, Any]:
+    async def summarize(self, eval_results: EvaluationResults2) -> dict[str, Any]:
         summary = {}
 
         for name, scores in eval_results.scores.items():
