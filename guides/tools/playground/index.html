@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://www.googletagmanager.com">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-0J3TM1K4Z4"></script>
 <script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","G-0J3TM1K4Z4",{anonymize_ip:!0})</script><link rel="stylesheet" href="/assets/css/styles.f68416a1.css">
-<script src="/assets/js/runtime~main.baac94bf.js" defer="defer"></script>
-<script src="/assets/js/main.241f94d2.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.730b94bc.js" defer="defer"></script>
+<script src="/assets/js/main.345b28f6.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();t(null!==e?e:"light")}(),function(){try{const n=new URLSearchParams(window.location.search).entries();for(var[t,e]of n)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script>
@@ -60,7 +60,7 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="prerequisites">Prerequisites<a class="hash-link" aria-label="Direct link to Prerequisites" title="Direct link to Prerequisites" href="/guides/tools/playground#prerequisites">​</a></h2>
 <p>Before you can use Playground, you must <a href="/guides/tools/playground#add-provider-credentials-and-information">add provider credentials</a>, and <a href="/guides/tools/playground#access-the-playground">open the Playground UI</a>.</p>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="add-provider-credentials-and-information">Add provider credentials and information<a class="hash-link" aria-label="Direct link to Add provider credentials and information" title="Direct link to Add provider credentials and information" href="/guides/tools/playground#add-provider-credentials-and-information">​</a></h3>
-<p>Playground currently supports OpenAI, Anthropic, Gemini, Groq, and Amazon Bedrock models.
+<p>Playground currently supports OpenAI, Anthropic, Gemini, Groq, Amazon Bedrock, and Azure models.
 To use one of the available models, add the appropriate information to your team secrets in W&amp;B settings.</p>
 <ul>
 <li>OpenAI: <code>OPENAI_API_KEY</code></li>
@@ -72,6 +72,13 @@ To use one of the available models, add the appropriate information to your team
 <li><code>AWS_ACCESS_KEY_ID</code></li>
 <li><code>AWS_SECRET_ACCESS_KEY</code></li>
 <li><code>AWS_REGION_NAME</code></li>
+</ul>
+</li>
+<li>Azure:<!-- -->
+<ul>
+<li><code>AZURE_API_KEY</code></li>
+<li><code>AZURE_API_BASE</code></li>
+<li><code>AZURE_API_VERSION</code></li>
 </ul>
 </li>
 </ul>
@@ -93,6 +100,7 @@ To use one of the available models, add the appropriate information to your team
 <ul>
 <li><a href="/guides/tools/playground#amazon-bedrock">Amazon Bedrock</a></li>
 <li><a href="/guides/tools/playground#anthropic">Anthropic</a></li>
+<li><a href="/guides/tools/playground#azure">Azure</a></li>
 <li><a href="/guides/tools/playground#gemini">Google Gemini</a></li>
 <li><a href="/guides/tools/playground#groq">Groq</a></li>
 <li><a href="/guides/tools/playground#openai">OpenAI</a></li>
@@ -138,6 +146,20 @@ To use one of the available models, add the appropriate information to your team
 <li>claude-3-opus-20240229</li>
 <li>claude-3-sonnet-20240229</li>
 </ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="azure"><a href="/guides/integrations/azure">Azure</a><a class="hash-link" aria-label="Direct link to azure" title="Direct link to azure" href="/guides/tools/playground#azure">​</a></h3>
+<ul>
+<li>azure/o1-mini</li>
+<li>azure/o1-mini-2024-09-12</li>
+<li>azure/o1</li>
+<li>azure/o1-preview</li>
+<li>azure/o1-preview-2024-09-12</li>
+<li>azure/gpt-4o</li>
+<li>azure/gpt-4o-2024-08-06</li>
+<li>azure/gpt-4o-2024-11-20</li>
+<li>azure/gpt-4o-2024-05-13</li>
+<li>azure/gpt-4o-mini</li>
+<li>azure/gpt-4o-mini-2024-07-18</li>
+</ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="google-gemini"><a href="/guides/integrations/google-gemini">Google Gemini</a><a class="hash-link" aria-label="Direct link to google-gemini" title="Direct link to google-gemini" href="/guides/tools/playground#google-gemini">​</a></h3>
 <ul>
 <li>gemini/gemini-1.5-flash-001</li>
@@ -154,6 +176,8 @@ To use one of the available models, add the appropriate information to your team
 <li>gemini/gemini-1.5-pro-latest</li>
 <li>gemini/gemini-1.5-pro</li>
 <li>gemini/gemini-pro</li>
+<li>gemini/gemini-2.0-flash-exp</li>
+<li>gemini/gemini-2.0-flash-thinking-exp</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="groq"><a href="/guides/integrations/groq">Groq</a><a class="hash-link" aria-label="Direct link to groq" title="Direct link to groq" href="/guides/tools/playground#groq">​</a></h3>
 <ul>
@@ -190,6 +214,9 @@ To use one of the available models, add the appropriate information to your team
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="xai">X.AI<a class="hash-link" aria-label="Direct link to X.AI" title="Direct link to X.AI" href="/guides/tools/playground#xai">​</a></h3>
 <ul>
 <li>xai/grok-beta</li>
+<li>xai/grok-2-1212</li>
+<li>xai/grok-2</li>
+<li>xai/grok-2-latest</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="adjust-llm-parameters">Adjust LLM parameters<a class="hash-link" aria-label="Direct link to Adjust LLM parameters" title="Direct link to Adjust LLM parameters" href="/guides/tools/playground#adjust-llm-parameters">​</a></h2>
 <p>You can experiment with different parameter values for your selected model. To adjust parameters, do the following:</p>
@@ -209,7 +236,7 @@ To use one of the available models, add the appropriate information to your team
 <li>Click <strong>Chat settings</strong> to close the settings dropdown and save your changes.</li>
 </ol>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="retry-edit-and-delete-messages">Retry, edit, and delete messages<a class="hash-link" aria-label="Direct link to Retry, edit, and delete messages" title="Direct link to Retry, edit, and delete messages" href="/guides/tools/playground#retry-edit-and-delete-messages">​</a></h2>
-<p>With Playground, you can retry, edit, and delete messages. To use this feature,  hover over the message you want to edit, retry, or delete. Three buttons display: <strong>Delete</strong>, <strong>Edit</strong>, and <strong>Retry</strong>.</p>
+<p>With Playground, you can retry, edit, and delete messages. To use this feature, hover over the message you want to edit, retry, or delete. Three buttons display: <strong>Delete</strong>, <strong>Edit</strong>, and <strong>Retry</strong>.</p>
 <ul>
 <li><strong>Delete</strong>: Remove the message from the chat.</li>
 <li><strong>Edit</strong>: Modify the message content.</li>
@@ -243,6 +270,6 @@ To use one of the available models, add the appropriate information to your team
 <ol>
 <li>In the Playground UI, open the settings sidebar if it is not already open.</li>
 <li>Adjust the <strong>Number of trials</strong>.</li>
-</ol></div></div></div><div class="row"><div class="col col--12"><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col"><a href="https://github.com/wandb/weave/blob/master/docs/docs/guides/tools/playground.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"><span class="theme-last-updated">Last updated<!-- --> on <b><time datetime="2025-01-31T22:13:55.000Z" itemprop="dateModified">Jan 31, 2025</time></b></span></div></div></footer></div></div></article><div class="row"><div class="col col--12"><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/guides/tools/comparison"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Comparison</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/guides/core-types/media"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Logging media</div></a></nav></div></div></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#features">Features</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#prerequisites">Prerequisites</a><ul><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-provider-credentials-and-information">Add provider credentials and information</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#access-the-playground">Access the Playground</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#select-an-llm">Select an LLM</a><ul><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#amazon-bedrock">Amazon Bedrock</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#anthropic">Anthropic</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#google-gemini">Google Gemini</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#groq">Groq</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#openai">OpenAI</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#xai">X.AI</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#adjust-llm-parameters">Adjust LLM parameters</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-a-function">Add a function</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#retry-edit-and-delete-messages">Retry, edit, and delete messages</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-a-new-message">Add a new message</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#compare-llms">Compare LLMs</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#adjust-the-number-of-trials">Adjust the number of trials</a></li></ul></div></div></div></div></main></div></div></div><footer class="footer"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Made with ❤️ by Weights & Biases</div></div></div></footer></div>
+</ol></div></div></div><div class="row"><div class="col col--12"><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col"><a href="https://github.com/wandb/weave/blob/master/docs/docs/guides/tools/playground.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"><span class="theme-last-updated">Last updated<!-- --> on <b><time datetime="2025-01-31T23:53:38.000Z" itemprop="dateModified">Jan 31, 2025</time></b></span></div></div></footer></div></div></article><div class="row"><div class="col col--12"><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/guides/tools/comparison"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Comparison</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/guides/core-types/media"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Logging media</div></a></nav></div></div></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#features">Features</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#prerequisites">Prerequisites</a><ul><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-provider-credentials-and-information">Add provider credentials and information</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#access-the-playground">Access the Playground</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#select-an-llm">Select an LLM</a><ul><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#amazon-bedrock">Amazon Bedrock</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#anthropic">Anthropic</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#azure">Azure</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#google-gemini">Google Gemini</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#groq">Groq</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#openai">OpenAI</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#xai">X.AI</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#adjust-llm-parameters">Adjust LLM parameters</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-a-function">Add a function</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#retry-edit-and-delete-messages">Retry, edit, and delete messages</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#add-a-new-message">Add a new message</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#compare-llms">Compare LLMs</a></li><li><a class="table-of-contents__link toc-highlight" href="/guides/tools/playground#adjust-the-number-of-trials">Adjust the number of trials</a></li></ul></div></div></div></div></main></div></div></div><footer class="footer"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Made with ❤️ by Weights & Biases</div></div></div></footer></div>
 </body>
 </html>
