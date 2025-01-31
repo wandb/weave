@@ -8,7 +8,6 @@ import {toast} from 'react-toastify';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
-import {Pill} from '../../../../Tag/Pill';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowCurrentRouteContext} from '../context';
@@ -171,23 +170,23 @@ export const DatasetVersionPage: React.FC<{
           <Tooltip
             title={`${maybePluralize(Number(addedCountStr), 'row')} added`}
             {...TOOLTIP_PROPS}>
-            <div className="flex items-center gap-1 text-xs font-semibold text-green-600">
-            <Icon name="add-new" width={12} height={12} />
-            <span>{addedCountStr}</span>
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="add-new" width={12} height={12} />
+              <span>{addedCountStr}</span>
             </div>
           </Tooltip>
           <Tooltip
             title={`${maybePluralize(Number(deletedCountStr), 'row')} deleted`}
             {...TOOLTIP_PROPS}>
-            <div className="flex items-center gap-1 text-xs font-semibold text-red-600">
-            <Icon name="remove" width={12} height={12} />
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="remove" width={12} height={12} />
               <span>{deletedCountStr}</span>
             </div>
           </Tooltip>
           <Tooltip
             title={`${maybePluralize(Number(editCountStr), 'row')} edited`}
             {...TOOLTIP_PROPS}>
-            <div className="flex items-center gap-1 text-xs font-semibold text-blue-600">
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
               <Icon name="pencil-edit" width={12} height={12} />
               <span>{editCountStr}</span>
             </div>
@@ -234,7 +233,7 @@ export const DatasetVersionPage: React.FC<{
       headerContent={
         <Tailwind>
           <div className="flex justify-between">
-            <div className="grid auto-cols-max grid-flow-col gap-[16px] text-[14px] overflow-x-auto">
+            <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
               <div className="block">
                 <p className="text-moon-500">Name</p>
                 <ObjectVersionsLink
@@ -299,67 +298,71 @@ export const DatasetVersionPage: React.FC<{
           </div>
         </Tailwind>
       }
-      tabs={!isEditing ? [
-        {
-          label: 'Rows',
-          content: (
-            <ScrollableTabContent sx={{p: 0}}>
-              <Box sx={{flex: '0 0 auto', height: '100%'}}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <EditableDatasetView
-                        isEditing={isEditing}
-                        datasetObject={objectVersion.val}
+      tabs={
+        !isEditing
+          ? [
+              {
+                label: 'Rows',
+                content: (
+                  <ScrollableTabContent sx={{p: 0}}>
+                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <EditableDatasetView
+                              isEditing={isEditing}
+                              datasetObject={objectVersion.val}
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+              {
+                label: 'Use',
+                content: (
+                  <ScrollableTabContent>
+                    <Tailwind>
+                      <TabUseDataset
+                        name={objectName}
+                        uri={refUri}
+                        versionIndex={objectVersionIndex}
                       />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
-                )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Use',
-          content: (
-            <ScrollableTabContent>
-              <Tailwind>
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              </Tailwind>
-            </ScrollableTabContent>
-          ),
-        },
-      ] : [
-        {
-          label: 'Editing',
-          content: (
-            <ScrollableTabContent sx={{p: 0}}>
-              <Box sx={{flex: '0 0 auto', height: '100%'}}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <EditableDatasetView
-                        isEditing={isEditing}
-                        datasetObject={objectVersion.val}
-                      />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
-                )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        }
-      ]}
+                    </Tailwind>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : [
+              {
+                label: 'Editing',
+                content: (
+                  <ScrollableTabContent sx={{p: 0}}>
+                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <EditableDatasetView
+                              isEditing={isEditing}
+                              datasetObject={objectVersion.val}
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+      }
     />
   );
 };

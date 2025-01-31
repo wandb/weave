@@ -557,8 +557,8 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '34px',
-              }
-            }
+              },
+            },
           },
           // Removed default MUI blue from editing cell
           '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {

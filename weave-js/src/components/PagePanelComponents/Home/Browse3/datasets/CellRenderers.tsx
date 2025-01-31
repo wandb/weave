@@ -149,7 +149,7 @@ export const CellViewingRenderer: React.FC<
             '&:hover': {
               borderLeft: '1px solid #DFE0E2',
               borderRight: '1px solid #DFE0E2',
-            }
+            },
           }}>
           <Icon
             name={value ? 'checkmark' : 'close'}
