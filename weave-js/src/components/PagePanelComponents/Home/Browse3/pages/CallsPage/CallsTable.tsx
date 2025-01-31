@@ -921,7 +921,7 @@ export const CallsTable: FC<{
         disableColumnResize={false}
         // ColumnSelector is definitely useful
         disableColumnSelector={false}
-        disableMultipleColumnsSorting={true}
+        disableMultipleColumnsSorting={false}
         // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
