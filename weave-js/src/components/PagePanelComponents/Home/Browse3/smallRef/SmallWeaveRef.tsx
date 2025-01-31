@@ -1,34 +1,22 @@
-import {getTypeName, Type} from '@wandb/weave/core';
+/**
+ * Display a link to a Weave object.
+ */
+
+import React from 'react';
+
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
   ObjectRef,
-  refUri,
   WeaveObjectRef,
-} from '@wandb/weave/react';
-import React, {FC} from 'react';
-
+} from '../../../../../react';
 import {IconName, IconNames} from '../../../../Icon';
+import {LoadingDots} from '../../../../LoadingDots';
+import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
-import {Link} from '../pages/common/Links';
 import {useWFHooks} from '../pages/wfReactInterface/context';
-import {isObjDeleteError} from '../pages/wfReactInterface/utilities';
-import {
-  ObjectVersionKey,
-  OpVersionKey,
-} from '../pages/wfReactInterface/wfDataModelHooksInterface';
-import {SmallRefBox} from './SmallRefBox';
+import {SmallRefLoaded} from './SmallRefLoaded';
 import {WFDBTableType} from './types';
-
-const getRootType = (t: Type): Type => {
-  if (
-    (t as any)._base_type != null &&
-    (t as any)._base_type?.type !== 'Object'
-  ) {
-    return getRootType((t as any)._base_type);
-  }
-  return t;
-};
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
@@ -67,29 +55,51 @@ export const objectRefDisplayName = (
   throw new Error('Unknown ref type');
 };
 
-export const SmallWeaveRef: FC<{
+// TODO: Unify with OBJECT_ICONS in ObjectVersionPage
+const ICON_MAP: Record<string, IconName> = {
+  ActionSpec: IconNames.RocketLaunch,
+  AnnotationSpec: IconNames.ForumChatBubble,
+  Dataset: IconNames.Table,
+  Evaluation: IconNames.BaselineAlt,
+  Leaderboard: IconNames.BenchmarkSquare,
+  List: IconNames.List, // TODO: Not sure how you get this type
+  Model: IconNames.Model,
+  Op: IconNames.JobProgramCode,
+  Prompt: IconNames.ForumChatBubble,
+  Scorer: IconNames.TypeNumberAlt,
+};
+
+const getObjectVersionLabel = (
+  objRef: ObjectRef,
+  versionIndex: number
+): string => {
+  let label = objRef.artifactName + ':';
+  if (versionIndex >= 0) {
+    label += 'v' + versionIndex;
+  } else {
+    label += objRef.artifactVersion.slice(0, 6);
+  }
+  if (objRef.artifactRefExtra) {
+    label += '/' + objRef.artifactRefExtra;
+  }
+  return label;
+};
+
+type SmallWeaveRefProps = {
   objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
-}> = ({objRef, wfTable, iconOnly = false}) => {
-  const {
-    useObjectVersion,
-    useOpVersion,
-    derived: {useRefsType},
-  } = useWFHooks();
+};
 
-  let objVersionKey: ObjectVersionKey | null = null;
-  let opVersionKey: OpVersionKey | null = null;
-
-  if (objRef.weaveKind === 'op') {
-    opVersionKey = {
-      entity: objRef.entityName,
-      project: objRef.projectName,
-      opId: objRef.artifactName,
-      versionHash: objRef.artifactVersion,
-    };
-  } else {
-    objVersionKey = {
+export const SmallWeaveRef = ({
+  objRef,
+  wfTable,
+  iconOnly = false,
+}: SmallWeaveRefProps) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const {useObjectVersion} = useWFHooks();
+  const objectVersion = useObjectVersion(
+    {
       scheme: 'weave',
       entity: objRef.entityName,
       project: objRef.projectName,
@@ -98,61 +108,33 @@ export const SmallWeaveRef: FC<{
       versionHash: objRef.artifactVersion,
       path: '',
       refExtra: objRef.artifactRefExtra,
-    };
-  }
-
-  const objectVersion = useObjectVersion(objVersionKey, true);
-  const opVersion = useOpVersion(opVersionKey, true);
-  const isDeleted =
-    isObjDeleteError(objectVersion?.error) ||
-    isObjDeleteError(opVersion?.error);
-  const versionIndex =
-    objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
-
-  const {peekingRouter} = useWeaveflowRouteContext();
-  const refTypeQuery = useRefsType([refUri(objRef)]);
-  const refType: Type =
-    refTypeQuery.loading || refTypeQuery.result == null
-      ? 'unknown'
-      : refTypeQuery.result[0];
-  let rootType = getRootType(refType);
-  if (objRef.scheme === 'weave' && objRef.weaveKind === 'op') {
-    // TODO: Why is this necessary? The type is coming back as `objRef`
-    rootType = {type: 'OpDef'};
-  }
-  const {label} = objectRefDisplayName(objRef, versionIndex);
-
-  const rootTypeName = getTypeName(rootType);
-  let icon: IconName = IconNames.CubeContainer;
-  if (rootTypeName === 'Dataset') {
-    icon = IconNames.Table;
-  } else if (rootTypeName === 'Model') {
-    icon = IconNames.Model;
-  } else if (rootTypeName === 'List') {
-    icon = IconNames.List;
-  } else if (rootTypeName === 'OpDef') {
-    icon = IconNames.JobProgramCode;
-  }
-  const Item = (
-    <SmallRefBox
-      iconName={icon}
-      text={label}
-      iconOnly={iconOnly}
-      isDeleted={isDeleted}
-    />
+    },
+    true
   );
 
-  if (refTypeQuery.loading || isDeleted) {
-    return Item;
+  const error = objectVersion?.error ?? null;
+  if (objectVersion.loading && !error) {
+    return <LoadingDots />;
   }
+
+  // If the query for version number / object type fails,
+  // we will render a generic object icon and digest.
+  const objVersion = objectVersion.result ?? {
+    baseObjectClass: undefined,
+    versionIndex: -1,
+  };
+  const {baseObjectClass, versionIndex} = objVersion;
+  const rootTypeName =
+    objRef.weaveKind === 'op' ? 'Op' : baseObjectClass ?? 'Object';
+
+  const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
+  const url = peekingRouter.refUIUrl(rootTypeName, objRef, wfTable);
+  const label = iconOnly
+    ? undefined
+    : getObjectVersionLabel(objRef, versionIndex);
   return (
-    <Link
-      $variant="secondary"
-      style={{
-        width: '100%',
-      }}
-      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
-      {Item}
-    </Link>
+    <TailwindContents>
+      <SmallRefLoaded icon={icon} label={label} url={url} error={error} />
+    </TailwindContents>
   );
 };
