@@ -854,9 +854,6 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
-        # TODO: Implement, test, and document this.
-        # I think we should just support plain-text names or refs and treat this as an AND
-        # Maybe we should use the star notation like op names? probably not.
         scored_by: list[str] | None = None,
     ) -> CallsIter:
         """
@@ -873,6 +870,9 @@ class WeaveClient:
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
+            scored_by: A list of Scorers to filter by. Multiple scorers are ANDed together. You can
+                pass in just the name (fetching scores for all versions of the scorer) or the
+                full ref URI which will fetch scores for a specific version of the scorer.
 
         Returns:
             An iterator of calls.
