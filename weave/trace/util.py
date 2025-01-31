@@ -198,6 +198,12 @@ def is_async_callable(obj: Any) -> bool:
     return False
 
 
+def parse_op_name_from_uri(uri: str) -> str:
+    *_, name = uri.split("/")
+    name, *_ = name.split(":")
+    return name
+
+
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread

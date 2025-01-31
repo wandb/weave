@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import multiprocessing
@@ -246,6 +248,8 @@ class CoerceError(Exception):
 
 
 def _datasetify(obj: Any) -> Dataset:
+    from weave.flow.dataset import Dataset
+
     if isinstance(obj, Dataset):
         return obj
 

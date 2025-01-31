@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import traceback
 from collections.abc import AsyncGenerator, Iterable, Sequence
 from datetime import datetime
 from typing import (
@@ -15,34 +14,34 @@ from typing import (
 )
 
 from pydantic import PrivateAttr, model_validator
-from rich import print
 from rich.console import Console
-from typing_extensions import NotRequired, Self, TypedDict
+from typing_extensions import Self, TypedDict
 
 import weave
 from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import (
-    ApplyModelError,
     Model,
     PreprocessModelInput,
-    apply_model_async,
 )
 from weave.flow.obj import Object
-from weave.flow.util import make_memorable_name
+from weave.flow.util import _opify, make_memorable_name
 from weave.scorers import (
     Scorer,
     _has_oldstyle_scorers,
     _validate_scorer_signature,
-    auto_summarize,
-    get_scorer_attributes,
-    transpose,
 )
+from weave.scorers.base_scorer import auto_summarize
+from weave.scorers.classification_scorer import transpose
 from weave.trace.env import get_weave_parallelism
-from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
+from weave.trace.util import (
+    get_callable_name,
+    is_async_callable,
+    parse_op_name_from_uri,
+)
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, InputsT, OutputT, get_ref
 
@@ -71,9 +70,10 @@ ScorerLike = Union[Callable, Op, Scorer]
 ModelLike = Union[Op, Model]
 
 
-class ScoreDict(TypedDict):
-    score: float
-    metadata: NotRequired[dict[str, Any]]
+# TODO: In future, we should enforce that Scorers return this, or something similar
+# class ScoreDict(TypedDict):
+#     score: float
+#     metadata: NotRequired[dict[str, Any]]
 
 
 class ScoringTask(TypedDict, Generic[OutputT]):
@@ -84,7 +84,7 @@ class ScoringTask(TypedDict, Generic[OutputT]):
 
 class ScoringTaskResult(TypedDict):
     name: str
-    score: ScoreDict
+    score: Any
 
 
 ScoreT = TypeVar("ScoreT")
@@ -93,7 +93,7 @@ ScoreT = TypeVar("ScoreT")
 class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
     dataset: Dataset  # TODO: Should be Dataset[InputsT]
     predictions: Sequence[OutputT]
-    scores: Optional[Sequence[dict[str, list[ScoreDict]]]] = None
+    scores: Optional[dict[str, list[ScoreT]]] = None
 
     @classmethod
     def from_calls(
@@ -105,19 +105,24 @@ class EvaluationResults2(Object, Generic[InputsT, OutputT, ScoreT]):
     ) -> Self:
         inputs = []
         predictions = []
-        scores = []
+        scores = None
 
         for pred_call in prediction_calls:
             inputs.append(pred_call.inputs)
             predictions.append(pred_call.output)
 
         if scorer_calls:
+            scores: dict[str, list[ScoreT]] = {}
             for scorer_call in scorer_calls:
-                scores.append(scorer_call.output)
-        else:
-            scores = []
+                name = parse_op_name_from_uri(scorer_call.op_name)
+                scores.setdefault(name, [])
+                scores[name].append(scorer_call.output)
 
-        return cls(dataset=inputs, predictions=predictions, scores=scores)
+        return cls(
+            dataset=Dataset(rows=inputs),
+            predictions=predictions,
+            scores=scores,
+        )
 
 
 @register_object
@@ -271,153 +276,272 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
     async def predict(
         self, *, model: ModelLike
     ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
-        pass
+        preds = [output async for output in self._predict(model)]
+        return EvaluationResults2(
+            dataset=self.dataset,
+            predictions=preds,
+        )
 
     async def _predict(self, model: ModelLike) -> AsyncGenerator[OutputT, None]:
-        pass
+        # TODO: Need opify equivalent for Callables?
+        model = _opify(model)
+
+        async def predict_row(row: InputsT) -> OutputT:
+            if self.preprocess_model_input:
+                row = self.preprocess_model_input(row)
+
+            if is_async_callable(model):
+                return await model(**row)
+            return model(**row)
+
+        async for _, pred in util.async_foreach(
+            self.dataset, predict_row, get_weave_parallelism()
+        ):
+            yield pred
 
     async def score(
         self,
         *,
-        eval_result: EvaluationResults2[InputsT, OutputT, ScoreT],
+        eval_results: EvaluationResults2[InputsT, OutputT, ScoreT],
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
-    ) -> Sequence[dict[str, list[ScoreDict]]]:
-        pass
+    ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
+        scores = {get_callable_name(scorer): [] for scorer in self.scorers}
+        async for res in self._score(eval_results, extra_metadata):
+            scores[res["name"]].append(res["score"])
+        return EvaluationResults2(
+            dataset=eval_results.dataset,
+            predictions=eval_results.predictions,
+            scores=scores,
+        )
 
     async def _score(
         self,
-        *,
-        eval_result: EvaluationResults2[InputsT, OutputT, ScoreT],
+        eval_results: EvaluationResults2[InputsT, OutputT, ScoreT],
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
-    ) -> AsyncGenerator[dict[str, list[ScoreDict]], None]:
-        pass
+    ) -> AsyncGenerator[ScoringTaskResult, None]:
+        if not eval_results.predictions:
+            raise ValueError("No predictions found in eval_result")
+
+        if extra_metadata is None:
+            extra_metadata = [{} for _ in range(len(eval_results.predictions))]
+
+        if (
+            not len(eval_results.predictions)
+            == len(self.dataset)
+            == len(extra_metadata)
+        ):
+            raise ValueError(
+                "Mismatch in number of predictions, dataset, and extra_metadata"
+            )
+
+        scoring_tasks = (
+            ScoringTask(scorer=scorer, output=output, metadata=metadata)
+            for output, metadata in zip(eval_results.predictions, extra_metadata)
+            for scorer in self.scorers
+        )
+
+        async def run_scorer(task: ScoringTask) -> ScoringTaskResult:
+            # TODO: Currently we assume the scorer can return anything, but this is not
+            # specific enough.  Instead, it should conform to a protocol like
+            # class ScorerProtocol(Generic[OutputT, ScoreT]):
+            #     def score(self, output: OutputT, **kwargs: Any) -> ScoreDict: ...
+            try:
+                if is_async_callable(task["scorer"]):
+                    score = await task["scorer"](task["output"], **task["metadata"])
+                else:
+                    score = task["scorer"](task["output"], **task["metadata"])
+            except Exception as e:
+                score = None
+                metadata = {"error": str(e)}
+            else:
+                metadata = {}
+
+            return ScoringTaskResult(
+                name=get_callable_name(task["scorer"]),
+                score=score,
+                metadata=metadata,
+            )
+
+        async for _, res in util.async_foreach(
+            scoring_tasks, run_scorer, get_weave_parallelism()
+        ):
+            yield res
 
     # TODO: This doesn't need to be async, but is done for consistency.
     async def summarize(
-        self, eval_result: EvaluationResults2[InputsT, OutputT, ScoreT]
+        self, eval_results: EvaluationResults2[InputsT, OutputT, ScoreT]
     ) -> dict[str, Any]:
-        pass
+        summary = {}
 
-    async def evaluate(self, model: ModelLike) -> dict[str, Any]:
-        pass
+        for name, scores in eval_results.scores.items():
+            summary[name] = auto_summarize(scores)
+
+        input_dataset_rows = list(eval_results.dataset)
+        input_dataset_cols = transpose(input_dataset_rows)
+        for name, val in input_dataset_cols.items():
+            if model_output_summary := auto_summarize(val):
+                summary[name] = model_output_summary
+
+        return summary
+
+    async def evaluate(
+        self,
+        model: Optional[ModelLike] = None,
+        *,
+        predictions: Optional[Sequence[OutputT]] = None,
+        scores: Optional[dict[str, list[ScoreT]]] = None,
+    ) -> dict[str, Any]:
+        """Conduct an evaluation end to end.
+
+        Evaluations have three phases:
+        1. Predict: Given an input dataset, generate outputs
+        2. Score: Given an input dataset and outputs, generate scores
+        3. Summarize: Given an input dataset, outputs, and scores, generate a summary
+        """
+        if model is None and predictions is None:
+            raise ValueError("Either model or predictions must be provided")
+
+        # Phase 1: Predict
+        if predictions is None:
+            eval_results = await self.predict(model=model)
+        else:
+            eval_results = EvaluationResults2(
+                dataset=self.dataset,
+                predictions=list(predictions),
+            )
+
+        # Phase 2: Score
+        if scores is None:
+            eval_results = await self.score(eval_results=eval_results)
+        else:
+            eval_results = EvaluationResults2(
+                dataset=eval_results.dataset,
+                predictions=eval_results.predictions,
+                scores=scores,
+            )
+
+        # Phase 3: Summarize
+        summary = await self.summarize(eval_results)
+
+        return summary
 
     ###########################################################
 
-    @weave.op()
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
-        apply_model_result = await apply_model_async(
-            model, example, self.preprocess_model_input
-        )
+    # @weave.op()
+    # async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+    #     apply_model_result = await apply_model_async(
+    #         model, example, self.preprocess_model_input
+    #     )
 
-        if isinstance(apply_model_result, ApplyModelError):
-            return {
-                self._output_key: None,
-                "scores": {},
-                "model_latency": apply_model_result.model_latency,
-            }
+    #     if isinstance(apply_model_result, ApplyModelError):
+    #         return {
+    #             self._output_key: None,
+    #             "scores": {},
+    #             "model_latency": apply_model_result.model_latency,
+    #         }
 
-        model_output = apply_model_result.model_output
-        model_call = apply_model_result.model_call
-        model_latency = apply_model_result.model_latency
+    #     model_output = apply_model_result.model_output
+    #     model_call = apply_model_result.model_call
+    #     model_latency = apply_model_result.model_latency
 
-        scores = {}
-        scorers = self._post_init_scorers
+    #     scores = {}
+    #     scorers = self._post_init_scorers
 
-        for scorer in scorers:
-            apply_scorer_result = await model_call.apply_scorer(scorer, example)
-            result = apply_scorer_result.result
-            scorer_attributes = get_scorer_attributes(scorer)
-            scorer_name = scorer_attributes.scorer_name
-            scores[scorer_name] = result
+    #     for scorer in scorers:
+    #         apply_scorer_result = await model_call.apply_scorer(scorer, example)
+    #         result = apply_scorer_result.result
+    #         scorer_attributes = get_scorer_attributes(scorer)
+    #         scorer_name = scorer_attributes.scorer_name
+    #         scores[scorer_name] = result
 
-        return {
-            self._output_key: model_output,
-            "scores": scores,
-            "model_latency": model_latency,
-        }
+    #     return {
+    #         self._output_key: model_output,
+    #         "scores": scores,
+    #         "model_latency": model_latency,
+    #     }
 
-    @weave.op()
-    async def summarize(self, eval_table: EvaluationResults) -> dict:
-        eval_table_rows = list(eval_table.rows)
-        cols = transpose(eval_table_rows)
-        summary = {}
+    # @weave.op()
+    # async def summarize(self, eval_table: EvaluationResults) -> dict:
+    #     eval_table_rows = list(eval_table.rows)
+    #     cols = transpose(eval_table_rows)
+    #     summary = {}
 
-        for name, vals in cols.items():
-            if name == "scores":
-                scorers = self._post_init_scorers
-                for scorer in scorers:
-                    scorer_attributes = get_scorer_attributes(scorer)
-                    scorer_name = scorer_attributes.scorer_name
-                    summarize_fn = scorer_attributes.summarize_fn
-                    scorer_stats = transpose(vals)
-                    score_table = scorer_stats[scorer_name]
-                    scored = summarize_fn(score_table)
-                    summary[scorer_name] = scored
-            else:
-                model_output_summary = auto_summarize(vals)
-                if model_output_summary:
-                    summary[name] = model_output_summary
-        return summary
+    #     for name, vals in cols.items():
+    #         if name == "scores":
+    #             scorers = self._post_init_scorers
+    #             for scorer in scorers:
+    #                 scorer_attributes = get_scorer_attributes(scorer)
+    #                 scorer_name = scorer_attributes.scorer_name
+    #                 summarize_fn = scorer_attributes.summarize_fn
+    #                 scorer_stats = transpose(vals)
+    #                 score_table = scorer_stats[scorer_name]
+    #                 scored = summarize_fn(score_table)
+    #                 summary[scorer_name] = scored
+    #         else:
+    #             model_output_summary = auto_summarize(vals)
+    #             if model_output_summary:
+    #                 summary[name] = model_output_summary
+    #     return summary
 
-    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
-        if not is_valid_model(model):
-            raise ValueError(INVALID_MODEL_ERROR)
-        eval_rows = []
+    # async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
+    #     if not is_valid_model(model):
+    #         raise ValueError(INVALID_MODEL_ERROR)
+    #     eval_rows = []
 
-        async def eval_example(example: dict) -> dict:
-            try:
-                eval_row = await self.predict_and_score(model, example)
-            except OpCallError as e:
-                raise e
-            except Exception:
-                print("Predict and score failed")
-                traceback.print_exc()
-                return {self._output_key: None, "scores": {}}
-            return eval_row
+    #     async def eval_example(example: dict) -> dict:
+    #         try:
+    #             eval_row = await self.predict_and_score(model, example)
+    #         except OpCallError as e:
+    #             raise e
+    #         except Exception:
+    #             print("Predict and score failed")
+    #             traceback.print_exc()
+    #             return {self._output_key: None, "scores": {}}
+    #         return eval_row
 
-        n_complete = 0
-        # with console.status("Evaluating...") as status:
-        dataset = self._post_init_dataset
-        _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
-            if eval_row is None:
-                eval_row = {self._output_key: None, "scores": {}}
-            else:
-                eval_row["scores"] = eval_row.get("scores", {})
-            for scorer in self._post_init_scorers:
-                scorer_attributes = get_scorer_attributes(scorer)
-                scorer_name = scorer_attributes.scorer_name
-                if scorer_name not in eval_row["scores"]:
-                    eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
-        return EvaluationResults(rows=weave.Table(eval_rows))
+    #     n_complete = 0
+    #     # with console.status("Evaluating...") as status:
+    #     dataset = self._post_init_dataset
+    #     _rows = dataset.rows
+    #     trial_rows = list(_rows) * self.trials
+    #     async for example, eval_row in util.async_foreach(
+    #         trial_rows, eval_example, get_weave_parallelism()
+    #     ):
+    #         n_complete += 1
+    #         print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+    #         # status.update(
+    #         #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
+    #         # )
+    #         if eval_row is None:
+    #             eval_row = {self._output_key: None, "scores": {}}
+    #         else:
+    #             eval_row["scores"] = eval_row.get("scores", {})
+    #         for scorer in self._post_init_scorers:
+    #             scorer_attributes = get_scorer_attributes(scorer)
+    #             scorer_name = scorer_attributes.scorer_name
+    #             if scorer_name not in eval_row["scores"]:
+    #                 eval_row["scores"][scorer_name] = {}
+    #         eval_rows.append(eval_row)
+    #     return EvaluationResults(rows=weave.Table(eval_rows))
 
-    @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Op, Model]) -> dict:
-        # The need for this pattern is quite unfortunate and highlights a gap in our
-        # data model. As a user, I just want to pass a list of data `eval_rows` to
-        # summarize. Under the hood, Weave should choose the appropriate storage
-        # format (in this case `Table`) and serialize it that way. Right now, it is
-        # just a huge list of dicts. The fact that "as a user" I need to construct
-        # `weave.Table` at all is a leaky abstraction. Moreover, the need to
-        # construct `EvaluationResults` just so that tracing and the UI works is
-        # also bad. In the near-term, this will at least solve the problem of
-        # breaking summarization with big datasets, but this is not the correct
-        # long-term solution.
-        eval_results = await self.get_eval_results(model)
-        summary = await self.summarize(eval_results)
+    # @weave.op(call_display_name=default_evaluation_display_name)
+    # async def evaluate(self, model: Union[Op, Model]) -> dict:
+    #     # The need for this pattern is quite unfortunate and highlights a gap in our
+    #     # data model. As a user, I just want to pass a list of data `eval_rows` to
+    #     # summarize. Under the hood, Weave should choose the appropriate storage
+    #     # format (in this case `Table`) and serialize it that way. Right now, it is
+    #     # just a huge list of dicts. The fact that "as a user" I need to construct
+    #     # `weave.Table` at all is a leaky abstraction. Moreover, the need to
+    #     # construct `EvaluationResults` just so that tracing and the UI works is
+    #     # also bad. In the near-term, this will at least solve the problem of
+    #     # breaking summarization with big datasets, but this is not the correct
+    #     # long-term solution.
+    #     eval_results = await self.get_eval_results(model)
+    #     summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+    #     print("Evaluation summary", summary)
 
-        return summary
+    #     return summary
 
 
 def evaluate(
