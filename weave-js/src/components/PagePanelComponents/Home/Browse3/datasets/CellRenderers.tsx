@@ -16,9 +16,9 @@ import {TextEditor} from './editors/TextEditor';
 import {EditorMode, EditPopover} from './EditPopover';
 
 export const CELL_COLORS = {
-  DELETED: 'rgba(255, 0, 0, 0.1)',
-  EDITED: 'rgba(0, 128, 128, 0.1)',
-  NEW: 'rgba(0, 255, 0, 0.1)',
+  DELETED: '#FFE6E6', // Red 200
+  EDITED: '#E0EDFE', // Blue 200
+  NEW: '#E4F7EE', // Green 200
   TRANSPARENT: 'transparent',
 } as const;
 
@@ -146,18 +146,14 @@ export const CellViewingRenderer: React.FC<
             transition: 'background-color 0.2s ease',
             '&:hover': {
               backgroundColor: 'rgba(0, 0, 0, 0.08)',
-            },
-            ...(isEditing && {
-              border: '2px solid rgb(77, 208, 225)',
-              backgroundColor: 'rgba(77, 208, 225, 0.2)',
-            }),
+            }
           }}>
           <Icon
             name={value ? 'checkmark' : 'close'}
             height={20}
             width={20}
             style={{
-              color: value ? '#22c55e' : '#ef4444',
+              color: value ? '#00875A' : '#CC2944',
             }}
           />
         </Box>
