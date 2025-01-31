@@ -434,7 +434,7 @@ Finally, if you would like to see all the calls scored by a Scorer, navigate to 
 
 ![Scorer Details Page](./img/scorer_detail_page.png)
 
-Next, click the `View` button to view all the calls scored by your Scorer.
+Next, click the `View Traces` button under `Scores` to view all the calls scored by your Scorer.
 
 ![Filtered Calls to Scorer Version](./img/filtered_calls_to_scorer_version.png)
 
