@@ -262,13 +262,14 @@ With the repositories set up and the `values.yaml` file prepared, the next step 
 ```
 helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
 ```
-* If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments --create-namespace --namespace <NAMESPACE>.
+:::important
+If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
+:::
 
 #### Confirm Clickhouse deployment
 
-```
+```bash
 kubectl get pods -n <NAMESPACE>
-```
 
 ## Deploy Weave
 
