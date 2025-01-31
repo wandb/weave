@@ -8,7 +8,7 @@ To deploy a fully production grade instance, please email `support@wandb.com`.
 W&B strongly recommends using the [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud) option where Weave is Generally Available for production environments.
 :::
 
-One of the key components required to deploy W&B Weave is the ClickHouseDB used by Weave application backend.
+One of the key components required to deploy W&B Weave is the [ClickHouseDB](https://clickhouse.com/) used by Weave application backend.
 
 While the deployment results in a fully functional ClickHouseDB installation, there may be additional measures needed to improve reliability and availability in a fully production-ready environment.
 
@@ -16,12 +16,16 @@ While the deployment results in a fully functional ClickHouseDB installation, th
 
 - W&B Platform installed. For more information, see the [Self-Managed Deployment Guide](https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/)
 - [Bitnami's ClickHouse Helm Chart](https://github.com/bitnami/charts/tree/main/bitnami/clickhouse)
-- An S3 bucket pre-configured for ClickHouse storage. For configuration details, see [Provide S3 Credentials](#provide-s3-credentials).
+- An S3 bucket pre-configured for ClickHouse storage. For configuration details, see [Provide S3 Credentials](#provide-s3-credentials)
 - Kubernetes Cluster Nodes with the following specifications:
   - CPU: 8 cores  
   - RAM: 64 GB  
   - Disk: 200GB+
-A more detailed reference architecture is available here (https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/#models-and-weave)
+- A Weave-enabled license from W&B. To request a license, please reach out to `support@wandb.com`.
+
+:::tip  
+For a more detailed reference architecture, see [https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/](https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/#models-and-weave).
+:::
 
 ## Deploy ClickHouse
 
@@ -35,16 +39,14 @@ The Bitnami Helm chart provides good support for basic ClickHouse functionalitie
 
    `helm repo add bitnami https://charts.bitnami.com/bitnami` 
 
-2. Update the repository
+2. Update the repository:
 
    `helm repo update`
 
 
 ### Create Helm Configuration
 
-Below is an example `values.yaml` file with customizable parameters to suit your needs.
-
-The most critical part of this document is the ClickHouse configuration, which is provided in XML format.
+The most critical part of the Helm configuration is the ClickHouse configuration, which is provided in XML format. Below is an example `values.yaml` file with customizable parameters to suit your needs.
 To make the configuration process easier, we have added comments in the relevant sections using the format `<!-- COMMENT -->`.
 
 Modify the following parameters:
@@ -237,7 +239,7 @@ zookeeper:
 ```
 ### Provide S3 Credentials
 
-You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having Clickhouse fetch the data from environment variables or an EC2 instance:
+You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having ClickHouse fetch the data from environment variables or an EC2 instance:
 
 #### Hardcode the configuration   
    
@@ -248,76 +250,85 @@ Directly include the credentials in the storage configuration:
 <endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
 <access_key_id>xxx</access_key_id>
 <secret_access_key>xxx</secret_access_key>
+```
 
-2. **Using Environment Variables or EC2 Metadata**  
-   Instead of hardcoding credentials, you can enable ClickHouse to fetch them dynamically from environment variables or Amazon EC2 instance metadata:
+#### Use environment variables or EC2 Metadata
 
-   `<use_environment_credentials>true</use_environment_credentials>`  
-   
-   You can find more details on this at [ClickHouse: Separation of Storage and Compute](https://clickhouse.com/docs/en/guides/separation-storage-compute).
+Instead of hardcoding credentials, you can enable ClickHouse to fetch them dynamically from environment variables or Amazon EC2 instance metadata.
 
-### Install ClickHouse
+```plaintext
+<use_environment_credentials>true</use_environment_credentials>
+```  
+
+You can find more details on this at [ClickHouse: Separation of Storage and Compute](https://clickhouse.com/docs/en/guides/separation-storage-compute).
+
+## Install ClickHouse
+
+:::important
+If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
+:::
 
 With the repositories set up and the `values.yaml` file prepared, the next step is to deploy ClickHouse.
 
 ```bash
 helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
-:::important
-If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
-:::
+```
 
-#### Confirm Clickhouse deployment
+## Confirm ClickHouse deployment
+
+Confirm that ClickHouse is deployed using the following command:
 
 ```bash
 kubectl get pods -n <NAMESPACE>
+```
 
 ## Deploy Weave
 
 Weave is already available for automatic deployment via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator). With the W&B Platform installed, the next steps would be as follows:
 
-1. Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform
+1. Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform.
 2. Add the Weave configuration.
 
-### Gather information
+## Gather information
 
-Use Kubernetes service details to configure Weave tracing:
+1. Use Kubernetes service details to configure Weave tracing:
 
-- **Endpoint**: `<release-name>-headless.<namespace>.svc.cluster.local`
-  - Replace `<release-name>` with your Helm release name.
-  - Replace `<namespace>` with your `NAMESPACE`.
-  - **Get the service details:** `kubectl get svc -n <namespace>`
-- **Username**: Set in the `values.yaml`
-- **Password**: Set in the `values.yaml`
+  - **Endpoint**: `<release-name>-headless.<namespace>.svc.cluster.local`
+    - Replace `<release-name>` with your Helm release name
+    - Replace `<namespace>` with your `NAMESPACE`
+    - Get the service details: `kubectl get svc -n <namespace>`
+  - **Username**: Set in the `values.yaml`
+  - **Password**: Set in the `values.yaml`
 
-With this information, update the W&B Platform Custom Resource(CR) by adding the following configuration:
+2. With this information, update the W&B Platform Custom Resource(CR) by adding the following configuration:
 
-```yaml
-apiVersion: apps.wandb.com/v1
-kind: WeightsAndBiases
-metadata:
-  labels:
-    app.kubernetes.io/name: weightsandbiases
-    app.kubernetes.io/instance: wandb
-  name: wandb
-  namespace: default
-spec:
-  values:
-    global:
-    [...]
-      clickhouse:
-        host: <release-name>-headless.<namespace>.svc.cluster.local
-        port: 8123
-        password: <password>
-        user: <username>
-        database: wandb_weave
+    ```yaml
+    apiVersion: apps.wandb.com/v1
+    kind: WeightsAndBiases
+    metadata:
+      labels:
+        app.kubernetes.io/name: weightsandbiases
+        app.kubernetes.io/instance: wandb
+      name: wandb
+      namespace: default
+    spec:
+      values:
+        global:
+        [...]
+          clickhouse:
+            host: <release-name>-headless.<namespace>.svc.cluster.local
+            port: 8123
+            password: <password>
+            user: <username>
+            database: wandb_weave
 
-      weave-trace:
-        enabled: true
-    [...]
-    weave-trace:
-      install: true
-    [...]
-```
+          weave-trace:
+            enabled: true
+        [...]
+        weave-trace:
+          install: true
+        [...]
+    ```
 
 The final configuration may look like the example below:
 
@@ -368,13 +379,9 @@ spec:
       install: true
 ```
 
-With the Custom Resource (CR) prepared, apply the new configuration
+3. With the Custom Resource (CR) prepared, apply the new configuration:
 
-```bash
-kubectl apply -n <NAMESPACE> -f wandb.yaml
-
-:::tip
-For Weave to be functional, you'll need a Weave enabled license from W&B.
-To request a license, please reach out to support@wandb.com
-:::
+    ```bash
+    kubectl apply -n <NAMESPACE> -f wandb.yaml
+    ```
 
