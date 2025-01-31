@@ -1,7 +1,7 @@
 import {Box, Tooltip} from '@mui/material';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {Link, useHistory} from 'react-router-dom';
 import {toast} from 'react-toastify';
 
@@ -60,7 +60,9 @@ export const DatasetVersionPage: React.FC<{
   const {useRootObjectVersions, useRefsData, useTableUpdate, useObjCreate} =
     useWFHooks();
 
-  const [isEditing, setIsEditing] = useState(false);
+  const tableUpdate = useTableUpdate();
+  const objCreate = useObjCreate();
+  const history = useHistory();
 
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -97,20 +99,7 @@ export const DatasetVersionPage: React.FC<{
 
   const originalTableDigest = viewerDataAsObject?.rows?.split('/').pop() ?? '';
 
-  const handleEditClick = useCallback(() => setIsEditing(true), []);
-  const handleCancelClick = useCallback(() => {
-    resetEditState();
-    setIsEditing(false);
-  }, [resetEditState]);
-
-  const tableUpdate = useTableUpdate();
-  const objCreate = useObjCreate();
-
-  const history = useHistory();
-
   const handlePublish = useCallback(async () => {
-    setIsEditing(false);
-
     const tableUpdateSpecs = convertEditsToTableUpdateSpec();
     const tableUpdateResp = await tableUpdate(
       projectId,
@@ -192,28 +181,25 @@ export const DatasetVersionPage: React.FC<{
             </div>
           </Tooltip>
         </div>
-        <Button
-          title="Cancel"
-          tooltip="Cancel"
-          variant="secondary"
-          size="medium"
-          onClick={handleCancelClick}>
-          Cancel
-        </Button>
-        <Button
-          title="Publish"
-          tooltip="Publish"
-          size="medium"
-          variant="primary"
-          icon="checkmark"
-          onClick={handlePublish}
-          disabled={
-            editCountStr === '0' &&
-            deletedCountStr === '0' &&
-            addedCountStr === '0'
-          }>
-          Publish
-        </Button>
+        <div className="flex gap-8">
+          {showDeleteButton && (
+            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+          )}
+          <Button
+            title="Publish"
+            tooltip="Publish"
+            size="medium"
+            variant="primary"
+            icon="checkmark"
+            onClick={handlePublish}
+            disabled={
+              editCountStr === '0' &&
+              deletedCountStr === '0' &&
+              addedCountStr === '0'
+            }>
+            Publish
+          </Button>
+        </div>
       </div>
     );
   };
@@ -279,90 +265,49 @@ export const DatasetVersionPage: React.FC<{
               )}
             </div>
             <div className="ml-auto flex-shrink-0">
-              {isEditing ? (
-                renderEditingControls()
-              ) : (
-                <Button
-                  title="Edit dataset"
-                  tooltip="Edit dataset"
-                  variant="ghost"
-                  size="medium"
-                  icon="pencil-edit"
-                  onClick={handleEditClick}
-                />
-              )}
-              {showDeleteButton && !isEditing && (
-                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
-              )}
+              {renderEditingControls()}
             </div>
           </div>
         </Tailwind>
       }
-      tabs={
-        !isEditing
-          ? [
-              {
-                label: 'Rows',
-                content: (
-                  <ScrollableTabContent sx={{p: 0}}>
-                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
-                      {data.loading ? (
-                        <CenteredAnimatedLoader />
-                      ) : (
-                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                          <CustomWeaveTypeProjectContext.Provider
-                            value={{entity: entityName, project: projectName}}>
-                            <EditableDatasetView
-                              isEditing={isEditing}
-                              datasetObject={objectVersion.val}
-                            />
-                          </CustomWeaveTypeProjectContext.Provider>
-                        </WeaveCHTableSourceRefContext.Provider>
-                      )}
-                    </Box>
-                  </ScrollableTabContent>
-                ),
-              },
-              {
-                label: 'Use',
-                content: (
-                  <ScrollableTabContent>
-                    <Tailwind>
-                      <TabUseDataset
-                        name={objectName}
-                        uri={refUri}
-                        versionIndex={objectVersionIndex}
+      tabs={[
+        {
+          label: 'Rows',
+          content: (
+            <ScrollableTabContent sx={{p: 0}}>
+              <Box sx={{flex: '0 0 auto', height: '100%'}}>
+                {data.loading ? (
+                  <CenteredAnimatedLoader />
+                ) : (
+                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                    <CustomWeaveTypeProjectContext.Provider
+                      value={{entity: entityName, project: projectName}}>
+                      <EditableDatasetView
+                        isEditing={true}
+                        datasetObject={objectVersion.val}
                       />
-                    </Tailwind>
-                  </ScrollableTabContent>
-                ),
-              },
-            ]
-          : [
-              {
-                label: 'Editing',
-                content: (
-                  <ScrollableTabContent sx={{p: 0}}>
-                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
-                      {data.loading ? (
-                        <CenteredAnimatedLoader />
-                      ) : (
-                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                          <CustomWeaveTypeProjectContext.Provider
-                            value={{entity: entityName, project: projectName}}>
-                            <EditableDatasetView
-                              isEditing={isEditing}
-                              datasetObject={objectVersion.val}
-                            />
-                          </CustomWeaveTypeProjectContext.Provider>
-                        </WeaveCHTableSourceRefContext.Provider>
-                      )}
-                    </Box>
-                  </ScrollableTabContent>
-                ),
-              },
-            ]
-      }
+                    </CustomWeaveTypeProjectContext.Provider>
+                  </WeaveCHTableSourceRefContext.Provider>
+                )}
+              </Box>
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Use',
+          content: (
+            <ScrollableTabContent>
+              <Tailwind>
+                <TabUseDataset
+                  name={objectName}
+                  uri={refUri}
+                  versionIndex={objectVersionIndex}
+                />
+              </Tailwind>
+            </ScrollableTabContent>
+          ),
+        },
+      ]}
     />
   );
 };
