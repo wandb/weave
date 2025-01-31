@@ -59,11 +59,14 @@ class QueryBuilderField(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        no_agg: bool = False,
     ) -> str:
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, no_agg: bool = False
+    ) -> str:
+        return f"{self.as_sql(pb, table_alias, no_agg=no_agg)} AS {self.field}"
 
 
 class CallsMergedField(QueryBuilderField):
@@ -79,8 +82,11 @@ class CallsMergedAggField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        no_agg: bool = False,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if no_agg:
+            return inner
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
@@ -92,16 +98,19 @@ class CallsMergedDynamicField(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        no_agg: bool = False,
     ) -> str:
-        res = super().as_sql(pb, table_alias)
+        res = super().as_sql(pb, table_alias, no_agg=no_agg)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, no_agg: bool = False
+    ) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
-        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+        return f"{super().as_sql(pb, table_alias, no_agg=no_agg)} AS {self.field}"
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
         extra_path = [*(self.extra_path or [])]
@@ -144,13 +153,16 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        no_agg: bool = False,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
         param_name = pb.add_param(self.feedback_type)
         res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, no_agg: bool = False
+    ) -> str:
         raise NotImplementedError(
             "Feedback fields cannot be selected directly, yet - implement me!"
         )
@@ -178,16 +190,19 @@ class QueryBuilderDynamicField(QueryBuilderField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        no_agg: bool = False,
     ) -> str:
-        res = super().as_sql(pb, table_alias)
+        res = super().as_sql(pb, table_alias, no_agg=no_agg)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, no_agg: bool = False
+    ) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
-        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+        return f"{super().as_sql(pb, table_alias, no_agg=no_agg)} AS {self.field}"
 
 
 def json_dump_field_as_sql(
@@ -249,11 +264,12 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str, no_agg: bool = False) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            no_agg=no_agg,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -649,6 +665,35 @@ class CallsQuery(BaseModel):
         {offset_sql}
         """
 
+        select_fields_raw_sql = ", ".join(
+            field.as_select_sql(pb, table_alias, no_agg=True)
+            for field in self.select_fields
+        )
+
+        where_filter_sql = combine_conditions(
+            having_conditions_sql
+            + [c.as_sql(pb, table_alias, no_agg=True) for c in self.query_conditions],
+            "AND",
+        )
+
+        no_agg_sql = f"""
+        SELECT {select_fields_raw_sql}
+        FROM calls_merged_2
+        WHERE calls_merged_2.project_id = {_param_slot(project_param, 'String')}
+        {id_mask_sql}
+        {id_subquery_sql}
+        {where_filter_sql}
+        {order_by_sql}
+        {limit_sql}
+        {offset_sql}
+        """
+
+        print(">>>>> NO AGG SQL <<<<<\n")
+        print(no_agg_sql)
+        print("\n\n")
+
+        logger.info(">>>>> NO AGG SQL <<<<<\n", extra={"no_agg_sql": no_agg_sql})
+
         return _safely_format_sql(raw_sql)
 
 
@@ -701,6 +746,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    no_agg: bool = False,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -769,7 +815,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            field = structured_field.as_sql(param_builder, table_alias, no_agg=no_agg)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
