@@ -47,38 +47,6 @@ interface CellViewingRendererProps {
   serverValue?: any;
 }
 
-const ShimmerOverlay: React.FC = () => (
-  <Box
-    sx={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background:
-        'linear-gradient(90deg, transparent 0%, rgba(128, 128, 128, 0) 20%, rgba(128, 128, 128, 0.2) 50%, rgba(128, 128, 128, 0) 80%, transparent 100%)',
-      animation: 'shimmer-wobble 2s infinite ease-in-out',
-      '@keyframes shimmer-wobble': {
-        '0%': {
-          transform: 'translateX(-100%) skewX(-15deg)',
-          opacity: 0,
-        },
-        '20%': {
-          opacity: 1,
-        },
-        '80%': {
-          opacity: 1,
-        },
-        '100%': {
-          transform: 'translateX(100%) skewX(-15deg)',
-          opacity: 0,
-        },
-      },
-      pointerEvents: 'none',
-    }}
-  />
-);
-
 export const CellViewingRenderer: React.FC<
   GridRenderCellParams & CellViewingRendererProps
 > = ({
@@ -253,24 +221,17 @@ export const CellViewingRenderer: React.FC<
           textDecoration: isDeleted
             ? DELETED_CELL_STYLES.textDecoration
             : 'none',
-          '@keyframes shimmer': {
-            '0%': {
-              transform: 'translateX(-100%)',
-            },
-            '100%': {
-              transform: 'translateX(100%)',
-            },
-          },
           '&:hover': {
             backgroundColor: 'rgba(0, 0, 0, 0.04)',
           },
           ...(isEditing && {
-            outline: '2px solid rgb(77, 208, 225)',
+            border: '2px solid rgb(77, 208, 225)',
+            backgroundColor: 'rgba(77, 208, 225, 0.2)',
           }),
         }}>
         <span style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
           {value}
-          {isEditing && <ShimmerOverlay />}
+          {isEditing}
         </span>
         {isHovered && (
           <Box
@@ -364,6 +325,8 @@ const NumberEditor: React.FC<{
         alignItems: 'center',
         height: '100%',
         width: '100%',
+        border: '2px solid rgb(77, 208, 225)',
+        backgroundColor: 'rgba(77, 208, 225, 0.2)',
       }}>
       <input
         type="number"
