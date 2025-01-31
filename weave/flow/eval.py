@@ -163,8 +163,7 @@ class Evaluation(Object):
         model_latency = apply_model_result.model_latency
 
         scores = {}
-        scorers = self.scorers
-        if scorers:
+        if scorers := self.scorers:
             for scorer in scorers:
                 apply_scorer_result = await model_call.apply_scorer(scorer, example)
                 result = apply_scorer_result.result
@@ -186,8 +185,7 @@ class Evaluation(Object):
 
         for name, vals in cols.items():
             if name == "scores":
-                scorers = self.scorers
-                if scorers:
+                if scorers := self.scorers:
                     for scorer in scorers:
                         scorer_attributes = get_scorer_attributes(scorer)
                         scorer_name = scorer_attributes.scorer_name
