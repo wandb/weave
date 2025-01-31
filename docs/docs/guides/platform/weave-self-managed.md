@@ -259,9 +259,9 @@ Directly include the credentials in the storage configuration:
 ### Install ClickHouse
 
 With the repositories set up and the `values.yaml` file prepared, the next step is to deploy ClickHouse.
-```
+
+```bash
 helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
-```
 :::important
 If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
 :::
