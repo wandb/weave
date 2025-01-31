@@ -1,13 +1,12 @@
 from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING, Any
 
-from pydantic import field_validator
 from typing_extensions import Self
 
-import weave
+from weave.flow.casting import TableLike
 from weave.flow.obj import Object
 from weave.trace.objectify import register_object
-from weave.trace.vals import WeaveObject, WeaveTable
+from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
@@ -47,7 +46,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: weave.Table
+    rows: TableLike
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -75,31 +74,6 @@ class Dataset(Object):
             raise ImportError("pandas is required to use this method")
 
         return pd.DataFrame(self.rows)
-
-    @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> weave.Table:
-        if not isinstance(rows, weave.Table):
-            table_ref = getattr(rows, "table_ref", None)
-            if isinstance(rows, WeaveTable):
-                rows = list(rows)
-            rows = weave.Table(rows)
-            if table_ref:
-                rows.table_ref = table_ref
-        if len(rows.rows) == 0:
-            raise ValueError("Attempted to construct a Dataset with an empty list.")
-        for row in rows.rows:
-            if not isinstance(row, dict):
-                raise TypeError(
-                    "Attempted to construct a Dataset with a non-dict object. Found type: "
-                    + str(type(row))
-                    + " of row: "
-                    + short_str(row)
-                )
-            if len(row) == 0:
-                raise ValueError(
-                    "Attempted to construct a Dataset row with an empty dict."
-                )
-        return rows
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
