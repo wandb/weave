@@ -140,7 +140,6 @@ async def perform_scorer_tests(
     assert call_ids(calls_high_level) == expected_ids
 
     # 3. Query for calls that have been scored by s0:v1
-    # TODO: THIS IS FAILING
     expected_ids = call_ids([call_scored_by_s0_v1])
     calls_low_level = client.server.calls_query(
         CallsQueryReq(
@@ -165,7 +164,6 @@ async def perform_scorer_tests(
     assert call_ids(calls_high_level) == expected_ids
 
     # 5. Query for calls that have been scored by s1:v0
-    # TODO: THIS IS FAILING
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
     calls_low_level = client.server.calls_query(
         CallsQueryReq(

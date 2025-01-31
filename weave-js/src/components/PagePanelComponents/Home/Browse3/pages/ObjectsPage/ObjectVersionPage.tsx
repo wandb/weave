@@ -11,7 +11,10 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
 import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
-import { callQueryFieldForScorerOutput, callQueryFieldForScorerVersion } from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
+import {
+  callQueryFieldForScorerOutput,
+  callQueryFieldForScorerVersion,
+} from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
@@ -238,7 +241,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid-cols-auto grid w-full grid-flow-col gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -299,14 +302,13 @@ const ObjectVersionPageInner: React.FC<{
                         field: callQueryFieldForScorerOutput(objectName),
                         operator: '(any): isNotEmpty',
                       },
-                      // A: this does not work on the backend yet
-                      // B: we probably want both of these buttons
-                      // {
-                      //   id: 1,
-                      //   field: callQueryFieldForScorerVersion(objectName),
-                      //   operator: "(string): equals",
-                      //   value: refUri,
-                      // },
+                      // This second clause makes it version-specific
+                      {
+                        id: 1,
+                        field: callQueryFieldForScorerVersion(objectName),
+                        operator: '(string): equals',
+                        value: refUri,
+                      },
                     ],
                   }}
                 />
