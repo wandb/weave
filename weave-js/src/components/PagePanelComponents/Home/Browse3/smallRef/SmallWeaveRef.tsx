@@ -1,23 +1,24 @@
-import {Box} from '@mui/material';
 import {getTypeName, Type} from '@wandb/weave/core';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
   ObjectRef,
   refUri,
+  WeaveObjectRef,
 } from '@wandb/weave/react';
 import React, {FC} from 'react';
 
-import {hexToRGB, MOON_300} from '../../../../common/css/globals.styles';
-import {Icon, IconName, IconNames} from '../../../Icon';
-import {useWeaveflowRouteContext} from '../Browse3/context';
-import {Link} from '../Browse3/pages/common/Links';
-import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
-import {isObjDeleteError} from '../Browse3/pages/wfReactInterface/utilities';
+import {IconName, IconNames} from '../../../../Icon';
+import {useWeaveflowRouteContext} from '../context';
+import {Link} from '../pages/common/Links';
+import {useWFHooks} from '../pages/wfReactInterface/context';
+import {isObjDeleteError} from '../pages/wfReactInterface/utilities';
 import {
   ObjectVersionKey,
   OpVersionKey,
-} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRefBox} from './SmallRefBox';
+import {WFDBTableType} from './types';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -28,16 +29,6 @@ const getRootType = (t: Type): Type => {
   }
   return t;
 };
-
-type WFDBTableType =
-  | 'Op'
-  | 'OpVersion'
-  | 'Type'
-  | 'TypeVersion'
-  | 'Trace'
-  | 'Call'
-  | 'Object'
-  | 'ObjectVersion';
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
@@ -76,8 +67,8 @@ export const objectRefDisplayName = (
   throw new Error('Unknown ref type');
 };
 
-export const SmallRef: FC<{
-  objRef: ObjectRef;
+export const SmallWeaveRef: FC<{
+  objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
 }> = ({objRef, wfTable, iconOnly = false}) => {
@@ -90,47 +81,31 @@ export const SmallRef: FC<{
   let objVersionKey: ObjectVersionKey | null = null;
   let opVersionKey: OpVersionKey | null = null;
 
-  const isArtifactRef = isWandbArtifactRef(objRef);
-  const isWeaveObjRef = isWeaveObjectRef(objRef);
-
-  if (isArtifactRef) {
-    objVersionKey = {
-      scheme: 'wandb-artifact',
+  if (objRef.weaveKind === 'op') {
+    opVersionKey = {
       entity: objRef.entityName,
       project: objRef.projectName,
+      opId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+    };
+  } else {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
       objectId: objRef.artifactName,
       versionHash: objRef.artifactVersion,
-      path: objRef.artifactPath,
+      path: '',
       refExtra: objRef.artifactRefExtra,
     };
-  } else if (isWeaveObjRef) {
-    if (objRef.weaveKind === 'op') {
-      opVersionKey = {
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        opId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-      };
-    } else {
-      objVersionKey = {
-        scheme: 'weave',
-        entity: objRef.entityName,
-        project: objRef.projectName,
-        weaveKind: objRef.weaveKind,
-        objectId: objRef.artifactName,
-        versionHash: objRef.artifactVersion,
-        path: '',
-        refExtra: objRef.artifactRefExtra,
-      };
-    }
   }
-  const objectVersion = useObjectVersion(objVersionKey);
-  const opVersion = useOpVersion(opVersionKey);
 
+  const objectVersion = useObjectVersion(objVersionKey, true);
+  const opVersion = useOpVersion(opVersionKey, true);
   const isDeleted =
     isObjDeleteError(objectVersion?.error) ||
     isObjDeleteError(opVersion?.error);
-
   const versionIndex =
     objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
@@ -159,42 +134,16 @@ export const SmallRef: FC<{
     icon = IconNames.JobProgramCode;
   }
   const Item = (
-    <Box display="flex" alignItems="center">
-      <Box
-        mr="4px"
-        bgcolor={hexToRGB(MOON_300, 0.48)}
-        sx={{
-          height: '22px',
-          width: '22px',
-          borderRadius: '16px',
-          display: 'flex',
-          flex: '0 0 22px',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-        <Icon name={icon} width={14} height={14} />
-      </Box>
-      {!iconOnly && (
-        <Box
-          sx={{
-            height: '22px',
-            flex: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-            textDecoration: isDeleted ? 'line-through' : 'none',
-          }}>
-          {label}
-        </Box>
-      )}
-    </Box>
+    <SmallRefBox
+      iconName={icon}
+      text={label}
+      iconOnly={iconOnly}
+      isDeleted={isDeleted}
+    />
   );
+
   if (refTypeQuery.loading || isDeleted) {
     return Item;
-  }
-  if (!isArtifactRef && !isWeaveObjRef) {
-    return <div>[Error: non wandb ref]</div>;
   }
   return (
     <Link

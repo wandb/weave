@@ -299,6 +299,7 @@ type Entity implements Node {
   id: ID!
   name: String!
   isTeam: Boolean!
+  project(name: String): Project
   projects(
     before: String
     after: String
