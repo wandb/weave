@@ -273,6 +273,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
 
     ###########################################################
 
+    @weave.op
     async def predict(
         self, *, model: ModelLike
     ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
@@ -299,12 +300,22 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
         ):
             yield pred
 
+    @weave.op
     async def score(
         self,
         *,
         eval_results: EvaluationResults2[InputsT, OutputT, ScoreT],
         extra_metadata: Optional[Sequence[dict[str, Any]]] = None,
     ) -> EvaluationResults2[InputsT, OutputT, ScoreT]:
+        # scores = {}
+        # for scorer in self.scorers:
+        #     # TODO: This check should be moved somewhere else
+        #     if isinstance(scorer, pydantic.BaseModel):
+        #         name = scorer.__class__.__name__
+        #     else:
+        #         name = get_callable_name(scorer)
+        #     scores[name] = []
+
         scores = {get_callable_name(scorer): [] for scorer in self.scorers}
         async for res in self._score(eval_results, extra_metadata):
             scores[res["name"]].append(res["score"])
@@ -368,6 +379,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
             yield res
 
     # TODO: This doesn't need to be async, but is done for consistency.
+    @weave.op
     async def summarize(
         self, eval_results: EvaluationResults2[InputsT, OutputT, ScoreT]
     ) -> dict[str, Any]:
@@ -384,6 +396,7 @@ class Evaluation(Object, Generic[InputsT, OutputT, ScoreT]):
 
         return summary
 
+    @weave.op
     async def evaluate(
         self,
         model: Optional[ModelLike] = None,

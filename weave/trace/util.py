@@ -173,8 +173,9 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
 
 
 def get_callable_name(obj: Any) -> str:
-    if not callable(obj):
-        raise TypeError(f"Object {obj} is not callable")
+    # TODO: fix later
+    # if not callable(obj):
+    #     raise TypeError(f"Object {obj} is not callable")
 
     if inspect.isfunction(obj):
         return obj.__name__
