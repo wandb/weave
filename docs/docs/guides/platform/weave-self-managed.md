@@ -235,18 +235,19 @@ defaultConfigurationOverrides: |
 zookeeper:
   enabled: false
 ```
-#### **Note:** Providing S3 Credentials
+### Provide S3 Credentials
 
-You can specify credentials for accessing an S3 bucket in two ways:
+You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having Clickhouse fetch the data from environment variables or an EC2 instance:
 
-1. **Hardcoded in the Configuration**    
-   Directly include the credentials in the storage configuration:
+#### Hardcode the configuration   
+   
+Directly include the credentials in the storage configuration:
 
-   `<type>s3</type>`
-
-`<endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>`  
-`<access_key_id>xxx</access_key_id>`  
-`<secret_access_key>xxx</secret_access_key>`
+```plaintext
+<type>s3</type>
+<endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
+<access_key_id>xxx</access_key_id>
+<secret_access_key>xxx</secret_access_key>
 
 2. **Using Environment Variables or EC2 Metadata**  
    Instead of hardcoding credentials, you can enable ClickHouse to fetch them dynamically from environment variables or Amazon EC2 instance metadata:
