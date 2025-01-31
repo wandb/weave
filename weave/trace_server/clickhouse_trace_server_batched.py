@@ -288,6 +288,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         pb = ParamBuilder()
         inner_query = cq.as_sql(pb)
+        print(">>>>> STATS SQL <<<<<\n")
+        print(inner_query)
+        print("\n\n")
         raw_res = self._query(
             f"SELECT count() FROM ({inner_query})",
             pb.get_params(),
@@ -1947,8 +1950,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
-        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump") or {}),
-        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump") or {}),
+        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump") or "{}"),
+        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump") or "{}"),
         "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         "summary": make_derived_summary_fields(
             summary=summary or {},
