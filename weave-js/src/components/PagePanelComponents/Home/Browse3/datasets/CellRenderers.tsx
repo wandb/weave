@@ -144,8 +144,11 @@ export const CellViewingRenderer: React.FC<
               : 'none',
             cursor: 'pointer',
             transition: 'background-color 0.2s ease',
+            borderLeft: '1px solid transparent',
+            borderRight: '1px solid transparent',
             '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.08)',
+              borderLeft: '1px solid #DFE0E2',
+              borderRight: '1px solid #DFE0E2',
             }
           }}>
           <Icon
@@ -221,8 +224,11 @@ export const CellViewingRenderer: React.FC<
           textDecoration: isDeleted
             ? DELETED_CELL_STYLES.textDecoration
             : 'none',
+          borderLeft: '1px solid transparent',
+          borderRight: '1px solid transparent',
           '&:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            borderLeft: '1px solid #DFE0E2',
+            borderRight: '1px solid #DFE0E2',
           },
           ...(isEditing && {
             border: '2px solid rgb(77, 208, 225)',
