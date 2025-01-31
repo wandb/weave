@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from typing import Annotated, Any, Union
+
+from pydantic import BeforeValidator
+
+import weave
+from weave.flow.dataset import Dataset
+from weave.scorers.base_scorer import Scorer, _validate_scorer_signature
+from weave.trace.op import Op, as_op, is_op
+
+
+def cast_to_dataset(obj: Any) -> Dataset:
+    if isinstance(obj, Dataset):
+        return obj
+
+    if isinstance(obj, list):
+        return Dataset(rows=obj)
+
+    raise TypeError("Unable to cast to Dataset")
+
+
+def cast_to_scorer(obj: Any) -> Scorer | Op:
+    res: Scorer | Op
+    if isinstance(obj, Scorer):
+        res = obj
+    elif isinstance(obj, type):
+        raise TypeError(
+            f"Scorer {obj.__name__} must be an instance, not a class. Did you instantiate?"
+        )
+    elif callable(obj) and not is_op(obj):
+        res = weave.op(obj)
+    elif is_op(obj):
+        res = as_op(obj)
+    else:
+        raise TypeError("Unable to cast to Scorer")
+
+    _validate_scorer_signature(res)
+
+    return res
+
+
+DatasetLike = Annotated[Dataset, BeforeValidator(cast_to_dataset)]
+ScorerLike = Annotated[Union[Op, Scorer], BeforeValidator(cast_to_scorer)]
