@@ -290,7 +290,7 @@ const ObjectVersionPageInner: React.FC<{
             )}
             {isScorer && (
               <div className="block">
-                <p className="text-moon-500">Score Log</p>
+                <p className="text-moon-500">Scores</p>
                 <CallsLink
                   entity={entityName}
                   project={projectName}

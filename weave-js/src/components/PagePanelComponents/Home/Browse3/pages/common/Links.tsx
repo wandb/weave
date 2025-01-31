@@ -429,7 +429,7 @@ export const CallsLink: React.FC<{
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
-  let label = 'View';
+  let label = 'View Traces';
   if (props.callCount != null) {
     label = props.callCount.toString();
     label += props.countIsLimited ? '+' : '';
