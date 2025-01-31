@@ -1,7 +1,29 @@
 """
-Slack digest tool for GitHub activity reporting.
-Run locally with: `uv run gh_actions/slack_digest.py`
-Or use as a GitHub Action.
+GitHub Activity Digest Generator
+
+This module generates comprehensive activity digests for GitHub repositories, with optional Slack integration.
+It tracks commits, pull requests, and categorizes changes across different areas of the codebase.
+
+Features:
+- Tracks recent commits and pull requests
+- Categorizes changes (docs, tests, server, UI, SDKs, etc.)
+- Formats output for both console and Slack
+- Handles GitHub API rate limiting
+- Supports parallel processing for better performance
+
+Usage:
+    As a script:
+        $ uv run gh_actions/slack_digest.py  # Console output
+        $ uv run gh_actions/slack_digest.py --slack --channel weave-dev-digest  # Slack output
+
+    As a GitHub Action:
+        See .github/workflows/slack-digest.yml
+
+Environment Variables:
+    GITHUB_TOKEN: GitHub API token (required)
+    SLACK_TOKEN: Slack API token (required for Slack output)
+
+Dependencies are managed through the script directive:
 """
 
 # /// script
@@ -11,6 +33,7 @@ Or use as a GitHub Action.
 #   "rich",
 #   "python-dateutil",
 #   "pytz",
+#   "tabulate",
 # ]
 # ///
 
@@ -19,11 +42,13 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from re import Pattern
+from typing import Any, Callable, Protocol
 
 import pytz
 import urllib3
@@ -38,6 +63,7 @@ from rich.progress import (
 )
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from tabulate import tabulate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,39 +88,120 @@ COLORS = [
 
 
 @dataclass
-class ChangeCategories:
-    """Tracks which categories of files were modified."""
+class CategoryRule:
+    """Rule for determining if a file belongs to a category.
 
-    docs: bool = False  # Changes in ./docs
-    server: bool = False  # Changes in ./weave/trace_server
-    ts_sdk: bool = False  # Changes in ./sdks/node
-    tests: bool = False  # Changes in test files
-    ui: bool = (
-        False  # Changes in weave-js/src/components/PagePanelComponents/Home/Browse3
-    )
-    py_sdk: bool = False  # Changes in ./weave (excluding trace_server)
+    Attributes:
+        name: Display name (e.g., "Docs")
+        column_header: Short name for table header (e.g., "📚")
+        emoji: Emoji indicator for visual representation
+        matcher: Rule can be either a regex pattern or a callback function
+    """
+
+    name: str
+    column_header: str
+    emoji: str
+    matcher: Pattern | Callable[[str], bool]
+
+
+# Define all categories with their rules
+CATEGORIES = [
+    CategoryRule(
+        name="Documentation",
+        column_header="Docs",
+        emoji="📚",
+        matcher=re.compile(r"^docs/"),
+    ),
+    CategoryRule(
+        name="Tests",
+        column_header="Tests",
+        emoji="🧪",
+        matcher=lambda path: "test" in path,
+    ),
+    CategoryRule(
+        name="Server",
+        column_header="Server",
+        emoji="🤖",
+        matcher=re.compile(r"^weave/trace_server/"),
+    ),
+    CategoryRule(
+        name="UI",
+        column_header="UI",
+        emoji="🎨",
+        matcher=re.compile(
+            r"^weave-js/src/components/PagePanelComponents/Home/Browse3/"
+        ),
+    ),
+    CategoryRule(
+        name="TypeScript SDK",
+        column_header="TS",
+        emoji="📦",
+        matcher=re.compile(r"^sdks/node/"),
+    ),
+    CategoryRule(
+        name="Python SDK",
+        column_header="Py",
+        emoji="🐍",
+        matcher=lambda path: path.startswith("weave/")
+        and not path.startswith("weave/trace_server/"),
+    ),
+]
 
 
 @dataclass
-class CategoryInfo:
-    """Information about a category of changes."""
+class FileCategories:
+    """Tracks which categories a set of files belongs to.
 
-    emoji: str
-    name: str
-    path: str
+    This class analyzes files against predefined category rules and maintains
+    a mapping of which categories match the files.
 
+    Attributes:
+        matches: Dictionary mapping category names to boolean match results
+    """
 
-# Define categories with their emojis and paths
-CATEGORIES = {
-    "docs": CategoryInfo("📚", "Docs", "./docs"),
-    "tests": CategoryInfo("🧪", "Tests", "test"),
-    "server": CategoryInfo("🤖", "Server", "./weave/trace_server"),
-    "ui": CategoryInfo(
-        "🎨", "UI", "weave-js/src/components/PagePanelComponents/Home/Browse3"
-    ),
-    "ts_sdk": CategoryInfo("📦", "TS SDK", "./sdks/node"),
-    "py_sdk": CategoryInfo("🐍", "Python SDK", "./weave"),
-}
+    matches: dict[str, bool]
+
+    @classmethod
+    def analyze(
+        cls, files: list[Any], categories: list[CategoryRule] = CATEGORIES
+    ) -> FileCategories:
+        """Analyze files against all category rules.
+
+        Args:
+            files: List of GitHub file objects to analyze
+            categories: List of category rules to check against (defaults to CATEGORIES)
+
+        Returns:
+            FileCategories instance with match results
+        """
+        matches = {}
+        paths = {f.filename for f in files}
+
+        for category in categories:
+            matches[category.name] = any(
+                category.matcher.match(path)
+                if isinstance(category.matcher, Pattern)
+                else category.matcher(path)
+                for path in paths
+            )
+
+        return cls(matches)
+
+    def get_emoji(self, category_name: str) -> str:
+        """Get emoji for category if it matches.
+
+        Args:
+            category_name: Name of the category to get emoji for
+
+        Returns:
+            Category emoji if matched, empty string otherwise
+        """
+        if not self.matches.get(category_name):
+            return ""
+        for cat in CATEGORIES:
+            if cat.name == category_name:
+                return cat.emoji
+        return ""
 
 
 class SlackNotifier:
@@ -114,10 +221,10 @@ class SlackNotifier:
         try:
             self.client.chat_postMessage(channel=channel, text=message)
             logger.info(f"Message sent to {channel}")
-            return True
         except SlackApiError as e:
             logger.exception(f"Failed to send message: {e.response['error']}")
             raise
+        return True
 
 
 class GitHubDigest:
@@ -131,7 +238,15 @@ class GitHubDigest:
         branch: str = "master",
         local_mode: bool = True,
     ):
-        """Initialize GitHub digest generator."""
+        """Initialize GitHub digest generator.
+
+        Args:
+            token: GitHub API token
+            repo: Repository name in format 'owner/repo'
+            days: Number of days to look back
+            branch: Branch to analyze
+            local_mode: Whether to show progress bars (True for local runs)
+        """
         # Configure connection pool for parallel requests
         self.pool_manager = urllib3.PoolManager(maxsize=32)
         self.github = Github(token, pool_size=32, retry=3)
@@ -186,88 +301,13 @@ class GitHubDigest:
                 time.sleep(sleep_time)
                 self._rate_limit_remaining = None  # Force a recheck after waiting
 
-    def analyze_paths(self, files) -> ChangeCategories:
+    def analyze_paths(self, files) -> FileCategories:
         """Analyze file paths to determine which categories were modified."""
-        cats = ChangeCategories()
-        paths = {f.filename for f in files}
-
-        for path in paths:
-            if path.startswith("docs/"):
-                cats.docs = True
-            elif path.startswith("weave/trace_server/"):
-                cats.server = True
-            elif path.startswith("sdks/node/"):
-                cats.ts_sdk = True
-            elif "test" in path:
-                cats.tests = True
-            elif path.startswith(
-                "weave-js/src/components/PagePanelComponents/Home/Browse3/"
-            ):
-                cats.ui = True
-            elif path.startswith("weave/") and not path.startswith(
-                "weave/trace_server/"
-            ):
-                cats.py_sdk = True
-
-        return cats
-
-    def get_display_width(self, text: str) -> int:
-        """Get the display width of text, counting our known emojis as double-width."""
-        width = 0
-        # Our known emojis
-        emoji_chars = {"📚", "🤖", "📦", "🧪", "🎨", "🐍"}
-
-        i = 0
-        while i < len(text):
-            # Check for our known emojis first
-            found_emoji = False
-            for emoji in emoji_chars:
-                if text[i:].startswith(emoji):
-                    width += 2  # Emojis take 2 spaces
-                    i += len(emoji)  # Skip the entire emoji
-                    found_emoji = True
-                    break
-
-            if not found_emoji:
-                width += 1
-                i += 1
-
-        return width
-
-    def truncate_text(self, text: str, width: int) -> str:
-        """Truncate text to width, adding ellipsis if needed."""
-        if self.get_display_width(text) <= width:
-            return text
-
-        # Truncate considering emoji widths
-        result = ""
-        current_width = 0
-        i = 0
-        while i < len(text):
-            if current_width >= width - 3:  # Leave room for ellipsis
-                break
-
-            # Check for our known emojis
-            found_emoji = False
-            for emoji in {"📚", "🤖", "📦", "🧪", "🎨", "🐍"}:
-                if text[i:].startswith(emoji):
-                    if current_width + 2 > width - 3:
-                        break
-                    result += emoji
-                    current_width += 2
-                    i += len(emoji)
-                    found_emoji = True
-                    break
-
-            if not found_emoji:
-                result += text[i]
-                current_width += 1
-                i += 1
-
-        return result + "..."
+        return FileCategories.analyze(files)
 
     def format_line_diff(self, additions: int, deletions: int) -> str:
         """Format the line differences in a compact way."""
+
         def format_number(n: int) -> str:
             """Format a number compactly using K/M suffixes."""
             if n >= 1_000_000:
@@ -288,7 +328,7 @@ class GitHubDigest:
         max_workers = min(32, (cpu_count or 1) * 4)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {}
+            futures: dict[Future, Any] = {}
 
             # Submit all items at once, only checking rate limit periodically
             for item in items:
@@ -334,160 +374,167 @@ class GitHubDigest:
 
         return results
 
-    def process_commit(self, commit):
-        """Process a single commit into row data."""
-        date = commit.commit.author.date.strftime("%Y-%m-%d %H:%M")
-        author = commit.author.login if commit.author else "Unknown"
-        message = commit.commit.message.split("\n")[0]
-        stats = commit.stats
-        categories = self.analyze_paths(commit.files)
+    def truncate_title(self, title: str, max_length: int = 64) -> str:
+        """Truncate title to specified length, adding ellipsis if needed."""
+        if len(title) <= max_length:
+            return title
+        return title[: max_length - 3] + "..."
 
+    def _get_base_row_data(self, item: Any, date_field: str) -> dict:
+        """Extract common row data from a GitHub item (commit or PR).
+
+        Args:
+            item: GitHub item (commit or PR)
+            date_field: Name of the date field to use
+
+        Returns:
+            Dictionary containing common row data
+        """
+        date = getattr(item, date_field).strftime("%Y-%m-%d %H:%M")
         return {
             "date": date,
-            "author": author,
-            "message": message,
-            "line_diff": self.format_line_diff(stats.additions, stats.deletions),
-            "files": str(stats.total),
-            "categories": categories,
-            "url": commit.html_url,
+            "line_diff": self.format_line_diff(
+                item.stats.additions, item.stats.deletions
+            ),
+            "files": str(item.stats.total),
+            "url": item.html_url,
         }
+
+    def _create_table_section(
+        self,
+        title: str,
+        items: list,
+        processor: Callable,
+        headers: list[str],
+        description: str,
+    ) -> Section:
+        """Create a table section from items.
+
+        Args:
+            title: Section title
+            items: List of items to process
+            processor: Function to process each item
+            headers: Table headers
+            description: Progress description
+
+        Returns:
+            Formatted Section object
+        """
+        results = self.process_items_parallel(items, processor, description)
+
+        rows = []
+        for processed, error in results:
+            if error is not None:
+                logger.warning(f"Skipping item due to error: {error}")
+                continue
+
+            categories = processed["categories"]
+            row = [
+                processed["date"],
+                processed["author"],
+                processed["message" if "message" in processed else "title"],
+                processed["line_diff"],
+                processed["files"],
+            ]
+            # Add category columns consistently
+            row.extend(categories.get_emoji(cat.name) for cat in CATEGORIES)
+            row.append(processed["url"])
+            rows.append(row)
+
+        return Section(title=title, headers=headers, rows=rows)
+
+    def process_commit(self, commit):
+        """Process a single commit into row data."""
+        base_data = self._get_base_row_data(commit, "commit.author.date")
+        base_data.update(
+            {
+                "author": commit.author.login if commit.author else "Unknown",
+                "message": self.truncate_title(commit.commit.message.split("\n")[0]),
+                "categories": FileCategories.analyze(commit.files),
+            }
+        )
+        return base_data
 
     def process_pr(self, pr):
         """Process a single PR into row data."""
-        date = pr.updated_at.strftime("%Y-%m-%d %H:%M")
-        author = pr.user.login
-        categories = self.analyze_paths(pr.get_files())
-
-        return {
-            "date": date,
-            "author": author,
-            "title": pr.title,
+        base_data = {
+            "date": pr.updated_at.strftime("%Y-%m-%d %H:%M"),
             "line_diff": self.format_line_diff(pr.additions, pr.deletions),
             "files": str(pr.changed_files),
-            "categories": categories,
             "url": pr.html_url,
-            "draft": pr.draft,
         }
+        base_data.update(
+            {
+                "author": pr.user.login,
+                "title": self.truncate_title(pr.title),
+                "categories": self.analyze_paths(pr.get_files()),
+                "draft": pr.draft,
+            }
+        )
+        return base_data
 
-    def format_categories(self, categories: ChangeCategories) -> str:
-        """Format category indicators in a fixed-width space."""
-        indicators = []
-        if categories.docs:   indicators.append("📚")
-        if categories.server: indicators.append("🤖")
-        if categories.ts_sdk: indicators.append("📦")
-        if categories.tests:  indicators.append("🧪")
-        if categories.ui:     indicators.append("🎨")
-        if categories.py_sdk: indicators.append("🐍")
+    def _create_commit_section(self, commits) -> Section:
+        """Create a section for commit information."""
+        headers = ["Date", "Author", "Message", "Line Diff", "Files"]
+        headers.extend(cat.column_header for cat in CATEGORIES)
+        headers.append("Link")
 
-        # Join with no space to save width, since emojis have their own spacing
-        result = "".join(indicators)
-
-        # Ensure we don't exceed the column width
-        if self.get_display_width(result) > 12:  # Categories column width
-            # If too many categories, show first few and add "..."
-            truncated = ""
-            current_width = 0
-            for indicator in indicators:
-                if current_width + 2 > 9:  # Leave room for "..."
-                    truncated += "..."
-                    break
-                truncated += indicator
-                current_width += 2
-            result = truncated
-
-        return result
-
-    def create_commit_table(self, commits, title: str) -> str:
-        """Create an ASCII table for displaying commit information."""
-        # Process commits in parallel
-        results = self.process_items_parallel(
-            commits, self.process_commit, "Processing commits..."
+        return self._create_table_section(
+            title="Recent Commits",
+            items=commits,
+            processor=self.process_commit,
+            headers=headers,
+            description="Processing commits...",
         )
 
-        # Format as ASCII table
-        table = [title, ""]  # Title and blank line
+    def _create_pr_sections(self, prs) -> tuple[Section, Section]:
+        """Create sections for pull requests."""
+        headers = ["Date", "Author", "Title", "Line Diff", "Files"]
+        headers.extend(cat.column_header for cat in CATEGORIES)
+        headers.append("Link")
 
-        # Headers and their widths - adjusted for content
-        headers = ["Date", "Author", "Message", "Line Diff", "Files", "Categories", "Link"]
-        widths = [16, 12, 45, 12, 6, 12, 40]  # Increased Line Diff width to 12
-
-        # Create format strings with proper padding
-        row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
-        sep_format = "|-" + "-|-".join("-" * w for w in widths) + "-|"
-
-        table.append(row_format.format(*headers))
-        table.append(sep_format)
-
-        # Data rows
-        for processed, error in results:
-            if error is not None:
-                logger.warning(f"Skipping commit due to error: {error}")
-                continue
-
-            row = [
-                processed["date"],
-                self.truncate_text(processed["author"], widths[1]),
-                self.truncate_text(processed["message"], widths[2]),
-                processed["line_diff"],
-                processed["files"],
-                self.format_categories(processed["categories"]),
-                self.truncate_text(processed["url"], widths[6]),
-            ]
-            table.append(row_format.format(*row))
-
-        return "\n".join(table)
-
-    def create_pr_tables(self, prs, title_prefix: str) -> tuple[str, str]:
-        """Create ASCII tables for pull requests."""
-        # Process PRs in parallel
+        sorted_prs = sorted(prs, key=lambda x: x.updated_at, reverse=True)
         results = self.process_items_parallel(
-            sorted(prs, key=lambda x: x.updated_at, reverse=True),
-            self.process_pr,
-            "Processing pull requests..."
+            sorted_prs, self.process_pr, "Processing pull requests..."
         )
 
-        # Headers and their widths - adjusted for content
-        headers = ["Date", "Author", "Title", "Line Diff", "Files", "Categories", "Link"]
-        widths = [16, 12, 45, 12, 6, 12, 40]  # Increased Line Diff width to 12
-
-        # Create format strings with proper padding
-        row_format = "| " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
-        sep_format = "|-" + "-|-".join("-" * w for w in widths) + "-|"
-
-        # Create header rows
-        header_row = row_format.format(*headers)
-        separator = sep_format
-
-        # Prepare tables
-        ready_rows = [f"{title_prefix} - Ready for Review", "", header_row, separator]
-        draft_rows = [f"{title_prefix} - In Progress", "", header_row, separator]
-
-        # Process results
+        ready_rows = []
+        draft_rows = []
         for processed, error in results:
             if error is not None:
                 logger.warning(f"Skipping PR due to error: {error}")
                 continue
 
+            categories = processed["categories"]
             row = [
                 processed["date"],
-                self.truncate_text(processed["author"], widths[1]),
-                self.truncate_text(processed["title"], widths[2]),
+                processed["author"],
+                processed["title"],
                 processed["line_diff"],
                 processed["files"],
-                self.format_categories(processed["categories"]),
-                self.truncate_text(processed["url"], widths[6]),
             ]
-            formatted_row = row_format.format(*row)
+            row.extend(categories.get_emoji(cat.name) for cat in CATEGORIES)
+            row.append(processed["url"])
 
             if processed["draft"]:
-                draft_rows.append(formatted_row)
+                draft_rows.append(row)
             else:
-                ready_rows.append(formatted_row)
+                ready_rows.append(row)
 
-        return "\n".join(ready_rows), "\n".join(draft_rows)
+        ready_section = Section(
+            title="Open Pull Requests - Ready for Review",
+            headers=headers,
+            rows=ready_rows,
+        )
 
-    def generate_digest(self) -> str:
-        """Generate a digest of recent GitHub activity."""
+        draft_section = Section(
+            title="Open Pull Requests - In Progress", headers=headers, rows=draft_rows
+        )
+
+        return ready_section, draft_section
+
+    def collect_sections(self) -> list[Section]:
+        """Collect all sections with their data."""
         since_date = datetime.now(pytz.UTC) - timedelta(days=self.days)
 
         try:
@@ -496,59 +543,250 @@ class GitHubDigest:
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
 
             self._handle_rate_limit()
-            prs = [pr for pr in self.repo.get_pulls(state="open")
-                   if pr.updated_at >= since_date]
+            prs = [
+                pr
+                for pr in self.repo.get_pulls(state="open")
+                if pr.updated_at >= since_date
+            ]
 
         except RateLimitExceededException:
             logger.exception("Rate limit exceeded while fetching initial data")
             self._handle_rate_limit()
             # Retry once after waiting
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
-            prs = [pr for pr in self.repo.get_pulls(state="open")
-                   if pr.updated_at >= since_date]
+            prs = [
+                pr
+                for pr in self.repo.get_pulls(state="open")
+                if pr.updated_at >= since_date
+            ]
         except GithubException as e:
             logger.exception(f"GitHub API error: {e}")
             raise
 
-        # Format all content
-        sections = [
-            f"Activity Report for {self.repo.full_name} (Last {self.days} days)",
-            "",
-            self.create_commit_table(commits, "Recent Commits"),
-            "",
-            self.create_pr_tables(prs, "Open Pull Requests")[0],  # Ready PRs
-            "",
-            self.create_pr_tables(prs, "Open Pull Requests")[1],  # Draft PRs
-            "",
-            "Legend: 📚 Docs, 🧪 Tests, 🤖 Server, 🎨 UI, 📦 TS SDK, 🐍 Python SDK"
-        ]
+        # Create header section
+        header = Section(
+            title=f"Activity Report for {self.repo.full_name} (Last {self.days} days)",
+            headers=[],
+            rows=[],
+        )
 
-        return "\n".join(sections)
+        # Create data sections
+        commit_section = self._create_commit_section(commits)
+        ready_prs, draft_prs = self._create_pr_sections(prs)
+
+        # Create legend section
+        legend = Section(
+            title="Legend",
+            headers=[],
+            rows=[],
+            footer="📚 Docs, 🧪 Tests, 🤖 Server, 🎨 UI, 📦 TS SDK, 🐍 Python SDK",
+        )
+
+        return [header, commit_section, ready_prs, draft_prs, legend]
 
 
-def send_digest_to_slack(digest: str, channel: str, slack_token: str):
-    """Send digest to Slack, splitting into appropriate chunks."""
-    MAX_LINES_PER_BLOCK = 23
-    notifier = SlackNotifier(slack_token)
+@dataclass
+class Section:
+    """A section of the digest containing a table and metadata.
 
-    # Split digest into lines
-    lines = digest.split('\n')
+    Attributes:
+        title: Section heading
+        headers: List of column headers
+        rows: List of row data
+        footer: Optional footer text
+    """
 
-    # Process lines in chunks
-    current_chunk = []
-    for line in lines:
-        current_chunk.append(line)
+    title: str
+    headers: list[str]
+    rows: list[list[Any]]
+    footer: str = ""
 
-        # When we hit the size limit or a table boundary, send the chunk
-        if len(current_chunk) >= MAX_LINES_PER_BLOCK or (line.strip() == '' and current_chunk):
-            message = "```\n" + "\n".join(current_chunk) + "\n```"
-            notifier.send_message(channel, message)
-            current_chunk = []
 
-    # Send any remaining lines
-    if current_chunk:
-        message = "```\n" + "\n".join(current_chunk) + "\n```"
-        notifier.send_message(channel, message)
+class DigestFormatter(Protocol):
+    """Protocol for formatting digest sections.
+
+    This protocol defines the interface that all digest formatters must implement
+    to provide consistent output formatting across different output types.
+    """
+
+    def format_section(self, section: Section) -> str:
+        """Format a single section.
+
+        Args:
+            section: Section to format
+
+        Returns:
+            Formatted section string
+        """
+        pass
+
+    def format_digest(self, sections: list[Section]) -> str:
+        """Format the complete digest.
+
+        Args:
+            sections: List of sections to format
+
+        Returns:
+            Complete formatted digest string
+        """
+        pass
+
+
+class TabulateFormatter:
+    """Formats digest sections using tabulate.
+
+    This formatter creates GitHub-flavored markdown tables using the tabulate library.
+    It ensures consistent formatting across all sections while maintaining readability.
+    """
+
+    def format_section(self, section: Section) -> str:
+        """Format a single section using tabulate.
+
+        Args:
+            section: Section to format
+
+        Returns:
+            Formatted section with title, table, and optional footer
+        """
+        table = tabulate(
+            section.rows,
+            headers=section.headers,
+            tablefmt="pipe",  # Use GitHub-style markdown tables
+            numalign="left",  # Left align numbers
+            stralign="left",  # Left align strings
+        )
+        parts = [section.title, "", table]
+        if section.footer:
+            parts.extend(["", section.footer])
+        return "\n".join(parts)
+
+    def format_digest(self, sections: list[Section]) -> str:
+        """Format the complete digest.
+
+        Args:
+            sections: List of sections to format
+
+        Returns:
+            Complete formatted digest as a string
+        """
+        formatted_sections = [self.format_section(section) for section in sections]
+        return "\n\n".join(formatted_sections)
+
+
+class DigestOutput(Protocol):
+    """Protocol for outputting the digest.
+
+    This protocol defines the interface that all output handlers must implement
+    to provide consistent output behavior across different destinations.
+    """
+
+    def send(self, content: str) -> None:
+        """Send the digest to the output destination.
+
+        Args:
+            content: Formatted digest content to send
+
+        Raises:
+            Any implementation-specific exceptions
+        """
+        pass
+
+
+class ConsoleOutput:
+    """Output digest to console using rich formatting."""
+
+    def __init__(self, console: Console = console):
+        """Initialize console output.
+
+        Args:
+            console: Rich console instance for output (defaults to global console)
+        """
+        self.console = console
+
+    def send(self, content: str) -> None:
+        """Send content to console with markdown code block formatting.
+
+        Args:
+            content: Formatted digest content to display
+        """
+        self.console.print("```")
+        self.console.print(content)
+        self.console.print("```")
+
+
+class SlackOutput:
+    """Output digest to Slack, handling message size limits.
+
+    This class handles splitting large messages into appropriate chunks
+    and ensures proper formatting is maintained across message boundaries.
+    """
+
+    def __init__(self, token: str, channel: str, max_lines_per_block: int = 23):
+        """Initialize Slack output handler.
+
+        Args:
+            token: Slack API token
+            channel: Target Slack channel
+            max_lines_per_block: Maximum lines per message block (default: 23)
+        """
+        self.notifier = SlackNotifier(token)
+        self.channel = channel
+        self.MAX_LINES_PER_BLOCK = max_lines_per_block
+
+    def send(self, content: str) -> None:
+        """Send content to Slack, splitting into appropriate chunks.
+
+        The content is split into chunks that respect table boundaries and
+        Slack's message size limits. Tables are wrapped in code blocks for
+        proper formatting.
+
+        Args:
+            content: Formatted digest content to send
+
+        Raises:
+            SlackApiError: If there's an error sending to Slack
+        """
+        lines = content.split("\n")
+        current_chunk: list[str] = []
+        in_table = False
+
+        for line in lines:
+            is_table_line = bool(line.strip()) and line.strip()[0] in "|+-"
+
+            # Start new chunk if:
+            # 1. Current chunk is too long, or
+            # 2. We're transitioning between table and non-table content
+            if len(current_chunk) >= self.MAX_LINES_PER_BLOCK or (
+                current_chunk and is_table_line != in_table
+            ):
+                self._send_chunk(current_chunk, in_table)
+                current_chunk = []
+
+            current_chunk.append(line)
+            in_table = is_table_line
+
+        if current_chunk:
+            self._send_chunk(current_chunk, in_table)
+
+    def _send_chunk(self, lines: list[str], is_table: bool) -> None:
+        """Send a chunk of lines to Slack.
+
+        Args:
+            lines: List of lines to send
+            is_table: Whether the chunk contains table content
+
+        Raises:
+            SlackApiError: If there's an error sending to Slack
+        """
+        if not lines:
+            return
+
+        content = "\n".join(lines)
+        if is_table:
+            content = f"```\n{content}\n```"
+
+        self.notifier.send_message(self.channel, content)
+
 
 def main():
     """Main entry point for both CLI and Action modes."""
@@ -583,24 +821,25 @@ def main():
             repo=args.repo,
             days=args.days,
             branch=args.branch,
-            local_mode=True,  # Always use progress bars
+            local_mode=True,
         )
 
-        message = digest.generate_digest()
+        # Collect and format sections
+        sections = digest.collect_sections()
+        formatter = TabulateFormatter()
+        content = formatter.format_digest(sections)
 
+        # Output the digest
         if args.slack:
-            # Send to Slack in chunks
             slack_token = os.getenv("SLACK_TOKEN")
             if not slack_token:
                 raise ValueError("SLACK_TOKEN environment variable is required")
 
-            send_digest_to_slack(message, args.channel, slack_token)
+            output = SlackOutput(slack_token, args.channel)
+            output.send(content)
         else:
-            # Print to console (default)
-            # Wrap in code block for consistent display
-            console.print("```")
-            console.print(message)
-            console.print("```")
+            output = ConsoleOutput()
+            output.send(content)
 
     except Exception as e:
         logger.exception(f"Error: {str(e)}")
