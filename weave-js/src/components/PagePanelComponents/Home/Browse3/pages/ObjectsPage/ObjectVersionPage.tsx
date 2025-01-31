@@ -11,6 +11,7 @@ import {Timestamp} from '../../../../../Timestamp';
 import {Tooltip} from '../../../../../Tooltip';
 import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {DatasetVersionPage} from '../../datasets/DatasetVersionPage';
+import { callQueryFieldForScorerOutput, callQueryFieldForScorerVersion } from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
@@ -49,7 +50,6 @@ import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
-import { callQueryFieldForScorerOutput } from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -298,6 +298,12 @@ const ObjectVersionPageInner: React.FC<{
                         id: 0,
                         field: callQueryFieldForScorerOutput(objectName),
                         operator: '(any): isNotEmpty',
+                      },
+                      {
+                        id: 1,
+                        field: callQueryFieldForScorerVersion(objectName),
+                        operator: "(string): equals",
+                        value: refUri,
                       },
                     ],
                   }}

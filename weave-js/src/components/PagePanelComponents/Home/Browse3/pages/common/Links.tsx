@@ -432,6 +432,8 @@ export const CallsLink: React.FC<{
   let label = 'View';
   if (props.callCount != null) {
     label = props.callCount.toString();
+    label += props.countIsLimited ? '+' : '';
+    label += maybePluralizeWord(props.callCount, 'call');
   }
   return (
     <Link
@@ -443,10 +445,6 @@ export const CallsLink: React.FC<{
         props.gridFilters
       )}>
       {label}
-      {props.countIsLimited ? '+' : ''}{' '}
-      {props.callCount != null
-        ? maybePluralizeWord(props.callCount, 'call')
-        : 'calls'}
     </Link>
   );
 };
