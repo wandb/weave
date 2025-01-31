@@ -33,7 +33,7 @@ Dependencies are managed through the script directive:
 #   "rich",
 #   "python-dateutil",
 #   "pytz",
-#   "tabulate",
+#   "tabulate[widechars]",
 # ]
 # ///
 
@@ -220,7 +220,8 @@ class SlackNotifier:
         channel = self.validate_channel(channel)
         try:
             self.client.chat_postMessage(channel=channel, text=message)
-            logger.info(f"Message sent to {channel}")
+            print(f"Message sent to {channel}:")
+            print(message)
         except SlackApiError as e:
             logger.exception(f"Failed to send message: {e.response['error']}")
             raise
@@ -380,24 +381,33 @@ class GitHubDigest:
             return title
         return title[: max_length - 3] + "..."
 
-    def _get_base_row_data(self, item: Any, date_field: str) -> dict:
+    def _get_base_row_data(self, item: Any, date_field: str, stats_source: Any = None) -> dict:
         """Extract common row data from a GitHub item (commit or PR).
 
         Args:
             item: GitHub item (commit or PR)
-            date_field: Name of the date field to use
+            date_field: Name of the date field to use, can be a dot-separated path
+            stats_source: Optional separate object to get stats from (for commits)
 
         Returns:
             Dictionary containing common row data
         """
-        date = getattr(item, date_field).strftime("%Y-%m-%d %H:%M")
+        # Handle nested attribute access for date field
+        current = item
+        for attr in date_field.split('.'):
+            current = getattr(current, attr)
+        date = current.strftime("%Y-%m-%d %H:%M")
+
+        # Use stats from stats_source if provided, otherwise from item
+        stats_obj = stats_source if stats_source is not None else item
+
         return {
             "date": date,
             "line_diff": self.format_line_diff(
-                item.stats.additions, item.stats.deletions
+                stats_obj.stats.additions, stats_obj.stats.deletions
             ),
-            "files": str(item.stats.total),
-            "url": item.html_url,
+            "files": str(stats_obj.stats.total),
+            "url": stats_obj.html_url,
         }
 
     def _create_table_section(
@@ -407,6 +417,7 @@ class GitHubDigest:
         processor: Callable,
         headers: list[str],
         description: str,
+        sort_by_date: bool = True,
     ) -> Section:
         """Create a table section from items.
 
@@ -416,6 +427,7 @@ class GitHubDigest:
             processor: Function to process each item
             headers: Table headers
             description: Progress description
+            sort_by_date: Whether to sort rows by date descending (default: True)
 
         Returns:
             Formatted Section object
@@ -441,18 +453,32 @@ class GitHubDigest:
             row.append(processed["url"])
             rows.append(row)
 
+        # Sort rows by date descending if requested
+        if sort_by_date and rows:
+            rows.sort(key=lambda x: x[0], reverse=True)
+
         return Section(title=title, headers=headers, rows=rows)
 
     def process_commit(self, commit):
-        """Process a single commit into row data."""
-        base_data = self._get_base_row_data(commit, "commit.author.date")
-        base_data.update(
-            {
-                "author": commit.author.login if commit.author else "Unknown",
-                "message": self.truncate_title(commit.commit.message.split("\n")[0]),
-                "categories": FileCategories.analyze(commit.files),
-            }
+        """Process a single commit into row data.
+        
+        Args:
+            commit: GitHub Commit object
+            
+        Returns:
+            Dictionary containing processed commit data
+        """
+        # Pass the outer commit object as stats_source since it contains the stats
+        base_data = self._get_base_row_data(
+            commit.commit,  # GitCommit object for author/date
+            "author.date",
+            stats_source=commit  # Outer commit object for stats
         )
+        base_data.update({
+            "author": commit.author.login if commit.author else "Unknown",
+            "message": self.truncate_title(commit.commit.message.split("\n")[0]),
+            "categories": FileCategories.analyze(commit.files),
+        })
         return base_data
 
     def process_pr(self, pr):
@@ -475,7 +501,7 @@ class GitHubDigest:
 
     def _create_commit_section(self, commits) -> Section:
         """Create a section for commit information."""
-        headers = ["Date", "Author", "Message", "Line Diff", "Files"]
+        headers = ["Date Merged", "Author", "Message", "Line Diff", "Files"]
         headers.extend(cat.column_header for cat in CATEGORIES)
         headers.append("Link")
 
@@ -489,10 +515,11 @@ class GitHubDigest:
 
     def _create_pr_sections(self, prs) -> tuple[Section, Section]:
         """Create sections for pull requests."""
-        headers = ["Date", "Author", "Title", "Line Diff", "Files"]
+        headers = ["Last Updated", "Author", "Title", "Line Diff", "Files"]
         headers.extend(cat.column_header for cat in CATEGORIES)
         headers.append("Link")
 
+        # Sort PRs by updated_at descending
         sorted_prs = sorted(prs, key=lambda x: x.updated_at, reverse=True)
         results = self.process_items_parallel(
             sorted_prs, self.process_pr, "Processing pull requests..."
@@ -521,6 +548,10 @@ class GitHubDigest:
             else:
                 ready_rows.append(row)
 
+        # Sort both ready and draft rows by date descending
+        ready_rows.sort(key=lambda x: x[0], reverse=True)
+        draft_rows.sort(key=lambda x: x[0], reverse=True)
+
         ready_section = Section(
             title="Open Pull Requests - Ready for Review",
             headers=headers,
@@ -528,7 +559,9 @@ class GitHubDigest:
         )
 
         draft_section = Section(
-            title="Open Pull Requests - In Progress", headers=headers, rows=draft_rows
+            title="Open Pull Requests - In Progress",
+            headers=headers,
+            rows=draft_rows
         )
 
         return ready_section, draft_section
@@ -574,15 +607,7 @@ class GitHubDigest:
         commit_section = self._create_commit_section(commits)
         ready_prs, draft_prs = self._create_pr_sections(prs)
 
-        # Create legend section
-        legend = Section(
-            title="Legend",
-            headers=[],
-            rows=[],
-            footer="📚 Docs, 🧪 Tests, 🤖 Server, 🎨 UI, 📦 TS SDK, 🐍 Python SDK",
-        )
-
-        return [header, commit_section, ready_prs, draft_prs, legend]
+        return [header, commit_section, ready_prs, draft_prs]
 
 
 @dataclass
