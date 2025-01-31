@@ -147,6 +147,10 @@ export const CellViewingRenderer: React.FC<
             '&:hover': {
               backgroundColor: 'rgba(0, 0, 0, 0.08)',
             },
+            ...(isEditing && {
+              border: '2px solid rgb(77, 208, 225)',
+              backgroundColor: 'rgba(77, 208, 225, 0.2)',
+            }),
           }}>
           <Icon
             name={value ? 'checkmark' : 'close'}
