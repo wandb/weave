@@ -877,7 +877,7 @@ class WeaveClient:
 
         # This logic might be pushed down to the server soon, but for now it lives here:
         if scored_by and len(scored_by) > 0:
-            include_feedback = True  # always include feedback for scored_by
+            include_feedback = True  # always include feedback for scored_by... hmmm, do we really want that?
             exprs = []
             if query is not None:
                 exprs.append(query["$expr"])
