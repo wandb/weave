@@ -8,11 +8,15 @@ import weave
 from weave.flow.dataset import Dataset
 from weave.scorers.base_scorer import Scorer, _validate_scorer_signature
 from weave.trace.op import Op, as_op, is_op
+from weave.trace.vals import WeaveObject
 
 
 def cast_to_dataset(obj: Any) -> Dataset:
     if isinstance(obj, Dataset):
         return obj
+
+    if isinstance(obj, WeaveObject):
+        return Dataset.from_obj(obj)
 
     if isinstance(obj, list):
         return Dataset(rows=obj)
