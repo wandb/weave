@@ -1,0 +1,1 @@
+ALTER TABLE calls_merged DROP PROJECTION IF EXISTS calls_merged_projection;

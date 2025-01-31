@@ -1,0 +1,1 @@
+ALTER TABLE calls_merged MODIFY SETTING min_bytes_for_wide_part = 0;
