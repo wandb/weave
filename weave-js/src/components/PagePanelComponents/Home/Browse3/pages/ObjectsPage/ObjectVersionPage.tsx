@@ -299,12 +299,14 @@ const ObjectVersionPageInner: React.FC<{
                         field: callQueryFieldForScorerOutput(objectName),
                         operator: '(any): isNotEmpty',
                       },
-                      {
-                        id: 1,
-                        field: callQueryFieldForScorerVersion(objectName),
-                        operator: "(string): equals",
-                        value: refUri,
-                      },
+                      // A: this does not work on the backend yet
+                      // B: we probably want both of these buttons
+                      // {
+                      //   id: 1,
+                      //   field: callQueryFieldForScorerVersion(objectName),
+                      //   operator: "(string): equals",
+                      //   value: refUri,
+                      // },
                     ],
                   }}
                 />
