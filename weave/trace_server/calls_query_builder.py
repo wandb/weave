@@ -121,7 +121,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
         """Expected format: `[feedback.type].dot.path`"""
-        regex = re.compile(r"^(\[.+\])\.(.+\..+)$")
+        regex = re.compile(r"^(\[.+\])\.(.+)$")
         match = regex.match(path)
         if not match:
             raise InvalidFieldError(f"Invalid feedback path: {path}")
@@ -129,12 +129,20 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         if feedback_type[0] != "[" or feedback_type[-1] != "]":
             raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
         extra_path = path.split(".")
-        if extra_path[0] != "payload":
-            raise InvalidFieldError(f"Invalid feedback path: {path}")
-        feedback_type = feedback_type[1:-1]
-        return CallsMergedFeedbackPayloadField(
-            field="payload_dump", feedback_type=feedback_type, extra_path=extra_path[1:]
-        )
+        if extra_path[0] == "payload":
+            feedback_type = feedback_type[1:-1]
+            return CallsMergedFeedbackPayloadField(
+                field="payload_dump",
+                feedback_type=feedback_type,
+                extra_path=extra_path[1:],
+            )
+
+        # Commented out, but needed for the versioned feedback query
+        # elif extra_path[0] == "runnable_ref":
+        #     return CallsMergedFeedbackPayloadField(
+        #         field="runnable_ref", feedback_type=feedback_type, extra_path=[]
+        #     )
+        raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:
         return True

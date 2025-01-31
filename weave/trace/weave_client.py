@@ -32,6 +32,7 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.interface_query_builder import exists_expr
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
@@ -49,6 +50,7 @@ from weave.trace.refs import (
     TableRef,
     parse_op_uri,
     parse_uri,
+    string_is_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
@@ -63,7 +65,10 @@ from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -844,6 +849,10 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
+        # TODO: Implement, test, and document this.
+        # I think we should just support plain-text names or refs and treat this as an AND
+        # Maybe we should use the star notation like op names? probably not.
+        scored_by: list[str] | None = None,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -865,6 +874,23 @@ class WeaveClient:
         """
         if filter is None:
             filter = CallsFilter()
+
+        # This logic might be pushed down to the server soon, but for now it lives here:
+        if scored_by:
+            exprs = []
+            if query is not None:
+                exprs.append(query["$expr"])
+            for name in scored_by:
+                if string_is_uri(name):
+                    # TODO: Implement this!!
+                    raise ValueError(f"Cannot filter by specific versions yet: {name}")
+                else:
+                    exprs.append(
+                        exists_expr(
+                            runnable_feedback_output_selector(name)
+                        )
+                    )
+            query = Query.model_validate({"$expr": {"$and": exprs}})
 
         return _make_calls_iterator(
             self.server,
