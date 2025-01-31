@@ -3,8 +3,8 @@
 This install guide outlines the process of deploying all the components necessary to enable W&B Weave in a self-managed environment.
 
 :::important
-Note that, Weave on self-managed is currently in Private Preview (PrPr). 
-To deploy a fully production grade instance, please reach out to support@wandb.com
+Weave on self-managed is currently in Private Preview (PrPr). 
+To deploy a fully production grade instance, please email `support@wandb.com`.
 W&B strongly recommends using the [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud) option where Weave is Generally Available for production environments.
 :::
 
@@ -14,7 +14,7 @@ While the deployment results in a fully functional ClickHouseDB installation, th
 
 ## Requirements
 
-- W&B Platform Installed. For more information, see the [Self-Managed Deployment Guide](https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/)
+- W&B Platform installed. For more information, see the [Self-Managed Deployment Guide](https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/)
 - [Bitnami's ClickHouse Helm Chart](https://github.com/bitnami/charts/tree/main/bitnami/clickhouse)
 - An S3 bucket pre-configured for ClickHouse storage. For configuration details, see [Provide S3 Credentials](#provide-s3-credentials).
 - Kubernetes Cluster Nodes with the following specifications:
@@ -42,16 +42,16 @@ The Bitnami Helm chart provides good support for basic ClickHouse functionalitie
 
 ### Create Helm Configuration
 
-Below is an example values.yaml file with customizable parameters to suit your needs.
+Below is an example `values.yaml` file with customizable parameters to suit your needs.
 
 The most critical part of this document is the ClickHouse configuration, which is provided in XML format.
-To make the configuration process easier, we have added comments in the relevant sections using the format <!-- COMMENT -->.
+To make the configuration process easier, we have added comments in the relevant sections using the format `<!-- COMMENT -->`.
 
-For this setup, we recommend modifying the following parameters:
+Modify the following parameters:
 
-- clusterName
-- auth.username
-- auth.password
+- `clusterName`
+- `auth.username`
+- `auth.password`
 - S3 bucket-related configurations
 
 ```yaml
@@ -287,7 +287,7 @@ Use Kubernetes service details to configure Weave tracing:
   - Replace `<namespace>` with your `NAMESPACE`.
   - **Get the service details:** `kubectl get svc -n <namespace>`
 - **Username**: Set in the `values.yaml`
-- **Password**: Also set in the `values.yaml`
+- **Password**: Set in the `values.yaml`
 
 With this information, update the W&B Platform Custom Resource(CR) by adding the following configuration:
 
@@ -370,7 +370,8 @@ spec:
 
 With the Custom Resource (CR) prepared, apply the new configuration
 
-`kubectl apply -n <NAMESPACE> -f wandb.yaml`
+```bash
+kubectl apply -n <NAMESPACE> -f wandb.yaml
 
 :::tip
 For Weave to be functional, you'll need a Weave enabled license from W&B.
