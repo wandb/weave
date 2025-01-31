@@ -341,6 +341,14 @@ async def evaluate_comprehensively(call):
 
 ### 4. Access Historical Data
 
+TODO:
+* Add how to query a single call's scores from the API
+* Add how to view a single call's scores from UI
+* Add how to get scores back from call query API
+* Add how to view scores in traces table from UI
+* Add how to get all scored calls from the API
+* Add how to view all scored calls from UI
+
 Scorer results are stored with their associated calls and can be accessed through:
 - The Call object's `feedback` field
 - The Weave Dashboard
