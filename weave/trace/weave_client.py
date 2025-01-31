@@ -885,11 +885,7 @@ class WeaveClient:
                     # TODO: Implement this!!
                     raise ValueError(f"Cannot filter by specific versions yet: {name}")
                 else:
-                    exprs.append(
-                        exists_expr(
-                            runnable_feedback_output_selector(name)
-                        )
-                    )
+                    exprs.append(exists_expr(runnable_feedback_output_selector(name)))
             query = Query.model_validate({"$expr": {"$and": exprs}})
 
         return _make_calls_iterator(

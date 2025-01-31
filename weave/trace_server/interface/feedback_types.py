@@ -43,5 +43,6 @@ def feedback_type_is_runnable(feedback_type: str) -> bool:
 def runnable_feedback_selector(name: str) -> str:
     return f"feedback.[{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{name}]"
 
+
 def runnable_feedback_output_selector(name: str) -> str:
     return f"{runnable_feedback_selector(name)}.payload.output"
