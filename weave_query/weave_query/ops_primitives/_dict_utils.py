@@ -22,7 +22,12 @@ def tag_aware_dict_val_for_escaped_key(
 ) -> typing.Any:
     if key == None:
         return None
-    return _any_val_for_path(obj, split_escaped_string(key))
+
+    obj_at_full_path = _any_val_for_path(obj, [unescape_dots(key)])
+    if box.is_none(obj_at_full_path):
+        return _any_val_for_path(obj, split_escaped_string(key))
+    else:
+        return obj_at_full_path
 
 
 class MergeInputTypes(typing.TypedDict):
