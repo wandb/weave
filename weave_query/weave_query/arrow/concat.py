@@ -198,6 +198,7 @@ def _concatenate_lists(
         l2_arrow_data.flatten(), l2.object_type.object_type, l2._artifact
     )
     concatted_values = _concatenate(self_values, other_values, depth=depth + 1)
+
     new_offsets = pa_concat_arrays(
         [
             offsets_starting_at_zero(l1_arrow_data)[:-1],
@@ -207,17 +208,24 @@ def _concatenate_lists(
             ).cast(pa.int32()),
         ]
     )
+
+    result_array = pa.ListArray.from_arrays(
+        new_offsets,
+        concatted_values._arrow_data,
+    )
+
+    # In pyarrow 17.0.0, we can only use either null offsets OR provide a mask,
+    # so track the null values to convert empty lists (that were null before
+    # conversion) and convert those empty lists to None before returning the AWL
+    combined_nulls = pa_concat_arrays([
+        pa.compute.is_null(l1._arrow_data),
+        pa.compute.is_null(l2._arrow_data)
+    ])
+
+    result_array = pc.if_else(combined_nulls, None, result_array)
+
     return ArrowWeaveList(
-        pa.ListArray.from_arrays(
-            new_offsets,
-            concatted_values._arrow_data,
-            mask=pa_concat_arrays(
-                [
-                    pa.compute.is_null(l1_arrow_data),
-                    pa.compute.is_null(l2_arrow_data),
-                ]
-            ),
-        ),
+        result_array,
         types.List(
             types.merge_types(l1.object_type.object_type, l2.object_type.object_type)
         ),
