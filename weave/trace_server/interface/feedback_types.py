@@ -46,3 +46,7 @@ def runnable_feedback_selector(name: str) -> str:
 
 def runnable_feedback_output_selector(name: str) -> str:
     return f"{runnable_feedback_selector(name)}.payload.output"
+
+
+def runnable_feedback_runnable_ref_selector(name: str) -> str:
+    return f"{runnable_feedback_selector(name)}.runnable_ref"

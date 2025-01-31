@@ -32,7 +32,11 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.trace.interface_query_builder import exists_expr
+from weave.trace.interface_query_builder import (
+    exists_expr,
+    get_field_expr,
+    literal_expr,
+)
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
@@ -48,9 +52,9 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
+    maybe_parse_uri,
     parse_op_uri,
     parse_uri,
-    string_is_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
@@ -68,6 +72,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
@@ -877,16 +882,29 @@ class WeaveClient:
 
         # This logic might be pushed down to the server soon, but for now it lives here:
         if scored_by and len(scored_by) > 0:
-            include_feedback = True  # always include feedback for scored_by... hmmm, do we really want that?
             exprs = []
             if query is not None:
                 exprs.append(query["$expr"])
             for name in scored_by:
-                if string_is_uri(name):
-                    # TODO: Implement this!!
-                    raise ValueError(f"Cannot filter by specific versions yet: {name}")
+                if ref := maybe_parse_uri(name):
+                    uri = name
+                    scorer_name = ref.name
+                    exprs.append(
+                        {
+                            "$eq": (
+                                get_field_expr(
+                                    runnable_feedback_runnable_ref_selector(scorer_name)
+                                ),
+                                literal_expr(uri),
+                            )
+                        }
+                    )
                 else:
-                    exprs.append(exists_expr(runnable_feedback_output_selector(name)))
+                    exprs.append(
+                        exists_expr(
+                            get_field_expr(runnable_feedback_output_selector(name))
+                        )
+                    )
             query = Query.model_validate({"$expr": {"$and": exprs}})
 
         return _make_calls_iterator(

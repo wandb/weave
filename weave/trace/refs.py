@@ -317,9 +317,8 @@ def parse_object_uri(uri: str) -> ObjectRef:
     return parsed
 
 
-def string_is_uri(s: str) -> bool:
+def maybe_parse_uri(s: str) -> AnyRef | None:
     try:
-        parse_uri(s)
+        return parse_uri(s)
     except ValueError:
-        return False
-    return True
+        return None
