@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   MOON_200,
   MOON_700,
@@ -419,21 +420,33 @@ export const CustomLink: React.FC<{
 export const CallsLink: React.FC<{
   entity: string;
   project: string;
-  callCount: number;
+  callCount?: number;
   countIsLimited?: boolean;
   filter?: WFHighLevelCallFilter;
+  gridFilters?: GridFilterModel;
   neverPeek?: boolean;
   variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
+  let label = 'View';
+  if (props.callCount != null) {
+    label = props.callCount.toString();
+  }
   return (
     <Link
       $variant={props.variant}
-      to={router.callsUIUrl(props.entity, props.project, props.filter)}>
-      {props.callCount}
+      to={router.callsUIUrl(
+        props.entity,
+        props.project,
+        props.filter,
+        props.gridFilters
+      )}>
+      {label}
       {props.countIsLimited ? '+' : ''}{' '}
-      {maybePluralizeWord(props.callCount, 'call')}
+      {props.callCount != null
+        ? maybePluralizeWord(props.callCount, 'call')
+        : 'calls'}
     </Link>
   );
 };

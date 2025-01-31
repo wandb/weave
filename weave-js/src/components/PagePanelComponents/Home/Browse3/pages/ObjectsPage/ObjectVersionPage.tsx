@@ -49,6 +49,7 @@ import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
+import { callQueryFieldForScorerOutput } from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -204,6 +205,7 @@ const ObjectVersionPageInner: React.FC<{
 
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
+  const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
@@ -236,7 +238,7 @@ const ObjectVersionPageInner: React.FC<{
       }
       headerContent={
         <Tailwind>
-          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_1fr] gap-[16px] text-[14px]">
+          <div className="grid w-full grid-flow-col grid-cols-[auto_auto_auto_auto_1fr] gap-[16px] text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
               <div className="flex items-center">
@@ -281,6 +283,25 @@ const ObjectVersionPageInner: React.FC<{
               <div className="block">
                 <p className="text-moon-500">Created by</p>
                 <UserLink userId={objectVersion.userId} includeName />
+              </div>
+            )}
+            {isScorer && (
+              <div className="block">
+                <p className="text-moon-500">Score Log</p>
+                <CallsLink
+                  entity={entityName}
+                  project={projectName}
+                  neverPeek
+                  gridFilters={{
+                    items: [
+                      {
+                        id: 0,
+                        field: callQueryFieldForScorerOutput(objectName),
+                        operator: '(any): isNotEmpty',
+                      },
+                    ],
+                  }}
+                />
               </div>
             )}
             {refExtra && (
