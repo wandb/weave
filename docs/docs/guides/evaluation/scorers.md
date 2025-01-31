@@ -316,7 +316,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 
 To apply scorers to your Weave ops, you'll need to use the `.call()` method which provides access to both the operation's result and its tracking information. This allows you to associate scorer results with specific calls in Weave's database.
 
-For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.md#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
+For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.mdx#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -357,10 +357,93 @@ For more information on how to use the `.call()` method, see the [Calling Ops](.
 
 ## Score Analysis
 
-TODO:
-* Add how to query a single call's scores from the API
-* Add how to view a single call's scores from UI
-* Add how to get scores back from call query API
-* Add how to view scores in traces table from UI
-* Add how to get all scored calls from the API
-* Add how to view all scored calls from UI
+| Analysis Type | API Access | UI Access |
+|--------------|------------|-----------|
+| [Single Call's Scores](#analyze-a-single-calls-scores) | [API](#single-call-api) | [UI](#single-call-ui) |
+| [Multiple Calls' Scores](#analyze-multiple-calls-scores) | [API](#multiple-calls-api) | [UI](#multiple-calls-ui) |
+| [All Calls by Scorer](#analyze-all-calls-scored-by-a-specific-scorer) | [API](#all-calls-by-scorer-api) | [UI](#all-calls-by-scorer-ui) |
+
+
+### Analyze a single Call's Scores
+
+#### Single Call API
+
+To retrieve the calls for a single call, you can use the `get_calls` method.
+
+```python
+client = weave.init("my-project")
+
+# Get a single call
+call = client.get_call("call-uuid-here")
+
+# Get the feedback for the call which contains the scores
+feedback = list(call.feedback)
+```
+
+
+#### Single Call UI
+
+![Call Scores Tab](./img/call_scores_tab.png)
+
+Scores for an individual call are displayed in the call details page under the "Scores" tab.
+
+
+### Analyze multiple Calls' Scores
+
+#### Multiple Calls API
+
+To retrieve the calls for multiple calls, you can use the `get_calls` method.
+
+```python
+client = weave.init("my-project")
+
+# Get multiple calls - use whatever filters you want and include feedback
+calls = client.get_calls(..., include_feedback=True)
+
+# Iterate over the calls and access the feedback which contains the scores
+for call in calls:
+    feedback = list(call.feedback)
+```
+
+#### Multiple Calls UI
+
+![Multiple Calls Tab](./img/traces_table_scores.png)
+
+Scores for multiple calls are displayed in the traces table under the "Scores" column.
+
+### Analyze all Calls scored by a specific Scorer
+
+#### All Calls by Scorer API
+
+To retrieve all calls scored by a specific scorer, you can use the `get_calls` method.
+
+```python
+client = weave.init("my-project")
+
+# To get all the calls scored by any version of a scorer, use the scorer name (typically the class name)
+calls = client.get_calls(scored_by=["MyScorer"], include_feedback=True)
+
+# To get all the calls scored by a specific version of a scorer, use the entire ref
+# Refs can be obtained from the scorer object or via the UI.
+calls = client.get_calls(scored_by=[myScorer.ref.uri()], include_feedback=True)
+
+# Iterate over the calls and access the feedback which contains the scores
+for call in calls:
+    feedback = list(call.feedback)
+```
+
+
+#### All Calls by Scorer UI
+
+Finally, if you would like to see all the calls scored by a Scorer, navigate to the Scorers Tab in the UI and select "Programmatic Scorer" tab. Click your Scorer to open the Scorer details page.
+
+![Scorer Details Page](./img/scorer_detail_page.png)
+
+Next, click the `View` button to view all the calls scored by your Scorer.
+
+![Filtered Calls to Scorer Version](./img/filtered_calls_to_scorer_version.png)
+
+This will default to the selected version of the Scorer. You can remove the version filter to see all the calls scored by any version of the Scorer.
+
+![Filtered Calls to Scorer Name](./img/filtered_calls_scorer_name.png)
+
