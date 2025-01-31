@@ -255,7 +255,7 @@ helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/click
 ```
 * If you don't want to create namespace or install in a specific namespace, remove he argunments `--create-namespace --namespace <NAMESPACE>`
 
-#### Confirm Clickhouse is deployed
+#### Confirm Clickhouse deployment
 
 ```
 kubectl get pods -n <NAMESPACE>
