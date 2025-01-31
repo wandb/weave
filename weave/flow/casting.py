@@ -8,6 +8,7 @@ import weave
 from weave.flow.dataset import Dataset
 from weave.scorers.base_scorer import Scorer, _validate_scorer_signature
 from weave.trace.op import Op, as_op, is_op
+from weave.trace.refs import OpRef
 from weave.trace.vals import WeaveObject
 
 
@@ -36,6 +37,8 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
         res = weave.op(obj)
     elif is_op(obj):
         res = as_op(obj)
+    elif isinstance(obj, OpRef):
+        res = obj.get()
     else:
         raise TypeError("Unable to cast to Scorer")
 
