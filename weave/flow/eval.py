@@ -4,7 +4,7 @@ import traceback
 from datetime import datetime
 from typing import Any, Callable, Literal, Optional, Union
 
-from pydantic import PrivateAttr, model_validator
+from pydantic import PrivateAttr
 from rich import print
 from rich.console import Console
 from typing_extensions import Self
@@ -124,14 +124,6 @@ class Evaluation(Object):
             evaluation_name=obj.evaluation_name,
         )
 
-    @model_validator(mode="after")
-    def _update_display_name(self) -> "Evaluation":
-        if self.evaluation_name:
-            # Treat user-specified `evaluation_name` as the name for `Evaluation.evaluate`
-            eval_op = as_op(self.evaluate)
-            eval_op.call_display_name = self.evaluation_name
-        return self
-
     def model_post_init(self, __context: Any) -> None:
         # Determine output key based on scorer types
         scorers = self.scorers or []
@@ -141,6 +133,10 @@ class Evaluation(Object):
                 logger,
                 "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
             )
+
+        if self.evaluation_name:
+            eval_op = as_op(self.evaluate)
+            eval_op.call_display_name = self.evaluation_name
 
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
