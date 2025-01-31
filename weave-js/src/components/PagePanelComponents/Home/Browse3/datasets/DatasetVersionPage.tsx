@@ -287,8 +287,9 @@ export const DatasetVersionPage: React.FC<{
                   variant="ghost"
                   size="medium"
                   icon="pencil-edit"
-                  onClick={handleEditClick}
-                />
+                  onClick={handleEditClick}>
+                  Edit
+                </Button>
               )}
               {showDeleteButton && !isEditing && (
                 <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
