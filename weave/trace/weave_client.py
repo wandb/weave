@@ -876,7 +876,8 @@ class WeaveClient:
             filter = CallsFilter()
 
         # This logic might be pushed down to the server soon, but for now it lives here:
-        if scored_by:
+        if scored_by and len(scored_by) > 0:
+            include_feedback = True  # always include feedback for scored_by
             exprs = []
             if query is not None:
                 exprs.append(query["$expr"])
