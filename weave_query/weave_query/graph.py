@@ -4,7 +4,7 @@ import typing
 
 from weave_query import weave_types
 from weave_query import uris, errors, storage
-
+from weave_query._dict_utils import unescape_dots
 if typing.TYPE_CHECKING:
     from weave_query import weave_inspector
 
@@ -193,7 +193,10 @@ class ConstNode(Node):
         if isinstance(val, dict) and "nodeType" in val:
             val = Node.node_from_json(val)
         else:
-            val = storage.from_python({"_type": obj["type"], "_val": obj["val"]})  # type: ignore
+            _val = obj["val"]
+            if isinstance(_val, str):
+                _val = unescape_dots(_val)
+            val = storage.from_python({"_type": obj["type"], "_val": _val})  # type: ignore
         t = weave_types.TypeRegistry.type_from_dict(obj["type"])
         if isinstance(t, weave_types.Function):
             cls = dispatch.RuntimeConstNode
