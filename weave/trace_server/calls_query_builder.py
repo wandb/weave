@@ -129,8 +129,8 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         if feedback_type[0] != "[" or feedback_type[-1] != "]":
             raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
         extra_path = path.split(".")
+        feedback_type = feedback_type[1:-1]
         if extra_path[0] == "payload":
-            feedback_type = feedback_type[1:-1]
             return CallsMergedFeedbackPayloadField(
                 field="payload_dump",
                 feedback_type=feedback_type,
@@ -154,6 +154,9 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         inner = super().as_sql(pb, "feedback")
         param_name = pb.add_param(self.feedback_type)
         res = f"anyIf({inner}, feedback.feedback_type = {_param_slot(param_name, 'String')})"
+        # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
+        if not self.extra_path:
+            return res
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:

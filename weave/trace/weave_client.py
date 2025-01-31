@@ -886,7 +886,8 @@ class WeaveClient:
             if query is not None:
                 exprs.append(query["$expr"])
             for name in scored_by:
-                if ref := maybe_parse_uri(name):
+                ref = maybe_parse_uri(name)
+                if ref and isinstance(ref, ObjectRef):
                     uri = name
                     scorer_name = ref.name
                     exprs.append(
