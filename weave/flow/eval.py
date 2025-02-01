@@ -60,8 +60,19 @@ class PredictionResult(TypedDict):
     model_latency: float
 
 
+class PredictResult(TypedDict):
+    inputs: dict[str, Any]
+    output: dict[str, Any]
+
+
 class ScoreResult(TypedDict):
     scores: dict[str, Any]
+
+
+class PredictRow(PredictResult): ...
+
+
+class ScoreRow(PredictRow, ScoreResult): ...
 
 
 @register_object
@@ -170,12 +181,46 @@ class Evaluation(Object):
             model_latency=apply_model_result.model_latency,
         )
 
+    async def predict(
+        self, model: Union[Op, Model], *, examples: Optional[list[dict]] = None
+    ) -> Dataset:
+        if examples is None:
+            examples = list(self.dataset)
+
+        async def _predict(example):
+            return await self.predict_one(model, example)
+
+        preds: list[PredictionResult] = []
+        async for _, pred in util.async_foreach(
+            examples, _predict, get_weave_parallelism()
+        ):
+            preds.append(pred)
+
+        inputs = []
+        for example in examples:
+            if ref := get_ref(example):
+                inputs.append(ref)
+            else:
+                inputs.append(example)
+
+        # TODO: keep track of refs?
+
+        res = Dataset(
+            rows=[
+                {"inputs": input_, "output": pred["model_call"].output}
+                for input_, pred in zip(inputs, preds)
+            ]
+        )
+        weave.publish(res, "output_dataset")
+        return res
+
     # @weave.op
     async def score_one(
         self, example: dict, prediction: PredictionResult
     ) -> ScoreResult:
         scores = {}
-        model_call = prediction["model_call"]
+        # model_call = prediction["model_call"]
+        model_call = prediction.get("model_call")
 
         if not self.scorers:
             return scores
@@ -191,6 +236,57 @@ class Evaluation(Object):
 
             scores[name] = res
         return scores
+
+    async def score(self, predictions: Optional[list[dict]] = None) -> Dataset:
+        if predictions is None:
+            raise ValueError("predictions must be provided to score()")
+
+        examples = list(self.dataset)
+        if len(examples) != len(predictions):
+            raise ValueError(
+                f"Number of predictions ({len(predictions)}) must match number of examples ({len(examples)})"
+            )
+
+        async def _score(args):
+            example, prediction = args
+            return await self.score_one(example, prediction)
+
+        scores: list[ScoreResult] = []
+        async for _, score in util.async_foreach(
+            zip(examples, predictions), _score, get_weave_parallelism()
+        ):
+            scores.append(score)
+
+        # Handle refs for inputs
+        inputs = []
+        for example in examples:
+            if ref := get_ref(example):
+                inputs.append(ref)
+            else:
+                inputs.append(example)
+
+        # Handle refs for outputs
+        outputs = []
+        for prediction in predictions:
+            output = prediction["output"]
+            if ref := get_ref(output):
+                outputs.append(ref)
+            else:
+                outputs.append(output)
+
+        # Create properly structured rows with both inputs and scores
+        res = Dataset(
+            rows=[
+                {
+                    "inputs": input_,
+                    "output": output,
+                    "scores": score["scores"] if score.get("scores") else score,
+                }
+                for input_, output, score in zip(inputs, outputs, scores)
+            ]
+        )
+        weave.publish(res, "score_dataset")
+        return res
 
     @weave.op()
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:

@@ -18,3 +18,4 @@ gha-creds-*.json
 .nox
 *.log
 */file::memory:?cache=shared
+.cursorrules
