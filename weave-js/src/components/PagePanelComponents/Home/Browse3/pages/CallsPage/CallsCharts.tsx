@@ -1,7 +1,8 @@
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {MOON_400} from '../../../../../../common/css/color.styles';
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {IconInfo} from '../../../../../Icon';
 import {WaveLoader} from '../../../../../Loaders/WaveLoader';
 import {Tailwind} from '../../../../../Tailwind';
@@ -113,6 +114,29 @@ export const CallsCharts = ({
     columnSet,
     columns
   );
+
+  const [callsQueryStartTime, setCallsQueryStartTime] = useState<number | null>(
+    null
+  );
+  const sentEvent = useRef(false);
+  useEffect(() => {
+    if (sentEvent.current) {
+      return;
+    }
+    if (calls.loading) {
+      const startTime = Date.now();
+      setCallsQueryStartTime(startTime);
+    } else if (!calls.loading && callsQueryStartTime !== null) {
+      const endTime = Date.now();
+      const latency = endTime - callsQueryStartTime;
+      userEvents.metricsPlotsViewed({
+        entity,
+        project,
+        latency,
+      });
+      sentEvent.current = true;
+    }
+  }, [calls.loading, callsQueryStartTime, entity, project]);
 
   const chartData = useMemo(() => {
     if (calls.loading || !calls.result || calls.result.length === 0) {
