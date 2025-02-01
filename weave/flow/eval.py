@@ -182,8 +182,17 @@ class Evaluation(Object):
         )
 
     async def predict(
-        self, model: Union[Op, Model], *, examples: Optional[list[dict]] = None
+        self,
+        model: Union[Op, Model],
+        *,
+        examples: Optional[DatasetLike] = None,
+        use_refs: bool = True,
     ) -> Dataset:
+        """Given a model and an examples dataset, return a dataset of predictions.
+
+        If no examples are given, the dataset passed to the Evaluation constructor will
+        be used.
+        """
         if examples is None:
             examples = list(self.dataset)
 
@@ -198,7 +207,7 @@ class Evaluation(Object):
 
         inputs = []
         for example in examples:
-            if ref := get_ref(example):
+            if use_refs and (ref := get_ref(example)):
                 inputs.append(ref)
             else:
                 inputs.append(example)
@@ -237,7 +246,14 @@ class Evaluation(Object):
             scores[name] = res
         return scores
 
-    async def score(self, predictions: Optional[list[dict]] = None) -> Dataset:
+    async def score(
+        self, predictions: DatasetLike, *, use_refs: bool = True
+    ) -> Dataset:
+        """Given a dataset of predictions, return a dataset of scores.
+
+        If no predictions are given, the predictions dataset passed to the Evaluation
+        constructor will be used.
+        """
         if predictions is None:
             raise ValueError("predictions must be provided to score()")
 
@@ -260,7 +276,7 @@ class Evaluation(Object):
         # Handle refs for inputs
         inputs = []
         for example in examples:
-            if ref := get_ref(example):
+            if use_refs and (ref := get_ref(example)):
                 inputs.append(ref)
             else:
                 inputs.append(example)
@@ -269,7 +285,7 @@ class Evaluation(Object):
         outputs = []
         for prediction in predictions:
             output = prediction["output"]
-            if ref := get_ref(output):
+            if use_refs and (ref := get_ref(output)):
                 outputs.append(ref)
             else:
                 outputs.append(output)
