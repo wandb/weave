@@ -115,28 +115,7 @@ export const CallsCharts = ({
     columns
   );
 
-  const [callsQueryStartTime, setCallsQueryStartTime] = useState<number | null>(
-    null
-  );
-  const sentEvent = useRef(false);
-  useEffect(() => {
-    if (sentEvent.current) {
-      return;
-    }
-    if (calls.loading) {
-      const startTime = Date.now();
-      setCallsQueryStartTime(startTime);
-    } else if (!calls.loading && callsQueryStartTime !== null) {
-      const endTime = Date.now();
-      const latency = endTime - callsQueryStartTime;
-      userEvents.metricsPlotsViewed({
-        entity,
-        project,
-        latency,
-      });
-      sentEvent.current = true;
-    }
-  }, [calls.loading, callsQueryStartTime, entity, project]);
+  useFireAnalyticsForMetricsPlotsViewed(entity, project, calls.loading);
 
   const chartData = useMemo(() => {
     if (calls.loading || !calls.result || calls.result.length === 0) {
@@ -211,4 +190,38 @@ export const CallsCharts = ({
       </div>
     </Tailwind>
   );
+};
+
+/**
+ * Fires an analytics event when the metrics plots are viewed.
+ * This is used to track the usage and latency of the metrics plots.
+ * Only fires once when opened.
+ */
+const useFireAnalyticsForMetricsPlotsViewed = (
+  entity: string,
+  project: string,
+  loading: boolean
+) => {
+  const [callsQueryStartTime, setCallsQueryStartTime] = useState<number | null>(
+    null
+  );
+  const sentEvent = useRef(false);
+  useEffect(() => {
+    if (sentEvent.current) {
+      return;
+    }
+    if (loading) {
+      const startTime = Date.now();
+      setCallsQueryStartTime(startTime);
+    } else if (!loading && callsQueryStartTime !== null) {
+      const endTime = Date.now();
+      const latency = endTime - callsQueryStartTime;
+      userEvents.metricsPlotsViewed({
+        entity,
+        project,
+        latency,
+      });
+      sentEvent.current = true;
+    }
+  }, [loading, callsQueryStartTime, entity, project]);
 };
