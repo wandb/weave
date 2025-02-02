@@ -52,13 +52,20 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     return res
 
 
+class ModelMetadata(TypedDict):
+    """Metadata about a model run."""
+
+    latency: float
+    call: NotRequired[Call]
+
+
 class EvaluationRow(TypedDict):
     """Defines an explicit schema for an evaluation row."""
 
     inputs: Any
     output: NotRequired[Any]
     scores: NotRequired[dict[str, Any]]
-    model_call: NotRequired[Call]  # TODO: See if we can remove or make a ref
+    metadata: NotRequired[ModelMetadata]  # Replacing model_call with metadata
 
 
 def normalize_eval_row(row: dict) -> EvaluationRow:
@@ -75,8 +82,8 @@ def normalize_eval_row(row: dict) -> EvaluationRow:
             normalized_row["output"] = row["output"]
         if "scores" in row:
             normalized_row["scores"] = row["scores"]
-        if "model_call" in row:
-            normalized_row["model_call"] = row["model_call"]
+        if "metadata" in row:
+            normalized_row["metadata"] = row["metadata"]
         return normalized_row
     # Otherwise, treat the entire row as the input.
     return {"inputs": row}
