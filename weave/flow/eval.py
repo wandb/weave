@@ -297,20 +297,6 @@ class Evaluation(Object):
         return res
 
     @weave.op()
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
-        predict_res = await self.predict_one(model, example)
-        score_res = await self.score_one(example, predict_res)
-        unwrapped_scores = {
-            k: (v.result if v is not None else None) for k, v in score_res.items()
-        }
-
-        return {
-            self._output_key: predict_res.model_call.output,
-            "scores": unwrapped_scores,
-            "model_latency": predict_res.model_latency,
-        }
-
-    @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
         cols = transpose(eval_table.rows)
         summary = {}
@@ -337,7 +323,19 @@ class Evaluation(Object):
 
         async def eval_example(example: dict) -> dict:
             try:
-                return await self.predict_and_score(model, example)
+                # Call predict_one to get the model's prediction for this example.
+                prediction = await self.predict_one(model, example)
+                # Then, call score_one to obtain scores for the prediction.
+                score_res = await self.score_one(example, prediction)
+                unwrapped_scores = {
+                    k: (v.result if v is not None else None)
+                    for k, v in score_res.items()
+                }
+                return {
+                    self._output_key: prediction.model_call.output,
+                    "scores": unwrapped_scores,
+                    "model_latency": prediction.model_latency,
+                }
             except OpCallError:
                 raise
             except Exception:
