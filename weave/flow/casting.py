@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, NotRequired, TypedDict, Union
+from typing import Annotated, Any, TypedDict, Union
 
 from pydantic import BeforeValidator
+from typing_extensions import NotRequired
 
 import weave
 from weave.flow.dataset import Dataset
