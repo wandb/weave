@@ -851,21 +851,24 @@ async def test_evaluation_with_wrong_column_map():
         # this is wrong because col3 does not exist
         dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col3"})
         evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-        await evaluation.predict_and_score(model_function, dataset[0])
+        preds = await evaluation.predict(model_function, examples=[dataset[0]])
+        scores = await evaluation.score(preds)
         assert "which is not in the scorer's argument names" in str(excinfo.value)
 
     with pytest.raises(ValueError) as excinfo:
         # Create the scorer with column_map missing a column
         dummy_scorer = DummyScorer(column_map={"foo": "col1"})
         evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-        await evaluation.predict_and_score(model_function, dataset[0])
+        preds = await evaluation.predict(model_function, examples=[dataset[0]])
+        scores = await evaluation.score(preds)
         assert "is not found in the dataset columns" in str(excinfo.value)
 
     with pytest.raises(ValueError) as excinfo:
         # Create the scorer with wrong argument name
         dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
         evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-        await evaluation.predict_and_score(model_function, dataset[0])
+        preds = await evaluation.predict(model_function, examples=[dataset[0]])
+        scores = await evaluation.score(preds)
         assert "is not found in the dataset columns and is not mapped" in str(
             excinfo.value
         )
