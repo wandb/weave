@@ -38,11 +38,6 @@ from weave.trace.weave_client import Call, get_ref
 console = Console()
 logger = logging.getLogger(__name__)
 
-INVALID_MODEL_ERROR = (
-    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
-    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
-)
-
 
 def default_evaluation_display_name(call: Call) -> str:
     date = datetime.now().strftime("%Y-%m-%d")
@@ -335,7 +330,10 @@ class Evaluation(Object):
 
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
-            raise ValueError(INVALID_MODEL_ERROR)
+            raise ValueError(
+                "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+                + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+            )
 
         async def eval_example(example: dict) -> dict:
             try:
