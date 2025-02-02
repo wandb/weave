@@ -212,14 +212,13 @@ class Evaluation(Object):
 
         # TODO: keep track of refs?
 
-        res = Dataset(
+        return Dataset(
             rows=[
                 {"inputs": input_, "output": pred["output"]}
                 for input_, pred in zip(inputs, preds)
-            ]
+            ],
+            name="output_dataset",
         )
-        weave.publish(res, "output_dataset")
-        return res
 
     # @weave.op
     async def score_one(
@@ -275,9 +274,7 @@ class Evaluation(Object):
             scored_rows.append(score_row)
 
         # Convert to Dataset format
-        res = Dataset(rows=scored_rows)
-        weave.publish(res, "score_dataset")
-        return res
+        return Dataset(rows=scored_rows, name="score_dataset")
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
