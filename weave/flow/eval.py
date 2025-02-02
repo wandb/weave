@@ -14,7 +14,7 @@ from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
 from weave.flow.dataset import Dataset
 from weave.flow.model import (
-    ApplyModelError,
+    ApplyModelResult,
     Model,
     PreprocessModelInput,
     apply_model_async,
@@ -168,20 +168,12 @@ class Evaluation(Object):
     # @weave.op
     async def predict_one(
         self, model: Union[Op, Model], example: dict
-    ) -> PredictionResult:
-        apply_model_result = await apply_model_async(
-            model, example, self.preprocess_model_input
-        )
-        if isinstance(apply_model_result, ApplyModelError):
-            model_call = None
-        else:
-            model_call = apply_model_result.model_call
-
-        return PredictionResult(
-            output_key=self._output_key,
-            model_call=model_call,
-            model_latency=apply_model_result.model_latency,
-        )
+    ) -> ApplyModelResult:
+        """
+        Run the model on a single example and return the ApplyModelResult directly.
+        """
+        # Directly return the ApplyModelResult produced by apply_model_async.
+        return await apply_model_async(model, example, self.preprocess_model_input)
 
     async def predict(
         self,
@@ -201,7 +193,7 @@ class Evaluation(Object):
         async def _predict(example):
             return await self.predict_one(model, example)
 
-        preds: list[PredictionResult] = []
+        preds: list[ApplyModelResult] = []
         async for _, pred in util.async_foreach(
             examples, _predict, get_weave_parallelism()
         ):
@@ -218,7 +210,7 @@ class Evaluation(Object):
 
         res = Dataset(
             rows=[
-                {"inputs": input_, "output": pred["model_call"].output}
+                {"inputs": input_, "output": pred.model_call.output}
                 for input_, pred in zip(inputs, preds)
             ]
         )
@@ -227,11 +219,10 @@ class Evaluation(Object):
 
     # @weave.op
     async def score_one(
-        self, example: dict, prediction: PredictionResult
+        self, example: dict, prediction: ApplyModelResult
     ) -> ScoreResult:
         scores = {}
-        # model_call = prediction["model_call"]
-        model_call = prediction.get("model_call")
+        model_call = prediction.model_call
 
         if not self.scorers:
             return scores
@@ -312,9 +303,9 @@ class Evaluation(Object):
         score_res = await self.score_one(example, predict_res)
 
         return {
-            self._output_key: predict_res["model_call"].output,
+            self._output_key: predict_res.model_call.output,
             "scores": score_res,
-            "model_latency": predict_res["model_latency"],
+            "model_latency": predict_res.model_latency,
         }
 
     @weave.op()
