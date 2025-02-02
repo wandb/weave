@@ -27,7 +27,6 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
-from weave.scorers.base_scorer import ApplyScorerResult
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.objectify import register_object
@@ -225,31 +224,37 @@ class Evaluation(Object):
     # @weave.op
     async def score_one(
         self, example: dict, prediction: EvaluationRow
-    ) -> dict[str, Optional[ApplyScorerResult]]:
-        scores = {}
-        model_call = prediction.get("metadata", {}).get("call")
+    ) -> EvaluationRow:
+        """Score a single prediction and return an EvaluationRow with scores added."""
+        scores: dict[str, Any] = {}
+        metadata: ModelMetadata = prediction.get("metadata", {"latency": 0.0})
+        model_call = metadata.get("call")
 
-        if not self.scorers:
-            return scores
+        if self.scorers:
+            for scorer in self.scorers:
+                attrs = get_scorer_attributes(scorer)
+                name = attrs.scorer_name
 
-        for scorer in self.scorers:
-            attrs = get_scorer_attributes(scorer)
-            name = attrs.scorer_name
+                if model_call:
+                    apply_scorer_result = await model_call.apply_scorer(scorer, example)
+                    scores[name] = (
+                        apply_scorer_result.result if apply_scorer_result else None
+                    )
+                else:
+                    scores[name] = None
 
-            if model_call:
-                apply_scorer_result = await model_call.apply_scorer(scorer, example)
-                scores[name] = apply_scorer_result
-            else:
-                scores[name] = None
-        return scores
+        # Return complete EvaluationRow with original data plus scores
+        return EvaluationRow(
+            inputs=prediction["inputs"],
+            output=prediction["output"],
+            metadata=metadata,
+            scores=scores,
+        )
 
     async def score(
         self, predictions: DatasetLike, *, use_refs: bool = True
     ) -> Dataset:
-        """Given a dataset of predictions, return a dataset of scores.
-        If no predictions are given, the predictions dataset passed to the Evaluation
-        constructor will be used.
-        """
+        """Given a dataset of predictions, return a dataset of scores."""
         if predictions is None:
             raise ValueError("predictions must be provided to score()")
 
@@ -263,40 +268,14 @@ class Evaluation(Object):
             example, prediction = args
             return await self.score_one(example, prediction)
 
-        scores: list[dict[str, Optional[ApplyScorerResult]]] = []
-        async for _, score_obj in util.async_foreach(
+        scored_rows: list[EvaluationRow] = []
+        async for _, score_row in util.async_foreach(
             zip(examples, predictions), _score, get_weave_parallelism()
         ):
-            scores.append(score_obj)
+            scored_rows.append(score_row)
 
-        inputs = []
-        for example in examples:
-            if use_refs and (ref := get_ref(example)):
-                inputs.append(ref)
-            else:
-                inputs.append(example)
-
-        outputs = []
-        for prediction in predictions:
-            output = prediction["output"]
-            if use_refs and (ref := get_ref(output)):
-                outputs.append(ref)
-            else:
-                outputs.append(output)
-
-        res = Dataset(
-            rows=[
-                {
-                    "inputs": input_,
-                    "output": output,
-                    "scores": {
-                        k: (v.result if v is not None else None)
-                        for k, v in score_obj.items()
-                    },
-                }
-                for input_, output, score_obj in zip(inputs, outputs, scores)
-            ]
-        )
+        # Convert to Dataset format
+        res = Dataset(rows=scored_rows)
         weave.publish(res, "score_dataset")
         return res
 
@@ -331,13 +310,10 @@ class Evaluation(Object):
                 prediction = await self.predict_one(model, example)
                 # Then, call score_one to obtain scores for the prediction.
                 score_res = await self.score_one(example, prediction)
-                unwrapped_scores = {
-                    k: (v.result if v is not None else None)
-                    for k, v in score_res.items()
-                }
+                # The scores are already unwrapped in score_one, so we can use them directly
                 return {
                     self._output_key: prediction["output"],
-                    "scores": unwrapped_scores,
+                    "scores": score_res["scores"],
                     "model_latency": prediction.get("metadata", {}).get("latency"),
                 }
             except OpCallError:
