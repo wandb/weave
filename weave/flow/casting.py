@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Union
+from typing import Annotated, Any, NotRequired, TypedDict, Union
 
 from pydantic import BeforeValidator
 
@@ -10,6 +10,7 @@ from weave.scorers.base_scorer import Scorer, _validate_scorer_signature
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.vals import WeaveObject
+from weave.trace.weave_client import Call
 
 
 def cast_to_dataset(obj: Any) -> Dataset:
@@ -48,6 +49,36 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     _validate_scorer_signature(res)
 
     return res
+
+
+class EvaluationRow(TypedDict):
+    """Defines an explicit schema for an evaluation row."""
+
+    inputs: Any
+    output: NotRequired[Any]
+    scores: NotRequired[dict[str, Any]]
+    model_call: NotRequired[Call]  # TODO: See if we can remove or make a ref
+
+
+def normalize_eval_row(row: dict) -> EvaluationRow:
+    """
+    Normalize an input row to conform to the EvaluationRow schema.
+    If the row already contains an "inputs" key, assume it is largely normalized,
+    and add any missing optional fields.
+    Otherwise, assume the entire row represents the input.
+    """
+    # If the row already has an "inputs" key, rebuild the dict ensuring only expected keys are present.
+    if "inputs" in row:
+        normalized_row: EvaluationRow = {"inputs": row["inputs"]}
+        if "output" in row:
+            normalized_row["output"] = row["output"]
+        if "scores" in row:
+            normalized_row["scores"] = row["scores"]
+        if "model_call" in row:
+            normalized_row["model_call"] = row["model_call"]
+        return normalized_row
+    # Otherwise, treat the entire row as the input.
+    return {"inputs": row}
 
 
 DatasetLike = Annotated[Dataset, BeforeValidator(cast_to_dataset)]
