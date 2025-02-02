@@ -153,7 +153,8 @@ class Evaluation(Object):
             self._output_key = "model_output"
             util.warn_once(
                 logger,
-                "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
+                "Using 'model_output' key for compatibility with older scorers. Please "
+                + "update scorers to use 'output' parameter.",
             )
 
         if self.evaluation_name:
@@ -170,9 +171,7 @@ class Evaluation(Object):
     async def predict_one(
         self, model: Union[Op, Model], example: dict
     ) -> ApplyModelResult:
-        """
-        Run the model on a single example and return the ApplyModelResult directly.
-        """
+        """Run the model on a single example and return the ApplyModelResult directly."""
         # Directly return the ApplyModelResult produced by apply_model_async.
         return await apply_model_async(model, example, self.preprocess_model_input)
 
