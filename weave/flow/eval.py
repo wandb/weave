@@ -125,8 +125,12 @@ class Evaluation(Object):
     # custom `call_display_name` to `weave.op` (see that for more details).
     evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
 
+    # Other configs
+    max_parallelism: int = get_weave_parallelism()
+
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+    _base_dataset_name: str = PrivateAttr("evaluation")
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -157,6 +161,9 @@ class Evaluation(Object):
 
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
+
+        if self.dataset.name:
+            self._base_dataset_name = self.dataset.name
 
     # @weave.op
     async def predict_one(
