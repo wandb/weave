@@ -28,6 +28,7 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
+from weave.scorers.base_scorer import ApplyScorerResult
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.objectify import register_object
@@ -220,7 +221,7 @@ class Evaluation(Object):
     # @weave.op
     async def score_one(
         self, example: dict, prediction: ApplyModelResult
-    ) -> ScoreResult:
+    ) -> dict[str, Optional[ApplyScorerResult]]:
         scores = {}
         model_call = prediction.model_call
 
@@ -231,19 +232,17 @@ class Evaluation(Object):
             attrs = get_scorer_attributes(scorer)
             name = attrs.scorer_name
 
-            res = None
             if model_call:
                 apply_scorer_result = await model_call.apply_scorer(scorer, example)
-                res = apply_scorer_result.result
-
-            scores[name] = res
+                scores[name] = apply_scorer_result
+            else:
+                scores[name] = None
         return scores
 
     async def score(
         self, predictions: DatasetLike, *, use_refs: bool = True
     ) -> Dataset:
         """Given a dataset of predictions, return a dataset of scores.
-
         If no predictions are given, the predictions dataset passed to the Evaluation
         constructor will be used.
         """
@@ -260,13 +259,12 @@ class Evaluation(Object):
             example, prediction = args
             return await self.score_one(example, prediction)
 
-        scores: list[ScoreResult] = []
-        async for _, score in util.async_foreach(
+        scores: list[dict[str, Optional[ApplyScorerResult]]] = []
+        async for _, score_obj in util.async_foreach(
             zip(examples, predictions), _score, get_weave_parallelism()
         ):
-            scores.append(score)
+            scores.append(score_obj)
 
-        # Handle refs for inputs
         inputs = []
         for example in examples:
             if use_refs and (ref := get_ref(example)):
@@ -274,7 +272,6 @@ class Evaluation(Object):
             else:
                 inputs.append(example)
 
-        # Handle refs for outputs
         outputs = []
         for prediction in predictions:
             output = prediction["output"]
@@ -283,15 +280,17 @@ class Evaluation(Object):
             else:
                 outputs.append(output)
 
-        # Create properly structured rows with both inputs and scores
         res = Dataset(
             rows=[
                 {
                     "inputs": input_,
                     "output": output,
-                    "scores": score["scores"] if score.get("scores") else score,
+                    "scores": {
+                        k: (v.result if v is not None else None)
+                        for k, v in score_obj.items()
+                    },
                 }
-                for input_, output, score in zip(inputs, outputs, scores)
+                for input_, output, score_obj in zip(inputs, outputs, scores)
             ]
         )
         weave.publish(res, "score_dataset")
@@ -301,10 +300,13 @@ class Evaluation(Object):
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
         predict_res = await self.predict_one(model, example)
         score_res = await self.score_one(example, predict_res)
+        unwrapped_scores = {
+            k: (v.result if v is not None else None) for k, v in score_res.items()
+        }
 
         return {
             self._output_key: predict_res.model_call.output,
-            "scores": score_res,
+            "scores": unwrapped_scores,
             "model_latency": predict_res.model_latency,
         }
 
@@ -354,13 +356,12 @@ class Evaluation(Object):
                 eval_row = {self._output_key: None, "scores": {}}
             eval_row.setdefault("scores", {})
 
-            if not self.scorers:
-                continue
-            for scorer in self.scorers:
-                attrs = get_scorer_attributes(scorer)
-                name = attrs.scorer_name
-                eval_row["scores"].setdefault(name, {})
-
+            if self.scorers:
+                for scorer in self.scorers:
+                    attrs = get_scorer_attributes(scorer)
+                    name = attrs.scorer_name
+                    if eval_row["scores"].get(name) is None:
+                        eval_row["scores"][name] = {}
             eval_rows.append(eval_row)
 
         return EvaluationResults(rows=weave.Table(eval_rows))
