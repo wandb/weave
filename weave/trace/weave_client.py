@@ -389,14 +389,18 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
-class CallDict(TypedDict):
+InputsT = TypeVar("InputsT", bound=dict[str, Any])
+OutputT = TypeVar("OutputT")
+
+
+class CallDict(TypedDict, Generic[InputsT, OutputT]):
     op_name: str
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: InputsT
     id: str | None
-    output: Any
+    output: OutputT
     exception: str | None
     summary: dict | None
     display_name: str | None
@@ -407,16 +411,16 @@ class CallDict(TypedDict):
 
 
 @dataclasses.dataclass
-class Call:
+class Call(Generic[InputsT, OutputT]):
     """A Call represents a single operation that was executed as part of a trace."""
 
     _op_name: str | Future[str]
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: InputsT
     id: str | None = None
-    output: Any = None
+    output: OutputT | None = None
     exception: str | None = None
     summary: dict | None = None
     _display_name: str | Callable[[Call], str] | None = None
@@ -632,7 +636,7 @@ def make_client_call(
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
-    call = Call(
+    call: Call[dict[str, Any], Any] = Call(
         _op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
@@ -1003,7 +1007,7 @@ class WeaveClient:
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
         call_id = generate_id()
-        call = Call(
+        call: Call[dict[str, Any], Any] = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
             trace_id=trace_id,

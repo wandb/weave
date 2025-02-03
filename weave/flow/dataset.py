@@ -112,3 +112,13 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
+
+    def get_column(self, name: str) -> list[Any]:
+        """Get all values for a column in the dataset.
+
+        This method may be slow since we have to materialize all of the rows of the dataset.
+        """
+        try:
+            return [row[name] for row in self.rows]
+        except KeyError:
+            raise KeyError(f"Column {name} not found in dataset")
