@@ -187,6 +187,15 @@ const SelectionHeader: FC<{
   return (
     <div className="flex w-full items-center gap-[8px]">
       {/* Left side group */}
+      <span className="font-semibold text-sm text-moon-600 flex items-center">
+      <Icon
+          name="close"
+          className="mr-[4px] w-[15px] h-[15px] cursor-pointer hover:text-moon-800"
+          onClick={onClearSelection}
+        />
+        {selectedCount} {isEvaluateTable ? 'evaluation' : 'trace'}
+        {selectedCount !== 1 ? 's' : ''} selected:
+      </span>
       {isEvaluateTable ? (
         <CompareEvaluationsTableButton
           onClick={onCompareClick}
@@ -214,12 +223,6 @@ const SelectionHeader: FC<{
           />
         </div>
       )}
-      <ButtonDivider />
-      <span
-        className="ml-[8px] cursor-pointer font-semibold text-teal-600 hover:text-teal-700"
-        onClick={onClearSelection}>
-        Clear selection
-      </span>
 
       {/* Right side group */}
       <div className="ml-auto flex-none">

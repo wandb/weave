@@ -478,7 +478,6 @@ export const BulkDeleteButton: FC<{
         onClick={onClick}
         tooltip="Select rows with the checkbox to delete"
         icon="delete">
-        Delete
       </Button>
     </Box>
   );
