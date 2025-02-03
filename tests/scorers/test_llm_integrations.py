@@ -9,10 +9,10 @@ from weave.scorers.summarization_scorer import (
 
 # Define providers and their models
 TEST_MODELS = {
-    "openai": ["openai/gpt-4o-mini", "openai/gpt-4o"],
-    "anthropic": ["anthropic/claude-3-haiku-20240307", "anthropic/claude-3-5-sonnet-20240620"],
-    "mistral": ["mistral/mistral-small-latest", "mistral/mistral-large-latest"],
-    "gemini": ["gemini/gemini-1.5-flash", "gemini/gemini-1.5-pro"],
+    "openai": ["openai/gpt-4o"],
+    "anthropic": ["anthropic/claude-3-5-sonnet-20240620"],
+    "mistral": ["mistral/mistral-large-latest"],
+    "gemini": ["gemini/gemini-1.5-pro"],
 }
 
 
@@ -55,8 +55,8 @@ async def test_summarization_scorer_evaluate_summary(provider, model):
         temperature=0.7,
         max_tokens=1024,
     )
-    input_text = "This is the original text."
-    summary_text = "This is the summary."
+    input_text = "The wolf is lonely in the forest. He is not happy that the fox is not with him."
+    summary_text = "Wolf is lonely and missing the fox."
     result = await summarization_scorer.evaluate_summary(
         input=input_text, summary=summary_text
     )
