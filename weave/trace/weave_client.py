@@ -7,7 +7,7 @@ import logging
 import platform
 import re
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
@@ -18,6 +18,7 @@ from typing import (
     Protocol,
     TypedDict,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -30,6 +31,7 @@ from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.errors import MissingRefError
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
@@ -115,6 +117,9 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 R = TypeVar("R", covariant=True)
+
+
+NestedCallList = list[Union["Call", "NestedCallList"]]
 
 
 class FetchFunc(Protocol[T]):
@@ -516,6 +521,11 @@ class Call:
             CallsFilter(parent_ids=[self.id]),
         )
 
+    def get_descendents(self) -> Iterable[WeaveObject] | NestedCallList:
+        """Get all descendents of the call."""
+        wc = weave_client_context.require_weave_client()
+        return wc.get_call_descendents(calls=[self])
+
     def delete(self) -> bool:
         """Delete the call."""
         client = weave_client_context.require_weave_client()
@@ -831,6 +841,16 @@ class WeaveClient:
         return weave_obj
 
     ################ Query API ################
+
+    def get_call_descendents(
+        self, calls: Iterable[Call]
+    ) -> Iterable[WeaveObject] | NestedCallList:
+        """Get all descendents of the given calls."""
+        return self.get_calls(
+            filter=CallsFilter(
+                trace_ids=[c.trace_id for c in calls],
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
@@ -1759,11 +1779,14 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
+    def _op_calls(self, op: Op, *, filter: CallsFilter | None = None) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
-            raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
+            raise MissingRefError(f"Can't get runs for unpublished op: {op}")
+        if filter is None:
+            filter = CallsFilter()
+        filter.op_names = [op_ref.uri()]
+        return self.get_calls(filter=filter)
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Callable, Literal, Optional, Union, cast
 
@@ -28,13 +29,14 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
+from weave.trace.context import weave_client_context
 from weave.trace.env import get_weave_parallelism
-from weave.trace.errors import OpCallError
+from weave.trace.errors import MissingRefError, OpCallError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, get_ref
+from weave.trace.weave_client import Call, NestedCallList, get_ref
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -317,6 +319,36 @@ class Evaluation(Object):
         print("Evaluation summary", summary)
 
         return summary
+
+    def get_evaluation_calls(
+        self, *, include_children: bool = False, nested: bool = False
+    ) -> Union[Iterable[WeaveObject], NestedCallList]:
+        """Get the calls associated with this evaluation.
+
+        Args:
+            include_children: If true, recursively include the calls of the evaluation's children.
+            nested: If true, return a nested list structure.
+        """
+        try:
+            return self._get_evaluation_calls(
+                include_children=include_children, nested=nested
+            )
+        except MissingRefError:
+            raise RuntimeError(
+                "Cannot get evaluation calls: No evaluation results found. "
+                "You must first run evaluation.evaluate(model) before calling get_evaluation_calls."
+            )
+
+    def _get_evaluation_calls(
+        self, *, include_children: bool = False, nested: bool = False
+    ) -> Union[Iterable[WeaveObject], NestedCallList]:
+        eval_calls = self.evaluate.calls()
+
+        if include_children:
+            wc = weave_client_context.require_weave_client()
+            return wc.get_call_descendents(eval_calls, nested=nested)
+
+        return eval_calls
 
 
 def evaluate(

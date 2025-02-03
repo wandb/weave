@@ -1053,3 +1053,38 @@ async def test_evaluation_with_custom_name(client):
 
     call = calls[0]
     assert call.display_name == "wow-custom!"
+
+
+@pytest.mark.asyncio
+async def test_get_evaluation_calls(client):
+    @weave.op
+    def model(a: int, b: int) -> int:
+        return a + b
+
+    ev = weave.Evaluation(
+        dataset=[
+            {"a": 1, "b": 2},
+            {"a": 2, "b": 3},
+            {"a": 3, "b": 4},
+        ]
+    )
+    await ev.evaluate(model)
+    await ev.evaluate(model)
+
+    res = ev.get_evaluation_calls()
+    # 2 calls to evaluate
+    assert len(res) == 2
+
+    res2 = ev.get_evaluation_calls(include_children=True)
+    # (1x evaluate, 3x predict_and_score, 3x model, 1x summarize) * 2
+    assert len(res2) == 16
+
+    # Also test getting from ref
+    ref = ev.ref
+
+    ev2 = ref.get()
+    res3 = ev2.get_evaluation_calls()
+    assert len(res3) == 2
+
+    res4 = ev2.get_evaluation_calls(include_children=True)
+    assert len(res4) == 16
