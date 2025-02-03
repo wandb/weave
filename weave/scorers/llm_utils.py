@@ -1,10 +1,3 @@
-try:
-    from litellm import amoderation
-except ImportError:
-    raise ImportError(
-        "litellm is not installed. Please install it with `pip install litellm`."
-    )
-
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_DEFAULT_MODERATION_MODEL = "text-moderation-latest"
