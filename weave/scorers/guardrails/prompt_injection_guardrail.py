@@ -6,6 +6,7 @@ import weave
 from weave.scorers import Scorer
 from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
+    PROMPT_INJECTION_GUARDRAIL_USER_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
@@ -55,16 +56,9 @@ class PromptInjectionLLMGuardrail(Scorer):
 
     @weave.op
     def score(self, output: str) -> LLMGuardrailResponse:
-        user_prompt = (
-            PROMPT_INJECTION_SURVEY_PAPER_SUMMARY
-            + f"""
-You are given the following user prompt that you are suppossed to assess whether it is a prompt injection attack or not:
-
-
-<input_prompt>
-{stringify(output)}
-</input_prompt>
-"""
+        user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
+            research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
+            prompt=stringify(output),
         )
         response: LLMGuardrailReasoning = create(
             self._client,
