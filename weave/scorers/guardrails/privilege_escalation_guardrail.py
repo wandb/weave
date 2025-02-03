@@ -1,10 +1,9 @@
-from typing import Any, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers import Scorer
-from weave.scorers.guardrails.prompt_injection_guardrail import LLMGuardrailReasoning
 from weave.scorers.guardrails.prompts import (
     PRIVILEGE_ESCALATION_SYSTEM_PROMPT,
     PRIVILEGE_ESCALATION_USER_PROMPT,
@@ -34,6 +33,7 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
         temperature (float): LLM temperature setting.
         max_tokens (int): Maximum number of tokens in the LLM's response.
     """
+
     system_prompt: str = PRIVILEGE_ESCALATION_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
@@ -45,14 +45,17 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
         from litellm import completion
 
         self._client = instructor.from_litellm(completion)
-    
+
     @weave.op
     def score(self, output: str) -> PrivilegeEscalationGuardrailResponse:
         return create(
             self._client,
             messages=[
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(prompt=output)},
+                {
+                    "role": "user",
+                    "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(prompt=output),
+                },
             ],
             model=self.model_id,
             response_model=PrivilegeEscalationGuardrailResponse,
