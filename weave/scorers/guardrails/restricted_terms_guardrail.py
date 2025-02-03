@@ -47,9 +47,9 @@ class RestrictedTermsAnalysis(BaseModel):
 class RestrictedTermsRecognitionResponse(BaseModel):
     """Response from the `RestrictedTermsLLMGuardrail`"""
 
-    safe: bool
+    flagged: bool
     detected_entities: list[TermMatch]
-    reasoning: str
+    reason: str
     anonymized_text: Optional[str] = None
 
 
@@ -140,8 +140,8 @@ class RestrictedTermsLLMGuardrail(Scorer):
         reasoning = self.frame_guardrail_reasoning(analysis)
         anonymized_text = self.get_anonymized_text(prompt, analysis)
         return RestrictedTermsRecognitionResponse(
-            safe=not analysis.contains_restricted_terms,
+            flagged=not analysis.contains_restricted_terms,
             detected_entities=analysis.detected_matches,
-            reasoning=reasoning,
+            reason=reasoning,
             anonymized_text=anonymized_text,
         ).model_dump()
