@@ -1,10 +1,21 @@
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import BaseModel, Field, field_validator
 
 import weave
 from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.llm_utils import _LLM_CLIENTS, OPENAI_DEFAULT_MODERATION_MODEL
+
+
+class OpenAIModerationScorerOutput(BaseModel):
+    """Output type for OpenAIModerationScorer."""
+
+    flagged: bool = Field(
+        description="Whether the model output is flagged by the moderation API"
+    )
+    categories: dict[str, bool] = Field(
+        description="The categories of the model output"
+    )
 
 
 class OpenAIModerationScorer(LLMScorer):
@@ -32,10 +43,12 @@ class OpenAIModerationScorer(LLMScorer):
         return v
 
     @weave.op
-    def score(self, output: Any) -> dict:
+    def score(self, output: Any) -> OpenAIModerationScorerOutput:
         response = self.client.moderations.create(
             model=self.model_id,
             input=output,
         ).results[0]
         categories = {k: v for k, v in response.categories.items() if v}
-        return {"flagged": response.flagged, "categories": categories}
+        return OpenAIModerationScorerOutput(
+            flagged=response.flagged, categories=categories
+        )

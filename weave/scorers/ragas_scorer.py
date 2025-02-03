@@ -15,6 +15,14 @@ class EntityExtractionResponse(BaseModel):
     )
 
 
+class ContextEntityRecallScorerOutput(BaseModel):
+    """Output type for ContextEntityRecallScorer."""
+
+    recall: float = Field(
+        description="The recall score of the context to the output, float between 0 and 1"
+    )
+
+
 class ContextEntityRecallScorer(InstructorLLMScorer):
     """
     A Scorer that estimates context recall by extracting entities from both the model output
@@ -65,18 +73,18 @@ class ContextEntityRecallScorer(InstructorLLMScorer):
         return entities
 
     @weave.op
-    def score(self, output: str, context: str) -> dict:
+    def score(self, output: str, context: str) -> ContextEntityRecallScorerOutput:
         expected_entities = self.extract_entities(output)
         context_entities = self.extract_entities(context)
         # Calculate recall
         if not expected_entities:
-            return {"recall": 0.0}
+            return ContextEntityRecallScorerOutput(recall=0.0)
         matches = set(expected_entities) & set(context_entities)
         recall = len(matches) / len(expected_entities)
-        return {"recall": recall}
+        return ContextEntityRecallScorerOutput(recall=recall)
 
 
-class RelevancyResponse(BaseModel):
+class ContextRelevancyScorerOutput(BaseModel):
     reasoning: str = Field(
         description="Think step by step about whether the context is relevant to the question"
     )
@@ -124,12 +132,12 @@ class ContextRelevancyScorer(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, output: str, context: str) -> dict:
+    async def score(self, output: str, context: str) -> ContextRelevancyScorerOutput:
         prompt = self.relevancy_prompt.format(question=output, context=context)
         response = create(
             self.client,
             messages=[{"role": "user", "content": prompt}],
-            response_model=RelevancyResponse,
+            response_model=ContextRelevancyScorerOutput,
             model=self.model_id,
         )
-        return response.model_dump()
+        return response

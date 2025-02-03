@@ -74,6 +74,21 @@ on the summarization_score."
     )
 
 
+class SummarizationScorerOutput(BaseModel):
+    """Output type for SummarizationScorer."""
+
+    summarization_eval_score: float = Field(
+        description="The score of the summarization evaluation, {`poor`: 0.0, `ok`: 0.5, `excellent`: 1.0}"
+    )
+    llm_eval_reasoning: str = Field(
+        description="The reasoning of the summarization evaluation"
+    )
+    is_entity_dense: bool = Field(description="Whether the summary is entity dense")
+    entity_density: float = Field(
+        description="The entity density of the summary, float between 0 and 1"
+    )
+
+
 class SummarizationScorer(InstructorLLMScorer):
     """
     A Scorer that evaluates the quality of summaries in two ways:
@@ -177,7 +192,7 @@ class SummarizationScorer(InstructorLLMScorer):
         return text.split()
 
     @weave.op
-    async def score(self, input: str, output: str) -> dict:
+    async def score(self, input: str, output: str) -> SummarizationScorerOutput:
         extract_task = asyncio.to_thread(self.extract_entities, text=str(output))
         evaluate_task = asyncio.to_thread(
             self.evaluate_summary, input=str(input), summary=str(output)
@@ -185,16 +200,20 @@ class SummarizationScorer(InstructorLLMScorer):
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
         # LLM evaluation
-        result = {}
-        result["summarization_eval_score"] = summarization_quality_mapping.get(
+        summarization_eval_score = summarization_quality_mapping.get(
             llm_eval.summarization_evaluation.lower()
         )
-        result["llm_eval_reasoning"] = llm_eval.think_step_by_step
+        llm_eval_reasoning = llm_eval.think_step_by_step
 
         # Entity density evaluation
         summary_words = self.simple_word_tokenize(output)
         entity_density = len(summary_entities) / len(summary_words)
-        result["is_entity_dense"] = entity_density >= self.entity_density_threshold
-        result["entity_density"] = entity_density
+        is_entity_dense = entity_density >= self.entity_density_threshold
+        entity_density = entity_density
 
-        return result
+        return SummarizationScorerOutput(
+            summarization_eval_score=summarization_eval_score,
+            llm_eval_reasoning=llm_eval_reasoning,
+            is_entity_dense=is_entity_dense,
+            entity_density=entity_density,
+        )

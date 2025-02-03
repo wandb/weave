@@ -1,18 +1,34 @@
 from typing import Callable
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 import weave
 from weave.scorers.base_scorer import Scorer
+
+
+class StringMatchScorerOutput(BaseModel):
+    """Output type for StringMatchScorer."""
+
+    string_in_input: bool = Field(
+        description="Whether the output string is found in the target string"
+    )
+
+
+class LevenshteinScorerOutput(BaseModel):
+    """Output type for LevenshteinScorer."""
+
+    levenshtein_distance: int = Field(
+        description="The Levenshtein distance between the output and the target"
+    )
 
 
 class StringMatchScorer(Scorer):
     """Scorer that checks if the model output string is found in the search columns of the dataset row."""
 
     @weave.op
-    def score(self, output: str, target: str) -> dict:
+    def score(self, output: str, target: str) -> StringMatchScorerOutput:
         string_in_input = output.lower() in target.lower()
-        return {"string_in_input": string_in_input}
+        return StringMatchScorerOutput(string_in_input=string_in_input)
 
 
 class LevenshteinScorer(Scorer):
@@ -34,6 +50,6 @@ class LevenshteinScorer(Scorer):
             return self
 
     @weave.op
-    def score(self, output: str, target: str) -> dict:
+    def score(self, output: str, target: str) -> LevenshteinScorerOutput:
         distance = self.distance(output, target)
-        return {"levenshtein_distance": distance}
+        return LevenshteinScorerOutput(levenshtein_distance=distance)

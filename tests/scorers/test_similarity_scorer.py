@@ -3,10 +3,13 @@ from openai import OpenAI
 
 import weave
 from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
-from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
+from weave.scorers.similarity_scorer import (
+    EmbeddingSimilarityScorer,
+    EmbeddingSimilarityScorerOutput,
+)
 
 
-# mock the create function
+# mock the embed function
 @pytest.fixture
 def mock_embed(monkeypatch):
     def _mock_embed(*args, **kwargs):
@@ -31,8 +34,10 @@ def test_similarity_scorer_score(similarity_scorer):
     target = "John likes various types of cheese."
     similarity_scorer.threshold = 0.0
     result = similarity_scorer.score(output=output, target=target)
-    assert result["similarity_score"] > 0.0
-    assert result["is_similar"] is True
+    # Assert that the returned object is a pydantic model
+    assert isinstance(result, EmbeddingSimilarityScorerOutput)
+    assert result.similarity_score > 0.0
+    assert result.is_similar is True
 
 
 def test_similarity_scorer_not_similar(similarity_scorer):
@@ -40,8 +45,9 @@ def test_similarity_scorer_not_similar(similarity_scorer):
     target = "John likes various types of cheese."
     similarity_scorer.threshold = 0.99
     result = similarity_scorer.score(output=output, target=target)
-    assert result["similarity_score"] < 0.99
-    assert result["is_similar"] is False
+    assert isinstance(result, EmbeddingSimilarityScorerOutput)
+    assert result.similarity_score < 0.99
+    assert result.is_similar is False
 
 
 @pytest.mark.asyncio
@@ -60,6 +66,7 @@ async def test_similarity_scorer_eval(similarity_scorer):
         scorers=[similarity_scorer],
     )
     result = await evaluation.evaluate(model)
+    # The evaluation result remains an aggregated dictionary.
     assert result["EmbeddingSimilarityScorer"]["similarity_score"]["mean"] > 0.0
     assert 0 <= result["EmbeddingSimilarityScorer"]["is_similar"]["true_count"] <= 2
 

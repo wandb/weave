@@ -1,8 +1,14 @@
 import json
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 import weave
 from weave.scorers.base_scorer import Scorer
+
+
+class ValidJSONScorerOutput(BaseModel):
+    json_valid: bool = Field(description="Whether the model output is valid JSON")
 
 
 class ValidJSONScorer(Scorer):
@@ -13,6 +19,6 @@ class ValidJSONScorer(Scorer):
         try:
             _ = json.loads(output)
         except json.JSONDecodeError:
-            return {"json_valid": False}
+            return ValidJSONScorerOutput(json_valid=False)
         else:
-            return {"json_valid": True}
+            return ValidJSONScorerOutput(json_valid=True)
