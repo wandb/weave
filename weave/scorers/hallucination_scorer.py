@@ -1,8 +1,9 @@
+from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import InstructorLLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_scorer import LLMScorer
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
 DEFAULT_HALLUCINATION_SYSTEM_PROMPT = """
@@ -102,7 +103,7 @@ the <output> contains hallucinations."
     )
 
 
-class HallucinationFreeScorer(InstructorLLMScorer):
+class HallucinationFreeScorer(LLMScorer):
     """
     A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
@@ -137,10 +138,9 @@ class HallucinationFreeScorer(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, output: str, context: str) -> HallucinationResponse:
+    async def score(self, output: str, context: str) -> HallucinationResponse:
         output = stringify(output)
-        response = create(
-            self.client,
+        response = await acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {
@@ -151,8 +151,11 @@ class HallucinationFreeScorer(InstructorLLMScorer):
                 },
             ],
             model=self.model_id,
-            response_model=HallucinationResponse,
+            response_format=HallucinationResponse,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return response.model_dump()  # Morgan wants this to be a dict
+        response = HallucinationResponse.model_validate_json(
+            response.choices[0].message.content
+        )
+        return response.model_dump()

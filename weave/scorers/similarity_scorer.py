@@ -1,38 +1,42 @@
 from typing import Any
 
 import numpy as np
+from litellm import aembedding
 from pydantic import Field
 
 import weave
-from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL, embed
+from weave.scorers.llm_scorer import Scorer
+from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
 
 
-class EmbeddingSimilarityScorer(LLMScorer):
+class EmbeddingSimilarityScorer(Scorer):
     """Check the cosine similarity distance between the model output and the target.
 
     The threshold is the minimum cosine similarity score that is considered similar.
 
     Args:
+        model_id: The model to use for embedding. Defaults to `text-embedding-3-small`.
         threshold: The minimum cosine similarity score that is considered similar. Defaults to 0.5
     """
 
-    threshold: float = Field(0.5, description="The threshold for the similarity score")
     model_id: str = OPENAI_DEFAULT_EMBEDDING_MODEL
+    threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    def score(self, output: str, target: str) -> Any:
+    async def score(self, output: str, target: str) -> Any:
         assert (
             self.threshold >= -1 and self.threshold <= 1
         ), "`threshold` should be between -1 and 1"
-        model_embedding, target_embedding = self._compute_embeddings(output, target)
+        model_embedding, target_embedding = await self._compute_embeddings(
+            output, target
+        )
         return self.cosine_similarity(model_embedding, target_embedding)
 
-    def _compute_embeddings(
+    async def _compute_embeddings(
         self, output: str, target: str
     ) -> tuple[list[float], list[float]]:
-        embeddings = embed(self.client, self.model_id, [output, target])
-        return embeddings[0], embeddings[1]
+        embeddings = await aembedding(self.model_id, [output, target])
+        return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> dict:
         """Compute the cosine similarity between two vectors."""
