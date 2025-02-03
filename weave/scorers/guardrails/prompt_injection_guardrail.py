@@ -23,11 +23,24 @@ class LLMGuardrailReasoning(BaseModel):
 
 
 class LLMGuardrailResponse(BaseModel):
-    safe: bool
-    reasoning: LLMGuardrailReasoning
+    flagged: bool
+    reason: LLMGuardrailReasoning
 
 
 class PromptInjectionLLMGuardrail(Scorer):
+    """
+    The `PromptInjectionLLMGuardrail` uses an LLM to assess whether a prompt is a prompt injection attack or not.
+
+    Attributes:
+        system_prompt (str): The prompt describing the task of detecting prompt injection attacks.
+            The system prompt is a summarized version of the research paper
+            [An Early Categorization of Prompt Injection Attacks on Large Language Models](https://arxiv.org/abs/2402.00898)
+            that contains the taxonomy of prompt injection attacks and the criteria and definitions for each attack type.
+        model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
+        temperature (float): LLM temperature setting.
+        max_tokens (int): Maximum number of tokens in the LLM's response.
+    """
+
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
@@ -65,5 +78,5 @@ You are given the following user prompt that you are suppossed to assess whether
             max_tokens=self.max_tokens,
         )
         return LLMGuardrailResponse(
-            safe=not response.injection_prompt, reasoning=response
+            flagged=response.injection_prompt, reason=response
         ).model_dump()

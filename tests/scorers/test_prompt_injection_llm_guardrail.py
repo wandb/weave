@@ -39,7 +39,7 @@ def test_prompt_injection_llm_guardrail_score(
     # we should be able to do this validation
     _ = LLMGuardrailResponse.model_validate(result)
 
-    assert result["safe"] == False
-    assert result["reasoning"]["injection_prompt"] == True
-    assert result["reasoning"]["is_direct_attack"] == True
-    assert result["reasoning"]["attack_type"] == "Instruction Manipulation"
+    assert result["flagged"] == True
+    assert result["reason"]["injection_prompt"] == True
+    assert result["reason"]["is_direct_attack"] == True
+    assert result["reason"]["attack_type"] == "Instruction Manipulation"
