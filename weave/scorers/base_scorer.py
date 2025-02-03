@@ -120,8 +120,8 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 @dataclass
 class ScorerAttributes:
-    scorer_name: str
-    score_op: Op
+    name: str
+    op: Op
     summarize_fn: Callable
 
 
@@ -158,16 +158,14 @@ def get_scorer_attributes(
     if scorer_name:
         scorer_name = sanitize_object_name(scorer_name)
 
-    return ScorerAttributes(
-        scorer_name=scorer_name, score_op=score_op, summarize_fn=summarize_fn
-    )
+    return ScorerAttributes(name=scorer_name, op=score_op, summarize_fn=summarize_fn)
 
 
 def _has_oldstyle_scorers(scorers: list[Union[Op, Scorer]]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
         scorer_attributes = get_scorer_attributes(scorer)
-        score_op = scorer_attributes.score_op
+        score_op = scorer_attributes.op
         score_signature = inspect.signature(score_op)
         if "model_output" in score_signature.parameters:
             return True
@@ -213,8 +211,8 @@ async def apply_scorer_async(
 
     # Extract the core components of the scorer
     scorer_attributes = get_scorer_attributes(scorer)
-    scorer_name = scorer_attributes.scorer_name
-    score_op = scorer_attributes.score_op
+    scorer_name = scorer_attributes.name
+    score_op = scorer_attributes.op
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
 
@@ -354,7 +352,7 @@ async def apply_scorer_async(
 
             scorer argument names: {score_arg_names}
             dataset keys: {example.keys()}
-            scorer.column_map: {getattr(scorer, 'column_map', '{}')}
+            scorer.column_map: {getattr(scorer, "column_map", "{}")}
 
             Options for resolving:
             a. if using the `Scorer` weave class, you can set the `scorer.column_map` attribute to map scorer argument names to dataset column names or

@@ -1,9 +1,12 @@
 import asyncio
+import inspect
 import logging
 import multiprocessing
 import random
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
+
+from weave.trace.weave_client import Call
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -233,3 +236,38 @@ def make_memorable_name() -> str:
     adj = random.choice(adjectives)
     noun = random.choice(nouns)
     return f"{adj}-{noun}"
+
+
+def get_callable_name(obj: Any) -> str:
+    if not callable(obj):
+        raise TypeError(f"Object {obj} is not callable")
+
+    if inspect.isfunction(obj):
+        return obj.__name__
+    elif inspect.ismethod(obj):
+        cls_name = obj.__self__.__class__.__name__
+        method_name = obj.__name__
+        return f"{cls_name}.{method_name}"
+    elif hasattr(obj, "__class__"):
+        return obj.__class__.__name__
+
+
+def is_async_callable(obj: Any) -> bool:
+    if inspect.iscoroutinefunction(obj):
+        return True
+
+    if hasattr(obj, "__call__") and inspect.iscoroutinefunction(obj.__call__):
+        return True
+
+    return False
+
+
+async def call(
+    func: Callable | Awaitable, *args: Any, **kwargs: Any
+) -> tuple[Any, Call]:
+    if is_async_callable(func):
+        _, _call = await func(*args, **kwargs)
+    else:
+        _, _call = func(*args, **kwargs)
+
+    return _call
