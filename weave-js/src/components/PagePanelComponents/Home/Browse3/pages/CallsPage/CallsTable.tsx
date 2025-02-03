@@ -188,9 +188,11 @@ const SelectionHeader: FC<{
     <div className="flex w-full items-center gap-[8px]">
       {/* Left side group */}
       <span className="font-semibold text-sm text-moon-600 flex items-center">
-      <Icon
-          name="close"
-          className="mr-[4px] w-[15px] h-[15px] cursor-pointer hover:text-moon-800"
+      <Button
+          icon="close"
+          variant="ghost"
+          size="small"
+          className="mr-[4px]"
           onClick={onClearSelection}
         />
         {selectedCount} {isEvaluateTable ? 'evaluation' : 'trace'}
