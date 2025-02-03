@@ -1,14 +1,13 @@
 import {Box, Tooltip} from '@mui/material';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {Link, useHistory} from 'react-router-dom';
 import {toast} from 'react-toastify';
 
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
-import {Pill} from '../../../../Tag/Pill';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowCurrentRouteContext} from '../context';
@@ -61,7 +60,9 @@ export const DatasetVersionPage: React.FC<{
   const {useRootObjectVersions, useRefsData, useTableUpdate, useObjCreate} =
     useWFHooks();
 
-  const [isEditing, setIsEditing] = useState(false);
+  const tableUpdate = useTableUpdate();
+  const objCreate = useObjCreate();
+  const history = useHistory();
 
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -98,20 +99,7 @@ export const DatasetVersionPage: React.FC<{
 
   const originalTableDigest = viewerDataAsObject?.rows?.split('/').pop() ?? '';
 
-  const handleEditClick = useCallback(() => setIsEditing(true), []);
-  const handleCancelClick = useCallback(() => {
-    resetEditState();
-    setIsEditing(false);
-  }, [resetEditState]);
-
-  const tableUpdate = useTableUpdate();
-  const objCreate = useObjCreate();
-
-  const history = useHistory();
-
   const handlePublish = useCallback(async () => {
-    setIsEditing(false);
-
     const tableUpdateSpecs = convertEditsToTableUpdateSpec();
     const tableUpdateResp = await tableUpdate(
       projectId,
@@ -167,52 +155,51 @@ export const DatasetVersionPage: React.FC<{
     const deletedCountStr = String(deletedRows.length);
     return (
       <div className="flex gap-8">
-        <div className="mr-8 flex items-center gap-4">
-          <Tooltip
-            title={`${maybePluralize(Number(editCountStr), 'row')} edited`}
-            {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={editCountStr} icon="pencil-edit" color="blue" />
-            </div>
-          </Tooltip>
+        <div className="absolute right-[28px] top-[68px] flex gap-8 font-mono text-xs">
           <Tooltip
             title={`${maybePluralize(Number(addedCountStr), 'row')} added`}
             {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={addedCountStr} icon="add-new" color="green" />
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="add-new" width={12} height={12} />
+              <span>{addedCountStr}</span>
             </div>
           </Tooltip>
           <Tooltip
             title={`${maybePluralize(Number(deletedCountStr), 'row')} deleted`}
             {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={deletedCountStr} icon="delete" color="red" />
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="remove" width={12} height={12} />
+              <span>{deletedCountStr}</span>
+            </div>
+          </Tooltip>
+          <Tooltip
+            title={`${maybePluralize(Number(editCountStr), 'row')} edited`}
+            {...TOOLTIP_PROPS}>
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="pencil-edit" width={12} height={12} />
+              <span>{editCountStr}</span>
             </div>
           </Tooltip>
         </div>
-        <Button
-          title="Cancel"
-          tooltip="Cancel"
-          variant="secondary"
-          size="medium"
-          icon="close"
-          onClick={handleCancelClick}>
-          Cancel
-        </Button>
-        <Button
-          title="Publish"
-          tooltip="Publish"
-          size="medium"
-          variant="primary"
-          icon="checkmark"
-          onClick={handlePublish}
-          disabled={
-            editCountStr === '0' &&
-            deletedCountStr === '0' &&
-            addedCountStr === '0'
-          }>
-          Publish
-        </Button>
+        <div className="flex gap-8">
+          {showDeleteButton && (
+            <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
+          )}
+          <Button
+            title="Publish"
+            tooltip="Publish"
+            size="medium"
+            variant="primary"
+            icon="checkmark"
+            onClick={handlePublish}
+            disabled={
+              editCountStr === '0' &&
+              deletedCountStr === '0' &&
+              addedCountStr === '0'
+            }>
+            Publish
+          </Button>
+        </div>
       </div>
     );
   };
@@ -232,7 +219,7 @@ export const DatasetVersionPage: React.FC<{
       headerContent={
         <Tailwind>
           <div className="flex justify-between">
-            <div className="grid auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
               <div className="block">
                 <p className="text-moon-500">Name</p>
                 <ObjectVersionsLink
@@ -277,22 +264,8 @@ export const DatasetVersionPage: React.FC<{
                 </div>
               )}
             </div>
-            <div className="ml-auto mr-0">
-              {isEditing ? (
-                renderEditingControls()
-              ) : (
-                <Button
-                  title="Edit dataset"
-                  tooltip="Edit dataset"
-                  variant="ghost"
-                  size="medium"
-                  icon="pencil-edit"
-                  onClick={handleEditClick}
-                />
-              )}
-              {showDeleteButton && !isEditing && (
-                <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
-              )}
+            <div className="ml-auto flex-shrink-0">
+              {renderEditingControls()}
             </div>
           </div>
         </Tailwind>
@@ -310,7 +283,7 @@ export const DatasetVersionPage: React.FC<{
                     <CustomWeaveTypeProjectContext.Provider
                       value={{entity: entityName, project: projectName}}>
                       <EditableDatasetView
-                        isEditing={isEditing}
+                        isEditing={true}
                         datasetObject={objectVersion.val}
                       />
                     </CustomWeaveTypeProjectContext.Provider>

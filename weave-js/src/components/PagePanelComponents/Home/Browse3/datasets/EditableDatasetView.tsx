@@ -489,7 +489,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
               icon="add-new"
               onClick={handleAddRowsClick}
               variant="secondary"
-              size="small"
               tooltip="Add row">
               Add row
             </Button>
@@ -550,6 +549,22 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
           height: '100%',
           '& .MuiDataGrid-cell': {
             padding: '0',
+            // This vertical / horizontal center aligns <span>'s inside of the columns
+            // Fixes an issure where boolean checkboxes are top-aligned pre-edit
+            '& .MuiBox-root': {
+              '& span.cursor-inherit': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '34px',
+              },
+            },
+          },
+          // Removed default MUI blue from editing cell
+          '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {
+            '&:focus, &:focus-within': {
+              outline: 'none',
+            },
           },
           '& .MuiDataGrid-columnHeaders': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',
