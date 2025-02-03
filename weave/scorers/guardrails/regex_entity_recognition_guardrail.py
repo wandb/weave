@@ -35,9 +35,9 @@ class RegexResult(BaseModel):
 
 
 class RegexEntityRecognitionResponse(BaseModel):
-    safe: bool
+    flagged: bool
     detected_entities: dict[str, list[str]]
-    reasoning: str
+    reason: str
     anonymized_text: Optional[str] = None
 
 
@@ -218,8 +218,8 @@ class RegexEntityRecognitionGuardrail(Scorer):
         reasonings = self.get_reasonings(result)
         anonymized_text = self.get_anonymized_text(prompt, result)
         return RegexEntityRecognitionResponse(
-            safe=result.passed,
+            flagged=result.passed,
             detected_entities=result.matched_patterns,
-            reasoning="\n".join(reasonings),
+            reason="\n".join(reasonings),
             anonymized_text=anonymized_text,
         ).model_dump()

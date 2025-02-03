@@ -24,7 +24,7 @@ def test_regex_entity_recognition_guardrail(regex_entity_recognition_guardrail):
     # we should be able to do this validation
     _ = RegexEntityRecognitionResponse.model_validate(result)
 
-    assert result["safe"] == False
+    assert result["flagged"] == False
     assert (
         result["anonymized_text"]
         == "EMP:[redacted] is [redacted] to PRJ-AB-[redacted]."
