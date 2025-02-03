@@ -4,7 +4,6 @@ import pytest
 
 import weave
 from weave import Evaluation
-
 from weave.scorers import MultiTaskBinaryClassificationF1
 
 
