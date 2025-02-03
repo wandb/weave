@@ -1,11 +1,12 @@
 import asyncio
 from typing import Literal
 
+from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import InstructorLLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_scorer import LLMScorer
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.
@@ -74,7 +75,7 @@ on the summarization_score."
     )
 
 
-class SummarizationScorer(InstructorLLMScorer):
+class SummarizationScorer(LLMScorer):
     """
     A Scorer that evaluates the quality of summaries in two ways:
         - using an LLM to calculate the entity density of the summary, similar to how entity density is
@@ -131,29 +132,31 @@ class SummarizationScorer(InstructorLLMScorer):
     max_tokens: int = 1024
 
     @weave.op
-    def extract_entities(self, text: str) -> list[str]:
+    async def extract_entities(self, text: str) -> list[str]:
         """Use an LLM to extract entities"""
-        response = create(
-            self.client,
+        response = await acompletion(
             messages=[
                 {"role": "system", "content": self.extraction_system_prompt},
                 {"role": "user", "content": self.extraction_prompt.format(text=text)},
             ],
-            response_model=EntityExtractionResponse,
+            response_format=EntityExtractionResponse,
             model=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
+        response = EntityExtractionResponse.model_validate_json(
+            response.choices[0].message.content
+        )
+
         entities = [e.strip().lower() for e in response.entities]
         return entities
 
     @weave.op
-    def evaluate_summary(
+    async def evaluate_summary(
         self, input: str, summary: str
     ) -> SummarizationEvaluationResponse:
         """Evaluate the quality of a summary using an LLM"""
-        return create(
-            self.client,
+        response = await acompletion(
             messages=[
                 {
                     "role": "system",
@@ -166,10 +169,13 @@ class SummarizationScorer(InstructorLLMScorer):
                     ),
                 },
             ],
-            response_model=SummarizationEvaluationResponse,
+            response_format=SummarizationEvaluationResponse,
             model=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
+        )
+        return SummarizationEvaluationResponse.model_validate_json(
+            response.choices[0].message.content
         )
 
     def simple_word_tokenize(self, text: str) -> list[str]:
@@ -178,10 +184,8 @@ class SummarizationScorer(InstructorLLMScorer):
 
     @weave.op
     async def score(self, input: str, output: str) -> dict:
-        extract_task = asyncio.to_thread(self.extract_entities, text=str(output))
-        evaluate_task = asyncio.to_thread(
-            self.evaluate_summary, input=str(input), summary=str(output)
-        )
+        extract_task = self.extract_entities(text=str(output))
+        evaluate_task = self.evaluate_summary(input=str(input), summary=str(output))
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
         # LLM evaluation

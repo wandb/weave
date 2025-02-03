@@ -77,12 +77,7 @@ mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = ["Levenshtein>=0.26.0", "instructor>=1.5.2"]
 scorers_tests = [
-  "instructor>=1.5.2",
   "Levenshtein>=0.26.0",
-  "openai>=1.0.0",
-  "google-generativeai>=0.8.0",
-  "mistralai>=1.0.3",
-  "anthropic>=0.30.0",
   "litellm>=1.58.2",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
