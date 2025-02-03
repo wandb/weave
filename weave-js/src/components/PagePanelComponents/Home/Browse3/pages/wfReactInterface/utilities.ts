@@ -298,6 +298,15 @@ export const isObjDeleteError = (error: Error | null): boolean => {
   return false;
 };
 
+export const getErrorReason = (error: Error): string | null => {
+  try {
+    const parsed = JSON.parse(error.message);
+    return parsed.reason ?? null;
+  } catch (e) {
+    return null;
+  }
+};
+
 /// Hooks ///
 
 export const useParentCall = (

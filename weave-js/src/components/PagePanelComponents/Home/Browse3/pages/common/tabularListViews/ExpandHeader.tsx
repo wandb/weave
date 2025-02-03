@@ -4,8 +4,8 @@
 import React from 'react';
 import styled from 'styled-components';
 
-import {Button} from '../../../Button';
-import {Tooltip} from '../../../Tooltip';
+import {Button} from '../../../../../../Button';
+import {Tooltip} from '../../../../../../Tooltip';
 
 type ExpandHeaderProps = {
   headerName: string;
