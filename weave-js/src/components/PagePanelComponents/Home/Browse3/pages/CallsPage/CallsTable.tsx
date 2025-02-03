@@ -691,28 +691,28 @@ export const CallsTable: FC<{
         disableExport: true,
         display: 'flex',
         renderHeader: (params: any) => {
+          const currentPageRowIds = tableData.map(row => row.id);
+          const currentPageSelectedCount = currentPageRowIds.filter(id => selectedCalls.includes(id)).length;
+          const isChecked = currentPageSelectedCount === 0
+            ? false
+            : currentPageSelectedCount === currentPageRowIds.length
+            ? true
+            : 'indeterminate';
           return (
             <Checkbox
               size="small"
-              checked={
-                selectedCalls.length === 0
-                  ? false
-                  : selectedCalls.length === tableData.length
-                  ? true
-                  : 'indeterminate'
-              }
+              checked={isChecked}
               onCheckedChange={() => {
-                if (selectedCalls.length > 0) {
-                  // If any rows are selected, deselect all
-                  setSelectedCalls([]);
+                if (currentPageSelectedCount === currentPageRowIds.length) {
+                  // Deselect all rows on the current page
+                  setSelectedCalls(selectedCalls.filter(id => !currentPageRowIds.includes(id)));
                 } else {
-                  // If no rows are selected, select up to the max allowed
-                  const maxForTable = isEvaluateTable
-                    ? MAX_EVAL_COMPARISONS
-                    : MAX_SELECT;
-                  setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, maxForTable)
-                  );
+                  // Select all rows on the current page
+                  const missing = currentPageRowIds.filter(id => !selectedCalls.includes(id));
+                  const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+                  const availableSlots = maxForTable - selectedCalls.length;
+                  const additions = availableSlots < missing.length ? missing.slice(0, availableSlots) : missing;
+                  setSelectedCalls([...selectedCalls, ...additions]);
                 }
               }}
             />
