@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
+
 from pydantic import BaseModel
 
 import weave
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 
 class PresidioEntityRecognitionResponse(BaseModel):
     flagged: bool
-    detected_entities: Dict[str, List[str]]
+    detected_entities: dict[str, list[str]]
     reason: str
     anonymized_text: Optional[str] = None
 
@@ -22,28 +23,27 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     by leveraging Presidio's AnalyzerEngine and AnonymizerEngine to perform these tasks.
 
     Attributes:
-        selected_entities (List[str]): A list of entity types to detect in the text.
+        selected_entities (list[str]): A list of entity types to detect in the text.
         should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
         language (str): The language of the text to be analyzed.
 
     Args:
-        selected_entities (Optional[List[str]]): A list of entity types to detect in the text.
+        selected_entities (Optional[list[str]]): A list of entity types to detect in the text.
         should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
         language (str): The language of the text to be analyzed.
-        deny_lists (Optional[Dict[str, List[str]]]): A dictionary of entity types and their
+        deny_lists (Optional[dict[str, list[str]]]): A dictionary of entity types and their
             corresponding deny lists.
-        regex_patterns (Optional[Dict[str, List[Dict[str, str]]]]): A dictionary of entity
+        regex_patterns (Optional[dict[str, list[dict[str, str]]]]): A dictionary of entity
             types and their corresponding regex patterns.
-        custom_recognizers (Optional[List[Any]]): A list of custom recognizers to add to the
+        custom_recognizers (Optional[list[Any]]): A list of custom recognizers to add to the
             analyzer.
         show_available_entities (bool): A flag indicating whether to print available entities.
     """
 
     @staticmethod
-    def get_available_entities() -> List[str]:
+    def get_available_entities() -> list[str]:
         """Get available entities from Presidio"""
-
-        from presidio_analyzer import RecognizerRegistry, AnalyzerEngine
+        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
 
         registry = RecognizerRegistry()
         analyzer = AnalyzerEngine(registry=registry)
@@ -52,18 +52,18 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             for recognizer in analyzer.registry.recognizers
         ]
 
-    selected_entities: List[str]
+    selected_entities: list[str]
     language: str
-    _analyzer: Optional["AnalyzerEngine"] = None
-    _anonymizer: Optional["AnonymizerEngine"] = None
+    _analyzer: "AnalyzerEngine"
+    _anonymizer: "AnonymizerEngine"
 
     def __init__(
         self,
-        selected_entities: Optional[List[str]] = None,
+        selected_entities: Optional[list[str]] = None,
         language: str = "en",
-        deny_lists: Optional[Dict[str, List[str]]] = None,
-        regex_patterns: Optional[Dict[str, List[Dict[str, str]]]] = None,
-        custom_recognizers: Optional[List[Any]] = None,
+        deny_lists: Optional[dict[str, list[str]]] = None,
+        regex_patterns: Optional[dict[str, list[dict[str, str]]]] = None,
+        custom_recognizers: Optional[list[Any]] = None,
         show_available_entities: bool = False,
     ):
         from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
@@ -138,10 +138,10 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
     @weave.op
     def group_analyzer_results_by_entity_type(
-        self, output: str, analyzer_results: List[Any]
-    ) -> Dict[str, List[str]]:
+        self, output: str, analyzer_results: list[Any]
+    ) -> dict[str, list[str]]:
         """Group results by entity type"""
-        detected_entities = {}
+        detected_entities: dict[str, list[str]] = {}
         for result in analyzer_results:
             entity_type = result.entity_type
             text_slice = output[result.start : result.end]
@@ -151,7 +151,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         return detected_entities
 
     @weave.op
-    def create_reason(self, detected_entities: Dict[str, List[str]]) -> str:
+    def create_reason(self, detected_entities: dict[str, list[str]]) -> str:
         """Create explanation for why the text was flagged"""
         explanation_parts = []
         if detected_entities:
@@ -174,9 +174,9 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     def anonymize_text(
         self,
         output: str,
-        analyzer_results: List["RecognizerResult"],
-        detected_entities: Dict[str, List[str]],
-    ) -> str:
+        analyzer_results: list["RecognizerResult"],
+        detected_entities: dict[str, list[str]],
+    ) -> Optional[str]:
         anonymized_text = None
         if detected_entities:
             anonymized_result = self._anonymizer.anonymize(
