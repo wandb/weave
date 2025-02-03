@@ -1,0 +1,40 @@
+name: Weekly Slack Digest
+
+on:
+  # Disable until we are confident this works
+  # schedule:
+  #   - cron: '0 14 * * 1'  # Every Monday at 6 AM PST (14:00 UTC)
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Slack channel to post to'
+        required: false
+        default: 'weave-dev-digest'
+      days:
+        description: 'Number of days to look back'
+        required: false
+        default: '7'
+
+jobs:
+  notify:
+    name: python
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Recommended uv setup: https://docs.astral.sh/uv/guides/integration/github/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Install a specific version of uv.
+          version: "0.5.25"
+
+      - name: Send Digest
+        env:
+          SLACK_TOKEN: ${{ secrets.WEAVE_DEV_BOT_SLACK_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run gh_actions/slack_digest.py --slack \
+            --channel "${{ github.event.inputs.channel || 'weave-dev-digest' }}" \
+            --days "${{ github.event.inputs.days || '7' }}"

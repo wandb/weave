@@ -4,7 +4,7 @@ Weave is available on the following deployment options:
 
 - **[W&B SaaS Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/saas_cloud):** A multi-tenant, fully-managed platform deployed in W&B's Google Cloud Platform (GCP) account in a North America region.
 - **[W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud):** Generally available on AWS and in preview on GCP and Azure. 
-- **Self-managed instances:** For teams that prefer to host Weave independently, guidance is available from your W&B team to evaluate deployment options.
+- **[Self-managed instances](./weave-self-managed.md):** For teams that prefer to host Weave independently, guidance is available from your W&B team to evaluate deployment options.
 
 ## Identity and Access Management
 

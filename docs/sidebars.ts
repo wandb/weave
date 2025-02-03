@@ -132,6 +132,10 @@ const sidebars: SidebarsConfig = {
           type: "doc",
           id: "guides/platform/index",
         },
+        {
+          type: "doc",
+          id: "guides/platform/weave-self-managed",
+        }
       ],
     },
   ],

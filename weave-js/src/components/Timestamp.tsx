@@ -85,12 +85,10 @@ export const Timestamp = ({value, format, live = true}: TimestampProps) => {
         live={live}
       />
     );
-    return (
-      <Tooltip position="top center" content={content} trigger={timeago} />
-    );
+    return <Tooltip content={content} trigger={timeago} />;
   }
 
   const {long, short} = formatTimestampInternal(then, format);
   const text = <span>{short}</span>;
-  return <Tooltip position="top center" content={long} trigger={text} />;
+  return <Tooltip content={long} trigger={text} />;
 };
