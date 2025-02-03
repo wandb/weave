@@ -9,8 +9,8 @@ export const ButtonVariants = {
   Primary: 'primary',
   Secondary: 'secondary',
   Ghost: 'ghost',
-  Quiet: 'quiet',
   Destructive: 'destructive',
+  Outline: 'outline',
 } as const;
 export type ButtonVariant =
   (typeof ButtonVariants)[keyof typeof ButtonVariants];

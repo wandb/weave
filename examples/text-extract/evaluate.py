@@ -1,13 +1,12 @@
-from typing import Any
-
 import asyncio
 import json
 import os
-import re
-import openai
-import weave
+from typing import Any
 
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+import openai
+
+import weave
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 
 class TextExtractModel(weave.Model):

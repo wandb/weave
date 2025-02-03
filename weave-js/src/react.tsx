@@ -47,6 +47,8 @@ import {
   useState,
 } from 'react';
 
+import {captureAndThrowError} from './common/util/sentry';
+import {WEAVE_REF_PREFIX} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
@@ -64,7 +66,6 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
-import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
@@ -351,11 +352,11 @@ export const useNodeValue = <T extends Type>(
     // Just rethrow the error in the render thread so it can be caught
     // by an error boundary.
     if (error != null) {
-      const message =
-        'Node execution failed (useNodeValue): ' + errorToText(error);
-      // console.error(message);
-
-      throw new UseNodeValueServerExecutionError(message);
+      const message = `Node execution failed (useNodeValue): ${errorToText(
+        error
+      )}`;
+      const err = new UseNodeValueServerExecutionError(message);
+      captureAndThrowError(err, {fingerprint: ['useNodeValue']});
     }
     if (isConstNode(node)) {
       if (isFunction(node.type)) {
@@ -474,7 +475,7 @@ export interface WandbArtifactRef {
   artifactRefExtra?: string;
 }
 
-type WeaveKind = 'object' | 'op' | 'table';
+export type WeaveKind = 'object' | 'op' | 'table' | 'call';
 export interface WeaveObjectRef {
   scheme: 'weave';
   entityName: string;
@@ -501,8 +502,11 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
   return ref.scheme === 'weave';
 };
 
-const PATTERN_ENTITY = '([a-z0-9-_]+)'; // Entity name: lowercase, digits, dash, underscore
+// Entity name should be lowercase, digits, dash, underscore
+// Unfortunately many teams have been created that violate this.
+const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
+const PATTERN_REF_EXTRA = '([a-zA-Z0-9_.~/%-]*)'; // Optional ref extra (valid chars are result of python urllib.parse.quote and javascript encodeURIComponent)
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -516,7 +520,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -529,24 +533,45 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     '/table/',
     '([a-f0-9]+)', // Digest
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_REF_EXTRA, // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
+const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
+  [
+    '^', // Start of the string
+    PATTERN_ENTITY,
+    '/',
+    PATTERN_PROJECT,
+    '/call/',
+    '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
+    '/?', // Ref extra portion is optional
+    PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
 
+export const parseRefMaybe = (s: string): ObjectRef | null => {
+  try {
+    return parseRef(s);
+  } catch (e) {
+    return null;
+  }
+};
+
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
-  let splitLimit: number;
+  let maxSplitsToMake: number;
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
-    splitLimit = 4;
+    maxSplitsToMake = 3;
   } else if (isLocalArtifact) {
-    splitLimit = 2;
+    maxSplitsToMake = 2;
   } else if (isWeaveRef) {
-    splitLimit = 4;
+    return parseWeaveRef(ref);
   } else {
     throw new Error(`Unknown protocol: ${url.protocol}`);
   }
@@ -554,22 +579,22 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', maxSplitsToMake);
 
-  if (splitUri.length !== splitLimit) {
+  if (maxSplitsToMake !== splitUri.length) {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
   if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    const [entityName, projectName, artifactName] = splitUri;
+    const [artifactCollection, artifactVersion] = artifactName.split(':', 2);
     return {
       scheme: 'wandb-artifact',
       entityName,
       projectName,
-      artifactName: artifactNamePart,
+      artifactName: artifactCollection,
       artifactVersion,
-      artifactPath: artifactPathPart,
+      artifactPath: ref,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
   }
@@ -583,45 +608,58 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactPath,
     };
   }
+  throw new Error(`Unknown protocol: ${url.protocol}`);
+};
 
-  if (isWeaveRef) {
-    const trimmed = trimStartChar(decodedUri, '/');
-    const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
-    if (tableMatch !== null) {
-      const [entity, project, digest] = tableMatch.slice(1);
-      return {
-        scheme: 'weave',
-        entityName: entity,
-        projectName: project,
-        weaveKind: 'table' as WeaveKind,
-        artifactName: '',
-        artifactVersion: digest,
-        artifactRefExtra: '',
-      };
-    }
-    const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
-    if (match === null) {
-      throw new Error('Invalid weave ref uri: ' + ref);
-    }
-    const [
-      entityName,
-      projectName,
-      weaveKind,
-      artifactName,
-      artifactVersion,
-      artifactRefExtra,
-    ] = match.slice(1);
+const parseWeaveRef = (ref: string): WeaveObjectRef => {
+  const trimmed = ref.slice(WEAVE_REF_PREFIX.length);
+  const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
+  if (tableMatch !== null) {
+    const [entity, project, digest] = tableMatch.slice(1);
     return {
       scheme: 'weave',
-      entityName,
-      projectName,
-      weaveKind: weaveKind as WeaveKind,
-      artifactName,
-      artifactVersion,
-      artifactRefExtra: artifactRefExtra ?? '',
+      entityName: entity,
+      projectName: project,
+      weaveKind: 'table' as WeaveKind,
+      artifactName: '',
+      artifactVersion: digest,
+      artifactRefExtra: '',
     };
   }
-  throw new Error(`Unknown protocol: ${url.protocol}`);
+  const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
+  if (callMatch !== null) {
+    const [entity, project, callId] = callMatch.slice(1);
+    return {
+      scheme: 'weave',
+      entityName: entity,
+      projectName: project,
+      weaveKind: 'call' as WeaveKind,
+      artifactName: callId,
+      artifactVersion: '',
+      artifactRefExtra: '',
+    };
+  }
+  const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
+  if (match === null) {
+    throw new Error('Invalid weave ref uri: ' + ref);
+  }
+  const [
+    entityName,
+    projectName,
+    weaveKind,
+    artifactName,
+    artifactVersion,
+    artifactRefExtra,
+  ] = match.slice(1);
+  return {
+    scheme: 'weave',
+    entityName,
+    projectName,
+    weaveKind: weaveKind as WeaveKind,
+    artifactName,
+    artifactVersion,
+    artifactRefExtra: artifactRefExtra ?? '',
+  };
 };
 
 export const objectRefWithExtra = (
@@ -1197,10 +1235,15 @@ export const useNodeWithServerType: typeof useNodeWithServerTypeDoNotCallMeDirec
   };
 
 export const useExpandedNode = (
-  node: NodeOrVoidNode
+  node: NodeOrVoidNode,
+  newVars?: {[key: string]: Node} | null
 ): {loading: boolean; result: NodeOrVoidNode} => {
   const [error, setError] = useState();
-  const {stack} = usePanelContext();
+  const {stack: origStack} = usePanelContext();
+
+  const stack = useMemo(() => {
+    return pushFrame(origStack, newVars ?? {});
+  }, [newVars, origStack]);
 
   let dereffedNode: NodeOrVoidNode;
   ({node, dereffedNode} = useRefEqualExpr(node, stack));
@@ -1232,7 +1275,7 @@ export const useExpandedNode = (
     if (error != null) {
       // rethrow in render thread
       console.error('useExpanded error', error);
-      throw new Error(error);
+      throw error;
     }
     return {
       loading: node.nodeType !== 'output' ? false : node !== result.node,

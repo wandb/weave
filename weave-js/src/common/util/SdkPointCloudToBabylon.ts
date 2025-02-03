@@ -160,7 +160,7 @@ export const handlePoints = (object3D: Object3DScene): ScenePoint[] => {
   // Draw Points
   return truncatedPoints.map(point => {
     const [x, y, z, r, g, b] = point;
-    const position: Position = [x, y, z];
+    const position: Position = [x ?? 0, y ?? 0, z ?? 0];
     const category = r;
 
     if (r !== undefined && g !== undefined && b !== undefined) {

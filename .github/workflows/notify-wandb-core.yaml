@@ -9,8 +9,35 @@ on:
       - "**"
   workflow_dispatch:
 
+permissions:
+  packages: write
+
 jobs:
+  publish-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure npm for GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> weave-js/.npmrc
+      - name: Publish package
+        run: |
+          cd weave-js
+          yarn install --frozen-lockfile
+          npm version 0.0.0-${{ github.sha }} --no-git-tag-version
+          yarn generate
+          cp package.json README.md .npmrc src/
+          cd src
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            npm publish
+          else
+            npm publish --tag prerelease
+          fi
+  check-which-tests-to-run:
+    uses: ./.github/workflows/check-which-tests-to-run.yaml
   notify-wandb-core:
+    needs: [check-which-tests-to-run, publish-package]
     runs-on: ubuntu-latest
     steps:
       - name: Repository dispatch
@@ -19,4 +46,4 @@ jobs:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
-          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}"}'
+          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_weave_js_tests": ${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}, "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}, "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}}'

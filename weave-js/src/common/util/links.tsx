@@ -102,11 +102,14 @@ export const TargetBlank: FCWithRef<
     ) {
       passthroughProps.href = getConfig().urlPrefixed(passthroughProps.href);
     }
+    // Tailwind default styling overrides styled components, need to specify here too.
+    const className = 'font-semibold text-teal-600 hover:text-teal-500';
     return (
       // eslint-disable-next-line wandb/no-a-tags
       <A
         target="_blank"
         rel="noopener noreferrer"
+        className={className}
         {...passthroughProps}
         ref={ref}>
         {children}

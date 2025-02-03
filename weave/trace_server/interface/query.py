@@ -26,16 +26,6 @@ import typing
 
 from pydantic import BaseModel, Field
 
-
-class Query(BaseModel):
-    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
-    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
-    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
-    expr_: "Operation" = Field(alias="$expr")
-    # In the future, we could have other top-level Query Operators as described here:
-    # https://www.mongodb.com/docs/manual/reference/operator/query/
-
-
 # Operations: all operations have the form of a single property
 # with the name of the operation suffixed with an underscore.
 # Subset of Mongo _Aggregation_ Operators: https://www.mongodb.com/docs/manual/reference/operator/aggregation/
@@ -47,7 +37,13 @@ class Query(BaseModel):
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
     literal_: typing.Union[
-        str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
+        str,
+        int,
+        float,
+        bool,
+        dict[str, "LiteralOperation"],
+        list["LiteralOperation"],
+        None,
     ] = Field(alias="$literal")
 
 
@@ -76,40 +72,48 @@ class ConvertOperation(BaseModel):
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
+CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
+
+
 class ConvertSpec(BaseModel):
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    to: typing.Literal["double", "string", "int", "bool"]
+    to: CastTo
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
-    and_: typing.List["Operand"] = Field(alias="$and")
+    and_: list["Operand"] = Field(alias="$and")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/or/
 class OrOperation(BaseModel):
-    or_: typing.List["Operand"] = Field(alias="$or")
+    or_: list["Operand"] = Field(alias="$or")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/not/
 class NotOperation(BaseModel):
-    not_: typing.Tuple["Operand"] = Field(alias="$not")
+    not_: tuple["Operand"] = Field(alias="$not")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/eq/
 class EqOperation(BaseModel):
-    eq_: typing.Tuple["Operand", "Operand"] = Field(alias="$eq")
+    eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gt/
 class GtOperation(BaseModel):
-    gt_: typing.Tuple["Operand", "Operand"] = Field(alias="$gt")
+    gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gte/
 class GteOperation(BaseModel):
-    gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
+    gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
+
+
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
+class InOperation(BaseModel):
+    in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
 
 
 # This is not technically in the Mongo spec. Mongo has:
@@ -134,12 +138,10 @@ Operation = typing.Union[
     EqOperation,
     GtOperation,
     GteOperation,
+    InOperation,
     ContainsOperation,
 ]
-Operand = typing.Union[
-    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
-]
-
+Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, Operation]
 
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()
@@ -150,4 +152,14 @@ NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
 GteOperation.model_rebuild()
+InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+
+
+class Query(BaseModel):
+    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
+    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
+    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
+    expr_: Operation = Field(alias="$expr")
+    # In the future, we could have other top-level Query Operators as described here:
+    # https://www.mongodb.com/docs/manual/reference/operator/query/

@@ -1,10 +1,5 @@
 from typing import Any
 
-import openai
-from openai._types import NotGiven
-from openai.types.chat import (
-    ChatCompletionMessageParam,
-)
 from pydantic import Field
 
 import weave
@@ -36,6 +31,10 @@ class Agent(Object):
         Returns:
             The new state of the environment.
         """
+        import openai
+        from openai._types import NotGiven
+        from openai.types.chat import ChatCompletionMessageParam
+
         LogEvents.step_start("agent", "green")
 
         messages: list[ChatCompletionMessageParam] = [

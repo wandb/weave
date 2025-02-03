@@ -1,11 +1,8 @@
-import Box from '@mui/material/Box';
-import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
 import {useDeepMemo} from '../../../../../hookUtils';
-import {SmallRef} from '../../Browse2/SmallRef';
 
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
@@ -25,28 +22,6 @@ export const truncateID = (id: string, maxLen: number = 9) => {
   const startLen = Math.floor((maxLen - 3) / 2);
   const endLen = maxLen - 3 - startLen;
   return `${id.slice(0, startLen)}...${id.slice(-endLen)}`;
-};
-
-export const renderCell = (value: any) => {
-  if (typeof value === 'string' && value.startsWith('wandb-artifact:///')) {
-    return <SmallRef objRef={parseRef(value)} />;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'True' : 'False';
-  }
-  if (typeof value === 'number') {
-    const printedVal = Number.isInteger(value) ? value : value.toFixed(4);
-    return (
-      <Box
-        sx={{
-          textAlign: 'right',
-          width: '100%',
-        }}>
-        {printedVal}
-      </Box>
-    );
-  }
-  return value;
 };
 
 /**

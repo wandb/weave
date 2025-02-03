@@ -15,18 +15,27 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@docusaurus/core": "3.1.0",
-    "@docusaurus/preset-classic": "3.1.0",
+    "@docusaurus/core": "^3.4.0",
+    "@docusaurus/plugin-google-gtag": "^3.4.0",
+    "@docusaurus/plugin-google-tag-manager": "^3.4.0",
+    "@docusaurus/preset-classic": "^3.4.0",
+    "@easyops-cn/docusaurus-search-local": "^0.44.4",
+    "@laxels/docusaurus-plugin-segment": "^1.0.6",
     "@mdx-js/react": "^3.0.0",
     "clsx": "^2.0.0",
+    "docusaurus-plugin-openapi-docs": "^3.0.1",
+    "docusaurus-plugin-sass": "^0.2.5",
+    "docusaurus-theme-openapi-docs": "^3.0.1",
+    "plugin-image-zoom": "^1.2.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "sass": "^1.77.8"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.1.0",
-    "@docusaurus/tsconfig": "3.1.0",
-    "@docusaurus/types": "3.1.0",
+    "@docusaurus/module-type-aliases": "^3.4.0",
+    "@docusaurus/tsconfig": "^3.4.0",
+    "@docusaurus/types": "^3.4.0",
     "typescript": "~5.2.2"
   },
   "browserslist": {
@@ -43,5 +52,6 @@
   },
   "engines": {
     "node": ">=18.0"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

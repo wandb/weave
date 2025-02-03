@@ -34,8 +34,10 @@ deserialized in a Python runtime that does not have the serializer
 registered.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 
 @dataclass
@@ -43,6 +45,10 @@ class Serializer:
     target_class: type
     save: Callable
     load: Callable
+
+    # Added to provide a function to check if an object is an instance of the
+    # target class because protocol isinstance checks can fail in python3.12+
+    instance_check: Callable[[Any], bool] | None = None
 
     def id(self) -> str:
         ser_id = self.target_class.__module__ + "." + self.target_class.__name__
@@ -52,25 +58,32 @@ class Serializer:
             # "Op" in the database.
             if ser_id.endswith(".Op"):
                 return "Op"
-        return self.target_class.__name__
+        return ser_id
 
 
 SERIALIZERS = []
 
 
-def register_serializer(target_class: type, save: Callable, load: Callable) -> None:
-    SERIALIZERS.append(Serializer(target_class, save, load))
+def register_serializer(
+    target_class: type,
+    save: Callable,
+    load: Callable,
+    instance_check: Callable[[Any], bool] | None = None,
+) -> None:
+    SERIALIZERS.append(Serializer(target_class, save, load, instance_check))
 
 
-def get_serializer_by_id(id: str) -> Optional[Serializer]:
+def get_serializer_by_id(id: str) -> Serializer | None:
     for serializer in SERIALIZERS:
         if serializer.id() == id:
             return serializer
     return None
 
 
-def get_serializer_for_obj(obj: Any) -> Optional[Serializer]:
+def get_serializer_for_obj(obj: Any) -> Serializer | None:
     for serializer in SERIALIZERS:
-        if isinstance(obj, serializer.target_class):
+        if serializer.instance_check and serializer.instance_check(obj):
+            return serializer
+        elif isinstance(obj, serializer.target_class):
             return serializer
     return None

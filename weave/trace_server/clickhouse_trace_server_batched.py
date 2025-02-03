@@ -28,37 +28,94 @@ import hashlib
 import json
 import logging
 import threading
-import typing
 from collections import defaultdict
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import emoji
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult, StreamContext
+from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel, ValidationError
 
-from . import clickhouse_trace_server_migrator as wf_migrator
-from . import environment as wf_env
-from . import refs_internal
-from . import trace_server_interface as tsi
-from .emoji_util import detone_emojis
-from .errors import InvalidRequest, RequestTooLarge
-from .feedback import (
+from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import environment as wf_env
+from weave.trace_server import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.calls_query_builder import (
+    CallsQuery,
+    HardCodedFilter,
+    OrderField,
+    QueryBuilderDynamicField,
+    QueryBuilderField,
+    combine_conditions,
+)
+from weave.trace_server.clickhouse_schema import (
+    CallDeleteCHInsertable,
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+    CallUpdateCHInsertable,
+    ObjCHInsertable,
+    ObjDeleteCHInsertable,
+    SelectableCHCallSchema,
+    SelectableCHObjSchema,
+)
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
+from weave.trace_server.emoji_util import detone_emojis
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidRequest,
+    MissingLLMApiKeyError,
+    NotFoundError,
+    ObjectDeletedError,
+    RequestTooLarge,
+)
+from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .interface import query as tsi_query
-from .orm import Column, ParamBuilder, Row, Table
-from .trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+from weave.trace_server.ids import generate_id
+from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
+from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.objects_query_builder import (
+    ObjectMetadataQueryBuilder,
+    format_metadata_objects_from_query_result,
+    make_objects_val_query_and_parameters,
+)
+from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.table_query_builder import (
+    ROW_ORDER_COLUMN_NAME,
+    TABLE_ROWS_ALIAS,
+    VAL_DUMP_COLUMN_NAME,
+    make_natural_sort_table_query,
+    make_standard_table_query,
+)
+from weave.trace_server.token_costs import (
+    LLM_TOKEN_PRICES_TABLE,
+    validate_cost_purge_req,
+)
+from weave.trace_server.trace_server_common import (
+    DynamicBatchProcessor,
+    LRUCache,
+    empty_str_to_none,
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_derived_summary_fields,
+    make_feedback_query_req,
+    set_nested_key,
+)
+from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
-    generate_id,
     str_digest,
 )
 
@@ -71,102 +128,16 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+INITIAL_CALLS_STREAM_BATCH_SIZE = 50
+MAX_CALLS_STREAM_BATCH_SIZE = 500
 
 
-class NotFoundError(Exception):
-    pass
-
-
-class CallStartCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-    op_name: str
-    started_at: datetime.datetime
-    attributes_dump: str
-    inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = []  # sadly, this is required
-    display_name: typing.Optional[str] = None
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-
-class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
-    summary_dump: str
-    output_dump: str
-    input_refs: typing.List[str] = []  # sadly, this is required
-    output_refs: typing.List[str]
-
-
-class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    deleted_at: datetime.datetime
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-
-class CallUpdateCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    # update types
-    display_name: typing.Optional[str] = None
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-
-CallCHInsertable = typing.Union[
+CallCHInsertable = Union[
     CallStartCHInsertable,
     CallEndCHInsertable,
     CallDeleteCHInsertable,
     CallUpdateCHInsertable,
 ]
-
-
-# Very critical that this matches the calls table schema! This should
-# essentially be the DB version of CallSchema with the addition of the
-# created_at and updated_at fields
-class SelectableCHCallSchema(BaseModel):
-    project_id: str
-    id: str
-
-    op_name: str
-    display_name: typing.Optional[str] = None
-
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-
-    started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
-
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
-
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    deleted_at: typing.Optional[datetime.datetime] = None
 
 
 all_call_insert_columns = list(
@@ -178,10 +149,7 @@ all_call_insert_columns = list(
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
-
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_select_columns) - set([]))
+required_call_columns = ["id", "project_id", "trace_id", "op_name", "started_at"]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -191,34 +159,21 @@ call_select_argmax_columns = ["display_name"]  # argMaxMerge
 # all others use `any`
 
 
-class ObjCHInsertable(BaseModel):
-    project_id: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    object_id: str
-    refs: typing.List[str]
-    val_dump: str
-    digest: str
-
-
-class SelectableCHObjSchema(BaseModel):
-    project_id: str
-    object_id: str
-    created_at: datetime.datetime
-    refs: typing.List[str]
-    val_dump: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    digest: str
-    version_index: int
-    is_latest: int
-
-
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
 all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
-required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
+required_obj_select_columns = list(set(all_obj_select_columns) - set())
+
+ObjRefListType = list[ri.InternalObjectRef]
+
+
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
+ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
+
+CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
+    "max_memory_usage": 16 * 1024 * 1024 * 1024,  # 16 GiB
+}
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -240,12 +195,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._password = password
         self._database = database
         self._flush_immediately = True
-        self._call_batch: typing.List[typing.List[typing.Any]] = []
+        self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
+        self._model_to_provider_info_map = read_model_to_provider_info_map()
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
-        return cls(
+        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
+        # that type checking is applied to the constructor.
+        return ClickHouseTraceServer(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
             user=wf_env.wf_clickhouse_user(),
@@ -255,7 +213,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     @contextmanager
-    def call_batch(self) -> typing.Iterator[None]:
+    def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
         self._flush_immediately = False
         try:
@@ -296,8 +254,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        # Return the marshaled response
-        return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
+        res = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(
+                    call_ids=[req.id],
+                ),
+                limit=1,
+                include_costs=req.include_costs,
+            )
+        )
+        try:
+            _call = next(res)
+        except StopIteration:
+            _call = None
+        return tsi.CallReadRes(call=_call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -307,92 +278,171 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        having_conditions = []
-        start_event_conditions = []
-        end_event_conditions = []
-        param_builder = ParamBuilder()
-        raw_fields_used = set()
+        cq = CallsQuery(project_id=req.project_id)
 
-        # First, apply the application filter
-        if req.filter:
-            filter_to_conditions = _process_calls_filter_to_conditions(
-                req.filter, param_builder
-            )
-            raw_fields_used.update(filter_to_conditions.fields_used)
-            having_conditions.extend(filter_to_conditions.having_conditions)
-            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
-            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+        cq.add_field("id")
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
 
-        # Next, apply the query filter
-        if req.query:
-            having_query_conds, fields_used = _process_query_to_conditions(
-                req.query, all_call_select_columns, all_call_json_columns, param_builder
-            )
-            raw_fields_used.update(fields_used)
-            having_conditions.extend(having_query_conds)
-
-        # Perform the query against the database
-        stats = self._calls_query_stats_raw(
-            req.project_id,
-            columns=list(raw_fields_used),
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            parameters=param_builder.get_params(),
+        pb = ParamBuilder()
+        inner_query = cq.as_sql(pb)
+        raw_res = self._query(
+            f"SELECT count() FROM ({inner_query})",
+            pb.get_params(),
         )
+        rows = raw_res.result_rows
+        count = 0
+        if rows and len(rows) == 1 and len(rows[0]) == 1:
+            count = rows[0][0]
+        return tsi.CallsQueryStatsRes(count=count)
 
-        # Return the marshaled response
-        return tsi.CallsQueryStatsRes(count=stats["count"])
-
-    def calls_query_stream(
-        self, req: tsi.CallsQueryReq
-    ) -> typing.Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        having_conditions = []
-        start_event_conditions = []
-        end_event_conditions = []
-        param_builder = ParamBuilder()
+        cq = CallsQuery(
+            project_id=req.project_id, include_costs=req.include_costs or False
+        )
+        columns = all_call_select_columns
+        if req.columns:
+            # Set columns to user-requested columns, w/ required columns
+            # These are all formatted by the CallsQuery, which prevents injection
+            # and other attack vectors.
+            columns = list(set(required_call_columns + req.columns))
+            # TODO: add support for json extract fields
+            # Split out any nested column requests
+            columns = [col.split(".")[0] for col in columns]
 
-        # First, apply the application filter
-        if req.filter:
-            filter_to_conditions = _process_calls_filter_to_conditions(
-                req.filter, param_builder
-            )
-            having_conditions.extend(filter_to_conditions.having_conditions)
-            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
-            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
 
-        # Next, apply the query filter
-        if req.query:
-            having_query_conds, _ = _process_query_to_conditions(
-                req.query, all_call_select_columns, all_call_json_columns, param_builder
-            )
-            having_conditions.extend(having_query_conds)
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        if req.include_costs:
+            summary_columns = ["summary", "summary_dump"]
+            columns = [
+                *[col for col in columns if col not in summary_columns],
+                "summary_dump",
+            ]
+        for col in columns:
+            cq.add_field(col)
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
 
-        # Perform the query against the database
-        ch_call_dicts = self._select_calls_query_raw(
-            req.project_id,
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            parameters=param_builder.get_params(),
-            limit=req.limit,
-            offset=req.offset,
-            # This order-by clause creation should probably be moved into this function
-            # and passed down as a processed object. It will follow the same patterns as
-            # the filters and queries.
-            order_by=(
-                None
-                if not req.sort_by
-                else [(s.field, s.direction) for s in req.sort_by]
-            ),
+        # Sort with empty list results in no sorting
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+        else:
+            cq.add_order("started_at", "asc")
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
+
+        pb = ParamBuilder()
+        raw_res = self._query_stream(
+            cq.as_sql(pb),
+            pb.get_params(),
         )
 
-        # Yield the marshaled response
-        for ch_dict in ch_call_dicts:
-            yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(ch_dict)
+        select_columns = [c.field for c in cq.select_fields]
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
+
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+
+        if not expand_columns and not include_feedback:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            return
+
+        ref_cache = LRUCache(max_size=1000)
+        batch_processor = DynamicBatchProcessor(
+            initial_size=INITIAL_CALLS_STREAM_BATCH_SIZE,
+            max_size=MAX_CALLS_STREAM_BATCH_SIZE,
+            growth_factor=10,
+        )
+
+        for batch in batch_processor.make_batches(raw_res):
+            call_dicts = [row_to_call_schema_dict(row) for row in batch]
+            if expand_columns:
+                self._expand_call_refs(
+                    req.project_id, call_dicts, expand_columns, ref_cache
+                )
+
+            if include_feedback:
+                self._add_feedback_to_calls(req.project_id, call_dicts)
+
+            for call in call_dicts:
+                yield tsi.CallSchema.model_validate(call)
+
+    def _add_feedback_to_calls(
+        self, project_id: str, calls: list[dict[str, Any]]
+    ) -> None:
+        if len(calls) == 0:
+            return
+
+        feedback_query_req = make_feedback_query_req(project_id, calls)
+        with self.with_new_client():
+            feedback = self.feedback_query(feedback_query_req)
+        hydrate_calls_with_feedback(calls, feedback)
+
+    def _get_refs_to_resolve(
+        self, calls: list[dict[str, Any]], expand_columns: list[str]
+    ) -> dict[tuple[int, str], ri.InternalObjectRef]:
+        refs_to_resolve: dict[tuple[int, str], ri.InternalObjectRef] = {}
+        for i, call in enumerate(calls):
+            for col in expand_columns:
+                if col in call:
+                    val = call[col]
+                else:
+                    val = get_nested_key(call, col)
+                    if not val:
+                        continue
+
+                if not ri.any_will_be_interpreted_as_ref_str(val):
+                    continue
+
+                ref = ri.parse_internal_uri(val)
+                if not isinstance(ref, ri.InternalObjectRef):
+                    continue
+
+                refs_to_resolve[(i, col)] = ref
+        return refs_to_resolve
+
+    def _expand_call_refs(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+        expand_columns: list[str],
+        ref_cache: LRUCache,
+    ) -> None:
+        if len(calls) == 0:
+            return
+
+        # format expand columns by depth, iterate through each batch in order
+        expand_column_by_depth = defaultdict(list)
+        for col in expand_columns:
+            expand_column_by_depth[col.count(".")].append(col)
+
+        for depth in sorted(expand_column_by_depth.keys()):
+            refs_to_resolve = self._get_refs_to_resolve(
+                calls, expand_column_by_depth[depth]
             )
+            if not refs_to_resolve:
+                continue
+
+            with self.with_new_client():
+                vals = self._refs_read_batch_within_project(
+                    project_id, list(refs_to_resolve.values()), ref_cache
+                )
+            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
+                if isinstance(val, dict) and "_ref" not in val:
+                    val["_ref"] = ref.uri()
+                set_nested_key(calls[i], col, val)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -401,28 +451,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        # Note: i think this project condition is redundant
-        proj_cond = "calls_merged.project_id = {project_id: String}"
-        proj_params = {"project_id": req.project_id}
-
         # get all parents
-        parents = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=[
-                proj_cond,
-                "calls_merged.id IN {ids: Array(String)}",
-            ],
-            parameters=proj_params | {"ids": req.call_ids},
+        parents = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(
+                        call_ids=req.call_ids,
+                    ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
+                )
+            )
         )
 
         # get all calls with trace_ids matching parents
-        all_calls = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=[
-                proj_cond,
-                "calls_merged.trace_id IN {trace_ids: Array(String)}",
-            ],
-            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        all_calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(
+                        trace_ids=[p.trace_id for p in parents],
+                    ),
+                    # request minimal columns
+                    columns=["id", "parent_id"],
+                )
+            )
         )
 
         all_descendants = find_call_descendants(
@@ -474,49 +528,55 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        conds = [
-            "object_id = {name: String}",
-            "digest = {version_hash: String}",
-            "is_op = 1",
-        ]
-        parameters = {"name": req.name, "digest": req.digest}
-        objs = self._select_objs_query(
-            req.project_id, conditions=conds, parameters=parameters
-        )
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_object_ids_condition([req.name], "op_name")
+        object_query_builder.set_include_deleted(include_deleted=True)
+
+        objs = self._select_objs_query(object_query_builder)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
+        op = objs[0]
+        if op.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
+                deleted_at=op.deleted_at,
+            )
+
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        parameters = {}
-        conds: typing.List[str] = ["is_op = 1"]
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
         if req.filter:
             if req.filter.op_names:
-                conds.append("object_id IN {op_names: Array(String)}")
-                parameters["op_names"] = req.filter.op_names
-
+                object_query_builder.add_object_ids_condition(
+                    req.filter.op_names, "op_names"
+                )
             if req.filter.latest_only:
-                conds.append("is_latest = 1")
+                object_query_builder.add_is_latest_condition()
 
-        ch_objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-        )
+        ch_objs = self._select_objs_query(object_query_builder)
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        json_val = json.dumps(req.obj.val)
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
+        )
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
 
-        req_obj = req.obj
         ch_obj = ObjCHInsertable(
-            project_id=req_obj.project_id,
-            object_id=req_obj.object_id,
-            kind=get_kind(req.obj.val),
-            base_object_class=get_base_object_class(req.obj.val),
-            refs=extract_refs_from_values(req.obj.val),
+            project_id=req.obj.project_id,
+            object_id=req.obj.object_id,
+            wb_user_id=req.obj.wb_user_id,
+            kind=get_kind(processed_val),
+            base_object_class=processed_result["base_object_class"],
+            refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
         )
@@ -529,61 +589,128 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = ["object_id = {object_id: String}"]
-        parameters: typing.Dict[str, typing.Union[str, int]] = {
-            "object_id": req.object_id
-        }
-        if req.digest == "latest":
-            conds.append("is_latest = 1")
-        else:
-            (is_version, version_index) = _digest_is_version_like(req.digest)
-            if is_version:
-                conds.append("version_index = {version_index: UInt64}")
-                parameters["version_index"] = version_index
-            else:
-                conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.digest
-        objs = self._select_objs_query(
-            req.project_id, conditions=conds, parameters=parameters
-        )
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
+
+        objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
+            )
+
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conds: list[str] = []
-        parameters = {}
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append("is_op = 1")
+                    object_query_builder.add_is_op_condition(True)
                 else:
-                    conds.append("is_op = 0")
+                    object_query_builder.add_is_op_condition(False)
             if req.filter.object_ids:
-                conds.append("object_id IN {object_ids: Array(String)}")
-                parameters["object_ids"] = req.filter.object_ids
-            if req.filter.latest_only:
-                conds.append("is_latest = 1")
-            if req.filter.base_object_classes:
-                conds.append(
-                    "base_object_class IN {base_object_classes: Array(String)}"
+                object_query_builder.add_object_ids_condition(
+                    req.filter.object_ids, "object_ids"
                 )
-                parameters["base_object_classes"] = req.filter.base_object_classes
-
-        objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
-            parameters=parameters,
-        )
+            if req.filter.latest_only:
+                object_query_builder.add_is_latest_condition()
+            if req.filter.base_object_classes:
+                object_query_builder.add_base_object_classes_condition(
+                    req.filter.base_object_classes
+                )
+        if req.limit is not None:
+            object_query_builder.set_limit(req.limit)
+        if req.offset is not None:
+            object_query_builder.set_offset(req.offset)
+        if req.sort_by:
+            for sort in req.sort_by:
+                object_query_builder.add_order(sort.field, sort.direction)
+        metadata_only = req.metadata_only or False
+        object_query_builder.set_include_deleted(include_deleted=False)
+        objs = self._select_objs_query(object_query_builder, metadata_only)
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        """
+        Delete object versions by digest, belonging to given object_id.
+        All deletion in this method is "soft". Deletion occurs by inserting
+        a new row into the object_versions table with the deleted_at field set.
+        Inserted rows share identical primary keys (order by) with original rows,
+        and will be combined by the ReplacingMergeTree engine at database merge
+        time.
+        If no digests are provided all versions will have their data overwritten with
+        an empty val_dump.
+        """
+        MAX_OBJECTS_TO_DELETE = 100
+        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+            raise ValueError(
+                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+            )
+
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        metadata_only = True
+        if req.digests:
+            object_query_builder.add_digests_conditions(*req.digests)
+            metadata_only = False
+
+        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+
+        delete_insertables = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for obj in object_versions:
+            original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
+            delete_insertables.append(
+                ObjDeleteCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    digest=obj.digest,
+                    kind=obj.kind,
+                    val_dump=obj.val_dump,
+                    refs=obj.refs,
+                    base_object_class=obj.base_object_class,
+                    deleted_at=now,
+                    wb_user_id=obj.wb_user_id,
+                    # Keep the original created_at timestamp
+                    created_at=original_created_at,
+                )
+            )
+
+        if len(delete_insertables) == 0:
+            raise NotFoundError(
+                f"Object {req.object_id} ({req.digests}) not found when deleting."
+            )
+
+        if req.digests:
+            given_digests = set(req.digests)
+            found_digests = {obj.digest for obj in delete_insertables}
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        data = [list(obj.model_dump().values()) for obj in delete_insertables]
+        column_names = list(delete_insertables[0].model_fields.keys())
+
+        self._insert("object_versions", data=data, column_names=column_names)
+        num_deleted = len(delete_insertables)
+
+        return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError(
+                raise TypeError(
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
             row_json = json.dumps(r)
@@ -615,97 +742,204 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        conds = []
-        parameters = {}
-        if req.filter:
-            if req.filter.row_digests:
-                conds.append("tr.digest IN {row_digets: Array(String)}")
-                parameters["row_digests"] = req.filter.row_digests
-        else:
-            conds.append("1 = 1")
-        rows = self._table_query(
-            req.project_id,
-            req.digest,
-            conditions=conds,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        return tsi.TableQueryRes(rows=rows)
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        query = """
+            SELECT *
+            FROM (
+                    SELECT *,
+                        row_number() OVER (PARTITION BY project_id, digest) AS rn
+                    FROM tables
+                    WHERE project_id = {project_id:String} AND digest = {digest:String}
+                )
+            WHERE rn = 1
+            ORDER BY project_id, digest
+        """
 
-    def _table_query(
-        self,
-        project_id: str,
-        digest: str,
-        conditions: typing.Optional[typing.List[str]] = None,
-        limit: typing.Optional[int] = None,
-        offset: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[tsi.TableRowSchema]:
-        conds = ["project_id = {project_id: String}"]
-        if conditions:
-            conds.extend(conditions)
-
-        predicate = _combine_conditions(conds, "AND")
-        # The subqueries are for deduplication of table rows and tables by digest.
-        # It might be more efficient to do deduplication of table rows
-        # in the outer query instead of the right side of the JOIN clause here,
-        # that hasn't been tested yet.
-        query = f"""
-                SELECT tr.digest, tr.val_dump
-                FROM (
-                    SELECT project_id, row_digest
-                    FROM (
-                        SELECT *
-                        FROM (
-                                SELECT *,
-                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
-                                FROM tables
-                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
-                            )
-                        WHERE rn = 1
-                        ORDER BY project_id, digest
-                    )
-                    ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {{digest:String}}
-                ) AS t
-                JOIN (
-                    SELECT project_id, digest, val_dump
-                    FROM (
-                            SELECT *,
-                                row_number() OVER (PARTITION BY project_id, digest) AS rn
-                            FROM table_rows
-                            WHERE project_id = {{project_id:String}}
-                        )
-                    WHERE rn = 1
-                    ORDER BY project_id, digest
-                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
-                WHERE {predicate}
-            """
-        if parameters is None:
-            parameters = {}
-        if limit:
-            query += " LIMIT {limit: UInt64}"
-            parameters["limit"] = limit
-        if offset:
-            query += " OFFSET {offset: UInt64}"
-            parameters["offset"] = offset
-
-        query_result = self.ch_client.query(
+        row_digest_result_query = self.ch_client.query(
             query,
             parameters={
-                "project_id": project_id,
-                "digest": digest,
-                **parameters,
+                "project_id": req.project_id,
+                "digest": req.base_digest,
             },
         )
 
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-            for r in query_result.result_rows
-        ]
+        if len(row_digest_result_query.result_rows) == 0:
+            raise NotFoundError(f"Table {req.project_id}:{req.base_digest} not found")
+
+        final_row_digests: list[str] = row_digest_result_query.result_rows[0][2]
+        new_rows_needed_to_insert = []
+        known_digests = set(final_row_digests)
+
+        def add_new_row_needed_to_insert(row_data: Any) -> str:
+            if not isinstance(row_data, dict):
+                raise TypeError("All rows must be dictionaries")
+            row_json = json.dumps(row_data)
+            row_digest = str_digest(row_json)
+            if row_digest not in known_digests:
+                new_rows_needed_to_insert.append(
+                    (
+                        req.project_id,
+                        row_digest,
+                        extract_refs_from_values(row_data),
+                        row_json,
+                    )
+                )
+                known_digests.add(row_digest)
+            return row_digest
+
+        updated_digests = []
+        for update in req.updates:
+            if isinstance(update, tsi.TableAppendSpec):
+                new_digest = add_new_row_needed_to_insert(update.append.row)
+                final_row_digests.append(new_digest)
+                updated_digests.append(new_digest)
+            elif isinstance(update, tsi.TablePopSpec):
+                if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
+                    raise ValueError("Index out of range")
+                popped_digest = final_row_digests.pop(update.pop.index)
+                updated_digests.append(popped_digest)
+            elif isinstance(update, tsi.TableInsertSpec):
+                if (
+                    update.insert.index > len(final_row_digests)
+                    or update.insert.index < 0
+                ):
+                    raise ValueError("Index out of range")
+                new_digest = add_new_row_needed_to_insert(update.insert.row)
+                final_row_digests.insert(update.insert.index, new_digest)
+                updated_digests.append(new_digest)
+            else:
+                raise TypeError("Unrecognized update", update)
+
+        if new_rows_needed_to_insert:
+            self._insert(
+                "table_rows",
+                data=new_rows_needed_to_insert,
+                column_names=["project_id", "digest", "refs", "val_dump"],
+            )
+
+        table_hasher = hashlib.sha256()
+        for row_digest in final_row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        self._insert(
+            "tables",
+            data=[(req.project_id, digest, final_row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+        return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        rows = list(self.table_query_stream(req))
+        return tsi.TableQueryRes(rows=rows)
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        conds = []
+        pb = ParamBuilder()
+        if req.filter:
+            if req.filter.row_digests:
+                conds.append(
+                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+                )
+
+        sort_fields = []
+        if req.sort_by:
+            for sort in req.sort_by:
+                # TODO: better splitting of escaped dots (.) in field names
+                extra_path = sort.field.split(".")
+                field = OrderField(
+                    field=QueryBuilderDynamicField(
+                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
+                    ),
+                    direction="ASC" if sort.direction.lower() == "asc" else "DESC",
+                )
+                sort_fields.append(field)
+
+        rows = self._table_query_stream(
+            req.project_id,
+            req.digest,
+            pb,
+            sql_safe_conditions=conds,
+            sort_fields=sort_fields,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        yield from rows
+
+    def _table_query_stream(
+        self,
+        project_id: str,
+        digest: str,
+        pb: ParamBuilder,
+        *,
+        # using the `sql_safe_*` prefix is a way to signal to the caller
+        # that these strings should have been santized by the caller.
+        sql_safe_conditions: Optional[list[str]] = None,
+        sort_fields: Optional[list[OrderField]] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Iterator[tsi.TableRowSchema]:
+        if not sort_fields:
+            sort_fields = [
+                OrderField(
+                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+                    direction="ASC",
+                )
+            ]
+
+        if (
+            len(sort_fields) == 1
+            and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
+            and not sql_safe_conditions
+        ):
+            query = make_natural_sort_table_query(
+                project_id,
+                digest,
+                pb,
+                limit=limit,
+                offset=offset,
+                natural_direction=sort_fields[0].direction,
+            )
+        else:
+            order_by_components = ", ".join(
+                [sort_field.as_sql(pb, TABLE_ROWS_ALIAS) for sort_field in sort_fields]
+            )
+            sql_safe_sort_clause = f"ORDER BY {order_by_components}"
+            query = make_standard_table_query(
+                project_id,
+                digest,
+                pb,
+                sql_safe_conditions=sql_safe_conditions,
+                sql_safe_sort_clause=sql_safe_sort_clause,
+                limit=limit,
+                offset=offset,
+            )
+
+        res = self._query_stream(query, parameters=pb.get_params())
+
+        for row in res:
+            yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
+
+    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "digest": req.digest,
+        }
+
+        query = """
+        SELECT length(row_digests)
+        FROM tables
+        WHERE project_id = {project_id:String} AND digest = {digest:String}
+        """
+
+        query_result = self.ch_client.query(query, parameters=parameters)
+        count = query_result.result_rows[0][0] if query_result.result_rows else 0
+
+        return tsi.TableQueryStatsRes(count=count)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -715,77 +949,163 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
-        if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
+        # First, parse the refs
+        parsed_raw_refs = [ri.parse_internal_uri(r) for r in req.refs]
+
+        # Business logic to ensure that we don't have raw TableRefs (not allowed)
+        if any(isinstance(r, ri.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(
-            typing.List[refs_internal.InternalObjectRef], parsed_raw_refs
-        )
 
-        root_val_cache: typing.Dict[str, typing.Any] = {}
+        parsed_refs = cast(ObjRefListType, parsed_raw_refs)
+        vals = self._parsed_refs_read_batch(parsed_refs)
 
-        def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+        return tsi.RefsReadBatchRes(vals=vals)
+
+    def _parsed_refs_read_batch(
+        self,
+        parsed_refs: ObjRefListType,
+        root_val_cache: Optional[dict[str, Any]] = None,
+    ) -> list[Any]:
+        # Next, group the refs by project_id
+        refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
+        for ref in parsed_refs:
+            refs_by_project_id[ref.project_id].append(ref)
+
+        # Lookup data for each project, scoped to each project
+        final_result_cache: dict[str, Any] = {}
+
+        def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
+            return ref.uri()
+
+        for project in refs_by_project_id:
+            project_refs = refs_by_project_id[project]
+            project_results = self._refs_read_batch_within_project(
+                project,
+                refs_by_project_id[project],
+                root_val_cache,
+            )
+            for ref, result in zip(project_refs, project_results):
+                final_result_cache[make_ref_cache_key(ref)] = result
+
+        # Return the final data payload
+        return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
+
+    def _refs_read_batch_within_project(
+        self,
+        project_id_scope: str,
+        parsed_refs: ObjRefListType,
+        root_val_cache: Optional[dict[str, Any]],
+    ) -> list[Any]:
+        if root_val_cache is None:
+            root_val_cache = {}
+
+        def make_root_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
         def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
             return f"{obj.project_id}/{obj.object_id}/{obj.digest}"
 
         def get_object_refs_root_val(
-            refs: list[refs_internal.InternalObjectRef],
-        ) -> typing.Any:
-            conds = []
-            parameters = {}
+            refs: list[ri.InternalObjectRef],
+        ) -> Any:
+            conds: list[str] = []
+            object_id_conds: list[str] = []
+            parameters: dict[str, Union[str, int]] = {}
+            ref_digests: set[str] = set()
+
             for ref_index, ref in enumerate(refs):
                 if ref.version == "latest":
                     raise ValueError("Reading refs with `latest` is not supported")
 
-                cache_key = make_ref_cache_key(ref)
+                cache_key = make_root_ref_cache_key(ref)
 
                 if cache_key in root_val_cache:
                     continue
 
+                if ref.project_id != project_id_scope:
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
+                    raise ValueError("Will not resolve cross-project refs.")
+
                 object_id_param_key = "object_id_" + str(ref_index)
                 version_param_key = "version_" + str(ref_index)
-                conds.append(
-                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
-                )
+                conds.append(f"digest = {{{version_param_key}: String}}")
+                object_id_conds.append(f"object_id = {{{object_id_param_key}: String}}")
                 parameters[object_id_param_key] = ref.name
                 parameters[version_param_key] = ref.version
-
+                ref_digests.add(ref.version)
             if len(conds) > 0:
-                conditions = [_combine_conditions(conds, "OR")]
-                objs = self._select_objs_query(
-                    ref.project_id, conditions=conditions, parameters=parameters
+                conditions = [combine_conditions(conds, "OR")]
+                object_id_conditions = [combine_conditions(object_id_conds, "OR")]
+                object_query_builder = ObjectMetadataQueryBuilder(
+                    project_id=project_id_scope,
+                    conditions=conditions,
+                    object_id_conditions=object_id_conditions,
+                    parameters=parameters,
+                    include_deleted=True,
                 )
-                for obj in objs:
+                objs = self._select_objs_query(object_query_builder)
+                found_digests = {obj.digest for obj in objs}
+                if len(ref_digests) != len(found_digests):
+                    raise NotFoundError(
+                        f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
+                    )
+                # filter out deleted objects
+                valid_objects = [obj for obj in objs if obj.deleted_at is None]
+                for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
-            return [root_val_cache[make_ref_cache_key(ref)] for ref in refs]
+            return [
+                root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
+            ]
 
         # Represents work left to do for resolving a ref
         @dataclasses.dataclass
         class PartialRefResult:
             remaining_extra: list[str]
             # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
-            unresolved_obj_ref: typing.Optional[refs_internal.InternalObjectRef]
-            unresolved_table_ref: typing.Optional[refs_internal.InternalTableRef]
-            val: typing.Any
+            unresolved_obj_ref: Optional[ri.InternalObjectRef]
+            unresolved_table_ref: Optional[ri.InternalTableRef]
+            val: Any
 
-        def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
+        def resolve_extra(extra: list[str], val: Any) -> PartialRefResult:
             for extra_index in range(0, len(extra), 2):
+                empty_result = PartialRefResult(
+                    remaining_extra=[],
+                    unresolved_obj_ref=None,
+                    unresolved_table_ref=None,
+                    val=None,
+                )
                 op, arg = extra[extra_index], extra[extra_index + 1]
                 if isinstance(val, str) and val.startswith(
-                    refs_internal.WEAVE_INTERNAL_SCHEME + "://"
+                    ri.WEAVE_INTERNAL_SCHEME + "://"
                 ):
-                    parsed_ref = refs_internal.parse_internal_uri(val)
-                    if isinstance(parsed_ref, refs_internal.InternalObjectRef):
+                    parsed_ref = ri.parse_internal_uri(val)
+
+                    if parsed_ref.project_id != project_id_scope:
+                        # This is the primary check to enforce that we do not
+                        # traverse into a different project. It is perfectly
+                        # reasonable to support this functionality in the
+                        # future. At such point in time, we will want to define
+                        # a "check read project" function that the client can
+                        # use to validate that the project is allowed to be
+                        # read. Once this is lifted, other parts of this
+                        # function will need to be updated as well, as they will
+                        # currently `raise ValueError("Will not resolve
+                        # cross-project refs.")` under such conditions.
+                        return empty_result
+
+                    if isinstance(parsed_ref, ri.InternalObjectRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=parsed_ref,
                             unresolved_table_ref=None,
                             val=val,
                         )
-                    elif isinstance(parsed_ref, refs_internal.InternalTableRef):
+                    elif isinstance(parsed_ref, ri.InternalTableRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=None,
@@ -793,20 +1113,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             val=val,
                         )
                 if val is None:
-                    return PartialRefResult(
-                        remaining_extra=[],
-                        unresolved_obj_ref=None,
-                        unresolved_table_ref=None,
-                        val=None,
-                    )
-                if op == refs_internal.DICT_KEY_EDGE_NAME:
+                    return empty_result
+                if op == ri.DICT_KEY_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs_internal.OBJECT_ATTR_EDGE_NAME:
+                elif op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs_internal.LIST_INDEX_EDGE_NAME:
+                elif op == ri.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
                     if index >= len(val):
-                        return None
+                        return empty_result
                     val = val[index]
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
@@ -835,13 +1150,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.remaining_extra for r in extra_results)
         ):
             # Resolve any unresolved object refs
-            needed_extra_results: list[typing.Tuple[int, PartialRefResult]] = []
+            needed_extra_results: list[tuple[int, PartialRefResult]] = []
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
                     needed_extra_results.append((i, extra_result))
 
             if len(needed_extra_results) > 0:
-                refs: list[refs_internal.InternalObjectRef] = []
+                refs: list[ri.InternalObjectRef] = []
                 for i, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
@@ -859,9 +1174,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             # Resolve any unresolved table refs
             # First batch the table queries by project_id and table digest
-            table_queries: dict[
-                typing.Tuple[str, str], list[typing.Tuple[int, str]]
-            ] = {}
+            table_queries: dict[tuple[str, str], list[tuple[int, str]]] = {}
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_table_ref is not None:
                     table_ref = extra_result.unresolved_table_ref
@@ -871,7 +1184,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra[0],
                         extra_result.remaining_extra[1],
                     )
-                    if op != refs_internal.TABLE_ROW_ID_EDGE_NAME:
+                    if op != ri.TABLE_ROW_ID_EDGE_NAME:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
                         (table_ref.project_id, table_ref.digest), []
@@ -879,12 +1192,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Make the queries
             for (project_id, digest), index_digests in table_queries.items():
                 row_digests = [d for i, d in index_digests]
-                rows = self._table_query(
-                    project_id=project_id,
+                if project_id != project_id_scope:
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
+                    raise ValueError("Will not resolve cross-project refs.")
+                pb = ParamBuilder()
+                row_digests_name = pb.add_param(row_digests)
+                rows_stream = self._table_query_stream(
+                    project_id=project_id_scope,
                     digest=digest,
-                    conditions=["digest IN {digests: Array(String)}"],
-                    parameters={"digests": row_digests},
+                    pb=pb,
+                    sql_safe_conditions=[
+                        f"digest IN {{{row_digests_name}: Array(String)}}"
+                    ],
                 )
+                rows = list(rows_stream)
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:
@@ -902,7 +1227,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra, extra_result.val
                     )
 
-        return tsi.RefsReadBatchRes(vals=[r.val for r in extra_results])
+        return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
@@ -960,9 +1285,107 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+        costs = []
+        for llm_id, cost in req.costs.items():
+            cost_id = generate_id()
+
+            row: Row = {
+                "id": cost_id,
+                "created_by": req.wb_user_id,
+                "created_at": created_at,
+                "pricing_level": "project",
+                "pricing_level_id": req.project_id,
+                "provider_id": cost.provider_id if cost.provider_id else "default",
+                "llm_id": llm_id,
+                "effective_date": (
+                    cost.effective_date if cost.effective_date else created_at
+                ),
+                "prompt_token_cost": cost.prompt_token_cost,
+                "completion_token_cost": cost.completion_token_cost,
+                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
+                "completion_token_cost_unit": cost.completion_token_cost_unit,
+            }
+
+            costs.append((cost_id, llm_id))
+
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
+                database_type="clickhouse"
+            )
+            self._insert(
+                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
+            )
+
+        return tsi.CostCreateRes(ids=costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.select()
+        query = query.fields(req.fields)
+        query = query.where(query_with_pricing_level)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+
+        query = LLM_TOKEN_PRICES_TABLE.purge()
+        query = query.where(query_with_pricing_level)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.CostPurgeRes()
+
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req)
+        validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
@@ -982,7 +1405,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1024
+        MAX_PAYLOAD = 1 << 20  # 1 MiB
         if len(payload) > MAX_PAYLOAD:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
@@ -994,6 +1417,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "feedback_type": req.feedback_type,
             "payload": req.payload,
             "created_at": created_at,
+            "annotation_ref": req.annotation_ref,
+            "runnable_ref": req.runnable_ref,
+            "call_ref": req.call_ref,
+            "trigger_ref": req.trigger_ref,
         }
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
@@ -1031,9 +1458,125 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_client.query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        # To replace, first purge, then if successful, create.
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            }
+        )
+        purge_request = tsi.FeedbackPurgeReq(
+            project_id=req.project_id,
+            query=query,
+        )
+        self.feedback_purge(purge_request)
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        create_result = self.feedback_create(create_req)
+        return tsi.FeedbackReplaceRes(
+            id=create_result.id,
+            created_at=create_result.created_at,
+            wb_user_id=create_result.wb_user_id,
+            payload=create_result.payload,
+        )
+
+    def actions_execute_batch(
+        self, req: tsi.ActionsExecuteBatchReq
+    ) -> tsi.ActionsExecuteBatchRes:
+        if len(req.call_ids) == 0:
+            return tsi.ActionsExecuteBatchRes()
+        if len(req.call_ids) > 1:
+            # This is temporary until we setup our batching infrastructure
+            raise NotImplementedError("Batching actions is not yet supported")
+
+        # For now, we just execute in-process if it is a single action
+        execute_batch(
+            batch_req=req,
+            trace_server=self,
+        )
+
+        return tsi.ActionsExecuteBatchRes()
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        model_name = req.inputs.model
+        model_info = self._model_to_provider_info_map.get(model_name)
+        if not model_info:
+            raise InvalidRequest(f"No model info found for model {model_name}")
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        provider = model_info.get("litellm_provider")
+        if not api_key and provider != "bedrock" and provider != "bedrock_converse":
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
+
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key,
+            req.inputs,
+            provider,
+        )
+        end_time = datetime.datetime.now()
+
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in all_call_insert_columns]
+            batch_data.append(values)
+
+        self._insert_call_batch(batch_data)
+
+        return tsi.CompletionsCreateRes(
+            response=res.response, weave_call_id=start_call.id
+        )
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the clickhouse client"""
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
@@ -1051,10 +1594,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.database = self._database
         return client
 
+    @contextmanager
+    def with_new_client(self) -> Iterator[None]:
+        """Context manager to use a new client for operations.
+        Each call gets a fresh client with its own clickhouse session ID.
+
+        Usage:
+        ```
+        with self.with_new_client():
+            self.feedback_query(req)
+        ```
+        """
+        client = self._mint_client()
+        original_client = self.ch_client
+        self._thread_local.ch_client = client
+        try:
+            yield
+        finally:
+            self._thread_local.ch_client = original_client
+            client.close()
+
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
-    def _insert_call_batch(self, batch: typing.List) -> None:
+    def _insert_call_batch(self, batch: list) -> None:
         if batch:
             settings = {}
             if self._use_async_insert:
@@ -1067,415 +1630,52 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings=settings,
             )
 
-    def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
-        # Generate and run the query to get the call from the database
-        ch_calls = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=["calls_merged.id = {id: String}"],
-            limit=1,
-            parameters={"id": req.id},
-        )
-
-        # If the call is not found, raise a NotFoundError
-        if not ch_calls:
-            raise NotFoundError(f"Call with id {req.id} not found")
-
-        return ch_calls[0]
-
-    def _select_calls_query(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
-        offset: typing.Optional[int] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHCallSchema]:
-        dicts = self._select_calls_query_raw(
-            project_id,
-            columns=columns,
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            order_by=order_by,
-            offset=offset,
-            limit=limit,
-            parameters=parameters,
-        )
-        calls = []
-        for row in dicts:
-            calls.append(_raw_call_dict_to_ch_call(row))
-        return calls
-
-    def _select_calls_query_raw(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
-        offset: typing.Optional[int] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Iterable[typing.Dict]:
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["project_id"] = project_id
-        if columns == None:
-            columns = all_call_select_columns
-        columns = typing.cast(typing.List[str], columns)
-
-        remaining_columns = set(columns) - set(required_call_columns)
-        columns = required_call_columns + list(remaining_columns)
-
-        # Stop injection
-        assert (
-            set(columns) - set(all_call_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        merged_cols = []
-        for col in columns:
-            if col in call_select_raw_columns:
-                merged_cols.append(f"{col} AS {col}")
-            elif col in call_select_arrays_columns:
-                merged_cols.append(f"array_concat_agg({col}) AS {col}")
-            elif col in call_select_argmax_columns:
-                merged_cols.append(f"argMaxMerge({col}) AS {col}")
-            else:
-                merged_cols.append(f"any({col}) AS {col}")
-        select_columns_part = ", ".join(merged_cols)
-
-        having_conditions_part = None
-        if having_conditions:
-            having_conditions_part = _combine_conditions(having_conditions, "AND")
-
-        where_conditions_part = _make_calls_where_condition_from_event_conditions(
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-        )
-
-        order_by_part = "ORDER BY started_at ASC"
-        order_by_events = set(["START"])
-        if order_by is not None:
-            order_by_events = set([])
-            order_parts = []
-            for field, direction in order_by:
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                    "asc",
-                    "desc",
-                ], f"Invalid order_by direction: {direction}"
-
-                # For each order by field, if it is a dynamic field, we generate
-                # 3 order by terms: one for existence, one for float casting, and one for string casting.
-                # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
-                if _is_dynamic_field(field):
-                    # Prioritize existence, then cast to float, then str
-                    options = [
-                        ("exists", "desc"),
-                        ("float", direction),
-                        ("str", direction),
-                    ]
-                else:
-                    options = [(field, direction)]
-
-                start_fields = (
-                    "project_id",
-                    "id",
-                    "trace_id",
-                    "parent_id",
-                    "op_name",
-                    "started_at",
-                    "attributes",
-                    "inputs",
-                    "input_refs",
-                    "wb_user_id",
-                    "wb_run_id",
-                )
-                end_fields = (
-                    "ended_at",
-                    "exception",
-                    "summary",
-                    "output",
-                    "output_refs",
-                )
-
-                if (
-                    field in start_fields
-                    or field.startswith("inputs.")
-                    or field.startswith("attributes.")
-                ):
-                    order_by_events.add("START")
-                elif (
-                    field in end_fields
-                    or field.startswith("output.")
-                    or field.startswith("summary.")
-                ):
-                    order_by_events.add("END")
-                else:
-                    raise ValueError(f"Invalid order_by field: {field}")
-
-                # For each option, build the order by term
-                for cast, direct in options:
-                    # Future refactor: this entire section should be moved into its own helper
-                    # method and hoisted out of this function
-                    (
-                        inner_field,
-                        param_builder,
-                        _,
-                    ) = _transform_external_field_to_internal_field(
-                        field, all_call_select_columns, all_call_json_columns, cast
-                    )
-                    parameters.update(param_builder.get_params())
-
-                    order_parts.append(f"{inner_field} {direct}")
-
-            order_by_part = ", ".join(order_parts)
-            order_by_part = f"ORDER BY {order_by_part}"
-
-        offset_part = ""
-        if offset != None:
-            offset_part = "OFFSET {offset: Int64}"
-            parameters["offset"] = offset
-
-        limit_part = ""
-        if limit != None:
-            limit_part = "LIMIT {limit: Int64}"
-            parameters["limit"] = limit
-
-        if having_conditions_part or len(order_by_events) != 1:
-            if having_conditions_part is None:
-                having_conditions_part == "1 = 1"
-            query_str = f"""
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                HAVING {having_conditions_part}
-                {order_by_part}
-                {limit_part}
-                {offset_part}
-            """
-        else:
-            # FAST PATH!!
-            #
-            # Here we have an opportunity to optimize the query by using a subquery to
-            # filter out the rows before the group by. This is because the group by
-            # is expensive and we can avoid it if we can filter out rows before it.
-            # This is a common pattern in SQL optimization.
-            if "START" in order_by_events:
-                order_by_side = "AND isNotNull(started_at)"
-            elif "END" in order_by_events:
-                order_by_side = "AND isNotNull(ended_at)"
-            else:
-                raise ValueError("Invalid order_by_events")
-
-            where_conditions_part = f"""(
-                calls_merged.id IN (
-                    SELECT id from calls_merged WHERE (
-                        project_id = {{project_id: String}}
-                            AND
-                        {where_conditions_part}
-                    )
-                    {order_by_side}
-                    {order_by_part}
-                    {limit_part}
-                    {offset_part}
-                )
-            )"""
-            query_str = f"""
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                {order_by_part}
-            """
-
-        raw_res = self._query_stream(
-            query_str,
-            parameters,
-        )
-
-        for row in raw_res:
-            yield dict(zip(columns, row))
-
-    def _calls_query_stats_raw(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Dict:
-        """Generates and executes a query to get stats for a calls query."""
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["project_id"] = project_id
-
-        if not having_conditions:
-            having_conditions = ["1 = 1"]
-
-        having_conditions_part = _combine_conditions(having_conditions, "AND")
-
-        where_conditions_part = _make_calls_where_condition_from_event_conditions(
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-        )
-
-        if columns == None:
-            columns = ["id"]
-        columns = typing.cast(typing.List[str], columns)
-        if len(columns) == 0:
-            columns = ["id"]
-        # Stop injection
-        assert (
-            set(columns) - set(all_call_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        merged_cols = []
-        for col in columns:
-            if col in ["project_id", "id"]:
-                merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
-                merged_cols.append(f"array_concat_agg({col}) AS {col}")
-            else:
-                merged_cols.append(f"any({col}) AS {col}")
-        select_columns_part = ", ".join(merged_cols)
-
-        query_str = f"""
-            SELECT COUNT(*)
-            FROM (
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                HAVING {having_conditions_part}
-            )
-        """
-
-        raw_res = self._query(
-            query_str,
-            parameters,
-        )
-        rows = raw_res.result_rows
-        count = 0
-        if rows and len(rows) == 1 and len(rows[0]) == 1:
-            count = rows[0][0]
-        return dict(count=count)
-
     def _select_objs_query(
         self,
-        project_id: str,
-        conditions: typing.Optional[typing.List[str]] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHObjSchema]:
-        if not conditions:
-            conditions = ["1 = 1"]
+        object_query_builder: ObjectMetadataQueryBuilder,
+        metadata_only: bool = False,
+    ) -> list[SelectableCHObjSchema]:
+        """
+        Main query for fetching objects.
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        conditions:
+            conditions should include operations on version_index, digest, kind (is_op)
+            ALL conditions are AND'ed together.
+        object_id_conditions:
+            conditions should include operations on ONLY object_id
+            ALL conditions are AND'ed together.
+        parameters:
+            parameters to be passed to the query. Must include all parameters for both
+            conditions and object_id_conditions.
+        metadata_only:
+            if metadata_only is True, then we return early and dont grab the value.
+            Otherwise, make a second query to grab the val_dump from the db
+        """
+        obj_metadata_query = object_query_builder.make_metadata_query()
+        parameters = object_query_builder.parameters or {}
+        query_result = self._query_stream(obj_metadata_query, parameters)
+        metadata_result = format_metadata_objects_from_query_result(query_result)
 
-        limit_part = ""
-        if limit != None:
-            limit_part = f"LIMIT {limit}"
+        # -- Don't make second query for object values if metadata_only --
+        if metadata_only or len(metadata_result) == 0:
+            return metadata_result
 
-        if parameters is None:
-            parameters = {}
-        # The subquery is for deduplication of object versions by digest
-        query_result = self._query_stream(
-            f"""
-            SELECT
-                project_id,
-                object_id,
-                created_at,
-                kind,
-                base_object_class,
-                refs,
-                val_dump,
-                digest,
-                is_op,
-                _version_index_plus_1,
-                version_index,
-                version_count,
-                is_latest
-            FROM (
-                SELECT project_id,
-                    object_id,
-                    created_at,
-                    kind,
-                    base_object_class,
-                    refs,
-                    val_dump,
-                    digest,
-                    if (kind = 'op', 1, 0) AS is_op,
-                    row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
-                        ORDER BY created_at ASC
-                    ) AS _version_index_plus_1,
-                    _version_index_plus_1 - 1 AS version_index,
-                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
-                FROM (
-                    SELECT *,
-                        row_number() OVER (
-                            PARTITION BY project_id,
-                            kind,
-                            object_id,
-                            digest
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM object_versions
-                    WHERE project_id = {{project_id: String}}
-                )
-                WHERE rn = 1
-            )
-            WHERE project_id = {{project_id: String}} AND
-                {conditions_part}
-            {limit_part}
-        """,
-            {"project_id": project_id, **parameters},
+        value_query, value_parameters = make_objects_val_query_and_parameters(
+            project_id=object_query_builder.project_id,
+            object_ids=list({row.object_id for row in metadata_result}),
+            digests=list({row.digest for row in metadata_result}),
         )
-        result: typing.List[SelectableCHObjSchema] = []
+        query_result = self._query_stream(value_query, value_parameters)
+        # Map (object_id, digest) to val_dump
+        object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
-            result.append(
-                SelectableCHObjSchema.model_validate(
-                    dict(
-                        zip(
-                            [
-                                "project_id",
-                                "object_id",
-                                "created_at",
-                                "kind",
-                                "base_object_class",
-                                "refs",
-                                "val_dump",
-                                "digest",
-                                "is_op",
-                                "_version_index_plus_1",
-                                "version_index",
-                                "version_count",
-                                "is_latest",
-                            ],
-                            row,
-                        )
-                    )
-                )
-            )
+            (object_id, digest, val_dump) = row
+            object_values[(object_id, digest)] = val_dump
 
-        return result
+        # update the val_dump for each object
+        for obj in metadata_result:
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+        return metadata_result
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
@@ -1485,14 +1685,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _query_stream(
         self,
         query: str,
-        parameters: typing.Dict[str, typing.Any],
-        column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Iterator[QueryResult]:
+        parameters: dict[str, Any],
+        column_formats: Optional[dict[str, Any]] = None,
+        settings: Optional[dict[str, Any]] = None,
+    ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
+        if not settings:
+            settings = {}
+        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
         summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
+            query,
+            parameters=parameters,
+            column_formats=column_formats,
+            use_none=True,
+            settings=settings,
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
@@ -1504,14 +1713,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "summary": summary,
                 },
             )
-            for row in stream:
-                yield row
+            yield from stream
 
     def _query(
         self,
         query: str,
-        parameters: typing.Dict[str, typing.Any],
-        column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        parameters: dict[str, Any],
+        column_formats: Optional[dict[str, Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         parameters = _process_parameters(parameters)
@@ -1531,9 +1739,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _insert(
         self,
         table: str,
-        data: typing.Sequence[typing.Sequence[typing.Any]],
-        column_names: typing.List[str],
-        settings: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: Optional[dict[str, Any]] = None,
     ) -> QuerySummary:
         try:
             return self.ch_client.insert(
@@ -1547,7 +1755,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
-                raise RequestTooLarge("Could not insert record")
+                raise InsertTooLarge(
+                    "Database insertion failed. Record too large. "
+                    "A likely cause is that a single row or cell exceeded "
+                    "the limit. If logging images, save them as `Image.PIL`."
+                )
             raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -1560,38 +1772,88 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_calls()
 
     def _flush_calls(self) -> None:
-        self._insert_call_batch(self._call_batch)
+        try:
+            self._insert_call_batch(self._call_batch)
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
+            self._insert_call_batch(batch)
+
         self._call_batch = []
+
+    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
+        """
+        Iterate through the batch and replace large values with placeholders.
+
+        If values are larger than 1MiB replace them with placeholder values.
+        """
+        final_batch = []
+        # Set the value byte limit to be anything over 1MiB to catch
+        # payloads with multiple large values that are still under the
+        # single row insert limit.
+        val_byte_limit = 1 * 1024 * 1024
+        for item in batch:
+            bytes_size = _num_bytes(str(item))
+            # If bytes_size > the limit, this item is too large,
+            # iterate through the json-dumped item values to find and
+            # replace the large values with a placeholder.
+            if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+                stripped_item = []
+                for value in item:
+                    # all the values should be json dumps, there are no
+                    # non json fields controlled by the user that can
+                    # be large enough to strip... (?)
+                    if _num_bytes(value) > val_byte_limit:
+                        stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                    else:
+                        stripped_item += [value]
+                final_batch.append(stripped_item)
+            else:
+                final_batch.append(item)
+        return final_batch
+
+
+def _num_bytes(data: Any) -> int:
+    """
+    Calculate the number of bytes in a string.
+
+    This can be computationally expensive, only call when necessary.
+    Never raise on a failed str cast, just return 0.
+    """
+    try:
+        return len(str(data).encode("utf-8"))
+    except Exception:
+        return 0
 
 
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
     if not isinstance(value, dict):
-        raise ValueError(f"Value is not a dict: {value}")
+        raise TypeError(f"Value is not a dict: {value}")
     return json.dumps(value)
 
 
 def _any_value_to_dump(
-    value: typing.Any,
+    value: Any,
 ) -> str:
     return json.dumps(value)
 
 
-def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
+def _dict_dump_to_dict(val: str) -> dict[str, Any]:
     res = json.loads(val)
     if not isinstance(res, dict):
-        raise ValueError(f"Value is not a dict: {val}")
+        raise TypeError(f"Value is not a dict: {val}")
     return res
 
 
-def _any_dump_to_any(val: str) -> typing.Any:
+def _any_dump_to_any(val: str) -> Any:
     return json.loads(val)
 
 
 def _ensure_datetimes_have_tz(
-    dt: typing.Optional[datetime.datetime] = None,
-) -> typing.Optional[datetime.datetime]:
+    dt: Optional[datetime.datetime] = None,
+) -> Optional[datetime.datetime]:
     # https://github.com/ClickHouse/clickhouse-connect/issues/210
     # Clickhouse does not support timezone-aware datetimes. You can specify the
     # desired timezone at query time. However according to the issue above,
@@ -1608,67 +1870,94 @@ def _ensure_datetimes_have_tz(
     return dt
 
 
+def _ensure_datetimes_have_tz_strict(
+    dt: datetime.datetime,
+) -> datetime.datetime:
+    res = _ensure_datetimes_have_tz(dt)
+    if res is None:
+        raise ValueError(f"Datetime is None: {dt}")
+    return res
+
+
 def _nullable_dict_dump_to_dict(
-    val: typing.Optional[str],
-) -> typing.Optional[typing.Dict[str, typing.Any]]:
+    val: Optional[str],
+) -> Optional[dict[str, Any]]:
     return _dict_dump_to_dict(val) if val else None
 
 
 def _nullable_any_dump_to_any(
-    val: typing.Optional[str],
-) -> typing.Optional[typing.Any]:
+    val: Optional[str],
+) -> Optional[Any]:
     return _any_dump_to_any(val) if val else None
 
 
 def _raw_call_dict_to_ch_call(
-    call: typing.Dict[str, typing.Any],
+    call: dict[str, Any],
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
-    return val if val != "" else None
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
+    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
+    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
+    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
+    display_name = empty_str_to_none(ch_call.display_name)
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
-        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
-        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump),
+        started_at=started_at,
+        ended_at=ended_at,
+        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
+        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call.op_name,
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call.exception,
+            display_name=display_name,
+        ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=_empty_str_to_none(ch_call.display_name),
+        display_name=display_name,
     )
 
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
-def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
-    return dict(
-        project_id=ch_call_dict.get("project_id"),
-        id=ch_call_dict.get("id"),
-        trace_id=ch_call_dict.get("trace_id"),
-        parent_id=ch_call_dict.get("parent_id"),
-        op_name=ch_call_dict.get("op_name"),
-        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
-        inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
-        output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
-        exception=ch_call_dict.get("exception"),
-        wb_run_id=ch_call_dict.get("wb_run_id"),
-        wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
-    )
+def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
+    summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
+    started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
+    display_name = empty_str_to_none(ch_call_dict.get("display_name"))
+    return {
+        "project_id": ch_call_dict.get("project_id"),
+        "id": ch_call_dict.get("id"),
+        "trace_id": ch_call_dict.get("trace_id"),
+        "parent_id": ch_call_dict.get("parent_id"),
+        "op_name": ch_call_dict.get("op_name"),
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
+        "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
+        "summary": make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call_dict.get("op_name", ""),
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call_dict.get("exception"),
+            display_name=display_name,
+        ),
+        "exception": ch_call_dict.get("exception"),
+        "wb_run_id": ch_call_dict.get("wb_run_id"),
+        "wb_user_id": ch_call_dict.get("wb_user_id"),
+        "display_name": display_name,
+    }
 
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
@@ -1676,6 +1965,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
@@ -1718,15 +2008,15 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(end_call.summary),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )
 
 
 def _process_parameters(
-    parameters: typing.Dict[str, typing.Any],
-) -> typing.Dict[str, typing.Any]:
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
     # Special processing for datetimes! For some reason, the clickhouse connect
     # client truncates the datetime to the nearest second, so we need to convert
     # the datetime to a float which is then converted back to a datetime in the
@@ -1753,7 +2043,7 @@ def _process_parameters(
 #     )
 
 
-def get_type(val: typing.Any) -> str:
+def get_type(val: Any) -> str:
     if val == None:
         return "none"
     elif isinstance(val, dict):
@@ -1767,49 +2057,17 @@ def get_type(val: typing.Any) -> str:
     return "unknown"
 
 
-def get_kind(val: typing.Any) -> str:
+def get_kind(val: Any) -> str:
     val_type = get_type(val)
     if val_type == "Op":
         return "op"
     return "object"
 
 
-def get_base_object_class(val: typing.Any) -> typing.Optional[str]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] == "Object":
-                            if len(val["_bases"]) > 2:
-                                return val["_bases"][-3]
-                            elif "_class_name" in val:
-                                return val["_class_name"]
-    return None
-
-
-def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
-    if not digest.startswith("v"):
-        return (False, -1)
-    try:
-        return (True, int(digest[1:]))
-    except ValueError:
-        return (False, -1)
-
-
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
-        raise ValueError(f"Invalid operator: {operator}")
-    if len(conditions) == 1:
-        return conditions[0]
-    combined = f" {operator} ".join(f"({c})" for c in conditions)
-    return f"({combined})"
-
-
 def find_call_descendants(
-    root_ids: typing.List[str],
-    all_calls: typing.List[SelectableCHCallSchema],
-) -> typing.List[str]:
+    root_ids: list[str],
+    all_calls: list[tsi.CallSchema],
+) -> list[str]:
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
@@ -1817,7 +2075,7 @@ def find_call_descendants(
             children_map[call.parent_id].append(call.id)
 
     # do DFS to get all descendants
-    def find_all_descendants(root_ids: typing.List[str]) -> typing.Set[str]:
+    def find_all_descendants(root_ids: list[str]) -> set[str]:
         descendants = set()
         stack = root_ids
 
@@ -1833,366 +2091,3 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
-
-
-def _python_value_to_ch_type(value: typing.Any) -> str:
-    """Helper function to convert python types to clickhouse types."""
-    if isinstance(value, str):
-        return "String"
-    elif isinstance(value, int):
-        return "UInt64"
-    elif isinstance(value, float):
-        return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
-    elif value is None:
-        return "Nullable(String)"
-    else:
-        raise ValueError(f"Unknown value type: {value}")
-
-
-def _param_slot(param_name: str, param_type: str) -> str:
-    """Helper function to create a parameter slot for a clickhouse query."""
-    return f"{{{param_name}:{param_type}}}"
-
-
-def _quote_json_path(path: str) -> str:
-    """Helper function to quote a json path for use in a clickhouse query. Moreover,
-    this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
-
-    See comments on `GetFieldOperator` for current limitations
-    """
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
-def _is_dynamic_field(field: str) -> bool:
-    """Dynamic fields are fields that are arbitrary values produced by the user."""
-    return (
-        field in ("inputs", "output", "attributes", "summary")
-        or field.startswith("inputs.")
-        or field.startswith("output.")
-        or field.startswith("attributes.")
-        or field.startswith("summary.")
-    )
-
-
-def _transform_external_field_to_internal_field(
-    field: str,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
-    cast: typing.Optional[str] = None,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[str, ParamBuilder, set[str]]:
-    """Transforms a request for a dot-notation field to a clickhouse field."""
-    param_builder = param_builder or ParamBuilder()
-    raw_fields_used = set()
-    json_path = None
-    for prefix in json_columns:
-        if field == prefix or field.startswith(prefix + "."):
-            if field == prefix:
-                json_path = "$"
-            else:
-                json_path = _quote_json_path(field[len(prefix + ".") :])
-            field = prefix + "_dump"
-            break
-
-    # validate field
-    if field not in all_columns:
-        raise ValueError(f"Unknown field: {field}")
-
-    raw_fields_used.add(field)
-    if json_path is not None:
-        json_path_param_name = param_builder.add_param(json_path)
-        if cast == "exists":
-            field = (
-                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
-            )
-        else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
-            field = (
-                method
-                + "(JSON_VALUE("
-                + field
-                + ", {"
-                + json_path_param_name
-                + ":String}))"
-            )
-
-    return field, param_builder, raw_fields_used
-
-
-class FilterToConditions(BaseModel):
-    having_conditions: list[str]
-    start_event_conditions: list[str]
-    end_event_conditions: list[str]
-    fields_used: set[str]
-
-
-def _process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> FilterToConditions:
-    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
-    param_builder = param_builder or ParamBuilder()
-    having_conditions: list[str] = []
-    start_event_conditions: list[str] = []
-    end_event_conditions: list[str] = []
-    raw_fields_used = set()
-
-    if filter.op_names:
-        # We will build up (0 or 1) + N conditions for the op_version_refs
-        # If there are any non-wildcarded names, then we at least have an IN condition
-        # If there are any wildcarded names, then we have a LIKE condition for each
-
-        or_conditions: typing.List[str] = []
-
-        non_wildcarded_names: typing.List[str] = []
-        wildcarded_names: typing.List[str] = []
-        for name in filter.op_names:
-            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_names.append(name)
-            else:
-                non_wildcarded_names.append(name)
-
-        if non_wildcarded_names:
-            or_conditions.append(
-                f"calls_merged.op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-            )
-            raw_fields_used.add("op_name")
-
-        for name in wildcarded_names:
-            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"calls_merged.op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
-            )
-            raw_fields_used.add("op_name")
-
-        if or_conditions:
-            start_event_conditions.append(_combine_conditions(or_conditions, "OR"))
-
-    if filter.input_refs:
-        start_event_conditions.append(
-            f"hasAny(calls_merged.input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("input_refs")
-
-    if filter.output_refs:
-        end_event_conditions.append(
-            f"hasAny(calls_merged.output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("output_refs")
-
-    if filter.parent_ids:
-        start_event_conditions.append(
-            f"calls_merged.parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("parent_id")
-
-    if filter.trace_ids:
-        start_event_conditions.append(
-            f"calls_merged.trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("trace_id")
-
-    if filter.call_ids:
-        start_event_conditions.append(
-            f"calls_merged.id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("id")
-
-    if filter.trace_roots_only:
-        start_event_conditions.append("calls_merged.parent_id IS NULL")
-        raw_fields_used.add("parent_id")
-
-    if filter.wb_user_ids:
-        start_event_conditions.append(
-            f"calls_merged.wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_user_id")
-
-    if filter.wb_run_ids:
-        start_event_conditions.append(
-            f"calls_merged.wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_run_id")
-
-    return FilterToConditions(
-        having_conditions=having_conditions,
-        start_event_conditions=start_event_conditions,
-        end_event_conditions=end_event_conditions,
-        fields_used=raw_fields_used,
-    )
-
-
-# TODO: Implement predicate pushdown just like `_process_calls_filter_to_conditions`
-def _process_query_to_conditions(
-    query: tsi.Query,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[list[str], set[str]]:
-    """Converts a Query to a list of conditions for a clickhouse query."""
-    param_builder = param_builder or ParamBuilder()
-    conditions = []
-    raw_fields_used = set()
-
-    # This is the mongo-style query
-    def process_operation(operation: tsi_query.Operation) -> str:
-        cond = None
-
-        if isinstance(operation, tsi_query.AndOperation):
-            if len(operation.and_) == 0:
-                raise ValueError("Empty AND operation")
-            elif len(operation.and_) == 1:
-                return process_operand(operation.and_[0])
-            parts = [process_operand(op) for op in operation.and_]
-            cond = f"({' AND '.join(parts)})"
-        elif isinstance(operation, tsi_query.OrOperation):
-            if len(operation.or_) == 0:
-                raise ValueError("Empty OR operation")
-            elif len(operation.or_) == 1:
-                return process_operand(operation.or_[0])
-            parts = [process_operand(op) for op in operation.or_]
-            cond = f"({' OR '.join(parts)})"
-        elif isinstance(operation, tsi_query.NotOperation):
-            operand_part = process_operand(operation.not_[0])
-            cond = f"(NOT ({operand_part}))"
-        elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part = process_operand(operation.eq_[0])
-            rhs_part = process_operand(operation.eq_[1])
-            cond = f"({lhs_part} = {rhs_part})"
-        elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part = process_operand(operation.gt_[0])
-            rhs_part = process_operand(operation.gt_[1])
-            cond = f"({lhs_part} > {rhs_part})"
-        elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part = process_operand(operation.gte_[0])
-            rhs_part = process_operand(operation.gte_[1])
-            cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
-        else:
-            raise ValueError(f"Unknown operation type: {operation}")
-
-        return cond
-
-    def process_operand(operand: tsi_query.Operand) -> str:
-        if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
-                _python_value_to_ch_type(operand.literal_),
-            )
-        elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, param_builder
-            )
-            raw_fields_used.update(fields_used)
-            return field
-        elif isinstance(operand, tsi_query.ConvertOperation):
-            field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
-        elif isinstance(
-            operand,
-            (
-                tsi_query.AndOperation,
-                tsi_query.OrOperation,
-                tsi_query.NotOperation,
-                tsi_query.EqOperation,
-                tsi_query.GtOperation,
-                tsi_query.GteOperation,
-                tsi_query.ContainsOperation,
-            ),
-        ):
-            return process_operation(operand)
-        else:
-            raise ValueError(f"Unknown operand type: {operand}")
-
-    filter_cond = process_operation(query.expr_)
-
-    conditions.append(filter_cond)
-
-    return conditions, raw_fields_used
-
-
-def _make_calls_where_condition_from_event_conditions(
-    start_event_conditions: typing.Optional[typing.List[str]] = None,
-    end_event_conditions: typing.Optional[typing.List[str]] = None,
-) -> str:
-    event_conds = []
-    if start_event_conditions is not None and len(start_event_conditions) > 0:
-        conds = _combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(started_at)",
-                *start_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    if end_event_conditions is not None and len(end_event_conditions) > 0:
-        conds = _combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(ended_at)",
-                *end_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    # Exclude deleted calls
-    conds = _combine_conditions(
-        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
-    )
-    event_conds.append(
-        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
-    )
-
-    where_conditions_part = _combine_conditions(event_conds, "AND")
-
-    return where_conditions_part

@@ -1,4 +1,4 @@
-export const MAX_RUN_LIMIT = 50;
+export const MAX_RUN_LIMIT = 100;
 export const MAX_DATE_MS = 8640000000000000; // max date value, https://stackoverflow.com/a/28425951/15867258
 
 // If true, attach useful debugging fn's to globalThis:

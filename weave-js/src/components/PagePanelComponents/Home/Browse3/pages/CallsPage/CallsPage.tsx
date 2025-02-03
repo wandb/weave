@@ -1,20 +1,23 @@
-import _ from 'lodash';
+import {
+  GridColumnVisibilityModel,
+  GridFilterModel,
+  GridPaginationModel,
+  GridPinnedColumnFields,
+  GridSortModel,
+} from '@mui/x-data-grid-pro';
 import React, {FC, useMemo} from 'react';
 
 import {
   WeaveHeaderExtrasContext,
   WeaveHeaderExtrasProvider,
 } from '../../context';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
-import {
-  opVersionKeyToRefUri,
-  opVersionRefOpName,
-} from '../wfReactInterface/utilities';
+import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {CallsTable} from './CallsTable';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 
 const HeaderExtras = () => {
   const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
@@ -28,6 +31,21 @@ export const CallsPage: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+
+  columnVisibilityModel: GridColumnVisibilityModel;
+  setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
+
+  pinModel: GridPinnedColumnFields;
+  setPinModel: (newModel: GridPinnedColumnFields) => void;
+
+  filterModel: GridFilterModel;
+  setFilterModel: (newModel: GridFilterModel) => void;
+
+  sortModel: GridSortModel;
+  setSortModel: (newModel: GridSortModel) => void;
+
+  paginationModel: GridPaginationModel;
+  setPaginationModel: (newModel: GridPaginationModel) => void;
 }> = props => {
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -46,7 +64,9 @@ export const CallsPage: FC<{
     }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
-      return opNiceName(opName) + ' Traces';
+      if (opName) {
+        return opNiceName(opName) + ' Traces';
+      }
     }
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
@@ -69,9 +89,20 @@ export const CallsPage: FC<{
                 // to the frozenFilter prop. Furthermore, "frozen" is only used when showing the
                 // evaluations table. So, in this case, I think we should really just remove the
                 // `frozen` property completely and have a top-level evaluations tab that hides controls.
-                hideControls={filter.frozen}
+                hideControls={filter.frozen && !isEvaluationTable}
+                hideOpSelector={isEvaluationTable}
                 initialFilter={filter}
                 onFilterUpdate={setFilter}
+                columnVisibilityModel={props.columnVisibilityModel}
+                setColumnVisibilityModel={props.setColumnVisibilityModel}
+                pinModel={props.pinModel}
+                setPinModel={props.setPinModel}
+                filterModel={props.filterModel}
+                setFilterModel={props.setFilterModel}
+                sortModel={props.sortModel}
+                setSortModel={props.setSortModel}
+                paginationModel={props.paginationModel}
+                setPaginationModel={props.setPaginationModel}
               />
             ),
           },
@@ -80,32 +111,4 @@ export const CallsPage: FC<{
       />
     </WeaveHeaderExtrasProvider>
   );
-};
-
-export const useEvaluationsFilter = (
-  entity: string,
-  project: string
-): WFHighLevelCallFilter => {
-  return useMemo(() => {
-    return {
-      frozen: true,
-      opVersionRefs: [
-        opVersionKeyToRefUri({
-          entity,
-          project,
-          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-          versionHash: '*',
-        }),
-      ],
-    };
-  }, [entity, project]);
-};
-
-export const useCurrentFilterIsEvaluationsFilter = (
-  currentFilter: WFHighLevelCallFilter,
-  entity: string,
-  project: string
-) => {
-  const evaluationsFilter = useEvaluationsFilter(entity, project);
-  return _.isEqual(currentFilter, evaluationsFilter);
 };

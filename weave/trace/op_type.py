@@ -3,21 +3,34 @@ import builtins
 import collections
 import collections.abc
 import inspect
+import io
 import json
 import os
+import re
 import sys
 import textwrap
 import types as py_types
 import typing
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.legacy import artifact_fs, context_state
+from weave.trace import serializer, settings
+from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.ipython import (
+    ClassNotFoundError,
+    get_class_source,
+    is_running_interactively,
+)
+from weave.trace.mem_artifact import MemTraceFilesArtifact
+from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
+from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace_server.trace_server_interface_util import str_digest
 
-from .. import environment, errors, storage
-from . import serializer
-from .op import Op
+WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
+WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
+
+CODE_DEP_ERROR_SENTINEL = "<error>"
 
 
 def type_code(type_: Any) -> str:
@@ -164,12 +177,7 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o: Any) -> Any:
-        if isinstance(o, artifact_fs.FilesystemArtifactRef):
-            if o.serialize_as_path_ref:
-                ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
-            else:
-                ref_code = f"weave.ref('{str(o)}')"
-        elif isinstance(o, (ObjectRef)):
+        if isinstance(o, (ObjectRef)):
             ref_code = f"weave.ref('{str(o)}')"
 
         if ref_code is not None:
@@ -186,9 +194,113 @@ class GetCodeDepsResult(typing.TypedDict):
     warnings: list[str]
 
 
-def get_code_deps(
+def get_source_notebook_safe(fn: typing.Callable) -> str:
+    # In ipython, we can't use inspect.getsource on classes defined in the notebook
+    if is_running_interactively() and inspect.isclass(fn):
+        try:
+            src = get_class_source(fn)
+        except ClassNotFoundError:
+            # Not all times are we using notebook code - for example if a class
+            # is defined int he Weave package itself.
+            src = inspect.getsource(fn)
+    else:
+        src = inspect.getsource(fn)
+    return textwrap.dedent(src)
+
+
+def reconstruct_signature(fn: typing.Callable) -> str:
+    sig = inspect.signature(fn)
+    module = sys.modules[fn.__module__]
+
+    def make_annotation_str(annotation: Any) -> str:
+        if isinstance(annotation, str):
+            return annotation
+        if annotation is inspect.Parameter.empty:
+            return ""
+
+        if (origin := get_origin(annotation)) is not None:
+            args = get_args(annotation)
+            replaced_args = [make_annotation_str(arg) for arg in args]
+            replaced_args_str = ", ".join(replaced_args)
+
+            if origin_name := getattr(origin, "__name__", None):
+                return f"{origin_name}[{replaced_args_str}]"
+            return f"{origin}[{replaced_args_str}]"
+
+        if isinstance(annotation, type):
+            # For builtins, just use the name
+            if annotation.__module__ == "builtins":
+                return annotation.__name__
+            # Otherwise, check if the type is imported and use the alias if given
+            for name, obj in module.__dict__.items():
+                if isinstance(obj, py_types.ModuleType):
+                    if annotation.__module__ == obj.__name__:
+                        return f"{name}.{annotation.__name__}"
+        return str(annotation)
+
+    def quote_default_str(default: Any) -> Any:
+        if isinstance(default, str):
+            return f'"{default}"'
+        return default
+
+    params = []
+    for name, param in sig.parameters.items():
+        annotation_str = make_annotation_str(param.annotation)
+        if param.default is param.empty:
+            default = ""
+        else:
+            default = f" = {quote_default_str(param.default)}"
+        params.append(f"{name}: {annotation_str}{default}")
+
+    return_annotation = make_annotation_str(sig.return_annotation)
+
+    sig_str = f"({', '.join(params)})"
+    if return_annotation:
+        sig_str += f" -> {return_annotation}"
+
+    return sig_str
+
+
+def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
+    if is_op(fn):
+        fn = as_op(fn)
+        fn = fn.resolve_fn
+
+    if not settings.should_capture_code():
+        # This digest is kept for op versioning purposes
+        digest = str_digest(inspect.getsource(fn))
+        return textwrap.dedent(
+            f"""
+            def func(*args, **kwargs):
+                ...  # Code-capture was disabled while saving this op (digest: {digest})
+            """
+        )
+
+    try:
+        return get_source_notebook_safe(fn)
+    except OSError:
+        pass
+
+    try:
+        sig_str = reconstruct_signature(fn)
+    except Exception as e:
+        warnings.append(f"Failed to reconstruct signature: {e}")
+        sig_str = "(*args, **kwargs)"
+
+    func_name = fn.__name__
+    missing_code_template = textwrap.dedent(
+        f"""
+        def {func_name}{sig_str}:
+            ... # Code-capture unavailable for this op
+        """
+    )[1:]  # skip first newline char
+
+    return missing_code_template
+
+
+def get_code_deps_safe(
     fn: Union[typing.Callable, type],  # A function or a class
-    artifact: artifact_fs.FilesystemArtifact,
+    artifact: MemTraceFilesArtifact,
     depth: int = 0,
 ) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
@@ -211,16 +323,34 @@ def get_code_deps(
         tupe: A tuple containing
             import_code: str, the code that should be included in the generated code to ensure all
                 dependencies are available for the function body.
+            code: str, the function body code.
             warnings: list[str], any warnings that occurred during the process.
     """
+    try:
+        return _get_code_deps(fn, artifact, {}, depth)
+    except Exception as e:
+        print(f"Error getting code deps for {fn}: {e}")
+        return {
+            "import_code": [],
+            "code": [CODE_DEP_ERROR_SENTINEL],
+            "warnings": [f"Error getting code dependencies for function {fn}: {e}"],
+        }
+
+
+def _get_code_deps(
+    fn: Union[typing.Callable, type],  # A function or a class
+    artifact: MemTraceFilesArtifact,
+    seen: dict[Union[Callable, type], bool],
+    depth: int = 0,
+) -> GetCodeDepsResult:
     warnings: list[str] = []
     if depth > 20:
         warnings = [
-            "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
+            "Recursion depth exceeded in get_code_deps, this may indicate circular dependencies, which are not yet handled."
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = textwrap.dedent(inspect.getsource(fn))
+    source = get_source_or_fallback(fn, warnings=warnings)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -237,7 +367,13 @@ def get_code_deps(
         var_value = None
         if isinstance(fn, py_types.FunctionType):
             var_value = resolve_var(fn, var_name)
-        if var_value == fn:
+
+        try:
+            # Some objects throw on equality comparison (like dataframes)
+            equivalent = var_value == fn
+        except ValueError:
+            equivalent = False
+        if equivalent:
             # If the variable is the function itself (recursion), we don't need to include it
             continue
         if var_value is None:
@@ -257,19 +393,21 @@ def get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
+        elif isinstance(var_value, (py_types.FunctionType, type)) or is_op(var_value):
             if var_value.__module__ == fn.__module__:
-                result = get_code_deps(var_value, artifact, depth + 1)
-                fn_warnings = result["warnings"]
-                fn_import_code = result["import_code"]
-                fn_code = result["code"]
+                if not var_value in seen:
+                    seen[var_value] = True
+                    result = _get_code_deps(var_value, artifact, seen, depth + 1)
+                    fn_warnings = result["warnings"]
+                    fn_import_code = result["import_code"]
+                    fn_code = result["code"]
 
-                import_code += fn_import_code
+                    import_code += fn_import_code
 
-                code += fn_code
-                code.append(textwrap.dedent(inspect.getsource(var_value)))
+                    code += fn_code
+                    code.append(get_source_notebook_safe(var_value))
 
-                warnings += fn_warnings
+                    warnings += fn_warnings
             else:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
@@ -278,7 +416,7 @@ def get_code_deps(
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
-                if isinstance(var_value, Op):
+                if is_op(var_value):
                     warnings.append(
                         f"Cross-module op dependencies are not yet serializable {var_value}"
                     )
@@ -303,21 +441,26 @@ def get_code_deps(
                 import_code.append(import_line)
             else:
                 try:
-                    # This relies on old Weave type mechanism.
-                    # TODO: Update to use new Weave trace serialization mechanism.
-                    json_val = storage.to_json_with_refs(
-                        var_value, artifact, path=[var_name]
-                    )
-                except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
+                    if (client := get_weave_client()) is None:
+                        raise ValueError("Weave client not found")
+
+                    from weave.trace.serialize import to_json
+
+                    # Redact sensitive values
+                    if should_redact(var_name):
+                        json_val = REDACTED_VALUE
+                    else:
+                        json_val = to_json(var_value, client._project_id(), client)
+                except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
                     )
                 else:
-                    code_paragraph = (
-                        f"{var_name} = "
-                        + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
-                        + "\n"
-                    )
+                    if should_redact(var_name):
+                        json_str = f'"{REDACTED_VALUE}"'
+                    else:
+                        json_str = json.dumps(json_val, cls=RefJSONEncoder, indent=4)
+                    code_paragraph = f"{var_name} = " + json_str + "\n"
                     code_paragraph = code_paragraph.replace(
                         f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
                     )
@@ -367,10 +510,8 @@ def dedupe_list(original_list: list[str]) -> list[str]:
     return deduped
 
 
-def save_instance(
-    obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
-) -> None:
-    result = get_code_deps(obj.resolve_fn, artifact)
+def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
+    result = get_code_deps_safe(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
     warnings = result["warnings"]
@@ -378,18 +519,19 @@ def save_instance(
         message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
         for warning in warnings:
             message += "\n  " + warning
-        if context_state.get_strict_op_saving():
-            raise errors.WeaveOpSerializeError(message)
-        else:
-            # print(message)
-            pass
 
-    op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
-    if "op()" not in op_function_code:
+    op_function_code = get_source_or_fallback(obj, warnings=warnings)
+
+    if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
+    else:
+        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+            "@weave.op()", op_function_code
+        )
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
+        assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
         import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
@@ -400,14 +542,9 @@ def save_instance(
 
 
 def load_instance(
-    artifact: artifact_fs.FilesystemArtifact,
+    artifact: MemTraceFilesArtifact,
     name: str,
 ) -> Optional["Op"]:
-    if environment.wandb_production():
-        # Returning None here instead of erroring allows the Weaveflow app
-        # to reference op defs without crashing.
-        return None
-
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
 
@@ -424,15 +561,14 @@ def load_instance(
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))
-    with context_state.no_op_register():
-        try:
-            mod = __import__(import_name, fromlist=[module_dir])
-        except Exception as e:
-            print("Op loading exception. This might be fine!", e)
-            import traceback
+    try:
+        mod = __import__(import_name, fromlist=[module_dir])
+    except Exception as e:
+        print("Op loading exception. This might be fine!", e)
+        import traceback
 
-            traceback.print_exc()
-            return None
+        traceback.print_exc()
+        return None
     sys.path.pop(0)
 
     # In the case where the saved op calls another op, we will have multiple
@@ -452,8 +588,7 @@ def load_instance(
         )
         return None
 
-    od: "Op" = getattr(mod, last_op_function.name)
-
+    od: Op = getattr(mod, last_op_function.name)
     return od
 
 
@@ -466,4 +601,4 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-serializer.register_serializer(Op, save_instance, load_instance)
+serializer.register_serializer(Op, save_instance, load_instance, is_op)

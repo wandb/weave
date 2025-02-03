@@ -10,7 +10,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
+import {Format, ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
 
 type ValueViewStringProps = {
   value: string;
@@ -39,13 +39,13 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const Collapsed = styled.div<{hasScrolling: boolean}>`
+const Collapsed = styled.div`
   min-height: 38px;
   line-height: 38px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: ${props => (props.hasScrolling ? 'pointer' : 'default')};
+  cursor: pointer;
 `;
 Collapsed.displayName = 'S.Collapsed';
 
@@ -72,12 +72,27 @@ const PreserveWrapping = styled.div`
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
 
+const getDefaultFormat = (value: string): Format => {
+  // TODO: Add JSON detection.
+  // We previously would autoselect the markdown renderer if the string appeared
+  // to have markdown content. Unfortunately, our markdown renderer can hang
+  // for several seconds on large strings and was particularly a problem when
+  // the user would do something like expand all inputs. Rendering the markdown
+  // is nice for cases like embedded code or images, so it would be nice to revisit
+  // this if we can fix the issue with the renderer somehow. Leaving this function
+  // in the code for that reason.
+  return 'Text';
+};
+
 export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const trimmed = value.trim();
   const hasScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
   const [hasFull, setHasFull] = useState(false);
 
-  const [format, setFormat] = useState('Text');
+  const [format, setFormat] = useState(getDefaultFormat(value));
+  useEffect(() => {
+    setFormat(getDefaultFormat(value));
+  }, [value]);
 
   const [mode, setMode] = useState(hasScrolling ? (isExpanded ? 1 : 0) : 0);
 
@@ -85,18 +100,16 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     setMode(hasScrolling ? (isExpanded ? 1 : 0) : 0);
   }, [hasScrolling, isExpanded]);
 
-  const onClick = hasScrolling
-    ? () => {
-        const numModes = hasFull ? 3 : 2;
-        setMode((mode + 1) % numModes);
-      }
-    : undefined;
+  const onClick = () => {
+    const numModes = hasFull ? 3 : 2;
+    setMode((mode + 1) % numModes);
+  };
   const copy = useCallback(() => {
     copyToClipboard(value);
     toast('Copied to clipboard');
   }, [value]);
 
-  const onSetFormat = (newFormat: string) => {
+  const onSetFormat = (newFormat: Format) => {
     setFormat(newFormat);
   };
 
@@ -194,9 +207,5 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
       </Column>
     );
   }
-  return (
-    <Collapsed hasScrolling={hasScrolling} onClick={onClick}>
-      {content}
-    </Collapsed>
-  );
+  return <Collapsed onClick={onClick}>{content}</Collapsed>;
 };

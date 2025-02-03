@@ -1,0 +1,21 @@
+# top level version field is required
+version: 2
+
+projectIgnorePaths:
+  - "docs"
+  - "integration_tests"
+
+# only trigger pull request alerts when these files change.
+# triggerPaths:
+#   - "ignored-folder"
+#   - "foo/bar/package.json"
+
+# issueRules:
+#   unresolvedRequire: false
+
+githubApp:
+  enabled: true # enable/disable the Socket.dev GitHub app entirely
+  pullRequestAlertsEnabled: true # enable/disable GitHub app pull request alert checks
+  dependencyOverviewEnabled: true # enable/disable GitHub app dependency overview comments in pull request alerts.
+  projectReportsEnabled: true # enable/disable Github app project report checks
+  # ignoreUsers: ["aBotOnGitHub"]

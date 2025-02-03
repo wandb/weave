@@ -1,53 +1,62 @@
 import dataclasses
 import inspect
+import logging
 import operator
 import typing
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from collections.abc import Generator, Iterator
+from copy import deepcopy
+from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.legacy import box
-from weave.legacy.graph_client_context import get_graph_client
-from weave.table import Table
+from weave.trace import box
+from weave.trace.context.tests_context import get_raise_on_captured_errors
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
+from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op
+from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
     ObjectRef,
     RefWithExtra,
     TableRef,
 )
 from weave.trace.serialize import from_json
+from weave.trace.table import Table
+from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableRowFilter,
     TraceServerInterface,
-    _TableRowFilter,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
 class MutationSetitem:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setitem"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationSetattr:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setattr"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationAppend:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["append"]
     args: tuple[Any]
 
@@ -57,7 +66,7 @@ MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["appen
 
 
 def make_mutation(
-    path: list[str], operation: MutationOperation, args: tuple[Any, ...]
+    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
@@ -78,16 +87,28 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
-class Tracable:
-    mutated_value: Any = None
-    ref: RefWithExtra
-    list_mutations: Optional[list] = None
+class Traceable:
+    ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
-    root: "Tracable"
+    root: "Traceable"
+    parent: Optional["Traceable"] = None
     server: TraceServerInterface
+    _is_dirty: bool = False
+
+    def _mark_dirty(self) -> None:
+        """Recursively mark this object and its ancestors as dirty and removes their refs."""
+        self._is_dirty = True
+        self.ref = None
+        if (
+            # Written this way to satisfy mypy
+            self.parent is not self
+            and self.parent is not None
+            and hasattr(self.parent, "_mark_dirty")
+        ):
+            self.parent._mark_dirty()
 
     def add_mutation(
-        self, path: list[str], operation: MutationOperation, *args: Any
+        self, path: tuple[str, ...], operation: MutationOperation, *args: Any
     ) -> None:
         if self.mutations is None:
             self.mutations = []
@@ -95,7 +116,7 @@ class Tracable:
 
     def save(self) -> ObjectRef:
         if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only save from object refs")
+            raise TypeError("Can only save from object refs")
         if self.root is not self:
             raise ValueError("Can only save from root object")
         if self.mutations is None:
@@ -109,6 +130,12 @@ class Tracable:
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
+
+    # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
+    # infinitely recurse.
+    if name.startswith("__") and name.endswith("__"):
+        return attribute
+
     if name not in object.__getattribute__(self, "model_fields"):
         return attribute
     if name == "ref":
@@ -117,8 +144,14 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
         except AttributeError:
             return None
 
-    server = gc.server if (gc := get_graph_client()) else None
+    server = gc.server if (gc := get_weave_client()) else None
     res = attribute_access_result(self, attribute, name, server=server)
+
+    # We need this because we override __getattribute__ and wrap the returned values.
+    # The wrapped result may be mutable (e.g. list), so we need to replace the attribute
+    # on self so that mutations are applied to the correct object and the user gets back
+    # what they expect when they call `self.<name>`.
+    self.__dict__[name] = res
     return res
 
 
@@ -131,45 +164,58 @@ def attribute_access_result(
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
-        return val_attr_val
+        return maybe_bind_method(val_attr_val, self)
 
-    ref = None
-    try:
-        ref = self.ref  # type: ignore
-    except AttributeError:
-        pass
-    if ref is None:
-        return val_attr_val
-
-    new_ref = ref.with_attr(attr_name)
+    if (ref := getattr(self, "ref", None)) is None:
+        # Even if we have not parent ref, if our current value is an object
+        # ref, we should still process it with make_trace_obj. Practically,
+        # this allows a user to "get" a Model, update a field, then invoke it.
+        # Primary test: `test_dirty_model_op_retrieval`
+        if not isinstance(val_attr_val, ObjectRef):
+            return val_attr_val
+        new_ref = None
+    else:
+        new_ref = ref.with_attr(attr_name)
 
     if server is None:
         return val_attr_val
+
+    root = getattr(self, "root", None)
 
     return make_trace_obj(
         val_attr_val,
         new_ref,
         server,
-        None,  # TODO: not passing root, needed for mutate which is not implemented yet
-        # self.root,
+        root,
         self,
     )
 
 
-class TraceObject(Tracable):
+class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
-        ref: RefWithExtra,
+        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        root: typing.Optional[Tracable],
+        root: typing.Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self._val = val
         self.ref = ref
         self.server = server
-        if root is None:
-            root = self
-        self.root = root
+        self.root = root or self
+        self.parent = parent
+
+    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+        val_copy = deepcopy(self._val, memo)
+        res = WeaveObject(
+            val_copy,
+            ref=self.ref,  # maybe this should be zero'd?
+            server=self.server,
+            root=self.root,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -178,6 +224,7 @@ class TraceObject(Tracable):
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
+
         # Store the result on _val so we don't deref next time.
         try:
             object.__setattr__(self._val, __name, result)
@@ -188,222 +235,424 @@ class TraceObject(Tracable):
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in ["_val", "ref", "server", "root", "mutations"]:
+        if __name in [
+            "_val",
+            "ref",
+            "server",
+            "root",
+            "mutations",
+            "_is_dirty",
+            "parent",
+        ]:
             return object.__setattr__(self, __name, __value)
         else:
-            if not isinstance(self.ref, ObjectRef):
-                raise ValueError("Can only set attributes on object refs")
-            object.__getattribute__(self, "root").add_mutation(
-                self.ref.extra, "setattr", __name, __value
-            )
-            return object.__setattr__(self._val, __name, __value)
+            self._mark_dirty()
+            if isinstance(__value, Traceable):
+                __value.parent = self
+
+            return setattr(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)
 
     def __repr__(self) -> str:
-        return f"TraceObject({self._val})"
+        return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
 
-class TraceTable(Tracable):
-    filter: _TableRowFilter
+class WeaveTable(Traceable):
+    filter: TableRowFilter
 
     def __init__(
         self,
-        table_ref: TableRef,
+        table_ref: Optional[TableRef],
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: _TableRowFilter,
-        root: typing.Optional[Tracable],
+        filter: TableRowFilter,
+        root: Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref  # type: ignore
-        self.server: TraceServerInterface = server
-        if root is None:
-            root = self
-        self.root = root
-        self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
+        self.server = server
+        self.root = root or self
+        self.parent = parent
+        self._rows: Optional[list[dict]] = None
+
+        # _prefetched_rows is a local cache of rows that can be used to
+        # avoid a remote call. Should only be used by internal code.
+        self._prefetched_rows: Optional[list[dict]] = None
+
+    @property
+    def rows(self) -> list[dict]:
+        if self._rows is None:
+            should_local_iter = (
+                self.ref is not None
+                and self.table_ref is not None
+                and self.table_ref._row_digests is not None
+                and self._prefetched_rows is not None
+            )
+            if should_local_iter:
+                self._rows = list(self._local_iter_with_remote_fallback())
+            else:
+                self._rows = list(self._remote_iter())
+        return self._rows
+
+    @rows.setter
+    def rows(self, value: list[dict]) -> None:
+        if not all(isinstance(row, dict) for row in value):
+            raise ValueError("All table rows must be dicts")
+
+        self._rows = value
+        self._mark_dirty()
+
+    def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
+        """Sets the rows to a local cache of rows that can be used to
+        avoid a remote call. Should only be used by internal code.
+
+        It is expected that these rows are the exact same rows that would
+        be returned by a query for this table. Failing to meet this expectation
+        will cause table operations to behave unexpectedly.
+        """
+        if self._rows is not None:
+            raise ValueError(
+                "Cannot set prefetched rows on WeaveTable when rows are already loaded"
+            )
+        self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
-        return len(self._all_rows())
+        return len(self.rows)
 
-    def _all_rows(self) -> typing.List[typing.Dict]:
-        # TODO: This is not an efficient way to do this - we essentially
-        # load the entire set of rows the first time we need anything. However
-        # the previous implementation loaded the entire set of rows for every action
-        # so this is still better.
-        if self._loaded_rows == None:
-            self._loaded_rows = [row for row in self._remote_iter()]
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
 
-        return typing.cast(typing.List[typing.Dict], self._loaded_rows)
+    def _mark_dirty(self) -> None:
+        self.table_ref = None
+        self._prefetched_rows = None
+        super()._mark_dirty()
 
-    def _remote_iter(self) -> Generator[typing.Dict, None, None]:
+    def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
+        """
+        This is the case where we:
+        1. Have all the rows in memory
+        2. Have all the row digests
+
+        In this case, we don't need to make any calls and can just return the rows
+        """
+        wc = get_weave_client()
+        if (
+            wc is None
+            or self.ref is None
+            or self.table_ref is None
+            or self.table_ref._row_digests is None
+            or self._prefetched_rows is None
+        ):
+            if get_raise_on_captured_errors():
+                raise
+            logger.error(
+                "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
+            )
+            yield from self._remote_iter()
+            return
+
+        cached_table_ref = self.table_ref
+        if isinstance(self.table_ref._row_digests, list):
+            # Only do this check if it is resolved
+            row_digest_len = len(self.table_ref._row_digests)
+            prefetched_rows_len = len(self._prefetched_rows)
+            if row_digest_len != prefetched_rows_len:
+                if get_raise_on_captured_errors():
+                    raise
+                logger.error(
+                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                )
+                yield from self._remote_iter()
+                return
+
+        for i, _ in enumerate(self._prefetched_rows):
+            next_id_future = wc.future_executor.defer(
+                lambda closure=i: cached_table_ref.row_digests[closure]
+            )
+            new_ref = self.ref.with_item(next_id_future)
+            val = self._prefetched_rows[i]
+            res = from_json(val, self.table_ref.project_id, self.server)
+            res = make_trace_obj(res, new_ref, self.server, self.root)
+            yield res
+
+    def _remote_iter(self) -> Generator[dict, None, None]:
+        if self.table_ref is None:
+            return
+
         page_index = 0
-        page_size = 1000
-        i = 0
+        page_size = 100
         while True:
             response = self.server.table_query(
                 TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
+                    project_id=self.table_ref.project_id,
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
                     # filter=self.filter,
                 )
             )
-            for item in response.rows:
-                new_ref = self.ref.with_item(item.digest)
-                yield make_trace_obj(
-                    item.val,
-                    new_ref,
-                    self.server,
-                    self.root,
+
+            if self._prefetched_rows is not None and len(response.rows) != len(
+                self._prefetched_rows
+            ):
+                if get_raise_on_captured_errors():
+                    raise
+                logger.error(
+                    f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
                 )
-                i += 1
+                self._prefetched_rows = None
+
+            for i, item in enumerate(response.rows):
+                new_ref = self.ref.with_item(item.digest) if self.ref else None
+                # Here, we use the raw rows if they exist, otherwise we use the
+                # rows from the server. This is a temporary trick to ensure
+                # we don't re-deserialize the rows on every access. Once all servers
+                # return digests, this branch can be removed because anytime we have prefetched
+                # rows we should also have the digests - and we should be in the
+                #  _local_iter_with_remote_fallback case.
+                val = (
+                    item.val
+                    if self._prefetched_rows is None
+                    else self._prefetched_rows[i]
+                )
+                res = from_json(val, self.table_ref.project_id, self.server)
+                res = make_trace_obj(res, new_ref, self.server, self.root)
+                yield res
+
             if len(response.rows) < page_size:
                 break
+
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        rows = self._all_rows()
-        if isinstance(key, slice):
+        rows = self.rows
+        if isinstance(key, (int, slice)):
             return rows[key]
-        elif isinstance(key, int):
-            return rows[key]
-        else:
-            for row in rows:
-                if row.ref.extra[-1] == key:  # type: ignore
-                    return row
-            else:
-                raise KeyError(f"Row ID not found: {key}")
 
-    def __iter__(self) -> Generator[Any, None, None]:
-        for row in self._all_rows():
-            yield row
+        for row in rows:
+            if row.ref.extra[-1] == key:  # type: ignore
+                return row
 
-    def append(self, val: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only append to object refs")
-        self.root.add_mutation(self.ref.extra, "append", val)
+        raise KeyError(f"Row ID not found: {key}")
+
+    def __iter__(self) -> Iterator[dict]:
+        return iter(self.rows)
+
+    def append(self, val: dict) -> None:
+        if not isinstance(val, dict):
+            raise TypeError("Can only append dicts to tables")
+        self._mark_dirty()
+        self.rows.append(val)
+
+    def pop(self, index: int) -> None:
+        self._mark_dirty()
+        self.rows.pop(index)
 
 
-class TraceList(Tracable, list):
+class WeaveList(Traceable, list):
     def __init__(
         self,
         *args: Any,
-        **kwargs: Any,
-    ):
-        self.ref: RefWithExtra = kwargs.pop("ref")
-        self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
-        if root is None:
-            root = self
-        self.root = root
-        super().__init__(*args, **kwargs)
+        server: TraceServerInterface,
+        ref: Optional[RefWithExtra] = None,
+        root: Optional[Traceable] = None,
+        parent: Optional[Traceable] = None,
+    ) -> None:
+        self.server = server
+
+        self.ref = ref
+        self.root = root if root is not None else self
+        self.parent = parent
+        super().__init__(*args)
+
+    def __deepcopy__(self, memo: dict) -> "WeaveList":
+        items_copy = [deepcopy(item, memo) for item in self]
+        res = WeaveList(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
-            raise ValueError("Slices not yet supported")
+            raise TypeError("Slices not yet supported")
         index = operator.index(i)
-        new_ref = self.ref.with_index(index)
+        new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
+
+    def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
+        if isinstance(i, slice):
+            raise TypeError("Slices not yet supported")
+        if (index := operator.index(i)) >= len(self):
+            raise IndexError("list assignment index out of range")
+
+        # Though this ostensibly only marks the parent (list) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
+        super().__setitem__(index, value)
+
+    def append(self, item: Any) -> None:
+        self._mark_dirty()
+        if isinstance(item, Traceable):
+            item.parent = self
+
+        super().append(item)
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
             yield self[i]
 
     def __repr__(self) -> str:
-        return f"TraceList({super().__repr__()})"
+        return f"WeaveList({super().__repr__()})"
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, list):
+            return False
+        if len(self) != len(other):
+            return False
+        for v1, v2 in zip(self, other):
+            if v1 != v2:
+                return False
+        return True
 
 
-class TraceDict(Tracable, dict):
+class WeaveDict(Traceable, dict):
     def __init__(
         self,
         *args: Any,
+        server: TraceServerInterface,
+        ref: Optional[RefWithExtra] = None,
+        root: Optional[Traceable] = None,
+        parent: Optional[Traceable] = None,
         **kwargs: Any,
-    ):
-        self.ref: RefWithExtra = kwargs.pop("ref")
-        self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
-        if root is None:
-            root = self
-        self.root = root
+    ) -> None:
+        self.server = server
+
+        self.ref = ref
+        self.root = root if root is not None else self
+        self.parent = parent
         super().__init__(*args, **kwargs)
 
+    def __deepcopy__(self, memo: dict) -> "WeaveDict":
+        items_copy = {k: deepcopy(v, memo) for k, v in self.items()}
+        res = WeaveDict(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getitem__(self, key: str) -> Any:
-        new_ref = self.ref.with_key(key)
-        return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
+        new_ref = self.ref.with_key(key) if self.ref else None
+        v = super().__getitem__(key)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
-        new_ref = self.ref.with_key(key)
-        return make_trace_obj(
-            super().get(key, default), new_ref, self.server, self.root
-        )
+        new_ref = self.ref.with_key(key) if self.ref else None
+        v = super().get(key, default)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only set items on object refs")
+        # Though this ostensibly only marks the parent (dict) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
         super().__setitem__(key, value)
-        self.root.add_mutation(self.ref.extra, "setitem", key, value)
 
-    def keys(self):  # type: ignore
-        return super().keys()
+    def keys(self) -> Generator[Any, Any, Any]:  # type: ignore
+        yield from super().keys()
 
-    def values(self):  # type: ignore
+    def values(self) -> Generator[Any, Any, Any]:  # type: ignore
         for k in self.keys():
             yield self[k]
 
-    def items(self):  # type: ignore
+    def items(self) -> Generator[tuple[Any, Any], Any, Any]:  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
     def __iter__(self) -> Iterator[str]:
-        # Simply define this to so that d = TraceDict({'a': 1, 'b': 2})); d2 = dict(d)
+        # Simply define this to so that d = WeaveDict({'a': 1, 'b': 2})); d2 = dict(d)
         # works. The dict(d) constructor works differently if __iter__ is not defined
         # on d.
         return super().__iter__()
 
     def __repr__(self) -> str:
-        return f"TraceDict({super().__repr__()})"
+        return f"WeaveDict({super().__repr__()})"
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, dict):
+            return False
+        if len(self) != len(other):
+            return False
+        for k, v in self.items():
+            if k not in other:
+                return False
+            if other[k] != v:
+                return False
+        return True
 
 
 def make_trace_obj(
     val: Any,
-    new_ref: RefWithExtra,
+    new_ref: Optional[RefWithExtra],  # Can this actually be None?
     server: TraceServerInterface,
-    root: Optional[Tracable],
+    root: Optional[Traceable],
     parent: Any = None,
 ) -> Any:
-    if isinstance(val, Tracable):
-        # If val is a TraceTable, we want to refer to it via the outer object
+    if isinstance(val, Traceable):
+        # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
         # want Dataset row refs to be Dataset.rows[id] rather than table[id]
-        if isinstance(val, TraceTable):
+        if isinstance(val, WeaveTable):
             val.ref = new_ref
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
-        # The Tracable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Tracable
+        # The Traceable check above does not currently work for Ops, where we
+        # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
     # Derefence val and create the appropriate wrapper object
-    extra: list[str] = []
+    extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra
-        read_res = server.obj_read(
-            ObjReadReq(
-                project_id=f"{val.entity}/{val.project}",
-                object_id=val.name,
-                digest=val.digest,
+        try:
+            project_id = f"{val.entity}/{val.project}"
+            read_res = server.obj_read(
+                ObjReadReq(
+                    project_id=project_id,
+                    object_id=val.name,
+                    digest=val.digest,
+                )
             )
-        )
-        val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
+            val = from_json(read_res.obj.val, project_id, server)
+            prepare_obj(val)
+        except ObjectDeletedError as e:
+            # encountered a deleted object, return DeletedRef, warn and continue
+            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
+            logger.warning(f"Could not read deleted object: {new_ref}")
 
     if isinstance(val, Table):
         val_ref = val.ref
@@ -414,9 +663,30 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-        val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
+        rows = val.rows
+        val = WeaveTable(
+            table_ref=val_ref,
+            ref=new_ref,
+            server=server,
+            filter=TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
+        # Use in memory rows! This is the case where we are making
+        # a trace object from an existing Table! If we don't do this
+        # then the WeaveTable will try to fetch all the rows from the
+        # server, throwing away the in memory rows. This is really expensive
+        # when we are doing evaluations!
+        val.set_prefetched_rows(rows)
     if isinstance(val, TableRef):
-        val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(
+            table_ref=val,
+            ref=new_ref,
+            server=server,
+            filter=TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
 
     if extra:
         # This is where extra resolution happens?
@@ -435,16 +705,25 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+                val = WeaveTable(
+                    table_ref=val,
+                    ref=new_ref,
+                    server=server,
+                    filter=TableRowFilter(),
+                    root=root,
+                    parent=parent,
+                )
 
-    if not isinstance(val, Tracable):
+    if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return TraceObject(val, new_ref, server, root)
+            return WeaveObject(
+                val, ref=new_ref, server=server, root=root, parent=parent
+            )
         elif isinstance(val, list):
-            return TraceList(val, ref=new_ref, server=server, root=root)
+            return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
-            return TraceDict(val, ref=new_ref, server=server, root=root)
-    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+            return WeaveDict(val, ref=new_ref, server=server, root=root)
+    if is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
         # bit of a hack since we are not always sure that the current object is
@@ -463,12 +742,27 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val = val.__get__(parent, type(parent))
+        # TODO: This binding is correct but not done for consistency with the
+        # not-yet-saved-method-op API which requires explicitly passing self
+        # val.call = partial(call, val, parent)
+        val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel):
+    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
+    elif box_val is None or isinstance(box_val, bool):
+        # We intentionally don't box None and bools because it's imposible to
+        # make them behave like the underlying True/False/None objects in python.
+        # This is unlike other objects (dict, list, int) that can be inherited
+        # from and compared.
+
+        # The tradeoff we're making here is:
+        # 1. We won't ref track bools or None when passed into a call; but
+        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
+
+        pass
     else:
-        setattr(box_val, "ref", new_ref)
+        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 

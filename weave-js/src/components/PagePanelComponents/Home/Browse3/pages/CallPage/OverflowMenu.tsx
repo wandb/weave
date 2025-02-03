@@ -5,21 +5,37 @@ import {
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete} from '@wandb/weave/components/Icon';
+import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useClosePeek} from '../../context';
+import {isEvaluateOp} from '../common/heuristics';
+import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
-}> = ({selectedCalls}) => {
+  setIsRenaming: (isEditing: boolean) => void;
+}> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
+    [
+      {
+        key: 'rename',
+        text: 'Rename',
+        icon: <IconPencilEdit style={{marginRight: '4px'}} />,
+        onClick: () => setIsRenaming(true),
+        disabled: selectedCalls.length !== 1,
+      },
+    ],
     [
       {
         key: 'delete',
@@ -51,7 +67,7 @@ export const OverflowMenu: FC<{
             style={{marginLeft: '4px'}}
           />
         }
-        offset="-68px, -10px"
+        offset="-78px, -16px"
       />
     </>
   );
@@ -65,6 +81,18 @@ const CallName = styled.p`
   text-align: left;
 `;
 CallName.displayName = 'S.CallName';
+
+const CallNameRow = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+`;
+CallNameRow.displayName = 'S.CallNameRow';
+
+const CallIdDiv = styled.div`
+  margin-left: 4px;
+`;
+CallIdDiv.displayName = 'S.CallIdDiv';
 
 const DialogContent = styled(MaterialDialogContent)`
   padding: 0 32px !important;
@@ -91,56 +119,100 @@ DialogActions.displayName = 'S.DialogActions';
 
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
-const ConfirmDeleteModal: FC<{
+export const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({calls, confirmDelete, setConfirmDelete}) => {
+  onDeleteCallback?: () => void;
+}> = ({calls, confirmDelete, setConfirmDelete, onDeleteCallback}) => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {orgName} = useOrgName({
+    entityName: userInfoLoaded?.username ?? '',
+    skip: viewerLoading,
+  });
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
 
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  let error = null;
-  if (calls.length === 0) {
-    error = 'No calls selected';
-  } else if (new Set(calls.map(c => c.entity)).size > 1) {
-    error = 'Cannot delete calls from multiple entities';
-  } else if (new Set(calls.map(c => c.project)).size > 1) {
-    error = 'Cannot delete calls from multiple projects';
-  }
+  const deleteTargetStr = makeDeleteTargetStr(calls);
+
+  // Deletion requires constant entity/project, break calls into groups
+  const makeProjectGroups = (mixedCalls: CallSchema[]) => {
+    const projectGroups: {[key: string]: string[]} = {};
+    mixedCalls.forEach(call => {
+      const projectKey = `${call.entity}/${call.project}`;
+      projectGroups[projectKey] = projectGroups[projectKey] || [];
+      projectGroups[projectKey].push(call.callId);
+    });
+    return projectGroups;
+  };
 
   const onDelete = () => {
+    if (calls.length === 0) {
+      setError(`No ${deleteTargetStr} selected`);
+      return;
+    }
     setDeleteLoading(true);
-    callsDelete(
-      `${calls[0].entity}/${calls[0].project}`,
-      calls.map(c => c.callId)
-    ).then(() => {
-      setDeleteLoading(false);
-      setConfirmDelete(false);
-      closePeek();
+    userEvents.deleteClicked({
+      callIds: calls.map(
+        call => `${call.entity}/${call.project}/${call.callId}`
+      ),
+      numCalls: calls.length,
+      userId: userInfoLoaded?.id ?? '',
+      organizationName: orgName,
+      username: userInfoLoaded?.username ?? '',
     });
+
+    const projectGroups = makeProjectGroups(calls);
+    const deletePromises: Array<Promise<void>> = [];
+    Object.keys(projectGroups).forEach(projectKey => {
+      const [entity, project] = projectKey.split('/');
+      deletePromises.push(
+        callsDelete(entity, project, projectGroups[projectKey])
+      );
+    });
+    Promise.all(deletePromises)
+      .then(() => {
+        setDeleteLoading(false);
+        setConfirmDelete(false);
+        onDeleteCallback?.();
+        closePeek();
+      })
+      .catch(() => {
+        setError(`Error deleting ${deleteTargetStr}`);
+        setDeleteLoading(false);
+      });
   };
 
   return (
     <Dialog
       open={confirmDelete}
-      onClose={() => setConfirmDelete(false)}
+      onClose={() => {
+        setConfirmDelete(false);
+        setError(null);
+      }}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
-      <DialogContent>
+      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
+      <DialogContent style={{overflow: 'hidden'}}>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
-          <p>
-            Are you sure you want to delete
-            {calls.length > 1 ? ' these calls' : ' this call'}?
-          </p>
+          <p>Are you sure you want to delete?</p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallName key={call.callId}>{call.spanName}</CallName>
+          <CallNameRow key={call.callId}>
+            <div>
+              <CallName>{callDisplayName(call)}</CallName>
+            </div>
+            <CallIdDiv>
+              <CopyableId id={call.callId} type="Call" />
+            </CallIdDiv>
+          </CallNameRow>
         ))}
         {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>
@@ -153,15 +225,53 @@ const ConfirmDeleteModal: FC<{
           variant="destructive"
           disabled={error != null || deleteLoading}
           onClick={onDelete}>
-          {calls.length > 1 ? 'Delete calls' : 'Delete call'}
+          {`Delete ${deleteTargetStr}`}
         </Button>
         <Button
           variant="ghost"
           disabled={deleteLoading}
-          onClick={() => setConfirmDelete(false)}>
+          onClick={() => {
+            setConfirmDelete(false);
+            setError(null);
+          }}>
           Cancel
         </Button>
       </DialogActions>
     </Dialog>
   );
+};
+
+const callDisplayName = (call: CallSchema) => {
+  if (call.displayName) {
+    return call.displayName;
+  }
+  return call.spanName;
+};
+
+const makeDeleteTargetStr = (calls: CallSchema[]) => {
+  if (calls.length === 0) {
+    return 'calls';
+  }
+
+  let evaluationCount = 0;
+  for (const call of calls) {
+    if (isEvaluateOp(call.spanName)) {
+      ++evaluationCount;
+    }
+  }
+
+  if (evaluationCount > 0) {
+    if (evaluationCount === calls.length) {
+      // All evaluations
+      return maybePluralizeWord(calls.length, 'evaluation');
+    }
+    // Mixed calls and evaluations
+    return (
+      maybePluralizeWord(evaluationCount, 'evaluation') +
+      ' and ' +
+      maybePluralizeWord(calls.length - evaluationCount, 'call')
+    );
+  }
+  // All calls
+  return maybePluralizeWord(calls.length, 'call');
 };

@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import dataclasses
 import types
 from inspect import getmro, isclass
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 import pydantic
 
-from weave.trace.op import Op
+from weave.trace.op import is_op
 
 
 class ObjectRecord:
@@ -33,12 +35,24 @@ class ObjectRecord:
                 return False
         return True
 
-    def map_values(self, fn: Callable) -> "ObjectRecord":
+    def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
 
-def pydantic_asdict_one_level(obj: pydantic.BaseModel) -> dict[str, Any]:
-    return {k: getattr(obj, k) for k in obj.model_fields}
+PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
+
+
+def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
+    if isinstance(obj, pydantic.BaseModel):
+        return obj.model_fields
+    elif isinstance(obj, pydantic.v1.BaseModel):
+        return obj.__fields__
+    else:
+        raise TypeError(f"{obj} is not a pydantic model")
+
+
+def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
+    return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}
 
 
 def class_all_bases_names(cls: type) -> list[str]:
@@ -46,10 +60,10 @@ def class_all_bases_names(cls: type) -> list[str]:
     return [c.__name__ for c in cls.mro()[1:-1]]
 
 
-def pydantic_object_record(obj: pydantic.BaseModel) -> ObjectRecord:
+def pydantic_object_record(obj: PydanticBaseModelGeneral) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: isinstance(x, Op), lambda e: None):
-        attrs[k] = v
+    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+        attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
     return ObjectRecord(attrs)
@@ -65,8 +79,8 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: isinstance(x, Op), lambda e: None):
-        attrs[k] = v
+    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+        attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
     return ObjectRecord(attrs)

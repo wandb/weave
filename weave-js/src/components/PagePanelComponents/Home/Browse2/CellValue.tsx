@@ -1,40 +1,34 @@
 import {Box} from '@mui/material';
 import React from 'react';
-import styled from 'styled-components';
 
 import {parseRef} from '../../../../react';
+import {isArtifactRef, isWeaveRef} from '../Browse3/filters/common';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
+import {
+  isProbablyTimestamp,
+  ValueViewNumberTimestamp,
+} from '../Browse3/pages/CallPage/ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
-import {isRef} from '../Browse3/pages/common/util';
+import {SmallRef} from '../Browse3/smallRef/SmallRef';
+import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
-import {SmallRef} from './SmallRef';
 
 type CellValueProps = {
   value: any;
-  isExpanded?: boolean;
 };
 
-const Collapsed = styled.div<{hasScrolling: boolean}>`
-  min-height: 38px;
-  line-height: 38px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: ${props => (props.hasScrolling ? 'pointer' : 'default')};
-`;
-Collapsed.displayName = 'S.Collapsed';
-
-export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
+export const CellValue = ({value}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
   if (value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(value)) {
-    return <SmallRef objRef={parseRef(value)} iconOnly={isExpanded} />;
+  if (isWeaveRef(value) || isArtifactRef(value)) {
+    return <SmallRef objRef={parseRef(value)} />;
   }
   if (typeof value === 'boolean') {
     return (
@@ -54,6 +48,9 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     return <CellValueString value={value} />;
   }
   if (typeof value === 'number') {
+    if (isProbablyTimestamp(value)) {
+      return <ValueViewNumberTimestamp value={value} />;
+    }
     return (
       <Box
         sx={{
@@ -63,6 +60,9 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
         <ValueViewNumber value={value} fractionDigits={4} />
       </Box>
     );
+  }
+  if (isCustomWeaveTypePayload(value)) {
+    return <CustomWeaveTypeDispatcher data={value} />;
   }
   return <CellValueString value={JSON.stringify(value)} />;
 };

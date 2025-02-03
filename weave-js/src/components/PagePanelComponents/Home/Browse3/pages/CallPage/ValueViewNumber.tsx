@@ -16,7 +16,7 @@ export const ValueViewNumber = ({
   }
 
   const str = value.toString();
-  const fixed = value.toFixed(fractionDigits ?? 6);
+  const fixed = Number(value.toFixed(fractionDigits ?? 6)).toString();
   const node = <span>{fixed}</span>;
   if (str !== fixed) {
     return <Tooltip content={str} trigger={node} />;

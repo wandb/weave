@@ -30,6 +30,12 @@ export interface EditableFieldProps {
   showEditIcon?: boolean;
   renderLinks?: boolean;
   save?(value: string): void;
+  /* onFinish is called when the user finishes editing the field. In contrast to
+  `save` which is called at a 500ms debounce rate for all edits, `finish` is called
+  only when the editing state is exited. This should only be used when you are fine
+  with losing the edit-state in the event of network issue or other fatal issue that
+  might occur between editing and finishing the edit (eg. browser refresh / close)*/
+  onFinish?(value: string): void;
   overrideClick?(): void;
 }
 
@@ -107,6 +113,7 @@ export default class EditableField extends React.Component<
   stopEditing = () => {
     this.setState({editing: false, origValue: this.state.currentValue});
     this.save.flush();
+    this.props.onFinish?.(this.state.currentValue);
   };
 
   cancelEditing = () => {

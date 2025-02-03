@@ -83,7 +83,7 @@ export function _getTypeHandlerStacks<
     if (convertedType != null) {
       let children: Array<TypedInputHandlerStack<T, H, C>> =
         _getTypeHandlerStacks(
-          convertedType,
+          convertedType as T,
           handlers,
           converters,
           isAssignableTo,

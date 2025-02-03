@@ -3,6 +3,8 @@ export const WANDB_ARTIFACT_REF_SCHEME = 'wandb-artifact';
 export const WANDB_ARTIFACT_REF_PREFIX = `${WANDB_ARTIFACT_REF_SCHEME}:///`;
 export const WEAVE_REF_SCHEME = 'weave';
 export const WEAVE_REF_PREFIX = `${WEAVE_REF_SCHEME}:///`;
+export const WEAVE_PRIVATE_SCHEME = 'weave-private';
+export const WEAVE_PRIVATE_PREFIX = `${WEAVE_PRIVATE_SCHEME}:///`;
 export const WILDCARD_ARTIFACT_VERSION_AND_PATH = ':*/obj';
 export const DICT_KEY_EDGE_NAME = 'key';
 export const LIST_INDEX_EDGE_NAME = 'index';
@@ -17,4 +19,14 @@ export const OP_CATEGORIES = [
   'evaluate',
   'tune',
 ] as const;
-export const KNOWN_BASE_OBJECT_CLASSES = ['Model', 'Dataset'] as const;
+export const KNOWN_BASE_OBJECT_CLASSES = [
+  'Prompt',
+  'Model',
+  'Dataset',
+  'Evaluation',
+  'Leaderboard',
+  'Scorer',
+  'ActionSpec',
+  'AnnotationSpec',
+  'SavedView',
+] as const;

@@ -1,0 +1,139 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #0096ad;
+  --ifm-color-primary-dark: #29784c;
+  --ifm-color-primary-darker: #277148;
+  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-light: #33925d;
+  --ifm-color-primary-lighter: #359962;
+  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-code-font-size: 85%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.07);
+
+  /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
+  --ifm-transition-fast: 100ms;
+  --ifm-transition-slow: 100ms;
+
+
+  /* Footer */
+  --ifm-footer-padding-vertical: 1.125rem;
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* Typography Scale */
+h1 { font-size: 2rem !important; }
+h2 { font-size: 1.8rem !important; }
+h3 { font-size: 1.6rem !important; }
+h4 { font-size: 1.4rem !important; }
+h5 { font-size: 1.2rem !important; }
+h6 { font-size: 1rem !important; }
+
+/* Sidebar styling */
+.theme-doc-sidebar-container {
+  /* Section Headers */
+  li.sidebar-section-title {
+    > div.menu__list-item-collapsible {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 0.5rem 0.75rem;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+
+    &:first-child > div.menu__list-item-collapsible {
+      margin-top: 0;
+    }
+  }
+
+  /* Menu Items */
+  nav.menu {
+    .menu__link {
+      font-size: 0.9375rem;
+      margin: 0.125rem 0;
+    }
+  }
+
+  /* Nested Items */
+  .menu__list-item {
+    .menu__list {
+      margin: 0.125rem 0 0.125rem 0.5rem;
+
+      .menu__link {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
+
+  /* Carets */
+  .clean-btn.menu__caret {
+    &:hover {
+      /* eliminates the double hover effect causing ugly carets */
+      background-color: transparent;
+    }
+    &:before {
+      /* reduces the default caret size to be less invasive */
+      background: var(--ifm-menu-link-sublist-icon) 50% / 1.4rem 1.4rem
+    }
+  }
+
+  .menu__link--sublist-caret:after {
+    /* reduces the default caret size to be less invasive */
+    background: var(--ifm-menu-link-sublist-icon) 50% / 1.4rem 1.4rem
+  }
+}
+
+/* Specific element styling */
+
+/* Custom styling for the Notebook CTA button */
+.notebook-cta-button {
+  text-decoration: none;
+
+  > div {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+  }
+}
+
+/* Custom styling for colab button */
+.vertical-align-colab-button {
+  vertical-align: middle;
+  line-height: 16px;
+}
+
+/* Table of Contents */
+.table-of-contents {
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  position: sticky;
+  top: var(--wb-space-4);
+
+  &__link {
+    display: block;
+    padding: var(--wb-space-1) 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

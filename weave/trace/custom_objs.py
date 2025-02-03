@@ -1,104 +1,30 @@
-import contextlib
-import io
-import os
-import tempfile
-from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
+from __future__ import annotations
 
-from weave.legacy import artifact_fs
-from weave.legacy.graph_client_context import require_graph_client
-from weave.trace import op_type  # Must import this to register op save/load
+from collections.abc import Mapping
+from typing import Any, Callable
+
+from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
-from weave.trace_server.trace_server_interface_util import (
-    decode_b64_to_bytes,
-    encode_bytes_as_b64,
-)
 
 
-class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
-    RefClass = artifact_fs.FilesystemArtifactRef
-    temp_read_dir: Optional[tempfile.TemporaryDirectory]
-    path_contents: dict[str, bytes]
-
-    def __init__(
-        self,
-        path_contents: Optional[Mapping[str, Union[str, bytes]]] = None,
-        metadata: Optional[dict[str, str]] = None,
-    ):
-        if path_contents is None:
-            path_contents = {}
-        self.path_contents = path_contents  # type: ignore
-        if metadata is None:
-            metadata = {}
-        self._metadata = metadata
-        self.temp_read_dir = None
-
-    @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
-        f: Union[io.StringIO, io.BytesIO]
-        if binary:
-            f = io.BytesIO()
-        else:
-            f = io.StringIO()
-        yield f
-        self.path_contents[path] = f.getvalue()  # type: ignore
-        f.close()
-
-    @property
-    def is_saved(self) -> bool:
-        return True
-
-    @contextlib.contextmanager
-    def open(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
-        f: Union[io.StringIO, io.BytesIO]
-        try:
-            if binary:
-                val = self.path_contents[path]
-                if not isinstance(val, bytes):
-                    raise ValueError(
-                        f"Expected binary file, but got string for path {path}"
-                    )
-                f = io.BytesIO(val)
-            else:
-                val = self.path_contents[path]
-                f = io.StringIO(val.decode("utf-8"))
-        except KeyError:
-            raise FileNotFoundError(path)
-        yield f
-        f.close()
-
-    def path(self, path: str) -> str:
-        if path not in self.path_contents:
-            raise FileNotFoundError(path)
-
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, path)
-        with open(write_path, "wb") as f:
-            f.write(self.path_contents[path])
-            f.flush()
-            os.fsync(f.fileno())
-        return write_path
-
-    @property
-    def metadata(self) -> artifact_fs.ArtifactMetadata:
-        return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
-
-    @contextlib.contextmanager
-    def writeable_file_path(self, path: str) -> Generator[str, None, None]:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            full_path = os.path.join(tmpdir, path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            yield full_path
-            with open(full_path, "rb") as fp:
-                self.path_contents[path] = fp.read()
+class DecodeCustomObjectError(Exception):
+    """An error that occurs while decoding a custom object."""
 
 
-def encode_custom_obj(obj: Any) -> Optional[dict]:
+# in future, could generalize as
+# {target_cls.__module__}.{target_cls.__qualname__}
+KNOWN_TYPES = {
+    "Op",
+    "PIL.Image.Image",
+    "wave.Wave_read",
+}
+
+
+def encode_custom_obj(obj: Any) -> dict | None:
     serializer = get_serializer_for_obj(obj)
     if serializer is None:
         # We silently return None right now. We could warn here. This object
@@ -117,9 +43,10 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
         if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
         # Save the load_intance_op
-        wc = require_graph_client()
+        wc = require_weave_client()
 
         # TODO(PR): this can fail right? Or does it return None?
+        # Calculating this URL is blocking, but we only have to pay it once per custom type
         load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
         load_op_uri = load_instance_op_ref.uri()
 
@@ -135,34 +62,57 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     }
 
 
-def decode_custom_obj(
-    weave_type: Dict,
-    encoded_path_contents: Mapping[str, Union[str, bytes]],
-    load_instance_op_uri: Optional[str],
+def _decode_custom_obj(
+    encoded_path_contents: Mapping[str, str | bytes],
+    load_instance_op: Callable[..., Any],
 ) -> Any:
-    from weave.legacy import artifact_fs
+    # Disables tracing so that calls to loading data itself don't get traced
+    load_instance_op._tracing_enabled = False  # type: ignore
+    art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
+    res = load_instance_op(art, "obj")
+    res.art = art
+    return res
 
-    load_instance_op = None
-    if load_instance_op_uri is not None:
+
+def decode_custom_obj(
+    weave_type: dict,
+    encoded_path_contents: Mapping[str, str | bytes],
+    load_instance_op_uri: str | None = None,
+) -> Any:
+    _type = weave_type["type"]
+    found_serializer = False
+
+    # First, try to load the object using a known serializer
+    if _type in KNOWN_TYPES:
+        serializer = get_serializer_by_id(_type)
+        if serializer is not None:
+            found_serializer = True
+            load_instance_op = serializer.load
+
+            try:
+                return _decode_custom_obj(encoded_path_contents, load_instance_op)
+            except Exception as e:
+                pass
+
+    # Otherwise, fall back to load_instance_op
+    if not found_serializer:
+        if load_instance_op_uri is None:
+            raise ValueError(f"No serializer found for `{_type}`")
+
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
-        wc = require_graph_client()
+            raise TypeError(f"Expected ObjectRef, got `{type(ref)}`")
+
+        wc = require_weave_client()
         load_instance_op = wc.get(ref)
-        if load_instance_op == None:  # == to check for None or BoxedNone
+        if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
+                f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
             )
 
-    if load_instance_op is None:
-        serializer = get_serializer_by_id(weave_type["type"])
-        if serializer is None:
-            raise ValueError(f"No serializer found for {weave_type}")
-        load_instance_op = serializer.load
-
-    art = MemTraceFilesArtifact(
-        encoded_path_contents,
-        metadata={},
-    )
-    with artifact_fs.loading_artifact(art):
-        return load_instance_op(art, "obj")
+    try:
+        return _decode_custom_obj(encoded_path_contents, load_instance_op)
+    except Exception as e:
+        raise DecodeCustomObjectError(
+            f"Failed to decode object of type `{_type}`. See logs above for more information."
+        ) from e

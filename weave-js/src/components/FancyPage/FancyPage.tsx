@@ -22,7 +22,12 @@ export const FancyPage = React.memo(
     const activeItem =
       activeSlug === undefined
         ? undefined
-        : items.find(item => item.slug === activeSlug);
+        : items.find(
+            item =>
+              ('slug' in item && item.slug === activeSlug) ||
+              ('additionalSlugs' in item &&
+                item.additionalSlugs?.includes(activeSlug))
+          );
     return (
       <div className="fancy-page">
         <FancyPageSidebar
@@ -31,7 +36,8 @@ export const FancyPage = React.memo(
           baseUrl={baseUrl}
         />
         <div className="fancy-page__content">
-          {children ?? activeItem?.render?.()}
+          {children ??
+            (activeItem && 'render' in activeItem && activeItem.render?.())}
         </div>
       </div>
     );

@@ -1,8 +1,8 @@
 import subprocess
-from rich import print
-from rich.console import Console
 import sys
 
+from rich import print
+from rich.console import Console
 
 import weave
 from weave.flow.agent import Agent, AgentState
@@ -45,9 +45,10 @@ def list_files(directory: str) -> str:
         if len(result) > LENGTH_LIMIT:
             result = result[:LENGTH_LIMIT]
             result += "\n... (truncated)"
-        return result
     except Exception as e:
         return json.dumps([str(e)])
+    else:
+        return result
 
 
 @weave.op()
@@ -64,9 +65,10 @@ def write_to_file(path: str, content: str) -> str:
     try:
         with open(path, "w") as f:
             f.write(content)
-        return "File written successfully."
     except Exception as e:
         return str(e)
+    else:
+        return "File written successfully."
 
 
 @weave.op()
@@ -80,7 +82,7 @@ def read_from_file(path: str) -> str:
         The content of the file.
     """
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             result = f.read()
             if len(result) > LENGTH_LIMIT:
                 result = result[:LENGTH_LIMIT]
@@ -103,8 +105,7 @@ def run_command(command: str) -> str:
     try:
         completed_process = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             shell=True,
         )

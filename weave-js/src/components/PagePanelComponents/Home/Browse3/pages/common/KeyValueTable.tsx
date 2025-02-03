@@ -4,7 +4,8 @@ import _ from 'lodash';
 import moment from 'moment';
 import React, {useContext, useEffect, useState} from 'react';
 
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {parseRefMaybe} from '../../../../../../react';
+import {SmallRef} from '../../smallRef/SmallRef';
 import {isPrimitive} from './util';
 
 const VALUE_SPACE = 4;

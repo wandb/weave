@@ -26,7 +26,13 @@ interface ColumnSelectorProps {
 const ColumnSelector: React.FC<ColumnSelectorProps> = React.memo(
   ({inputNode, tableState, update}) => {
     const weave = useWeaveContext();
-    const defaultTable = Table.initTableWithPickColumns(inputNode, weave);
+    // Use all columns to allow searching the in the column selector.
+    const defaultTable = Table.initTableWithPickColumns(
+      inputNode,
+      weave,
+      undefined,
+      null
+    );
     const colNameMap = useMemo(() => {
       const m: {[key: string]: string} = {};
       for (const colId of defaultTable.order) {

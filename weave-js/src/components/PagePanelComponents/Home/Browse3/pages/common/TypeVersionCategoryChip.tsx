@@ -4,8 +4,15 @@ import {Pill, TagColorName} from '../../../../../Tag';
 import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
+  Prompt: 'purple',
   Model: 'blue',
   Dataset: 'green',
+  Evaluation: 'cactus',
+  Leaderboard: 'gold',
+  Scorer: 'purple',
+  ActionSpec: 'sienna',
+  AnnotationSpec: 'magenta',
+  SavedView: 'magenta',
 };
 
 export const TypeVersionCategoryChip: React.FC<{

@@ -6,7 +6,7 @@
 [![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
 )](https://github.com/wandb/weave)
 
-Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
+Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/)!
 
 ---
 
@@ -94,7 +94,6 @@ sentence = "There are many fruits that were found on the recently discovered pla
 
 extract_fruit(sentence)
 ```
-
 
 ## Contributing
 

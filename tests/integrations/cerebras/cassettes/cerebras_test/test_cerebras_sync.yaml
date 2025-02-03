@@ -1,0 +1,86 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "What is the capital of France?"}],
+      "model": "llama3.1-8b"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      content-length:
+      - '101'
+      content-type:
+      - application/json
+      host:
+      - api.cerebras.ai
+      user-agent:
+      - Cerebras/Python 0.6.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.6.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.9
+    method: POST
+    uri: https://api.cerebras.ai/v1/chat/completions
+  response:
+    body:
+      string: '{"id":"chatcmpl-48b9a448-c1cc-4a11-9686-76dd8e744e02","choices":[{"finish_reason":"stop","index":0,"message":{"content":"The
+        capital of France is Paris.","role":"assistant"}}],"created":1724146768,"model":"llama3.1-8b","system_fingerprint":"fp_70185065a4","object":"chat.completion","usage":{"prompt_tokens":17,"completion_tokens":8,"total_tokens":25},"time_info":{"queue_time":6.615e-05,"prompt_time":0.0015992892857142858,"completion_time":0.004536781714285715,"total_time":0.02078700065612793,"created":1724146768}}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=86400
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 20 Aug 2024 09:39:28 GMT
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 e90132d2777b51acfb2fd86213866952.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 5UD2_0bkNmZIqCzFZQJ51eWJpqqn_3TUueEW8n82e3VCib6M6Lf-Cg==
+      X-Amz-Cf-Pop:
+      - CDG52-P5
+      X-Amzn-Trace-Id:
+      - root=1-66c46450-1702385454adf3b15962ddd9;sampled=1;lineage=822f479c:0
+      X-Cache:
+      - Miss from cloudfront
+      x-amzn-Remapped-content-length:
+      - '518'
+      x-amzn-Remapped-date:
+      - Tue, 20 Aug 2024 09:39:03 GMT
+      x-amzn-Remapped-server:
+      - uvicorn
+      x-amzn-RequestId:
+      - 86a3b877-20d0-44cf-85ec-6a29da1bdc94
+      x-ratelimit-limit-requests-day:
+      - '28800'
+      x-ratelimit-limit-tokens-minute:
+      - '60000'
+      x-ratelimit-remaining-requests-day:
+      - '28800'
+      x-ratelimit-remaining-tokens-minute:
+      - '59975'
+      x-ratelimit-reset-requests-day:
+      - '51631.72441959381'
+      x-ratelimit-reset-tokens-minute:
+      - '31.724419593811035'
+      x-request-id:
+      - 5UD2_0bkNmZIqCzFZQJ51eWJpqqn_3TUueEW8n82e3VCib6M6Lf-Cg==
+    status:
+      code: 200
+      message: OK
+version: 1

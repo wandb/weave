@@ -29,7 +29,9 @@ export const OpCodeViewerDiff = ({
   const onMount = (editor: any, monaco: Monaco) => {
     if (onSplitResize) {
       editor.getOriginalEditor().onDidLayoutChange((dimensions: any) => {
-        onSplitResize(dimensions.width);
+        if (dimensions.contentWidth >= 0) {
+          onSplitResize(dimensions.width);
+        }
       });
     }
   };

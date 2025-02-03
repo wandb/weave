@@ -1,19 +1,29 @@
 import Box from '@mui/material/Box';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {isRef} from '../common/util';
+import {isWeaveRef} from '../../filters/common';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
+
+const EXPANDED_IDS_LENGTH = 200;
 
 type Data = Record<string, any>;
 
@@ -51,7 +61,7 @@ const isSimpleData = (data: Data): boolean => {
       isSimple = false;
       return false;
     }
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       isSimple = false;
       return false;
     }
@@ -86,9 +96,7 @@ const ObjectViewerSectionNonEmpty = ({
   isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const [mode, setMode] = useState(
-    isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
-  );
+  const [mode, setMode] = useState('collapsed');
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
@@ -115,7 +123,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -145,34 +153,64 @@ const ObjectViewerSectionNonEmpty = ({
     setMode('collapsed');
     setExpandedIds([]);
   };
+
+  const isExpandAllSmall =
+    !!apiRef?.current?.getAllRowIds &&
+    getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
+
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
-    setExpandedIds(getGroupIds());
+    if (isExpandAllSmall) {
+      setExpandedIds(getGroupIds());
+    } else {
+      setExpandedIds(
+        getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
+      );
+    }
   };
 
+  // On first render and when data changes, recompute expansion state
+  useEffect(() => {
+    if (mode === 'hidden' || mode === 'json') {
+      return;
+    }
+    const isSimple = isSimpleData(data);
+    const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
+    if (newMode === 'expanded') {
+      onClickExpanded();
+    } else {
+      onClickCollapsed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, isExpanded]);
+
   return (
-    <>
+    <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
         <Title>{title}</Title>
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="row-height-small"
           active={mode === 'collapsed'}
           onClick={onClickCollapsed}
           tooltip="View collapsed"
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="expand-uncollapse"
           active={mode === 'expanded'}
           onClick={onClickExpanded}
-          tooltip="View expanded"
+          tooltip={
+            isExpandAllSmall
+              ? 'Expand all'
+              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+          }
         />
         <Button
-          variant="quiet"
+          variant="ghost"
           icon="code-alt"
           active={mode === 'json'}
           onClick={() => setMode('json')}
@@ -180,7 +218,7 @@ const ObjectViewerSectionNonEmpty = ({
         />
         {!noHide && (
           <Button
-            variant="quiet"
+            variant="ghost"
             icon="hide-hidden"
             active={mode === 'hidden'}
             onClick={() => setMode('hidden')}
@@ -189,7 +227,7 @@ const ObjectViewerSectionNonEmpty = ({
         )}
       </TitleRow>
       {body}
-    </>
+    </Box>
   );
 };
 
@@ -199,9 +237,20 @@ export const ObjectViewerSection = ({
   noHide,
   isExpanded,
 }: ObjectViewerSectionProps) => {
-  const numKeys = Object.keys(data).length;
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
+  if (isCustomWeaveTypePayload(data)) {
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <CustomWeaveTypeDispatcher data={data} />
+      </>
+    );
+  }
+
+  const numKeys = Object.keys(data).length;
   if (numKeys === 0) {
     return (
       <>
@@ -213,17 +262,18 @@ export const ObjectViewerSection = ({
     );
   }
   if (numKeys === 1 && '_result' in data) {
-    const value = data._result;
+    let value = data._result;
+    if (isWeaveRef(value)) {
+      // Little hack to make sure that we render refs
+      // inside the expansion table view
+      value = {' ': value};
+    }
     const valueType = getValueType(value);
-    if (
-      valueType === 'object' ||
-      (valueType === 'array' && value.length > 0) ||
-      isRef(value)
-    ) {
+    if (valueType === 'object' || (valueType === 'array' && value.length > 0)) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
           title={title}
-          data={{Value: value}}
+          data={value}
           noHide={noHide}
           isExpanded={isExpanded}
         />

@@ -2,20 +2,24 @@ import {
   hexToRGB,
   MEDIUM_BREAKPOINT,
   MOON_250,
+  MOON_500,
   MOON_800,
   MOONBEAM,
   OBLIVION,
   TEAL_450,
   TEAL_550,
+  TRANSPARENT,
 } from '@wandb/weave/common/css/globals.styles';
 import {TargetBlank} from '@wandb/weave/common/util/links';
 import {Icon} from '@wandb/weave/components/Icon';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import React from 'react';
 import {Link} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {isInNightMode} from '../nightMode';
+import {ItemIcon, ItemLabel, SidebarButton} from './FancyPageButton';
+import {FancyPageMenu} from './FancyPageMenu';
 import {FancyPageSidebarItem} from './FancyPageSidebar';
 
 const SidebarWrapper = styled.div`
@@ -26,43 +30,31 @@ const SidebarWrapper = styled.div`
 `;
 SidebarWrapper.displayName = 'S.SidebarWrapper';
 
-const SidebarButton = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-SidebarButton.displayName = 'S.SidebarButton';
-
-type ItemIconProps = {
-  color: string;
-};
-const ItemIcon = styled.div<ItemIconProps>`
-  height: 32px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  padding: 6px 12px;
-  background-color: ${props => props.color};
-  display: flex;
-  align-items: center;
+const SidebarLabel = styled.div`
+  font-family: Source Sans Pro;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  color: ${MOON_500};
+  margin-bottom: -12px; // Undo the flex gap a bit
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
-    padding: 0 12px;
+    display: none;
   }
 `;
-ItemIcon.displayName = 'S.ItemIcon';
+SidebarLabel.displayName = 'S.SidebarLabel';
 
-type ItemLabelProps = {
-  color: string;
-};
-const ItemLabel = styled.div<ItemLabelProps>`
-  color: ${props => props.color};
-  font-family: 'Source Sans Pro';
-  font-weight: 600;
-  height: 14px;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
+const SidebarDivider = styled.div`
+  background: #d2d2d2;
+  height: 1px;
+  margin: 0 12px;
+  @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
+    width: 1px;
+    height: 32px;
+    margin: 12px 0;
+  }
 `;
-ItemLabel.displayName = 'S.ItemLabel';
+SidebarDivider.displayName = 'S.SidebarDivider';
 
 type FancyPageSidebarSectionProps = {
   selectedItem?: FancyPageSidebarItem;
@@ -72,33 +64,55 @@ type FancyPageSidebarSectionProps = {
 
 const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
   const isNightMode = isInNightMode();
-
   const [hoveredItem, setHoveredItem] =
     React.useState<FancyPageSidebarItem | null>(null);
   return (
     <>
       {props.items.map(item => {
-        const onMouseEnter = (e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-          setHoveredItem(item);
-        };
-        const onMouseLeave = (e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-          setHoveredItem(null);
-        };
-        let colorIconBg: string = 'transparent';
+        if (item.type === 'divider') {
+          return <SidebarDivider key={item.key} />;
+        }
+        if (item.type === 'label') {
+          return (
+            <SidebarLabel key={'label' + item.label}>{item.label}</SidebarLabel>
+          );
+        }
+
+        let colorIconBg: string = TRANSPARENT;
         let colorIcon: string = isNightMode ? MOON_250 : MOON_800;
         let colorText: string = isNightMode ? MOON_250 : MOON_800;
         if (item === props.selectedItem) {
           colorIconBg = hexToRGB(TEAL_550, isNightMode ? 0.16 : 0.1);
           colorIcon = colorText = isNightMode ? TEAL_450 : TEAL_550;
-        } else if (item.isDisabled) {
+        } else if (item.type === 'button' && item.isDisabled) {
           colorIcon = colorText = isNightMode ? MOON_800 : MOON_250;
         } else if (item === hoveredItem) {
           colorIconBg = isNightMode
             ? hexToRGB(MOONBEAM, 0.08)
             : hexToRGB(OBLIVION, 0.04);
         }
+        const onMouseEnter = () => {
+          setHoveredItem(item);
+        };
+        const onMouseLeave = () => {
+          setHoveredItem(null);
+        };
+
+        if (item.type === 'menu') {
+          return (
+            <FancyPageMenu
+              key={item.key}
+              baseUrl={props.baseUrl}
+              menuItems={item.menu}
+              colorIconBg={colorIconBg}
+              colorText={colorText}
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
+            />
+          );
+        }
+
         const baseLinkProps = {
-          key: item.name,
           onClick: () => {
             item.onClick?.();
           },
@@ -121,7 +135,11 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 }}>
                 <SidebarButton>
                   <ItemIcon color={colorIconBg}>
-                    <Icon name={item.iconName} color={colorIcon} />
+                    <Icon
+                      name={item.iconName}
+                      color={colorIcon}
+                      role="presentation"
+                    />
                   </ItemIcon>
                   <ItemLabel color={colorText}>{item.name}</ItemLabel>
                 </SidebarButton>
@@ -138,11 +156,21 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 pathname: item.slug
                   ? `${props.baseUrl}/${item.slug}`
                   : props.baseUrl,
-                // Preserve query string. Gets updated because the component happens to re-render on hover.
-                search: window.location.search,
               },
         };
 
+        const button = (
+          <SidebarButton>
+            <ItemIcon color={colorIconBg}>
+              <Icon
+                name={item.iconName}
+                color={colorIcon}
+                role="presentation"
+              />
+            </ItemIcon>
+            <ItemLabel color={colorText}>{item.name}</ItemLabel>
+          </SidebarButton>
+        );
         const wrapper = (
           <SidebarWrapper key={item.name} className="night-aware">
             <Link
@@ -151,23 +179,18 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
                 pointerEvents: item.isDisabled ? 'none' : 'auto',
                 cursor: item.isDisabled ? 'default' : 'pointer',
               }}>
-              <SidebarButton>
-                <ItemIcon color={colorIconBg}>
-                  <Icon name={item.iconName} color={colorIcon} />
-                </ItemIcon>
-                <ItemLabel color={colorText}>{item.name}</ItemLabel>
-              </SidebarButton>
+              {button}
             </Link>
           </SidebarWrapper>
         );
 
         if (item.nameTooltip) {
           return (
-            <Tooltip
+            <TooltipDeprecated
               key={item.name}
               content={<span>{item.nameTooltip}</span>}
               trigger={wrapper}
-              position="right center"
+              side="right"
             />
           );
         }

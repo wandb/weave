@@ -3,7 +3,7 @@ on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened,closed,synchronize]
+    types: [opened, closed, synchronize]
 
 # explicitly configure permissions, in case your GITHUB_TOKEN workflow permissions are set to read-only in repository settings
 permissions:
@@ -22,9 +22,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: 'cla/signatures/version1/cla.json'
-          path-to-document: 'https://github.com/wandb/weave/blob/master/cla/cla.md' # e.g. a CLA or a DCO document
+          path-to-signatures: "cla/signatures/version1/cla.json"
+          path-to-document: "https://github.com/wandb/weave/blob/master/dev_docs/cla.md" # e.g. a CLA or a DCO document
           # branch should not be protected
-          branch: 'cla'
+          branch: "cla"
           # cannot use teams due to: https://github.com/contributor-assistant/github-action/issues/100
-          allowlist: actions-user, altay, dannygoldstein, davidwallacejackson, jamie-rasmussen, jlzhao27, jo-fang, jwlee64, laxels, morganmcg1, nickpenaranda, scottire, shawnlewis, staceysv, tssweeney, vanpelt, vwrj, wandbmachine
+          allowlist: actions-user, altay, andrewtruong, bdytx5, dannygoldstein, davidwallacejackson, jamie-rasmussen, jlzhao27, jo-fang, jwlee64, laxels, morganmcg1, nickpenaranda, openhands@all-hands.dev, scottire, shawnlewis, staceysv, tssweeney, vanpelt, vwrj, wandbmachine, weave@wandb.com

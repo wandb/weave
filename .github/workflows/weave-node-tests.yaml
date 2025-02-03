@@ -1,0 +1,32 @@
+name: Node.js Tests
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: sdks/node/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: sdks/node
+      - name: Run tests
+        run: pnpm test
+        working-directory: sdks/node
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}

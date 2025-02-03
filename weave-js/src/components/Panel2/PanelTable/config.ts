@@ -10,7 +10,7 @@ import * as _ from 'lodash';
 import {useCallback} from 'react';
 
 import * as Table from './tableState';
-import {typeShapesMatch} from './util';
+import {typesAreConcattable} from './util';
 
 export enum RowSize {
   Small = 1,
@@ -175,7 +175,7 @@ const typeSafeTableState = (
   if (
     config?.tableStateInputType == null ||
     incomingType == null ||
-    typeShapesMatch(incomingType, config.tableStateInputType)
+    typesAreConcattable(incomingType, config.tableStateInputType)
   ) {
     return config?.tableState;
   } else {
@@ -206,7 +206,7 @@ export const getTableConfig = (
   const mConfig = migrateConfig(config, node);
   const configNeedsReset =
     mConfig?.tableStateInputType != null &&
-    !typeShapesMatch(node.type, mConfig?.tableStateInputType);
+    !typesAreConcattable(node.type, mConfig?.tableStateInputType);
 
   const currentTableState: PanelTableConfig['tableState'] = configNeedsReset
     ? undefined

@@ -4,6 +4,7 @@ import React, {useCallback, useMemo} from 'react';
 import {useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
+import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TableType from '../PanelTable/tableType';
 import * as PTypes from './types';
 import * as PUtil from './util';
@@ -12,6 +13,8 @@ type PanelProjectionConverterProps = Panel2.PanelProps<
   typeof PTypes.inputType,
   PTypes.PanelProjectionConverterConfigType
 >;
+
+const recordEvent = makeEventRecorder('Projection');
 
 const MIN_ITER = 500;
 
@@ -150,6 +153,7 @@ const PanelProjectionConverterConfigInner: React.FC<
           }
         });
         updateConfig(rootUpdate);
+        recordEvent('UPDATE_CONFIG', rootUpdate);
       };
     },
     [config, updateConfig]

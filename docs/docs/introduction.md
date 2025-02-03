@@ -1,57 +1,32 @@
 ---
 slug: /
-sidebar_position: 1
-hide_table_of_contents: true
-
 ---
 
-# Introduction
+# W&B Weave
 
-**Weave** is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
+Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
 
-Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.
+- **Tracing & Monitoring**: [Track LLM calls and application logic](./guides/tracking/) to debug and analyze production systems.
+- **Systematic Iteration**: Refine and iterate on [prompts](./guides/core-types/prompts.md), [datasets](./guides/core-types/datasets.md), and [models](./guides/core-types/models.md).
+- **Experimentation**: Experiment with different models and prompts in the [LLM Playground](./guides/tools/playground.md). 
+- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/scorers#predefined-scorers) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
+- **Guardrails**: Protect your application with [pre- and post-safeguards](./guides/evaluation/guardrails_and_monitors.md) for content moderation, prompt safety, and more.
 
-**[Get started](/quickstart)** by decorating Python functions with `@weave.op()`. 
+Integrate Weave with your existing development stack via the:
+- [Python SDK](./reference/python-sdk/weave/index.md)
+- [TypeScript SDK](./reference/typescript-sdk/weave/README.md)
+- [Service API](./reference/service-api/call-start-call-start-post)
 
-![Weave Hero](../static/img/weave-hero.png)
+Weave supports [numerous LLM providers, local models, frameworks, and third-party services](./guides/integrations/index.md).
 
-Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+## Get started
 
-You can use Weave to:
-- Log and debug language model inputs, outputs, and traces
-- Build rigorous, apples-to-apples evaluations for language model use cases
-- Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
+Are you new to Weave? Set up and start using Weave with the [Python quickstart](/quickstart) or [TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md).
 
+## Advanced guides
 
-## Key concepts
+Learn more about advanced topics:
 
-Weave's **core types** layer contains everything you need for organizing Generative AI projects, with built-in lineage, tracking, and reproducibility.
-
-  - **[Datasets](/guides/core-types/datasets)**: Version, store, and share rich tabular data.
-  - **[Models](/guides/core-types/models)**: Version, store, and share parameterized functions.
-  - **[Evaluations](/guides/core-types/evaluations)**: Test suites for AI models.
-  - [soon] Agents: ...
-
-Weave's **tracking** layer brings immutable tracing and versioning to your programs and experiments.
-
-  - **[Objects](/guides/tracking/objects)**: Weave's extensible serialization lets you easily version, track, and share Python objects.
-  - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
-  - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
-
-Weave's **ecosystem** is batteries included for other libraries, systems, and best practices.
-
-  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for openai api calls
-  - [soon] Langchain auto-logging
-  - [soon] llama-index auto-logging
-
-Weave's **tools** layer contains utilities for making use of Weave objects.
-  
-  - **[Serve](/guides/tools/serve)**: FastAPI server for Weave Ops and Models
-  - **[Deploy](/guides/tools/deploy)**: Deploy Weave Ops and Models to various targets
-
-
-
-
-## What's next?
-
-Try the [Quickstart](/quickstart) to see Weave in action.
+- [Integrations](./guides/integrations/index.md): Use Weave with popular LLM providers, local models, frameworks, and third-party services.
+- [Cookbooks](./reference/gen_notebooks/01-intro_notebook.md): Build with Weave using Python and TypeScript. Tutorials are available as interactive notebooks.
+- [W&B AI Academy](https://www.wandb.courses/pages/w-b-courses): Build advanced RAG systems, improve LLM prompting, fine-tune LLMs, and more.

@@ -573,6 +573,7 @@ const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
   return showControls || fullscreen ? (
     <S.ControlWrapper
+      data-test="panel-control-wrapper"
       hovering={hovering}
       onMouseEnter={() => {
         // onExpressionHover();

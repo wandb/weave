@@ -174,7 +174,7 @@ const DragDropProviderComp: FC<DragDropProviderProps> = ({
 
   const setClientXYFromEvent = useMemo(
     () =>
-      _.throttle((e: DragEvent) => {
+      _.throttle((e: MouseEvent) => {
         setClientXY([e.clientX, e.clientY]);
       }, 500),
     []
@@ -203,13 +203,30 @@ const DragDropProviderComp: FC<DragDropProviderProps> = ({
   useEffect(() => {
     // Firefox doesn't give you clientX and clientY on drag events (wtf)
     // So we add an event handler to document.dragover and store the result in the context
-    function handler(e: DragEvent) {
+    function mousemoveHandler(e: MouseEvent) {
       setClientXYFromEvent(e);
+    }
+
+    function dragstartHandler() {
+      document.addEventListener('mousemove', mousemoveHandler);
+    }
+
+    function dragendHandler() {
+      document.removeEventListener('mousemove', mousemoveHandler);
+    }
+
+    function dragoverHandler(e: DragEvent) {
       onDocumentDragOver?.(contextValRef.current, e);
     }
-    document.addEventListener('dragover', handler);
+
+    document.addEventListener('dragstart', dragstartHandler);
+    document.addEventListener('dragend', dragendHandler);
+    document.addEventListener('dragover', dragoverHandler);
     return () => {
-      document.removeEventListener('dragover', handler);
+      document.removeEventListener('mousemove', mousemoveHandler);
+      document.removeEventListener('dragover', dragoverHandler);
+      document.removeEventListener('dragstart', dragstartHandler);
+      document.removeEventListener('dragend', dragstartHandler);
     };
   }, [setClientXYFromEvent, onDocumentDragOver]);
 

@@ -54,8 +54,27 @@ It *will not work* if you apply the tw-style class to the same element
   -webkit-text-size-adjust: 100%; /* 2 */
   -moz-tab-size: 4; /* 3 */
   tab-size: 4; /* 3 */
-  font-family: theme('fontFamily.sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"); /* 4 */
-  font-feature-settings: theme('fontFamily.sans[1].fontFeatureSettings', normal); /* 5 */
+  font-family: theme(
+    'fontFamily.sans',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    'Noto Sans',
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji'
+  ); /* 4 */
+  font-feature-settings: theme(
+    'fontFamily.sans[1].fontFeatureSettings',
+    normal
+  ); /* 5 */
 }
 
 /*
@@ -129,7 +148,17 @@ Add the correct font weight in Edge and Safari.
 .tw-style kbd,
 .tw-style samp,
 .tw-style pre {
-  font-family: theme('fontFamily.mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace); /* 1 */
+  font-family: theme(
+    'fontFamily.mono',
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace
+  ); /* 1 */
   font-size: 1em; /* 2 */
 }
 
@@ -346,7 +375,7 @@ Set the default cursor for buttons.
 */
 
 .tw-style button,
-.tw-style [role="button"] {
+.tw-style [role='button'] {
   cursor: pointer;
 }
 
@@ -388,4 +417,45 @@ Constrain images and videos to the parent width and preserve their intrinsic asp
 /* Make elements with the HTML hidden attribute stay hidden by default */
 .tw-style [hidden] {
   display: none;
+}
+
+/*
+  The `tw-eject` class is used to optionally eject from `.tw-style` resets if this component happens to be rendered with a `.tw-style` parent in the tree. Right now the only known use case is keeping tailwind styles from contaminating markdown content 
+*/
+
+.tw-style .tw-eject a {
+  color: #2e78c7;
+}
+
+.tw-style .tw-eject h1,
+.tw-style .tw-eject h2,
+.tw-style .tw-eject h3,
+.tw-style .tw-eject h4,
+.tw-style .tw-eject h5,
+.tw-style .tw-eject h6 {
+  font-size: revert;
+  font-weight: revert;
+}
+
+.tw-style .tw-eject ol,
+.tw-style .tw-eject ul {
+  list-style: revert;
+  margin: revert;
+  padding: revert;
+}
+
+.tw-style .tw-eject blockquote,
+.tw-style .tw-eject dl,
+.tw-style .tw-eject dd,
+.tw-style .tw-eject h1,
+.tw-style .tw-eject h2,
+.tw-style .tw-eject h3,
+.tw-style .tw-eject h4,
+.tw-style .tw-eject h5,
+.tw-style .tw-eject h6,
+.tw-style .tw-eject hr,
+.tw-style .tw-eject figure,
+.tw-style .tw-eject p,
+.tw-style .tw-eject pre {
+  margin: revert;
 }

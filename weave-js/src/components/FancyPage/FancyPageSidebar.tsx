@@ -11,7 +11,7 @@ import FancyPageSidebarSection from './FancyPageSidebarSection';
 
 const Sidebar = styled.div`
   background-color: ${WHITE};
-  box-sizing: content-box;
+  box-sizing: border-box;
   border-right: 1px solid ${MOON_250};
   width: 56px;
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
@@ -46,24 +46,54 @@ const SidebarSections = styled.div`
 `;
 SidebarSections.displayName = 'S.SidebarSections';
 
-export type FancyPageSidebarItem = {
+export type FancyPageSidebarItemButton = {
+  type?: 'button';
+
   iconName: IconName;
   name: string;
   nameTooltip?: string;
-  slug?: string;
+  slug: string;
+
+  // Some buttons should get active highlighting for multiple different slugs.
+  additionalSlugs?: string[];
+
   externalLink?: string;
+
   onClick?: () => void;
   /**
    * @deprecated Pass children to FancyPage instead to define rendered page contents
    */
   render?: () => React.ReactNode;
-  /**
-   * Enables multiple sections with dividers in between. Defaults to 0.
-   */
-  sectionIndex?: number;
 
   isDisabled?: boolean;
 };
+
+export type FancyPageSidebarItemMenuPlaceholder = {
+  type: 'menuPlaceholder';
+  key: string;
+  menu: string[];
+};
+
+export type FancyPageSidebarItemMenu = {
+  type: 'menu';
+  key: string;
+  menu: FancyPageSidebarItemButton[];
+};
+
+type FancyPageSidebarItemLabel = {
+  type: 'label';
+  label: string;
+};
+type FancyPageSidebarItemDivider = {
+  type: 'divider';
+  key: string;
+};
+
+export type FancyPageSidebarItem =
+  | FancyPageSidebarItemButton
+  | FancyPageSidebarItemMenu
+  | FancyPageSidebarItemLabel
+  | FancyPageSidebarItemDivider;
 
 type FancyPageSidebarProps = {
   selectedItem?: FancyPageSidebarItem;
@@ -72,34 +102,17 @@ type FancyPageSidebarProps = {
 };
 
 export const FancyPageSidebar = (props: FancyPageSidebarProps) => {
-  if (props.items.length < 2) {
-    return <></>;
-  }
-
-  const sections = new Set<number>();
-  props.items.forEach(item => {
-    sections.add(item.sectionIndex || 0);
-  });
-
+  // TODO: We previously would hide the sidebar if there were 0 or 1 items,
+  //       took that out to better handle the fact that there is a loading delay.
+  //       We could consider putting it back in.
   return (
     <Sidebar className="fancy-page__sidebar">
       <SidebarSections>
-        {Array.from(sections)
-          .sort()
-          .map((section, i) => (
-            <React.Fragment key={'section__' + i}>
-              {i !== 0 && (
-                <div className="fancy-page__sidebar__sections__divider" />
-              )}
-              <FancyPageSidebarSection
-                selectedItem={props.selectedItem}
-                items={props.items.filter(
-                  item => section === (item.sectionIndex || 0)
-                )}
-                baseUrl={props.baseUrl}
-              />
-            </React.Fragment>
-          ))}
+        <FancyPageSidebarSection
+          selectedItem={props.selectedItem}
+          items={props.items}
+          baseUrl={props.baseUrl}
+        />
       </SidebarSections>
     </Sidebar>
   );

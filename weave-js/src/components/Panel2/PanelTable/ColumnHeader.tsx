@@ -1,3 +1,4 @@
+import {CSSProperties} from '@material-ui/core/styles/withStyles';
 import {WBMenuOption, WBPopupMenuTrigger} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
@@ -17,7 +18,7 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {TableState} from '@wandb/weave/index';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
@@ -31,6 +32,7 @@ import {PanelComp2} from '../PanelComp';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
+import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {stripTag} from './util';
 
@@ -152,6 +154,7 @@ export const ColumnHeader: React.FC<{
 }) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
+  const {columnFormat} = useContext(WeaveFormatContext);
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
 
@@ -201,7 +204,9 @@ export const ColumnHeader: React.FC<{
       }
 
       if (panelUpdated) {
-        recordEvent('UPDATE_COLUMN_PANEL');
+        recordEvent('UPDATE_COLUMN_PANEL', {
+          exprString: weave.expToString(workingSelectFunction),
+        });
       }
     }
 
@@ -494,8 +499,27 @@ export const ColumnHeader: React.FC<{
     };
   }, [cellFrame, weave, propsSelectFunction, inputArrayNode]);
 
+  const columnNameStyle =
+    columnFormat?.textAlign === 'right'
+      ? {marginLeft: `-${colControlsWidth}px`}
+      : {marginRight: `-${colControlsWidth}px`};
+
+  // When there is a right justified column, reverse the order of the indicators
+  // and set z-index to 1 otherwise click events on the Ellipses icon is blocked
+  // by the click event on the column name due to DOM ordering and negative margins.
+  const columnActionContainerStyle: CSSProperties =
+    columnFormat?.textAlign === 'right'
+      ? {zIndex: 1, flexDirection: 'row-reverse'}
+      : {flexDirection: 'row'};
+
   return (
-    <S.ColumnHeader data-test="column-header">
+    <S.ColumnHeader
+      data-test="column-header"
+      style={{
+        textAlign: columnFormat?.textAlign ?? 'center',
+        flexDirection:
+          columnFormat?.textAlign === 'right' ? 'row-reverse' : 'row',
+      }}>
       {simpleTable ? (
         workingColumnName !== '' ? (
           <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
@@ -535,9 +559,7 @@ export const ColumnHeader: React.FC<{
           }}
           trigger={
             <S.ColumnName
-              style={{
-                marginRight: `-${colControlsWidth}px`,
-              }}
+              style={columnNameStyle}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
               {propsColumnName !== '' ? (
                 <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
@@ -644,36 +666,44 @@ export const ColumnHeader: React.FC<{
       {!simpleTable && (
         <WBPopupMenuTrigger options={columnMenuItems}>
           {({anchorRef, setOpen, open}) => (
-            <S.ColumnAction className="column-controls">
-              {isPinned && (
-                <PinnedIndicator unpin={() => setColumnPinState(false)} />
-              )}
-              {isGroupCol && (
-                <S.ControlIcon
-                  name="group-runs"
-                  onClick={e => {
-                    recordEvent('REMOVE_COLUMN_GROUPING');
-                    doUngroup();
-                  }}
+            <S.ColumnActionContainer
+              className="column-controls"
+              style={columnActionContainerStyle}>
+              <S.ColumnAction>
+                {isPinned && (
+                  <PinnedIndicator unpin={() => setColumnPinState(false)} />
+                )}
+                {isGroupCol && (
+                  <S.ControlIcon
+                    name="group-runs"
+                    onClick={e => {
+                      recordEvent('REMOVE_COLUMN_GROUPING');
+                      doUngroup();
+                    }}
+                  />
+                )}
+              </S.ColumnAction>
+              <S.ColumnAction>
+                {colIsSorted && (
+                  <SortStateToggle
+                    {...{
+                      tableState,
+                      colId,
+                      updateTableState,
+                    }}
+                  />
+                )}
+              </S.ColumnAction>
+              <S.ColumnAction>
+                <S.EllipsisIcon
+                  ref={anchorRef}
+                  data-test="column-options"
+                  name="overflow"
+                  className="column-actions-trigger"
+                  onClick={() => setOpen(o => !o)}
                 />
-              )}
-              {colIsSorted && (
-                <SortStateToggle
-                  {...{
-                    tableState,
-                    colId,
-                    updateTableState,
-                  }}
-                />
-              )}
-              <S.EllipsisIcon
-                ref={anchorRef}
-                data-test="column-options"
-                name="overflow"
-                className="column-actions-trigger"
-                onClick={() => setOpen(o => !o)}
-              />
-            </S.ColumnAction>
+              </S.ColumnAction>
+            </S.ColumnActionContainer>
           )}
         </WBPopupMenuTrigger>
       )}

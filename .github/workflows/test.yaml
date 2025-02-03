@@ -12,88 +12,66 @@ on:
   push:
 
 jobs:
-  build-container:
-    name: Build test container
+  check-which-tests-to-run:
+    uses: ./.github/workflows/check-which-tests-to-run.yaml
+
+  # ==== Query Service Jobs ====
+  build-container-query-service:
+    name: Build Legacy (Query Service) test container
     timeout-minutes: 30
     runs-on: [self-hosted, builder]
-    # runs-on: ubuntu-latest
+    outputs:
+      build_needed: ${{ steps.build_check.outputs.build_needed }}
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
+    needs: check-which-tests-to-run
+
+    # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
 
+      - name: Check if build is needed
+        id: build_check
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}" == "true" ]]; then
+            echo "Build is needed"
+            echo "build_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Build is not needed"
+            echo "build_needed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to Docker Hub
+        if: steps.build_check.outputs.build_needed == 'true'
         uses: docker/login-action@v2
         with:
           registry: us-east4-docker.pkg.dev
           username: _json_key
           password: ${{ secrets.gcp_sa_key }}
 
-      # this script is hardcoded to build for linux/amd64
       - name: Prune docker cache
+        if: steps.build_check.outputs.build_needed == 'true'
         run: docker system prune -f
-      - name: Build unit test image
-        run: python3 docker_build.py build_deps weave-test builder . Dockerfile.test
-      - name: Build integration test image
-        run: python3 docker_build.py build weave-integration-test . Dockerfile.test
 
-  lint:
-    name: Python lint
-    timeout-minutes: 7
-    needs:
-      - build-container
-    # runs-on: [self-hosted, gke-runner]
-    runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
-    steps:
-      - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
-      - name: Show changes if pre-commit fails
-        if: failure()
-        run: |
-          echo "Files were modified, printing names of changed files"
-          git diff --name-only
-          echo "Failing this step to expand logs in the UI"
-          exit 1
+      - name: Build legacy (query service) unit test image
+        if: steps.build_check.outputs.build_needed == 'true'
+        run: python3 weave_query/docker/docker_build.py build_deps weave-test-python-query-service builder . weave_query/Dockerfile.ci.test
 
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
-    # runs-on: [self-hosted, gke-runner]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "18.x"
-      - run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn tslint
-          yarn prettier
-          yarn run tsc
-
-  test:
-    name: Python unit tests
+  test-query-service:
+    name: Legacy (Query Service) Python unit tests
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
-      - build-container
-    # runs-on: [self-hosted, gke-runner]
+      - check-which-tests-to-run
+      - build-container-query-service
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         job_num: [0, 1]
-
     # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+    container: ${{ needs.build-container-query-service.outputs.build_needed == 'true' && format('us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test-python-query-service:{0}', github.sha) || null }}
     services:
       wandbservice:
         image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
@@ -103,111 +81,254 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
           - "8080:8080"
           - "8083:8083"
           - "9015:9015"
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+    outputs:
+      tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check if tests should run
+        id: test_check
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}" == "true" ]]; then
+            echo "Tests should run"
+            echo "tests_should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tests should not run"
+            echo "tests_should_run=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Verify wandb server is running
+        if: steps.test_check.outputs.tests_should_run == 'true'
+        run: curl -s http://wandbservice:8080/healthz
+      - name: Run Legacy (Query Service) Python Unit Tests
+        if: steps.test_check.outputs.tests_should_run == 'true'
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          source /root/venv/bin/activate && \
+          cd weave_query && \
+          pytest \
+          --job-num=${{ matrix.job_num }} \
+          --timeout=90 \
+          --ddtrace \
+          --durations=5 \
+          .
+
+  test-query-service-matrix-check: # This job does nothing and is only used for the branch protection
+    if: always()
+
+    needs:
+      - test-query-service
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Passes if all test-query-service jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  # ==== Weave UI Jobs ====
+  weavejs-lint-compile:
+    name: WeaveJS Lint and Compile
+    runs-on: ubuntu-latest
+    needs:
+      - check-which-tests-to-run
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check if lint and compile should run
+        id: check_run
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}" == "true" ]]; then
+            echo "Lint and compile should run"
+            echo "should_lint_and_compile=true" >> $GITHUB_OUTPUT
+          else
+            echo "Lint and compile should not run"
+            echo "should_lint_and_compile=false" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/setup-node@v1
+        if: steps.check_run.outputs.should_lint_and_compile == 'true'
+        with:
+          node-version: "18.x"
+      - name: Configure npm for GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+      - name: Run WeaveJS Lint and Compile
+        if: steps.check_run.outputs.should_lint_and_compile == 'true'
+        run: |
+          set -e
+          cd weave-js
+          yarn install --frozen-lockfile
+          yarn generate
+          yarn eslint --max-warnings=0
+          yarn tslint
+          yarn prettier
+          yarn run tsc
+          yarn testci
+
+  # ==== Trace Jobs ====
+  lint:
+    name: Python lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox
+        run: nox -e lint
+
+  trace-docs:
+    name: Trace docs
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Setup docs
+        run: make setup-docs-ci
+      - name: Run docs
+        run: make docs
+
+  trace-tests:
+    name: Trace nox tests
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        nox-shard:
+          [
+            "trace",
+            "trace_server",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "dspy",
+            "groq",
+            "google_ai_studio",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral0",
+            "mistral1",
+            "notdiamond",
+            "openai",
+            "vertexai",
+            "scorers_tests",
+            "pandas-test",
+          ]
+      fail-fast: false
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
           - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
-      # - uses: datadog/agent-github-action@v1.3
-      #   with:
-      #     api_key: ${{ secrets.DD_API_KEY }}
-      - uses: actions/checkout@v2
-      - name: Verify wandb server is running
-        run: curl -s http://wandbservice:8080/healthz
-      - name: Run Python Unit Tests (Clickhouse Client Only)
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Enable debug logging
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install SQLite dev package
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Clickhouse Only)
         env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
-        # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
-      - name: Run Python Unit Tests
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "weave_client and not skip_clickhouse_client" \
+            --weave-server=clickhouse
+      - name: Run nox
         env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
-
-  # nbmake:
-  #   name: Run notebooks with nbmake
-  #   runs-on: self-hosted
-  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-
-  #     - name: Run notebooks
-  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
-  #     - name: Upload executed notebooks
-  #       uses: actions/upload-artifact@v3
-  #       if: always()
-  #       with:
-  #         name: notebooks
-  #         path: examples
-
-  cypress-run:
-    name: Notebook and UI tests
-    timeout-minutes: 25 # 15 minute timeout routinely trips on rerun
-    needs:
-      - build-container
-      # - lint
-      # - test
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+  trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
-    # runs-on: [self-hosted, gke-runner]
+
+    needs:
+      - trace-tests
+
     runs-on: ubuntu-latest
 
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        containers: [1, 2, 3, 4, 5, 6]
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup W&B API key
-        run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
-      - name: Setup Replicate API token
-        run: echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" > $GITHUB_ENV
-      - name: Copy node_modules from container to checkout
-        run: cp -R /root/integration_test/node_modules ./integration_test/
-      - name: Activate venv
-        run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
-      - name: Make Log Dir
-        run: mkdir -p /tmp/weave/log
-      - name: Copy over built assets
-        run: cp -r /root/weave-js-build/* ./weave/frontend
-      - name: Start weave server
-        # github actions does something funky with the std file descriptors, they end up
-        # being closed. tqdm (for example) raises an exception when the descriptor it
-        # wants to write to is closed.
-        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
-        shell: bash
-      - name: Cypress run
-        # Use the following to run just a single test
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --browser replay-chromium
-        # uses: cypress-io/github-action@v4
-        # with:
-        #   working-directory: ./integration_testG
-        #   record: true
-        #   parallel: true
-        env:
-          REPLAY_API_KEY: ${{ secrets.REPLAY_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SPLIT: ${{ strategy.job-total }}
-          SPLIT_INDEX: ${{ strategy.job-index }}
-          # - uses: actions/upload-artifact@v3
-      - name: Upload logs
-        uses: actions/upload-artifact@v3
-        if: failure()
+      - name: Passes if all trace-tests jobs succeeded
+        uses: re-actors/alls-green@release/v1
         with:
-          name: weave-server-logs
-          path: /tmp/weave/log
-          retention-days: 3
+          jobs: ${{ toJSON(needs) }}

@@ -1,6 +1,6 @@
 import './ModifiedDropdown.less';
 
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import _ from 'lodash';
 import memoize from 'memoize-one';
 import React, {
@@ -17,10 +17,11 @@ import {
   DropdownItemProps,
   Icon,
   Label,
+  LabelProps,
   StrictDropdownProps,
 } from 'semantic-ui-react';
-import {LabelProps} from 'semantic-ui-react';
 
+import {IconChevronDown, IconChevronUp} from '../../../components/Icon';
 import {
   DragDropProvider,
   DragDropState,
@@ -44,16 +45,51 @@ type LabelCoord = {
 
 const ITEM_LIMIT_VALUE = '__item_limit';
 
-const simpleSearch = (options: DropdownItemProps[], query: string) => {
+/**
+ * The functionality here is similar to `searchRegexFromQuery` in `panelbank.ts`
+ */
+export function getAsValidRegex(s: string): RegExp | null {
+  let cleanS = s.trim();
+
+  // if the query is a single '*', match everything (even though * isn't technically a valid regex)
+  if (cleanS === '*') {
+    cleanS = '.*';
+  }
+
+  if (cleanS.length === 0) {
+    return null;
+  }
+
+  try {
+    return new RegExp(cleanS, 'i');
+  } catch (e) {
+    return null;
+  }
+}
+
+export const simpleSearch = (
+  options: DropdownItemProps[],
+  query: string,
+  config: {
+    allowRegexSearch?: boolean;
+  } = {}
+) => {
+  const regex = config.allowRegexSearch ? getAsValidRegex(query) : null;
+
   return _.chain(options)
-    .filter(o =>
-      _.includes(JSON.stringify(o.text).toLowerCase(), query.toLowerCase())
-    )
+    .filter(o => {
+      const t = typeof o.text === 'string' ? o.text : JSON.stringify(o.text);
+
+      return regex
+        ? regex.test(t)
+        : _.includes(t.toLowerCase(), query.toLowerCase());
+    })
     .sortBy(o => {
-      const valJSON = typeof o.text === 'string' ? `"${query}"` : query;
-      return JSON.stringify(o.text).toLowerCase() === valJSON.toLowerCase()
-        ? 0
-        : 1;
+      const oString =
+        typeof o.text === 'string' ? o.text : JSON.stringify(o.text);
+      const qString = typeof query === 'string' ? query : JSON.stringify(query);
+
+      return oString.toLowerCase() === qString.toLowerCase() ? 0 : 1;
     })
     .value();
 };
@@ -68,16 +104,17 @@ const getOptionProps = (opt: Option, hideText: boolean) => {
 };
 
 export interface ModifiedDropdownExtraProps {
+  allowRegexSearch?: boolean;
   debounceTime?: number;
   enableReordering?: boolean;
+  hideText?: boolean;
   itemLimit?: number;
   options: Option[];
+  optionTransform?(option: Option): Option;
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
-  hideText?: boolean;
-
-  optionTransform?(option: Option): Option;
+  useIcon?: boolean;
 }
 
 type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
@@ -96,10 +133,11 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     } = props;
 
     const {
+      allowAdditions,
+      allowRegexSearch,
+      enableReordering,
       itemLimit,
       optionTransform,
-      enableReordering,
-      allowAdditions,
       resultLimit = 100,
       resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
       ...passProps
@@ -128,15 +166,13 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
               _.concat(currentOptions, search(propsOptions, query) as Option[])
             );
           } else {
-            setOptions(
-              _.concat(
-                currentOptions,
-                simpleSearch(propsOptions, query) as Option[]
-              )
-            );
+            const matchedOptions = simpleSearch(propsOptions, query, {
+              allowRegexSearch,
+            }) as Option[];
+            setOptions([...currentOptions, ...matchedOptions]);
           }
         }, debounceTime || 400),
-      [multiple, propsOptions, search, value, debounceTime]
+      [allowRegexSearch, debounceTime, multiple, propsOptions, search, value]
     );
 
     const firstRenderRef = useRef(true);
@@ -462,14 +498,30 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
-          const valCount = _.isArray(val) ? val.length : 0;
+          const valIsArray = Array.isArray(val);
+          const valCount = valIsArray ? val.length : 0;
+
+          // HACK: If a multi-select a click on the limit message will append the limiter to the value, make sure to no-op this. A better solution would be to render the limit message as an interactable element, but refactoring this is a much larger task
+          const valIsLimit = valIsArray
+            ? val.includes(ITEM_LIMIT_VALUE)
+            : val === ITEM_LIMIT_VALUE;
+
           if (valCount < itemCount() || !atItemLimit()) {
-            if (onChange && val !== ITEM_LIMIT_VALUE) {
+            if (onChange && !valIsLimit) {
               onChange(e, {value: val});
             }
           }
         }}
         trigger={renderTrigger()}
+        icon={
+          passProps.useIcon ? (
+            passProps.open ? (
+              <IconChevronUp />
+            ) : (
+              <IconChevronDown />
+            )
+          ) : undefined
+        }
       />
     );
   },
@@ -509,7 +561,7 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
         textOverflow: 'ellipsis',
       }}>
       {showTooltip ? (
-        <Tooltip
+        <TooltipDeprecated
           content={
             <span
               style={{

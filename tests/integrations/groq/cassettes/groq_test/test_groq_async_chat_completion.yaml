@@ -1,0 +1,101 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a psychiatrist helping
+      young minds"}, {"role": "user", "content": "I panicked during the test, even
+      though I knew everything on the test paper."}], "model": "llama3-8b-8192", "max_tokens":
+      360, "seed": 42, "stop": null, "stream": false, "temperature": 0.3, "top_p":
+      1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '321'
+      content-type:
+      - application/json
+      host:
+      - api.groq.com
+      user-agent:
+      - AsyncGroq/Python 0.9.0
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 0.9.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.groq.com/openai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SUwY7bOAyG7/sUhC5zcQLbmSSOL4PFnubaSw9tEcgWbasji6pIN+MO8u4L2UkG
+        vdLk/38kRX8oa1St2kFLOwa3wa7I27bYbfDUms1zU+WbpjmazanRebGvDvuuzVWmqPmJrdwKty2N
+        waFY8ipTbUQtaFRdHMui2Bf7YpepkQw6VSvn9Kh3m6rZVMWpTNkD2RZZ1d8+lPUG31WdZ2pEZt2j
+        qj9UJIeqVprZsmgvqYa8oE/urwJMkzcMzr4hzDQ9RYQO0VnfQ0Tt3AxdnFhiYgLtDRjLOgSyPgUu
+        VoZUFhldB9H2g4CnyxZe5Ynh1he6GTzFUTsQWtRBBi1w0XMGyAFbuxhdBvR3honRpOyAsaM4JpwL
+        OrcQSMrjyRj0CS/pPfB/IziUTyRDF7/97r/7//SiDZJURoSRIoJuaBK4JJhBh4AeDZgpJjcZEARZ
+        XuDrysrQ0/oh0tSvXcNovXlwA4uOsnIvVEF7276heYGvmsHKIhoiMk8RgbqHCVhJtBlQXJxkwIjA
+        NKIMyRMd4zozibbvMaJZ/bV/tyjzS+rwX8eUwaB/L5MAfA8YLfoWzQqSxG/5jyaRhaHBjiK+wGsH
+        SWEZx7rx3iJ/Kt530lLAdfMyED/eC4P1a4eaZSH6giOODcYMNK+8ged2sFqiZclgnKEn7cBykh3Q
+        hdXHG4zpsZqF5ek+efLL+rtl5npeikbtdY9/DQOYFplW+/vzSZmJrEmzpu6W3lhnZd6qa6Yc9SFS
+        w6r2k3OZ6qy3PJwjaiavasVCQV1/ZGq631WINAY5C72hZ1XvquwRsiOqOt/m+WFfllVVpYu7H/ij
+        oNiXf8dvVUW5O5TPVbXPlJBo91lwyh+he+4uL56Px+PumimeWXA8d9b3GEO0y3134XzQh+Ox0Hhq
+        Vabez32kXwl/+WtF/HXOi5/lfPoTA2M5cB5DHJr51D13O3W9/vM/AAAA//8DABp2MKffBAAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a43c43d6d2d3f05-BOM
+      Cache-Control:
+      - private, max-age=0, no-store, no-cache, must-revalidate
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 16 Jul 2024 17:38:33 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=qQdvj.QJXp3Lw0KuWYvU8wwXWSjBpJqRl9WABDmTilI-1721151513-1.0.1.1-6Gi.sgPeaHOhXjGLdnupr4eOHeoXlj9eVO2kNQc8A1dCOtar0Vd.Mpb0NRfBb.WsEmzS0k8PqHPynwdOnVMVYA;
+        path=/; expires=Tue, 16-Jul-24 18:08:33 GMT; domain=.groq.com; HttpOnly; Secure;
+        SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      vary:
+      - Origin
+      via:
+      - 1.1 google
+      x-ratelimit-limit-requests:
+      - '100000'
+      x-ratelimit-limit-tokens:
+      - '70000'
+      x-ratelimit-remaining-requests:
+      - '99998'
+      x-ratelimit-remaining-tokens:
+      - '69961'
+      x-ratelimit-reset-requests:
+      - 1.313999999s
+      x-ratelimit-reset-tokens:
+      - 33.428571ms
+      x-request-id:
+      - req_01j2y9zrpse2hs0rprhby9f4f3
+    status:
+      code: 200
+      message: OK
+version: 1

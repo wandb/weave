@@ -1,9 +1,11 @@
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Optional
 
-from openai.types.chat import (
-    ChatCompletion,
-    ChatCompletionChunk,
-)
+if TYPE_CHECKING:
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionChunk,
+    )
 
 
 class OpenAIStream:
@@ -17,22 +19,22 @@ class OpenAIStream:
         chunk_iter: The output of an openai chat completion streaming=True call.
     """
 
-    def __init__(self, chunk_iter: Iterator[ChatCompletionChunk]) -> None:
+    def __init__(self, chunk_iter: Iterator["ChatCompletionChunk"]) -> None:
         self.chunk_iter = chunk_iter
         self.first_chunk: Optional[ChatCompletionChunk] = None
         self.output_choices: list[dict] = []
 
-    def __next__(self) -> ChatCompletionChunk:
+    def __next__(self) -> "ChatCompletionChunk":
         chunk = self.chunk_iter.__next__()
         self._process_chunk(chunk)
         return chunk
 
-    def __iter__(self) -> Iterator[ChatCompletionChunk]:
+    def __iter__(self) -> Iterator["ChatCompletionChunk"]:
         for chunk in self.chunk_iter:
             self._process_chunk(chunk)
             yield chunk
 
-    def _process_chunk(self, chunk: ChatCompletionChunk) -> None:
+    def _process_chunk(self, chunk: "ChatCompletionChunk") -> None:
         if self.first_chunk is None:
             self.first_chunk = chunk
         for chunk_choice in chunk.choices:
@@ -98,7 +100,9 @@ class OpenAIStream:
                                 tool_call_delta.function.arguments
                             )
 
-    def final_response(self) -> ChatCompletion:
+    def final_response(self) -> "ChatCompletion":
+        from openai.types.chat import ChatCompletion
+
         if self.first_chunk is None:
             raise ValueError("No chunks received")
         return ChatCompletion(

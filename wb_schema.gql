@@ -104,10 +104,24 @@ type UpdateUserPayload {
   clientMutationId: String
 }
 
+input InsertSecretInput {
+  entityName: String!
+  secretName: String!
+    @constraints(max: 255, pattern: "^[A-Za-z_][A-Za-z0-9_]*$")
+  secretValue: String!
+  clientMutationId: String
+}
+
+type InsertSecretPayload {
+  success: Boolean!
+  clientMutationId: String
+}
+
 type Mutation {
   updateUser(input: UpdateUserInput!): UpdateUserPayload @audit
   deleteView(input: DeleteViewInput!): DeleteViewPayload
   upsertView(input: UpsertViewInput!): UpsertViewPayload @audit
+  insertSecret(input: InsertSecretInput!): InsertSecretPayload
   updateArtifactSequence(
     input: UpdateArtifactSequenceInput!
   ): UpdateArtifactCollectionPayload
@@ -169,6 +183,7 @@ type User implements Node {
   photoUrl: String
   deletedAt: DateTime
   teams(before: String, after: String, first: Int, last: Int): EntityConnection
+  admin: Boolean
 }
 
 type UserConnection {
@@ -187,6 +202,7 @@ type Project implements Node {
   createdAt: DateTime!
   updatedAt: DateTime
   id: ID!
+  internalId: ID!
   name: String!
   runs(filters: JSONString, order: String, first: Int): RunConnection
   entity: Entity!
@@ -274,10 +290,17 @@ type RowType {
   row: JSON!
 }
 
+type Secret {
+  entityId: Int!
+  name: String!
+  createdAt: DateTime!
+}
+
 type Entity implements Node {
   id: ID!
   name: String!
   isTeam: Boolean!
+  project(name: String): Project
   projects(
     before: String
     after: String
@@ -295,6 +318,7 @@ type Entity implements Node {
     filters: JSONString
     collectionTypes: [ArtifactCollectionType!]
   ): ArtifactCollectionConnection
+  secrets: [Secret!]!
 }
 
 type EntityConnection {
@@ -566,6 +590,7 @@ type Artifact {
   currentManifest: ArtifactManifest
   historyStep: Int64
   ttlDurationSeconds: Int64!
+  tags: [Tag!]!
 }
 
 type ArtifactManifestConnection {

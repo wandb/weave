@@ -227,6 +227,22 @@ const PanelTableInnerConfigSetter: React.FC<
     return {...config, tableState: tableState ?? autoTable};
   }, [config, tableState, autoTable]);
 
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    const defineColumnVariables = (currentTableState: Table.TableState) => {
+      return Object.keys(currentTableState.columns).reduce(
+        (acc: {[key: string]: NodeOrVoidNode}, colId) => {
+          const columnName =
+            currentTableState.columnNames[colId] || colId.replace(/-/g, '');
+          acc[columnName] = currentTableState.columnSelectFunctions[colId];
+          return acc;
+        },
+        {}
+      );
+    };
+
+    return defineColumnVariables(config.tableState ?? tableState ?? autoTable);
+  }, [config.tableState, tableState, autoTable]);
+
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
 
   if (!hasLoadedOnce) {
@@ -234,14 +250,16 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <PanelTableInner
-      {...props}
-      config={protectedConfig}
-      autoTable={autoTable}
-      updateConfig={protectedUpdateConfig}
-      showColumnSelect={showColumnSelect}
-      setShowColumnSelect={setShowColumnSelect}
-    />
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelTableInner
+        {...props}
+        config={protectedConfig}
+        autoTable={autoTable}
+        updateConfig={protectedUpdateConfig}
+        showColumnSelect={showColumnSelect}
+        setShowColumnSelect={setShowColumnSelect}
+      />
+    </PanelContextProvider>
   );
 };
 
@@ -430,11 +448,10 @@ const PanelTableInner: React.FC<
           );
         }
       } else {
-        const activeRowForGrouping =
-          {
-            ...config.activeRowForGrouping,
-            [compositeGroupKey]: row,
-          } ?? {};
+        const activeRowForGrouping = {
+          ...config.activeRowForGrouping,
+          [compositeGroupKey]: row,
+        };
         // if row is less than 0, delete the active row
         if (row < 0) {
           delete activeRowForGrouping[compositeGroupKey];
@@ -542,28 +559,33 @@ const PanelTableInner: React.FC<
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
+      const columnDef = columnDefinitions[colId];
+      const colType = columnDef.selectFn.type;
+
       return (
-        <ColumnHeader
-          isGroupCol={columnDefinitions[colId].isGrouped}
-          tableState={tableState}
-          inputArrayNode={input}
-          rowsNode={rowsNode}
-          columnName={tableState.columnNames[colId]}
-          selectFunction={tableState.columnSelectFunctions[colId]}
-          colId={colId}
-          panelId={tableState.columns[colId].panelId}
-          config={tableState.columns[colId].panelConfig}
-          panelContext={props.context}
-          updatePanelContext={updateContext}
-          updateTableState={updateTableState}
-          isPinned={config.pinnedColumns?.includes(colId)}
-          setColumnPinState={(pinned: boolean) => {
-            setColumnPinState(colId, pinned);
-          }}
-          simpleTable={props.config.simpleTable}
-          countColumnId={countColumnId}
-          setCountColumnId={setCountColumnId}
-        />
+        <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+          <ColumnHeader
+            isGroupCol={columnDefinitions[colId].isGrouped}
+            tableState={tableState}
+            inputArrayNode={input}
+            rowsNode={rowsNode}
+            columnName={tableState.columnNames[colId]}
+            selectFunction={tableState.columnSelectFunctions[colId]}
+            colId={colId}
+            panelId={tableState.columns[colId].panelId}
+            config={tableState.columns[colId].panelConfig}
+            panelContext={props.context}
+            updatePanelContext={updateContext}
+            updateTableState={updateTableState}
+            isPinned={config.pinnedColumns?.includes(colId)}
+            setColumnPinState={(pinned: boolean) => {
+              setColumnPinState(colId, pinned);
+            }}
+            simpleTable={props.config.simpleTable}
+            countColumnId={countColumnId}
+            setCountColumnId={setCountColumnId}
+          />
+        </WeaveFormatContext.Provider>
       );
     },
     [
@@ -859,16 +881,13 @@ const PanelTableInner: React.FC<
               .map(rowSize => (
                 <Tooltip
                   key={rowSize}
-                  position="top center"
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
                   trigger={
                     <Button
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
                       onClick={() => setRowSize(RowSize[rowSize])}
                       active={config.rowSize === RowSize[rowSize]}
-                      variant={
-                        config.rowSize === RowSize[rowSize] ? 'ghost' : 'quiet'
-                      }
+                      variant="ghost"
                       size="small"
                     />
                   }
@@ -881,7 +900,7 @@ const PanelTableInner: React.FC<
           <div
             style={{flex: '0 0 auto', display: 'flex', alignItems: 'center'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="back"
               tooltip="First page"
@@ -890,7 +909,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-back"
               tooltip="Previous page"
@@ -937,7 +956,7 @@ const PanelTableInner: React.FC<
                 : totalRowCountUse.result - (useOneBasedIndex ? 0 : 1)}
             </span>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="chevron-next"
               tooltip="Next page"
@@ -947,7 +966,7 @@ const PanelTableInner: React.FC<
               }}
             />
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               icon="forward-next"
               tooltip="Last page"
@@ -962,7 +981,7 @@ const PanelTableInner: React.FC<
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
             <Button
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 downloadDataAsCSV();
@@ -974,7 +993,7 @@ const PanelTableInner: React.FC<
               trigger={
                 <Button
                   data-test="select-columns"
-                  variant="quiet"
+                  variant="ghost"
                   size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
@@ -1004,7 +1023,7 @@ const PanelTableInner: React.FC<
             </Modal>
             <Button
               data-test="auto-columns"
-              variant="quiet"
+              variant="ghost"
               size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');

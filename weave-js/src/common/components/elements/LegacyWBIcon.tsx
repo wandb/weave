@@ -24,8 +24,13 @@ export interface LegacyWBIconProps {
   onMouseEnter?: any;
   onMouseLeave?: any;
   style?: any;
+  disabled?: boolean;
 
   'data-test'?: any;
+
+  role?: string;
+  ariaHidden?: string;
+  ariaLabel?: string;
 }
 
 const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
@@ -42,6 +47,11 @@ const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
       onMouseLeave,
       style,
       'data-test': dataTest,
+      role,
+      title,
+      ariaHidden,
+      ariaLabel,
+      disabled = false,
     },
     ref
   ) => {
@@ -59,6 +69,11 @@ const LegacyWBIconComp = React.forwardRef<HTMLElement, LegacyWBIconProps>(
       onMouseLeave,
       style,
       'data-test': dataTest,
+      role,
+      title,
+      'aria-hidden': ariaHidden,
+      'aria-label': ariaLabel,
+      disabled,
     };
     if (ref == null) {
       return <Icon {...passProps} className={className} />;

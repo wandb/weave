@@ -1,5 +1,12 @@
 import classNames from 'classnames';
-import React, {FC, ReactElement, useMemo, useRef} from 'react';
+import React, {
+  FC,
+  ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
@@ -8,6 +15,7 @@ import {RemoveAction} from './RemoveAction';
 import {TagTooltip} from './TagTooltip';
 import {
   getRandomTagColor,
+  getTagColorByString,
   getTagColorClass,
   getTagHoverClass,
   isTagLabelTruncated,
@@ -19,9 +27,21 @@ export const DEFAULT_TAG_ICON = 'tag';
 /**
  * A Tag not given a specific color would have its color change every render cycle. This calculates a default color as a stable value, and only adds it to the class list when color isn't defined
  */
-export function useTagClasses({color}: {color?: TagColorName}) {
-  const defaultColorRef = React.useRef(color ?? getRandomTagColor());
-  const tagColor = color ?? defaultColorRef.current;
+export function useTagClasses({
+  color,
+  isInteractive,
+  label,
+}: {
+  color?: TagColorName;
+  isInteractive?: boolean;
+  label?: string;
+}) {
+  const randomColor = useRef(color || label ? undefined : getRandomTagColor());
+  const labelHashColor = useMemo(
+    () => (!color && label ? getTagColorByString(label) : undefined),
+    [label, color]
+  );
+  const tagColor = color ?? labelHashColor ?? randomColor.current;
 
   return useMemo(
     () =>
@@ -29,9 +49,9 @@ export function useTagClasses({color}: {color?: TagColorName}) {
         'night-aware',
         'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] text-[14px]',
         getTagColorClass(tagColor),
-        getTagHoverClass(tagColor)
+        isInteractive ? getTagHoverClass(tagColor) : ''
       ),
-    [tagColor]
+    [isInteractive, tagColor]
   );
 }
 
@@ -40,9 +60,11 @@ export type TagProps = {
   color?: TagColorName;
   showIcon?: boolean;
   iconName?: IconName;
+  endIconName?: IconName;
   // Wrapping the Tag in Tailwind can be a problem if the Tailwind wrapper is supplied higher up
   // and there is a need to position the Tag as a direct child for something like flexbox
   Wrapper?: React.ComponentType<any> | null;
+  isInteractive?: boolean;
 };
 
 export const Tag: FC<TagProps> = ({
@@ -50,9 +72,11 @@ export const Tag: FC<TagProps> = ({
   color,
   showIcon = false,
   iconName,
+  endIconName,
   Wrapper = Tailwind,
+  isInteractive = false,
 }) => {
-  const classes = useTagClasses({color});
+  const classes = useTagClasses({color, isInteractive, label});
 
   const nakedTag = (
     <div
@@ -64,6 +88,7 @@ export const Tag: FC<TagProps> = ({
       <span className="max-w-[24ch] overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
       </span>
+      {endIconName && <Icon className="ml-4 h-14 w-14" name={endIconName} />}
     </div>
   );
   if (Wrapper) {
@@ -73,7 +98,7 @@ export const Tag: FC<TagProps> = ({
   return nakedTag;
 };
 
-export type RemovableTagProps = TagProps & {
+export type RemovableTagProps = Omit<TagProps, 'isInteractive'> & {
   removeAction: ReactElement<typeof RemoveAction>;
 };
 export const RemovableTag: FC<RemovableTagProps> = ({
@@ -85,11 +110,18 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   Wrapper = Tailwind,
 }) => {
   const labelRef = useRef<HTMLParagraphElement>(null);
-  const isTooltipEnabled = isTagLabelTruncated(labelRef);
-  const classes = useTagClasses({color});
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    if (labelRef.current) {
+      setIsTruncated(isTagLabelTruncated(labelRef));
+    }
+  }, [label]);
+
+  const classes = useTagClasses({color, isInteractive: true, label});
 
   const nakedTag = (
-    <TagTooltip value={label} disabled={!isTooltipEnabled}>
+    <TagTooltip value={label} disabled={!isTruncated}>
       <div
         key={`tag-${label}`}
         className={twMerge(classes, showIcon ? 'px-4' : 'pl-6 pr-4')}>
@@ -114,6 +146,5 @@ export const RemovableTag: FC<RemovableTagProps> = ({
   if (Wrapper) {
     return <Wrapper>{nakedTag}</Wrapper>;
   }
-
   return nakedTag;
 };

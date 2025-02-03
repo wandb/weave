@@ -8,7 +8,7 @@
  *    project and configures the context accordingly.
  */
 
-import React, {createContext, FC, useContext} from 'react';
+import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {useHasTraceServerClientContext} from './traceServerClientContext';
 import {tsWFDataModelHooks} from './tsDataModelHooks';
@@ -51,10 +51,13 @@ export const useProjectHasTraceServerData = (
     project,
     {},
     1,
+    true,
     {
       skip: !hasTraceServer,
+      noAutoRefresh: true,
     }
   );
+  const columns = useMemo(() => ['id'], []);
 
   const calls = tsWFDataModelHooks.useCalls(
     entity,
@@ -64,14 +67,18 @@ export const useProjectHasTraceServerData = (
     undefined,
     undefined,
     undefined,
+    columns,
     undefined,
     {
       skip: !hasTraceServer,
     }
   );
   const loading = objs.loading || calls.loading;
-  return {
-    loading,
-    result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
-  };
+  return useMemo(
+    () => ({
+      loading,
+      result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
+    }),
+    [loading, objs.result, calls.result]
+  );
 };

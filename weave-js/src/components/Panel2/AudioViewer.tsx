@@ -161,7 +161,7 @@ const AudioViewer = (props: AudioViewerProps) => {
               }}
             />
             <div
-              style={{flex: '1 1 auto', overflow: 'hidden'}}
+              style={{flex: '0 1 auto', overflow: 'hidden', marginLeft: '10px'}}
               className="audio-card-time">
               {[audioCurrentTime, audioTotalTime]
                 .map(formatDurationWithColons)
@@ -172,10 +172,13 @@ const AudioViewer = (props: AudioViewerProps) => {
                 style={{
                   background: globals.white,
                   width: '100%',
-                  overflow: 'hidden',
+                  maxHeight: '3em',
+                  overflowX: 'hidden',
+                  overflowY: 'auto',
                   display: 'flex',
-                  justifyContent: 'center',
+                  justifyContent: 'left',
                   flex: '1 1',
+                  marginLeft: '10px',
                 }}>
                 {
                   <div style={{flexGrow: 1}}>
@@ -183,6 +186,7 @@ const AudioViewer = (props: AudioViewerProps) => {
                       style={{
                         padding: '0 5px',
                         textOverflow: 'ellipsis',
+                        whiteSpace: 'normal',
                       }}>
                       {caption}
                     </div>

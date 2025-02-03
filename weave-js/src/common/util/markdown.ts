@@ -14,7 +14,7 @@ import math from 'remark-math';
 import parse from 'remark-parse';
 import remark2rehype from 'remark-rehype';
 import {Plugin, unified} from 'unified';
-import visit from 'unist-util-visit';
+import {visit} from 'unist-util-visit';
 
 import {blankifyLinks, shiftHeadings} from './html';
 

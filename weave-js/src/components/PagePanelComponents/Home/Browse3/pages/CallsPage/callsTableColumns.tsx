@@ -5,44 +5,49 @@
 
 import {
   GridColDef,
-  GridColumnGroup,
   GridColumnGroupingModel,
-  GridColumnNode,
+  GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {TEAL_600} from '../../../../../../common/css/color.styles';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
-import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
-import {ExpandHeader} from '../../../Browse2/ExpandHeader';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {CellValueString} from '../../../Browse2/CellValueString';
 import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
-} from '../CallPage/TraceUsageStats';
+  convertFeedbackFieldToBackendFilter,
+  parseFeedbackType,
+} from '../../feedback/HumanFeedback/tsHumanFeedback';
+import {
+  convertScorerFeedbackFieldToBackendFilter,
+  parseScorerFeedbackField,
+  RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX,
+  RUNNABLE_FEEDBACK_OUTPUT_PART,
+} from '../../feedback/HumanFeedback/tsScorerFeedback';
+import {Reactions} from '../../feedback/Reactions';
+import {CellFilterWrapper, OnAddFilter} from '../../filters/CellFilterWrapper';
+import {isWeaveRef} from '../../filters/common';
+import {
+  getCostsFromCellParams,
+  getTokensFromCellParams,
+} from '../CallPage/cost';
+import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
-import {isRef} from '../common/util';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
-import {
-  EXPANDED_REF_REF_KEY,
-  EXPANDED_REF_VAL_KEY,
-  isTableRef,
-} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
-import {OpVersionIndexText} from './CallsTable';
-import {buildTree} from './callsTableBuildTree';
 import {
   insertPath,
   isDynamicCallColumn,
@@ -50,7 +55,13 @@ import {
   stringToPath,
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {allOperators} from './callsTableQuery';
+import {OpVersionIndexText} from './OpVersionIndexText';
+
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
+  'summary.usage',
+  'summary.weave',
+  'feedback',
+];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -60,7 +71,10 @@ export const useCallsTableColumns = (
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
-  columnIsRefExpanded: (col: string) => boolean
+  columnIsRefExpanded: (col: string) => boolean,
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -134,7 +148,10 @@ export const useCallsTableColumns = (
         columnsWithRefs,
         onExpand,
         columnIsRefExpanded,
-        userDefinedColumnWidths
+        userDefinedColumnWidths,
+        allowedColumnPatterns,
+        onAddFilter,
+        costsLoading
       ),
     [
       entity,
@@ -149,6 +166,9 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      allowedColumnPatterns,
+      onAddFilter,
+      costsLoading,
     ]
   );
 
@@ -171,46 +191,87 @@ function buildCallsTableColumns(
   columnsWithRefs: Set<string>,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  userDefinedColumnWidths: Record<string, number>
+  userDefinedColumnWidths: Record<string, number>,
+  allowedColumnPatterns?: string[],
+  onAddFilter?: OnAddFilter,
+  costsLoading: boolean = false
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !c.startsWith('summary.usage.')
-  );
+  // Sort attributes after inputs and outputs.
+  const filteredDynamicColumnNames = allDynamicColumnNames
+    .filter(
+      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+    )
+    .sort((a, b) => {
+      const prefixes = ['inputs.', 'output.', 'attributes.'];
+      const aPrefix =
+        a === 'output' ? 'output.' : prefixes.find(p => a.startsWith(p)) ?? '';
+      const bPrefix =
+        b === 'output' ? 'output.' : prefixes.find(p => b.startsWith(p)) ?? '';
+      if (aPrefix !== bPrefix) {
+        return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
+      }
+      return a.localeCompare(b);
+    });
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
       field: 'op_name',
       headerName: 'Trace',
       minWidth: 100,
-      // This filter should be controlled by the custom filter
-      // in the header
-      filterable: false,
       width: 250,
       hideable: false,
-      valueGetter: rowParams => {
-        const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        const op_name = row.op_name;
+        if (!isWeaveRef(op_name)) {
           return op_name;
         }
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
-        const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
-          return op_name;
-        }
+        const opName =
+          rowParams.row.display_name ??
+          opVersionRefOpName(rowParams.row.op_name) ??
+          rowParams.row.op_name;
+        const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
         return (
           <CallLink
             entityName={entity}
             projectName={project}
-            opName={opVersionRefOpName(op_name)}
+            opName={opName}
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+            color={TEAL_600}
+            isEval={isEval}
+          />
+        );
+      },
+    },
+    {
+      field: 'feedback',
+      headerName: 'Feedback',
+      width: 150,
+      sortable: false,
+      filterable: false,
+      renderCell: (rowParams: GridRenderCellParams) => {
+        const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
+          rowParams.id
+        );
+        const callId = rowParams.row.id;
+        const weaveRef = makeRefCall(entity, project, callId);
+        return (
+          <Reactions
+            weaveRef={weaveRef}
+            forceVisible={rowIndex === 0}
+            twWrapperStyles={{
+              width: '100%',
+              height: '100%',
+            }}
           />
         );
       },
@@ -220,7 +281,7 @@ function buildCallsTableColumns(
           {
             field: 'derived.op_version',
             headerName: 'Op Version',
-            type: 'number',
+            type: 'number' as const,
             align: 'right' as const,
             disableColumnMenu: true,
             sortable: false,
@@ -245,20 +306,16 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'derived.status_code',
+      field: 'status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
-      disableColumnMenu: true,
+      // disableColumnMenu: true,
       resizable: false,
-      // Again, the underlying value is not obvious to the user,
-      // so the default free-form filter is likely more confusing than helpful.
-      filterable: false,
-      // type: 'singleSelect',
-      // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
       width: 59,
-      valueGetter: cellParams => {
-        return traceCallStatusCode(cellParams.row);
+      display: 'flex',
+      valueGetter: (unused: any, row: any) => {
+        return traceCallStatusCode(row);
       },
       renderCell: cellParams => {
         return (
@@ -270,134 +327,133 @@ function buildCallsTableColumns(
     },
   ];
 
-  const tree = buildTree([...filteredDynamicColumnNames]);
-  let groupingModel: GridColumnGroupingModel = tree.children.filter(
-    c => 'groupId' in c
-  ) as GridColumnGroup[];
+  const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
+    filteredDynamicColumnNames,
+    row => {
+      const [rowEntity, rowProject] = row.project_id.split('/');
+      return {entity: rowEntity, project: rowProject};
+    },
+    (row, key) => (row as any)[key],
+    key => expandedRefCols.has(key),
+    key => columnsWithRefs.has(key),
+    onCollapse,
+    onExpand,
+    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+    (key, operator, value, rowId) => {
+      onAddFilter?.(key, operator, value, rowId);
+    }
+  );
+  cols.push(...newCols);
 
-  const walkGroupingModel = (
-    nodes: GridColumnNode[],
-    fn: (node: GridColumnNode) => GridColumnNode
-  ) => {
-    return nodes.map(node => {
-      node = fn(node);
-      if ('children' in node) {
-        node.children = walkGroupingModel(node.children, fn);
-      }
-      return node;
+  // Create special feedback columns with grouping model
+  const annotationColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith('summary.weave.feedback.wandb.annotation') &&
+      c.endsWith('payload.value')
+  );
+  if (annotationColNames.length > 0) {
+    // Add feedback group to grouping model
+    groupingModel.push({
+      groupId: 'feedback',
+      headerName: 'Annotations',
+      children: annotationColNames.map(col => ({
+        field: convertFeedbackFieldToBackendFilter(col),
+      })),
     });
-  };
-  const groupIds = new Set<string>();
-  groupingModel = walkGroupingModel(groupingModel, node => {
-    if ('groupId' in node) {
-      const key = node.groupId;
-      groupIds.add(key);
-      if (expandedRefCols.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <CollapseHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              onCollapse={onCollapse}
-            />
-          );
+
+    // Add feedback columns
+    const annotationColumns: Array<GridColDef<TraceCallSchema>> =
+      annotationColNames.map(c => {
+        const parsed = parseFeedbackType(c);
+        return {
+          field: convertFeedbackFieldToBackendFilter(c),
+          headerName: parsed ? parsed.displayName : `${c}`,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed ? parsed.userDefinedType : c}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            if (typeof params.value === 'boolean') {
+              return <div>{params.value ? 'true' : 'false'}</div>;
+            }
+            if (typeof params.value === 'string') {
+              return <CellValueString value={params.value} />;
+            }
+            return <div>{params.value}</div>;
+          },
         };
-      } else if (columnsWithRefs.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <ExpandHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              hasExpand
-              onExpand={onExpand}
-            />
-          );
+      });
+    cols.push(...annotationColumns);
+  }
+
+  const scoreColNames = allDynamicColumnNames.filter(
+    c =>
+      c.startsWith(RUNNABLE_FEEDBACK_IN_SUMMARY_PREFIX) &&
+      c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
+  );
+  if (scoreColNames.length > 0) {
+    // Add feedback group to grouping model
+    const scoreGroup = {
+      groupId: 'scores',
+      headerName: 'Scores',
+      children: [] as any[],
+    };
+    groupingModel.push(scoreGroup);
+
+    // Add feedback columns
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
+      c => {
+        const parsed = parseScorerFeedbackField(c);
+        const field = convertScorerFeedbackFieldToBackendFilter(c);
+        scoreGroup.children.push({
+          field,
+        });
+        if (parsed === null) {
+          return {
+            field,
+            headerName: c,
+            width: 150,
+            renderHeader: () => {
+              return <div> {c}</div>;
+            },
+            valueGetter: (unused: any, row: any) => {
+              return row[c];
+            },
+            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+              return <CellValue value={params.value} />;
+            },
+          };
+        }
+        return {
+          field,
+          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
+          width: 150,
+          renderHeader: () => {
+            return <div>{parsed.scorerName + parsed.scorePath}</div>;
+          },
+          valueGetter: (unused: any, row: any) => {
+            return row[c];
+          },
+          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+            return (
+              <CellFilterWrapper
+                onAddFilter={onAddFilter}
+                field={field}
+                rowId={params.id.toString()}
+                operation={null}
+                value={params.value}>
+                <CellValue value={params.value} />
+              </CellFilterWrapper>
+            );
+          },
         };
       }
-    }
-    return node;
-  }) as GridColumnGroupingModel;
-
-  for (const key of filteredDynamicColumnNames) {
-    const col: GridColDef<TraceCallSchema> = {
-      flex: 1,
-      minWidth: 150,
-      field: key,
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      filterable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      sortable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      filterOperators: allOperators,
-      headerName: key,
-      renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
-      },
-      valueGetter: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (Array.isArray(val) || typeof val === 'object') {
-          try {
-            return JSON.stringify(val);
-          } catch {
-            return val;
-          }
-        }
-        return val;
-      },
-      renderCell: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (val === undefined) {
-          return <NotApplicable />;
-        }
-        return (
-          <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
-            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
-            CallsTable-specific data structure and we might not want to leak that into the
-            rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
-          </ErrorBoundary>
-        );
-      },
-    };
-
-    if (groupIds.has(key)) {
-      col.renderHeader = () => {
-        return <></>;
-      };
-    } else if (expandedRefCols.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <CollapseHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            onCollapse={onCollapse}
-          />
-        );
-      };
-    } else if (columnsWithRefs.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <ExpandHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            hasExpand
-            onExpand={onExpand}
-          />
-        );
-      };
-    }
-    cols.push(col);
+    );
+    cols.push(...scoreColumns);
   }
 
   cols.push({
@@ -405,77 +461,109 @@ function buildCallsTableColumns(
     headerName: 'User',
     headerAlign: 'center',
     width: 50,
-    // Might be confusing to enable as-is, because the user sees name /
-    // email but the underlying data is userId.
-    filterable: false,
     align: 'center',
     sortable: false,
     resizable: false,
-    disableColumnMenu: true,
+    display: 'flex',
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
         return null;
       }
-      return <UserLink username={userId} />;
+      return (
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="wb_user_id"
+          rowId={cellParams.id.toString()}
+          operation="(string): equals"
+          value={userId}>
+          <UserLink userId={userId} />
+        </CellFilterWrapper>
+      );
     },
   });
 
   const startedAtCol: GridColDef<TraceCallSchema> = {
     field: 'started_at',
     headerName: 'Called',
-    // Should have custom timestamp filter here.
-    filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
     sortable: true,
     sortingOrder: ['desc', 'asc'],
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     renderCell: cellParams => {
+      // TODO: A better filter might be to be on the same day?
+      const date = convertISOToDate(cellParams.row.started_at);
+      const filterDate = new Date(date);
+      filterDate.setSeconds(0, 0);
+      const filterValue = filterDate.toISOString();
+      const value = date.getTime() / 1000;
       return (
-        <Timestamp
-          value={convertISOToDate(cellParams.row.started_at).getTime() / 1000}
-          format="relative"
-        />
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="started_at"
+          rowId={cellParams.id.toString()}
+          operation="(date): after"
+          value={filterValue}>
+          <Timestamp value={value} format="relative" />
+        </CellFilterWrapper>
       );
     },
   };
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'derived.tokens',
+    field: 'tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: (unused: any, row: any) => {
+      const {tokensNum} = getTokensFromCellParams(row);
+      return tokensNum;
+    },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
+      const {tokens, tokenToolTipContent} = getTokensFromCellParams(
+        cellParams.row
+      );
+      return (
+        <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTipContent} />
+      );
     },
   });
-
   cols.push({
-    field: 'derived.cost',
+    field: 'cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
     maxWidth: 100,
+    align: 'right',
+    headerAlign: 'right',
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: (unused: any, row: any) => {
+      const {costNum} = getCostsFromCellParams(row);
+      return costNum;
+    },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
-      return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
+      if (costsLoading) {
+        return <LoadingDots />;
+      }
+      const {cost, costToolTipContent} = getCostsFromCellParams(cellParams.row);
+      return (
+        <Tooltip trigger={<div>{cost}</div>} content={costToolTipContent} />
+      );
     },
   });
 
   cols.push({
-    field: 'derived.latency',
+    field: 'latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
@@ -483,13 +571,13 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
-    valueGetter: cellParams => {
-      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+    valueGetter: (unused: any, row: any) => {
+      if (traceCallStatusCode(row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
-      return traceCallLatencyS(cellParams.row);
+      return traceCallLatencyS(row);
     },
     renderCell: cellParams => {
       if (traceCallStatusCode(cellParams.row) === 'UNSET') {
@@ -508,7 +596,21 @@ function buildCallsTableColumns(
     }
   });
 
-  return {cols, colGroupingModel: groupingModel};
+  // TODO: It would be better to build up the cols rather than throwing away
+  //       some at the end, but making simpler change for now.
+  let orderedCols = cols;
+  if (allowedColumnPatterns !== undefined) {
+    orderedCols = allowedColumnPatterns.flatMap(shownCol => {
+      if (shownCol.includes('*')) {
+        const regex = new RegExp('^' + shownCol.replace('*', '.*') + '$');
+        return cols.filter(col => regex.test(col.field));
+      } else {
+        return cols.filter(col => col.field === shownCol);
+      }
+    });
+  }
+
+  return {cols: orderedCols, colGroupingModel: groupingModel};
 }
 /**
  * This function maintains an ever-growing list of dynamic column names. It is used to
@@ -559,7 +661,7 @@ const useAllDynamicColumnNames = (
 };
 
 const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);
@@ -573,29 +675,4 @@ const refIsExpandable = (ref: string): boolean => {
     );
   }
   return false;
-};
-
-type ExpandedRefWithValue<T = any> = {
-  [EXPANDED_REF_REF_KEY]: string;
-  [EXPANDED_REF_VAL_KEY]: T;
-};
-
-export type ExpandedRefWithValueAsTableRef = ExpandedRefWithValue<string>;
-
-const isExpandedRefWithValue = (ref: any): ref is ExpandedRefWithValue => {
-  return (
-    typeof ref === 'object' &&
-    ref !== null &&
-    EXPANDED_REF_REF_KEY in ref &&
-    EXPANDED_REF_VAL_KEY in ref
-  );
-};
-
-const isExpandedRefWithValueAsTableRef = (
-  ref: any
-): ref is ExpandedRefWithValueAsTableRef => {
-  if (!isExpandedRefWithValue(ref)) {
-    return false;
-  }
-  return isTableRef(ref[EXPANDED_REF_VAL_KEY]);
 };

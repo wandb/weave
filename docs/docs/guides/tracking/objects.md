@@ -1,34 +1,84 @@
----
-sidebar_position: 0
-hide_table_of_contents: true
----
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Objects
 
-Weave's serialization layer saves and versions Python objects.
-
 ## Publishing an object
 
-```python
-import weave
-# Initialize tracking to the project 'intro-example'
-weave.init('intro-example')
-# Save a list, giving it the name 'cat-names'
-weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
-```
+Weave's serialization layer saves and versions objects.
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+
+    ```python
+    import weave
+    # Initialize tracking to the project 'intro-example'
+    weave.init('intro-example')
+    # Save a list, giving it the name 'cat-names'
+    weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    Publishing in TypeScript is still early, so not all objects are fully supported yet.
+
+    ```typescript
+    import * as weave from 'weave'
+
+    // Initialize tracking to the project 'intro-example'
+    const client = await weave.init('intro-example')
+
+    // Save an array, giving it the name 'cat-names'
+    client.publish(['felix', 'jimbo', 'billie'], 'cat-names')
+    ```
+
+  </TabItem>
+</Tabs>
 
 Saving an object with a name will create the first version of that object if it doesn't exist.
 
 ## Getting an object back
 
-`weave.publish` returns a Ref. You can call `.get()` on any Ref to get the object back.
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    `weave.publish` returns a Ref. You can call `.get()` on any Ref to get the object back.
 
-You can construct a ref and then fetch the object back.
+    You can construct a ref and then fetch the object back.
 
-```python
-weave.init('intro-example')
-cat_names = weave.ref('cat-names').get()
-```
+    ```python
+    weave.init('intro-example')
+    cat_names = weave.ref('cat-names').get()
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
+
+## Deleting an object
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    To delete a version of an object, call `.delete()` on the object ref.
+
+    ```python
+    weave.init('intro-example')
+    cat_names_ref = weave.ref('cat-names:v1')
+    cat_names_ref.delete()
+    ```
+
+    Trying to access a deleted object will result in an error. Resolving an object that has a reference to a deleted object will return a `DeletedRef` object in place of the deleted object.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  </TabItem>
+</Tabs>
 
 ## Ref styles
 

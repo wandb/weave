@@ -222,7 +222,7 @@ export const mediaCardStrings = [
   'plotly',
 ] as MediaCardType[];
 
-export const isMediaCardType = (type: string) => {
+export const isMediaCardType = (type: string): type is MediaCardType => {
   return _.includes(mediaCardStrings, type);
 };
 

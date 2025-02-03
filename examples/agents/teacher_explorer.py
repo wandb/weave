@@ -1,12 +1,14 @@
-from rich.console import Console
-import openai
 import subprocess
 import textwrap
+
+import openai
+from rich.console import Console
+
 import weave
-from weave.flow.obj import Object
 from weave.flow.agent import Agent, AgentState
 from weave.flow.chat_util import OpenAIStream
 from weave.flow.console import LogEvents
+from weave.flow.obj import Object
 
 TEACHER_MESSAGE = """Assistant is a teacher.
 The teacher uses a direct technique, without motivational fluff, to drive the student to discover itself.

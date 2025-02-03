@@ -1,6 +1,6 @@
 import './globalStyleImports';
 
-import {ApolloProvider} from '@apollo/client';
+import {ApolloProvider, useApolloClient} from '@apollo/client';
 import {
   getNightMode,
   updateUserInfo,
@@ -12,10 +12,9 @@ import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
 
-import {apolloClient} from './apollo';
+import {makeGorillaApolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
-import {Browse2} from './components/PagePanelComponents/Home/Browse2';
 import {Browse3} from './components/PagePanelComponents/Home/Browse3';
 import {OptionalTraceServerClientContextProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
@@ -29,7 +28,6 @@ import {
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
-  URL_BROWSE2,
   URL_BROWSE3,
   URL_LOCAL,
   URL_RECENT,
@@ -94,12 +92,13 @@ const setPageNightMode = (isNightMode: boolean) => {
 // Handle light/dark mode theme
 const Themer = ({children}: ThemerProps) => {
   const {loading, userInfo} = useViewerUserInfo();
+  const apolloClient = useApolloClient();
 
   useMousetrap('option+m', () => {
     const isNightMode = getNightMode(userInfo);
     setPageNightMode(!isNightMode);
     userInfo.betaFeatures.night = !isNightMode;
-    updateUserInfo(userInfo);
+    updateUserInfo(userInfo, apolloClient);
   });
 
   useEffect(() => {
@@ -162,7 +161,7 @@ const BrowseWrapper: FC = props => (
 
 const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <ApolloProvider client={apolloClient}>
+  <ApolloProvider client={makeGorillaApolloClient()}>
     <Router basename={basename}>
       <Switch>
         <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
@@ -182,11 +181,6 @@ ReactDOM.render(
         </Route>
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
-        </Route>
-        <Route path={`/${URL_BROWSE2}`}>
-          <BrowseWrapper>
-            <Browse2 basename={`/${URL_BROWSE2}`} />
-          </BrowseWrapper>
         </Route>
         <Route path={`/${URL_BROWSE3}`}>
           <BrowseWrapper>

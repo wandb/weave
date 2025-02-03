@@ -1,0 +1,99 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Given the fields `sentence`,
+      produce the fields `sentiment`.\n\n---\n\nFollow the following format.\n\nSentence:
+      ${sentence}\nSentiment: ${sentiment}\n\n---\n\nSentence: it''s a charming and
+      often affecting journey.\nSentiment:"}], "model": "gpt-3.5-turbo", "frequency_penalty":
+      0, "max_tokens": 150, "n": 1, "presence_penalty": 0, "temperature": 0.0, "top_p":
+      1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '405'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - _ModuleClient/Python 1.35.10
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.35.10
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SQQW7CMBBF9zmFNWuCSCBCzR2qtlIrFlWFTBiSaW2PZU8oFHH3yiFAu/HiP/+v
+        Z58ypYC2UCtoOi2N9SZ/IE/m+Lh66e0TEUftV933Prweft7kAJPU4M0nNnJtTRu23qAQuwtuAmrB
+        tFosy9liWZbLagCWt2hSrfWSz6dVLn3YcD4rympsdkwNRqjVe6aUUqfhTI5uiweo1WxyTSzGqFuE
+        +nZJKQhsUgI6RoqincDkDht2gm7QfuZIQnuEkZ5vs4ZbH3iTFFxvzC3fkaPYrQPqyC5NRGF/qZ8z
+        pT4G/f6fEfjA1sta+AtdGqzmlzm4f9gdFiMTFm3+dBbZqAfxGAXtekeuxeADDU9Jktk5+wUAAP//
+        AwCAafOwyQEAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a02fd48cefb4463-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 08 Jul 2024 20:57:55 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=PQ5U9wplck.BAVwiM8aiNyiKmAqXZa4rqQUgqOatbGc-1720472275-1.0.1.1-eV0dWLXSH59fr1xdbrP6Mf.qrGKstzRfjJXwV8XmYnBpN5.f0uAM47i_VUX49FLOd_yDrFXZK8N8YwpqM858Og;
+        path=/; expires=Mon, 08-Jul-24 21:27:55 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=GJHHiFZq.RIQzOWshVzeVSHU5sdelkNLjaTM9kWe9WU-1720472275789-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '79'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '5000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '4999795'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 2ms
+      x-request-id:
+      - req_47ac1327fa4fd29a9aaf39dd2affe5ff
+    status:
+      code: 200
+      message: OK
+version: 1

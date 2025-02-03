@@ -10,8 +10,8 @@ import typing
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface import query as tsi_query
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
 
@@ -45,12 +45,21 @@ class ParamBuilder:
     ):
         global param_builder_count
         param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
+        self._params: dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
         self._database_type = database_type
+        self._param_to_name: dict[typing.Any, str] = {}
 
     def add_param(self, param_value: typing.Any) -> str:
         param_name = self._prefix + str(len(self._params))
+
+        # Only attempt caching for hashable values
+        if isinstance(param_value, typing.Hashable):
+            if param_value in self._param_to_name:
+                return self._param_to_name[param_value]
+            self._param_to_name[param_value] = param_name
+
+        # For non-hashable values, just generate a new param without caching
         self._params[param_name] = param_value
         return param_name
 
@@ -68,11 +77,11 @@ class ParamBuilder:
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
         if self._database_type == "clickhouse":
-            ptype = param_type or _python_value_to_ch_type(param_value)
+            ptype = param_type or python_value_to_ch_type(param_value)
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
 
-    def get_params(self) -> typing.Dict[str, typing.Any]:
+    def get_params(self) -> dict[str, typing.Any]:
         return {**self._params}
 
 
@@ -89,6 +98,7 @@ ColumnType = typing.Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
+    "float",
 ]
 
 
@@ -170,7 +180,7 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tup: typing.Tuple, fields: list[str]) -> Row:
+    def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
         d = {}
         for i, field in enumerate(fields):
             if field.endswith("_dump"):
@@ -182,7 +192,7 @@ class Table:
                 d[field] = value
         return d
 
-    def tuples_to_rows(self, tuples: list[typing.Tuple], fields: list[str]) -> Rows:
+    def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:
         rows = []
         for t in tuples:
             rows.append(self.tuple_to_row(t, fields))
@@ -198,23 +208,39 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+class Join:
+    join_type: typing.Optional[str]
+    table: Table
+    query: tsi.Query
+
+    def __init__(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ):
+        self.join_type = join_type
+        self.table = table
+        self.query = query
+
+
 class Select:
     table: Table
     all_columns: list[str]
+    joins: list[Join]
 
     action: Action
 
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
-    _order_by: typing.Optional[typing.List[tsi._SortBy]]
+    _order_by: typing.Optional[list[tsi.SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
+    _group_by: typing.Optional[list[str]]
 
     def __init__(self, table: Table, action: Action = "SELECT"):
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.joins = []
 
         self._project_id = None
         self._fields = []
@@ -222,6 +248,15 @@ class Select:
         self._order_by = None
         self._limit = None
         self._offset = None
+        self._group_by = None
+
+    def join(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ) -> "Select":
+        self.joins.append(Join(table, query, join_type))
+        for col in table.cols:
+            self.all_columns.append(col.dbname())
+        return self
 
     def project_id(self, project_id: typing.Optional[str]) -> "Select":
         self._project_id = project_id
@@ -235,7 +270,7 @@ class Select:
         self._query = query
         return self
 
-    def order_by(self, order_by: typing.Optional[typing.List[tsi._SortBy]]) -> "Select":
+    def order_by(self, order_by: typing.Optional[list[tsi.SortBy]]) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (
@@ -257,6 +292,10 @@ class Select:
         if offset is not None and offset < 0:
             raise ValueError("Offset must be non-negative")
         self._offset = offset
+        return self
+
+    def group_by(self, fields: typing.Optional[list[str]]) -> "Select":
+        self._group_by = fields
         return self
 
     def prepare(
@@ -287,6 +326,15 @@ class Select:
 
         sql += f"FROM {self.table.name}"
 
+        # Handle joins
+        # Returns {join type} JOIN {table name} ON {join condition}
+        for j in self.joins:
+            query_conds, fields_used = _process_query_to_conditions(
+                j.query, self.all_columns, self.table.json_cols, param_builder
+            )
+            joined = combine_conditions(query_conds, "AND")
+            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
+
         conditions = []
         if self._project_id:
             param_project_id = param_builder.add(
@@ -299,9 +347,22 @@ class Select:
             )
             conditions.extend(query_conds)
 
-        joined = _combine_conditions(conditions, "AND")
+        joined = combine_conditions(conditions, "AND")
         if joined:
             sql += f"\nWHERE {joined}"
+
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
 
         if self._order_by is not None:
             order_parts = []
@@ -312,11 +373,11 @@ class Select:
                 # 3 order by terms: one for existence, one for float casting, and one for string casting.
                 # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
                 if _is_dynamic_field(field, self.table.json_cols):
-                    # Prioritize existence, then cast to float, then str
+                    # Prioritize existence, then cast to double, then str
                     options = [
                         ("exists", "desc"),
-                        ("float", direction),
-                        ("str", direction),
+                        ("double", direction),
+                        ("string", direction),
                     ]
                 else:
                     options = [(field, direction)]
@@ -406,9 +467,10 @@ class Insert:
         return PreparedInsert(sql=sql, column_names=column_names, data=data)
 
 
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
+def combine_conditions(conditions: list[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
+    conditions = [c for c in conditions if c is not None and c != ""]
     if not conditions:
         return ""
     if len(conditions) == 1:
@@ -417,23 +479,43 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-def _python_value_to_ch_type(value: typing.Any) -> str:
+def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
+    elif isinstance(value, bool):
+        return "Bool"
     elif isinstance(value, int):
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
     elif value is None:
         return "Nullable(String)"
     else:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def _quote_json_path(path: str) -> str:
+def clickhouse_cast(
+    inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
+) -> str:
+    """Helper function to cast a sql expression to a clickhouse type."""
+    if cast == None:
+        return inner_sql
+    if cast == "int":
+        return f"toInt64OrNull({inner_sql})"
+    elif cast == "double":
+        return f"toFloat64OrNull({inner_sql})"
+    elif cast == "bool":
+        return f"toUInt8OrNull({inner_sql})"
+    elif cast == "string":
+        return f"toString({inner_sql})"
+    elif cast == "exists":
+        return f"({inner_sql} IS NOT NULL)"
+    else:
+        raise ValueError(f"Unknown cast: {cast}")
+
+
+def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
     notation (required by clickhouse)
@@ -441,6 +523,10 @@ def _quote_json_path(path: str) -> str:
     See comments on `GetFieldOperator` for current limitations
     """
     parts = path.split(".")
+    return quote_json_path_parts(parts)
+
+
+def quote_json_path_parts(parts: list[str]) -> str:
     parts_final = []
     for part in parts:
         try:
@@ -466,36 +552,43 @@ def _transform_external_field_to_internal_field(
         if field == prefix:
             field = prefix + "_dump"
         elif field.startswith(prefix + "."):
-            json_path = _quote_json_path(field[len(prefix + ".") :])
+            json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
 
+    # pops of table_prefix
+    # necessary for joins, allows table1.field1 and table2.field2
+    table_prefix = None
+    unprefixed_field = field
+    if "." in field:
+        table_prefix, field = field.split(".", 1)
+
     # validate field
-    if field not in all_columns and field.lower() != "count(*)":
+    if (
+        field not in all_columns
+        and field != "*"
+        and field.lower() != "count(*)"
+        and not any(
+            # Checks that a column is in the field, allows prefixed columns to be used
+            substr in unprefixed_field.lower()
+            for substr in all_columns
+        )
+    ):
         raise ValueError(f"Unknown field: {field}")
 
-    raw_fields_used.add(field)
+    raw_fields_used.add(unprefixed_field)
     if json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
             field = "(JSON_EXISTS(" + field + ", " + json_path_param + "))"
         else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
             is_sqlite = param_builder._database_type == "sqlite"
             json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
-                field = method + "(" + field + ")"
+                field = clickhouse_cast(field, cast or "string")  # type: ignore
+
+    if table_prefix:
+        field = f"{table_prefix}.{field}"
 
     return field, param_builder, raw_fields_used
 
@@ -544,6 +637,10 @@ def _process_query_to_conditions(
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.InOperation):
+            lhs_part = process_operand(operation.in_[0])
+            rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
+            cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
             lhs_part = process_operand(operation.contains_.input)
             rhs_part = process_operand(operation.contains_.substr)
@@ -552,14 +649,14 @@ def _process_query_to_conditions(
                 position_operation = "positionCaseInsensitive"
             cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
-            raise ValueError(f"Unknown operation type: {operation}")
+            raise TypeError(f"Unknown operation type: {operation}")
 
         return cond
 
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return pb.add(
-                operand.literal_, None, _python_value_to_ch_type(operand.literal_)
+                operand.literal_, None, python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (
@@ -573,18 +670,7 @@ def _process_query_to_conditions(
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
+            return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(
             operand,
             (
@@ -594,12 +680,13 @@ def _process_query_to_conditions(
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
                 tsi_query.GteOperation,
+                tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),
         ):
             return process_operation(operand)
         else:
-            raise ValueError(f"Unknown operand type: {operand}")
+            raise TypeError(f"Unknown operand type: {operand}")
 
     filter_cond = process_operation(query.expr_)
 

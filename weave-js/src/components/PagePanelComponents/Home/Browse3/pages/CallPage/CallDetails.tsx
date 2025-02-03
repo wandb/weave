@@ -1,4 +1,3 @@
-import {Typography} from '@mui/material';
 import Box from '@mui/material/Box';
 import _ from 'lodash';
 import React, {FC, useContext, useMemo} from 'react';
@@ -8,16 +7,17 @@ import styled from 'styled-components';
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
-import {KeyValueTable} from '../common/KeyValueTable';
-import {CallLink, opNiceName} from '../common/Links';
-import {CenteredAnimatedLoader} from '../common/Loader';
+import {CallLink} from '../common/Links';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
 import {ExceptionDetails, getExceptionInfo} from './Exceptions';
 import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
+
+const HEADER_HEIGHT_BUFFER = 60;
 
 const Heading = styled.div`
   color: ${MOON_800};
@@ -70,6 +70,14 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
   );
 };
 
+const ALLOWED_COLUMN_PATTERNS = [
+  'op_name',
+  'status',
+  'inputs.*',
+  'output',
+  'output.*',
+];
+
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
@@ -81,12 +89,21 @@ export const CallDetails: FC<{
     () => getDisplayInputsAndOutput(call),
     [call]
   );
+  const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
+  const childCalls = useCalls(
+    call.entity,
+    call.project,
+    {
+      parentIds: [call.callId],
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    columns
+  );
 
-  const childCalls = useCalls(call.entity, call.project, {
-    parentIds: [call.callId],
-  });
-
-  const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
+  const {multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
   );
@@ -115,24 +132,35 @@ export const CallDetails: FC<{
         <Box
           sx={{
             flex: '0 0 auto',
+            maxHeight: `calc(100% - ${HEADER_HEIGHT_BUFFER}px)`,
             p: 2,
           }}>
-          <ObjectViewerSection title="Inputs" data={inputs} />
+          <CustomWeaveTypeProjectContext.Provider
+            value={{entity: call.entity, project: call.project}}>
+            <ObjectViewerSection title="Inputs" data={inputs} />
+          </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
           sx={{
             flex: '0 0 auto',
+            maxHeight: `calc(100% - ${
+              multipleChildCallOpRefs.length > 0 ? HEADER_HEIGHT_BUFFER : 0
+            }px)`,
             p: 2,
           }}>
           {'traceback' in excInfo ? (
-            <>
-              <TitleRow>
+            <div style={{overflow: 'auto', height: '100%'}}>
+              <TitleRow
+                style={{position: 'sticky', top: 0, backgroundColor: 'white'}}>
                 <Title>Error</Title>
               </TitleRow>
               <ExceptionDetails exceptionInfo={excInfo} />
-            </>
+            </div>
           ) : (
-            <ObjectViewerSection title="Outputs" data={output} />
+            <CustomWeaveTypeProjectContext.Provider
+              value={{entity: call.entity, project: call.project}}>
+              <ObjectViewerSection title="Output" data={output} isExpanded />
+            </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {
@@ -160,6 +188,8 @@ export const CallDetails: FC<{
               }}
               entity={call.entity}
               project={call.project}
+              allowedColumnPatterns={ALLOWED_COLUMN_PATTERNS}
+              paginationModel={isPeeking ? {page: 0, pageSize: 10} : undefined}
             />
           );
           if (isPeeking) {
@@ -176,7 +206,6 @@ export const CallDetails: FC<{
               sx={{
                 flex: '0 0 auto',
                 height: '500px',
-                maxHeight: '95%',
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -215,33 +244,6 @@ export const CallDetails: FC<{
             </Box>
           );
         })}
-        {childCalls.loading && <CenteredAnimatedLoader />}
-        {/* Disabling display of singular children while we decide if we want them here. */}
-        {false && singularChildCalls.length > 0 && (
-          <Box
-            sx={{
-              flex: '0 0 auto',
-            }}>
-            {multipleChildCallOpRefs.length === 0 ? (
-              <Typography pl={1}>Child calls</Typography>
-            ) : (
-              <Typography pl={1}>Singular child calls</Typography>
-            )}
-            {singularChildCalls.map(c => (
-              <Box
-                key={c.callId}
-                sx={{
-                  flex: '0 0 auto',
-                  p: 2,
-                }}>
-                <KeyValueTable
-                  headerTitle={opNiceName(c.spanName)}
-                  data={getDisplayInputsAndOutput(c)}
-                />
-              </Box>
-            ))}
-          </Box>
-        )}
       </Box>
     </Box>
   );
@@ -251,13 +253,15 @@ const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
   const inputKeys =
     span.inputs._keys ??
-    Object.keys(span.inputs).filter(k => !k.startsWith('_'));
+    Object.keys(span.inputs).filter(k => !k.startsWith('_') || k === '_type');
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
   const outputKeys =
     callOutput._keys ??
-    Object.keys(callOutput).filter(k => k === '_result' || !k.startsWith('_'));
+    Object.keys(callOutput).filter(
+      k => k === '_result' || !k.startsWith('_') || k === '_type'
+    );
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };

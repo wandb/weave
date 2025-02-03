@@ -5,11 +5,12 @@ import time
 import typing
 from pathlib import Path
 
-from weave import artifact_wandb, environment
+from weave_query import artifact_wandb as artifact_wandb  # type: ignore
+from weave_query import environment  # type: ignore
+
 from weave.trace.refs import ObjectRef, parse_uri
 
 try:
-    import dotenv
     from modal.cli.import_refs import import_stub
     from modal.config import config
     from modal.runner import deploy_stub
@@ -29,7 +30,7 @@ def compile(
 ) -> Path:
     """Generates a modal py file and secret env vars to run the weave op"""
     dir = Path(tempfile.mkdtemp())
-    with open(Path(__file__).parent / "stub.py", "r") as f:
+    with open(Path(__file__).parent / "stub.py") as f:
         template = string.Template(f.read())
         src = template.substitute(
             {
@@ -98,7 +99,6 @@ def deploy(
     auth_entity: typing.Optional[str] = None,
 ) -> None:
     """Deploy a model to the modal labs cloud."""
-
     ref = generate_modal_stub(
         model_ref,
         wandb_project,

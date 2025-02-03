@@ -424,5 +424,5 @@ See [generateDocs.ts](./generateDocs.ts) for implementation.
 
 # Testing Against Weave Python
 
-1. Start a Weave Server using `./weave_server.sh` from the `weave/weave` directory
+1. Start a Weave Server using `./scripts/weave_server.sh` from the `weave_query` directory
 2. Run `yarn test:python-backend` from this directory

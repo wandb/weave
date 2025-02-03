@@ -7,11 +7,10 @@ import tempfile
 import typing
 from pathlib import Path
 
-from weave import __version__, environment
-from weave.artifact_wandb import WeaveWBArtifactURI
+from weave import __version__
+from weave.deploy.util import execute, safe_name
+from weave.trace import env
 from weave.trace.refs import ObjectRef, parse_uri
-
-from ..util import execute, safe_name
 
 
 def generate_dockerfile(
@@ -46,9 +45,11 @@ def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> st
     cwd = Path(os.getcwd())
     if dev and (cwd / "build_dist.py").exists():
         print("Building weave for development...")
-        env = os.environ.copy()
-        env.update({"WEAVE_SKIP_BUILD": "1"})
-        execute([sys.executable, str(cwd / "build_dist.py")], env=env, capture=False)
+        env_dict = os.environ.copy()
+        env_dict.update({"WEAVE_SKIP_BUILD": "1"})
+        execute(
+            [sys.executable, str(cwd / "build_dist.py")], env=env_dict, capture=False
+        )
         wheel = f"weave-{__version__}-py3-none-any.whl"
         execute(["cp", str(cwd / "dist" / wheel), dir], capture=False)
         weave = f"/app/{wheel}"
@@ -181,7 +182,7 @@ def ensure_secret(
         [
             "secrets",
             "list",
-            f"--filter=name~^.*\/{name}$",
+            rf"--filter=name~^.*\/{name}$",
             f"--project={project}",
             "--format=json",
         ]
@@ -254,10 +255,10 @@ def deploy(
     dir = compile(model_ref, model_method, wandb_project, auth_entity, base_image)
     ref = parse_uri(model_ref)
     if not isinstance(ref, ObjectRef):
-        raise ValueError(f"Expected a weave object uri, got {type(ref)}")
+        raise TypeError(f"Expected a weave object uri, got {type(ref)}")
     name = safe_name(f"{ref.project}-{ref.name}")
     project = wandb_project or ref.project
-    key = environment.weave_wandb_api_key()
+    key = env.weave_wandb_api_key()
     secrets = {
         "WANDB_API_KEY": key,
     }
@@ -309,7 +310,7 @@ def develop(
     )
     model_uri = parse_uri(model_ref)
     if not isinstance(model_uri, ObjectRef):
-        raise ValueError(f"Expected a weave object uri, got {type(model_uri)}")
+        raise TypeError(f"Expected a weave object uri, got {type(model_uri)}")
     name = safe_name(model_uri.name)
     docker = shutil.which("docker")
     if docker is None:
@@ -318,11 +319,11 @@ def develop(
     execute(
         [docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False
     )
-    env_api_key = environment.weave_wandb_api_key()
+    env_api_key = env.weave_wandb_api_key()
     if env_api_key is None:
         raise ValueError("WANDB_API_KEY environment variable required")
-    env = {"WANDB_API_KEY": env_api_key}
-    env.update(os.environ.copy())
+    env_dict = {"WANDB_API_KEY": env_api_key}
+    env_dict.update(os.environ.copy())
     print("Running container at http://localhost:8080")
     execute(
         [
@@ -336,7 +337,7 @@ def develop(
             "OPENAI_API_KEY",
             name,
         ],
-        env=env,
+        env=env_dict,
         capture=False,
     )
     if os.getenv("DEBUG") == None:

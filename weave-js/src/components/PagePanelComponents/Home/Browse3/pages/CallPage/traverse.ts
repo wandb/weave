@@ -93,7 +93,7 @@ export class ObjectPath {
 
   hasHiddenKey(): boolean {
     const t = this.tail();
-    return typeof t === 'string' && (t.startsWith('_') || t === 'name');
+    return typeof t === 'string' && t.startsWith('_');
   }
 
   length(): number {
@@ -155,7 +155,7 @@ export class ObjectPath {
   }
 }
 
-type ValueType =
+export type ValueType =
   | 'null'
   | 'undefined'
   | 'boolean'
@@ -196,6 +196,7 @@ export type TraverseContext = {
   valueType: ValueType;
   isLeaf: boolean;
   depth: number;
+  parent?: ObjectPath;
 };
 
 type CallbackResult = void | boolean | 'skip';
@@ -256,6 +257,7 @@ export const traverse = (
           value,
           valueType: itemValueType,
           isLeaf: isLeafType(itemValueType),
+          parent: context.path,
           path: context.path.plus(i),
           depth: context.depth + 1,
         });
@@ -270,6 +272,7 @@ export const traverse = (
           value,
           valueType: itemValueType,
           isLeaf: isLeafType(itemValueType),
+          parent: context.path,
           path: context.path.plus(key),
           depth: context.depth + 1,
         });
@@ -301,7 +304,7 @@ export const mapObject = (
   data: any,
   transform: (context: TraverseContext) => any
 ) => {
-  const result = {};
+  const result = getValueType(data) === 'array' ? [] : {};
   traverse(data, context => {
     if (context.depth === 0) {
       return;

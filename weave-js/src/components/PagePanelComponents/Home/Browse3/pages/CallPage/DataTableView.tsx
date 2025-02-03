@@ -1,6 +1,11 @@
-import LinkIcon from '@mui/icons-material/Link';
-import {Alert, Box} from '@mui/material';
-import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
+import {Box} from '@mui/material';
+import {
+  GridColDef,
+  GridEventListener,
+  GridPaginationModel,
+  GridSortModel,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {
   isAssignableTo,
   list,
@@ -9,24 +14,44 @@ import {
   typedDict,
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
+import {useDeepMemo} from '@wandb/weave/hookUtils';
 import _ from 'lodash';
-import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {flattenObject} from '../../../Browse2/browse2Util';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  parseRefMaybe,
+} from '../../../../../../react';
+import {Tooltip} from '../../../../../Tooltip';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
+import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {A} from '../common/Links';
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
-import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
+import {SortBy} from '../wfReactInterface/traceServerClientTypes';
 
-// Controls the maximum number of rows to display in the table
-const MAX_ROWS = 1000;
+export const RowId = styled.span`
+  font-family: 'Inconsolata', monospace;
+`;
+RowId.displayName = 'S.RowId';
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
@@ -48,21 +73,103 @@ export const WeaveCHTable: FC<{
   // Gets the source of this Table (set by a few levels up)
   const sourceRef = useContext(WeaveCHTableSourceRefContext);
 
-  // Retrieves the data for the table, with a limit of MAX_ROWS + 1
-  const fetchQuery = useValueOfRefUri(props.tableRefUri, {
-    limit: MAX_ROWS + 1,
+  const {useTableQueryStats, useTableRowsQuery} = useWFHooks();
+
+  const parsedRef = useMemo(
+    () => parseRefMaybe(props.tableRefUri),
+    [props.tableRefUri]
+  );
+
+  const lookupKey = useMemo(() => {
+    if (
+      parsedRef == null ||
+      !isWeaveObjectRef(parsedRef) ||
+      parsedRef.weaveKind !== 'table'
+    ) {
+      return null;
+    }
+    return {
+      entity: parsedRef.entityName,
+      project: parsedRef.projectName,
+      digest: parsedRef.artifactVersion,
+    };
+  }, [parsedRef]);
+
+  const numRowsQuery = useTableQueryStats(
+    lookupKey?.entity ?? '',
+    lookupKey?.project ?? '',
+    lookupKey?.digest ?? '',
+    {skip: lookupKey == null}
+  );
+
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+  const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<SortBy[]>([]);
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+
+  const onSortModelChange = useCallback(
+    (model: GridSortModel) => {
+      setSortModel(model);
+    },
+    [setSortModel]
+  );
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
   });
 
-  // Determines if the table itself is truncated
-  const isTruncated = useMemo(() => {
-    return (fetchQuery.result ?? []).length > MAX_ROWS;
-  }, [fetchQuery.result]);
+  const onPaginationModelChange = useCallback(
+    (model: GridPaginationModel) => {
+      setPaginationModel(model);
+    },
+    [setPaginationModel]
+  );
 
-  // `sourceRows` are the effective rows to display. If the table is truncated,
-  // we only display the first MAX_ROWS rows.
-  const sourceRows = useMemo(() => {
-    return (fetchQuery.result ?? []).slice(0, MAX_ROWS);
-  }, [fetchQuery.result]);
+  useEffect(() => {
+    setOffset(paginationModel.page * paginationModel.pageSize);
+    setLimit(paginationModel.pageSize);
+  }, [paginationModel]);
+
+  useEffect(() => {
+    setSortBy(
+      sortModel.map(sort => ({
+        field: sort.field,
+        direction: sort.sort === 'asc' ? 'asc' : 'desc',
+      }))
+    );
+  }, [sortModel]);
+
+  const fetchQuery = useTableRowsQuery(
+    lookupKey?.entity ?? '',
+    lookupKey?.project ?? '',
+    lookupKey?.digest ?? '',
+    undefined,
+    limit,
+    offset,
+    sortBy,
+    {skip: lookupKey == null}
+  );
+
+  const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
+  const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!fetchQuery.loading) {
+      if (fetchQuery.result) {
+        setLoadedRows(fetchQuery.result.rows);
+      }
+      setFetchQueryLoaded(true);
+    }
+  }, [fetchQuery.loading, fetchQuery.result]);
+
+  const pagedRows = useMemo(() => {
+    return loadedRows ?? [];
+  }, [loadedRows]);
+
+  const totalRows = useMemo(() => {
+    return numRowsQuery.result?.count ?? pagedRows.length;
+  }, [numRowsQuery.result, pagedRows]);
 
   // In this block, we setup a click handler. The underlying datatable is more general
   // and not aware of the nuances of our links and ref model. Therefore, we handle
@@ -95,18 +202,49 @@ export const WeaveCHTable: FC<{
     [history, sourceRef, router]
   );
 
-  return (
-    <DataTableView
-      data={sourceRows ?? []}
-      loading={fetchQuery.loading}
-      isTruncated={isTruncated}
-      // Display key is "val" as the resulting rows have metadata/ref
-      // information outside of the actual data
-      displayKey="val"
-      onLinkClick={onClickEnabled ? onClick : undefined}
-      fullHeight={props.fullHeight}
-    />
+  const pageControl: DataTableServerSidePaginationControls = useMemo(
+    () => ({
+      paginationModel,
+      onPaginationModelChange,
+      totalRows,
+      pageSizeOptions: [DEFAULT_PAGE_SIZE],
+      sortModel,
+      onSortModelChange,
+    }),
+    [
+      paginationModel,
+      onPaginationModelChange,
+      totalRows,
+      sortModel,
+      onSortModelChange,
+    ]
   );
+
+  return (
+    <CustomWeaveTypeProjectContext.Provider
+      value={{
+        entity: lookupKey?.entity ?? '',
+        project: lookupKey?.project ?? '',
+      }}>
+      <DataTableView
+        data={pagedRows}
+        loading={!fetchQueryLoaded}
+        displayKey="val"
+        onLinkClick={onClickEnabled ? onClick : undefined}
+        fullHeight={props.fullHeight}
+        pageControl={pageControl}
+      />
+    </CustomWeaveTypeProjectContext.Provider>
+  );
+};
+
+export type DataTableServerSidePaginationControls = {
+  paginationModel: GridPaginationModel;
+  onPaginationModelChange: (model: GridPaginationModel) => void;
+  totalRows: number;
+  pageSizeOptions: number[];
+  sortModel: GridSortModel;
+  onSortModelChange: (model: GridSortModel) => void;
 };
 
 // This is a general purpose table view that can be used to render any data.
@@ -115,8 +253,9 @@ export const DataTableView: FC<{
   fullHeight?: boolean;
   loading?: boolean;
   displayKey?: string;
-  isTruncated?: boolean;
   onLinkClick?: (row: any) => void;
+  pageControl?: DataTableServerSidePaginationControls;
+  autoPageSize?: boolean;
 }> = props => {
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -133,7 +272,7 @@ export const DataTableView: FC<{
       if (val == null) {
         return {};
       } else if (typeof val === 'object' && !Array.isArray(val)) {
-        return flattenObject(val);
+        return flattenObjectPreservingWeaveTypes(val);
       }
       return {'': val};
     });
@@ -144,30 +283,10 @@ export const DataTableView: FC<{
     () =>
       (dataAsListOfDict ?? []).map((row, i) => ({
         id: i,
-        ...row,
+        data: row,
       })),
     [dataAsListOfDict]
   );
-
-  // This effect will resize the columns after the table is rendered. We use a
-  // timeout to ensure that the table has been rendered before we resize the
-  // columns.
-  useEffect(() => {
-    let mounted = true;
-    const timeoutId = setTimeout(() => {
-      if (!mounted) {
-        return;
-      }
-      apiRef.current.autosizeColumns({
-        includeHeaders: true,
-        includeOutliers: true,
-      });
-    }, 0);
-    return () => {
-      mounted = false;
-      clearInterval(timeoutId);
-    };
-  }, [gridRows, apiRef]);
 
   // Next, we determine the type of the data. Previously, we used the WeaveJS
   // `Type` system to determine the type of the data. However, this is way to
@@ -229,35 +348,49 @@ export const DataTableView: FC<{
     return typedDict(propertyTypes);
   }, [dataAsListOfDict]);
 
+  const propsDataRef = useRef(props.data);
+  useEffect(() => {
+    propsDataRef.current = props.data;
+  }, [props.data]);
+
+  const objectTypeDeepMemo = useDeepMemo(objectType);
+
   // Here we define the column spec for the table. It is based on
   // the type of the data and if we have a link or not.
-  const columnSpec: GridColDef[] = useMemo(() => {
+  const dataInitializedColumnSpec: GridColDef[] = useMemo(() => {
     const res: GridColDef[] = [];
     if (props.onLinkClick) {
       res.push({
         field: '_row_click',
-        headerName: '',
+        headerName: 'id',
         width: 50,
-        renderCell: params => (
-          <LinkIcon
-            style={{
-              cursor: 'pointer',
-            }}
-            onClick={() => props.onLinkClick!(props.data[params.id as number])}
-          />
-        ),
+        renderCell: params => {
+          const rowId = params.id as number;
+          const dataRefValue = propsDataRef.current[rowId];
+          const {digest} = dataRefValue;
+          const rowLabel = digest ? digest.slice(-4) : rowId;
+          const rowSpan = (
+            <Tooltip trigger={<RowId>{rowLabel}</RowId>} content={digest} />
+          );
+          return (
+            <A onClick={() => props.onLinkClick!(dataRefValue)}>{rowSpan}</A>
+          );
+        },
       });
     }
-    return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
-  }, [props.onLinkClick, props.data, objectType, isPeeking]);
+    return [
+      ...res,
+      ...typeToDataGridColumnSpec(objectTypeDeepMemo, isPeeking, true),
+    ];
+  }, [props.onLinkClick, objectTypeDeepMemo, isPeeking]);
 
   // Finally, we do some math to determine the height of the table.
   const isSingleColumn =
     USE_TABLE_FOR_ARRAYS &&
-    columnSpec.length === 1 &&
-    columnSpec[0].field === '';
+    dataInitializedColumnSpec.length === 1 &&
+    dataInitializedColumnSpec[0].field === '';
   if (isSingleColumn) {
-    columnSpec[0].flex = 1;
+    dataInitializedColumnSpec[0].flex = 1;
   }
   const hideHeader = isSingleColumn;
   const displayRows = 10;
@@ -271,6 +404,74 @@ export const DataTableView: FC<{
     (hideHeader ? 0 : headerHeight) +
     (hideFooter ? 0 : footerHeight) +
     (props.loading ? loadingHeight : contentHeight);
+
+  const [columnSpec, setColumnSpec] = useState<GridColDef[]>([]);
+
+  // This effect will resize the columns after the table is rendered. We use a
+  // timeout to ensure that the table has been rendered before we resize the
+  // columns.
+  const hasLinkClick = props.onLinkClick != null;
+  useEffect(() => {
+    let mounted = true;
+
+    // Update the column set if the column spec changes (ignore empty columns
+    // which can occur during loading)
+    setColumnSpec(curr => {
+      const dataFieldSet = new Set(
+        dataInitializedColumnSpec.map(col => col.field)
+      );
+      const currFieldSet = new Set(curr.map(col => col.field));
+      if (dataFieldSet.size > (hasLinkClick ? 1 : 0)) {
+        // Update if they are different
+        if (!_.isEqual(dataFieldSet, currFieldSet)) {
+          return dataInitializedColumnSpec;
+        }
+      }
+      return curr;
+    });
+
+    const timeoutId = setTimeout(() => {
+      if (!mounted) {
+        return;
+      }
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+      // apiRef.current.forceUpdate()
+    }, 0);
+    return () => {
+      mounted = false;
+      clearInterval(timeoutId);
+    };
+  }, [dataInitializedColumnSpec, apiRef, hasLinkClick]);
+
+  const onColumnOrderChange: GridEventListener<'columnOrderChange'> =
+    useCallback(params => {
+      const oldIndex = params.oldIndex;
+      const newIndex = params.targetIndex;
+      setColumnSpec(currSpec => {
+        const col = currSpec[oldIndex];
+        currSpec.splice(oldIndex, 1);
+        currSpec.splice(newIndex, 0, col);
+        return currSpec;
+      });
+    }, []);
+
+  const onColumnWidthChange: GridEventListener<'columnWidthChange'> =
+    useCallback(params => {
+      const field = params.colDef.field;
+      const newWidth = params.width;
+      setColumnSpec(currSpec => {
+        for (const col of currSpec) {
+          if (col.field === field) {
+            col.width = newWidth;
+          }
+        }
+        return currSpec;
+      });
+    }, []);
+
   return (
     <div
       style={{
@@ -279,16 +480,9 @@ export const DataTableView: FC<{
         width: '100%',
         height: props.fullHeight ? '100%' : 'inherit',
       }}>
-      {props.isTruncated && (
-        <Alert severity="warning">
-          Showing {dataAsListOfDict.length.toLocaleString()} rows only.
-        </Alert>
-      )}
       <Box
         sx={{
-          height: props.fullHeight
-            ? `calc(100% - ${props.isTruncated ? '48px' : '0px'})`
-            : height,
+          height: props.fullHeight ? `100%` : height,
           width: '100%',
         }}>
         <StyledDataGrid
@@ -318,11 +512,10 @@ export const DataTableView: FC<{
                 }
               : {}),
           }}
-          autoPageSize={true}
+          autoPageSize={props.autoPageSize}
           keepBorders={false}
           apiRef={apiRef}
           density="compact"
-          experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
           columns={columnSpec}
           loading={props.loading}
@@ -330,6 +523,17 @@ export const DataTableView: FC<{
           sx={{
             border: 'none',
           }}
+          pagination
+          paginationModel={props.pageControl?.paginationModel}
+          onPaginationModelChange={props.pageControl?.onPaginationModelChange}
+          pageSizeOptions={props.pageControl?.pageSizeOptions}
+          paginationMode={props.pageControl ? 'server' : 'client'}
+          rowCount={props.pageControl?.totalRows}
+          sortingMode={props.pageControl ? 'server' : 'client'}
+          sortModel={props.pageControl?.sortModel}
+          onSortModelChange={props.pageControl?.onSortModelChange}
+          onColumnOrderChange={onColumnOrderChange}
+          onColumnWidthChange={onColumnWidthChange}
         />
       </Box>
     </div>
@@ -344,6 +548,7 @@ export const typeToDataGridColumnSpec = (
 ): GridColDef[] => {
   if (isAssignableTo(type, {type: 'typedDict', propertyTypes: {}})) {
     const maxWidth = window.innerWidth * (isPeeking ? 0.5 : 0.75);
+    const minWidth = 100;
     const propertyTypes = typedDictPropertyTypes(type);
     return Object.entries(propertyTypes).flatMap(([key, valueType]) => {
       const innerKey = parentKey ? `${parentKey}.${key}` : key;
@@ -354,7 +559,7 @@ export const typeToDataGridColumnSpec = (
         innerKey
       );
       if (valTypeCols.length === 0) {
-        let colType = 'string';
+        let colType: GridColDef['type'] = 'string';
         let editable = false;
         if (isAssignableTo(valueType, maybe('boolean'))) {
           editable = true;
@@ -370,12 +575,14 @@ export const typeToDataGridColumnSpec = (
           return [
             {
               maxWidth,
-              type: 'string',
+              minWidth,
+              flex: 1,
+              type: 'string' as const,
               editable: false,
               field: innerKey,
               headerName: innerKey,
               renderCell: params => {
-                const listValue = params.row[innerKey];
+                const listValue = params.row.data[innerKey];
                 if (listValue == null) {
                   return '-';
                 }
@@ -388,12 +595,15 @@ export const typeToDataGridColumnSpec = (
         return [
           {
             maxWidth,
+            minWidth,
+            flex: 1,
+            display: 'flex',
             type: colType,
             editable: editable && !disableEdits,
             field: innerKey,
             headerName: innerKey,
             renderCell: params => {
-              const data = params.row[innerKey];
+              const data = params.row.data[innerKey];
               return <CellValue value={data ?? ''} />;
             },
           },
@@ -406,27 +616,4 @@ export const typeToDataGridColumnSpec = (
     });
   }
   return [];
-};
-
-const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
-  const {useRefsData} = useWFHooks();
-  const data = useRefsData([refUriStr], tableQuery);
-  return useMemo(() => {
-    if (data.loading) {
-      return {
-        loading: true,
-        result: undefined,
-      };
-    }
-    if (data.result == null || data.result.length === 0) {
-      return {
-        loading: true,
-        result: undefined,
-      };
-    }
-    return {
-      loading: false,
-      result: data.result[0],
-    };
-  }, [data]);
 };

@@ -3,7 +3,7 @@ import classNames from 'classnames';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
-import {Tailwind} from '../Tailwind';
+import {TailwindContents} from '../Tailwind';
 
 /**
  * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#provider}
@@ -42,7 +42,7 @@ export const Trigger = ({
   ...props
 }: RadixTooltip.TooltipTriggerProps) => (
   <RadixTooltip.Trigger
-    className={twMerge(classNames('cursor-default', className))}
+    className={twMerge(classNames('cursor-inherit', className))}
     {...props}
   />
 );
@@ -57,17 +57,18 @@ export const Portal = RadixTooltip.Portal;
  */
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixTooltip.TooltipContentProps, ref) => (
-    <Tailwind>
+    <TailwindContents>
       <RadixTooltip.Content
         className={twMerge(
           'night-aware',
-          'rounded text-sm leading-[140%] shadow-md',
-          'bg-moon-900 p-12 text-moon-200 dark:bg-moon-50 dark:text-moon-800'
+          'z-[999999] rounded text-sm leading-[140%] shadow-md',
+          'bg-moon-900 p-12 text-moon-200 dark:bg-moon-50 dark:text-moon-800',
+          className
         )}
         sideOffset={5}
         {...props}>
         {children}
       </RadixTooltip.Content>
-    </Tailwind>
+    </TailwindContents>
   )
 );

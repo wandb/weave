@@ -1,6 +1,6 @@
-from weave.legacy import graph_client_context
+from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.patcher import Patcher
-from weave.weave_client import Call
+from weave.trace.weave_client import Call
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
@@ -21,21 +21,21 @@ except Exception:
     )
 
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 if not import_failed:
 
-    class WeaveCallbackHandler(BaseCallbackHandler):
+    class WeaveCallbackHandler(BaseCallbackHandler):  # pyright: ignore[reportRedeclaration]
         """Base callback handler that can be used to track event starts and ends."""
 
         def __init__(
             self,
-            event_starts_to_ignore: Optional[List[CBEventType]] = None,
-            event_ends_to_ignore: Optional[List[CBEventType]] = None,
+            event_starts_to_ignore: Optional[list[CBEventType]] = None,
+            event_ends_to_ignore: Optional[list[CBEventType]] = None,
         ) -> None:
             # Map from event id to call object - this is used for bookkeeping
             # and eventually closing the call.
-            self._call_map: Dict[str, Call] = {}
+            self._call_map: dict[str, Call] = {}
 
             # Everything below here is just boilerplate for inheriting from
             # BaseCallbackHandler.
@@ -51,14 +51,14 @@ if not import_failed:
         def on_event_start(
             self,
             event_type: CBEventType,
-            payload: Optional[Dict[EventPayload, Any]] = None,
+            payload: Optional[dict[EventPayload, Any]] = None,
             event_id: str = "",
             parent_id: str = "",
             **kwargs: Any,
         ) -> str:
             """Run when an event starts and return id of event."""
             # Get a handle to the internal graph client.
-            gc = graph_client_context.require_graph_client()
+            gc = weave_client_context.require_weave_client()
 
             # Check to see if the event is an exception.
             if event_type == CBEventType.EXCEPTION:
@@ -105,13 +105,13 @@ if not import_failed:
         def on_event_end(
             self,
             event_type: CBEventType,
-            payload: Optional[Dict[EventPayload, Any]] = None,
+            payload: Optional[dict[EventPayload, Any]] = None,
             event_id: str = "",
             **kwargs: Any,
         ) -> None:
             """Run when an event ends."""
             # Get a handle to the internal graph client.
-            gc = graph_client_context.require_graph_client()
+            gc = weave_client_context.require_weave_client()
 
             # If the event is in the call map, finish the call.
             if event_id in self._call_map:
@@ -127,15 +127,15 @@ if not import_failed:
         def end_trace(
             self,
             trace_id: Optional[str] = None,
-            trace_map: Optional[Dict[str, List[str]]] = None,
+            trace_map: Optional[dict[str, list[str]]] = None,
         ) -> None:
             """Run when an overall trace is exited."""
             # Not implemented - required by interface.
             pass
 
     def process_payload(
-        payload: Optional[Dict[EventPayload, Any]] = None,
-    ) -> Optional[Dict[EventPayload, Any]]:
+        payload: Optional[dict[EventPayload, Any]] = None,
+    ) -> Optional[dict[EventPayload, Any]]:
         if payload is None:
             return None
         res = {}
@@ -147,7 +147,7 @@ if not import_failed:
                 res[k] = v
         return res
 
-    def get_embedding_shape(embedding: List) -> Tuple:
+    def get_embedding_shape(embedding: list) -> tuple:
         """Get the shape of an embedding."""
         res = []
         while isinstance(embedding, list):
@@ -174,9 +174,10 @@ class LLamaIndexPatcher(Patcher):
             self._original_handler = llama_index.core.global_handler
 
             llama_index.core.global_handler = WeaveCallbackHandler()
-            return True
         except Exception:
             return False
+        else:
+            return True
 
     def undo_patch(self) -> bool:
         if not hasattr(self, "_original_handler"):
@@ -185,9 +186,10 @@ class LLamaIndexPatcher(Patcher):
             import llama_index.core
 
             llama_index.core.global_handler = self._original_handler
-            return True
         except Exception:
             return False
+        else:
+            return True
 
 
 llamaindex_patcher = LLamaIndexPatcher()

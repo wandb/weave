@@ -1,4 +1,12 @@
-from typing import Any, Callable, Optional
+from __future__ import annotations
+
+import logging
+from collections.abc import Sequence
+from typing import Any, Callable
+
+from weave.trace.context.tests_context import get_raise_on_captured_errors
+
+logger = logging.getLogger(__name__)
 
 
 class Patcher:
@@ -9,20 +17,40 @@ class Patcher:
         raise NotImplementedError()
 
 
+class NoOpPatcher(Patcher):
+    def attempt_patch(self) -> bool:
+        return True
+
+    def undo_patch(self) -> bool:
+        return True
+
+
 class MultiPatcher(Patcher):
-    def __init__(self, patchers: list[Patcher]) -> None:
+    def __init__(self, patchers: Sequence[Patcher]) -> None:
         self.patchers = patchers
 
     def attempt_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.attempt_patch()
+            try:
+                all_successful = all_successful and patcher.attempt_patch()
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                logger.exception(f"Error patching - some logs may not be captured: {e}")
+                all_successful = False
         return all_successful
 
     def undo_patch(self) -> bool:
         all_successful = True
         for patcher in self.patchers:
-            all_successful = all_successful and patcher.undo_patch()
+            try:
+                all_successful = all_successful and patcher.undo_patch()
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                logger.exception(f"Error unpatching: {e}")
+                all_successful = False
         return all_successful
 
 
@@ -45,7 +73,7 @@ class SymbolPatcher(Patcher):
         self._attribute_name = attribute_name
         self._make_new_value = make_new_value
 
-    def _get_symbol_target(self) -> Optional[_SymbolTarget]:
+    def _get_symbol_target(self) -> _SymbolTarget | None:
         try:
             base_symbol = self._get_base_symbol()
         except Exception:
@@ -71,7 +99,7 @@ class SymbolPatcher(Patcher):
         try:
             new_val = self._make_new_value(original_value)
         except Exception:
-            print(f"Failed to patch {self._attribute_name}")
+            logger.exception(f"Failed to patch {self._attribute_name}")
             return False
         setattr(
             target.base_symbol,
@@ -89,4 +117,5 @@ class SymbolPatcher(Patcher):
             return False
 
         setattr(target.base_symbol, target.attr, self._original_value)
+        self._original_value = None
         return True

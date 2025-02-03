@@ -1,69 +1,144 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-# Quickstart: Track inputs & outputs of LLM calls
+# Track LLM inputs & outputs
+
+<!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
 Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-## 1. Install Python library.
-```python
-pip install weave
-```
-Weave currently requires Python 3.9+.
+## 1. Install Weave and create an API Key
+
+**Install weave**
+
+First install the weave library:
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    ```bash
+    pip install weave
+    ```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```bash
+    pnpm install weave
+    ```
+  </TabItem>
+</Tabs>
+
+**Get your API key**
+
+Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your API key from https://wandb.ai/authorize
 
 ## 2. Log a trace to a new project
 
-- Import weave
-- Call `weave.init('project-name')` to start logging
-- Add the `@weave.op()` decorator to the functions you want to track
+To get started with tracking your first project with Weave:
 
-In this example, we're using openai so you will need to [add an openai API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+- Import the `weave` library
+- Call `weave.init('project-name')` to start tracking
+  - You will be prompted to log in with your API key if you are not yet logged in on your machine.
+  - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
+  - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
+- Add the `@weave.op()` decorator to the python functions you want to track
 
-```python
-# highlight-next-line
-import weave
-import json
-from openai import OpenAI
+_In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
 
-# highlight-next-line
-@weave.op()
-def extract_fruit(sentence: str) -> dict:
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+    ```python
+    # highlight-next-line
+    import weave
+    from openai import OpenAI
+
     client = OpenAI()
 
-    response = client.chat.completions.create(
-    model="gpt-3.5-turbo-1106",
-    messages=[
-        {
-            "role": "system",
-            "content": "You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys."
-        },
-        {
-            "role": "user",
-            "content": sentence
-        }
+    # Weave will track the inputs, outputs and code of this function
+    # highlight-next-line
+    @weave.op()
+    def extract_dinos(sentence: str) -> dict:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """In JSON format extract a list of `dinosaurs`, with their `name`,
+    their `common_name`, and whether its `diet` is a herbivore or carnivore"""
+                },
+                {
+                    "role": "user",
+                    "content": sentence
+                }
+                ],
+                response_format={ "type": "json_object" }
+            )
+        return response.choices[0].message.content
+
+
+    # Initialise the weave project
+    # highlight-next-line
+    weave.init('jurassic-park')
+
+    sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
+    both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant \
+    Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
+
+    result = extract_dinos(sentence)
+    print(result)
+    ```
+    When you call the `extract_dinos` function Weave will output a link to view your trace.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+    ```typescript
+    import OpenAI from 'openai';
+    // highlight-next-line
+    import * as weave from 'weave';
+
+    // highlight-next-line
+    const openai = weave.wrapOpenAI(new OpenAI());
+
+    async function extractDinos(input: string) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: `In JSON format extract a list of 'dinosaurs', with their 'name', their 'common_name', and whether its 'diet' is a herbivore or carnivore: ${input}`,
+          },
         ],
-        temperature=0.7,
-        response_format={ "type": "json_object" }
-    )
-    extracted = response.choices[0].message.content
-    return json.loads(extracted)
+      });
+      return response.choices[0].message.content;
+    }
+    // highlight-next-line
+    const extractDinosOp = weave.op(extractDinos);
 
-# highlight-next-line
-weave.init('intro-example')
-sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
-extract_fruit(sentence)
-```
+    async function main() {
+      // highlight-next-line
+      await weave.init('examples');
+      const result = await extractDinosOp(
+        'I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.'
+      );
+      console.log(result);
+    }
 
-:::note
-Calls made with the openai library are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
-:::
+    main();
 
-## 3. See traces of your application in your project
-🎉 Congrats! Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code.
-Run this application and your console will output a link to view it within W&B.
+    ```
+    When you call the `extractDinos` function Weave will output a link to view your trace.
+
+  </TabItem>
+</Tabs>
+
+## 3. Automated LLM library logging
+
+Calls made to OpenAI, Anthropic and [many more LLM libraries](guides/integrations/) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
+
+## 4. See traces of your application in your project
+
+🎉 Congrats! Now, every time you call this function, weave will automatically capture the input & output data and log any changes made to the code.
+
+![Weave Trace Outputs 1](../static/img/tutorial_trace_1.png)
 
 ## What's next?
 
-- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+- Follow the [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.

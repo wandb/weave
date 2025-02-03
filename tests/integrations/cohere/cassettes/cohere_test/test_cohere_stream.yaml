@@ -1,0 +1,131 @@
+interactions:
+- request:
+    body: '{"message": "Hello, Cohere!", "model": "command", "max_tokens": 1024, "stream":
+      true}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '85'
+      content-type:
+      - application/json
+      host:
+      - api.cohere.com
+      user-agent:
+      - python-httpx/0.27.0
+      x-fern-language:
+      - Python
+      x-fern-sdk-name:
+      - cohere
+      x-fern-sdk-version:
+      - 5.5.8
+    method: POST
+    uri: https://api.cohere.com/v1/chat
+  response:
+    body:
+      string: '{"is_finished":false,"event_type":"stream-start","generation_id":"061990fd-01a5-426d-96b0-7c2458a5c0aa"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"Hello"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"!"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" It"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"''s"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" nice"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" to"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" meet"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" you"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"."}
+
+        {"is_finished":false,"event_type":"text-generation","text":" If"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" you"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" have"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" any"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" questions"}
+
+        {"is_finished":false,"event_type":"text-generation","text":","}
+
+        {"is_finished":false,"event_type":"text-generation","text":" let"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" me"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" know"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" and"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" I"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"''ll"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" do"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" my"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" best"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" to"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" help"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"."}
+
+        {"is_finished":true,"event_type":"stream-end","response":{"response_id":"742bbbd9-474b-452c-b720-9c29db7c2eb7","text":"Hello!
+        It''s nice to meet you. If you have any questions, let me know and I''ll do
+        my best to help.","generation_id":"061990fd-01a5-426d-96b0-7c2458a5c0aa","chat_history":[{"role":"USER","message":"Hello,
+        Cohere!"},{"role":"CHATBOT","message":"Hello! It''s nice to meet you. If you
+        have any questions, let me know and I''ll do my best to help."}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":5,"output_tokens":27},"tokens":{"input_tokens":67,"output_tokens":28}}},"finish_reason":"COMPLETE"}
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 google
+      access-control-expose-headers:
+      - X-Debug-Trace-ID
+      cache-control:
+      - no-cache, no-store, no-transform, must-revalidate, private, max-age=0
+      content-type:
+      - application/stream+json
+      date:
+      - Thu, 04 Jul 2024 20:29:52 GMT
+      expires:
+      - Thu, 01 Jan 1970 00:00:00 UTC
+      pragma:
+      - no-cache
+      server:
+      - envoy
+      vary:
+      - Origin
+      x-accel-expires:
+      - '0'
+      x-debug-trace-id:
+      - f6dfa0c7cf525ed3a5fdc0b882ba10d3
+      x-endpoint-monthly-call-limit:
+      - '1000'
+      x-envoy-upstream-service-time:
+      - '117'
+      x-trial-endpoint-call-limit:
+      - '40'
+      x-trial-endpoint-call-remaining:
+      - '39'
+    status:
+      code: 200
+      message: OK
+version: 1

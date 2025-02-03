@@ -16,6 +16,7 @@ import {Button} from '../../../Button';
 import {CodeEditor} from '../../../CodeEditor';
 import {
   DraggableGrow,
+  DraggableHandle,
   PoppedBody,
   StyledTooltip,
   TooltipHint,
@@ -38,8 +39,6 @@ type CellValueStringProps = {
 };
 
 const Collapsed = styled.div`
-  min-height: 38px;
-  line-height: 38px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -76,7 +75,6 @@ const Toolbar = styled.div`
   display: flex;
   align-items: center;
   padding: 4px 0;
-  border-bottom: 1px solid ${Colors.MOON_150};
 `;
 Toolbar.displayName = 'S.Toolbar';
 
@@ -114,7 +112,15 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     } catch (err) {
       // ignore
     }
-    content = <CodeEditor value={reformatted} language={language} readOnly />;
+    content = (
+      <CodeEditor
+        value={reformatted}
+        language={language}
+        readOnly
+        handleMouseWheel
+        alwaysConsumeMouseWheel={false}
+      />
+    );
   } else if (format === 'Markdown') {
     content = <Markdown content={trimmed} />;
   }
@@ -155,63 +161,64 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
         TransitionComponent={DraggableGrow}>
         <Popped>
           <TooltipContent>
-            <Toolbar className="handle">
-              <Button
-                size="small"
-                variant="ghost"
-                icon="copy"
-                tooltip="Copy to clipboard"
-                onClick={e => {
-                  e.stopPropagation();
-                  copy();
-                }}
-              />
-              <Spacer />
-              <Button
-                size="small"
-                variant="quiet"
-                active={format === 'Text'}
-                icon="text-language"
-                tooltip="Text mode"
-                onClick={e => {
-                  e.stopPropagation();
-                  setFormat('Text');
-                }}
-              />
-              <Button
-                size="small"
-                variant="quiet"
-                active={format === 'Markdown'}
-                icon="document"
-                tooltip="Markdown mode"
-                onClick={e => {
-                  e.stopPropagation();
-                  setFormat('Markdown');
-                }}
-              />
-              <Button
-                size="small"
-                variant="quiet"
-                active={format === 'Code'}
-                icon="job-program-code"
-                tooltip="Code mode"
-                onClick={e => {
-                  e.stopPropagation();
-                  setFormat('Code');
-                }}
-              />
-              <Spacer />
-              <Button
-                size="small"
-                variant="ghost"
-                icon="close"
-                tooltip="Close preview"
-                onClick={e => {
-                  e.stopPropagation();
-                  setAnchorEl(null);
-                }}
-              />
-            </Toolbar>
+            <DraggableHandle>
+              <Toolbar>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  active={format === 'Text'}
+                  icon="text-language"
+                  tooltip="Text mode"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setFormat('Text');
+                  }}
+                />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  active={format === 'Markdown'}
+                  icon="markdown"
+                  tooltip="Markdown mode"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setFormat('Markdown');
+                  }}
+                />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  active={format === 'Code'}
+                  icon="code-alt"
+                  tooltip="Code mode"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setFormat('Code');
+                  }}
+                />
+                <Spacer />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="copy"
+                  tooltip="Copy to clipboard"
+                  onClick={e => {
+                    e.stopPropagation();
+                    copy();
+                  }}
+                />
+                <Button
+                  size="small"
+                  variant="ghost"
+                  icon="close"
+                  tooltip="Close preview"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setAnchorEl(null);
+                  }}
+                />
+              </Toolbar>
+            </DraggableHandle>
             <PoppedBody>{content}</PoppedBody>
           </TooltipContent>
         </Popped>
