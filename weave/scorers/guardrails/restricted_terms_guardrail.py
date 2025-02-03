@@ -85,7 +85,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
         self._client = instructor.from_litellm(completion)
 
     @weave.op
-    def analyse_restricted_terms(self, prompt: str) -> RestrictedTermsAnalysis:
+    def analyse_restricted_terms(self, output: str) -> RestrictedTermsAnalysis:
         return create(
             self._client,
             messages=[
@@ -93,7 +93,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
                 {
                     "role": "user",
                     "content": self.user_prompt.format(
-                        text=prompt, custom_terms=", ".join(self.custom_terms)
+                        text=output, custom_terms=", ".join(self.custom_terms)
                     ),
                 },
             ],
@@ -118,11 +118,11 @@ class RestrictedTermsLLMGuardrail(Scorer):
 
     @weave.op
     def get_anonymized_text(
-        self, prompt: str, analysis: RestrictedTermsAnalysis
+        self, output: str, analysis: RestrictedTermsAnalysis
     ) -> Union[str, None]:
         anonymized_text = None
         if self.should_anonymize and analysis.contains_restricted_terms:
-            anonymized_text = prompt
+            anonymized_text = output
             for match in analysis.detected_matches:
                 replacement = (
                     "[redacted]"
@@ -135,10 +135,10 @@ class RestrictedTermsLLMGuardrail(Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, prompt: str) -> RestrictedTermsRecognitionResponse:
-        analysis: RestrictedTermsAnalysis = self.analyse_restricted_terms(prompt)
+    def score(self, output: str) -> RestrictedTermsRecognitionResponse:
+        analysis: RestrictedTermsAnalysis = self.analyse_restricted_terms(output)
         reasoning = self.frame_guardrail_reasoning(analysis)
-        anonymized_text = self.get_anonymized_text(prompt, analysis)
+        anonymized_text = self.get_anonymized_text(output, analysis)
         return RestrictedTermsRecognitionResponse(
             flagged=not analysis.contains_restricted_terms,
             detected_entities=analysis.detected_matches,
