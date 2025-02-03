@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal
+from typing import Literal, TypedDict
 
 from litellm import acompletion
 from pydantic import BaseModel, Field
@@ -73,6 +73,14 @@ on the summarization_score."
     summarization_evaluation: summarization_quality_options = Field(
         description="The evaluation of the summary"
     )
+
+
+class SummarizationScorerOutput(TypedDict):
+    """Output type for SummarizationScorer."""
+    summarization_eval_score: float
+    llm_eval_reasoning: str
+    is_entity_dense: bool
+    entity_density: float
 
 
 class SummarizationScorer(LLMScorer):
@@ -183,7 +191,7 @@ class SummarizationScorer(LLMScorer):
         return text.split()
 
     @weave.op
-    async def score(self, input: str, output: str) -> dict:
+    async def score(self, input: str, output: str) -> SummarizationScorerOutput:
         extract_task = self.extract_entities(text=str(output))
         evaluate_task = self.evaluate_summary(input=str(input), summary=str(output))
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)

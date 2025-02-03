@@ -1,12 +1,19 @@
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 from litellm import aembedding
 from pydantic import Field
 
 import weave
-from weave.scorers.llm_scorer import Scorer
+from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
+
+
+class EmbeddingSimilarityScorerOutput(TypedDict):
+    """Output type for EmbeddingSimilarityScorer."""
+
+    similarity_score: float
+    is_similar: bool
 
 
 class EmbeddingSimilarityScorer(Scorer):
@@ -23,7 +30,7 @@ class EmbeddingSimilarityScorer(Scorer):
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    async def score(self, output: str, target: str) -> Any:
+    async def score(self, output: Any, target: str) -> EmbeddingSimilarityScorerOutput:
         assert (
             self.threshold >= -1 and self.threshold <= 1
         ), "`threshold` should be between -1 and 1"
@@ -33,12 +40,12 @@ class EmbeddingSimilarityScorer(Scorer):
         return self.cosine_similarity(model_embedding, target_embedding)
 
     async def _compute_embeddings(
-        self, output: str, target: str
+        self, output: Any, target: str
     ) -> tuple[list[float], list[float]]:
         embeddings = await aembedding(self.model_id, [output, target])
         return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 
-    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> dict:
+    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> EmbeddingSimilarityScorerOutput:
         """Compute the cosine similarity between two vectors."""
         arr1 = np.array(vec1)
         arr2 = np.array(vec2)

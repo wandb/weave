@@ -29,6 +29,3 @@ class LLMScorer(Scorer):
 
     # TODO: check if we can validate the model_id with litellm on a post_init method
 
-
-class InstructorLLMScorer(LLMScorer):
-    pass

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, TypedDict
 
 from litellm import acompletion
 from pydantic import BaseModel
@@ -13,26 +13,38 @@ from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
 
-class LLMGuardrailReasoning(BaseModel):
+class PromptInjectionGuardrailOutput(TypedDict):
+    """Output type for PromptInjectionLLMGuardrail."""
+
     injection_prompt: bool
     is_direct_attack: bool
     attack_type: Optional[str]
     explanation: Optional[str]
 
 
-class LLMGuardrailResponse(BaseModel):
-    safe: bool
-    reasoning: LLMGuardrailReasoning
+class LLMGuardrailReasoning(BaseModel):
+    """Pydantic model for validation of LLM response."""
+
+    injection_prompt: bool
+    is_direct_attack: bool
+    attack_type: Optional[str]
+    explanation: Optional[str]
 
 
 class PromptInjectionLLMGuardrail(LLMScorer):
+    """A guardrail that detects prompt injection attacks.
+
+    This guardrail uses an LLM to analyze whether a given text contains a prompt injection attack.
+    It looks for various types of attacks and provides detailed reasoning about its decision.
+    """
+
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
 
     @weave.op
-    async def score(self, output: str) -> LLMGuardrailResponse:
+    async def score(self, output: str) -> PromptInjectionGuardrailOutput:
         user_prompt = (
             PROMPT_INJECTION_SURVEY_PAPER_SUMMARY
             + f"""
@@ -44,7 +56,7 @@ You are given the following user prompt that you are suppossed to assess whether
 </input_prompt>
 """
         )
-        response: LLMGuardrailReasoning = await acompletion(
+        response = await acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},

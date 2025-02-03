@@ -1,6 +1,7 @@
 # implementing metrics from ragas: https://github.com/explodinggradients/ragas
 
 from textwrap import dedent
+from typing import TypedDict
 
 from litellm import acompletion
 from pydantic import BaseModel, Field
@@ -14,6 +15,11 @@ class EntityExtractionResponse(BaseModel):
     entities: list[str] = Field(
         description="A list of unique entities extracted from the text"
     )
+
+
+class ContextEntityRecallScorerOutput(TypedDict):
+    """Output type for ContextEntityRecallScorer."""
+    recall: float
 
 
 class ContextEntityRecallScorer(LLMScorer):
@@ -68,7 +74,7 @@ class ContextEntityRecallScorer(LLMScorer):
         return entities
 
     @weave.op
-    async def score(self, output: str, context: str) -> dict:
+    async def score(self, output: str, context: str) -> ContextEntityRecallScorerOutput:
         expected_entities = await self.extract_entities(output)
         context_entities = await self.extract_entities(context)
         # Calculate recall
@@ -86,6 +92,12 @@ class RelevancyResponse(BaseModel):
     relevancy_score: int = Field(
         description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)",
     )
+
+
+class ContextRelevancyScorerOutput(TypedDict):
+    """Output type for ContextRelevancyScorer."""
+    reasoning: str
+    relevancy_score: int
 
 
 class ContextRelevancyScorer(LLMScorer):
@@ -125,7 +137,7 @@ class ContextRelevancyScorer(LLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    async def score(self, output: str, context: str) -> dict:
+    async def score(self, output: str, context: str) -> ContextRelevancyScorerOutput:
         prompt = self.relevancy_prompt.format(question=output, context=context)
         response = await acompletion(
             messages=[{"role": "user", "content": prompt}],

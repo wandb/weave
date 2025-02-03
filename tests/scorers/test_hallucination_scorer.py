@@ -1,5 +1,5 @@
+import json
 import pytest
-from openai import OpenAI
 
 import weave
 from weave.scorers import (
@@ -11,39 +11,43 @@ from weave.scorers.hallucination_scorer import (
 )
 
 
-# mock the create function
+# Mock the acompletion function
 @pytest.fixture
-def mock_create(monkeypatch):
-    def _mock_create(*args, **kwargs):
-        return HallucinationResponse(
-            chain_of_thought="The output is consistent with the input data.",
-            reasonings=[
-                HallucinationReasoning(
-                    observation="My observation for this is that the output is consistent with the input data.",
-                    hallucination_type="No Hallucination",
-                )
+def mock_acompletion(monkeypatch):
+    async def _mock_acompletion(*args, **kwargs):
+        content = {
+            "chain_of_thought": "The output is consistent with the input data.",
+            "reasonings": [
+                {
+                    "hallucination_type": "No Hallucination",
+                    "observation": "My observation for this is that the output is consistent with the input data.",
+                }
             ],
-            conclusion="The output is consistent with the input data.",
-            has_hallucination=True,
-        )
+            "conclusion": "The output is consistent with the input data.",
+            "has_hallucination": True,
+        }
+        
+        return type('Response', (), {
+            'choices': [type('Choice', (), {'message': type('Message', (), {'content': json.dumps(content)})()})()]
+        })()
 
-    monkeypatch.setattr("weave.scorers.hallucination_scorer.create", _mock_create)
+    monkeypatch.setattr("weave.scorers.hallucination_scorer.acompletion", _mock_acompletion)
 
 
 @pytest.fixture
-def hallucination_scorer(mock_create):
+def hallucination_scorer(mock_acompletion):
     return HallucinationFreeScorer(
-        client=OpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-4o",
         temperature=0.7,
         max_tokens=4096,
     )
 
 
-def test_hallucination_scorer_score(hallucination_scorer, mock_create):
+@pytest.mark.asyncio
+async def test_hallucination_scorer_score(hallucination_scorer):
     output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
-    result = hallucination_scorer.score(output=output, context=context)
+    result = await hallucination_scorer.score(output=output, context=context)
     # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
