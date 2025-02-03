@@ -54,7 +54,7 @@ class PromptInjectionLLMGuardrail(Scorer):
         self._client = instructor.from_litellm(completion)
 
     @weave.op
-    def score(self, prompt: str) -> LLMGuardrailResponse:
+    def score(self, output: str) -> LLMGuardrailResponse:
         user_prompt = (
             PROMPT_INJECTION_SURVEY_PAPER_SUMMARY
             + f"""
@@ -62,7 +62,7 @@ You are given the following user prompt that you are suppossed to assess whether
 
 
 <input_prompt>
-{stringify(prompt)}
+{stringify(output)}
 </input_prompt>
 """
         )
