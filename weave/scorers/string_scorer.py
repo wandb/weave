@@ -3,16 +3,18 @@ from typing import Callable, TypedDict
 from pydantic import Field, model_validator
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 
 
 class StringMatchScorerOutput(TypedDict):
     """Output type for StringMatchScorer."""
+
     string_in_input: bool
 
 
 class LevenshteinScorerOutput(TypedDict):
     """Output type for LevenshteinScorer."""
+
     levenshtein_distance: int
 
 

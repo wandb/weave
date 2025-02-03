@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 import weave
@@ -6,7 +7,6 @@ from weave.scorers import (
     HallucinationFreeScorer,
 )
 from weave.scorers.hallucination_scorer import (
-    HallucinationReasoning,
     HallucinationResponse,
 )
 
@@ -26,12 +26,28 @@ def mock_acompletion(monkeypatch):
             "conclusion": "The output is consistent with the input data.",
             "has_hallucination": True,
         }
-        
-        return type('Response', (), {
-            'choices': [type('Choice', (), {'message': type('Message', (), {'content': json.dumps(content)})()})()]
-        })()
 
-    monkeypatch.setattr("weave.scorers.hallucination_scorer.acompletion", _mock_acompletion)
+        return type(
+            "Response",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {
+                            "message": type(
+                                "Message", (), {"content": json.dumps(content)}
+                            )()
+                        },
+                    )()
+                ]
+            },
+        )()
+
+    monkeypatch.setattr(
+        "weave.scorers.hallucination_scorer.acompletion", _mock_acompletion
+    )
 
 
 @pytest.fixture

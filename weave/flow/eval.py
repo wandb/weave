@@ -19,8 +19,7 @@ from weave.flow.model import (
     apply_model_async,
 )
 from weave.flow.obj import Object
-from weave.flow.util import make_memorable_name
-from weave.scorers import (
+from weave.flow.scorer import (
     Scorer,
     _has_oldstyle_scorers,
     _validate_scorer_signature,
@@ -28,6 +27,7 @@ from weave.scorers import (
     get_scorer_attributes,
     transpose,
 )
+from weave.flow.util import make_memorable_name
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance

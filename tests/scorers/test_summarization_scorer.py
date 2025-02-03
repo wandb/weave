@@ -19,12 +19,24 @@ def mock_acompletion(monkeypatch):
             content = '{"entities": ["entity1", "entity2"]}'
         elif response_format == SummarizationEvaluationResponse:
             content = '{"think_step_by_step": "This is some reasoning.", "summarization_evaluation": "excellent"}'
-        
-        return type('Response', (), {
-            'choices': [type('Choice', (), {'message': type('Message', (), {'content': content})()})()]
-        })()
 
-    monkeypatch.setattr("weave.scorers.summarization_scorer.acompletion", _mock_acompletion)
+        return type(
+            "Response",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {"message": type("Message", (), {"content": content})()},
+                    )()
+                ]
+            },
+        )()
+
+    monkeypatch.setattr(
+        "weave.scorers.summarization_scorer.acompletion", _mock_acompletion
+    )
 
 
 @pytest.fixture

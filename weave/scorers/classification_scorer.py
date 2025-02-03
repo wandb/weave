@@ -1,8 +1,7 @@
-from collections import defaultdict
 from typing import Optional
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer, transpose
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
@@ -51,11 +50,3 @@ class MultiTaskBinaryClassificationF1(Scorer):
                 "negative": not class_output,
             }
         return result
-
-
-def transpose(rows: list[dict]) -> dict[str, list]:
-    cols = defaultdict(list)
-    for row in rows:
-        for k, v in row.items():
-            cols[k].append(v)
-    return dict(cols)

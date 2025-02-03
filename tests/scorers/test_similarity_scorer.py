@@ -1,11 +1,9 @@
 import pytest
-from litellm import aembedding
 
 import weave
 from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
 from weave.scorers.similarity_scorer import (
     EmbeddingSimilarityScorer,
-    EmbeddingSimilarityScorerOutput,
 )
 
 
@@ -15,9 +13,16 @@ def mock_aembedding(monkeypatch):
     async def _mock_aembedding(*args, **kwargs):
         import random
 
-        return type('Response', (), {
-            'data': [{'embedding': [random.random() for _ in range(1024)]} for _ in range(2)]
-        })()
+        return type(
+            "Response",
+            (),
+            {
+                "data": [
+                    {"embedding": [random.random() for _ in range(1024)]}
+                    for _ in range(2)
+                ]
+            },
+        )()
 
     monkeypatch.setattr("weave.scorers.similarity_scorer.aembedding", _mock_aembedding)
 

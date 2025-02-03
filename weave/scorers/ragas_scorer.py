@@ -19,6 +19,7 @@ class EntityExtractionResponse(BaseModel):
 
 class ContextEntityRecallScorerOutput(TypedDict):
     """Output type for ContextEntityRecallScorer."""
+
     recall: float
 
 
@@ -96,6 +97,7 @@ class RelevancyResponse(BaseModel):
 
 class ContextRelevancyScorerOutput(TypedDict):
     """Output type for ContextRelevancyScorer."""
+
     reasoning: str
     relevancy_score: int
 

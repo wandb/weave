@@ -19,10 +19,20 @@ def mock_acompletion(monkeypatch):
             content = '{"entities": ["Paris"]}'
         elif response_format is RelevancyResponse:
             content = '{"reasoning": "The context directly answers the question.", "relevancy_score": 1}'
-        
-        return type('Response', (), {
-            'choices': [type('Choice', (), {'message': type('Message', (), {'content': content})()})()]
-        })()
+
+        return type(
+            "Response",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {"message": type("Message", (), {"content": content})()},
+                    )()
+                ]
+            },
+        )()
 
     monkeypatch.setattr("weave.scorers.ragas_scorer.acompletion", _mock_acompletion)
 

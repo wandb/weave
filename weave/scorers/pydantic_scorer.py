@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 
 
 class PydanticScorer(Scorer):

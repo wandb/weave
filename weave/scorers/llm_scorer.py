@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 
 
 class LLMScorer(Scorer):
@@ -28,4 +28,3 @@ class LLMScorer(Scorer):
     )
 
     # TODO: check if we can validate the model_id with litellm on a post_init method
-

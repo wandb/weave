@@ -2,11 +2,12 @@ import xml.etree.ElementTree as ET
 from typing import TypedDict, Union
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 
 
 class ValidXMLScorerOutput(TypedDict):
     """Output type for ValidXMLScorer."""
+
     xml_valid: bool
 
 

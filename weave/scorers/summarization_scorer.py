@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal, TypedDict
+from typing import Literal, TypedDict, cast
 
 from litellm import acompletion
 from pydantic import BaseModel, Field
@@ -77,6 +77,7 @@ on the summarization_score."
 
 class SummarizationScorerOutput(TypedDict):
     """Output type for SummarizationScorer."""
+
     summarization_eval_score: float
     llm_eval_reasoning: str
     is_entity_dense: bool
@@ -209,4 +210,4 @@ class SummarizationScorer(LLMScorer):
         result["is_entity_dense"] = entity_density >= self.entity_density_threshold
         result["entity_density"] = entity_density
 
-        return result
+        return cast(SummarizationScorerOutput, result)

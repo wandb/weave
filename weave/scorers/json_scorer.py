@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 
 
 class ValidJSONScorer(Scorer):

@@ -4,11 +4,11 @@ from litellm import acompletion
 from pydantic import BaseModel
 
 import weave
-from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
+from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
