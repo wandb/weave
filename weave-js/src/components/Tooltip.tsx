@@ -24,6 +24,9 @@ type TooltipProps = {
   /** Element to be rendered in-place where the popup is defined. */
   trigger: React.ReactNode;
 
+  /** If true, don't wrap the trigger with a span. */
+  noTriggerWrap?: boolean;
+
   side?: Side;
   align?: Align;
 
@@ -59,6 +62,7 @@ const parsePosition = (position?: TooltipPosition): ParsedPosition => {
 
 export const Tooltip = ({
   trigger,
+  noTriggerWrap,
   content,
   side,
   align,
@@ -67,13 +71,20 @@ export const Tooltip = ({
 }: TooltipProps) => {
   const defaultPosition = parsePosition(position);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+
+  // The span wrapper allows the Tooltip to work on function components (like Icon) that cannot be given refs.
+  // We allow disabling it because the trigger might be something like a div that shouldn't be inside a span
+  // and the extra element layer can cause positioning problems for the tooltip.
+  const triggerChild = noTriggerWrap ? (
+    trigger
+  ) : (
+    <span className="[display:inherit]">{trigger}</span>
+  );
+
   return (
     <Provider>
       <Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-        <Trigger asChild>
-          {/* span is needed so tooltip works on disabled buttons */}
-          <span className="[display:inherit]">{trigger}</span>
-        </Trigger>
+        <Trigger asChild>{triggerChild}</Trigger>
         <Portal>
           <Content
             style={{
