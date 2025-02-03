@@ -5,12 +5,14 @@ import {twMerge} from 'tailwind-merge';
 import {Button, ButtonSize} from './Button';
 import {IconName} from './Icon';
 import {Tailwind} from './Tailwind';
+import {Tooltip} from './Tooltip';
 
 export type ToggleOption = {
   value: string;
   icon?: IconName;
   isDisabled?: boolean;
   iconOnly?: boolean;
+  tooltip?: string;
 };
 
 export type ToggleButtonGroupProps = {
@@ -56,25 +58,23 @@ export const ToggleButtonGroup = React.forwardRef<
         <ToggleGroup.Root
           type="single" // supports single selection only
           value={value}
-          onValueChange={handleValueChange}
-          className={twMerge('flex gap-px', className)}
+          className="flex gap-px"
           ref={ref}>
           {options.map(
             ({
               value: optionValue,
               icon,
               isDisabled: optionIsDisabled,
+              tooltip,
               iconOnly = false,
-            }) => (
-              <ToggleGroup.Item
-                key={optionValue}
-                value={optionValue}
-                disabled={isDisabled}
-                asChild>
+            }) => {
+              const button = (
                 <Button
                   icon={icon}
                   size={size}
+                  onClick={() => handleValueChange(optionValue)}
                   className={twMerge(
+                    'night-aware',
                     size === 'small' &&
                       (icon ? 'gap-4 px-4 py-3 text-sm' : 'px-8 py-3 text-sm'),
                     size === 'medium' &&
@@ -88,15 +88,30 @@ export const ToggleButtonGroup = React.forwardRef<
                     (isDisabled || optionIsDisabled) &&
                       'cursor-auto opacity-35',
                     value === optionValue
-                      ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48]'
-                      : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800',
-                    'first:rounded-l-sm', // First button rounded left
-                    'last:rounded-r-sm' // Last button rounded right
+                      ? 'bg-teal-300/[0.48] text-teal-600 hover:bg-teal-300/[0.48] dark:bg-teal-700/[0.48] dark:text-teal-400'
+                      : 'hover:bg-oblivion/7 bg-oblivion/5 text-moon-600 hover:text-moon-800 dark:bg-moonbeam/[0.05] hover:dark:bg-teal-700/[0.48] hover:dark:text-teal-400',
+                    'rounded-none group-first:rounded-l-sm group-first:rounded-r-none group-last:rounded-l-none group-last:rounded-r-sm'
                   )}>
                   {!iconOnly ? optionValue : <></>}
                 </Button>
-              </ToggleGroup.Item>
-            )
+              );
+
+              return (
+                <div className="group" key={optionValue}>
+                  <ToggleGroup.Item
+                    key={optionValue}
+                    value={optionValue}
+                    disabled={isDisabled}
+                    asChild>
+                    {tooltip ? (
+                      <Tooltip content={tooltip} trigger={button} />
+                    ) : (
+                      button
+                    )}
+                  </ToggleGroup.Item>
+                </div>
+              );
+            }
           )}
         </ToggleGroup.Root>
       </Tailwind>
