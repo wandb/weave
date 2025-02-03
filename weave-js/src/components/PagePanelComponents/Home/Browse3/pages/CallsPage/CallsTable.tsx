@@ -63,6 +63,7 @@ import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
+import {defaultDateRangeFilter} from '../../grid/filters';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -129,7 +130,7 @@ export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
 export const DEFAULT_FILTER_CALLS: GridFilterModel = {
-  items: [],
+  items: [defaultDateRangeFilter()],
   logicOperator: GridLogicOperator.And,
 };
 
