@@ -42,7 +42,7 @@ This hierarchical and logical categorization helps in systematically handling an
 
 ## Direct prompt injections
 
-The majority of prompt injections identified in the sources were direct prompt injections. This prevalence is likely due to the relative ease of testing and demonstrating them with models like GPT-3, ChatGPT, or Bing AI. Descriptions and objectives for each class of direct prompt injections are detailed in Table 2, with examples provided in Appendix A.
+The majority of prompt injections identified in the sources were direct prompt injections. This prevalence is likely due to the relative ease of testing and demonstrating them with models like GPT-3, ChatGPT, or Bing AI. Descriptions and objectives for each class of direct prompt injections are detailed in the following table.
 
 Direct prompt injections typically aim to bypass security measures that restrict the generation of certain types of content. Prohibited actions often include generating hate speech, malware, content promoting violence or illegal activities, and adult content. The examples found suggest that these security measures can be circumvented with relatively straightforward prompt injections. The terminology used in sources for these direct prompt injections varied, with many simply referred to as jailbreaks.
 
