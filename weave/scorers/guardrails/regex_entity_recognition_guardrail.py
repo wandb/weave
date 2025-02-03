@@ -168,17 +168,17 @@ class RegexEntityRecognitionGuardrail(Scorer):
         return rf"\b{escaped_text}\b"
 
     @weave.op
-    def check_regex_model(self, prompt: str) -> RegexResult:
+    def check_regex_model(self, output: str) -> RegexResult:
         if self.custom_terms:
             # Create a temporary RegexModel with only the custom patterns
             temp_patterns = {
                 term: self.text_to_pattern(term) for term in self.custom_terms
             }
             temp_model = RegexModel(patterns=temp_patterns)
-            result = temp_model.check(prompt)
+            result = temp_model.check(output)
         else:
             # Use the original regex_model if no custom terms provided
-            result = self.regex_model.check(prompt)
+            result = self.regex_model.check(output)
         return result
 
     @weave.op
@@ -198,10 +198,10 @@ class RegexEntityRecognitionGuardrail(Scorer):
         return explanation_parts
 
     @weave.op
-    def get_anonymized_text(self, prompt: str, result: RegexResult) -> Union[str, None]:
+    def get_anonymized_text(self, output: str, result: RegexResult) -> Union[str, None]:
         anonymized_text = None
         if getattr(self, "should_anonymize", False) and result.matched_patterns:
-            anonymized_text = prompt
+            anonymized_text = output
             for entity_type, matches in result.matched_patterns.items():
                 for match in matches:
                     replacement = (
@@ -213,10 +213,10 @@ class RegexEntityRecognitionGuardrail(Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, prompt: str) -> RegexEntityRecognitionResponse:
-        result: RegexResult = self.check_regex_model(prompt)
+    def score(self, output: str) -> RegexEntityRecognitionResponse:
+        result: RegexResult = self.check_regex_model(output)
         reasonings = self.get_reasonings(result)
-        anonymized_text = self.get_anonymized_text(prompt, result)
+        anonymized_text = self.get_anonymized_text(output, result)
         return RegexEntityRecognitionResponse(
             flagged=result.passed,
             detected_entities=result.matched_patterns,
