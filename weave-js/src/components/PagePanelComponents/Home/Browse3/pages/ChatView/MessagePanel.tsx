@@ -72,7 +72,7 @@ export const MessagePanel = ({
   return (
     <div
       className={classNames('group', {
-        'mb-[24px]': !isNested,
+        'mb-[16px]': !isNested,
         'mb-[0]': isNested,
       })}>
       <div className="flex gap-[16px]">
@@ -122,8 +122,10 @@ export const MessagePanel = ({
             <div
               ref={contentRef}
               className={classNames('w-full overflow-y-hidden', {
-                'max-h-[400px]': !isShowingMore,
-                'max-h-full': isShowingMore,
+                'max-h-[400px]':
+                  !isShowingMore && !editorHeight && !isNested && !hasToolCalls,
+                'max-h-full':
+                  isShowingMore || editorHeight || isNested || hasToolCalls,
               })}>
               {messageHeader}
               {isPlayground && editorHeight ? (
@@ -167,9 +169,10 @@ export const MessagePanel = ({
               )}
             </div>
 
-            {isOverflowing && !editorHeight && (
+            {isOverflowing && !hasToolCalls && !editorHeight && (
               <ShowMoreButton
                 isUser={isUser}
+                isSystemPrompt={isSystemPrompt}
                 isShowingMore={isShowingMore}
                 setIsShowingMore={setIsShowingMore}
               />

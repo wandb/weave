@@ -1,5 +1,6 @@
 import io
 import random
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -148,20 +149,19 @@ def test_image_as_file(client: WeaveClient) -> None:
         file_path.unlink()
 
 
+def make_random_image(image_size: tuple[int, int] = (1024, 1024)):
+    random_colour = (
+        random.randint(0, 255),
+        random.randint(0, 255),
+        random.randint(0, 255),
+    )
+    return Image.new("RGB", image_size, random_colour)
+
+
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
-    IMAGE_SIZE = (1024, 1024)
     N_ROWS = 50
-
-    def make_random_image():
-        random_colour = (
-            random.randint(0, 255),
-            random.randint(0, 255),
-            random.randint(0, 255),
-        )
-        return Image.new("RGB", IMAGE_SIZE, random_colour)
-
     rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
@@ -184,3 +184,33 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res, dict)
     assert "model_latency" in res and "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
+
+
+@pytest.mark.asyncio
+async def test_many_images_will_consistently_log():
+    # This test is a bit strange -- I can't get the issue to repro inside pytest, but
+    # it will work when run as a script.  See the actual script for more details.
+    res = subprocess.run(
+        ["python", "trace/type_handlers/Image/image_saving_script.py"],
+        capture_output=True,
+        text=True,
+    )
+
+    # This should always be True because the future executor won't raise an exception
+    assert res.returncode == 0
+
+    # But if there's an issue, the stderr will contain `Task failed:`
+    assert "Task failed" not in res.stderr
+
+
+def test_images_in_load_of_dataset(client):
+    N_ROWS = 50
+    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    dataset = weave.Dataset(rows=rows)
+    ref = weave.publish(dataset)
+
+    dataset = ref.get()
+    for gotten_row, local_row in zip(dataset, rows):
+        assert isinstance(gotten_row["img"], Image.Image)
+        assert gotten_row["img"].size == local_row["img"].size
+        assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
