@@ -149,20 +149,19 @@ def test_image_as_file(client: WeaveClient) -> None:
         file_path.unlink()
 
 
+def make_random_image(image_size: tuple[int, int] = (1024, 1024)):
+    random_colour = (
+        random.randint(0, 255),
+        random.randint(0, 255),
+        random.randint(0, 255),
+    )
+    return Image.new("RGB", image_size, random_colour)
+
+
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
-    IMAGE_SIZE = (1024, 1024)
     N_ROWS = 50
-
-    def make_random_image():
-        random_colour = (
-            random.randint(0, 255),
-            random.randint(0, 255),
-            random.randint(0, 255),
-        )
-        return Image.new("RGB", IMAGE_SIZE, random_colour)
-
     rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
@@ -202,3 +201,16 @@ async def test_many_images_will_consistently_log():
 
     # But if there's an issue, the stderr will contain `Task failed:`
     assert "Task failed" not in res.stderr
+
+
+def test_images_in_load_of_dataset(client):
+    N_ROWS = 50
+    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    dataset = weave.Dataset(rows=rows)
+    ref = weave.publish(dataset)
+
+    dataset = ref.get()
+    for gotten_row, local_row in zip(dataset, rows):
+        assert isinstance(gotten_row["img"], Image.Image)
+        assert gotten_row["img"].size == local_row["img"].size
+        assert gotten_row["img"].tobytes() == local_row["img"].tobytes()

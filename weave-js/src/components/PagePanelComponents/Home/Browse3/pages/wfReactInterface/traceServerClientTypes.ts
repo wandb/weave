@@ -217,6 +217,7 @@ export interface TraceObjSchema<
   project_id: string;
   object_id: string;
   created_at: string;
+  deleted_at: string | null;
   digest: string;
   version_index: number;
   is_latest: number;
@@ -234,6 +235,7 @@ export type TraceObjReadReq = {
   project_id: string;
   object_id: string;
   digest: string;
+  metadata_only?: boolean;
 };
 
 export type TraceObjReadRes = {
@@ -256,12 +258,11 @@ export type TraceObjCreateRes = {
 export type TraceObjDeleteReq = {
   project_id: string;
   object_id: string;
-  digests: string[];
+  digests?: string[];
 };
 
 export type TraceObjDeleteRes = {
   num_deleted?: number;
-  detail?: string;
 };
 
 export type TraceRefsReadBatchReq = {

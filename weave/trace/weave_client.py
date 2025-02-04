@@ -16,6 +16,7 @@ from typing import (
     Callable,
     Generic,
     Protocol,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -52,7 +53,11 @@ from weave.trace.refs import (
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism
+from weave.trace.settings import (
+    client_parallelism,
+    should_capture_client_info,
+    should_capture_system_info,
+)
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -384,6 +389,23 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+class CallDict(TypedDict):
+    op_name: str
+    trace_id: str
+    project_id: str
+    parent_id: str | None
+    inputs: dict
+    id: str | None
+    output: Any
+    exception: str | None
+    summary: dict | None
+    display_name: str | None
+    attributes: dict | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -581,6 +603,27 @@ class Call:
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
+
+    def to_dict(self) -> CallDict:
+        if callable(display_name := self.display_name):
+            display_name = "Callable Display Name (not called yet)"
+
+        return CallDict(
+            op_name=self.op_name,
+            trace_id=self.trace_id,
+            project_id=self.project_id,
+            parent_id=self.parent_id,
+            inputs=self.inputs,
+            id=self.id,
+            output=self.output,
+            exception=self.exception,
+            summary=self.summary,
+            display_name=display_name,
+            attributes=self.attributes,
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            deleted_at=self.deleted_at,
+        )
 
 
 def make_client_call(
@@ -948,12 +991,14 @@ class WeaveClient:
             attributes = {}
 
         attributes = AttributesDict(**attributes)
-        attributes._set_weave_item("client_version", version.VERSION)
-        attributes._set_weave_item("source", "python-sdk")
-        attributes._set_weave_item("os_name", platform.system())
-        attributes._set_weave_item("os_version", platform.version())
-        attributes._set_weave_item("os_release", platform.release())
-        attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_client_info():
+            attributes._set_weave_item("client_version", version.VERSION)
+            attributes._set_weave_item("source", "python-sdk")
+            attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_system_info():
+            attributes._set_weave_item("os_name", platform.system())
+            attributes._set_weave_item("os_version", platform.version())
+            attributes._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 

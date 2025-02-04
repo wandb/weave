@@ -15,6 +15,7 @@ from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
+    client_is_sqlite,
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
@@ -32,9 +33,6 @@ from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
-)
-from weave.trace_server.sqlite_trace_server import (
-    SqliteTraceServer,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1370,8 +1368,7 @@ def test_table_partitioning(network_proxy_client):
 
 
 def test_summary_tokens_cost(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # SQLite does not support costs
         return
 
@@ -1507,8 +1504,7 @@ def test_summary_tokens_cost(client):
 
 @pytest.mark.skip_clickhouse_client
 def test_summary_tokens_cost_sqlite(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if not is_sqlite:
+    if not client_is_sqlite(client):
         # only run this test for sqlite
         return
 
@@ -1606,6 +1602,19 @@ def test_object_version_read(client):
             )
         )
         assert obj_res.obj.val == {"a": i}
+        assert obj_res.obj.version_index == i
+
+    # read each object one at a time, check the version, metadata only
+    for i in range(10):
+        obj_res = client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=refs[i].name,
+                digest=refs[i].digest,
+                metadata_only=True,
+            )
+        )
+        assert obj_res.obj.val == {}
         assert obj_res.obj.version_index == i
 
     # now grab the latest version of the object

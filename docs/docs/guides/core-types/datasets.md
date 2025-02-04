@@ -11,7 +11,7 @@ This guide will show you how to:
 - Download the latest version
 - Iterate over examples
 
-## Sample code
+## Quickstart
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -65,6 +65,59 @@ This guide will show you how to:
     // Access a specific example
     const exampleLabel = datasetRef.getRow(2).sentence;
     ```
+
+  </TabItem>
+</Tabs>
+
+## Alternate constructors
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+  Datasets can also be constructed from common Weave objects like `Call`s, and popular python objects like `pandas.DataFrame`s.
+  <Tabs groupId="use-case">
+    <TabItem value="from-calls" label="From Calls">
+    This can be useful if you want to create an example from specific examples.
+
+    ```python
+    @weave.op
+    def model(task: str) -> str:
+        return f"Now working on {task}"
+
+    res1, call1 = model.call(task="fetch")
+    res2, call2 = model.call(task="parse")
+
+    dataset = Dataset.from_calls([call1, call2])
+    # Now you can use the dataset to evaluate the model, etc.
+    ```
+    </TabItem>
+
+    <TabItem value="from-pandas" label="From Pandas">
+    You can also freely convert between `Dataset`s and `pandas.DataFrame`s.
+
+    ```python
+    import pandas as pd
+
+    df = pd.DataFrame([
+        {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
+        {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
+        {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
+    ])
+    dataset = Dataset.from_pandas(df)
+    df2 = dataset.to_pandas()
+
+    assert df.equals(df2)
+    ```
+
+    </TabItem>
+
+  </Tabs>
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+```typescript
+This feature is not available in TypeScript yet.  Stay tuned!
+```
 
   </TabItem>
 </Tabs>

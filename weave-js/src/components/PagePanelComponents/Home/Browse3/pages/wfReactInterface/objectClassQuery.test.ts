@@ -51,6 +51,7 @@ describe('Type Tests', () => {
           project_id: '',
           object_id: '',
           created_at: '',
+          deleted_at: null,
           digest: '',
           version_index: 0,
           is_latest: 0,

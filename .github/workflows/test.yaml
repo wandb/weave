@@ -180,6 +180,7 @@ jobs:
           yarn tslint
           yarn prettier
           yarn run tsc
+          yarn testci
 
   # ==== Trace Jobs ====
   lint:
@@ -217,7 +218,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -235,6 +236,7 @@ jobs:
             "trace",
             "trace_server",
             "anthropic",
+            "bedrock",
             "cerebras",
             "cohere",
             "dspy",

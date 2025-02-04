@@ -421,6 +421,12 @@ class ObjReadReq(BaseModel):
     object_id: str
     digest: str
 
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
+
 
 class ObjReadRes(BaseModel):
     obj: ObjSchema
