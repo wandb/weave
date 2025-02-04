@@ -73,7 +73,7 @@ jobs:
               break
             fi
           done <<< "$changed_files"
-          echo "changed_files=$changed_files"
+          echo "is_docs_only=$is_docs_only"
           echo "is_docs_only=$is_docs_only" >> $GITHUB_OUTPUT
       - id: weave_query
         name: Weave Query Checks
