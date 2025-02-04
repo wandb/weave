@@ -339,6 +339,9 @@ export const CallsTable: FC<{
     new Set<string>().add('inputs.example')
   );
 
+  // Keep track of the display sort model separately from the actual sort model
+  const [displaySortModel, setDisplaySortModel] = useState<GridSortModel>([]);
+
   // Helpers to handle expansion
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -864,16 +867,36 @@ export const CallsTable: FC<{
       }
 
       // handle feedback conversion from weave summary to backend filter
-      for (const sort of newModel) {
+      const processedModel = newModel.map(sort => {
         if (sort.field.startsWith('summary.weave.feedback')) {
           const parsed = parseFeedbackType(sort.field);
           if (parsed) {
-            const backendFilter = convertFeedbackFieldToBackendFilter(
-              parsed.field
-            );
-            sort.field = backendFilter;
+            return {
+              ...sort,
+              field: convertFeedbackFieldToBackendFilter(parsed.field),
+            };
           }
         }
+        return sort;
+      });
+
+      // Update the display sort model
+      setDisplaySortModel(processedModel);
+
+      // If there's no sort specified, use started_at desc only
+      if (processedModel.length === 0) {
+        setSortModel([{field: 'started_at', sort: 'desc'}]);
+        return;
+      }
+
+      // Only append started_at as secondary sort if it's not already present
+      const hasStartedAt = processedModel.some(
+        sort => sort.field === 'started_at'
+      );
+      if (!hasStartedAt) {
+        setSortModel([...processedModel, {field: 'started_at', sort: 'desc'}]);
+      } else {
+        setSortModel(processedModel);
       }
     },
     [callsLoading, setSortModel, muiColumns]
@@ -1088,7 +1111,7 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={displaySortModel}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
