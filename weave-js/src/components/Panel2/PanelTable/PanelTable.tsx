@@ -882,6 +882,7 @@ const PanelTableInner: React.FC<
                 <Tooltip
                   key={rowSize}
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  noTriggerWrap
                   trigger={
                     <Button
                       startIcon={rowSizeIconName[RowSize[rowSize]]}
