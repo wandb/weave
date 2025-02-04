@@ -18,4 +18,4 @@ from weave.scorers import ValidJSONScorer
 def test_json_scorer(output, expected_result):
     scorer = ValidJSONScorer()
     result = scorer.score(output)
-    assert result["json_valid"] is expected_result
+    assert result.json_valid == expected_result

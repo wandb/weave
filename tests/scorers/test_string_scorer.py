@@ -16,7 +16,7 @@ from weave.scorers import (
 def test_string_match_scorer(output, target, expected_result):
     scorer = StringMatchScorer()
     result = scorer.score(output, target)
-    assert result["string_in_input"] is expected_result
+    assert result.string_in_input is expected_result
 
 
 @pytest.mark.parametrize(
@@ -30,4 +30,4 @@ def test_string_match_scorer(output, target, expected_result):
 def test_levenshtein_scorer(output, target, expected_distance):
     scorer = LevenshteinScorer()
     result = scorer.score(output, target)
-    assert result["levenshtein_distance"] == expected_distance
+    assert result.levenshtein_distance == expected_distance
