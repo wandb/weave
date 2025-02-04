@@ -99,7 +99,7 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
           width: `${internalWidth}px`,
           position: 'fixed',
           maxWidth: `${maxAllowedWidth}px`,
-          minWidth: '120px',
+          minWidth: '538px',
           maxHeight: 'calc(100vh - 60px)',
           height: 'calc(100vh - 60px)',
         },

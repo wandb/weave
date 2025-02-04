@@ -41,6 +41,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const editContextRef = React.useRef<any>(null);
   const [drawerWidth, setDrawerWidth] = useState(800);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const router = useWeaveflowCurrentRouteContext();
 
@@ -167,8 +168,8 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
     <ResizableDrawer
       open={open}
       onClose={onClose}
-      defaultWidth={drawerWidth}
-      setWidth={setDrawerWidth}>
+      defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
+      setWidth={width => !isFullscreen && setDrawerWidth(width)}>
       <DatasetEditProvider>
         <Box
           sx={{
@@ -213,6 +214,15 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
             </Typography>
           </Box>
           <Box sx={{display: 'flex', gap: 1}}>
+            {currentStep === 2 && (
+              <Button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                variant="ghost"
+                icon="full-screen-mode-expand"
+                tooltip={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                size="medium"
+              />
+            )}
             {currentStep === 1 && (
               <Button
                 size="medium"

@@ -184,11 +184,8 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
               sx={{
                 width: '100%',
                 flexWrap: 'wrap',
-                scrollbarWidth: 'none',
-                '&::-webkit-scrollbar': {
-                  display: 'none',
-                },
-                msOverflowStyle: 'none',
+                maxHeight: '192px',
+                overflowY: 'auto',
               }}>
               {Object.entries(
                 selectedCalls.reduce((acc, call) => {
