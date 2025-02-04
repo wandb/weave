@@ -66,11 +66,14 @@ const DragSourceComp: FC<DragSourceProps> = ({
         setDragging(true);
       }
 
-      // Automatically scroll the window if you're dragging near the top or bottom of the page
-      // const clientYForAutoScroll = e.clientY ?? clientXY?.[1];
-      // This check is very important. ClientXY can be 0
+      // Firefox sets clientX and clientY on drag events to 0.
+      // This is a 16 year old bug that they still haven't addressed https://bugzilla.mozilla.org/show_bug.cgi?id=505521
+      // The workaround is to add a dragoverhandler and keep track of the clientXY instead.
+      // Note: please be careful when changing this especially when if considering using ?? because 0 is not null or undefined.
       const clientYForAutoScroll = isFirefox ? clientXY?.[1] : e.clientY;
+
       if (clientYForAutoScroll != null) {
+        // Automatically scroll the window if you're dragging near the top or bottom of the page
         autoScrollWhenDragging(clientYForAutoScroll);
       }
 
@@ -112,7 +115,6 @@ const DragSourceComp: FC<DragSourceProps> = ({
     (e: React.DragEvent<HTMLDivElement>) => {
       if (selectedForDrag) {
         setDragStarted(true);
-        // e.dataTransfer.setData('text', ''); // required for firefox
         if (data) {
           setDragData(data);
         }
