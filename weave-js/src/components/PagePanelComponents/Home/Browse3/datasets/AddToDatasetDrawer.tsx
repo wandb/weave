@@ -1,5 +1,4 @@
-import {Box, Drawer, Stack, Typography} from '@mui/material';
-import debounce from 'lodash/debounce';
+import {Box, Stack, Typography} from '@mui/material';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 
@@ -14,6 +13,7 @@ import {EditAndConfirmStep} from './EditAndConfirmStep';
 import {SchemaMappingStep} from './SchemaMappingStep';
 import {CallData, FieldMapping} from './schemaUtils';
 import {SelectDatasetStep} from './SelectDatasetStep';
+import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 
 interface AddToDatasetDrawerProps {
   entity: string;
@@ -41,9 +41,6 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const editContextRef = React.useRef<any>(null);
   const [drawerWidth, setDrawerWidth] = useState(800);
-  const [isResizing, setIsResizing] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const lastWidthRef = useRef(800);
 
   const router = useWeaveflowCurrentRouteContext();
 
@@ -127,58 +124,11 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
 
   const isNextDisabled = currentStep === 1 && !selectedDataset;
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsResizing(true);
-  };
-
-  const debouncedSetWidth = useCallback((newWidth: number) => {
-    setDrawerWidth(newWidth);
-  }, []);
-
-  const debouncedSetWidthFn = debounce(debouncedSetWidth, 250);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing) {
-        return;
-      }
-
-      const width = document.body.offsetWidth - e.clientX;
-      const minWidth = 600;
-      const maxWidth = Math.min(1500, window.innerWidth - 100);
-
-      if (width >= minWidth && width <= maxWidth) {
-        lastWidthRef.current = width;
-        requestAnimationFrame(() => {
-          if (drawerRef.current) {
-            drawerRef.current.style.width = `${lastWidthRef.current}px`;
-          }
-        });
-        debouncedSetWidthFn(width);
-      }
-    },
-    [isResizing, debouncedSetWidthFn]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-    setDrawerWidth(lastWidthRef.current);
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
-
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
-          <Stack spacing={4} sx={{mt: 2}}>
+          <div>
             <SelectDatasetStep
               selectedDataset={selectedDataset}
               setSelectedDataset={setSelectedDataset}
@@ -197,7 +147,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
                 onDatasetObjectLoaded={setDatasetObject}
               />
             )}
-          </Stack>
+          </div>
         );
       case 2:
         return selectedDataset && datasetObject ? (
@@ -214,79 +164,82 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
   };
 
   return (
-    <Drawer
-      anchor="right"
+    <ResizableDrawer
       open={open}
       onClose={onClose}
-      PaperProps={{
-        ref: drawerRef,
-        sx: {
-          width: drawerWidth,
-          height: 'calc(100vh - 54px)',
-          top: '54px',
-          display: 'flex',
-          flexDirection: 'column',
-          right: 0,
-          left: 'auto',
-        },
-      }}>
-      <Box
-        sx={{
-          width: '5px',
-          cursor: 'ew-resize',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          bottom: 0,
-          zIndex: 100,
-        }}
-        onMouseDown={handleMouseDown}
-      />
+      defaultWidth={drawerWidth}
+      setWidth={setDrawerWidth}>
       <DatasetEditProvider>
         <Box
           sx={{
-            p: 3,
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            pl: '16px',
+            pr: '8px',
+            height: 44,
+            width: '100%',
             borderBottom: '1px solid',
             borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'white',
           }}>
           <Box
             sx={{
+              height: 44,
               display: 'flex',
               alignItems: 'center',
-              gap: 2,
-              mb: 1,
+              gap: 1,
             }}>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              icon="back"
-              twWrapperStyles={{padding: 0}}
-            />
+            {currentStep === 2 ? (
+              <Button
+                onClick={handleBack}
+                variant="ghost"
+                icon="back"
+                tooltip="Back"
+                size="medium"
+              />
+            ) : null}
             <Typography
               sx={{
                 ...typographyStyle,
                 fontWeight: 600,
-                fontSize: '18px',
+                fontSize: '1.25rem',
               }}>
               Add example{selectedCalls.length !== 1 ? 's' : ''} to dataset
             </Typography>
+          </Box>
+          <Box sx={{display: 'flex', gap: 1}}>
+            {currentStep === 1 && (
+              <Button
+                size="medium"
+                variant="ghost"
+                icon="close"
+                onClick={onClose}
+                tooltip="Close"
+              />
+            )}
           </Box>
         </Box>
         <Typography
           sx={{
             ...typographyStyle,
             color: 'text.secondary',
-            p: 3,
+            px: 2,
+            pt: 2,
             pb: 0,
           }}>
           Step {currentStep} of 2:{' '}
-          {currentStep === 1 ? 'Select Dataset & Map Fields' : 'Edit & Confirm'}
+          {currentStep === 1 ? 'Select dataset & map fields' : 'Edit & confirm'}
         </Typography>
         <Box
           sx={{
             flex: 1,
             overflow: 'auto',
-            p: 3,
+            px: 2,
             display: 'flex',
             flexDirection: 'column',
           }}>
@@ -341,6 +294,6 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
           )}
         </Box>
       </DatasetEditProvider>
-    </Drawer>
+    </ResizableDrawer>
   );
 };

@@ -25,9 +25,9 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   }));
 
   return (
-    <Stack spacing={3} sx={{mt: 2, flex: 1}}>
+    <Stack spacing={1} sx={{flex: 1, mt: 2}}>
       <Typography sx={{...typographyStyle, fontWeight: 600}}>
-        Dataset Selection
+        Dataset selection
       </Typography>
       <Select
         placeholder="Select Dataset"

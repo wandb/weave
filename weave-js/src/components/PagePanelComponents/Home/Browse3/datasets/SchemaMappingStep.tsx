@@ -130,7 +130,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     !targetSchema.length
   ) {
     return (
-      <Stack spacing={3} sx={{mt: 3}}>
+      <Stack spacing={1} sx={{mt: 2}}>
         <Typography sx={{...typographyStyle, fontWeight: 600}}>
           Field Mapping
         </Typography>
@@ -143,7 +143,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   if (!selectedCalls.length || !tableRowsQuery.result?.rows?.length) {
     return (
-      <Stack spacing={3} sx={{mt: 4}}>
+      <Stack spacing={1} sx={{mt: 2}}>
         <Typography sx={typographyStyle}>
           No data available to extract schema from.
         </Typography>
@@ -153,7 +153,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
 
   if (!sourceSchema.length || !targetSchema.length) {
     return (
-      <Stack spacing={3} sx={{mt: 4}}>
+      <Stack spacing={1} sx={{mt: 2}}>
         <Typography sx={typographyStyle}>
           No schema could be extracted from the data.
         </Typography>
@@ -162,11 +162,11 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   }
 
   return (
-    <Stack spacing={3} sx={{mt: 3}}>
+    <Stack spacing={1} sx={{mt: 2}}>
       <Typography sx={{...typographyStyle, fontWeight: 600}}>
-        Field Mapping
+        Field mapping
       </Typography>
-      <Paper sx={{p: 2}}>
+      <Paper variant="outlined" sx={{p: 2}}>
         <Box display="flex" alignItems="center" gap={2}>
           <Box
             sx={{
@@ -268,7 +268,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
           </Box>
         </Box>
       </Paper>
-      <Paper variant="outlined" sx={{p: 2}}>
+      <Paper variant="outlined" sx={{p: 2, bgcolor: '#F8F8F8'}}>
         <Stack spacing={2}>
           {targetSchema.map(targetField => {
             const currentMapping = localFieldMappings.find(
