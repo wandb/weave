@@ -4,11 +4,11 @@ from litellm import acompletion
 from pydantic import BaseModel
 
 import weave
-from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
+from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
@@ -44,7 +44,7 @@ You are given the following user prompt that you are suppossed to assess whether
 </input_prompt>
 """
         )
-        response: LLMGuardrailReasoning = await acompletion(
+        response = await acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
