@@ -187,7 +187,7 @@ const SelectionHeader: FC<{
   return (
     <div className="flex w-full items-center gap-[8px]">
       {/* Left side group */}
-      <span className="text-moon-600 flex items-center">
+      <span className="text-sm text-moon-600 flex items-center">
       <Button
           icon="close"
           variant="ghost"
