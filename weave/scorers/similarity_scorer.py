@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 from litellm import aembedding
@@ -38,7 +38,7 @@ class EmbeddingSimilarityScorer(Scorer):
         embeddings = await aembedding(self.model_id, [output, target])
         return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 
-    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> dict:
+    def cosine_similarity(self, vec1: Sequence[float], vec2: Sequence[float]) -> dict:
         """Compute the cosine similarity between two vectors."""
         arr1 = np.array(vec1)
         arr2 = np.array(vec2)
