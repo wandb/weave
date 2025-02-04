@@ -1,14 +1,15 @@
-import {Box, Paper, Stack, Typography, Tooltip} from '@mui/material';
+import {Box, Paper, Stack, Tooltip, Typography} from '@mui/material';
 import React, {useEffect, useState} from 'react';
 
 import {parseRef} from '../../../../../react';
 import {Select} from '../../../../Form/Select';
 import {Icon} from '../../../../Icon';
+import {LoadingDots} from '../../../../LoadingDots';
+import {Pill} from '../../../../Tag/Pill';
 import {CopyableId} from '../pages/common/Id';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRef} from '../smallRef/SmallRef';
-import {Pill} from '../../../../Tag/Pill';
 import {
   CallData,
   extractSourceSchema,
@@ -17,7 +18,6 @@ import {
   SchemaField,
   suggestMappings,
 } from './schemaUtils';
-import {LoadingDots} from '../../../../LoadingDots';
 
 export interface SchemaMappingStepProps {
   selectedDataset: ObjectVersionSchema;
@@ -135,7 +135,15 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         <Typography sx={{...typographyStyle, fontWeight: 600}}>
           Field Mapping
         </Typography>
-        <Paper variant="outlined" sx={{p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '56px'}}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '56px',
+          }}>
           <LoadingDots />
         </Paper>
       </Stack>
@@ -216,7 +224,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                               label="Error"
                               icon="warning"
                               color="red"
-                              className="text-xs font-semibold py-2 rounded"
+                              className="rounded py-2 text-xs font-semibold"
                             />
                           </Box>
                         </Tooltip>
@@ -259,11 +267,12 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
             }}>
             <Icon name="forward-next" />
           </Box>
-          <Box sx={{
-            flex: 1,
-            minWidth: '100px',
-            paddingTop: '4px'
-          }}>
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: '100px',
+              paddingTop: '4px',
+            }}>
             <SmallRef
               objRef={{
                 scheme: 'weave',

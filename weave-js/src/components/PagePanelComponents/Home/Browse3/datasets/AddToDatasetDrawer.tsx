@@ -1,9 +1,10 @@
-import {Box, Stack, Typography} from '@mui/material';
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Box, Typography} from '@mui/material';
+import React, {useCallback, useEffect, useState} from 'react';
 import {toast} from 'react-toastify';
 
 import {Button} from '../../../../Button';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {DatasetEditProvider} from './DatasetEditorContext';
@@ -13,7 +14,6 @@ import {EditAndConfirmStep} from './EditAndConfirmStep';
 import {SchemaMappingStep} from './SchemaMappingStep';
 import {CallData, FieldMapping} from './schemaUtils';
 import {SelectDatasetStep} from './SelectDatasetStep';
-import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 
 interface AddToDatasetDrawerProps {
   entity: string;
@@ -219,7 +219,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
                 onClick={() => setIsFullscreen(!isFullscreen)}
                 variant="ghost"
                 icon="full-screen-mode-expand"
-                tooltip={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                tooltip={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                 size="medium"
               />
             )}
