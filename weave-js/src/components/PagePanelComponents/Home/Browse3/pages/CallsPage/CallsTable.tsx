@@ -729,14 +729,16 @@ export const CallsTable: FC<{
 
       // If there's no sort specified, use started_at desc only
       if (processedModel.length === 0) {
-        setSortModel([{ field: 'started_at', sort: 'desc' }]);
+        setSortModel([{field: 'started_at', sort: 'desc'}]);
         return;
       }
 
       // Only append started_at as secondary sort if it's not already present
-      const hasStartedAt = processedModel.some(sort => sort.field === 'started_at');
+      const hasStartedAt = processedModel.some(
+        sort => sort.field === 'started_at'
+      );
       if (!hasStartedAt) {
-        setSortModel([...processedModel, { field: 'started_at', sort: 'desc' }]);
+        setSortModel([...processedModel, {field: 'started_at', sort: 'desc'}]);
       } else {
         setSortModel(processedModel);
       }
