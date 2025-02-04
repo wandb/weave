@@ -25,6 +25,8 @@ jobs:
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
     needs: check-which-tests-to-run
+    
+    # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
       - uses: actions/checkout@v3
         with:
@@ -92,6 +94,7 @@ jobs:
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
+      - uses: actions/checkout@v2
       - name: Check if tests should run
         id: test_check
         run: |
