@@ -220,6 +220,70 @@ jobs:
     needs:
       - check-which-tests-to-run
     if: needs.check-which-tests-to-run.outputs.docs_only_change != 'true'
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        nox-shard:
+          [
+            "trace",
+            "trace_server",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "dspy",
+            "groq",
+            "google_ai_studio",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral0",
+            "mistral1",
+            "notdiamond",
+            "openai",
+            "vertexai",
+            "scorers_tests",
+            "pandas-test",
+          ]
+      fail-fast: false
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -265,6 +329,7 @@ jobs:
 
     needs:
       - trace-tests
+      - check-which-tests-to-run
 
     runs-on: ubuntu-latest
 
