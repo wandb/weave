@@ -287,7 +287,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
               <Button
                 onClick={handleBack}
                 color="primary"
-                variant="ghost"
+                variant="secondary"
                 style={{width: '100%'}}
                 twWrapperStyles={{width: '100%'}}>
                 Back
@@ -298,7 +298,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
                 variant="primary"
                 style={{width: '100%'}}
                 twWrapperStyles={{width: '100%'}}>
-                Add
+                Add to dataset
               </Button>
             </>
           )}
