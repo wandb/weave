@@ -103,7 +103,7 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
-    from weave.scorers.base_scorer import ApplyScorerResult, Scorer
+    from weave.flow.base_scorer import ApplyScorerResult, Scorer
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -582,7 +582,7 @@ class Call:
         result, score_call = prediction.apply_scorer(my_scorer)
         ```
         """
-        from weave.scorers.base_scorer import Scorer, apply_scorer_async
+        from weave.flow.base_scorer import Scorer, apply_scorer_async
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}

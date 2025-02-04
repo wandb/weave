@@ -1,4 +1,4 @@
-from weave.scorers.base_scorer import (
+from weave.flow.base_scorer import (
     Scorer,
     _has_oldstyle_scorers,
     _validate_scorer_signature,
