@@ -115,6 +115,7 @@ const DragSourceComp: FC<DragSourceProps> = ({
     (e: React.DragEvent<HTMLDivElement>) => {
       if (selectedForDrag) {
         setDragStarted(true);
+        e.dataTransfer.setData('text', ''); // required for firefox
         if (data) {
           setDragData(data);
         }
