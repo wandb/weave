@@ -17,6 +17,7 @@ import {
   SchemaField,
   suggestMappings,
 } from './schemaUtils';
+import {LoadingDots} from '../../../../LoadingDots';
 
 export interface SchemaMappingStepProps {
   selectedDataset: ObjectVersionSchema;
@@ -134,8 +135,8 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         <Typography sx={{...typographyStyle, fontWeight: 600}}>
           Field Mapping
         </Typography>
-        <Paper sx={{p: 2, minHeight: '200px'}}>
-          <WeaveLoader />
+        <Paper variant="outlined" sx={{p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '56px'}}>
+          <LoadingDots />
         </Paper>
       </Stack>
     );
