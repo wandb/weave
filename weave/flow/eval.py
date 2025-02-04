@@ -11,13 +11,6 @@ from typing_extensions import Self
 
 import weave
 from weave.flow import util
-from weave.flow.scorer import (
-    Scorer,
-    _has_oldstyle_scorers,
-    _validate_scorer_signature,
-    auto_summarize,
-    get_scorer_attributes,
-)
 from weave.flow.dataset import Dataset
 from weave.flow.model import (
     ApplyModelError,
@@ -26,6 +19,13 @@ from weave.flow.model import (
     apply_model_async,
 )
 from weave.flow.obj import Object
+from weave.flow.scorer import (
+    Scorer,
+    _has_oldstyle_scorers,
+    _validate_scorer_signature,
+    auto_summarize,
+    get_scorer_attributes,
+)
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
