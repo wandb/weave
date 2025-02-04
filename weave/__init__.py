@@ -9,9 +9,9 @@ __version__ = version.VERSION
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
+from weave.flow.base_scorer import Scorer
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation
-from weave.flow.base_scorer import Scorer
 from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt

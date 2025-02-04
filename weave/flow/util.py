@@ -11,12 +11,14 @@ U = TypeVar("U")
 
 _shown_warnings = set()
 
+
 def transpose(rows: list[dict]) -> dict[str, list]:
     cols = defaultdict(list)
     for row in rows:
         for k, v in row.items():
             cols[k].append(v)
     return dict(cols)
+
 
 async def async_foreach(
     sequence: Iterable[T],

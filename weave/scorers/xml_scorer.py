@@ -3,6 +3,7 @@ from typing import Union
 
 import weave
 
+
 class ValidXMLScorer(weave.Scorer):
     """Score an XML string."""
 
