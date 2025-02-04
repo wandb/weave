@@ -25,6 +25,7 @@ jobs:
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
     needs: check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.docs_only_change != 'true'
 
     # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
@@ -147,6 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.docs_only_change != 'true'
     steps:
       - uses: actions/checkout@v2
         with:
@@ -220,6 +222,9 @@ jobs:
     name: Trace nox tests
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    needs:
+      - check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.docs_only_change != 'true'
     strategy:
       matrix:
         python-version-major: ["3"]
