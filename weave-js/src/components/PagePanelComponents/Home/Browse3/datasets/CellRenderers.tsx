@@ -63,7 +63,9 @@ export const CellViewingRenderer: React.FC<
   const [isHovered, setIsHovered] = useState(false);
   const {setEditedRows} = useDatasetEditContext();
 
-  const isEditable = typeof value !== 'object' && typeof value !== 'boolean';
+  const isWeaveUrl = typeof value === 'string' && value.startsWith('weave:///');
+  const isEditable =
+    !isWeaveUrl && typeof value !== 'object' && typeof value !== 'boolean';
 
   const handleEditClick = (event: React.MouseEvent) => {
     event.stopPropagation();

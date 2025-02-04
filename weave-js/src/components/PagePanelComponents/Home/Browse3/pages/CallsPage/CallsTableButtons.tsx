@@ -468,6 +468,22 @@ export const BulkDeleteButton: FC<{
   );
 };
 
+export const BulkAddToDatasetButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
+  return (
+    <Button
+      variant="ghost"
+      size="medium"
+      onClick={onClick}
+      disabled={disabled}
+      tooltip="Add selected rows to a dataset"
+      icon="table"
+    />
+  );
+};
+
 export const RefreshButton: FC<{
   onClick: () => void;
   disabled?: boolean;

@@ -710,6 +710,15 @@ export const refUri = (ref: ObjectRef): string => {
   }
 };
 
+export const createWeaveTableRef = (
+  entity: string,
+  project: string,
+  tableDigest: string
+): string => {
+  const projectId = `${entity}/${project}`;
+  return `weave:///${projectId}/table/${tableDigest}`;
+};
+
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {
   const rootConstructorNode = getChainRootConstructor(absoluteTarget);
   const rootArgsInner: {[key: string]: any} = {};
