@@ -52,7 +52,7 @@ class ContextEntityRecallScorer(LLMScorer):
     temperature: float = 0.7
     max_tokens: int = 4096
 
-    async def extract_entities(self, text: str) -> list[str]:
+    async def _extract_entities(self, text: str) -> list[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
         response = await acompletion(
@@ -69,8 +69,8 @@ class ContextEntityRecallScorer(LLMScorer):
 
     @weave.op
     async def score(self, output: str, context: str) -> dict:
-        expected_entities = await self.extract_entities(output)
-        context_entities = await self.extract_entities(context)
+        expected_entities = await self._extract_entities(output)
+        context_entities = await self._extract_entities(context)
         # Calculate recall
         if not expected_entities:
             return {"recall": 0.0}
