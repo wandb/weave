@@ -187,7 +187,7 @@ const SelectionHeader: FC<{
   return (
     <div className="flex w-full items-center gap-[8px]">
       {/* Left side group */}
-      <span className="font-semibold text-sm text-moon-600 flex items-center">
+      <span className="text-moon-600 flex items-center">
       <Button
           icon="close"
           variant="ghost"
@@ -875,13 +875,6 @@ export const CallsTable: FC<{
           }
         }
       }
-
-      // Always append started_at as secondary sort if it's not already the primary sort
-      const finalModel = [...newModel];
-      if (newModel.length > 0 && newModel[0].field !== 'started_at') {
-        finalModel.push({ field: 'started_at', sort: 'desc' });
-      }
-      setSortModel(finalModel);
     },
     [callsLoading, setSortModel, muiColumns]
   );
