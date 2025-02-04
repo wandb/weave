@@ -1,7 +1,6 @@
 import {Box, Paper, Stack, Typography} from '@mui/material';
 import React, {useEffect, useState} from 'react';
 
-import {WeaveLoader} from '../../../../../common/components/WeaveLoader';
 import {parseRef} from '../../../../../react';
 import {Select} from '../../../../Form/Select';
 import {Icon} from '../../../../Icon';
@@ -270,7 +269,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         </Box>
       </Paper>
       <Paper variant="outlined" sx={{p: 2, bgcolor: '#F8F8F8'}}>
-        <Stack spacing={2}>
+        <Stack spacing={1}>
           {targetSchema.map(targetField => {
             const currentMapping = localFieldMappings.find(
               m => m.targetField === targetField.name

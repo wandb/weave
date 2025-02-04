@@ -239,7 +239,7 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = ({
           sx={{
             flex: 1,
             overflow: 'auto',
-            px: 2,
+            px: currentStep === 1 ? 2 : 0,
             display: 'flex',
             flexDirection: 'column',
           }}>
