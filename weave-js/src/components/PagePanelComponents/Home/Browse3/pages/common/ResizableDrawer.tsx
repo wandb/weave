@@ -100,6 +100,8 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
           position: 'fixed',
           maxWidth: `${maxAllowedWidth}px`,
           minWidth: '120px',
+          maxHeight: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 60px)',
         },
       }}>
       <Box
