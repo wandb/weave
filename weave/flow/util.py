@@ -2,6 +2,7 @@ import asyncio
 import logging
 import multiprocessing
 import random
+from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
@@ -10,6 +11,12 @@ U = TypeVar("U")
 
 _shown_warnings = set()
 
+def transpose(rows: list[dict]) -> dict[str, list]:
+    cols = defaultdict(list)
+    for row in rows:
+        for k, v in row.items():
+            cols[k].append(v)
+    return dict(cols)
 
 async def async_foreach(
     sequence: Iterable[T],
