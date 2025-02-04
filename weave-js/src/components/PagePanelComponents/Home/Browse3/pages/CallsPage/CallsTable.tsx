@@ -830,7 +830,13 @@ export const CallsTable: FC<{
           }
         }
       }
-      setSortModel(newModel);
+
+      // Always append started_at as secondary sort if it's not already the primary sort
+      const finalModel = [...newModel];
+      if (newModel.length > 0 && newModel[0].field !== 'started_at') {
+        finalModel.push({ field: 'started_at', sort: 'desc' });
+      }
+      setSortModel(finalModel);
     },
     [callsLoading, setSortModel, muiColumns]
   );
