@@ -9,7 +9,7 @@ __version__ = version.VERSION
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
-from weave.flow.base_scorer import Scorer
+from weave.flow.scorer import Scorer
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation
 from weave.flow.model import Model
