@@ -693,31 +693,76 @@ export const CallsTable: FC<{
         disableExport: true,
         display: 'flex',
         renderHeader: (params: any) => {
+          // Get IDs of all rows on current page
           const currentPageRowIds = tableData.map(row => row.id);
-          const currentPageSelectedCount = currentPageRowIds.filter(id => selectedCalls.includes(id)).length;
+          // Count how many of current page rows are selected
+          const currentPageSelectedCount = currentPageRowIds.filter(id => 
+            selectedCalls.includes(id)
+          ).length;
+          
+          // Determine checkbox state:
+          // - false if none selected
+          // - true if all selected 
+          // - 'indeterminate' if some selected
           const isChecked = currentPageSelectedCount === 0
-            ? false
+            ? false 
             : currentPageSelectedCount === currentPageRowIds.length
             ? true
             : 'indeterminate';
+
+          const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+          const isAtLimit = selectedCalls.length >= maxForTable;
+          
+          // Determine tooltip text based on state
+          let tooltipText = '';
+          if (isChecked === false && isAtLimit) {
+            tooltipText = `Select limited to ${isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT} items`;
+          } else if (isChecked === 'indeterminate') {
+            tooltipText = 'De-select this page';
+          } else if (isChecked === false) {
+            const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+            const availableSlots = maxForTable - selectedCalls.length;
+            const pageSize = currentPageRowIds.length;
+            tooltipText = availableSlots < pageSize 
+              ? `Select ${availableSlots} items (max 100)`
+              : 'Select this page';
+          } else {
+            tooltipText = 'De-select this page';
+          }
+
           return (
-            <Checkbox
-              size="small"
-              checked={isChecked}
-              onCheckedChange={() => {
-                if (currentPageSelectedCount === currentPageRowIds.length) {
-                  // Deselect all rows on the current page
-                  setSelectedCalls(selectedCalls.filter(id => !currentPageRowIds.includes(id)));
-                } else {
-                  // Select all rows on the current page
-                  const missing = currentPageRowIds.filter(id => !selectedCalls.includes(id));
-                  const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
-                  const availableSlots = maxForTable - selectedCalls.length;
-                  const additions = availableSlots < missing.length ? missing.slice(0, availableSlots) : missing;
-                  setSelectedCalls([...selectedCalls, ...additions]);
-                }
-              }}
-            />
+            <Tooltip title={tooltipText} placement="right" arrow>
+              <span>
+                <Checkbox
+                  size="small"
+                  checked={isChecked}
+                  disabled={isChecked === false && isAtLimit}
+                  onCheckedChange={() => {
+                    if (isChecked === 'indeterminate') {
+                      // If partially selected, deselect all items on current page
+                      setSelectedCalls(selectedCalls.filter(id => 
+                        !currentPageRowIds.includes(id)
+                      ));
+                    } else if (isChecked === true) {
+                      // If all selected, deselect all items on current page
+                      setSelectedCalls(selectedCalls.filter(id => 
+                        !currentPageRowIds.includes(id)
+                      ));
+                    } else {
+                      // If none selected, select all items on current page
+                      const missing = currentPageRowIds.filter(id => 
+                        !selectedCalls.includes(id)
+                      );
+                      const availableSlots = maxForTable - selectedCalls.length;
+                      const additions = availableSlots < missing.length 
+                        ? missing.slice(0, availableSlots) 
+                        : missing;
+                      setSelectedCalls([...selectedCalls, ...additions]);
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
           );
         },
         renderCell: (params: any) => {
