@@ -74,11 +74,13 @@ export const formatTokenCount = (num: number): string => {
   return parseFloat(millions).toString() + 'm';
 };
 
+const MIN_COST = 0.0001;
+const COST_PRECISION = 4;
 export const formatTokenCost = (cost: number): string => {
-  if (cost < 0.0001) {
-    return '<$0.0001';
+  if (cost < MIN_COST) {
+    return '<$' + MIN_COST.toFixed(COST_PRECISION);
   }
-  return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(COST_PRECISION)}`;
 };
 
 // TODO(Josiah): this is here because sometimes the cost query is not returning all the ids I believe for unfinished calls,
