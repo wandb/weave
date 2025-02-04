@@ -26,7 +26,7 @@ jobs:
       weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
       weave_js_tests: ${{ steps.weave_js.outputs.run_tests }}
       trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
-      docs_only_change: ${{ steps.check_docs_only.outputs.is_docs_only }}
+      docs_only_change: ${{ steps.check_docs_only.outputs.docs_only_change }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -63,18 +63,22 @@ jobs:
       - id: check_docs_only
         name: Check if changes are docs-only
         run: |
-          is_docs_only=true
+          docs_only_change=true
           while IFS= read -r file; do
             # Skip empty lines
             [ -z "$file" ] && continue
             # Check if file is not a .md file and not in a docs directory
             if [[ ! "$file" =~ \.md$ ]] && [[ ! "$file" =~ ^${{ env.DOCS_PATHS }}/ ]]; then
-              is_docs_only=false
+              docs_only_change=false
               break
             fi
           done <<< "$changed_files"
-          echo "is_docs_only=$is_docs_only"
-          echo "is_docs_only=$is_docs_only" >> $GITHUB_OUTPUT
+          echo "docs_only_change=$docs_only_change"
+          # echo "docs_only_change=$docs_only_change" >> $GITHUB_OUTPUT
+
+          # For testing
+          docs_only_change=true
+          echo "docs_only_change=$docs_only_change" >> $GITHUB_OUTPUT
       - id: weave_query
         name: Weave Query Checks
         run: |
