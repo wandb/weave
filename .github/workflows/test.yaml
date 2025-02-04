@@ -276,6 +276,10 @@ jobs:
           --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
+        env:
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DATABASE: default
         ports:
           - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
