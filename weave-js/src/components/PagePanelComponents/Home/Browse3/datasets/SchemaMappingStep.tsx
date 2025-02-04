@@ -168,21 +168,22 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         Field mapping
       </Typography>
       <Paper variant="outlined" sx={{p: 2}}>
-        <Box display="flex" alignItems="center" gap={2}>
+        <Box display="flex" alignItems="flex-start" gap={2}>
           <Box
             sx={{
               position: 'relative',
-              width: '300px',
-              minWidth: '300px',
+              flex: 1,
+              minWidth: '100px',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-start',
             }}>
             <Box
               ref={scrollRef}
               display="flex"
               gap={1}
               sx={{
-                overflowX: 'auto',
+                width: '100%',
+                flexWrap: 'wrap',
                 scrollbarWidth: 'none',
                 '&::-webkit-scrollbar': {
                   display: 'none',
@@ -205,6 +206,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1,
+                    flexWrap: 'wrap',
                   }}>
                   {(() => {
                     try {
@@ -252,12 +254,19 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
           <Box
             sx={{
               width: '40px',
+              flexShrink: 0,
               display: 'flex',
               justifyContent: 'center',
+              alignItems: 'flex-start',
+              paddingTop: '8px',
             }}>
             <Icon name="forward-next" />
           </Box>
-          <Box sx={{width: '200px'}}>
+          <Box sx={{
+            flex: 1,
+            minWidth: '100px',
+            paddingTop: '4px'
+          }}>
             <SmallRef
               objRef={{
                 scheme: 'weave',
@@ -287,7 +296,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                   gap: 2,
                   height: '40px',
                 }}>
-                <Box sx={{width: '300px'}}>
+                <Box sx={{flex: 1, minWidth: '100px'}}>
                   <Select
                     placeholder="Select column"
                     value={
@@ -316,12 +325,13 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                 <Box
                   sx={{
                     width: '40px',
+                    flexShrink: 0,
                     display: 'flex',
                     justifyContent: 'center',
                   }}>
                   <Icon name="forward-next" />
                 </Box>
-                <Box sx={{width: '200px'}}>
+                <Box sx={{flex: 1, minWidth: '100px'}}>
                   <Typography sx={{...typographyStyle}}>
                     {targetField.name}
                   </Typography>
