@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import weave
-from weave.flow.base_scorer import ApplyScorerResult
+from weave.flow.scorer import ApplyScorerResult
 from weave.trace.op import OpCallError
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import Call, Op, WeaveClient
