@@ -3,22 +3,22 @@ import TabItem from '@theme/TabItem';
 
 # Datasets
 
-Weave _datasets_ help you to organize, collect, track, and version examples for LLM application evaluation for easy comparison. You can create and interact with datasets programmatically and via the UI. 
+Weave `Dataset`s help you to organize, collect, track, and version examples for LLM application evaluation for easy comparison. You can create and interact with `Dataset`s programmatically and via the UI. 
 
 This page describes:
 
-- Basic dataset operations in Python and TypeScript and how to get started  
-- How to create a dataset in Python and TypeScript from objects such as Weave [calls](../tracking/tracing.mdx)
-- Available operations on a dataset in the UI
+- Basic `Dataset` operations in Python and TypeScript and how to get started  
+- How to create a `Dataset` in Python and TypeScript from objects such as Weave [calls](../tracking/tracing.mdx)
+- Available operations on a `Dataset` in the UI
 
-## Dataset quickstart
+## `Dataset` quickstart
 
-The following code samples demonstrate how to perform fundamental dataset operations using Python and TypeScript. Using the SDKs, you can:
+The following code samples demonstrate how to perform fundamental `Dataset` operations using Python and TypeScript. Using the SDKs, you can:
 
-- Create a dataset
-- Publish the dataset
-- Retrieve the dataset
-- Access a specific example in the dataset
+- Create a `Dataset`
+- Publish the `Dataset`
+- Retrieve the `Dataset`
+- Access a specific example in the `Dataset`
 
 Select a tab to see Python and TypeScript-specific code. 
 
@@ -78,15 +78,15 @@ Select a tab to see Python and TypeScript-specific code.
   </TabItem>
 </Tabs>
 
-## Create a dataset from other objects
+## Create a `Dataset` from other objects
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-  In Python, datasets can also be constructed from common Weave objects like [calls](../tracking/tracing.mdx), and Python objects like `pandas.DataFrame`s. This feature is useful if you want to create an example dataset from specific examples.
+  In Python, `Dataset`s can also be constructed from common Weave objects like [calls](../tracking/tracing.mdx), and Python objects like `pandas.DataFrame`s. This feature is useful if you want to create an example `Dataset` from specific examples.
 
   ### Weave call
 
-  To create a dataset from one or more Weave calls, retrieve the call object(s), and add them to a list in the `from_calls` method.
+  To create a `Dataset` from one or more Weave calls, retrieve the call object(s), and add them to a list in the `from_calls` method.
 
   ```python
   @weave.op
@@ -102,9 +102,9 @@ Select a tab to see Python and TypeScript-specific code.
 
   ### Pandas DataFrame
 
-  To create a dataset from a Pandas `DataFrame` object, use the `from_pandas` method. 
+  To create a `Dataset` from a Pandas `DataFrame` object, use the `from_pandas` method. 
 
-  To convert the dataset back, use `to_pandas`.
+  To convert the `Dataset` back, use `to_pandas`.
 
   ```python
   import pandas as pd
@@ -126,66 +126,66 @@ Select a tab to see Python and TypeScript-specific code.
   </TabItem>
 </Tabs>
 
-## Edit and delete a dataset in the UI
+## Edit and delete a `Dataset` in the UI
 
 :::tip
-To follow along with the example screenshots shown in this section, run the code shown in the [Dataset quickstart](#dataset-quickstart) and navigate to the **Datasets** tab in the Weave UI.
+To follow along with the example screenshots shown in this section, run the code shown in the [`Dataset` quickstart](#dataset-quickstart) and navigate to the **Datasets** tab in the Weave UI.
 :::
 
-You can edit and delete existing datasets from the **Datasets** tab in the UI. To create a dataset, [use one of the SDKs](#dataset-quickstart). 
+You can edit and delete existing `Dataset`s from the **Datasets** tab in the UI. To create a `Dataset`, [use one of the SDKs](#dataset-quickstart). 
 
-### Edit a dataset 
+### Edit a `Dataset` 
 
-1. Navigate to the Weave project containing the dataset you want to edit.
-2. From the sidebar, select **Datasets**. Your available datasets display.
+1. Navigate to the Weave project containing the `Dataset` you want to edit.
+2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
 
    ![Dataset UI](./imgs/datasetui.png)
 
-3. In the **Object** column, click the name and version of the dataset you want to edit. A pop-out modal showing dataset information like name, version, author, and dataset rows displays.
+3. In the **Object** column, click the name and version of the `Dataset` you want to edit. A pop-out modal showing `Dataset` information like name, version, author, and `Dataset` rows displays.
 
-   ![View dataset information](./imgs/datasetui-popout.png)
+   ![View `Dataset` information](./imgs/datasetui-popout.png)
 
 4. In the upper right-hand corner of the modal, click the **Edit dataset** button (the pencil icon). An **+ Add row** button displays at the bottom of the modal.
 
-    ![Dataset UI- Add row icon](./imgs/datasetui-popout-edit.png)
+    ![`Dataset` UI- Add row icon](./imgs/datasetui-popout-edit.png)
 
-5. Click **+ Add row**. A green row displays at the top of your existing dataset rows, indicating that you can add a new row to the dataset. 
+5. Click **+ Add row**. A green row displays at the top of your existing `Dataset` rows, indicating that you can add a new row to the `Dataset`. 
 
-    ![Dataset UI](./imgs/datasetui-popout-edit-green.png)
+    ![`Dataset` UI](./imgs/datasetui-popout-edit-green.png)
 
-6. To add data to the new row, click the column in the new row that you want to edit. You can't edit the default **id** column in a dataset row, as this is automatically assigned by Weave upon creation. A pop-out modal for editing displays, with **Text**, **Code** and **Diff** options for formatting.
+6. To add data to a new row, click the desired column within that row. The default **id** column in a `Dataset` row cannot be edited, as Weave assigns it automatically upon creation. An editing modal appears with **Text**, **Code**, and **Diff** options for formatting.
 
-    ![Dataset UI - Add data to a column and format.](./imgs/datasetui-popout-edit-addcol.png)
+    ![`Dataset` UI - Add data to a column and format.](./imgs/datasetui-popout-edit-addcol.png)
 
 7. Repeat step 6 for each column that you want to add data to in the new row. 
 
-    ![Dataset UI - Add data to all columns.](./imgs/datasetui-popout-edit-colsadded.png)
+    ![`Dataset` UI - Add data to all columns.](./imgs/datasetui-popout-edit-colsadded.png)
 
-8. Repeat step 5 for each row that you want to add to the dataset.
+8. Repeat step 5 for each row that you want to add to the `Dataset`.
 
-9. Once you're done editing, publish your dataset by clicking **Publish** in the upper right-hand corner of the modal. Alternatively, if you don't want to publish your changes, click **Cancel**. 
+9. Once you're done editing, publish your `Dataset` by clicking **Publish** in the upper right-hand corner of the modal. Alternatively, if you don't want to publish your changes, click **Cancel**. 
 
-    ![Dataset UI - Publish or cancel.](./imgs/datasetui-popout-edit-publish.png)
+    ![`Dataset` UI - Publish or cancel.](./imgs/datasetui-popout-edit-publish.png)
 
-   Once published, the new version of the dataset with updated rows is available in the UI. 
+   Once published, the new version of the `Dataset` with updated rows is available in the UI. 
 
-     ![Dataset UI - Published metadata.](./imgs/datasetui-popout-edit-published-meta.png)
-     ![Dataset UI - Published rows.](./imgs/datasetui-popout-edit-published-rows.png)
+     ![`Dataset` UI - Published metadata.](./imgs/datasetui-popout-edit-published-meta.png)
+     ![`Dataset` UI - Published rows.](./imgs/datasetui-popout-edit-published-rows.png)
    
-### Delete a dataset
+### Delete a `Dataset`
 
-1. Navigate to the Weave project containing the dataset you want to edit.
-2. From the sidebar, select **Datasets**. Your available datasets display.
-3. In the **Object** column, click the name and version of the dataset you want to delete. A pop-out modal showing dataset information like name, version, author, and dataset rows displays.
+1. Navigate to the Weave project containing the `Dataset` you want to edit.
+2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
+3. In the **Object** column, click the name and version of the `Dataset` you want to delete. A pop-out modal showing `Dataset` information like name, version, author, and `Dataset` rows displays.
 
 4. In the upper right-hand corner of the modal, click the trash can icon. 
 
-   ![Dataset UI - Delete a dataset icon.](./imgs/dataset-trashcan.png)
+   ![`Dataset` UI - Delete a `Dataset` icon.](./imgs/dataset-trashcan.png)
 
-   A pop-up modal prompting you to confirm dataset deletion displays. 
+   A pop-up modal prompting you to confirm `Dataset` deletion displays. 
 
-   ![Dataset UI - Confirm deletion modal.](./imgs/datasetui-delete-modal.png)
+   ![`Dataset` UI - Confirm deletion modal.](./imgs/datasetui-delete-modal.png)
 
-5. In the pop-up modal, click the red **Delete** button to delete the dataset. Alternatively, click **Cancel** if you don't want to delete the dataset. 
+5. In the pop-up modal, click the red **Delete** button to delete the `Dataset`. Alternatively, click **Cancel** if you don't want to delete the `Dataset`. 
 
-   Now, the dataset is deleted, and no longer visible in the **Datasets** tab in your Weave dashboard.
+   Now, the `Dataset` is deleted, and no longer visible in the **Datasets** tab in your Weave dashboard.
