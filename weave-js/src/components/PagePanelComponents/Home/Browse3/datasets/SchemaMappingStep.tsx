@@ -1,4 +1,4 @@
-import {Box, Paper, Stack, Typography} from '@mui/material';
+import {Box, Paper, Stack, Typography, Tooltip} from '@mui/material';
 import React, {useEffect, useState} from 'react';
 
 import {parseRef} from '../../../../../react';
@@ -8,6 +8,7 @@ import {CopyableId} from '../pages/common/Id';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRef} from '../smallRef/SmallRef';
+import {Pill} from '../../../../Tag/Pill';
 import {
   CallData,
   extractSourceSchema,
@@ -210,14 +211,16 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                       return <SmallRef objRef={parseRef(opName)} />;
                     } catch (e) {
                       return (
-                        <Typography
-                          sx={{
-                            ...typographyStyle,
-                            color: 'text.secondary',
-                            fontSize: '14px',
-                          }}>
-                          error
-                        </Typography>
+                        <Tooltip title={e.message} arrow>
+                          <Box>
+                            <Pill
+                              label="Error"
+                              icon="warning"
+                              color="red"
+                              className="text-xs font-semibold py-2 rounded"
+                            />
+                          </Box>
+                        </Tooltip>
                       );
                     }
                   })()}
