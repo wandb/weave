@@ -5,12 +5,12 @@ This scorer combines multiple scorers to provide a comprehensive trust evaluatio
 """
 
 import re
-from typing import Optional, Union, Any, Dict, List, Set, Type
+from typing import Optional, Union, Any, Dict, Set, Type
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
 
 import weave
 from weave.scorers.base_scorer import Scorer
-from weave.scorers.llm_utils import set_device
 from weave.scorers import (
     HallucinationScorer, 
     CoherenceScorer, 
@@ -18,7 +18,7 @@ from weave.scorers import (
     ContextRelevanceScorer, 
     ToxicityScorer
 )
-from pydantic import PrivateAttr, Field, model_validator
+from pydantic import PrivateAttr, Field
 
 
 class TrustScorer(Scorer):
@@ -48,10 +48,11 @@ class TrustScorer(Scorer):
         fluency_threshold (float): Minimum fluency score (0-1). Defaults to 0.5.
         toxicity_total_threshold (int): Maximum total toxicity score. Defaults to 5.
         toxicity_category_threshold (int): Maximum per-category toxicity score. Defaults to 2.
+        run_in_parallel (bool): Flag to toggle parallel scoring. Defaults to True.
 
     Example:
         ```python
-        scorer = TrustScorer()
+        scorer = TrustScorer(run_in_parallel=True)
 
         # Basic scoring
         result = scorer.score(
@@ -85,12 +86,34 @@ class TrustScorer(Scorer):
 
     """
     # Model configuration
-    device: str = "auto"
-    context_relevance_threshold: float = 0.45
-    hallucination_threshold: float = 0.5
-    fluency_threshold: float = 0.5
-    toxicity_total_threshold: int = 5
-    toxicity_category_threshold: int = 2
+    device: str = Field(
+        default="auto",
+        description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')"
+    )
+    context_relevance_threshold: float = Field(
+        default=0.45,
+        description="Minimum relevance score between output and context (0-1)"
+    )
+    hallucination_threshold: float = Field(
+        default=0.5,
+        description="Maximum hallucination score allowed in output (0-1)"
+    )
+    fluency_threshold: float = Field(
+        default=0.5,
+        description="Minimum fluency score required for output (0-1)"
+    )
+    toxicity_total_threshold: int = Field(
+        default=5,
+        description="Maximum total toxicity score allowed across all categories"
+    )
+    toxicity_category_threshold: int = Field(
+        default=2,
+        description="Maximum toxicity score allowed per individual category"
+    )
+    run_in_parallel: bool = Field(
+        default=True,
+        description="Whether to run scorers in parallel for improved performance"
+    )
 
     # Define scorer categories
     _critical_scorers: Set[Type[Scorer]] = {
@@ -186,24 +209,26 @@ class TrustScorer(Scorer):
         scorer_params = signature(scorer.score).parameters
         return {k: v for k, v in inputs.items() if k in scorer_params}
 
-    @weave.op
     def _score_all(
         self, 
         output: str, 
         context: Optional[Union[str, list[str]]] = None, 
         query: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Run all applicable scorers in parallel and return their raw results."""
+        """Run all applicable scorers and return their raw results.
+
+        Runs in parallel if run_in_parallel is True, otherwise runs sequentially.
+        """
         # Validate input
         error_response = self._validate_input(output)
         if error_response:
             return {"error": error_response}
-
+    
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
         processed_context = self._preprocess_text(context) if isinstance(context, str) else context
         processed_query = self._preprocess_text(query) if query else None
-
+    
         inputs = {'output': processed_output}
         if processed_context is not None:
             inputs['context'] = processed_context
@@ -211,14 +236,29 @@ class TrustScorer(Scorer):
             inputs['query'] = processed_query
         
         results = {}
-        for scorer_name, scorer in self._loaded_scorers.items():
-            try:
-                filtered_inputs = self._filter_inputs_for_scorer(scorer, inputs)
-                score = scorer.score(**filtered_inputs)
-                results[scorer_name] = score
-            except Exception:
-                # Silently skip failed scorers
-                pass
+
+        if self.run_in_parallel:
+            with ThreadPoolExecutor() as executor:
+                # Schedule each scorer's work concurrently.
+                future_to_scorer = {
+                    executor.submit(scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)): scorer_name
+                    for scorer_name, scorer in self._loaded_scorers.items()
+                }
+                # Collect results as they complete.
+                for future in as_completed(future_to_scorer):
+                    scorer_name = future_to_scorer[future]
+                    try:
+                        results[scorer_name] = future.result()
+                    except Exception:
+                        # Silently skip failed scorers.
+                        pass
+        else:
+            # Run scorers sequentially
+            for scorer_name, scorer in self._loaded_scorers.items():
+                try:
+                    results[scorer_name] = scorer.score(**self._filter_inputs_for_scorer(scorer, inputs))
+                except Exception:
+                    pass
         
         return results
 
