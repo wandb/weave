@@ -1,9 +1,15 @@
+import {
+  gql,
+  useMutation,
+} from '@apollo/client';
 import {Box, Drawer} from '@material-ui/core';
+import {ID} from '@wandb/weave/common/util/id';
 import {Button} from '@wandb/weave/components/Button/Button';
+import {coreAppUrl} from '@wandb/weave/config';
+import * as Urls from '@wandb/weave/core/_external/util/urls';
 import React, {FC, ReactNode, useEffect, useMemo, useState} from 'react';
 
 import {AutocompleteWithLabel} from '../pages/ScorersPage/FormComponents';
-
 interface ExportToReportDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -391,9 +397,38 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
     return [...createNewOption, ...reports];
   }, [selectedEntity, selectedProject, reports, reportsLoading]);
 
+  const [upsertReport] = useMutation(UPSERT_REPORT);
   const handleSave = () => {
     // TODO: Implement save logic
-    onClose();
+    upsertReport({
+      variables: {
+        description: '',
+        displayName: 'Untitled Report',
+        entityName,
+        name: ID(12),
+        projectName,
+        spec: JSON.stringify(getEmptyReportConfig()),
+        type: 'runs/draft',
+      },
+    }).then(result => {
+      const upsertedDraft = result.data?.upsertView?.view!;
+      let reportDraftPath = Urls.reportEdit(
+        {
+          entityName: selectedEntity,
+          projectName: selectedProject,
+          reportID: upsertedDraft.id,
+          reportName: upsertedDraft.displayName ?? '',
+        }
+        // `#${documentId}`
+      );
+      if (reportDraftPath.startsWith('//')) {
+        reportDraftPath = reportDraftPath.slice(1);
+      }
+      const path = coreAppUrl(reportDraftPath);
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      window.open(path, '_blank');
+      onClose();
+    });
   };
 
   // Show error states if any fetch failed
@@ -450,3 +485,65 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
     </SaveableDrawer>
   );
 };
+
+const UPSERT_REPORT = gql(`
+    mutation UpsertReport(
+      $id: ID,
+      $coverUrl: String,
+      $createdUsing: ViewSource,
+      $description: String,
+      $displayName: String,
+      $entityName: String,
+      $name: String,
+      $parentId: ID,
+      $previewUrl: String,
+      $projectName: String,
+      $spec: String,
+      $type: String,
+    ) {
+      upsertView(
+        input: {
+          id: $id,
+          coverUrl: $coverUrl,
+          createdUsing: $createdUsing,
+          description: $description,
+          displayName: $displayName,
+          entityName: $entityName,
+          name: $name,
+          parentId: $parentId,
+          previewUrl: $previewUrl,
+          projectName: $projectName,
+          spec: $spec,
+          type: $type,
+        }
+      ) {
+        view {
+          id
+          displayName
+        }
+      }
+    }
+  `);
+
+function getEmptyReportConfig() {
+  return {
+    blocks: [{type: 'paragraph', children: [{text: 'TESTING FROM WEAVE'}]}],
+    discussionThreads: [],
+    panelSettings: {
+      xAxis: '_step',
+      smoothingWeight: 0,
+      smoothingType: 'exponential',
+      ignoreOutliers: false,
+      xAxisActive: false,
+      smoothingActive: false,
+      useRunsTableGroupingInPanels: true,
+    },
+    width: 'readable',
+    version: 5, // ReportSpecVersion.SlateReport
+  };
+}
+
+// TODO: Actually produce the correct slate note
+// TODO: Implement entity/project/report selection
+// TODO: Implement adding to a report, not just creating
+// TODO: Refactor this to extract the report creation / addition logic into a hook
