@@ -203,9 +203,3 @@ export const Spec: Panel2.PanelSpec<PanelRunsHistoryTablesConfigType> = {
     },
   }),
 };
-
-Panel2.registerPanelFunction(
-  Spec.id,
-  Spec.inputType,
-  Spec.equivalentTransform!
-);
