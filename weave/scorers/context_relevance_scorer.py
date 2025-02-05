@@ -278,9 +278,11 @@ class ContextRelevanceScorer(HuggingFaceScorer):
         """Initialize the model, tokenizer and device after pydantic initialization."""
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
+        elif self.model_name_or_path != "":
+            self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
-        assert self._local_model_path, "Model path not found"
+        assert self._local_model_path, "model_name_or_path local path or artifact path not found"
         self.model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
         )
