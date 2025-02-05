@@ -10,17 +10,24 @@ from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
 from google.genai.models import Models, AsyncModels
+from google.genai.chats import Chat
 
 
 def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
+    if model_name is not None:
+        inputs["model"] = model_name
     return inputs
 
 
 def google_genai_2_on_finish(call: Call, output: Any, exception: BaseException | None) -> None:
+    model_name = None
     if "model" in call.inputs:
         model_name = call.inputs["model"]
+    else:
+        raise ValueError("Unknown model type")
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
@@ -107,6 +114,20 @@ def get_google_genai_2_patcher(
         }
     )
 
+    chat_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.chats.Chat.send_message"
+        }
+    )
+
+    chat_async_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.chats.AsyncChat.send_message"
+        }
+    )
+    
+    
+
     _google_genai_2_patcher = MultiPatcher(
         [
             SymbolPatcher(
@@ -128,6 +149,16 @@ def get_google_genai_2_patcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "AsyncModels.count_tokens",
                 google_genai_2_wrapper_async(count_tokens_async_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.chats"),
+                "Chat.send_message",
+                google_genai_2_wrapper_sync(chat_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.chats"),
+                "AsyncChat.send_message",
+                google_genai_2_wrapper_async(chat_async_settings),
             ),
         ]
     )
