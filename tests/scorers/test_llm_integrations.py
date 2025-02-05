@@ -22,7 +22,7 @@ PROVIDERS = {
         "env_key": "MISTRAL_API_KEY",
     },
     "gemini": {
-        "models": ["gemini/gemini-1.5-pro"],
+        "models": ["gemini/gemini-2.0-flash"],
         "env_key": "GOOGLE_API_KEY",
     },
 }
