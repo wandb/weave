@@ -123,11 +123,11 @@ def test_content_generation_async_stream(client):
     from google import genai
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+
     async def generate_content():
         response_text = ""
         response = await google_client.aio.models.generate_content_stream(
-            model="gemini-2.0-flash-exp",
-            contents="What's the capital of France?"
+            model="gemini-2.0-flash-exp", contents="What's the capital of France?"
         )
         async for chunk in response:
             response_text += chunk.text
