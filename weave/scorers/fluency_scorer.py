@@ -1,6 +1,7 @@
 import weave
+import os
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.llm_utils import set_device
+from weave.scorers.llm_utils import set_device, download_model, MODEL_PATHS
 
 
 class FluencyScorer(HuggingFacePipelineScorer):
@@ -23,7 +24,7 @@ class FluencyScorer(HuggingFacePipelineScorer):
         }
     """
     task: str = "text-classification"
-    model_name_or_path: str = "tcapelle/fluency-scorer" # TODO: replace with an artifact
+    model_name_or_path: str = ""
     device: str = "auto"
     threshold: float = 0.5
 
@@ -32,9 +33,16 @@ class FluencyScorer(HuggingFacePipelineScorer):
         """Loads the _pipeline attribute"""
         from transformers import pipeline
         self.device = set_device(self.device)
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        elif self.model_name_or_path != "":
+            self._local_model_path = download_model(self.model_name_or_path)
+        else:
+            self._local_model_path = download_model(MODEL_PATHS["fluency_scorer"])
+        
         self._pipeline = pipeline(
             "text-classification", 
-            model=self.model_name_or_path,
+            model=self._local_model_path,
             device=self.device,
             top_k=2,
         )
