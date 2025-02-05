@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -149,7 +150,8 @@ export const browse2Context = {
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    gridFilters?: GridFilterModel
   ) => {
     throw new Error('Not implemented');
   },
@@ -375,16 +377,21 @@ export const browse3ContextGen = (
     callsUIUrl: (
       entityName: string,
       projectName: string,
-      filter?: WFHighLevelCallFilter
+      filter?: WFHighLevelCallFilter,
+      gridFilters?: GridFilterModel
     ) => {
+      const searchParams = new URLSearchParams();
       const prunedFilter = pruneEmptyFields(filter);
-      if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/calls`;
+      if (Object.keys(prunedFilter).length !== 0) {
+        searchParams.set('filter', JSON.stringify(prunedFilter));
+      }
+      if (gridFilters) {
+        searchParams.set('filters', JSON.stringify(gridFilters));
       }
       return `${projectRoot(
         entityName,
         projectName
-      )}/calls?filter=${encodeURIComponent(JSON.stringify(prunedFilter))}`;
+      )}/calls?${searchParams.toString()}`;
     },
     objectVersionsUIUrl: (
       entityName: string,
@@ -542,7 +549,12 @@ type RouteType = {
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    // Using GridFilterModel here is really bad. Somehow this leaked into
+    // the implementation and now it is a part of our URL spec forever... :(
+    // It should have been implemented as the `query` component of WFHighLevelCallFilter
+    // which maps to our actual service API.
+    gridFilters?: GridFilterModel
   ) => string;
   objectVersionsUIUrl: (
     entityName: string,
