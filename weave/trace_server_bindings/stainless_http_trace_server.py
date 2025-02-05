@@ -8,8 +8,6 @@ import tenacity
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Self
 from weave_trace import WeaveTrace
-from weave_trace.types.call_end_params import End
-from weave_trace.types.call_start_params import Start
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
@@ -284,12 +282,9 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
 
-        # Handle both dict and CallStartReq cases
         if isinstance(req, dict):
-            start_data = req["start"]
-        else:
-            start_data = req.start.model_dump()
-        return self.stainless_client.calls.start(start=Start(**start_data))
+            req = tsi.CallStartReq.model_validate(req)
+        return self.stainless_client.calls.start(start=req.start)
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
@@ -302,14 +297,12 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallEndRes()
 
         if isinstance(req, dict):
-            end_data = req["end"]
-        else:
-            end_data = req.end.model_dump()
-        return self.stainless_client.calls.end(end=End(**end_data))
+            req = tsi.CallEndReq.model_validate(req)
+        return self.stainless_client.calls.end(end=req.end)
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
+        if isinstance(req, dict):
+            req = tsi.CallReadReq.model_validate(req)
         return self.stainless_client.calls.read(**req)
 
     def calls_query(
@@ -329,22 +322,22 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query_stats(
         self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
     ) -> tsi.CallsQueryStatsRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
+        if isinstance(req, dict):
+            req = tsi.CallsQueryStatsReq.model_validate(req)
         return self.stainless_client.calls.query_stats(**req)
 
     def calls_delete(
         self, req: Union[tsi.CallsDeleteReq, dict[str, Any]]
     ) -> tsi.CallsDeleteRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
+        if isinstance(req, dict):
+            req = tsi.CallsDeleteReq.model_validate(req)
         return self.stainless_client.calls.delete(**req)
 
     def call_update(
         self, req: Union[tsi.CallUpdateReq, dict[str, Any]]
     ) -> tsi.CallUpdateRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
+        if isinstance(req, dict):
+            req = tsi.CallUpdateReq.model_validate(req)
         return self.stainless_client.calls.update(**req)
 
     # Op API
@@ -368,20 +361,24 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
-        return self.stainless_client.objects.create(**req)
+        if isinstance(req, dict):
+            req = tsi.ObjCreateReq.model_validate(req)
+        return self.stainless_client.objects.create(obj=req.obj)
 
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
-        return self.stainless_client.objects.read(**req)
+        if isinstance(req, dict):
+            req = tsi.ObjReadReq.model_validate(req)
+        return self.stainless_client.objects.read(
+            project_id=req.project_id,
+            digest=req.digest,
+            object_id=req.object_id,
+        )
 
     def objs_query(
         self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
     ) -> tsi.ObjQueryRes:
-        if not isinstance(req, dict):
-            req = req.model_dump()
+        if isinstance(req, dict):
+            req = tsi.ObjQueryReq.model_validate(req)
         return self.stainless_client.objects.query(**req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -427,9 +424,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 digest=update_res.digest, row_digests=update_res.updated_row_digests
             )
         else:
-            return self._generic_request(
-                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-            )
+            return self.stainless_client.tables.create(table=req.table)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
@@ -462,16 +457,18 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
-            return self._generic_request(
-                "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
+            return self.stainless_client.tables.update(
+                base_digest=req.base_digest,
+                project_id=req.project_id,
+                updates=req.updates,
             )
 
     def table_query(
         self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
-        return self._generic_request(
-            "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.tables.query(**req)
 
     def table_query_stream(
         self, req: tsi.TableQueryReq
@@ -483,16 +480,16 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
-        return self._generic_request(
-            "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.tables.query_stats(**req)
 
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
-        return self._generic_request(
-            "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.refs.read_batch(**req)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
