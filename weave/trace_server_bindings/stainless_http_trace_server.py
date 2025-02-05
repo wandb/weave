@@ -363,19 +363,21 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
-        return self._generic_request(
-            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.objects.create(**req)
 
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
-        return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.objects.read(**req)
 
     def objs_query(
         self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
     ) -> tsi.ObjQueryRes:
-        return self._generic_request(
-            "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.objects.query(**req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         return self._generic_request(
