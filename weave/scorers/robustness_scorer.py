@@ -82,14 +82,15 @@ class RobustnessScorer(HuggingFaceScorer):
     @weave.op
     def score(
         self,
-        output: list[Union[str, bool]],
+        reference_text: list[Union[str, bool]],
+        texts: list[Union[str, bool]],
         ground_truths: Optional[list[Union[str, bool]]] = None,
     ) -> dict:
         """
         Computes the robustness score of the model's outputs.
 
         Args:
-            output (List[Union[str, bool]]): A list containing the original output followed by perturbed outputs.
+            output (List[Union[str, bool]]): A list containing the reference_text output followed by perturbed outputs.
             ground_truths (Optional[List[Union[str, bool]]]): Optional list of ground truths corresponding to each output.
 
         Returns:
@@ -101,7 +102,7 @@ class RobustnessScorer(HuggingFaceScorer):
                     - "cohen_d": The computed Cohen's d value.
 
                 Common keys:
-                    - "score(original)": The similarity score of the original output.
+                    - "score(reference_text)": The similarity score of the reference_text output.
                     - "score(perturbed)": The mean similarity score of the perturbed outputs.
 
         Raises:
@@ -133,10 +134,6 @@ class RobustnessScorer(HuggingFaceScorer):
                 isinstance(gt, str) for gt in ground_truths
             ), "All ground_truths must be strings."
 
-        # Original prediction and perturbed predictions
-        original = output[0]
-        perturbed_outputs = output[1:]
-
         # Compute similarity scores
         if self.use_exact_match:
             # Exact match scoring
@@ -149,10 +146,10 @@ class RobustnessScorer(HuggingFaceScorer):
                 perturbed_similarities = similarities[1:]
             else:
                 similarities = [
-                    1.0 if perturbed == original else 0.0
-                    for perturbed in perturbed_outputs
+                    1.0 if perturbed == reference_text else 0.0
+                    for perturbed in texts
                 ]
-                score_o = 1.0  # Original output compared with itself
+                score_o = 1.0  # reference_text output compared with itself
                 perturbed_similarities = similarities
         else:
             # Semantic similarity scoring
@@ -165,10 +162,10 @@ class RobustnessScorer(HuggingFaceScorer):
                 perturbed_similarities = similarities[1:]
             else:
                 similarities = [
-                    self.compute_similarity(original, perturbed)  # type: ignore
-                    for perturbed in perturbed_outputs
+                    self.compute_similarity(reference_text, perturbed)  # type: ignore
+                    for perturbed in texts
                 ]
-                score_o = 1.0  # Similarity of original output with itself
+                score_o = 1.0  # Similarity of reference_text output with itself
                 perturbed_similarities = similarities
 
         if not self.use_exact_match:
@@ -177,7 +174,7 @@ class RobustnessScorer(HuggingFaceScorer):
             result = {
                 "cohen_d": abs(d),
                 "cohen_d_sign": "positive" if d > 0 else "negative",
-                "score(original)": score_o,
+                "score(reference_text)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
             if self.return_interpretation:
@@ -189,7 +186,7 @@ class RobustnessScorer(HuggingFaceScorer):
             h = self.compute_cohens_h(score_o, perturbed_similarities)
             result = {
                 "cohen_h": h,
-                "score(original)": score_o,
+                "score(reference_text)": score_o,
                 "score(perturbed)": np.mean(perturbed_similarities).item(),
             }
             if self.return_interpretation:
@@ -207,7 +204,7 @@ class RobustnessScorer(HuggingFaceScorer):
         It is calculated using the arcsine transformation of the proportions.
 
         Args:
-            score_o (float): The similarity score of the original output (0 or 1).
+            score_o (float): The similarity score of the reference_text output (0 or 1).
             perturbed_similarities (List[float]): Similarity scores of perturbed outputs (0s and 1s).
 
         Returns:
@@ -246,7 +243,7 @@ class RobustnessScorer(HuggingFaceScorer):
         of perturbations on the similarity scores.
 
         Args:
-            score_o (float): The similarity score of the original output (usually 1.0).
+            score_o (float): The similarity score of the reference_text output (usually 1.0).
             perturbed_similarities (List[float]): Similarity scores of perturbed outputs.
 
         Returns:
@@ -260,7 +257,7 @@ class RobustnessScorer(HuggingFaceScorer):
         Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case. Refer to the notes below for more details.
 
         Notes:
-            - A positive Cohen's d indicates that the original score is higher than
+            - A positive Cohen's d indicates that the reference_text score is higher than
               the perturbed scores on average, suggesting that perturbations decrease
               the similarity.
             - A negative Cohen's d indicates that the perturbed scores are higher,
@@ -467,11 +464,11 @@ def create_perturbed_dataset(
     Create a dataset for robustness testing by generating perturbed versions of each input text.
 
     Args:
-        dataset: List of original text strings to perturb
+        dataset: List of reference_text text strings to perturb
         num_perturbations: Number of perturbed versions to generate for each text
 
     Returns:
-        List of dictionaries, where each dict contains original + perturbed versions of a text
+        List of dictionaries, where each dict contains reference_text + perturbed versions of a text
     """
 
     def perturb_text(text: str, num_perturbations: int = 1) -> list[str]:
