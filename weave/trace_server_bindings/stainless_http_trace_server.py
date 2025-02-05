@@ -385,6 +385,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         return self.stainless_client.objects.query(**req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        # TODO: For some reason, Stainless didn't generate this
         return self._generic_request(
             "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
