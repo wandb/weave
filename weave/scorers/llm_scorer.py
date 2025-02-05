@@ -31,7 +31,7 @@ class LLMScorer(weave.Scorer):
 
 
 class InstructorLLMScorer(LLMScorer):
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):  # type: ignore
         raise DeprecationWarning(
             "InstructorLLMScorer is deprecated and will be removed in a future version. "
             "Use LLMScorer directly instead, which now has built-in support for structured outputs."

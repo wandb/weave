@@ -1,7 +1,7 @@
 """Module to handle initialization of LLM-related dependencies."""
 
 
-def check_litellm_installation():
+def check_litellm_installation() -> bool:
     """Check if litellm is installed and raise an informative error if not."""
     try:
         from litellm import acompletion  # noqa: F401
