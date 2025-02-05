@@ -90,7 +90,7 @@ openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
 huggingface = ["huggingface-hub>=0.26.2"]
-vertexai = ["vertexai>=1.70.0"]
+vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
   "nox",
