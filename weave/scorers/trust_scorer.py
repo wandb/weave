@@ -110,6 +110,26 @@ class TrustScorer(Scorer):
         default=2,
         description="Maximum toxicity score allowed per individual category"
     )
+    context_relevance_model_name_or_path: str = Field(
+        default="",
+        description="Path or name of the context relevance model"
+    )
+    hallucination_model_name_or_path: str = Field(
+        default="",
+        description="Path or name of the hallucination model"
+    )
+    toxicity_model_name_or_path: str = Field(
+        default="",
+        description="Path or name of the toxicity model"
+    )
+    fluency_model_name_or_path: str = Field(
+        default="",
+        description="Path or name of the fluency model"
+    )
+    coherence_model_name_or_path: str = Field(
+        default="",
+        description="Path or name of the coherence model"
+    )
     run_in_parallel: bool = Field(
         default=True,
         description="Whether to run scorers in parallel for improved performance"
@@ -161,14 +181,20 @@ class TrustScorer(Scorer):
             # Add specific threshold parameters based on scorer type
             if scorer_cls == ContextRelevanceScorer:
                 scorer_params['threshold'] = self.context_relevance_threshold
+                scorer_params["model_name_or_path"] = self.context_relevance_model_name_or_path
             elif scorer_cls == HallucinationScorer:
                 scorer_params['hhem_score_threshold'] = self.hallucination_threshold
-            elif scorer_cls == FluencyScorer:
-                scorer_params['threshold'] = self.fluency_threshold
+                scorer_params["model_name_or_path"] = self.hallucination_model_name_or_path
             elif scorer_cls == ToxicityScorer:
                 scorer_params['total_threshold'] = self.toxicity_total_threshold
                 scorer_params['category_threshold'] = self.toxicity_category_threshold
-            
+                scorer_params["model_name_or_path"] = self.toxicity_model_name_or_path
+            elif scorer_cls == FluencyScorer:
+                scorer_params['threshold'] = self.fluency_threshold
+                scorer_params["model_name_or_path"] = self.fluency_model_name_or_path
+            elif scorer_cls == CoherenceScorer:
+                scorer_params["model_name_or_path"] = self.coherence_model_name_or_path
+
             # Initialize and store scorer
             self._loaded_scorers[scorer_cls.__name__] = scorer_cls(**scorer_params)
 
@@ -321,9 +347,9 @@ class TrustScorer(Scorer):
     @weave.op
     def score(
         self, 
-        output: str, 
+        query: Optional[str] = None,
         context: Optional[Union[str, list[str]]] = None, 
-        query: Optional[str] = None
+        output: Optional[str] = None
     ) -> Dict[str, Any]:
         """Basic scoring that flags any issues."""
         result = self._score_with_logic(output=output, context=context, query=query)
