@@ -188,7 +188,7 @@ class TrustScorer(Scorer):
                 scorer_params['threshold'] = self.context_relevance_threshold
                 scorer_params["model_name_or_path"] = self.context_relevance_model_name_or_path
             elif scorer_cls == HallucinationScorer:
-                scorer_params['hhem_score_threshold'] = self.hallucination_threshold
+                scorer_params['threshold'] = self.hallucination_threshold
                 scorer_params["model_name_or_path"] = self.hallucination_model_name_or_path
             elif scorer_cls == ToxicityScorer:
                 scorer_params['total_threshold'] = self.toxicity_total_threshold
