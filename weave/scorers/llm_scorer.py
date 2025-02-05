@@ -2,6 +2,7 @@ from pydantic import Field
 
 import weave
 
+
 class LLMScorer(weave.Scorer):
     """Score model outputs using a Large Language Model (LLM).
 

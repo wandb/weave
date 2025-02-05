@@ -1,5 +1,6 @@
 import pytest
 from pydantic import BaseModel
+
 import weave
 from weave.scorers import (
     SummarizationScorer,
@@ -22,8 +23,10 @@ def mock_acompletion(monkeypatch):
 
         class Message(BaseModel):
             content: str
+
         class Choice(BaseModel):
             message: Message
+
         class Response(BaseModel):
             choices: list[Choice]
 

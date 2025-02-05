@@ -1,5 +1,6 @@
 import pytest
 from pydantic import BaseModel
+
 from weave.scorers import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
@@ -19,13 +20,16 @@ def mock_acompletion(monkeypatch):
             content = '{"entities": ["Paris"]}'
         elif response_format is RelevancyResponse:
             content = '{"reasoning": "The context directly answers the question.", "relevancy_score": 1}'
+
         class Message(BaseModel):
             content: str
+
         class Choice(BaseModel):
             message: Message
+
         class Response(BaseModel):
             choices: list[Choice]
-        
+
         return Response(choices=[Choice(message=Message(content=content))])
 
     monkeypatch.setattr("weave.scorers.ragas_scorer.acompletion", _mock_acompletion)

@@ -2,6 +2,7 @@ import json
 
 import pytest
 from pydantic import BaseModel
+
 import weave
 from weave.scorers import (
     HallucinationFreeScorer,
@@ -29,10 +30,12 @@ def mock_acompletion(monkeypatch):
 
         class Message(BaseModel):
             content: str
+
         class Choice(BaseModel):
             message: Message
+
         class Response(BaseModel):
-            choices: list[Choice]  
+            choices: list[Choice]
 
         return Response(choices=[Choice(message=Message(content=json.dumps(content)))])
 

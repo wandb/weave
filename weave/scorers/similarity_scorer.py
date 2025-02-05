@@ -1,15 +1,15 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 from litellm import aembedding
 from pydantic import Field
 
 import weave
-from weave.scorers.llm_scorer import Scorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
 
 
-class EmbeddingSimilarityScorer(Scorer):
+class EmbeddingSimilarityScorer(weave.Scorer):
     """Check the cosine similarity distance between the model output and the target.
 
     The threshold is the minimum cosine similarity score that is considered similar.

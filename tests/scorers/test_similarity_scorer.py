@@ -1,12 +1,13 @@
-import pytest
 import random
-from pydantic import BaseModel
+
+import pytest
 
 import weave
 from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
 from weave.scorers.similarity_scorer import (
     EmbeddingSimilarityScorer,
 )
+
 
 # mock the aembedding function
 @pytest.fixture
@@ -15,10 +16,11 @@ def mock_aembedding(monkeypatch):
         class Response(weave.Model):
             data: list[dict]
 
-        return Response(data=[
-                {"embedding": [random.random() for _ in range(1024)]}
-                for _ in range(2)
-            ])
+        return Response(
+            data=[
+                {"embedding": [random.random() for _ in range(1024)]} for _ in range(2)
+            ]
+        )
 
     monkeypatch.setattr("weave.scorers.similarity_scorer.aembedding", _mock_aembedding)
 
