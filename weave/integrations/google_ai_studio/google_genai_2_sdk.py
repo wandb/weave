@@ -11,6 +11,7 @@ from weave.trace.weave_client import Call
 
 from google.genai.models import Models, AsyncModels
 from google.genai.chats import Chat
+from google.genai.types import GenerateContentResponse
 
 
 def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -44,6 +45,40 @@ def google_genai_2_on_finish(call: Call, output: Any, exception: BaseException |
         call.summary.update(summary_update)
 
 
+def google_genai_2_accumulator(
+    acc: GenerateContentResponse | None, value: GenerateContentResponse
+) -> GenerateContentResponse:
+    if acc is None:
+        return value
+    
+    for i, value_candidate in enumerate(value.candidates):
+        for j, value_part in enumerate(value_candidate.content.parts):
+            if value_part.text is not None:
+                acc.candidates[i].content.parts[j].text += value_part.text
+    
+    if acc.usage_metadata.prompt_token_count is None:
+        acc.usage_metadata.prompt_token_count = 0
+    elif value.usage_metadata.prompt_token_count is not None:
+        acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
+    
+    if acc.usage_metadata.candidates_token_count is None:
+        acc.usage_metadata.candidates_token_count = 0
+    elif value.usage_metadata.candidates_token_count is not None:
+        acc.usage_metadata.candidates_token_count += value.usage_metadata.candidates_token_count
+    
+    if acc.usage_metadata.total_token_count is None:
+        acc.usage_metadata.total_token_count = 0
+    elif value.usage_metadata.total_token_count is not None:
+        acc.usage_metadata.total_token_count += value.usage_metadata.total_token_count
+    
+    if acc.usage_metadata.cached_content_token_count is None:
+        acc.usage_metadata.cached_content_token_count = 0
+    elif value.usage_metadata.cached_content_token_count is not None:
+        acc.usage_metadata.cached_content_token_count += value.usage_metadata.cached_content_token_count
+    
+    return acc
+
+
 def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
@@ -53,7 +88,11 @@ def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Ca
         op = weave.op(fn, **op_kwargs)
         if not op.name.endswith("count_tokens"):
             op._set_on_finish_handler(google_genai_2_on_finish)
-        return op
+        return add_accumulator(
+            op,
+            make_accumulator=lambda inputs: google_genai_2_accumulator,
+            should_accumulate=lambda inputs: op.name.endswith("stream"),
+        )
 
     return wrapper
 
@@ -95,38 +134,36 @@ def get_google_genai_2_patcher(
             "name": base.name or "google.genai.models.Models.generate_content"
         }
     )
-
     count_tokens_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.models.Models.count_tokens"
         }
     )
-
     generate_content_async_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.models.AsyncModels.generate_content"
         }
     )
-
     count_tokens_async_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.models.AsyncModels.count_tokens"
         }
     )
-
     chat_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.chats.Chat.send_message"
         }
     )
-
     chat_async_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.chats.AsyncChat.send_message"
         }
     )
-    
-    
+    generate_content_stream_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.models.Models.generate_content_stream"
+        }
+    )
 
     _google_genai_2_patcher = MultiPatcher(
         [
@@ -159,6 +196,11 @@ def get_google_genai_2_patcher(
                 lambda: importlib.import_module("google.genai.chats"),
                 "AsyncChat.send_message",
                 google_genai_2_wrapper_async(chat_async_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "Models.generate_content_stream",
+                google_genai_2_wrapper_sync(generate_content_stream_settings),
             ),
         ]
     )
