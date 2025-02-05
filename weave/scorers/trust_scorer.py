@@ -85,6 +85,7 @@ class TrustScorer(Scorer):
         ```
 
     """
+
     # Model configuration
     device: str = Field(
         default="auto",
@@ -150,9 +151,9 @@ class TrustScorer(Scorer):
         FluencyScorer, 
         CoherenceScorer
     }
-    
+
     # Private attributes
-    _loaded_scorers: Dict[str, Scorer] = PrivateAttr(default_factory=dict)
+    _loaded_scorers: dict[str, Scorer] = PrivateAttr(default_factory=dict)
     _emoji_pattern: re.Pattern = PrivateAttr(default=re.compile(
         "["
         "\U0001F600-\U0001F64F"  # emoticons
@@ -176,13 +177,13 @@ class TrustScorer(Scorer):
             'column_map': self.column_map,
             'device': self.device,
         }
-        
+
         # Load all scorers (both critical and advisory)
         all_scorers = self._critical_scorers | self._advisory_scorers
-        
+
         for scorer_cls in all_scorers:
             scorer_params = base_params.copy()
-            
+
             # Add specific threshold parameters based on scorer type
             if scorer_cls == ContextRelevanceScorer:
                 scorer_params['threshold'] = self.context_relevance_threshold
@@ -207,19 +208,19 @@ class TrustScorer(Scorer):
         """Preprocess text by handling emojis and length."""
         if not text:
             return text
-            
+
         # Replace emojis with their text representation while preserving spacing
         text = self._emoji_pattern.sub(lambda m: f" {m.group(0)} ", text)
-        
+
         # Clean up multiple spaces and normalize whitespace
         text = ' '.join(text.split())
-        
+
         # Ensure proper sentence spacing
         text = text.replace(' .', '.').replace(' ,', ',').replace(' !', '!').replace(' ?', '?')
-            
+
         return text
 
-    def _validate_input(self, output: str) -> Optional[Dict[str, Any]]:
+    def _validate_input(self, output: str) -> Optional[dict[str, Any]]:
         """Validate input and return error response if invalid."""
         if not output or not output.strip():
             return {
@@ -241,11 +242,11 @@ class TrustScorer(Scorer):
         return {k: v for k, v in inputs.items() if k in scorer_params}
 
     def _score_all(
-        self, 
-        output: str, 
+        self,
+        output: str,
         context: Optional[Union[str, list[str]]] = None, 
         query: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results.
 
         Runs in parallel if run_in_parallel is True, otherwise runs sequentially.
@@ -254,18 +255,18 @@ class TrustScorer(Scorer):
         error_response = self._validate_input(output)
         if error_response:
             return {"error": error_response}
-    
+
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
         processed_context = self._preprocess_text(context) if isinstance(context, str) else context
         processed_query = self._preprocess_text(query) if query else None
-    
+
         inputs = {'output': processed_output}
         if processed_context is not None:
             inputs['context'] = processed_context
         if processed_query is not None:
             inputs['query'] = processed_query
-        
+
         results = {}
 
         if self.run_in_parallel:
@@ -280,9 +281,8 @@ class TrustScorer(Scorer):
                     scorer_name = future_to_scorer[future]
                     try:
                         results[scorer_name] = future.result()
-                    except Exception:
-                        # Silently skip failed scorers.
-                        pass
+                    except Exception as e:
+                        raise Exception(f"Error calling {scorer_name}: {e}")
         else:
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
@@ -290,15 +290,15 @@ class TrustScorer(Scorer):
                     results[scorer_name] = scorer.score(**self._filter_inputs_for_scorer(scorer, inputs))
                 except Exception:
                     pass
-        
+
         return results
 
     def _score_with_logic(
-        self, 
-        output: str, 
+        self,
+        output: str,
         context: Optional[Union[str, list[str]]] = None, 
         query: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Score with nuanced logic for trustworthiness."""
         # Validate input
         error_response = self._validate_input(output)
@@ -306,15 +306,15 @@ class TrustScorer(Scorer):
             return error_response
 
         raw_results = self._score_all(output=output, context=context, query=query)
-        
+
         # Handle error case
         if "error" in raw_results:
             return raw_results["error"]
-        
+
         # Track issues by type
         critical_issues = []
         advisory_issues = []
-        
+
         # Check each scorer's results
         for scorer_name, result in raw_results.items():
             if result.get("flagged", False):
@@ -323,27 +323,27 @@ class TrustScorer(Scorer):
                     critical_issues.append(scorer_name)
                 elif scorer_cls in self._advisory_scorers:
                     advisory_issues.append(scorer_name)
-        
+
         # Determine trust level
         trust_level = "high"
         if critical_issues:
             trust_level = "low"
         elif advisory_issues:
             trust_level = "medium"
-        
+
         # Extract scores where available
         scores = {
             name: result["extras"]["score"]
             for name, result in raw_results.items()
             if "extras" in result and "score" in result["extras"]
         }
-        
+
         for i, label in enumerate(raw_results["FluencyScorer"]["extras"]):
-            if label == "non_fluent_score":
+            if label == "non-fluent":
                 scores["FluencyScorer"] = raw_results["FluencyScorer"]["extras"][i]["score"]
-        
+
         scores["ToxicityScorer"] = raw_results["ToxicityScorer"]["extras"]
-        
+
         return {
             "flagged": bool(critical_issues),
             "trust_level": trust_level,
@@ -357,11 +357,11 @@ class TrustScorer(Scorer):
 
     @weave.op
     def score(
-        self, 
+        self,
         query: Optional[str] = None,
         context: Optional[Union[str, list[str]]] = None, 
         output: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Basic scoring that flags any issues."""
         result = self._score_with_logic(output=output, context=context, query=query)
         return {
