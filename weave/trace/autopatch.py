@@ -65,7 +65,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
     )
-    from weave.integrations.google_ai_studio.google_genai_2_sdk import (
+    from weave.integrations.google_ai_studio.google_genai_sdk import (
         get_google_genai_2_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
@@ -108,7 +108,7 @@ def reset_autopatch() -> None:
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
     )
-    from weave.integrations.google_ai_studio.google_genai_2_sdk import (
+    from weave.integrations.google_ai_studio.google_genai_sdk import (
         get_google_genai_2_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
