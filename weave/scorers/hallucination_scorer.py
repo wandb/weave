@@ -285,7 +285,9 @@ class HallucinationScorer(HuggingFaceScorer):
             # Check if the model is already downloaded
             if os.path.isdir(self.model_name_or_path):
                 self._local_model_path = self.model_name_or_path
-            # Else assume it's a wandb model name and download it
+            elif self.model_name_or_path != "":
+                self._local_model_path = download_model(self.model_name_or_path)
+            # Else assume it's a wandb artifact name and download it
             else:
                 if self.use_hhem:
                     self._local_model_path = download_model(
