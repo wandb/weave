@@ -257,7 +257,7 @@ class HallucinationScorer(HuggingFaceScorer):
     top_k: Optional[int] = 20
     top_p: Optional[float] = 0.7
     use_torch_compile: bool = False
-    threshold: float = 0.5
+    threshold: float = 0.35
     _local_model_path: str = ""
     import_failed: bool = False
 
