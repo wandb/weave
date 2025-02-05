@@ -1,6 +1,6 @@
 import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -9,9 +9,8 @@ from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
-from google.genai.models import Models, AsyncModels
-from google.genai.chats import Chat
-from google.genai.types import GenerateContentResponse
+if TYPE_CHECKING:
+    from google.genai.types import GenerateContentResponse
 
 
 def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -23,7 +22,9 @@ def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def google_genai_2_on_finish(call: Call, output: Any, exception: BaseException | None) -> None:
+def google_genai_2_on_finish(
+    call: Call, output: Any, exception: BaseException | None
+) -> None:
     model_name = None
     if "model" in call.inputs:
         model_name = call.inputs["model"]
@@ -46,36 +47,40 @@ def google_genai_2_on_finish(call: Call, output: Any, exception: BaseException |
 
 
 def google_genai_2_accumulator(
-    acc: GenerateContentResponse | None, value: GenerateContentResponse
-) -> GenerateContentResponse:
+    acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
+) -> "GenerateContentResponse":
     if acc is None:
         return value
-    
+
     for i, value_candidate in enumerate(value.candidates):
         for j, value_part in enumerate(value_candidate.content.parts):
             if value_part.text is not None:
                 acc.candidates[i].content.parts[j].text += value_part.text
-    
+
     if acc.usage_metadata.prompt_token_count is None:
         acc.usage_metadata.prompt_token_count = 0
     elif value.usage_metadata.prompt_token_count is not None:
         acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
-    
+
     if acc.usage_metadata.candidates_token_count is None:
         acc.usage_metadata.candidates_token_count = 0
     elif value.usage_metadata.candidates_token_count is not None:
-        acc.usage_metadata.candidates_token_count += value.usage_metadata.candidates_token_count
-    
+        acc.usage_metadata.candidates_token_count += (
+            value.usage_metadata.candidates_token_count
+        )
+
     if acc.usage_metadata.total_token_count is None:
         acc.usage_metadata.total_token_count = 0
     elif value.usage_metadata.total_token_count is not None:
         acc.usage_metadata.total_token_count += value.usage_metadata.total_token_count
-    
+
     if acc.usage_metadata.cached_content_token_count is None:
         acc.usage_metadata.cached_content_token_count = 0
     elif value.usage_metadata.cached_content_token_count is not None:
-        acc.usage_metadata.cached_content_token_count += value.usage_metadata.cached_content_token_count
-    
+        acc.usage_metadata.cached_content_token_count += (
+            value.usage_metadata.cached_content_token_count
+        )
+
     return acc
 
 
@@ -97,7 +102,9 @@ def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Ca
     return wrapper
 
 
-def google_genai_2_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+def google_genai_2_wrapper_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -127,41 +134,29 @@ def get_google_genai_2_patcher(
 ) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
-    
+
     if not settings.enabled:
         return NoOpPatcher()
-    
+
     base = settings.op_settings
 
     generate_content_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.models.Models.generate_content"
-        }
+        update={"name": base.name or "google.genai.models.Models.generate_content"}
     )
     count_tokens_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.models.Models.count_tokens"
-        }
+        update={"name": base.name or "google.genai.models.Models.count_tokens"}
     )
     generate_content_async_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.models.AsyncModels.generate_content"
-        }
+        update={"name": base.name or "google.genai.models.AsyncModels.generate_content"}
     )
     count_tokens_async_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.models.AsyncModels.count_tokens"
-        }
+        update={"name": base.name or "google.genai.models.AsyncModels.count_tokens"}
     )
     chat_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.chats.Chat.send_message"
-        }
+        update={"name": base.name or "google.genai.chats.Chat.send_message"}
     )
     chat_async_settings = base.model_copy(
-        update={
-            "name": base.name or "google.genai.chats.AsyncChat.send_message"
-        }
+        update={"name": base.name or "google.genai.chats.AsyncChat.send_message"}
     )
     generate_content_stream_settings = base.model_copy(
         update={
@@ -170,7 +165,8 @@ def get_google_genai_2_patcher(
     )
     generate_content_stream_async_settings = base.model_copy(
         update={
-            "name": base.name or "google.genai.models.AsyncModels.generate_content_stream"
+            "name": base.name
+            or "google.genai.models.AsyncModels.generate_content_stream"
         }
     )
 
