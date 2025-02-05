@@ -29,6 +29,9 @@ class LLMScorer(weave.Scorer):
 
     # TODO: check if we can validate the model_id with litellm on a post_init method
 
-
 class InstructorLLMScorer(LLMScorer):
-    pass
+    def __new__(cls, *args, **kwargs):
+        raise DeprecationWarning(
+            "InstructorLLMScorer is deprecated and will be removed in a future version. "
+            "Use LLMScorer directly instead, which now has built-in support for structured outputs."
+        )
