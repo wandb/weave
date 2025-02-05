@@ -1,4 +1,5 @@
 import os
+
 import pytest
 
 from weave.scorers.summarization_scorer import (
@@ -26,13 +27,14 @@ PROVIDERS = {
     },
 }
 
+
 @pytest.fixture(
     params=[
         (provider, model)
         for provider, cfg in PROVIDERS.items()
         for model in cfg["models"]
     ],
-    ids=lambda p: f"{p[0]}:{p[1]}"
+    ids=lambda p: f"{p[0]}:{p[1]}",
 )
 def summarization_scorer(request):
     """
@@ -48,6 +50,7 @@ def summarization_scorer(request):
         temperature=0.7,
         max_tokens=1024,
     )
+
 
 @pytest.mark.asyncio
 async def test_summarization_scorer_evaluate_summary(summarization_scorer):
