@@ -340,8 +340,11 @@ class HallucinationScorer(HuggingFaceScorer):
 
         pairs = [(inps, outs)]
         pred = self.model.predict(pairs)
-        score = pred.item()
+        score = 1 - pred.item()
         return {
-            "flagged": 1 - score >= self.threshold,
+            "flagged": score >= self.threshold,
             "extras": {"score": score},
         }
+    
+    def load_tokenizer(self) -> None:
+        pass
