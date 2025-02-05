@@ -76,42 +76,18 @@ class CoherenceScorer(HuggingFacePipelineScorer):
                 formatted_chat_history += f"{turn['text']}\n<extra_id_1>User\n"
         return formatted_chat_history
 
-    def _score_via_api(
-        self,
-        input: str,
-        output: str,
-        chat_history: Optional[list[dict[str, str]]] = None,
-        context: Optional[str] = None,
-    ) -> dict[str, Any]:
-        import requests
-
-        assert self.base_url is not None
-        response = requests.post(
-            self.base_url,
-            json={
-                "input": input,
-                "output": output,
-                "chat_history": chat_history,
-                "context": context,
-            },
-        )
-        response.raise_for_status()
-        return response.json()
-
     @weave.op
     def score(
         self,
-        input: str,
+        query: str,
         output: str,
         chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[str] = None,
     ) -> dict[str, Any]:
-        if self.base_url:
-            return self._score_via_api(input, output, chat_history, context)
-        prompt = input
+        prompt = query
         if chat_history is not None:
             history = self._format_chat_history(chat_history)
-            prompt = f"{history}{input}"
+            prompt = f"{history}{query}"
         if context is not None:
-            prompt = f"{input}\n\n{context}"
+            prompt = f"{query}\n\n{context}"
         return self.score_messages(prompt, output)
