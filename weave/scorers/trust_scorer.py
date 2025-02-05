@@ -338,6 +338,12 @@ class TrustScorer(Scorer):
             if "extras" in result and "score" in result["extras"]
         }
         
+        for i, label in enumerate(raw_results["FluencyScorer"]["extras"]):
+            if label == "non_fluent_score":
+                scores["FluencyScorer"] = raw_results["FluencyScorer"]["extras"][i]["score"]
+        
+        scores["ToxicityScorer"] = raw_results["ToxicityScorer"]["extras"]
+        
         return {
             "flagged": bool(critical_issues),
             "trust_level": trust_level,
@@ -360,8 +366,8 @@ class TrustScorer(Scorer):
         result = self._score_with_logic(output=output, context=context, query=query)
         return {
             "flagged": result["flagged"],
-            "trust_level": result["trust_level"],
             "extras": {
+                "trust_level": result["trust_level"],
                 "raw_outputs": result["extras"]["raw_outputs"],
                 "scores": result["extras"]["scores"]
             }
