@@ -166,6 +166,7 @@ MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "relevance_scorer": "c-metrics/context-relevance-scorer/relevance_scorer:v0",
+    "robustness_scorer": "c-metrics/weave-scorers/robustness_scorer_embedding_model:v0",
     "llamaguard": "c-metrics/weave-scorers/llamaguard:v0",
 }
 

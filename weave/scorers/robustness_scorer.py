@@ -1,15 +1,18 @@
+import os
 import math
 import random
 import string
+from importlib.util import find_spec
 from typing import Any, Optional, Union
 
 import numpy as np
 
 import weave
-from weave.scorers.base_scorer import Scorer
+from weave.scorers.llm_scorer import HuggingFaceScorer
+from weave.scorers.llm_utils import MODEL_PATHS, download_model
 
 
-class RobustnessScorer(Scorer):
+class RobustnessScorer(HuggingFaceScorer):
     """
     RobustnessScorer evaluates the robustness of a language model's outputs against input perturbations.
 
@@ -50,31 +53,32 @@ class RobustnessScorer(Scorer):
     use_exact_match: bool = True
     use_ground_truths: bool = False
     return_interpretation: bool = True
-    embedding_model_name: str = "all-MiniLM-L6-v2"
+
     similarity_metric: str = "cosine"
     embedding_model: Optional[Any] = (
         None  # Delay type hinting to avoid dependency on SentenceTransformer
     )
     cohen_d_threshold: float = 1e-2
 
-    def model_post_init(self, __context: Any) -> None:
-        """
-        Post-initialization method to load the embedding model if required.
+    def load_model(self) -> None:
+        try:
+            if find_spec("sentence_transformers") is None:
+                raise ImportError("sentence_transformers is required but not installed")
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            print(
+                "The `sentence_transformers` package is required to use the RobustnessScorer, please run `pip install sentence-transformers`"
+            )
+        """Initialize the model, tokenizer and device after pydantic initialization."""
+        if os.path.isdir(self.model_name_or_path):
+            self._local_model_path = self.model_name_or_path
+        elif self.model_name_or_path != "":
+            self._local_model_path = download_model(self.model_name_or_path)
+        else:
+            self._local_model_path = download_model(MODEL_PATHS["robustness_scorer"])
+        assert self._local_model_path, "model_name_or_path local path or artifact path not found"
 
-        Args:
-            __context (Any): Contextual information (not used in this implementation).
-        """
-        # Load an embedding model for semantic similarity scoring
-        if not self.use_exact_match:
-            try:
-                from sentence_transformers import SentenceTransformer
-            except ImportError as e:
-                raise ImportError(
-                    "The `SentenceTransformer` and `torch` packages are required to use `RobustnessScorer` with semantic similarity scoring. (`use_exact_match=False`)"
-                    "Please install them by running `pip install sentence-transformers torch`."
-                ) from e
-
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
+        self.embedding_model = SentenceTransformer(self._local_model_path)
 
     @weave.op
     def score(
