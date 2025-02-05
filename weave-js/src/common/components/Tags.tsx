@@ -1,12 +1,12 @@
-import {BLACK, GOLD_300} from '@wandb/weave/common/css/globals.styles';
+import {GOLD_300, MOON_800} from '@wandb/weave/common/css/globals.styles';
 import _ from 'lodash';
 import React, {useState} from 'react';
 import {Label} from 'semantic-ui-react';
 
 import * as GQLTypes from '../types/graphql';
+import {regexMatchHighlight} from '../util/fuzzyMatch';
 import {SingleLineText} from './elements/Text';
 import * as S from './Tags.styles';
-import {regexMatchHighlight} from '../util/fuzzyMatch';
 
 export enum TagType {
   TAG,
@@ -96,7 +96,7 @@ export const Tag: React.FC<TagProps> = React.memo(
           {highlightedText
             ? regexMatchHighlight(tag.name, new RegExp(highlightedText, 'i'), {
                 backgroundColor: GOLD_300,
-                color: BLACK,
+                color: MOON_800,
               })
             : tag.name}
         </SingleLineText>
