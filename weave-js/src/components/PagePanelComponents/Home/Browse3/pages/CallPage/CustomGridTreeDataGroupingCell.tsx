@@ -6,9 +6,8 @@ import _ from 'lodash';
 import React, {FC, MouseEvent, useMemo} from 'react';
 import styled from 'styled-components';
 
-import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
-import {Icon, IconParentBackUp} from '../../../../../Icon';
-import {Tooltip} from '../../../../../Tooltip';
+import {MOON_250} from '../../../../../../common/css/color.styles';
+import {Icon} from '../../../../../Icon';
 import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -42,7 +41,6 @@ export const CustomGridTreeDataGroupingCell: FC<
   }
 > = props => {
   const {id, field, rowNode, row} = props;
-  const {isParentRow} = row;
   const call = row.call as CallSchema | undefined;
   const apiRef = useGridApiContext();
   const handleClick: ButtonProps['onClick'] = event => {
@@ -80,20 +78,13 @@ export const CustomGridTreeDataGroupingCell: FC<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, rowNode.id, rowNode.parent, hasCountRow]);
 
-  const tooltip = isParentRow
-    ? 'This is the parent of the currently viewed call. Click to view.'
-    : undefined;
-  const rowTypeIndicator = isParentRow ? (
-    <IconParentBackUp color={MOON_500} width={18} height={18} />
-  ) : null;
-
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
 
   if (call == null) {
     return <div />;
   }
 
-  const box = (
+  return (
     <CursorBox
       $isClickable={!isHiddenCount}
       sx={{
@@ -218,10 +209,7 @@ export const CustomGridTreeDataGroupingCell: FC<
             )}
           </>
         )}
-        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
       </CallOrCountRow>
     </CursorBox>
   );
-
-  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
 };
