@@ -50,6 +50,26 @@ def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Ca
     return wrapper
 
 
+def google_genai_2_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
+            @wraps(fn)
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await fn(*args, **kwargs)
+
+            return _async_wrapper
+
+        op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = google_genai_2_postprocess_inputs
+
+        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op._set_on_finish_handler(google_genai_2_on_finish)
+        return op
+
+    return wrapper
+
+
 def get_google_genai_2_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -67,12 +87,23 @@ def get_google_genai_2_patcher(
         }
     )
 
+    generate_content_async_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.models.AsyncModels.generate_content"
+        }
+    )
+
     _google_genai_2_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "Models.generate_content",
                 google_genai_2_wrapper_sync(generate_content_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "AsyncModels.generate_content",
+                google_genai_2_wrapper_async(generate_content_async_settings),
             ),
         ]
     )
