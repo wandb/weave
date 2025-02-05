@@ -55,7 +55,7 @@ from weave.scorers.string_scorer import (
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
 from weave.scorers.xml_scorer import ValidXMLScorer
-from weave.scorers.trust_score import TrustScorer
+from weave.scorers.trust_scorer import TrustScorer
 
 __all__ = [
     "auto_summarize",
