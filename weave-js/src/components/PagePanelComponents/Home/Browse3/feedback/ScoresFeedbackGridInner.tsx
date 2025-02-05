@@ -142,7 +142,11 @@ export const ScoresFeedbackGridInner = ({
           return null;
         }
         return (
-          <FeedbackGridActions projectId={projectId} feedbackId={feedbackId} />
+          <FeedbackGridActions
+            projectId={projectId}
+            feedbackId={feedbackId}
+            feedbackType="score"
+          />
         );
       },
     },
