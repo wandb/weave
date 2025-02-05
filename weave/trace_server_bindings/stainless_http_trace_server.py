@@ -8,6 +8,7 @@ import tenacity
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Self
 from weave_trace import WeaveTrace
+from weave_trace.types.call_end_params import End
 from weave_trace.types.call_start_params import Start
 
 from weave.trace.env import weave_trace_server_url
@@ -299,12 +300,17 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = req
             self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
             return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+
+        if isinstance(req, dict):
+            end_data = req["end"]
+        else:
+            end_data = req.end.model_dump()
+        return self.stainless_client.calls.end(end=End(**end_data))
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
-        return self._generic_request(
-            "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.calls.read(**req)
 
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
