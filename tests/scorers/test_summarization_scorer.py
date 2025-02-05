@@ -11,15 +11,17 @@ from weave.scorers.summarization_scorer import (
 )
 
 
-# Mock the acompletion function
 @pytest.fixture
-def mock_acompletion(monkeypatch):
+def summarization_scorer(monkeypatch):
     async def _mock_acompletion(*args, **kwargs):
         response_format = kwargs.get("response_format")
         if response_format == EntityExtractionResponse:
             content = '{"entities": ["entity1", "entity2"]}'
         elif response_format == SummarizationEvaluationResponse:
-            content = '{"think_step_by_step": "This is some reasoning.", "summarization_evaluation": "excellent"}'
+            content = (
+                '{"think_step_by_step": "This is some reasoning.", '
+                '"summarization_evaluation": "excellent"}'
+            )
 
         class Message(BaseModel):
             content: str
@@ -36,9 +38,6 @@ def mock_acompletion(monkeypatch):
         "weave.scorers.summarization_scorer.acompletion", _mock_acompletion
     )
 
-
-@pytest.fixture
-def summarization_scorer(mock_acompletion):
     return SummarizationScorer(
         model_id="gpt-4o",
         temperature=0.7,
