@@ -246,7 +246,7 @@ class BiasScorer(RollingWindowScorer):
     """
 
     base_url: Optional[str] = None
-    threshold: float = 0.5
+    threshold: float = 0.65
     _categories: list[str] = PrivateAttr(
         default=[
             "gender_bias",
