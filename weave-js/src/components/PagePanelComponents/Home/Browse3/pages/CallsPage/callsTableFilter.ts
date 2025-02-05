@@ -80,6 +80,10 @@ const validateFilterUICompatibility = (filter: WFHighLevelCallFilter) => {
 export const filterShouldUseTraceRootsOnly = (
   filter: WFHighLevelCallFilter
 ) => {
+  // Allow explicit override
+  if (filter.traceRootsOnly != null) {
+    return filter.traceRootsOnly;
+  }
   const opVersionRefsSet = (filter.opVersionRefs?.length ?? 0) > 0;
   const inputObjectVersionRefsSet =
     (filter.inputObjectVersionRefs?.length ?? 0) > 0;
