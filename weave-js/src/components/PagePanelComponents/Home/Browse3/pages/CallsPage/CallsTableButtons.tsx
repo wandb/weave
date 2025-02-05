@@ -23,10 +23,18 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
+import {ExportToReportDrawer} from '../../exportToReport/ExportToReport';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -77,9 +85,28 @@ export const ExportSelector = ({
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const openModal = useCallback(() => {
+    if (ref.current && !anchorEl) {
+      setAnchorEl(ref.current);
+    }
+  }, [anchorEl, ref]);
+
+  const closeModal = useCallback(() => {
+    setAnchorEl(null);
+  }, [setAnchorEl]);
+
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(anchorEl ? null : ref.current);
+    if (anchorEl) {
+      closeModal();
+    } else {
+      openModal();
+    }
   };
+
+  const [exportToReportDrawerOpen, setExportToReportDrawerOpen] =
+    useState(false);
+
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popper' : undefined;
 
@@ -132,7 +159,7 @@ export const ExportSelector = ({
       const date = new Date().toISOString().split('T')[0];
       const fileName = `weave_export_${callQueryParams.project}_${date}.${fileExtension}`;
       initiateDownloadFromBlob(blob, fileName);
-      setAnchorEl(null);
+      closeModal();
       setDownloadLoading(null);
 
       userEvents.exportClicked({
@@ -153,6 +180,12 @@ export const ExportSelector = ({
       });
     });
     setSelectionState('all');
+  };
+
+  const onClickAddToReport = () => {
+    console.log('onClickAddToReport');
+    closeModal();
+    setExportToReportDrawerOpen(true);
   };
 
   const pythonText = makeCodeText(
@@ -200,7 +233,7 @@ export const ExportSelector = ({
           },
         }}
         onClose={() => {
-          setAnchorEl(null);
+          closeModal();
           setSelectionState('all');
         }}
         TransitionComponent={DraggableGrow}>
@@ -253,10 +286,17 @@ export const ExportSelector = ({
               curlText={curlText}
               downloadLoading={downloadLoading}
               onClickDownload={onClickDownload}
+              onClickAddToReport={onClickAddToReport}
             />
           </div>
         </Tailwind>
       </Popover>
+      <ExportToReportDrawer
+        isOpen={exportToReportDrawerOpen}
+        onClose={() => setExportToReportDrawerOpen(false)}
+        entityName={callQueryParams.entity}
+        projectName={callQueryParams.project}
+      />
     </>
   );
 };
@@ -333,7 +373,14 @@ const DownloadGrid: FC<{
   curlText: string;
   downloadLoading: ContentType | null;
   onClickDownload: (contentType: ContentType) => void;
-}> = ({pythonText, curlText, downloadLoading, onClickDownload}) => {
+  onClickAddToReport: () => void;
+}> = ({
+  pythonText,
+  curlText,
+  downloadLoading,
+  onClickDownload,
+  onClickAddToReport,
+}) => {
   const [codeMode, setCodeMode] = useState<'python' | 'curl' | null>(null);
   return (
     <>
@@ -369,6 +416,13 @@ const DownloadGrid: FC<{
           disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.json)}>
           Export to JSON
+        </ClickableOutlinedCardWithIcon>
+      </div>
+      <div className="mt-8 flex items-center">
+        <ClickableOutlinedCardWithIcon
+          iconName="add-to-report"
+          onClick={onClickAddToReport}>
+          Add to W&B Report (Beta)
         </ClickableOutlinedCardWithIcon>
       </div>
       <div className="mt-8 flex items-center">
