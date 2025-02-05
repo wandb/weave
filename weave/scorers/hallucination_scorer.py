@@ -306,7 +306,7 @@ class HallucinationScorer(HuggingFaceScorer):
         self.model.eval()
 
     @weave.op
-    def score(self, query: str, context: str, output: str) -> dict[str, Any]:
+    def score(self, query: str, context: str | list[str], output: str) -> dict[str, Any]:
         if self.import_failed:
             return {
                 "flagged": False,
@@ -314,7 +314,9 @@ class HallucinationScorer(HuggingFaceScorer):
                     "error": "Unable to import required libraries. Please install transformers."
                 },
             }
-        inps = query + "\n\n" + context
+        # Handle context being either string or list of strings
+        context_str = "\n\n".join(context) if isinstance(context, list) else context
+        inps = query + "\n\n" + context_str
         outs = output
 
         inps_toks = self._tokenizer(inps, truncation=False)
