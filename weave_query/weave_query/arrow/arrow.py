@@ -347,8 +347,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
                 object_type.object_type,
                 source_artifact,
                 target_artifact,
-            ),
-            mask=pa.compute.is_null(data),
+            )
         )
     else:
         # We have a column of refs

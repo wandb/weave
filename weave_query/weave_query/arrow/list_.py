@@ -802,12 +802,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )._map_column(fn, pre_fn, path + (PathItemList(),))
             # print("SELF OBJECT TYPE", self.object_type)
             # print("SELF ARROW DATA TYPE", self._arrow_data.type)
+            result_array = pa.ListArray.from_arrays(
+                offsets_starting_at_zero(self._arrow_data),
+                items._arrow_data
+            )
+
+            result_array = pc.if_else(pa.compute.is_null(arr), None, result_array)
             with_mapped_children = ArrowWeaveList(
-                pa.ListArray.from_arrays(
-                    offsets_starting_at_zero(self._arrow_data),
-                    items._arrow_data,
-                    mask=pa.compute.is_null(arr),
-                ),
+                result_array,
                 self.object_type.__class__(items.object_type),
                 self._artifact,
                 invalid_reason=items._invalid_reason,

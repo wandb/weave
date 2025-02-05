@@ -350,9 +350,9 @@ def dropna(self):
     cumulative_non_null_counts = pa.compute.cumulative_sum(non_null)
     new_offsets = cumulative_non_null_counts.take(pa.compute.subtract(end_indexes, 1))
     new_offsets = pa.concat_arrays([start_indexes[:1], new_offsets])
-    unflattened = pa.ListArray.from_arrays(
-        new_offsets, new_data, mask=pa.compute.is_null(a)
-    )
+    unflattened = pa.ListArray.from_arrays(new_offsets, new_data)
+    unflattened = pa.compute.if_else(pa.compute.is_null(a), None, unflattened)
+
 
     return ArrowWeaveList(
         unflattened,
