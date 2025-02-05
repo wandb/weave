@@ -13,9 +13,9 @@ class VerboseClient(DefaultHttpxClient):
         print(f"Timestamp: {datetime.now().isoformat()}")
         print(f"Method: {request.method}")
         print(f"URL: {request.url}")
-        print("Headers:")
-        for name, value in request.headers.items():
-            print(f"  {name}: {value}")
+        # print("Headers:")
+        # for name, value in request.headers.items():
+        #     print(f"  {name}: {value}")
 
         if request.content:
             try:
@@ -37,9 +37,9 @@ class VerboseClient(DefaultHttpxClient):
         print("\n=== Response ===")
         print(f"Timestamp: {datetime.now().isoformat()}")
         print(f"Status: {response.status_code} {response.reason_phrase}")
-        print("Headers:")
-        for name, value in response.headers.items():
-            print(f"  {name}: {value}")
+        # print("Headers:")
+        # for name, value in response.headers.items():
+        #     print(f"  {name}: {value}")
 
         try:
             # Try to parse and print JSON content
