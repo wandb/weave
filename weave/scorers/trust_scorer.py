@@ -112,23 +112,28 @@ class TrustScorer(Scorer):
     )
     context_relevance_model_name_or_path: str = Field(
         default="",
-        description="Path or name of the context relevance model"
+        description="Path or name of the context relevance model",
+        validate_default=True
     )
     hallucination_model_name_or_path: str = Field(
         default="",
-        description="Path or name of the hallucination model"
+        description="Path or name of the hallucination model",
+        validate_default=True
     )
     toxicity_model_name_or_path: str = Field(
         default="",
-        description="Path or name of the toxicity model"
+        description="Path or name of the toxicity model",
+        validate_default=True
     )
     fluency_model_name_or_path: str = Field(
         default="",
-        description="Path or name of the fluency model"
+        description="Path or name of the fluency model",
+        validate_default=True
     )
     coherence_model_name_or_path: str = Field(
         default="",
-        description="Path or name of the coherence model"
+        description="Path or name of the coherence model",
+        validate_default=True
     )
     run_in_parallel: bool = Field(
         default=True,
