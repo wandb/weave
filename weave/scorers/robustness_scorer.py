@@ -80,6 +80,9 @@ class RobustnessScorer(HuggingFaceScorer):
 
         self.embedding_model = SentenceTransformer(self._local_model_path)
 
+    def load_tokenizer(self) -> None:
+        pass
+
     @weave.op
     def score(
         self,
