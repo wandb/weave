@@ -48,6 +48,7 @@ export const ExportSelector = ({
   refColumnsToExpand,
   disabled,
   callQueryParams,
+  defaultToSelected,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
@@ -61,8 +62,11 @@ export const ExportSelector = ({
     gridSort?: GridSortModel;
   };
   disabled: boolean;
+  defaultToSelected?: boolean;
 }) => {
-  const [selectionState, setSelectionState] = useState<SelectionState>('all');
+  const [selectionState, setSelectionState] = useState<SelectionState>(
+    defaultToSelected && selectedCalls.length > 0 ? 'selected' : 'all'
+  );
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
     null
   );
@@ -402,48 +406,59 @@ export const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-4"
-      size="medium"
-      variant="primary"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare
-    </Button>
-  </Box>
-);
+  selectedCount: number;
+}> = ({onClick, disabled, tooltipText, selectedCount}) => {
+  const defaultTooltip =
+    selectedCount === 1 ? 'Select more than one eval to compare' : undefined;
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        size="medium"
+        variant="ghost"
+        disabled={disabled || selectedCount === 1}
+        onClick={onClick}
+        icon="chart-scatterplot"
+        tooltip={tooltipText ?? defaultTooltip}>
+        Compare
+      </Button>
+    </Box>
+  );
+};
 
 export const CompareTracesTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-4"
-      size="medium"
-      variant="primary"
-      disabled={disabled}
-      onClick={onClick}
-      tooltip={tooltipText}>
-      Compare
-    </Button>
-  </Box>
-);
+  selectedCount: number;
+}> = ({onClick, disabled, tooltipText, selectedCount}) => {
+  const defaultTooltip =
+    selectedCount === 1 ? 'Select more than one trace to compare' : undefined;
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        size="medium"
+        variant="ghost"
+        disabled={disabled || selectedCount === 1}
+        onClick={onClick}
+        icon="chart-scatterplot"
+        tooltip={tooltipText ?? defaultTooltip}>
+        Compare
+      </Button>
+    </Box>
+  );
+};
 
 export const BulkDeleteButton: FC<{
   disabled?: boolean;
@@ -462,8 +477,8 @@ export const BulkDeleteButton: FC<{
         disabled={disabled}
         onClick={onClick}
         tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
+        icon="delete">
+      </Button>
     </Box>
   );
 };
@@ -480,7 +495,7 @@ export const RefreshButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        variant="outline"
+        variant="ghost"
         size="medium"
         onClick={onClick}
         disabled={disabled}

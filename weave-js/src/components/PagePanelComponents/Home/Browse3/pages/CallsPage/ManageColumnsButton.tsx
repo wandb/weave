@@ -89,9 +89,8 @@ export const ManageColumnsButton = ({
         <Button
           variant="ghost"
           icon="column"
-          tooltip="Manage columns"
-          onClick={onClick}
-        />
+          onClick={onClick}>
+        </Button>
       </span>
       <Popover
         id={id}
@@ -99,11 +98,11 @@ export const ManageColumnsButton = ({
         anchorEl={anchorEl}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'center',
+          horizontal: 'left',
         }}
         slotProps={{
           paper: {
