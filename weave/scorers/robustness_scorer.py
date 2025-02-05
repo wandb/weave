@@ -50,15 +50,11 @@ class RobustnessScorer(HuggingFaceScorer):
         print(result)
     """
 
-    use_exact_match: bool = True
-    use_ground_truths: bool = False
+    use_exact_match: bool = False
+    use_ground_truths: bool = True
     return_interpretation: bool = True
-
-    similarity_metric: str = "cosine"
-    embedding_model: Optional[Any] = (
-        None  # Delay type hinting to avoid dependency on SentenceTransformer
-    )
     cohen_d_threshold: float = 1e-2
+    embedding_model: Optional[Any] = None
 
     def load_model(self) -> None:
         try:
@@ -308,25 +304,22 @@ class RobustnessScorer(HuggingFaceScorer):
             - You can use any other embedding model by setting the `embedding_model_name` attribute which is compatible with `SentenceTransformer`. This flexibility will allow you to use the right embedding representation for your use case.
 
         """
-        if self.similarity_metric == "cosine":
-            try:
-                from sklearn.metrics.pairwise import cosine_similarity
-            except ImportError as e:
-                raise ImportError(
-                    "The `sklearn` package is required to use `RobustnessScorer` with cosine similarity scoring. (`use_exact_match=False`)"
-                    "Please install it by running `pip install scikit-learn`."
-                ) from e
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+        except ImportError as e:
+            raise ImportError(
+                "The `sklearn` package is required to use `RobustnessScorer` with cosine similarity scoring. (`use_exact_match=False`)"
+                "Please install it by running `pip install scikit-learn`."
+            ) from e
 
-            # Ensure the embedding model is loaded
-            if self.embedding_model is None:
-                raise ValueError("Embedding model is not initialized.")
+        # Ensure the embedding model is loaded
+        if self.embedding_model is None:
+            raise ValueError("Embedding model is not initialized.")
 
-            # Compute cosine similarity between sentence embeddings
-            embeddings = self.embedding_model.encode([text1, text2])
-            sim = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-            return sim.item()
-        else:
-            raise ValueError(f"Unsupported similarity metric: {self.similarity_metric}")
+        # Compute cosine similarity between sentence embeddings
+        embeddings = self.embedding_model.encode([text1, text2])
+        sim = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+        return sim.item()
 
     def get_cohen_h_interpretation(self, h: float) -> str:
         if h == 0.0:
