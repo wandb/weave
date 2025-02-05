@@ -1,5 +1,4 @@
 import os
-
 import pytest
 
 from weave.scorers.summarization_scorer import (
@@ -27,33 +26,35 @@ PROVIDERS = {
     },
 }
 
-# Generate test parameters by iterating over each provider and its associated models.
-test_params = [
-    (provider, model) for provider, cfg in PROVIDERS.items() for model in cfg["models"]
-]
-
-
-@pytest.mark.parametrize("provider,model", test_params, ids=lambda p: f"{p[0]}:{p[1]}")
-@pytest.mark.asyncio
-async def test_summarization_scorer_evaluate_summary(provider, model):
-    # Retrieve the environment variable key for the provider
+@pytest.fixture(
+    params=[
+        (provider, model)
+        for provider, cfg in PROVIDERS.items()
+        for model in cfg["models"]
+    ],
+    ids=lambda p: f"{p[0]}:{p[1]}"
+)
+def summarization_scorer(request):
+    """
+    Fixture that returns an instance of SummarizationScorer.
+    It checks if the required API key is available, and if not, skips the test.
+    """
+    provider, model = request.param
     env_key = PROVIDERS[provider]["env_key"]
-
-    # Check for the corresponding API key; skip the test if it's not present.
     if not os.getenv(env_key):
         pytest.skip(f"API key for {provider} not found. Skipping test.")
-
-    # Use the model directly as the model_id
-    model_id = model
-
-    summarization_scorer = SummarizationScorer(
-        model_id=model_id,
+    return SummarizationScorer(
+        model_id=model,
         temperature=0.7,
         max_tokens=1024,
     )
+
+@pytest.mark.asyncio
+async def test_summarization_scorer_evaluate_summary(summarization_scorer):
     input_text = "The wolf is lonely in the forest. He is not happy that the fox is not with him."
     summary_text = "Wolf is lonely and missing the fox."
     result = await summarization_scorer.evaluate_summary(
-        input=input_text, summary=summary_text
+        input=input_text,
+        summary=summary_text,
     )
     assert isinstance(result, SummarizationEvaluationResponse)
