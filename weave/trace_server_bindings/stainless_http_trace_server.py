@@ -7,11 +7,13 @@ from typing import Any, Optional, Union, cast
 import tenacity
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Self
+from weave_trace import WeaveTrace
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.utils.verbose_httpx_client import VerboseClient
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -101,6 +103,12 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
+        self.stainless_client = WeaveTrace(
+            username="megatruong",
+            password=self._auth[1] if self._auth else "",
+            base_url=self.trace_server_url,
+            http_client=VerboseClient(),
+        )
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -246,9 +254,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(self.trace_server_url + "/server_info")
-        r.raise_for_status()
-        return ServerInfoRes.model_validate(r.json())
+        return self.stainless_client.services.server_info()
 
     # Call API
     def call_start(
