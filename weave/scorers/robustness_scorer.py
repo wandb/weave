@@ -34,7 +34,7 @@ class RobustnessScorer(HuggingFaceScorer):
 
     Usage Example:
         # Initialize the scorer
-        scorer = RobustnessScorer(use_exact_match=False)
+        scorer = RobustnessScorer()
 
         # Outputs from the model
         outputs = [
@@ -44,7 +44,7 @@ class RobustnessScorer(HuggingFaceScorer):
         ]
 
         # Compute the robustness score
-        result = scorer.score(output=outputs)
+        result = scorer.score(reference_text=outputs[0], texts=outputs[1:])
 
         print("Robustness Scorer Results:")
         print(result)
@@ -90,7 +90,8 @@ class RobustnessScorer(HuggingFaceScorer):
         Computes the robustness score of the model's outputs.
 
         Args:
-            output (List[Union[str, bool]]): A list containing the reference_text output followed by perturbed outputs.
+            reference_text (List[Union[str, bool]]): The reference_text output to check against.
+            texts (List[Union[str, bool]]): A list containing outputs to measure against.
             ground_truths (Optional[List[Union[str, bool]]]): Optional list of ground truths corresponding to each output.
 
         Returns:
@@ -110,25 +111,25 @@ class RobustnessScorer(HuggingFaceScorer):
             ValueError: If an unsupported similarity metric is specified.
         """
         assert (
-            len(output) > 1
-        ), "There must be output of at least one perturbed question."
+            len(texts) > 1
+        ), "There are no `texts`, there must be at least one text to measure against."
 
         if self.use_ground_truths:
             assert (
                 ground_truths
             ), "`ground_truths` must be provided when use_ground_truths is True."
-            assert len(ground_truths) == len(output), (
+            assert len(ground_truths) == len(texts), (
                 "Length of ground_truths must match the length of output. "
-                f"Got {len(ground_truths)} ground_truths and {len(output)} outputs."
+                f"Got {len(ground_truths)} ground_truths and {len(texts)} outputs."
             )
 
         # Normalize `output` and `ground_truths` to strings
-        output = [str(o) for o in output]
+        texts = [str(o) for o in texts]
         if self.use_ground_truths and ground_truths:
             ground_truths = [str(gt) for gt in ground_truths]
 
         # Ensure all elements are strings
-        assert all(isinstance(o, str) for o in output), "All outputs must be strings."
+        assert all(isinstance(o, str) for o in texts), "All outputs must be strings."
         if self.use_ground_truths and ground_truths:
             assert all(
                 isinstance(gt, str) for gt in ground_truths
@@ -139,8 +140,8 @@ class RobustnessScorer(HuggingFaceScorer):
             # Exact match scoring
             if self.use_ground_truths and ground_truths:
                 similarities = [
-                    1.0 if output[i] == ground_truths[i] else 0.0
-                    for i in range(len(output))
+                    1.0 if texts[i] == ground_truths[i] else 0.0
+                    for i in range(len(texts))
                 ]
                 score_o = similarities[0]
                 perturbed_similarities = similarities[1:]
@@ -155,8 +156,8 @@ class RobustnessScorer(HuggingFaceScorer):
             # Semantic similarity scoring
             if self.use_ground_truths and ground_truths:
                 similarities = [
-                    self.compute_similarity(output[i], ground_truths[i])  # type: ignore
-                    for i in range(len(output))
+                    self.compute_similarity(texts[i], ground_truths[i])  # type: ignore
+                    for i in range(len(texts))
                 ]
                 score_o = similarities[0]
                 perturbed_similarities = similarities[1:]
