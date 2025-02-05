@@ -44,7 +44,8 @@ def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Ca
             op_kwargs["postprocess_inputs"] = google_genai_2_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
-        op._set_on_finish_handler(google_genai_2_on_finish)
+        if not op.name.endswith("count_tokens"):
+            op._set_on_finish_handler(google_genai_2_on_finish)
         return op
 
     return wrapper
@@ -64,7 +65,8 @@ def google_genai_2_wrapper_async(settings: OpSettings) -> Callable[[Callable], C
             op_kwargs["postprocess_inputs"] = google_genai_2_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        op._set_on_finish_handler(google_genai_2_on_finish)
+        if not op.name.endswith("count_tokens"):
+            op._set_on_finish_handler(google_genai_2_on_finish)
         return op
 
     return wrapper
@@ -87,9 +89,21 @@ def get_google_genai_2_patcher(
         }
     )
 
+    count_tokens_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.models.Models.count_tokens"
+        }
+    )
+
     generate_content_async_settings = base.model_copy(
         update={
             "name": base.name or "google.genai.models.AsyncModels.generate_content"
+        }
+    )
+
+    count_tokens_async_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.models.AsyncModels.count_tokens"
         }
     )
 
@@ -104,6 +118,16 @@ def get_google_genai_2_patcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "AsyncModels.generate_content",
                 google_genai_2_wrapper_async(generate_content_async_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "Models.count_tokens",
+                google_genai_2_wrapper_sync(count_tokens_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "AsyncModels.count_tokens",
+                google_genai_2_wrapper_async(count_tokens_async_settings),
             ),
         ]
     )
