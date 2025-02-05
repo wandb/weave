@@ -661,13 +661,17 @@ const CallPageBinding = () => {
   );
 };
 
-type CallsPageLastViewProps = {
+type RedirectToLastViewProps = {
   entity: string;
   project: string;
   tab: string;
 };
 
-const CallsPageLastView = ({entity, project, tab}: CallsPageLastViewProps) => {
+const RedirectToLastView = ({
+  entity,
+  project,
+  tab,
+}: RedirectToLastViewProps) => {
   const location = useLocation();
   const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
     entity,
@@ -1023,7 +1027,7 @@ const CallsPageBinding = () => {
   const query = useURLSearchParamsDict();
   const loadLastView = Object.keys(query).length === 0;
   if (loadLastView) {
-    return <CallsPageLastView entity={entity} project={project} tab={tab} />;
+    return <RedirectToLastView entity={entity} project={project} tab={tab} />;
   }
   return (
     <CallsPageLoadView
