@@ -20,66 +20,135 @@ interface SaveableDrawerProps {
   children: ReactNode;
 }
 
-interface Option {
+// More specific types for each option type
+interface EntityOption {
   label: string;
   value: string;
 }
 
+interface ProjectOption {
+  label: string;
+  value: string;
+}
+
+interface ReportOption {
+  label: string;
+  value: string;
+}
+
+interface FetchState<T> {
+  data: T[];
+  loading: boolean;
+  error: Error | null;
+}
+
 // Hook to fetch all available entities
 export const useAvailableEntities = () => {
-  const [loading, setLoading] = useState(false);
-  const [entities, setEntities] = useState<Option[]>([]);
+  const [state, setState] = useState<FetchState<EntityOption>>({
+    data: [],
+    loading: false,
+    error: null,
+  });
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchEntities = async () => {
-      setLoading(true);
+      setState(prev => ({...prev, loading: true, error: null}));
       try {
         await new Promise(resolve => setTimeout(resolve, 5000));
-        setEntities([
-          {label: 'entity1', value: 'entity1'},
-          {label: 'entity2', value: 'entity2'},
-          {label: 'entity3', value: 'entity3'},
-        ]);
-      } finally {
-        setLoading(false);
+        if (!mounted) {
+          return;
+        }
+
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          data: [
+            {label: 'entity1', value: 'entity1'},
+            {label: 'entity2', value: 'entity2'},
+            {label: 'entity3', value: 'entity3'},
+          ],
+        }));
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error:
+            error instanceof Error
+              ? error
+              : new Error('Failed to fetch entities'),
+        }));
       }
     };
 
     fetchEntities();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  return {entities, loading};
+  return state;
 };
 
 // Hook to fetch projects for a given entity
 export const useAvailableProjects = (entityName: string | undefined) => {
-  const [loading, setLoading] = useState(false);
-  const [projects, setProjects] = useState<Option[]>([]);
+  const [state, setState] = useState<FetchState<ProjectOption>>({
+    data: [],
+    loading: false,
+    error: null,
+  });
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchProjects = async () => {
-      const shouldLoad = Boolean(entityName);
-      if (!shouldLoad) {
+      if (!entityName) {
+        setState(prev => ({...prev, loading: false, data: [], error: null}));
         return;
       }
 
-      setLoading(true);
+      setState(prev => ({...prev, loading: true, error: null}));
       try {
         await new Promise(resolve => setTimeout(resolve, 5000));
-        setProjects([
-          {label: 'project1', value: 'project1'},
-          {label: 'project2', value: 'project2'},
-          {label: 'project3', value: 'project3'},
-        ]);
-      } finally {
-        setLoading(false);
+        if (!mounted) {
+          return;
+        }
+
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          data: [
+            {label: 'project1', value: 'project1'},
+            {label: 'project2', value: 'project2'},
+            {label: 'project3', value: 'project3'},
+          ],
+        }));
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error:
+            error instanceof Error
+              ? error
+              : new Error('Failed to fetch projects'),
+        }));
       }
     };
 
     fetchProjects();
+    return () => {
+      mounted = false;
+    };
   }, [entityName]);
 
-  return {projects, loading};
+  return state;
 };
 
 // Hook to fetch reports for a given entity and project
@@ -87,32 +156,59 @@ export const useAvailableReports = (
   entityName: string | undefined,
   projectName: string | undefined
 ) => {
-  const [loading, setLoading] = useState(false);
-  const [reports, setReports] = useState<Option[]>([]);
+  const [state, setState] = useState<FetchState<ReportOption>>({
+    data: [],
+    loading: false,
+    error: null,
+  });
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchReports = async () => {
-      const shouldLoad = Boolean(entityName && projectName);
-      if (!shouldLoad) {
+      if (!entityName || !projectName) {
+        setState(prev => ({...prev, loading: false, data: [], error: null}));
         return;
       }
 
-      setLoading(true);
+      setState(prev => ({...prev, loading: true, error: null}));
       try {
         await new Promise(resolve => setTimeout(resolve, 5000));
-        setReports([
-          {label: 'report1', value: 'report1'},
-          {label: 'report2', value: 'report2'},
-          {label: 'report3', value: 'report3'},
-        ]);
-      } finally {
-        setLoading(false);
+        if (!mounted) {
+          return;
+        }
+
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          data: [
+            {label: 'report1', value: 'report1'},
+            {label: 'report2', value: 'report2'},
+            {label: 'report3', value: 'report3'},
+          ],
+        }));
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error:
+            error instanceof Error
+              ? error
+              : new Error('Failed to fetch reports'),
+        }));
       }
     };
+
     fetchReports();
+    return () => {
+      mounted = false;
+    };
   }, [entityName, projectName]);
 
-  return {reports, loading};
+  return state;
 };
 
 const SaveableDrawer: FC<SaveableDrawerProps> = ({
@@ -207,7 +303,7 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
   const [selectedReport, setSelectedReport] = useState('create-new');
 
   // Clear downstream selections when parent selection changes
-  const handleEntityChange = (value: Option | null) => {
+  const handleEntityChange = (value: EntityOption | null) => {
     const newEntity = value?.value || '';
     setSelectedEntity(newEntity);
     // Clear project and report if entity changes
@@ -217,7 +313,7 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
     }
   };
 
-  const handleProjectChange = (value: Option | null) => {
+  const handleProjectChange = (value: ProjectOption | null) => {
     const newProject = value?.value || '';
     setSelectedProject(newProject);
     // Clear report if project changes
@@ -227,13 +323,21 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
   };
 
   // Fetch available options
-  const {entities, loading: entitiesLoading} = useAvailableEntities();
-  const {projects, loading: projectsLoading} =
-    useAvailableProjects(selectedEntity);
-  const {reports, loading: reportsLoading} = useAvailableReports(
-    selectedEntity,
-    selectedProject
-  );
+  const {
+    data: entities,
+    loading: entitiesLoading,
+    error: entitiesError,
+  } = useAvailableEntities();
+  const {
+    data: projects,
+    loading: projectsLoading,
+    error: projectsError,
+  } = useAvailableProjects(selectedEntity);
+  const {
+    data: reports,
+    loading: reportsLoading,
+    error: reportsError,
+  } = useAvailableReports(selectedEntity, selectedProject);
 
   // Clear project selection when loading starts, unless it's the default project
   useEffect(() => {
@@ -291,6 +395,15 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
     // TODO: Implement save logic
     onClose();
   };
+
+  // Show error states if any fetch failed
+  if (entitiesError || projectsError || reportsError) {
+    // TODO: Add proper error handling UI
+    console.error(
+      'Fetch error:',
+      entitiesError || projectsError || reportsError
+    );
+  }
 
   return (
     <SaveableDrawer
