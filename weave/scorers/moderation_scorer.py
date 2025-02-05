@@ -3,11 +3,10 @@ from typing import Any
 from litellm import amoderation
 
 import weave
-from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODERATION_MODEL
 
 
-class OpenAIModerationScorer(Scorer):
+class OpenAIModerationScorer(weave.Scorer):
     """Use OpenAI moderation API to check if the model output is safe.
 
     Args:
