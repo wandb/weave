@@ -85,6 +85,7 @@ def tests(session, shard):
     # setting some environment variables for the LLM providers
     if shard == "scorers_tests":
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
+        env["GEMINI_API_KEY"] = session.env.get("GEMINI_API_KEY")
         env["ANTHROPIC_API_KEY"] = session.env.get("ANTHROPIC_API_KEY")
         env["MISTRAL_API_KEY"] = session.env.get("MISTRAL_API_KEY")
         env["OPENAI_API_KEY"] = session.env.get("OPENAI_API_KEY")
