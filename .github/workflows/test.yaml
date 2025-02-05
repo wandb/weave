@@ -242,6 +242,7 @@ jobs:
             "dspy",
             "groq",
             "google_ai_studio",
+            "google_genai",
             "instructor",
             "langchain",
             "litellm",

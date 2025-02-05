@@ -40,6 +40,7 @@ def lint(session):
         "cohere",
         "dspy",
         "google_ai_studio",
+        "google_genai",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
