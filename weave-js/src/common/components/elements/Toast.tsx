@@ -18,7 +18,7 @@ export const ToastContainer: FC = React.memo(() => {
     <ToastifyContainer
       position={toastify.POSITION.TOP_RIGHT}
       hideProgressBar={true}
-      className="toast-container"
+      className="toast-container night-aware"
       toastClassName="toast"
       transition={Slide}
       closeButton={createElement(({closeToast}: CloseButtonProps) => (
