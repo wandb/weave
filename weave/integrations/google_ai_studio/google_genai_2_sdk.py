@@ -23,7 +23,7 @@ def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def google_genai_2_on_finish(
-    call: Call, output: Any, exception: BaseException | None
+    call: Call, output: Any, exception: Union[BaseException, None]
 ) -> None:
     model_name = None
     if "model" in call.inputs:
@@ -130,8 +130,8 @@ def google_genai_2_wrapper_async(
 
 
 def get_google_genai_2_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
+    settings: Union[IntegrationSettings, None] = None,
+) -> Union[MultiPatcher, NoOpPatcher]:
     if settings is None:
         settings = IntegrationSettings()
 
