@@ -41,7 +41,9 @@ export const PanelView = ({
   const onClick = () => onLoadView(view);
 
   let by = null;
-  if (creatorUserId === currentViewerId) {
+  if (!creatorUserId) {
+    // creatorUserId will be the empty string for our synthetic default view
+  } else if (creatorUserId === currentViewerId) {
     by = 'by you';
   } else {
     by = <UserName prefix="by " userId={creatorUserId} field="username" />;
