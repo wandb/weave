@@ -216,10 +216,14 @@ export const CustomGridTreeDataGroupingCell: FC<
         ) : (
           <Box />
         )}
-        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
       </CallOrCountRow>
+      {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
     </CursorBox>
   );
 
-  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
+  return tooltip ? (
+    <Tooltip content={tooltip} noTriggerWrap trigger={box} />
+  ) : (
+    box
+  );
 };
