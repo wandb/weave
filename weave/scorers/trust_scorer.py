@@ -346,6 +346,8 @@ class TrustScorer(Scorer):
             print(label)  # TODO remove print
             if label == "non-fluent":
                 scores["FluencyScorer"] = raw_results["FluencyScorer"]["extras"][i]["score"]
+                print("Added FluencyScorer score!")
+                break
 
         scores["ToxicityScorer"] = raw_results["ToxicityScorer"]["extras"]
 
