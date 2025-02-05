@@ -3,7 +3,7 @@ from typing import Any
 from litellm import amoderation
 
 import weave
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODERATION_MODEL
+from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 
 
 class OpenAIModerationScorer(weave.Scorer):

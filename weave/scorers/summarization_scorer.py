@@ -5,8 +5,8 @@ from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
+from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.llm_scorer import LLMScorer
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.

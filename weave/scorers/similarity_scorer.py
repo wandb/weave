@@ -6,7 +6,7 @@ from litellm import aembedding
 from pydantic import Field
 
 import weave
-from weave.scorers.llm_utils import OPENAI_DEFAULT_EMBEDDING_MODEL
+from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
 
 
 class EmbeddingSimilarityScorer(weave.Scorer):
