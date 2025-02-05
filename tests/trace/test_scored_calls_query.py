@@ -50,7 +50,7 @@ async def perform_scorer_tests(
     We also ensure that the low-level and high-level queries return the same results. This is because
     we will likely implement a better query at the service layer and we want to ensure that the high
     level api continues to work correctly. We don't really want users to manually write the mongo
-    query, so that part of these tests are just here for correctness.
+    query, so that part of these tests is just here for correctness.
 
     The only user-facing api we really want to maintain is the param `scored_by` on the client.
     """
@@ -90,7 +90,7 @@ async def perform_scorer_tests(
     s1_name = s1_v0_name
 
     """
-    The above ordering is quire important. We now have the following scores:
+    The above ordering is quite important. We now have the following scores:
     * call_unscored
     * call_scored_by_s0_v0
         * s0:v0

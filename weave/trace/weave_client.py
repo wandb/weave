@@ -854,7 +854,7 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
-        scored_by: list[str] | None = None,
+        scored_by: str | list[str] | None = None,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -870,9 +870,10 @@ class WeaveClient:
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
-            scored_by: A list of Scorers to filter by. Multiple scorers are ANDed together. You can
-                pass in just the name (fetching scores for all versions of the scorer) or the
-                full ref URI which will fetch scores for a specific version of the scorer.
+            scored_by: Accepts a list or single item. Each item is a name or ref uri of a scorer
+                to filter by. Multiple scorers are ANDed together. If passing in just the name,
+                then scores for all versions of the scorer are returned. If passing in the full ref
+                URI, then scores for a specific version of the scorer are returned.
 
         Returns:
             An iterator of calls.
@@ -881,7 +882,9 @@ class WeaveClient:
             filter = CallsFilter()
 
         # This logic might be pushed down to the server soon, but for now it lives here:
-        if scored_by and len(scored_by) > 0:
+        if scored_by:
+            if isinstance(scored_by, str):
+                scored_by = [scored_by]
             exprs = []
             if query is not None:
                 exprs.append(query["$expr"])

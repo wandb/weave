@@ -363,7 +363,7 @@ In this section, we'll show you how to analyze the scores for a single call, mul
 
 #### Single Call API
 
-To retrieve the calls for a single call, you can use the `get_calls` method.
+To retrieve the calls for a single call, you can use the `get_call` method.
 
 ```python
 client = weave.init("my-project")
