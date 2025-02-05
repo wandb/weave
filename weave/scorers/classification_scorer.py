@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Optional
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
@@ -19,7 +18,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
     return precision, recall, f1
 
 
-class MultiTaskBinaryClassificationF1(Scorer):
+class MultiTaskBinaryClassificationF1(weave.Scorer):
     class_names: list[str]
 
     @weave.op()
