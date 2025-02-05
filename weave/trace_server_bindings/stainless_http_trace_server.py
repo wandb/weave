@@ -315,11 +315,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
+        # TODO: Stainless didn't generate this for some reason
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        # TODO: Stainless didn't generate this for some reason
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
@@ -327,23 +329,23 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query_stats(
         self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
     ) -> tsi.CallsQueryStatsRes:
-        return self._generic_request(
-            "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.calls.query_stats(**req)
 
     def calls_delete(
         self, req: Union[tsi.CallsDeleteReq, dict[str, Any]]
     ) -> tsi.CallsDeleteRes:
-        return self._generic_request(
-            "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.calls.delete(**req)
 
     def call_update(
         self, req: Union[tsi.CallUpdateReq, dict[str, Any]]
     ) -> tsi.CallUpdateRes:
-        return self._generic_request(
-            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
-        )
+        if not isinstance(req, dict):
+            req = req.model_dump()
+        return self.stainless_client.calls.update(**req)
 
     # Op API
 
