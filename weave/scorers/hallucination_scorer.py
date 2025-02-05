@@ -257,8 +257,7 @@ class HallucinationScorer(HuggingFaceScorer):
     top_k: Optional[int] = 20
     top_p: Optional[float] = 0.7
     use_torch_compile: bool = False
-    use_hhem: bool = True
-    hhem_score_threshold: float = 0.5
+    threshold: float = 0.5
     _local_model_path: str = ""
     import_failed: bool = False
 
@@ -269,9 +268,7 @@ class HallucinationScorer(HuggingFaceScorer):
 
         # Lazy import of torch and transformers
         try:
-            import torch
             from transformers import (
-                AutoModelForCausalLM,
                 AutoModelForSequenceClassification,
             )
         except ImportError:
@@ -287,176 +284,64 @@ class HallucinationScorer(HuggingFaceScorer):
                 self._local_model_path = self.model_name_or_path
             elif self.model_name_or_path != "":
                 self._local_model_path = download_model(self.model_name_or_path)
-            # Else assume it's a wandb artifact name and download it
+            # Else assume it's Weave scorer artifact name and download it
             else:
-                if self.use_hhem:
-                    self._local_model_path = download_model(
-                        MODEL_PATHS["hallucination_hhem_scorer"]
-                    )
-                else:
-                    self._local_model_path = download_model(
-                        MODEL_PATHS["hallucination_scorer"]
-                    )
-
-            if self.use_hhem:
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    self._local_model_path,
-                    torch_dtype="bfloat16",
-                    trust_remote_code=True,
-                    device_map=self.device,
-                )
-                self._tokenizer = self.model.tokenzier
-                self._tokenizer.model_max_length = self.model_max_length
-            else:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self._local_model_path,
-                    torch_dtype="bfloat16",
-                    device_map=self.device,
+                self._local_model_path = download_model(
+                    MODEL_PATHS["hallucination_hhem_scorer"]
                 )
 
-                if self.use_torch_compile:
-                    self.model.generation_config.cache_implementation = "static"
-                    self.model = torch.compile(
-                        self.model, backend="inductor", fullgraph=True
-                    )
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                self._local_model_path,
+                torch_dtype="bfloat16",
+                trust_remote_code=True,
+                device_map=self.device,
+            )
+            self._tokenizer = self.model.tokenzier
+            self._tokenizer.model_max_length = self.model_max_length
+
         if not self.do_sample:
             self.top_k = None
             self.top_p = None
             self.temperature = None
         self.model.eval()
 
-    def load_tokenizer(self) -> None:
-        try:
-            from transformers import AutoTokenizer
-        except ImportError:
-            self.import_failed = True
-            print(
-                f"The `transformers` package is required to use the {self.__class__.__name__}, please run `pip install transformers`"
-            )
-            return
-        if self._tokenizer is None:
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                self._local_model_path, model_max_length=self.model_max_length
-            )
-        print(f"Tokenizer loaded on {self.device}")
-
-    def _score_via_api(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        import requests
-
-        assert self.base_url is not None
-        response = requests.post(self.base_url, json={"messages": messages})
-        response.raise_for_status()
-        return response.json()
-
     @weave.op
     def score(self, query: str, context: str, output: str) -> dict[str, Any]:
-        messages = get_chat_template_messages(
-            query=query,
-            context=context,
-            output=output,
-        )
-        if self.base_url:
-            res = self._score_via_api(messages)
-            res = res["data"]
-        else:
-            if self.import_failed:
-                return {
-                    "flagged": False,
-                    "extras": {
-                        "error": "Unable to import required libraries. Please install transformers."
-                    },
-                }
-            import torch
+        if self.import_failed:
+            return {
+                "flagged": False,
+                "extras": {
+                    "error": "Unable to import required libraries. Please install transformers."
+                },
+            }
+        inps = query + "\n\n" + context
+        outs = output
 
-            if self.use_hhem:
-                inps = query + "\n\n" + context
-                outs = output
+        inps_toks = self._tokenizer(inps, truncation=False)
+        outs_toks = self._tokenizer(outs, truncation=False)
 
-                inps_toks = self._tokenizer(inps, truncation=False)
-                outs_toks = self._tokenizer(outs, truncation=False)
-
-                len_inps = len(inps_toks.input_ids)
-                len_outs = len(outs_toks.input_ids)
-                if len_inps + len_outs > self.model_max_length:
-                    print(f"inps and outs > max_lenth: {len_inps + len_outs}")
-                    if len_outs < self.model_max_length - 1000:
-                        inp_remaining = self.model_max_length - (len_outs + 975)
-                        inps_input_ids = inps_toks.input_ids[:inp_remaining]
-                        out_input_ids = outs_toks.input_ids
-                    else:
-                        inps_input_ids = inps_toks.input_ids[:975]
-                        out_input_ids = outs_toks.input_ids[
-                            : self.model_max_length - 1025
-                        ]
-
-                    inps = self._tokenizer.decode(inps_input_ids)
-                    outs = self._tokenizer.decode(out_input_ids)
-
-                pairs = [(inps, outs)]
-                pred = self.model.predict(pairs)
-                score = pred.item()
-                return {
-                    "flagged": score <= self.hhem_score_threshold,
-                    "extras": {"score": score},
-                }
+        len_inps = len(inps_toks.input_ids)
+        len_outs = len(outs_toks.input_ids)
+        # Handle large inputs
+        if len_inps + len_outs > self.model_max_length:
+            print(f"inps and outs > max_lenth: {len_inps + len_outs}")
+            if len_outs < self.model_max_length - 1000:
+                inp_remaining = self.model_max_length - (len_outs + 975)
+                inps_input_ids = inps_toks.input_ids[:inp_remaining]
+                out_input_ids = outs_toks.input_ids
             else:
-                inp_template = self._tokenizer.apply_chat_template(
-                    messages,
-                    return_tensors="pt",
-                    tokenize=False,
-                    add_generation_prompt=True,
-                )
-                inp_tokenized = self._tokenizer(inp_template, return_tensors="pt").to(
-                    self.device
-                )
+                inps_input_ids = inps_toks.input_ids[:975]
+                out_input_ids = outs_toks.input_ids[
+                    : self.model_max_length - 1025
+                ]
 
-                pad_token_id = self._tokenizer.eos_token_id
+            inps = self._tokenizer.decode(inps_input_ids)
+            outs = self._tokenizer.decode(out_input_ids)
 
-                with torch.inference_mode():
-                    res = self.model.generate(
-                        inp_tokenized["input_ids"],
-                        max_new_tokens=self.max_new_tokens,
-                        attention_mask=inp_tokenized["attention_mask"],
-                        pad_token_id=pad_token_id,
-                        temperature=self.temperature,
-                        do_sample=self.do_sample,
-                        num_beams=self.num_beams,
-                        top_k=self.top_k,
-                        top_p=self.top_p,
-                    )
-
-                true_token = 2787
-                false_token = 4245
-
-                input_length = inp_tokenized["input_ids"].shape[1]  # type: ignore
-                completion_tokens = res[0][input_length:].tolist()  # type: ignore
-
-                is_hallucination = true_token in completion_tokens
-                extras: dict[str, Any] = {"score": 1 if is_hallucination else 0}
-                result = {
-                    "flagged": is_hallucination,
-                    "extras": extras,
-                }
-
-                if self.debug:
-                    scorer_worked = (
-                        completion_tokens.count(true_token)
-                        + completion_tokens.count(false_token)
-                    ) == 1
-                    print(
-                        f"COMPLETION TOKENS:\n{completion_tokens}\n----------------------\n"
-                    )
-                    completion = self._tokenizer.decode(completion_tokens)
-                    print(f"COMPLETION:\n{completion}\n----------------------\n")
-
-                    extras.update(
-                        {
-                            "completion": completion,
-                            "completion_tokens": completion_tokens,
-                            "total_tokens": len(res[0]),  # type: ignore
-                            "total_completion_tokens": len(completion_tokens),
-                            "scorer_worked": scorer_worked,
-                        }
-                    )
-
-        return result
+        pairs = [(inps, outs)]
+        pred = self.model.predict(pairs)
+        score = pred.item()
+        return {
+            "flagged": 1 - score >= self.threshold,
+            "extras": {"score": score},
+        }
