@@ -1,9 +1,7 @@
-try:
-    from litellm import acompletion  # noqa: F401
-except ImportError:
-    raise ImportError(
-        "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
-    )
+from weave.scorers.initialization import check_litellm_installation
+
+# Make sure litellm is available
+check_litellm_installation()
 
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
