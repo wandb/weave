@@ -12,9 +12,8 @@ from weave.scorers.hallucination_scorer import (
 )
 
 
-# Mock the acompletion function
 @pytest.fixture
-def mock_acompletion(monkeypatch):
+def hallucination_scorer(monkeypatch):
     async def _mock_acompletion(*args, **kwargs):
         content = {
             "chain_of_thought": "The output is consistent with the input data.",
@@ -43,9 +42,6 @@ def mock_acompletion(monkeypatch):
         "weave.scorers.hallucination_scorer.acompletion", _mock_acompletion
     )
 
-
-@pytest.fixture
-def hallucination_scorer(mock_acompletion):
     return HallucinationFreeScorer(
         model_id="gpt-4o",
         temperature=0.7,
