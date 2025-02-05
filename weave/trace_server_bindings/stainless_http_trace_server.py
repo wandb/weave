@@ -350,14 +350,17 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     # Op API
 
     def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
+        # TODO: This is not actually implemented in the trace server
         return self._generic_request(
             "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
         )
 
     def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
+        # TODO: This is not actually implemented in the trace server
         return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
 
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
+        # TODO: This is not actually implemented in the trace server
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
     # Obj API
