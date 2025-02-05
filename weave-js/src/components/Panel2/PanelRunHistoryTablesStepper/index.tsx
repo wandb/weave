@@ -89,7 +89,7 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
   const tableKeys = getTableKeysFromRunsHistoryPropertyType(
     runsHistoryRefined.result?.type
   );
-    const tableHistoryKey = getCurrentTableHistoryKey(
+  const tableHistoryKey = getCurrentTableHistoryKey(
     tableKeys,
     props.config?.tableHistoryKey
   );
