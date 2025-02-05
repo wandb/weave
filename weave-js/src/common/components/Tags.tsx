@@ -1,4 +1,4 @@
-import {GOLD_300} from '@wandb/weave/common/css/globals.styles';
+import {BLACK, GOLD_300} from '@wandb/weave/common/css/globals.styles';
 import _ from 'lodash';
 import React, {useState} from 'react';
 import {Label} from 'semantic-ui-react';
@@ -96,6 +96,7 @@ export const Tag: React.FC<TagProps> = React.memo(
           {highlightedText
             ? regexMatchHighlight(tag.name, new RegExp(highlightedText, 'i'), {
                 backgroundColor: GOLD_300,
+                color: BLACK,
               })
             : tag.name}
         </SingleLineText>
