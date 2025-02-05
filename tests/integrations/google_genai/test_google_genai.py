@@ -136,3 +136,55 @@ def test_content_generation_async_stream(client):
         == call.output.usage_metadata.candidates_token_count
         + call.output.usage_metadata.prompt_token_count
     )
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_chat_session_sync(client):
+    from google import genai
+
+    google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    system_instruction = """
+You are an expert software developer and a helpful coding assistant.
+You are able to generate high-quality code in the Python programming language."""
+
+    response = google_client.chats.create(
+        model="gemini-2.0-flash-exp",
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.5,
+        ),
+    ).send_message(
+        "Write a python function named `is_leap_year` that checks if a year is a leap year."
+    )
+
+    assert "def is_leap_year" in response.text.lower()
+
+    call = list(client.calls())[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.chats.Chat.send_message"
+    assert call.output is not None
+    assert call.output.usage_metadata.candidates_token_count > 0
+    assert call.output.usage_metadata.prompt_token_count > 0
+    assert (
+        call.output.usage_metadata.total_token_count
+        == call.output.usage_metadata.candidates_token_count
+        + call.output.usage_metadata.prompt_token_count
+    )
+
+    call = list(client.calls())[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.models.Models.generate_content"
+    assert call.output is not None
+    assert call.output.usage_metadata.candidates_token_count > 0
+    assert call.output.usage_metadata.prompt_token_count > 0
+    assert (
+        call.output.usage_metadata.total_token_count
+        == call.output.usage_metadata.candidates_token_count
+        + call.output.usage_metadata.prompt_token_count
+    )
