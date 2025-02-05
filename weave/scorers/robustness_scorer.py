@@ -51,7 +51,7 @@ class RobustnessScorer(HuggingFaceScorer):
     """
 
     use_exact_match: bool = False
-    use_ground_truths: bool = True
+    use_ground_truths: bool = False
     return_interpretation: bool = True
     cohen_d_threshold: float = 1e-2
     embedding_model: Optional[Any] = None
@@ -82,7 +82,7 @@ class RobustnessScorer(HuggingFaceScorer):
     @weave.op
     def score(
         self,
-        reference_text: list[Union[str, bool]],
+        reference_text: Union[str, bool],
         texts: list[Union[str, bool]],
         ground_truths: Optional[list[Union[str, bool]]] = None,
     ) -> dict:
@@ -90,7 +90,7 @@ class RobustnessScorer(HuggingFaceScorer):
         Computes the robustness score of the model's outputs.
 
         Args:
-            reference_text (List[Union[str, bool]]): The reference_text output to check against.
+            reference_text (Union[str, bool]): The reference text to check against.
             texts (List[Union[str, bool]]): A list containing outputs to measure against.
             ground_truths (Optional[List[Union[str, bool]]]): Optional list of ground truths corresponding to each output.
 
@@ -123,7 +123,10 @@ class RobustnessScorer(HuggingFaceScorer):
                 f"Got {len(ground_truths)} ground_truths and {len(texts)} outputs."
             )
 
-        # Normalize `output` and `ground_truths` to strings
+        # Convert reference_text to string
+        reference_text = str(reference_text)
+
+        # Normalize `texts` and `ground_truths` to strings
         texts = [str(o) for o in texts]
         if self.use_ground_truths and ground_truths:
             ground_truths = [str(gt) for gt in ground_truths]
