@@ -4,7 +4,7 @@ import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
-from weave.scorers import Scorer
+from weave import Scorer
 from weave.trace.op import Op
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsQueryReq, CallsQueryStatsReq
