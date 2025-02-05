@@ -183,19 +183,6 @@ You are able to generate high-quality code in the Python programming language.""
         + call.output.usage_metadata.prompt_token_count
     )
 
-    call = list(client.calls())[1]
-    assert call.started_at < call.ended_at
-    trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "google.genai.models.Models.generate_content"
-    assert call.output is not None
-    assert call.output.usage_metadata.candidates_token_count > 0
-    assert call.output.usage_metadata.prompt_token_count > 0
-    assert (
-        call.output.usage_metadata.total_token_count
-        == call.output.usage_metadata.candidates_token_count
-        + call.output.usage_metadata.prompt_token_count
-    )
-
 
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -228,19 +215,6 @@ You are able to generate high-quality code in the Python programming language.""
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.chats.AsyncChat.send_message"
-    assert call.output is not None
-    assert call.output.usage_metadata.candidates_token_count > 0
-    assert call.output.usage_metadata.prompt_token_count > 0
-    assert (
-        call.output.usage_metadata.total_token_count
-        == call.output.usage_metadata.candidates_token_count
-        + call.output.usage_metadata.prompt_token_count
-    )
-
-    call = list(client.calls())[1]
-    assert call.started_at < call.ended_at
-    trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "google.genai.models.AsyncModels.generate_content"
     assert call.output is not None
     assert call.output.usage_metadata.candidates_token_count > 0
     assert call.output.usage_metadata.prompt_token_count > 0

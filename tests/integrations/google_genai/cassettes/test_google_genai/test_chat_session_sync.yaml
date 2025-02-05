@@ -29,20 +29,20 @@ interactions:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
         [\n          {\n            \"text\": \"```python\\ndef is_leap_year(year):\\n
         \ \\\"\\\"\\\"\\n  Checks if a year is a leap year according to the Gregorian
-        calendar rules.\\n\\n  Args:\\n    year: The year to check (an integer).\\n\\n
-        \ Returns:\\n    True if the year is a leap year, False otherwise.\\n  \\\"\\\"\\\"\\n
-        \ if not isinstance(year, int):\\n    raise TypeError(\\\"Year must be an
-        integer.\\\")\\n  if year \\u003c 0:\\n    raise ValueError(\\\"Year must
-        be a non-negative integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100
-        == 0:\\n      if year % 400 == 0:\\n        return True\\n      else:\\n        return
-        False\\n    else:\\n      return True\\n  else:\\n    return False\\n```\"\n
-        \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.016964346336918835\n    }\n  ],\n  \"usageMetadata\":
-        {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\": 179,\n    \"totalTokenCount\":
-        230,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
-        \       \"tokenCount\": 51\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 179\n
-        \     }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash-exp\"\n}\n"
+        calendar rules.\\n\\n  Args:\\n    year: An integer representing the year
+        to check.\\n\\n  Returns:\\n    True if the year is a leap year, False otherwise.\\n
+        \ \\\"\\\"\\\"\\n  if not isinstance(year, int):\\n    raise TypeError(\\\"Year
+        must be an integer.\\\")\\n  if year \\u003c 0:\\n    raise ValueError(\\\"Year
+        must be a non-negative integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year
+        % 100 == 0:\\n      if year % 400 == 0:\\n        return True\\n      else:\\n
+        \       return False\\n    else:\\n      return True\\n  else:\\n    return
+        False\\n```\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n
+        \     \"finishReason\": \"STOP\",\n      \"avgLogprobs\": -0.020412423757201467\n
+        \   }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\":
+        179,\n    \"totalTokenCount\": 230,\n    \"promptTokensDetails\": [\n      {\n
+        \       \"modality\": \"TEXT\",\n        \"tokenCount\": 51\n      }\n    ],\n
+        \   \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \       \"tokenCount\": 179\n      }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash-exp\"\n}\n"
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -51,11 +51,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Wed, 05 Feb 2025 12:27:08 GMT
+      - Wed, 05 Feb 2025 13:01:27 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1378
+      - gfet4t7; dur=1405
       Transfer-Encoding:
       - chunked
       Vary:

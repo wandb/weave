@@ -32,17 +32,19 @@ interactions:
         calendar rules.\\n\\n  Args:\\n    year: An integer representing the year.\\n\\n
         \ Returns:\\n    True if the year is a leap year, False otherwise.\\n  \\\"\\\"\\\"\\n
         \ if not isinstance(year, int):\\n    raise TypeError(\\\"Year must be an
-        integer.\\\")\\n  if year \\u003c 0:\\n      raise ValueError(\\\"Year must
-        be a non-negative integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100
-        == 0:\\n      if year % 400 == 0:\\n        return True\\n      else:\\n        return
-        False\\n    else:\\n      return True\\n  else:\\n    return False\\n```\"\n
-        \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.024771695756642832\n    }\n  ],\n  \"usageMetadata\":
-        {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\": 177,\n    \"totalTokenCount\":
-        228,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
-        \       \"tokenCount\": 51\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 177\n
-        \     }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash-exp\"\n}\n"
+        integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100 == 0:\\n      if
+        year % 400 == 0:\\n        return True\\n      else:\\n        return False\\n
+        \   else:\\n      return True\\n  else:\\n    return False\\n```\"\n          }\n
+        \       ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
+        \"STOP\",\n      \"citationMetadata\": {\n        \"citationSources\": [\n
+        \         {\n            \"startIndex\": 300,\n            \"endIndex\": 495,\n
+        \           \"uri\": \"https://github.com/Multifaceted/Prog_Class\"\n          }\n
+        \       ]\n      },\n      \"avgLogprobs\": -0.016663475959531722\n    }\n
+        \ ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\":
+        155,\n    \"totalTokenCount\": 206,\n    \"promptTokensDetails\": [\n      {\n
+        \       \"modality\": \"TEXT\",\n        \"tokenCount\": 51\n      }\n    ],\n
+        \   \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \       \"tokenCount\": 155\n      }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash-exp\"\n}\n"
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -51,11 +53,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Wed, 05 Feb 2025 12:30:00 GMT
+      - Wed, 05 Feb 2025 13:01:36 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1425
+      - gfet4t7; dur=1231
       Transfer-Encoding:
       - chunked
       Vary:
