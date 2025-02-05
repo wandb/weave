@@ -8,6 +8,7 @@ import tenacity
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Self
 from weave_trace import WeaveTrace
+from weave_trace.types.call_start_params import Start
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
@@ -103,9 +104,16 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
+
+        username = "megatruong"
+        if self._auth is not None:
+            password = self._auth[1]
+        else:
+            password = ""
+
         self.stainless_client = WeaveTrace(
-            username="megatruong",
-            password=self._auth[1] if self._auth else "",
+            username=username,
+            password=password,
             base_url=self.trace_server_url,
             http_client=VerboseClient(),
         )
@@ -166,16 +174,16 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        r = requests.post(
-            self.trace_server_url + "/call/upsert_batch",
-            data=encoded_data,
-            auth=self._auth,
-        )
-        if r.status_code == 413:
-            # handle 413 explicitly to provide actionable error message
-            reason = json.loads(r.text)["reason"]
-            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
-        r.raise_for_status()
+        try:
+            self.stainless_client.calls.upsert_batch(batch=batch)
+        except requests.HTTPError as e:
+            if e.response and e.response.status_code == 413:
+                # handle 413 explicitly to provide actionable error message
+                reason = json.loads(e.response.text)["reason"]
+                raise requests.HTTPError(
+                    f"413 Client Error: {reason}", response=e.response
+                )
+            raise
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -274,9 +282,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
+
+        # Handle both dict and CallStartReq cases
+        if isinstance(req, dict):
+            start_data = req["start"]
+        else:
+            start_data = req.start.model_dump()
+        return self.stainless_client.calls.start(start=Start(**start_data))
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
