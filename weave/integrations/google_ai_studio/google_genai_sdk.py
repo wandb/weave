@@ -169,6 +169,12 @@ def get_google_genai_2_patcher(
             or "google.genai.models.AsyncModels.generate_content_stream"
         }
     )
+    chat_stream_settings = base.model_copy(
+        update={"name": base.name or "google.genai.chats.Chat.send_message_stream"}
+    )
+    chat_stream_async_settings = base.model_copy(
+        update={"name": base.name or "google.genai.chats.AsyncChat.send_message_stream"}
+    )
 
     _google_genai_2_patcher = MultiPatcher(
         [
