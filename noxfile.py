@@ -75,7 +75,7 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
-    if shard == "google_ai_studio":
+    if shard in ["google_ai_studio", "google_genai"]:
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
