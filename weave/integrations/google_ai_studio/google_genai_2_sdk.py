@@ -113,7 +113,11 @@ def google_genai_2_wrapper_async(settings: OpSettings) -> Callable[[Callable], C
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if not op.name.endswith("count_tokens"):
             op._set_on_finish_handler(google_genai_2_on_finish)
-        return op
+        return add_accumulator(
+            op,
+            make_accumulator=lambda inputs: google_genai_2_accumulator,
+            should_accumulate=lambda inputs: op.name.endswith("stream"),
+        )
 
     return wrapper
 
@@ -164,6 +168,11 @@ def get_google_genai_2_patcher(
             "name": base.name or "google.genai.models.Models.generate_content_stream"
         }
     )
+    generate_content_stream_async_settings = base.model_copy(
+        update={
+            "name": base.name or "google.genai.models.AsyncModels.generate_content_stream"
+        }
+    )
 
     _google_genai_2_patcher = MultiPatcher(
         [
@@ -201,6 +210,11 @@ def get_google_genai_2_patcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "Models.generate_content_stream",
                 google_genai_2_wrapper_sync(generate_content_stream_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "AsyncModels.generate_content_stream",
+                google_genai_2_wrapper_async(generate_content_stream_async_settings),
             ),
         ]
     )
