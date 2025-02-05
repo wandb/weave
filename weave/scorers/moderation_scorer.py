@@ -147,6 +147,8 @@ class ToxicityScorer(RollingWindowScorer):
         """Initialize the toxicity model and tokenizer."""
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
+        elif self.model_name_or_path != "":
+                self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
 
