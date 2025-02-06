@@ -27,7 +27,7 @@ from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRE
 from pydantic import PrivateAttr, Field
 
 
-class TrustScorer(Scorer):
+class WeaveTrustScorer(Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.
 
     The TrustScorer evaluates the trustworthiness of model outputs by combining multiple

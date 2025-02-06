@@ -6,8 +6,11 @@ from weave.scorers.llm_scorer import HuggingFacePipelineScorer
 from weave.scorers.llm_utils import MODEL_PATHS, download_model
 
 
-class CoherenceScorer(HuggingFacePipelineScorer):
+class WeaveCoherenceScorer(HuggingFacePipelineScorer):
     """
+    The scorer that assesses if the model output is coherent using a fine-tuned
+    deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
+
     Use wandb/coherence_scorer to check if the model output is coherent.
 
     Args:

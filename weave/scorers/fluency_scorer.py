@@ -6,19 +6,18 @@ from weave.scorers.llm_utils import set_device, download_model, MODEL_PATHS
 
 FLUENCY_SCORER_THRESHOLD = 0.5
 
-class FluencyScorer(HuggingFacePipelineScorer):
+class WeaveFluencyScorer(HuggingFacePipelineScorer):
     """
-    W&B Fluency Scorer
-
-    This scorer uses an in-house model to score fluency based on ModernBert.
+    The scorer uses an fine-tuned ModernBert model to score a given text's fluency, 
+    https://github.com/AnswerDotAI/ModernBERT
 
     Args:
         threshold (float): The threshold for the non-fluent score. Defaults to 0.5.
         device (str): The device to use for inference. Defaults to "auto".
-    
+
     Example:
-        >>> from weave.scorers.fluency_scorer import FluencyScorer
-        >>> scorer = FluencyScorer()
+        >>> from weave.scorers.fluency_scorer import WeaveFluencyScorer
+        >>> scorer = WeaveFluencyScorer()
         >>> result = scorer.score("This text is fluent.")
         >>> print(result)
         {
@@ -28,12 +27,12 @@ class FluencyScorer(HuggingFacePipelineScorer):
             }
         }
     """
+
     task: str = "text-classification"
     model_name_or_path: str = ""
     device: str = "auto"
     threshold: float = FLUENCY_SCORER_THRESHOLD
 
-    
     def _load_pipeline(self) -> None:
         """Loads the _pipeline attribute"""
         from transformers import pipeline

@@ -82,9 +82,9 @@ class OpenAIModerationScorer(LLMScorer):
 TOXICITY_CATEGORY_THRESHOLD = 2
 TOXICITY_TOTAL_THRESHOLD = 5
 
-class ToxicityScorer(RollingWindowScorer):
+class WeaveToxicityScorer(RollingWindowScorer):
     """
-    Moderation scorer using the Celadon model.
+    A moderation scorer using the Celadon model from PleIAs, https://huggingface.co/PleIAs/celadon
 
     Celadon is a DeBERTa-v3-small fine-tuned model with five classification heads, trained on 600k samples from the Toxic Commons dataset.
 
@@ -205,9 +205,11 @@ class ToxicityScorer(RollingWindowScorer):
 
 BIAS_SCORER_THRESHOLD = 0.60
 
-class BiasScorer(RollingWindowScorer):
+class WeaveBiasScorer(RollingWindowScorer):
     """
-    Moderation scorer that assesses gender and race/origin bias using a custom-trained model.
+
+    The scorer that assesses gender and race/origin bias using a fine-tuned 
+    deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
 
     This model is trained from scratch on a custom dataset of 260k samples.
 

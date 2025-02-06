@@ -177,7 +177,7 @@ the <output> contains hallucinations."
     )
 
 
-class HallucinationFreeScorer(InstructorLLMScorer):
+class LLMHallucinationScorer(InstructorLLMScorer):
     """
     A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
@@ -234,9 +234,10 @@ class HallucinationFreeScorer(InstructorLLMScorer):
 
 HALLUCINATION_SCORER_THRESHOLD = 0.35
 
-class HallucinationScorer(HuggingFaceScorer):
+class WeaveHallucinationScorer(HuggingFaceScorer):
     """
-    A scorer that detects hallucinations in the output, given an query and context.
+    A scorer that detects hallucinations in the output, given an query and context. This scorer 
+    uses the HHEM 2.1 model from Vectara, https://huggingface.co/vectara/hallucination_evaluation_model
 
     This scorer uses a fine-tuned LLM to analyze whether model outputs contain information not supported
     by the given context.
