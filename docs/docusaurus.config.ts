@@ -195,27 +195,15 @@ const config: Config = {
           position: "right",
           className: "button button--secondary button--med margin-right--sm",
         },
-      ],
-    },
-    footer: {
-      style: "dark",
-      links: [
         {
-          title: "Learning",
+          position: "left",
+          label: "Community",
+          type: "dropdown",
           items: [
-            {
-              label: "Documentation",
-              to: "/quickstart",
-            },
             {
               label: "LLM Courses",
               href: "https://www.wandb.courses/",
             },
-          ],
-        },
-        {
-          title: "Community",
-          items: [
             {
               label: "Forum",
               href: "https://community.wandb.ai",
@@ -226,16 +214,9 @@ const config: Config = {
             },
           ],
         },
-        {
-          title: "Github",
-          items: [
-            {
-              label: "Weave",
-              href: "https://github.com/wandb/weave",
-            },
-          ],
-        },
       ],
+    },
+    footer: {
       copyright: `Made with ❤️ by Weights & Biases`,
     },
     prism: {

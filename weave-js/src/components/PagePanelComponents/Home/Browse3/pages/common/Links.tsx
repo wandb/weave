@@ -6,7 +6,7 @@ import {
 } from '@wandb/weave/common/css/color.styles';
 import {WeaveObjectRef} from '@wandb/weave/react';
 import React from 'react';
-import {Link as LinkComp, useHistory} from 'react-router-dom';
+import {Link as LinkComp} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
@@ -161,7 +161,6 @@ export const ObjectVersionLink: React.FC<{
   color?: string;
   hideVersionSuffix?: boolean;
 }> = props => {
-  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
   //   ? props.version
@@ -177,15 +176,9 @@ export const ObjectVersionLink: React.FC<{
     props.filePath,
     props.refExtra
   );
-  const onClick = () => {
-    history.push(to);
-  };
 
   return (
-    <LinkWrapper
-      onClick={onClick}
-      fullWidth={props.fullWidth}
-      color={props.color}>
+    <LinkWrapper fullWidth={props.fullWidth} color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link
           to={to}
@@ -244,7 +237,6 @@ export const OpVersionLink: React.FC<{
   fullWidth?: boolean;
   color?: string;
 }> = props => {
-  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
   //   ? props.version
@@ -256,14 +248,8 @@ export const OpVersionLink: React.FC<{
     props.opName,
     props.version
   );
-  const onClick = () => {
-    history.push(to);
-  };
   return (
-    <LinkWrapper
-      onClick={onClick}
-      fullWidth={props.fullWidth}
-      color={props.color}>
+    <LinkWrapper fullWidth={props.fullWidth} color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
           {text}
@@ -276,7 +262,6 @@ export const OpVersionLink: React.FC<{
 export const CallRefLink: React.FC<{
   callRef: WeaveObjectRef;
 }> = props => {
-  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const callId = props.callRef.artifactName;
   const to = peekingRouter.callUIUrl(
@@ -285,16 +270,13 @@ export const CallRefLink: React.FC<{
     '',
     callId
   );
-  const onClick = () => {
-    history.push(to);
-  };
 
   if (props.callRef.weaveKind !== 'call') {
     return null;
   }
 
   return (
-    <LinkWrapper onClick={onClick}>
+    <LinkWrapper>
       <LinkTruncater>
         <Link
           to={to}
@@ -327,7 +309,6 @@ export const CallLink: React.FC<{
   color?: string;
   isEval?: boolean;
 }> = props => {
-  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
 
   const opName = opNiceName(props.opName);
@@ -360,15 +341,9 @@ export const CallLink: React.FC<{
     showTraceTree,
     showFeedbackExpand
   );
-  const onClick = () => {
-    history.push(to);
-  };
 
   return (
-    <LinkWrapper
-      onClick={onClick}
-      fullWidth={props.fullWidth}
-      color={props.color}>
+    <LinkWrapper fullWidth={props.fullWidth} color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link
           $variant={props.variant}

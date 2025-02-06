@@ -83,6 +83,7 @@ import * as TableType from './tableType';
 import {
   BaseTableDataType,
   getColumnCellFormats,
+  getColumnVariables,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -227,6 +228,10 @@ const PanelTableInnerConfigSetter: React.FC<
     return {...config, tableState: tableState ?? autoTable};
   }, [config, tableState, autoTable]);
 
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(config.tableState ?? tableState ?? autoTable);
+  }, [config.tableState, tableState, autoTable]);
+
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
 
   if (!hasLoadedOnce) {
@@ -234,14 +239,16 @@ const PanelTableInnerConfigSetter: React.FC<
   }
 
   return (
-    <PanelTableInner
-      {...props}
-      config={protectedConfig}
-      autoTable={autoTable}
-      updateConfig={protectedUpdateConfig}
-      showColumnSelect={showColumnSelect}
-      setShowColumnSelect={setShowColumnSelect}
-    />
+    <PanelContextProvider newVars={columnVariables}>
+      <PanelTableInner
+        {...props}
+        config={protectedConfig}
+        autoTable={autoTable}
+        updateConfig={protectedUpdateConfig}
+        showColumnSelect={showColumnSelect}
+        setShowColumnSelect={setShowColumnSelect}
+      />
+    </PanelContextProvider>
   );
 };
 
@@ -863,8 +870,8 @@ const PanelTableInner: React.FC<
               .map(rowSize => (
                 <Tooltip
                   key={rowSize}
-                  position="top center"
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  noTriggerWrap
                   trigger={
                     <Button
                       startIcon={rowSizeIconName[RowSize[rowSize]]}

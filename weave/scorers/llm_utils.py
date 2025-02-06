@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Union
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-OPENAI_DEFAULT_MODERATION_MODEL = "text-moderation-latest"
+OPENAI_DEFAULT_MODERATION_MODEL = "omni-moderation-latest"
 
 ANTHROPIC_DEFAULT_MODEL = "claude-3-5-sonnet"
 

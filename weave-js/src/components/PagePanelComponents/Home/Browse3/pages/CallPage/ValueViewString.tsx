@@ -39,13 +39,13 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const Collapsed = styled.div<{hasScrolling: boolean}>`
+const Collapsed = styled.div`
   min-height: 38px;
   line-height: 38px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: ${props => (props.hasScrolling ? 'pointer' : 'default')};
+  cursor: pointer;
 `;
 Collapsed.displayName = 'S.Collapsed';
 
@@ -100,12 +100,10 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     setMode(hasScrolling ? (isExpanded ? 1 : 0) : 0);
   }, [hasScrolling, isExpanded]);
 
-  const onClick = hasScrolling
-    ? () => {
-        const numModes = hasFull ? 3 : 2;
-        setMode((mode + 1) % numModes);
-      }
-    : undefined;
+  const onClick = () => {
+    const numModes = hasFull ? 3 : 2;
+    setMode((mode + 1) % numModes);
+  };
   const copy = useCallback(() => {
     copyToClipboard(value);
     toast('Copied to clipboard');
@@ -209,9 +207,5 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
       </Column>
     );
   }
-  return (
-    <Collapsed hasScrolling={hasScrolling} onClick={onClick}>
-      {content}
-    </Collapsed>
-  );
+  return <Collapsed onClick={onClick}>{content}</Collapsed>;
 };
