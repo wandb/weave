@@ -115,6 +115,8 @@ resources:
       update: post /call/update
       read: post /call/read
       query_stats: post /calls/query_stats
+      query: post /calls/query
+      query: post /calls/query
       stream_query:
         endpoint: post /calls/stream_query
         skip_test_reason: "prism"
@@ -124,6 +126,7 @@ resources:
       create: post /obj/create
       read: post /obj/read
       query: post /objs/query
+      delete: post /obj/delete
 
   tables:
     methods:
