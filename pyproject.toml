@@ -49,7 +49,6 @@ dependencies = [
 
   # TODO: This needs to be updated each time we regenerate the trace server bindings.
   # We will need some automation here
-  "weave-trace @ git+git@github.com:wandb/weave.git@",
 ]
 
 [tool.hatch.metadata]
@@ -129,6 +128,8 @@ test = [
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
+generate = "tools.stainless.do_everything:main"
+
 
 [project.urls]
 Company = "https://wandb.com"
