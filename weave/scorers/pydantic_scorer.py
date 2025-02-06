@@ -3,10 +3,9 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class PydanticScorer(Scorer):
+class PydanticScorer(weave.Scorer):
     """Validate the model output against a pydantic model."""
 
     model: type[BaseModel]
