@@ -249,7 +249,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, text: str) -> dict[str, Any]:
+    def score(self, text: str, output: Any) -> dict[str, Any]:
         predictions = self.predict(text)
         scores = [o >= self.threshold for o in predictions]
         categories = {}
