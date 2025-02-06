@@ -139,6 +139,17 @@ const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   page: 0,
 };
 
+const callsTableMuiSx = {
+  borderRadius: 0,
+  // This moves the pagination controls to the left
+  '& .MuiDataGrid-footerContainer': {
+    justifyContent: 'flex-start',
+  },
+  '& .MuiDataGrid-main:focus-visible': {
+    outline: 'none',
+  },
+};
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -710,6 +721,89 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
+  const onColumnWidthChange = useCallback(
+    newCol => {
+      setUserDefinedColumnWidths(curr => {
+        return {
+          ...curr,
+          [newCol.colDef.field]: newCol.colDef.computedWidth,
+        };
+      });
+    },
+    [setUserDefinedColumnWidths]
+  );
+  const muiSlots = useMemo(() => {
+    return {
+      noRowsOverlay: () => {
+        if (callsLoading) {
+          return <></>;
+        }
+        const isEmpty = callsResult.length === 0;
+        if (isEmpty) {
+          // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
+          if (isEvaluateTable) {
+            return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+          } else if (
+            effectiveFilter.traceRootsOnly &&
+            filterModelResolved.items.length === 0
+          ) {
+            return <Empty {...EMPTY_PROPS_TRACES} />;
+          }
+        }
+        return (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Typography color="textSecondary">
+              No calls found.{' '}
+              {clearFilters != null ? (
+                <>
+                  Try{' '}
+                  <A
+                    onClick={() => {
+                      clearFilters();
+                    }}>
+                    clearing the filters
+                  </A>{' '}
+                  or l
+                </>
+              ) : (
+                'L'
+              )}
+              earn more about how to log calls by visiting{' '}
+              <TargetBlank href="https://wandb.me/weave">the docs</TargetBlank>.
+            </Typography>
+          </Box>
+        );
+      },
+      columnMenu: CallsCustomColumnMenu,
+      pagination: () => <PaginationButtons hideControls={hideControls} />,
+      columnMenuSortDescendingIcon: IconSortDescending,
+      columnMenuSortAscendingIcon: IconSortAscending,
+      columnMenuHideIcon: IconNotVisible,
+      columnMenuPinLeftIcon: () => (
+        <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+      ),
+      columnMenuPinRightIcon: IconPinToRight,
+    };
+  }, [
+    callsLoading,
+    isEvaluateTable,
+    clearFilters,
+    effectiveFilter,
+    filterModelResolved,
+    hideControls,
+    callsResult.length,
+  ]);
+  const hideFooter = useMemo(() => {
+    return !callsLoading && callsTotal === 0;
+  }, [callsLoading, callsTotal]);
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -924,89 +1018,13 @@ export const CallsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
-        hideFooter={!callsLoading && callsTotal === 0}
+        hideFooter={hideFooter}
         hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
+        onColumnWidthChange={onColumnWidthChange}
         pinnedColumns={pinModelResolved}
         onPinnedColumnsChange={onPinnedColumnsChange}
-        sx={{
-          borderRadius: 0,
-          // This moves the pagination controls to the left
-          '& .MuiDataGrid-footerContainer': {
-            justifyContent: 'flex-start',
-          },
-          '& .MuiDataGrid-main:focus-visible': {
-            outline: 'none',
-          },
-        }}
-        slots={{
-          noRowsOverlay: () => {
-            if (callsLoading) {
-              return <></>;
-            }
-            const isEmpty = callsResult.length === 0;
-            if (isEmpty) {
-              // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
-              if (isEvaluateTable) {
-                return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-              } else if (
-                effectiveFilter.traceRootsOnly &&
-                filterModelResolved.items.length === 0
-              ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;
-              }
-            }
-            return (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <Typography color="textSecondary">
-                  No calls found.{' '}
-                  {clearFilters != null ? (
-                    <>
-                      Try{' '}
-                      <A
-                        onClick={() => {
-                          clearFilters();
-                        }}>
-                        clearing the filters
-                      </A>{' '}
-                      or l
-                    </>
-                  ) : (
-                    'L'
-                  )}
-                  earn more about how to log calls by visiting{' '}
-                  <TargetBlank href="https://wandb.me/weave">
-                    the docs
-                  </TargetBlank>
-                  .
-                </Typography>
-              </Box>
-            );
-          },
-          columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
-          columnMenuSortDescendingIcon: IconSortDescending,
-          columnMenuSortAscendingIcon: IconSortAscending,
-          columnMenuHideIcon: IconNotVisible,
-          columnMenuPinLeftIcon: () => (
-            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
-          ),
-          columnMenuPinRightIcon: IconPinToRight,
-        }}
+        sx={callsTableMuiSx}
+        slots={muiSlots}
       />
     </FilterLayoutTemplate>
   );
