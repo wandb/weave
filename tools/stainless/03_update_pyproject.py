@@ -12,15 +12,15 @@ import tomlkit
 
 
 def get_repo_info(repo_path: Path) -> tuple[str, str]:
-    # Get SHA
+    # Get SHA from the secondary repo path
+    print(f"Getting SHA for {repo_path}")
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_path, capture_output=True, text=True
     ).stdout.strip()
 
-    # Get remote URL
+    # Get remote URL from the current directory
     remote_url = subprocess.run(
         ["git", "remote", "get-url", "origin"],
-        cwd=repo_path,
         capture_output=True,
         text=True,
     ).stdout.strip()
