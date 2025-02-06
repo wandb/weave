@@ -6,8 +6,7 @@ from typing import Any, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
-from typing_extensions import Self
-from weave_trace import WeaveTrace
+from weave_trace import DefaultHttpxClient, WeaveTrace
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
@@ -86,15 +85,20 @@ def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
 
 
 class StainlessHTTPTraceServer(tsi.TraceServerInterface):
+    """A trace server that uses the Stainless generated API."""
+
     trace_server_url: str
 
     # My current batching is not safe in notebooks, disable it for now
     def __init__(
         self,
-        trace_server_url: str,
+        trace_server_url: str = weave_trace_server_url(),
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
+        username: str | None = None,
+        password: str | None = None,
+        debug: bool = False,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -102,19 +106,15 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
+        if username is not None and password is not None:
+            self._auth = ("api", password)
         self.remote_request_bytes_limit = remote_request_bytes_limit
-
-        username = "megatruong"
-        if self._auth is not None:
-            password = self._auth[1]
-        else:
-            password = ""
 
         self.stainless_client = WeaveTrace(
             username=username,
             password=password,
             base_url=self.trace_server_url,
-            http_client=VerboseClient(),
+            http_client=VerboseClient() if debug else DefaultHttpxClient(),
         )
 
     def ensure_project_exists(
@@ -125,15 +125,6 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         return tsi.EnsureProjectExistsRes.model_validate(
             project_creator.ensure_project_exists(entity, project)
         )
-
-    @classmethod
-    def from_env(cls, should_batch: bool = False) -> Self:
-        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
-        # that type checking is applied to the constructor.
-        return cls(weave_trace_server_url(), should_batch=should_batch)
-
-    def set_auth(self, auth: tuple[str, str]) -> None:
-        self._auth = auth
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
