@@ -340,14 +340,18 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
         data = arrow_data
         if isinstance(arrow_data, pa.ChunkedArray):
             data = arrow_data.combine_chunks()
-        return pa.ListArray.from_arrays(
-            offsets_starting_at_zero(data),
+
+        new_offsets = offsets_starting_at_zero(data)
+
+        return safe_list_array_from_arrays(
+            new_offsets,
             rewrite_weavelist_refs(
                 data.flatten(),
                 object_type.object_type,
                 source_artifact,
                 target_artifact,
-            )
+            ),
+            mask=pa.compute.is_null(data)
         )
     else:
         # We have a column of refs
@@ -472,6 +476,33 @@ def safe_coalesce(*arrs: pa.Array):
     for arr in arrs[1:]:
         result = pa.compute.if_else(safe_is_null(result), arr, result)
     return result
+
+def safe_list_array_from_arrays(offsets, values, mask=None):
+    # In PyArrow 17.0.0, ListArray.from_arrays() was updated to check for ambiguity
+    # between null offsets and masks via offsets.null_count(). When concatenating
+    # offset arrays, PyArrow uses lazy evaluation which can cause this check to see
+    # an intermediate state and incorrectly raise an "ambiguous to specify both 
+    # validity map and offsets with nulls" error.
+
+    # Convert offsets to PyArrow array if it isn't already
+    if not isinstance(offsets, pa.Array):
+        offsets = pa.array(offsets)
+
+    has_offsets_with_nulls = offsets.null_count > 0
+
+    if has_offsets_with_nulls:
+        # Can't use both a mask and an offset with nulls
+        result_array = pa.ListArray.from_arrays(
+            offsets,
+            values
+        )
+        return pc.if_else(mask, None, result_array)
+    else:
+        return pa.ListArray.from_arrays(
+            offsets,
+            values,
+            mask=mask
+        )
 
 
 def arrow_zip(*arrs: pa.Array) -> pa.Array:

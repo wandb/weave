@@ -4,7 +4,11 @@ import pyarrow as pa
 from pyarrow import compute as pc
 
 from weave_query import weave_types as types
-from weave_query.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave_query.arrow.arrow import (
+    ArrowWeaveListType,
+    arrow_as_array,
+    safe_list_array_from_arrays
+)
 from weave_query.arrow.list_ import ArrowWeaveList
 from weave_query.decorator_arrow_op import arrow_op
 from weave_query.language_features.tagging import tagged_value_type
@@ -350,9 +354,7 @@ def dropna(self):
     cumulative_non_null_counts = pa.compute.cumulative_sum(non_null)
     new_offsets = cumulative_non_null_counts.take(pa.compute.subtract(end_indexes, 1))
     new_offsets = pa.concat_arrays([start_indexes[:1], new_offsets])
-    unflattened = pa.ListArray.from_arrays(new_offsets, new_data)
-    unflattened = pa.compute.if_else(pa.compute.is_null(a), None, unflattened)
-
+    unflattened = safe_list_array_from_arrays(new_offsets, new_data, mask=pa.compute.is_null(a))
 
     return ArrowWeaveList(
         unflattened,

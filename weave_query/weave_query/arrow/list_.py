@@ -32,6 +32,7 @@ from weave_query.arrow.arrow import (
     offsets_starting_at_zero,
     pretty_print_arrow_type,
     safe_is_null,
+    safe_list_array_from_arrays
 )
 from weave_query.language_features.tagging import (
     tag_store,
@@ -802,12 +803,14 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             )._map_column(fn, pre_fn, path + (PathItemList(),))
             # print("SELF OBJECT TYPE", self.object_type)
             # print("SELF ARROW DATA TYPE", self._arrow_data.type)
-            result_array = pa.ListArray.from_arrays(
-                offsets_starting_at_zero(self._arrow_data),
-                items._arrow_data
+
+            new_offsets = offsets_starting_at_zero(self._arrow_data)
+            result_array = safe_list_array_from_arrays(
+                new_offsets,
+                items._arrow_data,
+                pa.compute.is_null(arr)
             )
 
-            result_array = pc.if_else(pa.compute.is_null(arr), None, result_array)
             with_mapped_children = ArrowWeaveList(
                 result_array,
                 self.object_type.__class__(items.object_type),

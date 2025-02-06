@@ -25,6 +25,7 @@ from weave_query.arrow.list_ import (
     make_vec_none,
     offsets_starting_at_zero,
     unsafe_awl_construction,
+    safe_list_array_from_arrays
 )
 from weave_query.language_features.tagging import tagged_value_type
 
@@ -209,20 +210,14 @@ def _concatenate_lists(
         ]
     )
 
-    result_array = pa.ListArray.from_arrays(
+    result_array = safe_list_array_from_arrays(
         new_offsets,
         concatted_values._arrow_data,
+        mask=pa_concat_arrays([
+            pa.compute.is_null(l1._arrow_data),
+            pa.compute.is_null(l2._arrow_data)
+        ])
     )
-
-    # In pyarrow 17.0.0, we can only use either null offsets OR provide a mask,
-    # so track the null values to convert empty lists (that were null before
-    # conversion) and convert those empty lists to None before returning the AWL
-    combined_nulls = pa_concat_arrays([
-        pa.compute.is_null(l1._arrow_data),
-        pa.compute.is_null(l2._arrow_data)
-    ])
-
-    result_array = pc.if_else(combined_nulls, None, result_array)
 
     return ArrowWeaveList(
         result_array,
@@ -520,7 +515,6 @@ def _concatenate(
                             pa.array(np.zeros(len(other), dtype=np.int8)),
                         ]
                     ),
-                    # offsets=pa.array(np.arange(len(self), dtype=np.int32)),
                     offsets=pa_concat_arrays(
                         [
                             self_offsets,
@@ -547,7 +541,6 @@ def _concatenate(
                         pa.compute.equal(other_type_codes, other_i).cast(pa.int8()),
                     ]
                 ),
-                # offsets=pa.array(np.arange(len(other), dtype=np.int32)),
                 offsets=pa_concat_arrays(
                     [
                         pa.array(np.zeros(len(self), dtype=np.int32)),
