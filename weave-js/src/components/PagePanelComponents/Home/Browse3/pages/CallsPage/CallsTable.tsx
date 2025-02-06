@@ -587,16 +587,6 @@ export const CallsTable: FC<{
       ? true
       : 'indeterminate';
   }, [selectedCalls, tableData]);
-  const rowCheckboxOnCheckedChange = useCallback(
-    (isSelected: CheckedState, rowId: string) => {
-      if (isSelected) {
-        setSelectedCalls(selectedCalls.filter(id => id !== rowId));
-      } else {
-        setSelectedCalls([...selectedCalls, rowId]);
-      }
-    },
-    [selectedCalls, setSelectedCalls]
-  );
 
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
@@ -619,38 +609,13 @@ export const CallsTable: FC<{
           );
         },
         renderCell: (params: any) => {
-          const rowId = params.id as string;
-          const isSelected = selectedCalls.includes(rowId);
-          const disabled =
-            !isSelected &&
-            (isEvaluateTable
-              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
-              : selectedCalls.length >= MAX_SELECT);
-          let tooltipText = '';
-          if (isEvaluateTable) {
-            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
-              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
-            }
-          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
-            tooltipText = `Selection limited to ${MAX_SELECT} items`;
-          }
-
           return (
-            <Tooltip title={tooltipText} placement="right" arrow>
-              {/* https://mui.com/material-ui/react-tooltip/ */}
-              {/* By default disabled elements like <button> do not trigger user interactions */}
-              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
-              <span>
-                <Checkbox
-                  size="small"
-                  disabled={disabled}
-                  checked={isSelected}
-                  onCheckedChange={checked =>
-                    rowCheckboxOnCheckedChange(checked, rowId)
-                  }
-                />
-              </span>
-            </Tooltip>
+            <CheckboxWithTooltip
+              selectedCalls={selectedCalls}
+              isEvaluateTable={isEvaluateTable}
+              rowId={params.id}
+              setSelectedCalls={setSelectedCalls}
+            />
           );
         },
       },
@@ -663,7 +628,6 @@ export const CallsTable: FC<{
     isEvaluateTable,
     headerChecked,
     headerCheckboxOnCheckedChange,
-    rowCheckboxOnCheckedChange,
   ]);
 
   // Register Compare Evaluations Button
@@ -1181,3 +1145,58 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
+
+const CheckboxWithTooltip = ({
+  isEvaluateTable,
+  rowId,
+  selectedCalls,
+  setSelectedCalls,
+}: {
+  isEvaluateTable: boolean;
+  rowId: string;
+  selectedCalls: string[];
+  setSelectedCalls: (calls: string[]) => void;
+}) => {
+  console.log('CHECKBOX WITH TOOLTIP', rowId);
+  const isSelected = selectedCalls.includes(rowId);
+  const disabled =
+    !isSelected &&
+    (isEvaluateTable
+      ? selectedCalls.length >= MAX_EVAL_COMPARISONS
+      : selectedCalls.length >= MAX_SELECT);
+  let tooltipText = '';
+  if (isEvaluateTable) {
+    if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
+      tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+    }
+  } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
+    tooltipText = `Selection limited to ${MAX_SELECT} items`;
+  }
+
+  const onCheckedChange = useCallback(
+    (isSelected: CheckedState) => {
+      if (isSelected) {
+        setSelectedCalls([...selectedCalls, rowId]);
+      } else {
+        setSelectedCalls(selectedCalls.filter(id => id !== rowId));
+      }
+    },
+    [selectedCalls, rowId, setSelectedCalls]
+  );
+
+  return (
+    <Tooltip title={tooltipText} placement="right" arrow>
+      {/* https://mui.com/material-ui/react-tooltip/ */}
+      {/* By default disabled elements like <button> do not trigger user interactions */}
+      {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+      <span>
+        <Checkbox
+          size="small"
+          disabled={disabled}
+          checked={isSelected}
+          onCheckedChange={onCheckedChange}
+        />
+      </span>
+    </Tooltip>
+  );
+};
