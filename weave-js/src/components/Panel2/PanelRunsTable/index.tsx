@@ -3,39 +3,24 @@ import {
   constString,
   isAssignableTo,
   list,
-  listObjectType,
-  maybe,
   opDropNa,
   opPick,
   opRunSummary,
-  Type,
   typedDict,
-  typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import React from 'react';
 
+import {LIST_RUNS_TYPE} from '../../../common/types/run';
+import {getTableKeysFromNodeType} from '../../../common/util/table';
 import {useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
 import {normalizeTableLike} from '../PanelTable/tableType';
 
-const CUSTOM_TABLE_TYPE = {
-  type: 'file' as const,
-  wbObjectType: {type: 'table' as const, columnTypes: {}},
-};
-
-const inputType = {
-  type: 'list' as const,
-  objectType: {
-    type: 'union' as const,
-    members: ['none' as const, 'run' as const],
-  },
-};
-
 type PanelRunsTableConfigType = {summaryKey: string};
 
 type PanelRunsTableProps = Panel2.PanelProps<
-  typeof inputType,
+  typeof LIST_RUNS_TYPE,
   PanelRunsTableConfigType
 >;
 
@@ -43,37 +28,12 @@ const PanelRunsTable: React.FC<PanelRunsTableProps> = props => {
   throw new Error('PanelRunsTable: Cannot be rendered directly');
 };
 
-const getKeysFromInputType = (
-  inputNodeType?: Type,
-  config?: PanelRunsTableConfigType
-) => {
-  if (
-    inputNodeType != null &&
-    isAssignableTo(inputNodeType, list(typedDict({})))
-  ) {
-    const typeMap = typedDictPropertyTypes(listObjectType(inputNodeType));
-    const tableKeys = Object.keys(typeMap)
-      .filter(key => {
-        return isAssignableTo(typeMap[key], maybe(CUSTOM_TABLE_TYPE));
-      })
-      .sort();
-    const value =
-      tableKeys.length > 0 &&
-      config?.summaryKey != null &&
-      tableKeys.indexOf(config?.summaryKey) !== -1
-        ? config.summaryKey
-        : tableKeys?.[0] ?? '';
-    return {tableKeys, value};
-  }
-  return {tableKeys: [], value: ''};
-};
-
 const PanelRunsTableConfig: React.FC<PanelRunsTableProps> = props => {
   const runSummaryNode = opRunSummary({run: props.input});
   const runSummaryRefined = useNodeWithServerType(runSummaryNode);
-  const {tableKeys, value} = getKeysFromInputType(
+  const {tableKeys, value} = getTableKeysFromNodeType(
     runSummaryRefined.result?.type,
-    props.config
+    props.config?.summaryKey
   );
   const options = tableKeys.map(key => ({text: key, value: key}));
   const updateConfig = props.updateConfig;
@@ -106,7 +66,7 @@ export const Spec: Panel2.PanelSpec = {
   displayName: 'Run Tables',
   Component: PanelRunsTable,
   ConfigComponent: PanelRunsTableConfig,
-  inputType,
+  inputType: LIST_RUNS_TYPE,
   outputType: () => ({
     type: 'list' as const,
     objectType: {
@@ -120,7 +80,10 @@ export const Spec: Panel2.PanelSpec = {
     const defaultNode = constNodeUnsafe(expectedReturnType, []);
     const runSummaryNode = opRunSummary({run: inputNode as any});
     const runSummaryRefined = await refineType(runSummaryNode);
-    const {value} = getKeysFromInputType(runSummaryRefined.type, config);
+    const {value} = getTableKeysFromNodeType(
+      runSummaryRefined.type,
+      config?.summaryKey
+    );
 
     const runTableNode = opPick({
       obj: runSummaryNode,

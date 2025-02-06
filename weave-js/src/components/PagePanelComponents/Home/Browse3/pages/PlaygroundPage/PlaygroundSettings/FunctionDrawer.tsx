@@ -4,7 +4,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useState} from 'react';
 
-import {StyledTextArea} from '../StyledTextarea';
+import {StyledTextArea} from '../../../StyledTextarea';
 
 type FunctionDrawerProps = {
   drawerFunctionIndex: number | null;

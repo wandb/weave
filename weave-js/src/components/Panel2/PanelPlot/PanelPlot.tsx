@@ -1,4 +1,4 @@
-import {isAssignableTo, maybe} from '@wandb/weave/core';
+import {isAssignableTo, maybe, NodeOrVoidNode} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -17,9 +17,10 @@ import {IconAddNew, IconDelete} from '../Icons';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
-import {usePanelContext} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import * as TableState from '../PanelTable/tableState';
 import * as TableType from '../PanelTable/tableType';
+import {getColumnVariables, useAutomatedTableState} from '../PanelTable/util';
 import {useConfig} from './config';
 import {ConfigDimComponent} from './ConfigDimComponent';
 import {PanelPlot2Inner} from './PanelPlot2Inner';
@@ -46,12 +47,32 @@ const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = <Panel2Loader />;
 
+  const {config} = useConfig(inputNode, newProps.config);
+
+  const weave = useWeaveContext();
+
+  const {tableState, autoTable} = useAutomatedTableState(
+    input,
+    (config as any).tableState,
+    weave
+  );
+
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(
+      (config as any).tableState ?? tableState ?? autoTable
+    );
+  }, [config, tableState, autoTable]);
+
   if (typedInputNodeUse.loading) {
     return loaderComp;
   } else if (typedInputNodeUse.result.nodeType === 'void') {
     return <></>;
   } else {
-    return <PanelPlotConfigInner {...newProps} />;
+    return (
+      <PanelContextProvider newVars={columnVariables}>
+        <PanelPlotConfigInner {...newProps} />
+      </PanelContextProvider>
+    );
   }
 };
 
@@ -606,6 +627,22 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
 
   const loaderComp = useLoader();
 
+  const {config} = useConfig(inputNode, props.config);
+
+  const weave = useWeaveContext();
+
+  const {tableState, autoTable} = useAutomatedTableState(
+    input,
+    (config as any).tableState,
+    weave
+  );
+
+  const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
+    return getColumnVariables(
+      (config as any).tableState ?? tableState ?? autoTable
+    );
+  }, [config, tableState, autoTable]);
+
   if (typedInputNodeUse.loading) {
     return <div style={{height: '100%', width: '100%'}}>{loaderComp}</div>;
   } else if (typedInputNodeUse.result.nodeType === 'void') {
@@ -613,7 +650,9 @@ const PanelPlot2: React.FC<PanelPlotProps> = props => {
   } else {
     return (
       <div style={{height: '100%', width: '100%'}}>
-        <PanelPlot2Inner {...newProps} />
+        <PanelContextProvider newVars={columnVariables}>
+          <PanelPlot2Inner {...newProps} />
+        </PanelContextProvider>
       </div>
     );
   }
