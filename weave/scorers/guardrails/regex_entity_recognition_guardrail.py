@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.flow.model import Model
-from weave.scorers import Scorer
+from weave import Scorer
 
 DEFAULT_PATTERNS = {
     "EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
