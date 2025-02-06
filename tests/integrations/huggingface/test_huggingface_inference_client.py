@@ -336,9 +336,7 @@ def test_huggingface_table_question_answering(client):
     }
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).table_question_answering(
-        table, query, model="google/tapas-base-finetuned-wtq"
-    )
+    ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
 
     calls = list(client.calls())
     assert len(calls) == 1
@@ -537,7 +535,8 @@ def test_huggingface_translation_async(client):
         AsyncInferenceClient(
             api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
         ).translation(
-            "My name is Wolfgang and I live in Berlin", model="Helsinki-NLP/opus-mt-en-fr"
+            "My name is Wolfgang and I live in Berlin",
+            model="Helsinki-NLP/opus-mt-en-fr",
         )
     )
 
@@ -576,10 +575,12 @@ def test_huggingface_text_to_image(client):
     call = calls[0]
     assert call.started_at < call.ended_at
     assert (
-        op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.text_to_image"
+        op_name_from_ref(call.op_name)
+        == "huggingface_hub.InferenceClient.text_to_image"
     )
     output = call.output
     assert output is not None
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
