@@ -1084,6 +1084,29 @@ def test_arrow_timestamp_conversion(li):
     # We are always representing timestamps as UTC
     assert li.use_node(data.toTimestamp()) == utc_dates
 
+@pytest.mark.parametrize("li", lath.ListInterfaces)
+def test_arrow_timestamp_conversion_floored(li):
+    dates = [
+        datetime.datetime(2020, 1, 2, 3, 4, 6),
+        datetime.datetime(2020, 1, 2),
+    ]
+    utc_dates = [d.astimezone(datetime.timezone.utc) for d in dates]
+    timestamps = [d.timestamp() * 1000 for d in utc_dates]
+
+    # Direct datetime type
+    data = li.make_node(dates)
+    if li == lath.ArrowNode:
+        # Arrow converts to UTC on read out
+        assert li.use_node(data) == utc_dates
+    else:
+        assert li.use_node(data) == dates
+
+    # Basic Floats to datetime conversion
+    data = li.make_node(timestamps)
+    assert li.use_node(data) == timestamps
+
+    output = li.use_node(data.toTimestampFloored())
+    assert output[0] == output[1]
 
 def test_mapeach_with_tags():
     data = [[2, 3, 4], [2, 3, 4], [2, 3, 4]]

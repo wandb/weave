@@ -220,6 +220,18 @@ class Number(object):
         )
 
     @op(
+        name="number-toTimestampFloored",
+        input_type={"val": types.Number()},
+        output_type=types.Timestamp(),
+    )
+    def to_timestamp_floored(val):
+        return weave_timestamp.ms_to_python_datetime(
+            weave_timestamp.unitless_int_to_inferred_ms(val)
+        ).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+
+    @op(
         name="number-toString",
         input_type={"val": types.Number()},
         output_type=types.String(),
