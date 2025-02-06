@@ -3,8 +3,8 @@ import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
-import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {

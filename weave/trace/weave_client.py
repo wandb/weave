@@ -16,6 +16,7 @@ from typing import (
     Callable,
     Generic,
     Protocol,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -31,6 +32,11 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.interface_query_builder import (
+    exists_expr,
+    get_field_expr,
+    literal_expr,
+)
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
@@ -46,19 +52,28 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
+    maybe_parse_uri,
     parse_op_uri,
     parse_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
-from weave.trace.settings import client_parallelism
+from weave.trace.settings import (
+    client_parallelism,
+    should_capture_client_info,
+    should_capture_system_info,
+)
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -98,7 +113,7 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
-    from weave.scorers.base_scorer import ApplyScorerResult, Scorer
+    from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -384,6 +399,23 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+class CallDict(TypedDict):
+    op_name: str
+    trace_id: str
+    project_id: str
+    parent_id: str | None
+    inputs: dict
+    id: str | None
+    output: Any
+    exception: str | None
+    summary: dict | None
+    display_name: str | None
+    attributes: dict | None
+    started_at: datetime.datetime | None
+    ended_at: datetime.datetime | None
+    deleted_at: datetime.datetime | None
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation that was executed as part of a trace."""
@@ -560,7 +592,7 @@ class Call:
         result, score_call = prediction.apply_scorer(my_scorer)
         ```
         """
-        from weave.scorers.base_scorer import Scorer, apply_scorer_async
+        from weave.flow.scorer import Scorer, apply_scorer_async
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
@@ -581,6 +613,27 @@ class Call:
                 scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
             wc._send_score_call(self, score_call, scorer_ref_uri)
         return apply_scorer_result
+
+    def to_dict(self) -> CallDict:
+        if callable(display_name := self.display_name):
+            display_name = "Callable Display Name (not called yet)"
+
+        return CallDict(
+            op_name=self.op_name,
+            trace_id=self.trace_id,
+            project_id=self.project_id,
+            parent_id=self.parent_id,
+            inputs=self.inputs,
+            id=self.id,
+            output=self.output,
+            exception=self.exception,
+            summary=self.summary,
+            display_name=display_name,
+            attributes=self.attributes,
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            deleted_at=self.deleted_at,
+        )
 
 
 def make_client_call(
@@ -801,6 +854,7 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
+        scored_by: str | list[str] | None = None,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -816,12 +870,46 @@ class WeaveClient:
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
+            scored_by: Accepts a list or single item. Each item is a name or ref uri of a scorer
+                to filter by. Multiple scorers are ANDed together. If passing in just the name,
+                then scores for all versions of the scorer are returned. If passing in the full ref
+                URI, then scores for a specific version of the scorer are returned.
 
         Returns:
             An iterator of calls.
         """
         if filter is None:
             filter = CallsFilter()
+
+        # This logic might be pushed down to the server soon, but for now it lives here:
+        if scored_by:
+            if isinstance(scored_by, str):
+                scored_by = [scored_by]
+            exprs = []
+            if query is not None:
+                exprs.append(query["$expr"])
+            for name in scored_by:
+                ref = maybe_parse_uri(name)
+                if ref and isinstance(ref, ObjectRef):
+                    uri = name
+                    scorer_name = ref.name
+                    exprs.append(
+                        {
+                            "$eq": (
+                                get_field_expr(
+                                    runnable_feedback_runnable_ref_selector(scorer_name)
+                                ),
+                                literal_expr(uri),
+                            )
+                        }
+                    )
+                else:
+                    exprs.append(
+                        exists_expr(
+                            get_field_expr(runnable_feedback_output_selector(name))
+                        )
+                    )
+            query = Query.model_validate({"$expr": {"$and": exprs}})
 
         return _make_calls_iterator(
             self.server,
@@ -948,12 +1036,14 @@ class WeaveClient:
             attributes = {}
 
         attributes = AttributesDict(**attributes)
-        attributes._set_weave_item("client_version", version.VERSION)
-        attributes._set_weave_item("source", "python-sdk")
-        attributes._set_weave_item("os_name", platform.system())
-        attributes._set_weave_item("os_version", platform.version())
-        attributes._set_weave_item("os_release", platform.release())
-        attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_client_info():
+            attributes._set_weave_item("client_version", version.VERSION)
+            attributes._set_weave_item("source", "python-sdk")
+            attributes._set_weave_item("sys_version", sys.version)
+        if should_capture_system_info():
+            attributes._set_weave_item("os_name", platform.system())
+            attributes._set_weave_item("os_version", platform.version())
+            attributes._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 

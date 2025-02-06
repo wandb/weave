@@ -103,9 +103,12 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   );
 };
 
-export const useShowDeleteButton = () => {
-  const viewerInfo = useViewerInfo();
-  return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
+export const useShowDeleteButton = (entity: string) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
+  const viewerInfo = loadingUserInfo ? null : userInfo;
+  const viewer = viewerInfo ? viewerInfo.id : null;
+  const isReadonly = !viewer || !viewerInfo?.teams.includes(entity);
+  return !isReadonly;
 };
 
 const Dialog = styled(MaterialDialog)`

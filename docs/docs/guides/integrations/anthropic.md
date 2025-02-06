@@ -2,6 +2,10 @@
 
 Weave automatically tracks and logs LLM calls made via the [Anthropic Python library](https://github.com/anthropics/anthropic-sdk-python), after `weave.init()` is called.
 
+:::note
+Do you want to experiment with Anthropic models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+:::
+
 ## Traces
 
 It’s important to store traces of LLM applications in a central database, both during development and in production. You’ll use these traces for debugging, and as a dataset that will help you improve your application.
