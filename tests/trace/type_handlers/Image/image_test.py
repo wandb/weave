@@ -186,8 +186,7 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
-@pytest.mark.asyncio
-async def test_many_images_will_consistently_log():
+def test_many_images_will_consistently_log():
     # This test is a bit strange -- I can't get the issue to repro inside pytest, but
     # it will work when run as a script.  See the actual script for more details.
     res = subprocess.run(
