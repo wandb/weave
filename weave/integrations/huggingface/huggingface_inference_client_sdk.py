@@ -63,8 +63,8 @@ def huggingface_accumulator(
         acc.usage = ChatCompletionOutputUsage(
             completion_tokens=0, prompt_tokens=0, total_tokens=0
         )
-    # # For some reason, value.usage is always coming `None`
-    # # Might be a bug in `huggingface_hub.InferenceClient`
+    # # For some reason, value.usage is always `None` when streaming.
+    # # This might be a bug in `huggingface_hub.InferenceClient`
     # if value.usage is not None:
     #     acc.usage.completion_tokens += value.usage.completion_tokens
     #     acc.usage.prompt_tokens += value.usage.prompt_tokens
