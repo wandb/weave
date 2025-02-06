@@ -293,9 +293,9 @@ def test_image_generation_sync(client):
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
-        model='imagen-3.0-generate-002',
-        prompt='Fuzzy bunnies in my kitchen',
-        config=GenerateImagesConfig(number_of_images=1)
+        model="imagen-3.0-generate-002",
+        prompt="Fuzzy bunnies in my kitchen",
+        config=GenerateImagesConfig(number_of_images=1),
     )
 
     assert len(response.generated_images) == 1
@@ -319,9 +319,9 @@ def test_image_generation_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = asyncio.run(
         google_client.aio.models.generate_images(
-            model='imagen-3.0-generate-002',
-            prompt='Fuzzy bunnies in my kitchen',
-            config=GenerateImagesConfig(number_of_images=1)
+            model="imagen-3.0-generate-002",
+            prompt="Fuzzy bunnies in my kitchen",
+            config=GenerateImagesConfig(number_of_images=1),
         )
     )
 
