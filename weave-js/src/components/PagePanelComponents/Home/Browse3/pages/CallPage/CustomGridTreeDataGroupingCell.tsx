@@ -89,10 +89,6 @@ export const CustomGridTreeDataGroupingCell: FC<
 
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
 
-  if (call == null) {
-    return <div />;
-  }
-
   const box = (
     <CursorBox
       $isClickable={!isHiddenCount}
@@ -184,7 +180,7 @@ export const CustomGridTreeDataGroupingCell: FC<
       <CallOrCountRow>
         {isHiddenCount ? (
           <Box>{row.count.toLocaleString()} hidden calls</Box>
-        ) : (
+        ) : call != null ? (
           <>
             <Box
               sx={{
@@ -217,11 +213,17 @@ export const CustomGridTreeDataGroupingCell: FC<
               />
             )}
           </>
+        ) : (
+          <Box />
         )}
-        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
       </CallOrCountRow>
+      {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
     </CursorBox>
   );
 
-  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
+  return tooltip ? (
+    <Tooltip content={tooltip} noTriggerWrap trigger={box} />
+  ) : (
+    box
+  );
 };
