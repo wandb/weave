@@ -3,6 +3,7 @@ from weave.scorers.initialization import check_litellm_installation
 # Make sure litellm is available
 check_litellm_installation()
 
+from weave.flow.scorer import Scorer
 from weave.scorers.accuracy_scorer import AccuracyScorer
 from weave.scorers.bleu_scorer import BLEUScorer
 from weave.scorers.classification_scorer import (
@@ -26,7 +27,7 @@ from weave.scorers.moderation_scorer import (
 )
 from weave.scorers.perplexity_scorer import (
     HuggingFacePerplexityScorer,
-    OpenAIPerplexityScorer,
+    # OpenAIPerplexityScorer,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (

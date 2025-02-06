@@ -129,18 +129,18 @@ class WeaveTrustScorer(weave.Scorer):
     )
 
     # Define scorer categories
-    _critical_scorers: Set[Type[Scorer]] = {
+    _critical_scorers: Set[Type[weave.Scorer]] = {
         WeaveToxicityScorer,
         WeaveHallucinationScorer,
         WeaveContextRelevanceScorer
     }
-    _advisory_scorers: Set[Type[Scorer]] = {
+    _advisory_scorers: Set[Type[weave.Scorer]] = {
         WeaveFluencyScorer,
         WeaveCoherenceScorer
     }
 
     # Private attributes
-    _loaded_scorers: dict[str, Scorer] = PrivateAttr(default_factory=dict)
+    _loaded_scorers: dict[str, weave.Scorer] = PrivateAttr(default_factory=dict)
     _emoji_pattern: re.Pattern = PrivateAttr(default=re.compile(
         "["
         "\U0001F600-\U0001F64F"  # emoticons
@@ -223,7 +223,7 @@ class WeaveTrustScorer(weave.Scorer):
             }
         return None
 
-    def _filter_inputs_for_scorer(self, scorer: Scorer, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def _filter_inputs_for_scorer(self, scorer: weave.Scorer, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Filter inputs to match scorer's signature."""
         scorer_params = signature(scorer.score).parameters
         return {k: v for k, v in inputs.items() if k in scorer_params}
