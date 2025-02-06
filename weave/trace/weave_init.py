@@ -106,7 +106,8 @@ def init_weave(
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
 
-    remote_server = init_weave_get_server(api_key)
+    username = get_username()
+    remote_server = init_weave_get_server(username, api_key)
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -125,7 +126,6 @@ def init_weave(
     # moved to InitializedClient.__init__
     autopatch.autopatch(autopatch_settings)
 
-    username = get_username()
     try:
         min_required_version = (
             remote_server.server_info().min_required_weave_python_version
@@ -171,7 +171,7 @@ def init_weave_disabled() -> InitializedClient:
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
-        init_weave_get_server("DISABLED", should_batch=False),
+        init_weave_get_server("DISABLED", "DISABLED", should_batch=False),
         ensure_project_exists=False,
     )
 
@@ -179,13 +179,15 @@ def init_weave_disabled() -> InitializedClient:
 
 
 def init_weave_get_server(
+    username: str | None = None,
     api_key: str | None = None,
     should_batch: bool = True,
 ) -> stainless_http_trace_server.StainlessHTTPTraceServer:
-    res = stainless_http_trace_server.StainlessHTTPTraceServer.from_env(should_batch)
-    if api_key is not None:
-        res.set_auth(("api", api_key))
-    return res
+    return stainless_http_trace_server.StainlessHTTPTraceServer(
+        should_batch=should_batch,
+        username=username,
+        password=api_key,
+    )
 
 
 def init_local() -> InitializedClient:
