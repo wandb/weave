@@ -342,10 +342,10 @@ class TrustScorer(Scorer):
             if "extras" in result and "score" in result["extras"]
         }
 
-        for i, label in enumerate(raw_results["FluencyScorer"]["extras"]):
-            print(label)  # TODO remove print
-            if label == "non-fluent":
-                scores["FluencyScorer"] = raw_results["FluencyScorer"]["extras"][i]["score"]
+        for i, score_label in enumerate(raw_results["FluencyScorer"]["extras"]):
+            print(score_label)  # TODO remove print
+            if score_label["label"] == "non-fluent":
+                scores["FluencyScorer"] = score_label["score"]
                 print("Added FluencyScorer score!")
                 break
 
