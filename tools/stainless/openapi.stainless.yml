@@ -25,6 +25,7 @@ targets:
     skip: false
     options:
       use_uv: true
+      use_new_recursive_imports: true
   typescript:
     package_name: weave-trace
     publish:
