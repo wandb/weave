@@ -71,7 +71,7 @@ class RobustnessScorer(HuggingFaceScorer):
         elif self.model_name_or_path != "":
             self._local_model_path = download_model(self.model_name_or_path)
         else:
-            self._local_model_path = download_model(MODEL_PATHS["robustness_scorer"])
+            self._local_model_path = download_model(MODEL_PATHS["embedding_model"])
         assert self._local_model_path, "model_name_or_path local path or artifact path not found"
 
         self.embedding_model = SentenceTransformer(self._local_model_path)

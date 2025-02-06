@@ -97,26 +97,6 @@ class TrustScorer(Scorer):
         default="auto",
         description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')"
     )
-    context_relevance_threshold: float = Field(
-        default=CONTEXT_RELEVANCE_SCORER_THRESHOLD,
-        description="Minimum relevance score between output and context (0-1)"
-    )
-    hallucination_threshold: float = Field(
-        default=HALLUCINATION_SCORER_THRESHOLD,
-        description="Maximum hallucination score allowed in output (0-1)"
-    )
-    fluency_threshold: float = Field(
-        default=FLUENCY_SCORER_THRESHOLD,
-        description="Minimum fluency score required for output (0-1)"
-    )
-    toxicity_total_threshold: int = Field(
-        default=TOXICITY_TOTAL_THRESHOLD,
-        description="Maximum total toxicity score allowed across all categories"
-    )
-    toxicity_category_threshold: int = Field(
-        default=TOXICITY_CATEGORY_THRESHOLD,
-        description="Maximum toxicity score allowed per individual category"
-    )
     context_relevance_model_name_or_path: str = Field(
         default="",
         description="Path or name of the context relevance model",
@@ -192,17 +172,17 @@ class TrustScorer(Scorer):
 
             # Add specific threshold parameters based on scorer type
             if scorer_cls == ContextRelevanceScorer:
-                scorer_params['threshold'] = self.context_relevance_threshold
+                scorer_params['threshold'] = CONTEXT_RELEVANCE_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = self.context_relevance_model_name_or_path
             elif scorer_cls == HallucinationScorer:
-                scorer_params['threshold'] = self.hallucination_threshold
+                scorer_params['threshold'] = HALLUCINATION_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = self.hallucination_model_name_or_path
             elif scorer_cls == ToxicityScorer:
-                scorer_params['total_threshold'] = self.toxicity_total_threshold
-                scorer_params['category_threshold'] = self.toxicity_category_threshold
+                scorer_params['total_threshold'] = TOXICITY_TOTAL_THRESHOLD
+                scorer_params['category_threshold'] = TOXICITY_CATEGORY_THRESHOLD
                 scorer_params["model_name_or_path"] = self.toxicity_model_name_or_path
             elif scorer_cls == FluencyScorer:
-                scorer_params['threshold'] = self.fluency_threshold
+                scorer_params['threshold'] = FLUENCY_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = self.fluency_model_name_or_path
             elif scorer_cls == CoherenceScorer:
                 scorer_params["model_name_or_path"] = self.coherence_model_name_or_path
