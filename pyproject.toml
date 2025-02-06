@@ -80,9 +80,9 @@ scorers = [
   "Levenshtein>=0.26.0",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
-  "transformers>=4.35.0",
+  "transformers>=4.48.2",
   "accelerate>=1.0.0",
-  "torch>=2.2.0",
+  "torch>=2.4.1",
   "sacrebleu>=2.4.2",
   "rouge>=1.0.1",
 ]
