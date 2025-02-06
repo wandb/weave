@@ -462,5 +462,30 @@ def get_huggingface_patcher(
         )
     )
 
+    image_to_image_settings = base.model_copy(
+        update={"name": base.name or "huggingface_hub.InferenceClient.image_to_image"}
+    )
+    patchers.append(
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "InferenceClient.image_to_image",
+            huggingface_wrapper_sync(image_to_image_settings),
+        )
+    )
+
+    image_to_image_async_settings = base.model_copy(
+        update={
+            "name": base.name or "huggingface_hub.AsyncInferenceClient.image_to_image"
+        }
+    )
+    patchers.append(
+        SymbolPatcher(
+            lambda: importlib.import_module("huggingface_hub"),
+            "AsyncInferenceClient.image_to_image",
+            huggingface_wrapper_sync(image_to_image_async_settings),
+        )
+    )
+    
+
     _huggingface_patcher = MultiPatcher(patchers)
     return _huggingface_patcher
