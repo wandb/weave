@@ -7,7 +7,6 @@ import React from 'react';
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
-import {SmallRef} from '../../Browse2/SmallRef';
 import {ObjectPath} from '../pages/CallPage/traverse';
 import {ValueViewNumber} from '../pages/CallPage/ValueViewNumber';
 import {
@@ -15,6 +14,7 @@ import {
   isProbablyTimestampSec,
 } from '../pages/CallPage/ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from '../pages/CallPage/ValueViewPrimitive';
+import {SmallRef} from '../smallRef/SmallRef';
 import {MISSING} from './compare';
 import {CompareGridCellValueCode} from './CompareGridCellValueCode';
 import {CompareGridCellValueTimestamp} from './CompareGridCellValueTimestamp';

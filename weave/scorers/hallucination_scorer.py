@@ -46,7 +46,7 @@ The cat has orange stripes.
 
 ## Analysis:
 {
-  "think_step_by_step": "The cat is black and white. The cat has orange stripes. \
+  "chain_of_thought": "The cat is black and white. The cat has orange stripes. \
 The output contradicts the input data because the input specifies black and white, \
 while the output mentions orange. The output also introduces a pattern not present in \
 the input.",
@@ -61,8 +61,8 @@ the input.",
     }
   ],
   "conclusion": "The output contains two hallucinations: it contradicts the color information \
-and introduces a pattern not present in the input."
-  "is_hallucination": true,
+and introduces a pattern not present in the input.",
+  "has_hallucination": true
 }
 
 # Notes
@@ -164,20 +164,18 @@ class HallucinationReasoning(BaseModel):
 
 class HallucinationResponse(BaseModel):
     chain_of_thought: str = Field(
-        description="Think step by step about whether the <output> contains hallucinations \
-based on the <input_data>."
+        description="Think step by step about whether the <output> contains hallucinations based on the <input_data>.",
     )
     reasonings: list[HallucinationReasoning] = Field(
-        description="A list of reasoning steps that lead to the conclusion about whether or not\
-the <output> contains hallucinations."
+        description="A list of reasoning steps that lead to the conclusion about whether or not the <output> contains hallucinations.",
     )
     conclusion: str = Field(description="The conclusion of the analysis.")
     has_hallucination: bool = Field(
-        description="Whether the <output> is free of hallucinations based on the <input_data>. True means it is NOT a hallucination."
+        description="Indicates whether the <output> contains hallucinations based on the <input_data>. True means hallucinations are present."
     )
 
 
-class HallucinationFreeScorer(InstructorLLMScorer):
+class HallucinationFreeScorer(LLMScorer):
     """
     A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
@@ -193,10 +191,10 @@ class HallucinationFreeScorer(InstructorLLMScorer):
         of LLMHallucinationScorer by passing `column_map={"context": "context"}`.
 
     Attributes:
-        system_prompt (str): The prompt describing the task, defines what a "hallucination" is.
-        user_prompt (str): The string template to pass the input and output data. The template must
+        system_prompt (str): The prompt describing the task and defining what a "hallucination" is.
+        user_prompt (str): The string template to pass the input and output data. The template must \
         contain placeholders for both `{input_data}` and `{output}`.
-        model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
+        model_id (str): The LLM model name, dependent on the LLM provider being used.
         temperature (float): LLM temperature setting.
         max_tokens (int): Maximum number of tokens in the LLM's response.
 
@@ -212,10 +210,9 @@ class HallucinationFreeScorer(InstructorLLMScorer):
     max_tokens: int = 4096
 
     @weave.op
-    def score(self, output: str, context: str) -> HallucinationResponse:
+    async def score(self, output: str, context: str) -> HallucinationResponse:
         output = stringify(output)
-        response = create(
-            self.client,
+        response = await acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {
@@ -226,7 +223,7 @@ class HallucinationFreeScorer(InstructorLLMScorer):
                 },
             ],
             model=self.model_id,
-            response_model=HallucinationResponse,
+            response_format=HallucinationResponse,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )

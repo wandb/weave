@@ -27,9 +27,9 @@ import {useHistory} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
 
 import {isWeaveObjectRef, parseRef, parseRefMaybe} from '../../../../../react';
-import {flattenObjectPreservingWeaveTypes} from '../../Browse2/browse2Util';
 import {CellValue} from '../../Browse2/CellValue';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {flattenObjectPreservingWeaveTypes} from '../flattenObject';
 import {WeaveCHTableSourceRefContext} from '../pages/CallPage/DataTableView';
 import {TABLE_ID_EDGE_NAME} from '../pages/wfReactInterface/constants';
 import {useWFHooks} from '../pages/wfReactInterface/context';
@@ -409,7 +409,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
-            <Box sx={{marginLeft: '8px'}}>
+            <Box sx={{marginLeft: '8px', height: '100%'}}>
               <CellValue value={params.value} />
             </Box>
           );
@@ -489,7 +489,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
               icon="add-new"
               onClick={handleAddRowsClick}
               variant="secondary"
-              size="small"
               tooltip="Add row">
               Add row
             </Button>
@@ -550,6 +549,22 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
           height: '100%',
           '& .MuiDataGrid-cell': {
             padding: '0',
+            // This vertical / horizontal center aligns <span>'s inside of the columns
+            // Fixes an issure where boolean checkboxes are top-aligned pre-edit
+            '& .MuiBox-root': {
+              '& span.cursor-inherit': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '34px',
+              },
+            },
+          },
+          // Removed default MUI blue from editing cell
+          '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {
+            '&:focus, &:focus-within': {
+              outline: 'none',
+            },
           },
           '& .MuiDataGrid-columnHeaders': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',

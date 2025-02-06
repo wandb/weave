@@ -16,11 +16,8 @@ import {
   WEAVE_REF_PREFIX,
   WEAVE_REF_SCHEME,
 } from './constants';
-import {useWFHooks} from './context';
 import {
-  CallSchema,
   KnownBaseObjectClassType,
-  Loadable,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
@@ -298,19 +295,11 @@ export const isObjDeleteError = (error: Error | null): boolean => {
   return false;
 };
 
-/// Hooks ///
-
-export const useParentCall = (
-  call: CallSchema | null
-): Loadable<CallSchema | null> => {
-  const {useCall} = useWFHooks();
-  let parentCall = null;
-  if (call && call.parentId) {
-    parentCall = {
-      entity: call.entity,
-      project: call.project,
-      callId: call.parentId,
-    };
+export const getErrorReason = (error: Error): string | null => {
+  try {
+    const parsed = JSON.parse(error.message);
+    return parsed.reason ?? null;
+  } catch (e) {
+    return null;
   }
-  return useCall(parentCall);
 };

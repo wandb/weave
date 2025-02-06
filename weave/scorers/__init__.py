@@ -9,7 +9,6 @@ from weave.scorers.base_scorer import (
 from weave.scorers.bleu_scorer import BLEUScorer
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
-    transpose,
 )
 from weave.scorers.coherence_scorer import WeaveCoherenceScorer
 from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorer
@@ -22,7 +21,6 @@ from weave.scorers.hallucination_scorer import (
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuardScorer
 from weave.scorers.llm_scorer import (
-    InstructorLLMScorer,
     LLMScorer,
 )
 from weave.scorers.llm_utils import (

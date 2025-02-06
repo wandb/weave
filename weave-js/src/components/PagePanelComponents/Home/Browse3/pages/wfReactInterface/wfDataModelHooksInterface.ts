@@ -222,7 +222,8 @@ export type WFDataModelHooksInterface = {
     baseObjectClass?: string
   ) => Promise<string>;
   useOpVersion: (
-    key: OpVersionKey | null
+    key: OpVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -233,7 +234,8 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
-    key: ObjectVersionKey | null
+    key: ObjectVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,

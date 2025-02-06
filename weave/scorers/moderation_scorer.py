@@ -15,61 +15,33 @@ from weave.scorers.llm_utils import (
 if TYPE_CHECKING:
     from torch import Tensor
 
+from litellm import amoderation
 
-class OpenAIModerationScorer(LLMScorer):
+import weave
+from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
+
+
+class OpenAIModerationScorer(weave.Scorer):
     """
-    Use the OpenAI moderation API to check if the output is safe.
+    Uses the OpenAI moderation API to check if the model output is safe.
 
-    The OpenAI moderation API returns a response with categories indicating different types of unsafe content:
-    - `sexual`: Sexual content
-    - `sexual/minors`: Sexual content involving minors
-    - `harassment`: Harassment content
-    - `harassment/threatening`: Threatening harassment
-    - `hate`: Hate speech
-    - `hate/threatening`: Threatening hate speech
-    - `illicit`: Illicit content
-    - `illicit/violent`: Violent illicit content
-    - `self-harm`: Self-harm content
-    - `self-harm/intent`: Intent of self-harm
-    - `self-harm/instructions`: Instructions for self-harm
-    - `violence`: Violent content
-    - `violence/graphic`: Graphic violence
+    This scorer sends the provided output to the OpenAI moderation API and returns a structured response
+    indicating whether the output contains unsafe content.
 
-    Args:
-        model_id (str): The OpenAI model to use for moderation. Defaults to `text-moderation-latest`.
-
-    Returns:
-        dict: A dictionary containing the `pass` status and the detected `categories`.
-
-    Example:
-        >>> from weave.scorers.moderation_scorer import OpenAIModerationScorer
-        >>> scorer = OpenAIModerationScorer()
-        >>> result = await scorer.score("This is some sample text.")
-        >>> print(result)
-        {'pass': True, 'categories': {}}
+    Attributes:
+        model_id (str): The OpenAI moderation model identifier to be used. Defaults to `OPENAI_DEFAULT_MODERATION_MODEL`.
     """
 
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
 
-    @field_validator("client")
-    def validate_openai_client(cls, v: _LLM_CLIENTS) -> _LLM_CLIENTS:
-        # Method implementation
-        try:
-            from openai import AsyncOpenAI
-        except ImportError:
-            raise ValueError("Install openai to use this scorer")
-
-        if not isinstance(v, AsyncOpenAI):
-            raise TypeError("Moderation scoring only works with AsyncOpenAI")
-        return v
-
     @weave.op
     async def score(self, output: Any) -> dict:
-        response = await self.client.moderations.create(
+        response = await amoderation(
             model=self.model_id,
             input=output,
         )
         response = response.results[0]
+
         passed = not response.flagged
         categories = {
             k: v
@@ -188,19 +160,15 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str) -> dict[str, Any]:
-        # local scoring
-        passed: bool = True
-        predictions: list[float] = self.predict(output)
-        if (sum(predictions) >= self.total_threshold) or any(
-            o >= self.category_threshold for o in predictions
-        ):
-            passed = False
+    async def score(self, output: Any) -> dict:
+        response = await amoderation(
+            model=self.model_id,
+            input=output,
+        )
+        response = response.results[0]
+        categories = {k: v for k, v in response.categories.model_dump().items() if v}
+        return {"flagged": response.flagged, "categories": categories}
 
-        return {
-            "extras": dict(zip(self._categories, predictions)),
-            "pass": passed,
-        }
 
 
 BIAS_SCORER_THRESHOLD = 0.60

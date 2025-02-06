@@ -1,32 +1,62 @@
-import pytest
+import json
 
-from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_context_and_output
-from weave.scorers import WeaveHallucinationScorer
-from weave.scorers.llm_utils import download_model
+import pytest
+from pydantic import BaseModel
+
+import weave
+from weave.scorers import (
+    HallucinationFreeScorer,
+)
+from weave.scorers.hallucination_scorer import (
+    HallucinationResponse,
+)
 
 
 @pytest.fixture
-def weave_hallucination_scorer():
-    """
-    Fixture that returns a WeaveHallucinationScorer instance,
-    referencing the 'hallucination_hhem_scorer' checkpoint.
-    """
-    model_path = download_model(TINY_MODEL_PATHS["hallucination_hhem_scorer"])
-    scorer = WeaveHallucinationScorer(
-        model_name_or_path=model_path,
-        use_hhem=True,
-        device="cpu",
-        threshold=0.35,
+def hallucination_scorer(monkeypatch):
+    async def _mock_acompletion(*args, **kwargs):
+        content = {
+            "chain_of_thought": "The output is consistent with the input data.",
+            "reasonings": [
+                {
+                    "hallucination_type": "No Hallucination",
+                    "observation": "My observation for this is that the output is consistent with the input data.",
+                }
+            ],
+            "conclusion": "The output is consistent with the input data.",
+            "has_hallucination": True,
+        }
+
+        class Message(BaseModel):
+            content: str
+
+        class Choice(BaseModel):
+            message: Message
+
+        class Response(BaseModel):
+            choices: list[Choice]
+
+        return Response(choices=[Choice(message=Message(content=json.dumps(content)))])
+
+    monkeypatch.setattr(
+        "weave.scorers.hallucination_scorer.acompletion", _mock_acompletion
+    )
+
+    return HallucinationFreeScorer(
+        model_id="gpt-4o",
+        temperature=0.7,
+        max_tokens=4096,
     )
     return scorer
 
 
-def test_weave_hallucination_scorer_basic(weave_hallucination_scorer):
-    """Test that a basic matching context/output does not get flagged."""
-    query = "The moon is a big rock."
-    context = "The moon is a big rock."
-    output = "The moon is a big rock."
-    result = weave_hallucination_scorer.score(query=query, context=context, output=output)
+@pytest.mark.asyncio
+async def test_hallucination_scorer_score(hallucination_scorer):
+    output = "John's favorite cheese is cheddar."
+    context = "John likes various types of cheese."
+    result = await hallucination_scorer.score(output=output, context=context)
+    # we should be able to do this validation
+    _ = HallucinationResponse.model_validate(result)
 
     assert isinstance(result, dict), "Result should be a dictionary"
     assert "pass" in result, "Result should contain 'pass' key"

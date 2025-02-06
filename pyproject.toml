@@ -44,6 +44,7 @@ dependencies = [
   "rich",                    # Used for special formatting of tables (should be made optional)
   "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",      # Used by scorers for field validation
+  "diskcache==5.6.3",        # Used for data caching
 ]
 
 [project.optional-dependencies]
@@ -74,14 +75,9 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
-scorers = ["Levenshtein>=0.26.0", "instructor>=1.5.2"]
-scorers_tests = [
-  "instructor>=1.5.2",
+scorers = [
+  "litellm>=1.58",
   "Levenshtein>=0.26.0",
-  "openai>=1.0.0",
-  "google-generativeai>=0.8.0",
-  "mistralai>=1.0.3",
-  "anthropic>=0.30.0",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
   "transformers>=4.35.0",
@@ -94,7 +90,7 @@ notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
-vertexai = ["vertexai>=1.70.0"]
+vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
   "nox",
@@ -237,7 +233,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.32-dev0"
+current_version = "0.51.34-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
