@@ -107,6 +107,7 @@ class ClickHouseTraceServerMigrator:
         migrations_to_apply = self._determine_migrations_to_apply(
             status["curr_version"], migration_map, target_version
         )
+        logger.info(f">>>>>> {migration_map} \n\n {migrations_to_apply}")
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
             if should_insert_costs(status["curr_version"], target_version):
