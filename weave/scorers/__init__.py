@@ -1,10 +1,3 @@
-from weave.scorers.base_scorer import (
-    Scorer,
-    _has_oldstyle_scorers,
-    _validate_scorer_signature,
-    auto_summarize,
-    get_scorer_attributes,
-)
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
     transpose,

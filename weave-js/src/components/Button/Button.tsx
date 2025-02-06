@@ -184,3 +184,4 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return <Tailwind style={wrapperStyles}>{button}</Tailwind>;
   }
 );
+Button.displayName = 'Button';

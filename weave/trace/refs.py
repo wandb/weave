@@ -315,3 +315,10 @@ def parse_object_uri(uri: str) -> ObjectRef:
     if not isinstance(parsed := parse_uri(uri), ObjectRef):
         raise TypeError(f"URI is not for an Object: {uri}")
     return parsed
+
+
+def maybe_parse_uri(s: str) -> AnyRef | None:
+    try:
+        return parse_uri(s)
+    except ValueError:
+        return None

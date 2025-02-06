@@ -198,6 +198,11 @@ export function getStackIdAndName<X, C, T extends Type>(
     ) {
       displayName = 'Run Tables  ▸  Combined';
     } else if (
+      ourDisplayName === 'Run History Tables Stepper' &&
+      childDisplayName === 'Paginated Tables'
+    ) {
+      displayName = 'Run History Tables Stepper';
+    } else if (
       ourDisplayName === 'Combined Table' &&
       childDisplayName === 'Table'
     ) {

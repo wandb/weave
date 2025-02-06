@@ -60,7 +60,7 @@ const sidebars: SidebarsConfig = {
           collapsed: false,
           label: "Evaluation",
           link: { type: "doc", id: "guides/core-types/evaluations" },
-          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors"],
+          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors", "guides/evaluation/builtin_scorers"],
         },
         "guides/core-types/prompts",
         "guides/core-types/models",

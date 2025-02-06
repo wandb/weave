@@ -321,7 +321,7 @@ On a high-level the steps to create custom Scorer are quite simple:
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     ```python
-    from weave.scorers import Scorer
+    from weave import Scorer
     from weave import WeaveList
 
     class CorrectnessLLMJudge(Scorer):

@@ -13,7 +13,7 @@ import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceSer
 import {ScoresFeedbackGridInner} from './ScoresFeedbackGridInner';
 import {RUNNABLE_FEEDBACK_TYPE_PREFIX} from './StructuredFeedback/runnableFeedbackTypes';
 
-type FeedbackGridProps = {
+type ScorerFeedbackGridProps = {
   entity: string;
   project: string;
   weaveRef: string;
@@ -25,7 +25,7 @@ export const ScorerFeedbackGrid = ({
   project,
   weaveRef,
   objectType,
-}: FeedbackGridProps) => {
+}: ScorerFeedbackGridProps) => {
   /**
    * This component is very similar to `FeedbackGrid`, but it only shows scores.
    * While some of the code is duplicated, it is kept separate to make it easier

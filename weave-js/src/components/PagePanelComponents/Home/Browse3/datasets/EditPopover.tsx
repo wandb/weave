@@ -41,8 +41,8 @@ export const EditPopover: React.FC<EditPopoverProps> = ({
       setPosition({
         left: rect.left + window.scrollX,
         top: isInTopHalf
-          ? rect.bottom + window.scrollY // Position below for top half
-          : rect.top + window.scrollY - initialHeight, // Position above for bottom half
+          ? rect.bottom + window.scrollY - 36 // Move up by 36px when below
+          : rect.top + window.scrollY - initialHeight + 36, // Move down by 36px when above
       });
     } else {
       setPosition(null);

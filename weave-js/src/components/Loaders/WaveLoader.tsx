@@ -25,7 +25,9 @@ const Dot = React.memo(
 export const WaveLoader = ({size}: {size: 'small' | 'huge'}) => {
   return (
     <TailwindContents>
-      <div className="flex items-center gap-x-4">
+      <div
+        className="flex items-center gap-x-4"
+        data-test={`wave-loader-${size}`}>
         <Dot size={size} />
         <Dot delay=".3s" size={size} />
         <Dot delay=".6s" size={size} />

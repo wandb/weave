@@ -17,8 +17,8 @@ os.environ["OPENAI_API_KEY"] = "<YOUR-OPENAI-API-KEY>"
 
 weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")
 
-gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
-dspy.configure(lm=gpt3_turbo)
+lm = dspy.LM('openai/gpt-4o-mini')
+dspy.configure(lm=lm)
 classify = dspy.Predict("sentence -> sentiment")
 classify(sentence="it's a charming and often affecting journey.")
 ```

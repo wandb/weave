@@ -3,10 +3,9 @@ from typing import Callable
 from pydantic import Field, model_validator
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class StringMatchScorer(Scorer):
+class StringMatchScorer(weave.Scorer):
     """Scorer that checks if the model output string is found in the search columns of the dataset row."""
 
     @weave.op
@@ -15,7 +14,7 @@ class StringMatchScorer(Scorer):
         return {"string_in_input": string_in_input}
 
 
-class LevenshteinScorer(Scorer):
+class LevenshteinScorer(weave.Scorer):
     distance: Callable[[str, str], int] = Field(
         default=None, description="The Levenshtein distance function"
     )

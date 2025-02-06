@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from pydantic import BaseModel
 
 import weave
-from weave.scorers import Scorer
 from weave.scorers.guardrails.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
@@ -27,7 +26,7 @@ class LLMGuardrailResponse(BaseModel):
     reasoning: LLMGuardrailReasoning
 
 
-class PromptInjectionLLMGuardrail(Scorer):
+class PromptInjectionLLMGuardrail(weave.Scorer):
     system_prompt: str = PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.7

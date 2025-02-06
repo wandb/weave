@@ -37,5 +37,5 @@ class OpenAIModerationScorer(LLMScorer):
             model=self.model_id,
             input=output,
         ).results[0]
-        categories = {k: v for k, v in response.categories.items() if v}
+        categories = {k: v for k, v in response.categories.to_dict().items() if v}
         return {"flagged": response.flagged, "categories": categories}

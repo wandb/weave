@@ -13,11 +13,13 @@ import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceSer
 type FeedbackGridActionsProps = {
   projectId: string;
   feedbackId: string;
+  feedbackType?: string;
 };
 
 export const FeedbackGridActions = ({
   projectId,
   feedbackId,
+  feedbackType,
 }: FeedbackGridActionsProps) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -35,6 +37,7 @@ export const FeedbackGridActions = ({
           feedbackId={feedbackId}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
+          feedbackType={feedbackType}
         />
       )}
     </>
@@ -70,6 +73,7 @@ type ConfirmDeleteModalProps = {
   feedbackId: string;
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
+  feedbackType?: string;
 };
 
 export const ConfirmDeleteModal = ({
@@ -77,7 +81,9 @@ export const ConfirmDeleteModal = ({
   feedbackId,
   confirmDelete,
   setConfirmDelete,
+  feedbackType,
 }: ConfirmDeleteModalProps) => {
+  feedbackType = feedbackType ?? 'feedback';
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -101,7 +107,7 @@ export const ConfirmDeleteModal = ({
         });
       } catch (error) {
         if (isMounted) {
-          setError('Failed to delete feedback');
+          setError(`Failed to delete ${feedbackType}`);
         }
       } finally {
         if (isMounted) {
@@ -117,7 +123,7 @@ export const ConfirmDeleteModal = ({
     return () => {
       isMounted = false;
     };
-  }, [isRunning, getTsClient, projectId, feedbackId]);
+  }, [isRunning, getTsClient, projectId, feedbackId, feedbackType]);
 
   const onDelete = () => {
     setIsRunning(true);
@@ -132,12 +138,12 @@ export const ConfirmDeleteModal = ({
       }}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete feedback</DialogTitle>
+      <DialogTitle>Delete {feedbackType}</DialogTitle>
       <DialogContent style={{overflow: 'hidden'}}>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
-          <p>Are you sure you want to delete this feedback?</p>
+          <p>Are you sure you want to delete this {feedbackType}?</p>
         )}
       </DialogContent>
       <DialogActions $align="left">
@@ -145,7 +151,7 @@ export const ConfirmDeleteModal = ({
           variant="destructive"
           disabled={error != null || isLoading}
           onClick={onDelete}>
-          Delete feedback
+          {`Delete ${feedbackType}`}
         </Button>
         <Button
           variant="ghost"

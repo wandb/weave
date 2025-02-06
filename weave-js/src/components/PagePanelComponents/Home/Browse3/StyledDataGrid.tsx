@@ -85,3 +85,4 @@ export const StyledDataGrid = styled(
     },
   },
 }));
+StyledDataGrid.displayName = 'StyledDataGrid';

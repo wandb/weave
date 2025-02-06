@@ -30,7 +30,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       onKeyDown={handleKeyDown}
       onFocus={e => {
         const target = e.target as HTMLTextAreaElement;
-        target.setSelectionRange(0, target.value.length);
+        target.setSelectionRange(target.value.length, target.value.length);
       }}
       fullWidth
       multiline

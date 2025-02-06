@@ -23,11 +23,11 @@ Throughout this guide, we'll refer to functions decorated with `@weave.op` as "o
 :::
 
 #### Ready-to-Use Scorers
-While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./scorers.md#predefined-scorers) that you can use right away, including:
-- [Hallucination detection](./scorers.md#hallucinationfreescorer)
-- [Summarization quality](./scorers.md#summarizationscorer)
-- [Embedding similarity](./scorers.md#embeddingsimilarityscorer)
-- [Relevancy evaluation](./scorers.md#ragas---contextrelevancyscorer)
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) that you can use right away, including:
+- [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
+- [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
+- [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
+- [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
 - And more!
 
 
@@ -307,6 +307,12 @@ score = scorer.score(output="some text")
 - ✅ No Op required
 - ❌ No association with the LLM/Op call
 
+### Score Analysis
+
+
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+
+
 ## Production Best Practices
 
 ### 1. Set Appropriate Sampling Rates
@@ -340,13 +346,10 @@ async def evaluate_comprehensively(call):
 - Set up alerts for concerning patterns (coming soon)
 
 ### 4. Access Historical Data
-
 Scorer results are stored with their associated calls and can be accessed through:
 - The Call object's `feedback` field
 - The Weave Dashboard
 - Our query APIs
-
-For detailed information about querying calls and their scorer results, see our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
 
 ### 5. Initialize Guards Efficiently
 
