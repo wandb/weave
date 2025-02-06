@@ -1,6 +1,6 @@
 from pydantic import Field, field_validator
 
-from weave.scorers.base_scorer import Scorer
+import weave
 from weave.scorers.llm_utils import (
     _LLM_CLIENTS,
     _LLM_CLIENTS_NAMES,
@@ -8,7 +8,7 @@ from weave.scorers.llm_utils import (
 )
 
 
-class LLMScorer(Scorer):
+class LLMScorer(weave.Scorer):
     """Score model outputs using a Large Language Model (LLM).
 
     This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
@@ -34,7 +34,7 @@ class LLMScorer(Scorer):
         return v
 
 
-class InstructorLLMScorer(Scorer):
+class InstructorLLMScorer(weave.Scorer):
     """Score a model using an LLM with structured outputs.
 
     This scorer extends the base LLM scoring capability by adding temperature and
