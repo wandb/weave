@@ -131,6 +131,7 @@ resources:
       create: post /table/create
       update: post /table/update
       query: post /table/query
+      # query_stream: post /table/query_stream
       query_stats: post /table/query_stats
 
   refs:
