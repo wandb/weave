@@ -15,7 +15,6 @@ import {
   WeaveHeaderExtrasContext,
   WeaveHeaderExtrasProvider,
 } from '../../context';
-import {opNiceName} from '../common/opNiceName';
 import {
   SimplePageLayout,
   SimplePageLayoutContext,

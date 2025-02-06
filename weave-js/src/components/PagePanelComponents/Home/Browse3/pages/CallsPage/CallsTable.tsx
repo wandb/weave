@@ -149,6 +149,16 @@ const resolveColumnVisibility = (
   // By default columns are shown. If we have columns that we want to
   // hide by default, set that in the visibility model.
   for (const col of columns) {
+    // Hide any temporary columns we added to fix the sort model.
+    if (
+      !(col.field in resolvedModel) &&
+      col.width === 0 &&
+      col.minWidth === 0
+    ) {
+      resolvedModel[col.field] = false;
+      continue;
+    }
+    // Hide some columns by default
     if (
       !(col.field in resolvedModel) &&
       DEFAULT_HIDDEN_COLUMN_PREFIXES.some(prefix =>
@@ -552,16 +562,12 @@ export const CallsTable: FC<{
     project
   );
 
-  const columnVisibilityModelResolved = resolveColumnVisibility(
-    columnVisibilityModel ?? {},
-    columns.cols
-  );
-
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -646,8 +652,40 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
+
+    // When a saved view is loading, the columns it specifies to sort on
+    // may not exist in cols yet, e.g. the sort may be on a column that is
+    // part of an output object. When MUI data grid gets a sort specification
+    // that references a column that doesn't exist it removes it from the sort
+    // model and invokes onSortModelChange, which updates our query parameter state.
+    // As a workaround, we add the missing columns here.
+    const sortModelFields = sortModelResolved.map(sort => sort.field);
+    const colFields = cols.map(col => col.field);
+    for (const field of sortModelFields) {
+      if (!colFields.includes(field)) {
+        // Add a temporary column. MUI won't respect the zero width,
+        // but this will signal to resolveColumnVisibility that it should be hidden.
+        cols.push({
+          field,
+          width: 0,
+          minWidth: 0,
+        });
+      }
+    }
+
     return cols;
-  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+  }, [
+    columns.cols,
+    selectedCalls,
+    tableData,
+    isEvaluateTable,
+    sortModelResolved,
+  ]);
+
+  const columnVisibilityModelResolved = resolveColumnVisibility(
+    columnVisibilityModel ?? {},
+    muiColumns
+  );
 
   // Register Compare Evaluations Button
   const history = useHistory();
