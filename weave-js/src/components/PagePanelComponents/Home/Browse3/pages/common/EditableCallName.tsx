@@ -2,7 +2,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 
-import {StyledTextArea} from '../PlaygroundPage/StyledTextarea';
+import {StyledTextArea} from '../../StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {opNiceName} from './Links';
