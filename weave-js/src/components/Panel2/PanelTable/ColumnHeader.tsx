@@ -180,7 +180,10 @@ export const ColumnHeader: React.FC<{
       workingSelectFunction.type !== 'invalid'
     ) {
       let panelUpdated = false;
-      if (workingSelectFunction !== propsSelectFunction) {
+      if (
+        weave.expToString(workingSelectFunction) !==
+        weave.expToString(propsSelectFunction)
+      ) {
         newState = Table.updateColumnSelect(
           newState,
           colId,
@@ -657,6 +660,28 @@ export const ColumnHeader: React.FC<{
                         </PanelContextProvider>
                       </S.PanelSettings>
                     )}
+                </S.ColumnEditorSection>
+                <S.ColumnEditorSection>
+                  <Button
+                    data-test="column-header-apply"
+                    size="small"
+                    disabled={
+                      weave.expToString(workingSelectFunction) ===
+                        weave.expToString(propsSelectFunction) &&
+                      workingColumnName === propsColumnName &&
+                      workingPanelId === propsPanelId &&
+                      workingPanelConfig === propsPanelConfig
+                    }
+                    twWrapperStyles={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                    onClick={() => {
+                      applyWorkingState();
+                      setColumnSettingsOpen(false);
+                    }}>
+                    Apply
+                  </Button>
                 </S.ColumnEditorSection>
               </div>
             )
