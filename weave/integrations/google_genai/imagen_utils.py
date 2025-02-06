@@ -2,28 +2,34 @@ from functools import wraps
 from typing import Any, Callable, Union
 
 import weave
-from weave.trace.weave_client import Call
+from weave.integrations.google_genai.gemini_utils import (
+    google_genai_gemini_postprocess_inputs,
+)
 from weave.trace.autopatch import OpSettings
-from weave.integrations.google_genai.gemini_utils import google_genai_gemini_postprocess_inputs
+from weave.trace.weave_client import Call
 
 
-
-def google_genai_gemini_postprocess_outputs(outputs: dict[str, Any]) -> dict[str, Any]:
-    from PIL import Image
+def google_genai_gemini_postprocess_outputs(
+    outputs: dict[str, Any],
+) -> list[dict[str, Any]]:
     from io import BytesIO
+
+    from PIL import Image
 
     modified_outputs = []
     for image_data in outputs.generated_images:
-        modified_outputs.append({
-            "image": {
-                "gcs_uri": image_data.image.gcs_uri,
-                "image_bytes": image_data.image.image_bytes,
-                "mime_type": image_data.image.mime_type,
-                "image": Image.open(BytesIO(image_data.image.image_bytes)),
-                "rai_filtered_reason": image_data.rai_filtered_reason,
-                "enhanced_prompt": image_data.enhanced_prompt,
+        modified_outputs.append(
+            {
+                "image": {
+                    "gcs_uri": image_data.image.gcs_uri,
+                    "image_bytes": image_data.image.image_bytes,
+                    "mime_type": image_data.image.mime_type,
+                    "image": Image.open(BytesIO(image_data.image.image_bytes)),
+                    "rai_filtered_reason": image_data.rai_filtered_reason,
+                    "enhanced_prompt": image_data.enhanced_prompt,
+                }
             }
-        })
+        )
 
     return modified_outputs
 
@@ -47,10 +53,10 @@ def google_genai_imagen_wrapper_sync(
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
-        
+
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
-        
+
         if not op_kwargs.get("postprocess_output"):
             op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
@@ -79,7 +85,7 @@ def google_genai_imagen_wrapper_async(
 
         if not op_kwargs.get("postprocess_output"):
             op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
-        
+
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         op._set_on_finish_handler(google_genai_imagen_on_finish)
         return op
