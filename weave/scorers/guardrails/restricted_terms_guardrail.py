@@ -1,17 +1,15 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+import warnings
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers import Scorer
+from weave import Scorer
 from weave.scorers.guardrails.prompts import (
     RESTRICTED_TERMS_GUARDRAIL_SYSTEM_PROMPT,
     RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
-
-if TYPE_CHECKING:
-    from instructor import Instructor
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
 
 class TermMatch(BaseModel):
@@ -74,32 +72,39 @@ class RestrictedTermsLLMGuardrail(Scorer):
     max_tokens: int = 4096
     should_anonymize: bool = True
     aggregate_redaction: bool = True
-    _client: Union["Instructor", None] = None
 
     def model_post_init(self, __context: Any) -> None:
-        import instructor
-        from litellm import completion
-
-        self._client = instructor.from_litellm(completion)
+        if self.model_id not in ["gpt-4o", "gpt-4o-mini", "o1", "o1-preview"]:
+            warnings.warn(
+                "The default system prompt is optimized for gpt-4o and gpt-4o-mini. Using a different model may lead to unexpected results."
+            )
 
     @weave.op
     def analyse_restricted_terms(self, output: str) -> RestrictedTermsAnalysis:
-        return create(
-            self._client,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": self.user_prompt.format(
-                        text=output, custom_terms=", ".join(self.custom_terms)
-                    ),
-                },
-            ],
-            model=self.model_id,
-            response_model=RestrictedTermsAnalysis,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+        import litellm
+        from litellm import completion
+
+        litellm.enable_json_schema_validation = True
+        response = (
+            completion(
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {
+                        "role": "user",
+                        "content": self.user_prompt.format(
+                            text=output, custom_terms=", ".join(self.custom_terms)
+                        ),
+                    },
+                ],
+                model=self.model_id,
+                response_format=RestrictedTermsAnalysis,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            .choices[0]
+            .message.content
         )
+        return RestrictedTermsAnalysis.model_validate_json(response)
 
     def frame_guardrail_reasoning(self, analysis: RestrictedTermsAnalysis) -> str:
         if analysis.contains_restricted_terms:
