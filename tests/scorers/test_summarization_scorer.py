@@ -49,7 +49,7 @@ def summarization_scorer(monkeypatch):
 async def test_summarization_scorer_evaluate_summary(summarization_scorer):
     input_text = "This is the original text."
     summary_text = "This is the summary."
-    result = await summarization_scorer.evaluate_summary(
+    result = await summarization_scorer._evaluate_summary(
         input=input_text, summary=summary_text
     )
     assert isinstance(result, SummarizationEvaluationResponse)
@@ -83,7 +83,7 @@ def test_summarization_scorer_initialization(summarization_scorer):
 @pytest.mark.asyncio
 async def test_summarization_scorer_extract_entities(summarization_scorer):
     text = "This is a sample text with entities."
-    entities = await summarization_scorer.extract_entities(text)
+    entities = await summarization_scorer._extract_entities(text)
     assert isinstance(entities, list)
     assert len(entities) == 2
     assert "entity1" in entities

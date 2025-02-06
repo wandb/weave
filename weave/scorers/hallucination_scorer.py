@@ -39,7 +39,7 @@ The cat has orange stripes.
 
 ## Analysis:
 {
-  "think_step_by_step": "The cat is black and white. The cat has orange stripes. \
+  "chain_of_thought": "The cat is black and white. The cat has orange stripes. \
 The output contradicts the input data because the input specifies black and white, \
 while the output mentions orange. The output also introduces a pattern not present in \
 the input.",
@@ -91,11 +91,9 @@ class HallucinationReasoning(BaseModel):
 class HallucinationResponse(BaseModel):
     chain_of_thought: str = Field(
         description="Think step by step about whether the <output> contains hallucinations based on the <input_data>.",
-        alias="think_step_by_step",
     )
     reasonings: list[HallucinationReasoning] = Field(
         description="A list of reasoning steps that lead to the conclusion about whether or not the <output> contains hallucinations.",
-        alias="reasoning",
     )
     conclusion: str = Field(description="The conclusion of the analysis.")
     has_hallucination: bool = Field(
