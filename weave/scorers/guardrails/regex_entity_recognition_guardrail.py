@@ -115,7 +115,6 @@ class RegexEntityRecognitionGuardrail(Scorer):
     entities in a text and optionally anonymize them.
 
     Args:
-        use_defaults (bool): Whether to use default patterns.
         should_anonymize (bool): Whether to anonymize the text.
         custom_terms (Optional[list[str]]): The custom terms to use for entity detection.
         aggregate_redaction (bool): Whether to aggregate redactions.
@@ -136,15 +135,13 @@ class RegexEntityRecognitionGuardrail(Scorer):
 
     def __init__(
         self,
-        use_defaults: bool = True,
         should_anonymize: bool = False,
         custom_terms: Optional[list[str]] = None,
         aggregate_redaction: bool = True,
+        patterns: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> None:
-        patterns = {}
-        if use_defaults:
-            patterns = DEFAULT_PATTERNS.copy()
+        patterns = patterns.copy() if patterns else DEFAULT_PATTERNS
         if kwargs.get("patterns"):
             patterns.update(kwargs["patterns"])
 
