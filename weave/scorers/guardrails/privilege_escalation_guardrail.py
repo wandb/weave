@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING, Any, Union
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers import Scorer
+from weave import Scorer
 from weave.scorers.guardrails.prompts import (
     PRIVILEGE_ESCALATION_SYSTEM_PROMPT,
     PRIVILEGE_ESCALATION_USER_PROMPT,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL, create
+from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
 if TYPE_CHECKING:
     from instructor import Instructor
@@ -36,8 +36,8 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
 
     system_prompt: str = PRIVILEGE_ESCALATION_SYSTEM_PROMPT
     model_id: str = OPENAI_DEFAULT_MODEL
-    temperature: float = 0.7
-    max_tokens: int = 4096
+    temperature: float = 0.0
+    max_tokens: int = 1024
     _client: Union["Instructor", None] = None
 
     def model_post_init(self, __context: Any) -> None:
@@ -48,17 +48,29 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
 
     @weave.op
     def score(self, output: str) -> PrivilegeEscalationGuardrailResponse:
-        return create(
-            self._client,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(prompt=output),
-                },
-            ],
-            model=self.model_id,
-            response_model=PrivilegeEscalationGuardrailResponse,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        ).model_dump()
+        import litellm
+        from litellm import completion
+
+        litellm.enable_json_schema_validation = True
+
+        response = (
+            completion(
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {
+                        "role": "user",
+                        "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(
+                            prompt=output
+                        ),
+                    },
+                ],
+                model=self.model_id,
+                response_format=PrivilegeEscalationGuardrailResponse,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            .choices[0]
+            .message.content
+        )
+
+        return PrivilegeEscalationGuardrailResponse.model_validate_json(response)
