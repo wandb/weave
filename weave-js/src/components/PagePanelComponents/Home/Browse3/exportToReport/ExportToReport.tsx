@@ -1,7 +1,4 @@
-import {
-  gql,
-  useMutation,
-} from '@apollo/client';
+import {gql, useMutation} from '@apollo/client';
 import {Box, Drawer} from '@material-ui/core';
 import {ID} from '@wandb/weave/common/util/id';
 import {Button} from '@wandb/weave/components/Button/Button';
@@ -407,7 +404,7 @@ export const ExportToReportDrawer: FC<ExportToReportDrawerProps> = ({
         entityName,
         name: ID(12),
         projectName,
-        spec: JSON.stringify(getEmptyReportConfig()),
+        spec: JSON.stringify(getEmptyReportConfig([buildQueryPanel()])),
         type: 'runs/draft',
       },
     }).then(result => {
@@ -525,9 +522,9 @@ const UPSERT_REPORT = gql(`
     }
   `);
 
-function getEmptyReportConfig() {
+function getEmptyReportConfig(blocks: any[]) {
   return {
-    blocks: [{type: 'paragraph', children: [{text: 'TESTING FROM WEAVE'}]}],
+    blocks: [{type: 'paragraph', children: [{text: ''}]}, ...blocks],
     discussionThreads: [],
     panelSettings: {
       xAxis: '_step',
@@ -540,6 +537,170 @@ function getEmptyReportConfig() {
     },
     width: 'readable',
     version: 5, // ReportSpecVersion.SlateReport
+  };
+}
+
+function buildQueryPanel() {
+  return {
+    type: 'weave-panel',
+    children: [{text: ''}],
+    config: {
+      panelConfig: {
+        vars: {},
+        id: 'Panel',
+        input_node: {nodeType: 'void', type: 'invalid'},
+        config: {
+          documentId: ID(12),
+        },
+        exp: {
+          nodeType: 'output',
+          type: 'unknown',
+          fromOp: {
+            name: 'project-traces',
+            inputs: {
+              project: {
+                nodeType: 'output',
+                type: 'project',
+                fromOp: {
+                  name: 'root-project',
+                  inputs: {
+                    entityName: {
+                      nodeType: 'const',
+                      type: 'string',
+                      val: 'timssweeney',
+                    },
+                    projectName: {
+                      nodeType: 'const',
+                      type: 'string',
+                      val: 'eval_example',
+                    },
+                  },
+                },
+              },
+              payload: {
+                nodeType: 'output',
+                type: {
+                  type: 'typedDict',
+                  propertyTypes: {
+                    project_id: 'string',
+                    filter: {
+                      type: 'typedDict',
+                      propertyTypes: {
+                        trace_roots_only: 'boolean',
+                      },
+                    },
+                    limit: 'number',
+                    offset: 'number',
+                    sort_by: {
+                      type: 'list',
+                      objectType: {
+                        type: 'typedDict',
+                        propertyTypes: {
+                          field: 'string',
+                          direction: 'string',
+                        },
+                      },
+                      minLength: 1,
+                      maxLength: 1,
+                    },
+                    include_feedback: 'boolean',
+                  },
+                },
+                fromOp: {
+                  name: 'dict',
+                  inputs: {
+                    project_id: {
+                      nodeType: 'const',
+                      type: 'string',
+                      val: 'timssweeney/eval_example',
+                    },
+                    filter: {
+                      nodeType: 'output',
+                      type: {
+                        type: 'typedDict',
+                        propertyTypes: {
+                          trace_roots_only: 'boolean',
+                        },
+                      },
+                      fromOp: {
+                        name: 'dict',
+                        inputs: {
+                          trace_roots_only: {
+                            nodeType: 'const',
+                            type: 'boolean',
+                            val: true,
+                          },
+                        },
+                      },
+                    },
+                    limit: {
+                      nodeType: 'const',
+                      type: 'number',
+                      val: 10000,
+                    },
+                    offset: {
+                      nodeType: 'const',
+                      type: 'number',
+                      val: 0,
+                    },
+                    sort_by: {
+                      nodeType: 'output',
+                      type: {
+                        type: 'list',
+                        objectType: {
+                          type: 'typedDict',
+                          propertyTypes: {
+                            field: 'string',
+                            direction: 'string',
+                          },
+                        },
+                        minLength: 1,
+                        maxLength: 1,
+                      },
+                      fromOp: {
+                        name: 'list',
+                        inputs: {
+                          '0': {
+                            nodeType: 'output',
+                            type: {
+                              type: 'typedDict',
+                              propertyTypes: {
+                                field: 'string',
+                                direction: 'string',
+                              },
+                            },
+                            fromOp: {
+                              name: 'dict',
+                              inputs: {
+                                field: {
+                                  nodeType: 'const',
+                                  type: 'string',
+                                  val: 'started_at',
+                                },
+                                direction: {
+                                  nodeType: 'const',
+                                  type: 'string',
+                                  val: 'desc',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    include_feedback: {
+                      nodeType: 'const',
+                      type: 'boolean',
+                      val: false,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   };
 }
 
