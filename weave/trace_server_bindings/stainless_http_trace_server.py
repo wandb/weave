@@ -96,8 +96,8 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        username: str | None = None,
-        password: str | None = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         debug: bool = False,
     ):
         super().__init__()
@@ -275,6 +275,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
 
         if isinstance(req, dict):
             req = tsi.CallStartReq.model_validate(req)
+        req = cast(tsi.CallStartReq, req)
         return self.stainless_client.calls.start(start=req.start)
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
@@ -289,11 +290,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
 
         if isinstance(req, dict):
             req = tsi.CallEndReq.model_validate(req)
+        req = cast(tsi.CallEndReq, req)
         return self.stainless_client.calls.end(end=req.end)
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         if isinstance(req, dict):
             req = tsi.CallReadReq.model_validate(req)
+        req = cast(tsi.CallReadReq, req)
         return self.stainless_client.calls.read(**req)
 
     def calls_query(
@@ -354,11 +357,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ObjCreateRes:
         if isinstance(req, dict):
             req = tsi.ObjCreateReq.model_validate(req)
+        req = cast(tsi.ObjCreateReq, req)
         return self.stainless_client.objects.create(obj=req.obj)
 
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
         if isinstance(req, dict):
             req = tsi.ObjReadReq.model_validate(req)
+        req = cast(tsi.ObjReadReq, req)
         return self.stainless_client.objects.read(
             project_id=req.project_id,
             digest=req.digest,
@@ -370,6 +375,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ObjQueryRes:
         if isinstance(req, dict):
             req = tsi.ObjQueryReq.model_validate(req)
+        req = cast(tsi.ObjQueryReq, req)
         return self.stainless_client.objects.query(**req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
