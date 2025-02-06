@@ -29,17 +29,11 @@ Given an <input> and a <summary>, evaluate the quality of the <summary>.
 - Does the <summary> contain information or assertions that are not present in the <input>?
 
 # Scoring Rubric
-`excellent`: The <summary> contains all of the key information and entities in the <input>, \
-is concise and information dense, is grammatically correct and doesn't contain any \
-information or assertions that are not present in the <input>.
+`excellent`: The <summary> contains all of the key information and entities in the <input>, is concise and informative, is grammatically correct and doesn't contain any information or assertions that are not present in the <input>.
 
-`ok`: The <summary> contains most of the key information and entities in the <input>, \
-is somewhat concise and informative, is mostly grammatically correct and doesn't contain any \
-information or assertions that are not present in the <input>.
+`ok`: The <summary> contains most of the key information and entities in the <input>, is somewhat concise and informative, is mostly grammatically correct and doesn't contain any information or assertions that are not present in the <input>.
 
-`poor`: The <summary> misses most or all of the key information in the <input>, \
-or is very verbose or vague, or is not concise or informative, or has many grammatical errors, \
-or contains information or assertions that are not present in the <input>.
+`poor`: The <summary> misses most or all of the key information in the <input>, or is very verbose or vague, or is not concise or informative, or has many grammatical errors, or contains information or assertions that are not present in the <input>.
 """
 
 DEFAULT_SUMMARIZATION_EVALUATION_USER_PROMPT = """
@@ -67,57 +61,46 @@ summarization_quality_mapping = {"poor": 0.0, "ok": 0.5, "excellent": 1.0}
 
 class SummarizationEvaluationResponse(BaseModel):
     think_step_by_step: str = Field(
-        description="Think step-by-step about the quality of the <summary> before deciding \
-on the summarization_score."
+        description="Think step-by-step about the quality of the <summary> before deciding on the summarization score."
     )
     summarization_evaluation: summarization_quality_options = Field(
-        description="The evaluation of the summary"
+        description="The evaluation of the summary ('poor', 'ok', or 'excellent')."
     )
 
 
 class SummarizationScorer(LLMScorer):
     """
     A Scorer that evaluates the quality of summaries in two ways:
-        - using an LLM to calculate the entity density of the summary, similar to how entity density is
-        used in the Chain of Density paper, https://arxiv.org/abs/2309.04269. This is a rough measure for
-        how information-dense the summary is.
-        - using another LLM evaluator to grade the summary quality from `poor`, `ok`, to `excellent`. These
-        grades are then mapped to numerical scores, {`poor`: 0.0, `ok`: 0.5, `excellent`: 1.0}, in order to
-        be able to calculate an average score across a dataset of summaries if needed.
+      - It uses an LLM to calculate the entity density of the summary, which is a rough measure of how
+        information-dense the summary is. This method evaluates whether the summary contains a sufficient
+        number of key entities relative to its length.
+      - It leverages another LLM evaluation to grade the summary quality on a scale of 'poor', 'ok', to 'excellent'.
+        These grades are then mapped to numerical scores ({'poor': 0.0, 'ok': 0.5, 'excellent': 1.0}), allowing
+        aggregate performance calculations on a dataset of summaries.
 
-    To customise the LLM evaluator you can customise the `summarization_evaluation_system_prompt`and
-    `summarization_evaluation_prompt` attributes to be tailored your specific definition of what a good summary
-    should look like.
+    The LLM evaluator's behavior can be customized by modifying the `summarization_evaluation_system_prompt` and
+    `summarization_evaluation_prompt` attributes, thus tailoring the definition of a good summary.
 
     Note:
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
-        provider's response; you will have to install the `instructor` python package to use it.
-        - The `score` method expects the input column from the dataset to be named "input". If your dataset
-        column has a different name, you can specify a different mapping using the `column_map` argument in the
-        init of SummarizationScorer by passing `column_map={"input": "news_article"}`.
+      - This scorer uses the LLM via litellm.acompletion to generate structured outputs from the LLM provider's response.
+      - The `score` method expects the input column from the dataset to be named "input". If your dataset column has a
+        different name, you can specify a different mapping using the `column_map` argument when initializing the scorer,
+        for example: `column_map={"input": "news_article"}`.
 
     Attributes:
-        extraction_system_prompt (str): System prompt to extract the distinct entities in the input. Customising
-        this can help ensure that the LLM identifies the `entities` that you care about.
-        extraction_prompt (str): Prompt template for entity extraction; must contain a `{text}` placeholder.
-        summarization_evaluation_system_prompt (str): System prompt defining how to evaluate the quality of a summary.
-            Asks an LLM to grade the summary from `poor`, `ok`, to `excellent` and provide a rationale for the grade.
-        summarization_evaluation_prompt (str): Prompt template for summarization evaluation instruction; must contain
-            `{input}` and `{summary}` placeholders.
-        entity_density_threshold (float): Threshold for determining if a summary is sufficiently entity-dense.
-        model_id (str): The LLM model name, depends on the LLM's providers to be used `client` being used.
-        temperature (float): LLM temperature setting.
-        max_tokens (int): Maximum number of tokens in the LLM's response.
+      extraction_system_prompt (str): System prompt used to extract distinct entities from the input.
+      extraction_prompt (str): Template prompt for entity extraction; must contain a `{text}` placeholder.
+      summarization_evaluation_system_prompt (str): System prompt that defines how to evaluate the quality of a summary.
+      summarization_evaluation_prompt (str): Template prompt for summarization evaluation; must include `{input}` and `{summary}`.
+      entity_density_threshold (float): Threshold for determining if a summary is sufficiently entity-dense.
+      model_id (str): Identifier for the LLM model to be used.
+      temperature (float): LLM temperature setting.
+      max_tokens (int): Maximum number of tokens in the LLM's response.
 
     Methods:
-        extract_entities(text: str) -> list[str]:
-            Uses an LLM to extract unique entities from the text.
-
-        evaluate_summary(input: str, summary: str) -> SummarizationEvaluationResponse:
-            Evaluates the quality of a summary using an LLM.
-
-        score(input: str, output: str) -> dict:
-            Calculates summarization score and entity density score for the given input and output.
+      score(input: str, output: str) -> dict:
+          Calculates both the LLM evaluation score (by mapping 'poor', 'ok', 'excellent' to numerical values) and
+          the entity density score of the summary.
     """
 
     extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT
@@ -132,8 +115,8 @@ class SummarizationScorer(LLMScorer):
     max_tokens: int = 1024
 
     @weave.op
-    async def extract_entities(self, text: str) -> list[str]:
-        """Use an LLM to extract entities"""
+    async def _extract_entities(self, text: str) -> list[str]:
+        """Use an LLM to extract unique entities from the provided text."""
         response = await acompletion(
             messages=[
                 {"role": "system", "content": self.extraction_system_prompt},
@@ -147,15 +130,14 @@ class SummarizationScorer(LLMScorer):
         response = EntityExtractionResponse.model_validate_json(
             response.choices[0].message.content
         )
-
         entities = [e.strip().lower() for e in response.entities]
         return entities
 
     @weave.op
-    async def evaluate_summary(
+    async def _evaluate_summary(
         self, input: str, summary: str
     ) -> SummarizationEvaluationResponse:
-        """Evaluate the quality of a summary using an LLM"""
+        """Evaluate the quality of a summary using an LLM."""
         response = await acompletion(
             messages=[
                 {
@@ -178,25 +160,39 @@ class SummarizationScorer(LLMScorer):
             response.choices[0].message.content
         )
 
-    def simple_word_tokenize(self, text: str) -> list[str]:
-        """Simple word tokenization"""
+    def _simple_word_tokenize(self, text: str) -> list[str]:
+        """Simple word tokenization: splits text into words."""
         return text.split()
 
     @weave.op
     async def score(self, input: str, output: str) -> dict:
-        extract_task = self.extract_entities(text=str(output))
-        evaluate_task = self.evaluate_summary(input=str(input), summary=str(output))
+        """
+        Evaluate a summary by combining entity density and LLM quality evaluation.
+
+        This method performs two assessments:
+          1. Entity Density Evaluation: Extracts entities from the summary and calculates the ratio of extracted entities
+             to the total number of words. Determines if the summary is dense enough based on the `entity_density_threshold`.
+          2. LLM Evaluation: Uses an LLM to assess the quality of the summary, mapping the evaluation ('poor', 'ok', or
+             'excellent') to a numerical score.
+
+        Returns:
+            A dictionary with:
+              - "summarization_eval_score": The numerical score based on LLM evaluation.
+              - "llm_eval_reasoning": The detailed reasoning from the LLM evaluation.
+              - "is_entity_dense": A boolean indicating if the summary meets the entity density threshold.
+              - "entity_density": The calculated entity density ratio.
+        """
+        extract_task = self._extract_entities(text=str(output))
+        evaluate_task = self._evaluate_summary(input=str(input), summary=str(output))
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
-        # LLM evaluation
         result = {}
         result["summarization_eval_score"] = summarization_quality_mapping.get(
             llm_eval.summarization_evaluation.lower()
         )
         result["llm_eval_reasoning"] = llm_eval.think_step_by_step
 
-        # Entity density evaluation
-        summary_words = self.simple_word_tokenize(output)
+        summary_words = self._simple_word_tokenize(output)
         entity_density = len(summary_entities) / len(summary_words)
         result["is_entity_dense"] = entity_density >= self.entity_density_threshold
         result["entity_density"] = entity_density

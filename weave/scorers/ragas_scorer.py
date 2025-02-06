@@ -22,17 +22,16 @@ class ContextEntityRecallScorer(LLMScorer):
     and the context, then computing the recall score between them.
 
     Note:
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
-        provider's response; you will have to install the `instructor` python package to use it.
+        - This Scorer uses the LLM via litellm.acompletion to generate structured responses.
         - The `score` method expects two arguments: 'output' (the model's response) and 'context'
-        (the reference text). If your dataset columns have different names, use the `column_map`
-        argument when initializing the scorer.
+          (the reference text). If your dataset columns have different names, use the `column_map`
+          argument when initializing the scorer.
         - Entity extraction is performed using an LLM, so results may vary based on the model used.
 
     Attributes:
         extraction_prompt (str): The prompt template used to extract entities from text. Must
-        contain a {text} placeholder.
-        model_id (str): The LLM model name, depends on the LLM provider being used.
+          contain a {text} placeholder.
+        model_id (str): The LLM model name, depending on the LLM provider being used.
         temperature (float): LLM temperature setting.
         max_tokens (int): Maximum number of tokens in the LLM's response.
 
@@ -84,7 +83,7 @@ class RelevancyResponse(BaseModel):
         description="Think step by step about whether the context is relevant to the question"
     )
     relevancy_score: int = Field(
-        description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)",
+        description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)"
     )
 
 
@@ -93,17 +92,16 @@ class ContextRelevancyScorer(LLMScorer):
     A Scorer that evaluates the relevancy of the provided context to the model output using an LLM.
 
     Note:
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
-        provider's response; you will have to install the `instructor` python package to use it.
+        - This Scorer uses the LLM via litellm.acompletion to generate structured responses.
         - The `score` method expects two arguments: 'output' (treated as the question) and 'context'
-        (the reference text). If your dataset columns have different names, use the `column_map`
-        argument when initializing the scorer.
+          (the reference text). If your dataset columns have different names, use the `column_map`
+          argument when initializing the scorer.
         - The relevancy score is binary (0 or 1) where 1 indicates relevant context.
 
     Attributes:
         relevancy_prompt (str): The prompt template used to evaluate context relevancy. Must
-        contain placeholders for both {question} and {context}.
-        model_id (str): The LLM model name, depends on the LLM provider being used.
+          contain placeholders for both {question} and {context}.
+        model_id (str): The LLM model name, depending on the LLM provider being used.
         temperature (float): LLM temperature setting.
         max_tokens (int): Maximum number of tokens in the LLM's response.
 
