@@ -311,11 +311,11 @@ class TrustScorer(Scorer):
                     advisory_issues.append(scorer_name)
 
         # Determine trust level
-        trust_level = "high_no_issues_found"
+        trust_level = "high_no-issues-found"
         if critical_issues:
-            trust_level = "low_critical_issues_found"
+            trust_level = "low_critical-issues-found"
         elif advisory_issues:
-            trust_level = "medium_advisory_issues_found"
+            trust_level = "medium_advisory-issues-found"
 
         # Extract scores where available
         scores = {
@@ -350,6 +350,8 @@ class TrustScorer(Scorer):
             "flagged": result["flagged"],
             "extras": {
                 "trust_level": result["trust_level"],
+                "critical_issues": result["critical_issues"],
+                "advisory_issues": result["advisory_issues"],
                 "raw_outputs": result["extras"]["raw_outputs"],
                 "scores": result["extras"]["scores"]
             }
