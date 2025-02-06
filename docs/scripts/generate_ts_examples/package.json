@@ -1,11 +1,12 @@
 {
-  "name": "weave-example",
+  "name": "generate-ts-examples",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start-intro-notebook": "ts-node src/intro-notebook.ts",
-    "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts",
+    "start-intro-notebook": "ts-node ts-examples/intro-notebook.ts",
+    "start-audio-notebook": "ts-node ts-examples/audio-notebook.ts",
+    "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts"
   },
   "dependencies": {
     "@types/node": "^22.10.2",
