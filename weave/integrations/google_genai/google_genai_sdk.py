@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse
 
 
-def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+def google_genai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
@@ -22,7 +22,7 @@ def google_genai_2_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def google_genai_2_on_finish(
+def google_genai_on_finish(
     call: Call, output: Any, exception: Union[BaseException, None]
 ) -> None:
     model_name = None
@@ -46,7 +46,7 @@ def google_genai_2_on_finish(
         call.summary.update(summary_update)
 
 
-def google_genai_2_accumulator(
+def google_genai_accumulator(
     acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
 ) -> "GenerateContentResponse":
     if acc is None:
@@ -84,25 +84,25 @@ def google_genai_2_accumulator(
     return acc
 
 
-def google_genai_2_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
+def google_genai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
-            op_kwargs["postprocess_inputs"] = google_genai_2_postprocess_inputs
+            op_kwargs["postprocess_inputs"] = google_genai_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
         if not op.name.endswith("count_tokens"):
-            op._set_on_finish_handler(google_genai_2_on_finish)
+            op._set_on_finish_handler(google_genai_on_finish)
         return add_accumulator(
             op,
-            make_accumulator=lambda inputs: google_genai_2_accumulator,
+            make_accumulator=lambda inputs: google_genai_accumulator,
             should_accumulate=lambda inputs: op.name.endswith("stream"),
         )
 
     return wrapper
 
 
-def google_genai_2_wrapper_async(
+def google_genai_wrapper_async(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
@@ -115,21 +115,21 @@ def google_genai_2_wrapper_async(
 
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
-            op_kwargs["postprocess_inputs"] = google_genai_2_postprocess_inputs
+            op_kwargs["postprocess_inputs"] = google_genai_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if not op.name.endswith("count_tokens"):
-            op._set_on_finish_handler(google_genai_2_on_finish)
+            op._set_on_finish_handler(google_genai_on_finish)
         return add_accumulator(
             op,
-            make_accumulator=lambda inputs: google_genai_2_accumulator,
+            make_accumulator=lambda inputs: google_genai_accumulator,
             should_accumulate=lambda inputs: op.name.endswith("stream"),
         )
 
     return wrapper
 
 
-def get_google_genai_2_patcher(
+def get_google_genai_patcher(
     settings: Union[IntegrationSettings, None] = None,
 ) -> Union[MultiPatcher, NoOpPatcher]:
     if settings is None:
@@ -176,49 +176,49 @@ def get_google_genai_2_patcher(
         update={"name": base.name or "google.genai.chats.AsyncChat.send_message_stream"}
     )
 
-    _google_genai_2_patcher = MultiPatcher(
+    _google_genai_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "Models.generate_content",
-                google_genai_2_wrapper_sync(generate_content_settings),
+                google_genai_wrapper_sync(generate_content_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "AsyncModels.generate_content",
-                google_genai_2_wrapper_async(generate_content_async_settings),
+                google_genai_wrapper_async(generate_content_async_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "Models.count_tokens",
-                google_genai_2_wrapper_sync(count_tokens_settings),
+                google_genai_wrapper_sync(count_tokens_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "AsyncModels.count_tokens",
-                google_genai_2_wrapper_async(count_tokens_async_settings),
+                google_genai_wrapper_async(count_tokens_async_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.chats"),
                 "Chat.send_message",
-                google_genai_2_wrapper_sync(chat_settings),
+                google_genai_wrapper_sync(chat_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.chats"),
                 "AsyncChat.send_message",
-                google_genai_2_wrapper_async(chat_async_settings),
+                google_genai_wrapper_async(chat_async_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "Models.generate_content_stream",
-                google_genai_2_wrapper_sync(generate_content_stream_settings),
+                google_genai_wrapper_sync(generate_content_stream_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("google.genai.models"),
                 "AsyncModels.generate_content_stream",
-                google_genai_2_wrapper_async(generate_content_stream_async_settings),
+                google_genai_wrapper_async(generate_content_stream_async_settings),
             ),
         ]
     )
 
-    return _google_genai_2_patcher
+    return _google_genai_patcher
