@@ -12,7 +12,7 @@ from weave.scorers.llm_scorer import HuggingFaceScorer
 from weave.scorers.llm_utils import MODEL_PATHS, download_model
 
 
-class RobustnessScorer(HuggingFaceScorer):
+class WeaveRobustnessScorer(HuggingFaceScorer):
     """
     RobustnessScorer evaluates the robustness of a language model's outputs against input perturbations.
 
