@@ -39,18 +39,18 @@ class FluencyScorer(HuggingFacePipelineScorer):
             self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["fluency_scorer"])
-        
+
         self._pipeline = pipeline(
             "text-classification", 
             model=self._local_model_path,
             device=self.device,
             top_k=2,
         )
-    
+
     @weave.op
     def score(self, output: str):
         pipeline_output = self._pipeline(output)[0]
-        non_fluent_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'non-fluent')
-        if non_fluent_score > self.threshold:
+        fluency_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'fluent')
+        if fluency_score <= self.threshold:
             return {"flagged": True, "extras": pipeline_output}
         return {"flagged": False, "extras": pipeline_output}

@@ -307,10 +307,6 @@ class TrustScorer(Scorer):
 
         raw_results = self._score_all(output=output, context=context, query=query)
 
-        for scorer_name, result in raw_results.items(): # TODO remove print
-            print(scorer_name)
-            print(result)
-
         # Handle error case
         if "error" in raw_results:
             return raw_results["error"]
@@ -342,8 +338,7 @@ class TrustScorer(Scorer):
             if "extras" in result and "score" in result["extras"]
         }
 
-        for i, score_label in enumerate(raw_results["FluencyScorer"]["extras"]):
-            print(score_label)  # TODO remove print
+        for score_label in raw_results["FluencyScorer"]["extras"]:
             if score_label["label"] == "non-fluent":
                 scores["FluencyScorer"] = score_label["score"]
                 print("Added FluencyScorer score!")

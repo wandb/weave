@@ -53,6 +53,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
         """Score a prompt response pair."""
         assert self._pipeline is not None
         coherence_output = self._pipeline(inputs={"text": prompt, "text_pair": output})
+        coherence_score = 1 - coherence_output["score"]
         flagged = False
         if "incoherent" in coherence_output["label"].lower():
             flagged = True
@@ -62,7 +63,7 @@ class CoherenceScorer(HuggingFacePipelineScorer):
             "extras": {
                 "coherence_label": coherence_output["label"],
                 "coherence_id": self._label2id[coherence_output["label"]],
-                "score": coherence_output["score"],
+                "score": coherence_score,
             },
         }
 
