@@ -3,10 +3,9 @@ from typing import Any, Literal, Optional
 from pydantic import Field
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class AccuracyScorer(Scorer):
+class AccuracyScorer(weave.Scorer):
     """Accuracy scorer supporting binary, multiclass, and multilabel tasks."""
 
     task: Literal["binary", "multiclass", "multilabel"]

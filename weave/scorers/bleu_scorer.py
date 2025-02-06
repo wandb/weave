@@ -3,10 +3,9 @@ from typing import Any, Optional, Union
 from pydantic import Field
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 
-class BLEUScorer(Scorer):
+class BLEUScorer(weave.Scorer):
     """A Scorer that computes the BLEU score using SacreBLEU."""
 
     # Optional configuration parameters

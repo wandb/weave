@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
 
 import weave
-from weave.scorers.base_scorer import Scorer
 from weave.scorers import (
     WeaveHallucinationScorer, 
     WeaveCoherenceScorer, 
@@ -27,7 +26,7 @@ from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRE
 from pydantic import PrivateAttr, Field
 
 
-class WeaveTrustScorer(Scorer):
+class WeaveTrustScorer(weave.Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.
 
     The TrustScorer evaluates the trustworthiness of model outputs by combining multiple
