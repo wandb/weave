@@ -6,13 +6,16 @@
   },
   "servers": [
     {
-      "url": "https://api.wandb.ai"
+      "url": "https://trace.wandb.ai",
+      "description": "Prod"
     }
   ],
   "paths": {
     "/health": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Read Root",
         "operationId": "read_root_health_get",
         "responses": {
@@ -29,7 +32,9 @@
     },
     "/server_info": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Server Info",
         "operationId": "server_info_server_info_get",
         "responses": {
@@ -48,7 +53,9 @@
     },
     "/call/start": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Start",
         "operationId": "call_start_call_start_post",
         "requestBody": {
@@ -92,7 +99,9 @@
     },
     "/call/end": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call End",
         "operationId": "call_end_call_end_post",
         "requestBody": {
@@ -136,7 +145,9 @@
     },
     "/call/upsert_batch": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Start Batch",
         "operationId": "call_start_batch_call_upsert_batch_post",
         "requestBody": {
@@ -180,7 +191,9 @@
     },
     "/calls/delete": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Delete",
         "operationId": "calls_delete_calls_delete_post",
         "requestBody": {
@@ -224,7 +237,9 @@
     },
     "/call/update": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Update",
         "operationId": "call_update_call_update_post",
         "requestBody": {
@@ -268,7 +283,9 @@
     },
     "/call/read": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Read",
         "operationId": "call_read_call_read_post",
         "requestBody": {
@@ -312,7 +329,9 @@
     },
     "/calls/query_stats": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Query Stats",
         "operationId": "calls_query_stats_calls_query_stats_post",
         "requestBody": {
@@ -356,7 +375,9 @@
     },
     "/calls/stream_query": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Query Stream",
         "operationId": "calls_query_stream_calls_stream_query_post",
         "security": [
@@ -410,7 +431,9 @@
     },
     "/obj/create": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Create",
         "operationId": "obj_create_obj_create_post",
         "requestBody": {
@@ -454,7 +477,9 @@
     },
     "/obj/read": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Read",
         "operationId": "obj_read_obj_read_post",
         "requestBody": {
@@ -498,7 +523,9 @@
     },
     "/objs/query": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Objs Query",
         "operationId": "objs_query_objs_query_post",
         "requestBody": {
@@ -540,9 +567,57 @@
         ]
       }
     },
+    "/obj/delete": {
+      "post": {
+        "tags": [
+          "Objects"
+        ],
+        "summary": "Obj Delete",
+        "operationId": "obj_delete_obj_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjDeleteReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
     "/table/create": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Create",
         "operationId": "table_create_table_create_post",
         "requestBody": {
@@ -586,7 +661,9 @@
     },
     "/table/update": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Update",
         "operationId": "table_update_table_update_post",
         "requestBody": {
@@ -630,7 +707,9 @@
     },
     "/table/query": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Query",
         "operationId": "table_query_table_query_post",
         "requestBody": {
@@ -674,7 +753,9 @@
     },
     "/table/query_stats": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Query Stats",
         "operationId": "table_query_stats_table_query_stats_post",
         "requestBody": {
@@ -718,7 +799,9 @@
     },
     "/refs/read_batch": {
       "post": {
-        "tags": ["Refs"],
+        "tags": [
+          "Refs"
+        ],
         "summary": "Refs Read Batch",
         "operationId": "refs_read_batch_refs_read_batch_post",
         "requestBody": {
@@ -762,7 +845,9 @@
     },
     "/file/create": {
       "post": {
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "File Create",
         "operationId": "file_create_file_create_post",
         "requestBody": {
@@ -806,7 +891,9 @@
     },
     "/file/content": {
       "post": {
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "File Content",
         "operationId": "file_content_file_content_post",
         "requestBody": {
@@ -848,7 +935,9 @@
     },
     "/cost/create": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Create",
         "operationId": "cost_create_cost_create_post",
         "requestBody": {
@@ -892,7 +981,9 @@
     },
     "/cost/query": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Query",
         "operationId": "cost_query_cost_query_post",
         "requestBody": {
@@ -936,7 +1027,9 @@
     },
     "/cost/purge": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Purge",
         "operationId": "cost_purge_cost_purge_post",
         "requestBody": {
@@ -980,7 +1073,9 @@
     },
     "/feedback/create": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Create",
         "description": "Add feedback to a call or object.",
         "operationId": "feedback_create_feedback_create_post",
@@ -1025,7 +1120,9 @@
     },
     "/feedback/query": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Query",
         "description": "Query for feedback.",
         "operationId": "feedback_query_feedback_query_post",
@@ -1070,7 +1167,9 @@
     },
     "/feedback/purge": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Purge",
         "description": "Permanently delete feedback.",
         "operationId": "feedback_purge_feedback_purge_post",
@@ -1115,7 +1214,9 @@
     },
     "/feedback/replace": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Replace",
         "operationId": "feedback_replace_feedback_replace_post",
         "requestBody": {
@@ -1205,7 +1306,9 @@
           }
         },
         "type": "object",
-        "required": ["$and"],
+        "required": [
+          "$and"
+        ],
         "title": "AndOperation"
       },
       "Body_file_create_file_create_post": {
@@ -1221,7 +1324,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "file"],
+        "required": [
+          "project_id",
+          "file"
+        ],
         "title": "Body_file_create_file_create_post"
       },
       "CallBatchEndMode": {
@@ -1236,7 +1342,9 @@
           }
         },
         "type": "object",
-        "required": ["req"],
+        "required": [
+          "req"
+        ],
         "title": "CallBatchEndMode"
       },
       "CallBatchStartMode": {
@@ -1251,7 +1359,9 @@
           }
         },
         "type": "object",
-        "required": ["req"],
+        "required": [
+          "req"
+        ],
         "title": "CallBatchStartMode"
       },
       "CallCreateBatchReq": {
@@ -1272,7 +1382,9 @@
           }
         },
         "type": "object",
-        "required": ["batch"],
+        "required": [
+          "batch"
+        ],
         "title": "CallCreateBatchReq"
       },
       "CallCreateBatchRes": {
@@ -1293,7 +1405,9 @@
           }
         },
         "type": "object",
-        "required": ["res"],
+        "required": [
+          "res"
+        ],
         "title": "CallCreateBatchRes"
       },
       "CallEndReq": {
@@ -1303,7 +1417,9 @@
           }
         },
         "type": "object",
-        "required": ["end"],
+        "required": [
+          "end"
+        ],
         "title": "CallEndReq"
       },
       "CallEndRes": {
@@ -1335,7 +1451,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "id"],
+        "required": [
+          "project_id",
+          "id"
+        ],
         "title": "CallReadReq"
       },
       "CallReadRes": {
@@ -1352,7 +1471,9 @@
           }
         },
         "type": "object",
-        "required": ["call"],
+        "required": [
+          "call"
+        ],
         "title": "CallReadRes"
       },
       "CallSchema": {
@@ -1401,12 +1522,10 @@
             "title": "Started At"
           },
           "attributes": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Attributes"
           },
           "inputs": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Inputs"
           },
@@ -1499,7 +1618,9 @@
           }
         },
         "type": "object",
-        "required": ["start"],
+        "required": [
+          "start"
+        ],
         "title": "CallStartReq"
       },
       "CallStartRes": {
@@ -1514,7 +1635,10 @@
           }
         },
         "type": "object",
-        "required": ["id", "trace_id"],
+        "required": [
+          "id",
+          "trace_id"
+        ],
         "title": "CallStartRes"
       },
       "CallUpdateReq": {
@@ -1552,7 +1676,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "call_id"],
+        "required": [
+          "project_id",
+          "call_id"
+        ],
         "title": "CallUpdateReq"
       },
       "CallUpdateRes": {
@@ -1587,7 +1714,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "call_ids"],
+        "required": [
+          "project_id",
+          "call_ids"
+        ],
         "title": "CallsDeleteReq"
       },
       "CallsDeleteRes": {
@@ -1840,11 +1970,18 @@
             ],
             "title": "Expand Columns",
             "description": "Columns to expand, i.e. refs to other objects",
-            "examples": [["inputs.self.message", "inputs.model.prompt"]]
+            "examples": [
+              [
+                "inputs.self.message",
+                "inputs.model.prompt"
+              ]
+            ]
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CallsQueryReq"
       },
       "CallsQueryStatsReq": {
@@ -1875,7 +2012,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CallsQueryStatsReq"
       },
       "CallsQueryStatsRes": {
@@ -1886,7 +2025,9 @@
           }
         },
         "type": "object",
-        "required": ["count"],
+        "required": [
+          "count"
+        ],
         "title": "CallsQueryStatsRes"
       },
       "ContainsOperation": {
@@ -1896,7 +2037,9 @@
           }
         },
         "type": "object",
-        "required": ["$contains"],
+        "required": [
+          "$contains"
+        ],
         "title": "ContainsOperation"
       },
       "ContainsSpec": {
@@ -1991,7 +2134,10 @@
           }
         },
         "type": "object",
-        "required": ["input", "substr"],
+        "required": [
+          "input",
+          "substr"
+        ],
         "title": "ContainsSpec"
       },
       "ConvertOperation": {
@@ -2001,7 +2147,9 @@
           }
         },
         "type": "object",
-        "required": ["$convert"],
+        "required": [
+          "$convert"
+        ],
         "title": "ConvertOperation"
       },
       "ConvertSpec": {
@@ -2046,12 +2194,21 @@
           },
           "to": {
             "type": "string",
-            "enum": ["double", "string", "int", "bool", "exists"],
+            "enum": [
+              "double",
+              "string",
+              "int",
+              "bool",
+              "exists"
+            ],
             "title": "To"
           }
         },
         "type": "object",
-        "required": ["input", "to"],
+        "required": [
+          "input",
+          "to"
+        ],
         "title": "ConvertSpec"
       },
       "CostCreateInput": {
@@ -2117,7 +2274,10 @@
           }
         },
         "type": "object",
-        "required": ["prompt_token_cost", "completion_token_cost"],
+        "required": [
+          "prompt_token_cost",
+          "completion_token_cost"
+        ],
         "title": "CostCreateInput"
       },
       "CostCreateReq": {
@@ -2125,7 +2285,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "costs": {
             "additionalProperties": {
@@ -2148,7 +2310,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "costs"],
+        "required": [
+          "project_id",
+          "costs"
+        ],
         "title": "CostCreateReq"
       },
       "CostCreateRes": {
@@ -2172,7 +2337,9 @@
           }
         },
         "type": "object",
-        "required": ["ids"],
+        "required": [
+          "ids"
+        ],
         "title": "CostCreateRes"
       },
       "CostPurgeReq": {
@@ -2180,14 +2347,19 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "query": {
             "$ref": "#/components/schemas/Query"
           }
         },
         "type": "object",
-        "required": ["project_id", "query"],
+        "required": [
+          "project_id",
+          "query"
+        ],
         "title": "CostPurgeReq"
       },
       "CostPurgeRes": {
@@ -2207,7 +2379,9 @@
               }
             ],
             "title": "Id",
-            "examples": ["2341-asdf-asdf"]
+            "examples": [
+              "2341-asdf-asdf"
+            ]
           },
           "llm_id": {
             "anyOf": [
@@ -2219,7 +2393,9 @@
               }
             ],
             "title": "Llm Id",
-            "examples": ["gpt4"]
+            "examples": [
+              "gpt4"
+            ]
           },
           "prompt_token_cost": {
             "anyOf": [
@@ -2231,7 +2407,9 @@
               }
             ],
             "title": "Prompt Token Cost",
-            "examples": [1.0]
+            "examples": [
+              1.0
+            ]
           },
           "completion_token_cost": {
             "anyOf": [
@@ -2243,7 +2421,9 @@
               }
             ],
             "title": "Completion Token Cost",
-            "examples": [1.0]
+            "examples": [
+              1.0
+            ]
           },
           "prompt_token_cost_unit": {
             "anyOf": [
@@ -2255,7 +2435,9 @@
               }
             ],
             "title": "Prompt Token Cost Unit",
-            "examples": ["USD"]
+            "examples": [
+              "USD"
+            ]
           },
           "completion_token_cost_unit": {
             "anyOf": [
@@ -2267,7 +2449,9 @@
               }
             ],
             "title": "Completion Token Cost Unit",
-            "examples": ["USD"]
+            "examples": [
+              "USD"
+            ]
           },
           "effective_date": {
             "anyOf": [
@@ -2280,7 +2464,9 @@
               }
             ],
             "title": "Effective Date",
-            "examples": ["2024-01-01T00:00:00Z"]
+            "examples": [
+              "2024-01-01T00:00:00Z"
+            ]
           },
           "provider_id": {
             "anyOf": [
@@ -2292,7 +2478,9 @@
               }
             ],
             "title": "Provider Id",
-            "examples": ["openai"]
+            "examples": [
+              "openai"
+            ]
           }
         },
         "type": "object",
@@ -2303,7 +2491,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "fields": {
             "anyOf": [
@@ -2365,7 +2555,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "offset": {
             "anyOf": [
@@ -2377,11 +2569,15 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CostQueryReq"
       },
       "CostQueryRes": {
@@ -2395,7 +2591,9 @@
           }
         },
         "type": "object",
-        "required": ["results"],
+        "required": [
+          "results"
+        ],
         "title": "CostQueryRes"
       },
       "EndedCallSchemaForInsert": {
@@ -2438,7 +2636,12 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "id", "ended_at", "summary"],
+        "required": [
+          "project_id",
+          "id",
+          "ended_at",
+          "summary"
+        ],
         "title": "EndedCallSchemaForInsert"
       },
       "EqOperation": {
@@ -2527,7 +2730,9 @@
           }
         },
         "type": "object",
-        "required": ["$eq"],
+        "required": [
+          "$eq"
+        ],
         "title": "EqOperation"
       },
       "FeedbackCreateReq": {
@@ -2535,12 +2740,16 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "weave_ref": {
             "type": "string",
             "title": "Weave Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "creator": {
             "anyOf": [
@@ -2552,15 +2761,18 @@
               }
             ],
             "title": "Creator",
-            "examples": ["Jane Smith"]
+            "examples": [
+              "Jane Smith"
+            ]
           },
           "feedback_type": {
             "type": "string",
             "title": "Feedback Type",
-            "examples": ["custom"]
+            "examples": [
+              "custom"
+            ]
           },
           "payload": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Payload",
             "examples": [
@@ -2579,7 +2791,9 @@
               }
             ],
             "title": "Annotation Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "runnable_ref": {
             "anyOf": [
@@ -2591,7 +2805,9 @@
               }
             ],
             "title": "Runnable Ref",
-            "examples": ["weave:///entity/project/op/name:digest"]
+            "examples": [
+              "weave:///entity/project/op/name:digest"
+            ]
           },
           "call_ref": {
             "anyOf": [
@@ -2603,7 +2819,9 @@
               }
             ],
             "title": "Call Ref",
-            "examples": ["weave:///entity/project/call/call_id"]
+            "examples": [
+              "weave:///entity/project/call/call_id"
+            ]
           },
           "trigger_ref": {
             "anyOf": [
@@ -2615,7 +2833,9 @@
               }
             ],
             "title": "Trigger Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "wb_user_id": {
             "anyOf": [
@@ -2631,7 +2851,12 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "weave_ref", "feedback_type", "payload"],
+        "required": [
+          "project_id",
+          "weave_ref",
+          "feedback_type",
+          "payload"
+        ],
         "title": "FeedbackCreateReq"
       },
       "FeedbackCreateRes": {
@@ -2650,13 +2875,17 @@
             "title": "Wb User Id"
           },
           "payload": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
         },
         "type": "object",
-        "required": ["id", "created_at", "wb_user_id", "payload"],
+        "required": [
+          "id",
+          "created_at",
+          "wb_user_id",
+          "payload"
+        ],
         "title": "FeedbackCreateRes"
       },
       "FeedbackPurgeReq": {
@@ -2664,14 +2893,19 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "query": {
             "$ref": "#/components/schemas/Query"
           }
         },
         "type": "object",
-        "required": ["project_id", "query"],
+        "required": [
+          "project_id",
+          "query"
+        ],
         "title": "FeedbackPurgeReq"
       },
       "FeedbackPurgeRes": {
@@ -2684,7 +2918,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "fields": {
             "anyOf": [
@@ -2699,7 +2935,13 @@
               }
             ],
             "title": "Fields",
-            "examples": [["id", "feedback_type", "payload.note"]]
+            "examples": [
+              [
+                "id",
+                "feedback_type",
+                "payload.note"
+              ]
+            ]
           },
           "query": {
             "anyOf": [
@@ -2735,7 +2977,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "offset": {
             "anyOf": [
@@ -2747,11 +2991,15 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "FeedbackQueryReq"
       },
       "FeedbackQueryRes": {
@@ -2765,7 +3013,9 @@
           }
         },
         "type": "object",
-        "required": ["result"],
+        "required": [
+          "result"
+        ],
         "title": "FeedbackQueryRes"
       },
       "FeedbackReplaceReq": {
@@ -2773,12 +3023,16 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "weave_ref": {
             "type": "string",
             "title": "Weave Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "creator": {
             "anyOf": [
@@ -2790,15 +3044,18 @@
               }
             ],
             "title": "Creator",
-            "examples": ["Jane Smith"]
+            "examples": [
+              "Jane Smith"
+            ]
           },
           "feedback_type": {
             "type": "string",
             "title": "Feedback Type",
-            "examples": ["custom"]
+            "examples": [
+              "custom"
+            ]
           },
           "payload": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Payload",
             "examples": [
@@ -2817,7 +3074,9 @@
               }
             ],
             "title": "Annotation Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "runnable_ref": {
             "anyOf": [
@@ -2829,7 +3088,9 @@
               }
             ],
             "title": "Runnable Ref",
-            "examples": ["weave:///entity/project/op/name:digest"]
+            "examples": [
+              "weave:///entity/project/op/name:digest"
+            ]
           },
           "call_ref": {
             "anyOf": [
@@ -2841,7 +3102,9 @@
               }
             ],
             "title": "Call Ref",
-            "examples": ["weave:///entity/project/call/call_id"]
+            "examples": [
+              "weave:///entity/project/call/call_id"
+            ]
           },
           "trigger_ref": {
             "anyOf": [
@@ -2853,7 +3116,9 @@
               }
             ],
             "title": "Trigger Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "wb_user_id": {
             "anyOf": [
@@ -2898,13 +3163,17 @@
             "title": "Wb User Id"
           },
           "payload": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
         },
         "type": "object",
-        "required": ["id", "created_at", "wb_user_id", "payload"],
+        "required": [
+          "id",
+          "created_at",
+          "wb_user_id",
+          "payload"
+        ],
         "title": "FeedbackReplaceRes"
       },
       "FileContentReadReq": {
@@ -2919,7 +3188,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "FileContentReadReq"
       },
       "FileCreateRes": {
@@ -2930,7 +3202,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "FileCreateRes"
       },
       "GetFieldOperator": {
@@ -2941,7 +3215,9 @@
           }
         },
         "type": "object",
-        "required": ["$getField"],
+        "required": [
+          "$getField"
+        ],
         "title": "GetFieldOperator"
       },
       "GtOperation": {
@@ -3030,7 +3306,9 @@
           }
         },
         "type": "object",
-        "required": ["$gt"],
+        "required": [
+          "$gt"
+        ],
         "title": "GtOperation"
       },
       "GteOperation": {
@@ -3119,7 +3397,9 @@
           }
         },
         "type": "object",
-        "required": ["$gte"],
+        "required": [
+          "$gte"
+        ],
         "title": "GteOperation"
       },
       "HTTPValidationError": {
@@ -3224,7 +3504,9 @@
           }
         },
         "type": "object",
-        "required": ["$in"],
+        "required": [
+          "$in"
+        ],
         "title": "InOperation"
       },
       "LLMUsageSchema": {
@@ -3335,7 +3617,9 @@
           }
         },
         "type": "object",
-        "required": ["$literal"],
+        "required": [
+          "$literal"
+        ],
         "title": "LiteralOperation"
       },
       "NotOperation": {
@@ -3387,7 +3671,9 @@
           }
         },
         "type": "object",
-        "required": ["$not"],
+        "required": [
+          "$not"
+        ],
         "title": "NotOperation"
       },
       "ObjCreateReq": {
@@ -3397,7 +3683,9 @@
           }
         },
         "type": "object",
-        "required": ["obj"],
+        "required": [
+          "obj"
+        ],
         "title": "ObjCreateReq"
       },
       "ObjCreateRes": {
@@ -3408,8 +3696,56 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "ObjCreateRes"
+      },
+      "ObjDeleteReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id"
+          },
+          "digests": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digests",
+            "description": "List of digests to delete. If not provided, all digests for the object will be deleted."
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "object_id"
+        ],
+        "title": "ObjDeleteReq"
+      },
+      "ObjDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "ObjDeleteRes"
       },
       "ObjQueryReq": {
         "properties": {
@@ -3417,7 +3753,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project to query",
-            "examples": ["user/project"]
+            "examples": [
+              "user/project"
+            ]
           },
           "filter": {
             "anyOf": [
@@ -3432,7 +3770,9 @@
             "examples": [
               {
                 "latest_only": true,
-                "object_ids": ["my_favorite_model"]
+                "object_ids": [
+                  "my_favorite_model"
+                ]
               }
             ]
           },
@@ -3447,7 +3787,9 @@
             ],
             "title": "Limit",
             "description": "Maximum number of results to return",
-            "examples": [100]
+            "examples": [
+              100
+            ]
           },
           "offset": {
             "anyOf": [
@@ -3460,7 +3802,9 @@
             ],
             "title": "Offset",
             "description": "Number of results to skip before returning",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           },
           "sort_by": {
             "anyOf": [
@@ -3500,7 +3844,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "ObjQueryReq"
       },
       "ObjQueryRes": {
@@ -3514,7 +3860,9 @@
           }
         },
         "type": "object",
-        "required": ["objs"],
+        "required": [
+          "objs"
+        ],
         "title": "ObjQueryRes"
       },
       "ObjReadReq": {
@@ -3530,10 +3878,27 @@
           "digest": {
             "type": "string",
             "title": "Digest"
+          },
+          "metadata_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Only",
+            "description": "If true, the `val` column is not read from the database and is empty.All other fields are returned.",
+            "default": false
           }
         },
         "type": "object",
-        "required": ["project_id", "object_id", "digest"],
+        "required": [
+          "project_id",
+          "object_id",
+          "digest"
+        ],
         "title": "ObjReadReq"
       },
       "ObjReadRes": {
@@ -3543,7 +3908,9 @@
           }
         },
         "type": "object",
-        "required": ["obj"],
+        "required": [
+          "obj"
+        ],
         "title": "ObjReadRes"
       },
       "ObjSchema": {
@@ -3602,6 +3969,18 @@
           },
           "val": {
             "title": "Val"
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
           }
         },
         "type": "object",
@@ -3653,10 +4032,26 @@
             ],
             "title": "Set Base Object Class",
             "deprecated": true
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
           }
         },
         "type": "object",
-        "required": ["project_id", "object_id", "val"],
+        "required": [
+          "project_id",
+          "object_id",
+          "val"
+        ],
         "title": "ObjSchemaForInsert"
       },
       "ObjectVersionFilter": {
@@ -3675,7 +4070,14 @@
             ],
             "title": "Base Object Classes",
             "description": "Filter objects by their base classes",
-            "examples": [["Model"], ["Dataset"]]
+            "examples": [
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ]
+            ]
           },
           "object_ids": {
             "anyOf": [
@@ -3691,7 +4093,10 @@
             ],
             "title": "Object Ids",
             "description": "Filter objects by their IDs",
-            "examples": ["my_favorite_model", "my_favorite_dataset"]
+            "examples": [
+              "my_favorite_model",
+              "my_favorite_dataset"
+            ]
           },
           "is_op": {
             "anyOf": [
@@ -3704,7 +4109,11 @@
             ],
             "title": "Is Op",
             "description": "Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
-            "examples": [true, false, null]
+            "examples": [
+              true,
+              false,
+              null
+            ]
           },
           "latest_only": {
             "anyOf": [
@@ -3717,7 +4126,10 @@
             ],
             "title": "Latest Only",
             "description": "If True, return only the latest version of each object. `False` and `None` will return all versions",
-            "examples": [true, false]
+            "examples": [
+              true,
+              false
+            ]
           }
         },
         "type": "object",
@@ -3768,7 +4180,9 @@
           }
         },
         "type": "object",
-        "required": ["$or"],
+        "required": [
+          "$or"
+        ],
         "title": "OrOperation"
       },
       "Query": {
@@ -3804,7 +4218,9 @@
           }
         },
         "type": "object",
-        "required": ["$expr"],
+        "required": [
+          "$expr"
+        ],
         "title": "Query"
       },
       "RefsReadBatchReq": {
@@ -3818,7 +4234,9 @@
           }
         },
         "type": "object",
-        "required": ["refs"],
+        "required": [
+          "refs"
+        ],
         "title": "RefsReadBatchReq"
       },
       "RefsReadBatchRes": {
@@ -3830,7 +4248,9 @@
           }
         },
         "type": "object",
-        "required": ["vals"],
+        "required": [
+          "vals"
+        ],
         "title": "RefsReadBatchRes"
       },
       "ServerInfoRes": {
@@ -3841,7 +4261,9 @@
           }
         },
         "type": "object",
-        "required": ["min_required_weave_python_version"],
+        "required": [
+          "min_required_weave_python_version"
+        ],
         "title": "ServerInfoRes"
       },
       "SortBy": {
@@ -3852,12 +4274,18 @@
           },
           "direction": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "title": "Direction"
           }
         },
         "type": "object",
-        "required": ["field", "direction"],
+        "required": [
+          "field",
+          "direction"
+        ],
         "title": "SortBy"
       },
       "StartedCallSchemaForInsert": {
@@ -3920,12 +4348,10 @@
             "title": "Started At"
           },
           "attributes": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Attributes"
           },
           "inputs": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Inputs"
           },
@@ -3984,19 +4410,22 @@
           }
         },
         "type": "object",
-        "required": ["append"],
+        "required": [
+          "append"
+        ],
         "title": "TableAppendSpec"
       },
       "TableAppendSpecPayload": {
         "properties": {
           "row": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Row"
           }
         },
         "type": "object",
-        "required": ["row"],
+        "required": [
+          "row"
+        ],
         "title": "TableAppendSpecPayload"
       },
       "TableCreateReq": {
@@ -4006,7 +4435,9 @@
           }
         },
         "type": "object",
-        "required": ["table"],
+        "required": [
+          "table"
+        ],
         "title": "TableCreateReq"
       },
       "TableCreateRes": {
@@ -4025,7 +4456,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "TableCreateRes"
       },
       "TableInsertSpec": {
@@ -4035,7 +4468,9 @@
           }
         },
         "type": "object",
-        "required": ["insert"],
+        "required": [
+          "insert"
+        ],
         "title": "TableInsertSpec"
       },
       "TableInsertSpecPayload": {
@@ -4045,13 +4480,15 @@
             "title": "Index"
           },
           "row": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Row"
           }
         },
         "type": "object",
-        "required": ["index", "row"],
+        "required": [
+          "index",
+          "row"
+        ],
         "title": "TableInsertSpecPayload"
       },
       "TablePopSpec": {
@@ -4061,7 +4498,9 @@
           }
         },
         "type": "object",
-        "required": ["pop"],
+        "required": [
+          "pop"
+        ],
         "title": "TablePopSpec"
       },
       "TablePopSpecPayload": {
@@ -4072,7 +4511,9 @@
           }
         },
         "type": "object",
-        "required": ["index"],
+        "required": [
+          "index"
+        ],
         "title": "TablePopSpecPayload"
       },
       "TableQueryReq": {
@@ -4081,7 +4522,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "digest": {
             "type": "string",
@@ -4121,7 +4564,9 @@
             ],
             "title": "Limit",
             "description": "Maximum number of rows to return",
-            "examples": [100]
+            "examples": [
+              100
+            ]
           },
           "offset": {
             "anyOf": [
@@ -4134,7 +4579,9 @@
             ],
             "title": "Offset",
             "description": "Number of rows to skip before starting to return rows",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "sort_by": {
             "anyOf": [
@@ -4161,7 +4608,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "TableQueryReq"
       },
       "TableQueryRes": {
@@ -4175,7 +4625,9 @@
           }
         },
         "type": "object",
-        "required": ["rows"],
+        "required": [
+          "rows"
+        ],
         "title": "TableQueryRes"
       },
       "TableQueryStatsReq": {
@@ -4184,7 +4636,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "digest": {
             "type": "string",
@@ -4196,7 +4650,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "TableQueryStatsReq"
       },
       "TableQueryStatsRes": {
@@ -4207,7 +4664,9 @@
           }
         },
         "type": "object",
-        "required": ["count"],
+        "required": [
+          "count"
+        ],
         "title": "TableQueryStatsRes"
       },
       "TableRowFilter": {
@@ -4248,7 +4707,10 @@
           }
         },
         "type": "object",
-        "required": ["digest", "val"],
+        "required": [
+          "digest",
+          "val"
+        ],
         "title": "TableRowSchema"
       },
       "TableSchemaForInsert": {
@@ -4266,7 +4728,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "rows"],
+        "required": [
+          "project_id",
+          "rows"
+        ],
         "title": "TableSchemaForInsert"
       },
       "TableUpdateReq": {
@@ -4298,7 +4763,11 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "base_digest", "updates"],
+        "required": [
+          "project_id",
+          "base_digest",
+          "updates"
+        ],
         "title": "TableUpdateReq"
       },
       "TableUpdateRes": {
@@ -4317,7 +4786,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "TableUpdateRes"
       },
       "ValidationError": {
@@ -4346,7 +4817,11 @@
           }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       }
     },

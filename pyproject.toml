@@ -48,7 +48,7 @@ dependencies = [
 
   # TODO: This needs to be updated each time we regenerate the trace server bindings.
   # We will need some automation here
-  "weave-trace @ git+https://github.com/wandb/weave-stainless.git@8e2c9844a60657aebe2db60ceb6fd4d4bfa8b59e",
+  "weave-trace @ git+git@github.com:wandb/weave.git@",
 ]
 
 [tool.hatch.metadata]
