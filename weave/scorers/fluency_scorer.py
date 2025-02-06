@@ -54,5 +54,5 @@ class FluencyScorer(HuggingFacePipelineScorer):
         pipeline_output = self._pipeline(output)[0]
         fluency_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'fluent')
         if fluency_score <= self.threshold:
-            return {"flagged": True, "extras": pipeline_output}
-        return {"flagged": False, "extras": pipeline_output}
+            return {"flagged": True, "extras": {"score": fluency_score, **pipeline_output}}
+        return {"flagged": False, "extras": {"score": fluency_score, **pipeline_output}}

@@ -311,11 +311,11 @@ class TrustScorer(Scorer):
                     advisory_issues.append(scorer_name)
 
         # Determine trust level
-        trust_level = "high"
+        trust_level = "high_no_issues_found"
         if critical_issues:
-            trust_level = "low"
+            trust_level = "low_critical_issues_found"
         elif advisory_issues:
-            trust_level = "medium"
+            trust_level = "medium_advisory_issues_found"
 
         # Extract scores where available
         scores = {
@@ -323,11 +323,6 @@ class TrustScorer(Scorer):
             for name, result in raw_results.items()
             if "extras" in result and "score" in result["extras"]
         }
-
-        for score_label in raw_results["FluencyScorer"]["extras"]:
-            if score_label["label"] == "non-fluent":
-                scores["FluencyScorer"] = score_label["score"]
-                break
 
         scores["ToxicityScorer"] = raw_results["ToxicityScorer"]["extras"]
 
