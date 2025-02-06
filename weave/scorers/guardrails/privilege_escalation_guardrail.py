@@ -10,9 +10,6 @@ from weave.scorers.guardrails.prompts import (
 )
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
-if TYPE_CHECKING:
-    from instructor import Instructor
-
 
 class PrivilegeEscalationGuardrailResponse(BaseModel):
     flagged: bool = Field(
