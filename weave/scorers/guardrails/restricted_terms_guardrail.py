@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -19,9 +19,7 @@ class TermMatch(BaseModel):
 
     original_term: str
     matched_text: str
-    match_type: str = Field(
-        description="Type of match: EXACT, MISSPELLING, ABBREVIATION, or VARIANT"
-    )
+    match_type: Literal["EXACT", "MISSPELLING", "ABBREVIATION", "VARIANT"]
     explanation: str = Field(
         description="Explanation of why this is considered a match"
     )
@@ -103,7 +101,6 @@ class RestrictedTermsLLMGuardrail(Scorer):
             max_tokens=self.max_tokens,
         )
 
-    @weave.op
     def frame_guardrail_reasoning(self, analysis: RestrictedTermsAnalysis) -> str:
         if analysis.contains_restricted_terms:
             reasoning_parts = ["Restricted terms detected:"]
@@ -111,10 +108,8 @@ class RestrictedTermsLLMGuardrail(Scorer):
                 reasoning_parts.append(
                     f"\n- {match.original_term}: {match.matched_text} ({match.match_type})"
                 )
-            reasoning = "\n".join(reasoning_parts)
-        else:
-            reasoning = "No restricted terms detected."
-        return reasoning
+            return "\n".join(reasoning_parts)
+        return "No restricted terms detected."
 
     @weave.op
     def get_anonymized_text(
@@ -140,7 +135,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
         reasoning = self.frame_guardrail_reasoning(analysis)
         anonymized_text = self.get_anonymized_text(output, analysis)
         return RestrictedTermsRecognitionResponse(
-            flagged=not analysis.contains_restricted_terms,
+            flagged=analysis.contains_restricted_terms,
             detected_entities=analysis.detected_matches,
             reason=reasoning,
             anonymized_text=anonymized_text,

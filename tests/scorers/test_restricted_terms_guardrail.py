@@ -42,7 +42,7 @@ def test_restricted_terms_guardrail_score(
         "Hello, my name is Microsoft."
     )
     _ = RestrictedTermsRecognitionResponse.model_validate(result)
-    assert result["flagged"] == False
+    assert result["flagged"] == True
     assert (
         result["reason"]
         == """Restricted terms detected:
