@@ -177,7 +177,7 @@ the <output> contains hallucinations."
     )
 
 
-class LLMHallucinationScorer(InstructorLLMScorer):
+class HallucinationFreeScorer(InstructorLLMScorer):
     """
     A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
@@ -190,7 +190,7 @@ class LLMHallucinationScorer(InstructorLLMScorer):
         - The `score` method expects the input column from the dataset to be named "context". It will use
         this data as the ground-truth to check hallucinations against. If your dataset column has a
         different name, you can specify a different mapping using the `column_map` argument in the init
-        of HallucinationFreeScorer by passing `column_map={"context": "context"}`.
+        of LLMHallucinationScorer by passing `column_map={"context": "context"}`.
 
     Attributes:
         system_prompt (str): The prompt describing the task, defines what a "hallucination" is.

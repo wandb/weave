@@ -16,7 +16,7 @@ from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorer
 from weave.scorers.faithfulness_scorer import WeaveFaithfulnessScorer
 from weave.scorers.fluency_scorer import WeaveFluencyScorer
 from weave.scorers.hallucination_scorer import (
-    LLMHallucinationScorer,
+    HallucinationFreeScorer,
     WeaveHallucinationScorer,
 )
 from weave.scorers.json_scorer import ValidJSONScorer
@@ -69,6 +69,7 @@ __all__ = [
     "ContextEntityRecallScorer",
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
+    "HallucinationFreeScorer",
     "HuggingFacePerplexityScorer",
     "InstructorLLMScorer",
     "LevenshteinScorer",

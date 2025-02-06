@@ -4,7 +4,7 @@ import string
 import pytest  # type: ignore
 
 import weave
-from weave.scorers import RobustnessScorer
+from weave.scorers import WeaveRobustnessScorer
 from weave.scorers.robustness_scorer import (
     add_whitespace,
     butterfingers,
@@ -27,118 +27,163 @@ def truncate(number, decimals=0):
 
 def test_robustness_scorer():
     # Example output with original and perturbed generations
-    output = ["True", "False", "True", "True", "False"]
+    reference_text = "True"
+    texts = ["False", "True", "True", "False"]
 
     # Instantiate the scorer
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",  # Will use default model
+    )
 
     # Run the scorer's `score` method
-    result = robustness_scorer.score(output=output)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Assert that the result matches the expected Cohen's h value
     assert truncate(result["cohen_h"], 5) == 0.49999
 
 
 def test_robustness_scorer_perfect_similarity():
-    output = ["True", "True", "True", "True"]
-    robustness_scorer = RobustnessScorer()
-    result = robustness_scorer.score(output=output)
+    reference_text = "True"
+    texts = ["True", "True", "True"]
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
     assert result["cohen_h"] == 0.0
 
 
 def test_robustness_scorer_no_similarity():
-    output = ["True", "False", "False", "False", "False"]
-    robustness_scorer = RobustnessScorer()
-    result = robustness_scorer.score(output=output)
+    reference_text = "True"
+    texts = ["False", "False", "False", "False"]
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
     assert result["cohen_h"] == 1.0
 
 
 def test_robustness_scorer_single_perturbation():
-    output = ["True", "False"]
-    robustness_scorer = RobustnessScorer()
-    result = robustness_scorer.score(output=output)
+    reference_text = "True"
+    texts = ["False"]
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
     assert result["cohen_h"] == 1.0
 
 
 def test_robustness_scorer_insufficient_outputs():
-    output = ["True"]  # No perturbed outputs
-    robustness_scorer = RobustnessScorer()
+    reference_text = "True"
+    texts = []  # No perturbed outputs
+    robustness_scorer = WeaveRobustnessScorer()
     with pytest.raises(
-        AssertionError, match="There must be output of at least one perturbed question"
+        AssertionError, match="There are no `texts`, there must be at least one text to measure against."
     ):
-        robustness_scorer.score(output=output)
+        robustness_scorer.score(reference_text=reference_text, texts=texts)
 
 
 def test_robustness_scorer_with_boolean_output():
-    output = [True, True, False, True]  # Boolean outputs from the system
-    robustness_scorer = RobustnessScorer()
-    result = robustness_scorer.score(output=output)
+    reference_text = True
+    texts = [True, False, True]  # Boolean outputs from the system
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
     assert truncate(result["cohen_h"], 5) == 0.39182
 
 
 def test_robustness_scorer_with_boolean_output_and_ground_truths():
-    output = [True, True, False, True]  # Boolean outputs from the system
-    ground_truths = [True, True, True, True]  # Boolean ground truths
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
-    result = robustness_scorer.score(output=output, ground_truths=ground_truths)
+    reference_text = True
+    texts = [True, False, True]  # Boolean outputs from the system
+    ground_truths = [True, True, True]  # Boolean ground truths
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+        use_ground_truths=True,
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.39182
 
 
 def test_robustness_scorer_with_ground_truths_as_strings():
-    output = ["apple", "aple", "orange", "apple"]
-    ground_truths = ["apple", "apple", "apple", "apple"]
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
-    result = robustness_scorer.score(output=output, ground_truths=ground_truths)
+    reference_text = "apple"
+    texts = ["aple", "orange", "apple"]
+    ground_truths = ["apple", "apple", "apple"]
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+        use_ground_truths=True,
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.60817
 
 
 def test_robustness_scorer_with_ground_truths_as_booleans():
-    output = ["True", "True", "False", "True"]
+    reference_text = "True"
+    texts = ["True", "False", "True"]
     ground_truths = [
         False,
         False,
         False,
-        False,
     ]  # Booleans will be converted to strings
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
-    result = robustness_scorer.score(output=output, ground_truths=ground_truths)
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+        use_ground_truths=True,
+    )
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
     assert truncate(result["cohen_h"], 5) == 0.39182
 
 
 def test_robustness_scorer_ground_truths_length_mismatch():
-    output = ["True", "False", "True"]
+    reference_text = "True"
+    texts = ["True", "False", "True"]
     ground_truths = ["True", "True"]  # Mismatched length
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
+    robustness_scorer = WeaveRobustnessScorer(use_ground_truths=True)
     with pytest.raises(
         AssertionError, match="Length of ground_truths must match the length of output."
     ):
-        robustness_scorer.score(output=output, ground_truths=ground_truths)
+        robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
 
 
 def test_robustness_scorer_ground_truths_edge_case():
-    output = ["True"]
+    reference_text = "True"
+    texts = []
     ground_truths = ["True"]
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
+    robustness_scorer = WeaveRobustnessScorer(use_ground_truths=True)
     with pytest.raises(
-        AssertionError, match="There must be output of at least one perturbed question."
+        AssertionError, match="There are no `texts`, there must be at least one text to measure against."
     ):
-        robustness_scorer.score(output=output, ground_truths=ground_truths)
+        robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
 
 
 def test_robustness_scorer_non_binary():
     # Example outputs with original and perturbed sentences
-    output = [
-        "The quick brown fox jumps over the lazy dog.",
+    reference_text = "The quick brown fox jumps over the lazy dog."
+    texts = [
         "A fast dark fox leaps over a sleepy canine.",
         "The quick brown fox hops over the lazy dog.",
         "An agile red fox jumps over the lazy hound.",
     ]
 
     # Instantiate the scorer with binary=False
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
 
     # Run the scorer's `score` method
-    result = robustness_scorer.score(output=output)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     print(result)
 
@@ -154,21 +199,21 @@ def test_robustness_scorer_non_binary():
 
 def test_robustness_scorer_non_binary_with_ground_truths():
     # Outputs from the model
-    output = [
-        "The capital of France is Paris.",
+    reference_text = "The capital of France is Paris."
+    texts = [
         "Paris is the capital city of France.",
         "France's capital is Paris.",
         "The capital city of France is Paris.",
     ]
 
     # Ground truths corresponding to each output
-    ground_truths = ["Paris", "Paris", "Paris", "Paris"]
+    ground_truths = ["Paris", "Paris", "Paris"]
 
     # Instantiate the scorer with binary=False
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
 
     # Run the scorer's `score` method
-    result = robustness_scorer.score(output=output, ground_truths=ground_truths)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
 
     print(result)
 
@@ -183,37 +228,40 @@ def test_robustness_scorer_non_binary_with_ground_truths():
 
 
 def test_robustness_scorer_invalid_similarity_metric():
-    output = ["Text A", "Text B"]
-    robustness_scorer = RobustnessScorer(
+    reference_text = "Text A"
+    texts = ["Text B"]
+    robustness_scorer = WeaveRobustnessScorer(
         use_exact_match=False, similarity_metric="invalid_metric"
     )
 
     with pytest.raises(
         ValueError, match="Unsupported similarity metric: invalid_metric"
     ):
-        robustness_scorer.score(output=output)
+        robustness_scorer.score(reference_text=reference_text, texts=texts)
 
 
 def test_robustness_scorer_zero_variance():
-    output = [
-        "The quick brown fox jumps over the lazy dog.",
+    reference_text = "The quick brown fox jumps over the lazy dog."
+    texts = [
         "The quick brown fox jumps over the lazy dog.",
         "The quick brown fox jumps over the lazy dog.",
         "The quick brown fox jumps over the lazy dog.",
     ]
 
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
-    result = robustness_scorer.score(output=output)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Since all outputs are identical, differences are zero, and std_dev is zero
     assert result["cohen_d"] == 0.0
 
 
 def test_robustness_scorer_long_texts():
-    output = [
+    reference_text = (
         "In a village of La Mancha, the name of which I have no desire to call to mind, "
         "there lived not long since one of those gentlemen that keep a lance in the lance-rack, "
-        "an old buckler, a lean hack, and a greyhound for coursing.",
+        "an old buckler, a lean hack, and a greyhound for coursing."
+    )
+    texts = [
         "In a small town in La Mancha, whose name I don't care to remember, there lived not long ago "
         "one of those gentlemen who always have a lance and ancient shield on a shelf, "
         "a skinny nag, and a greyhound for hunting.",
@@ -221,8 +269,8 @@ def test_robustness_scorer_long_texts():
         "who kept a spear in his rack, an old shield, a thin horse, and a hunting greyhound.",
     ]
 
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
-    result = robustness_scorer.score(output=output)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Assert that the scorer returns a valid effect size
     assert "cohen_d" in result
@@ -230,31 +278,15 @@ def test_robustness_scorer_long_texts():
 
 
 def test_robustness_scorer_unicode_texts():
-    output = [
-        "C'est la vie 😊",  # Original output with emoji
+    reference_text = "C'est la vie 😊"  # Original output with emoji
+    texts = [
         "C'est la vie 😊",  # Identical perturbed output
         "C'est la vie 😢",  # Perturbed output with different emoji
         "C'est la vie",  # Perturbed output without emoji
     ]
 
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
-    result = robustness_scorer.score(output=output)
-
-    # Assert that the scorer computes a valid effect size
-    assert "cohen_d" in result
-    assert isinstance(result["cohen_d"], float)
-
-
-def test_robustness_scorer_unicode_texts():
-    output = [
-        "C'est la vie 😊",  # Original output with emoji
-        "C'est la vie 😊",  # Identical perturbed output
-        "C'est la vie 😢",  # Perturbed output with different emoji
-        "C'est la vie",  # Perturbed output without emoji
-    ]
-
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
-    result = robustness_scorer.score(output=output)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Assert that the scorer computes a valid effect size
     assert "cohen_d" in result
@@ -262,8 +294,9 @@ def test_robustness_scorer_unicode_texts():
 
 
 def test_robustness_scorer_compute_similarity_exception():
-    output = ["Text A", "Text B"]
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
+    reference_text = "Text A"
+    texts = ["Text B"]
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
 
     # Mock the embedding model to raise an exception
     def mock_encode(*args, **kwargs):
@@ -272,16 +305,21 @@ def test_robustness_scorer_compute_similarity_exception():
     robustness_scorer.embedding_model.encode = mock_encode
 
     with pytest.raises(RuntimeError, match="Mocked exception in embedding model."):
-        robustness_scorer.score(output=output)
+        robustness_scorer.score(reference_text=reference_text, texts=texts)
 
 
 def test_robustness_scorer_mixed_data_types():
-    output = ["42", 42, True, None]
+    reference_text = "42"
+    texts = [42, True, None]
 
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+    )
 
     # Since outputs are converted to strings, this should work
-    result = robustness_scorer.score(output=output)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Assert that the scorer computes a valid effect size
     assert "cohen_h" in result
@@ -289,24 +327,30 @@ def test_robustness_scorer_mixed_data_types():
 
 
 def test_robustness_scorer_multilingual_texts():
-    output = [
-        "Hello, how are you?",  # English
+    reference_text = "Hello, how are you?"  # English
+    texts = [
         "Hola, ¿cómo estás?",  # Spanish
         "Bonjour, comment ça va?",  # French
         "こんにちは、お元気ですか？",  # Japanese
     ]
 
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
-    result = robustness_scorer.score(output=output)
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
+    result = robustness_scorer.score(reference_text=reference_text, texts=texts)
 
     # Since texts are in different languages, expect low similarities
     assert result["score(perturbed)"] < 0.5
 
 
 def test_interpretation_strings():
-    scorer = RobustnessScorer(use_exact_match=True, return_interpretation=True)
-    outputs = ["The capital of France is Paris.", "Paris is the capital of France."]
-    result = scorer.score(output=outputs)
+    reference_text = "The capital of France is Paris."
+    texts = ["Paris is the capital of France."]
+    scorer = WeaveRobustnessScorer(
+        use_exact_match=True,
+        device="cpu",
+        model_name_or_path="",
+        return_interpretation=True,
+    )
+    result = scorer.score(reference_text=reference_text, texts=texts)
     assert "interpretation" in result
     assert isinstance(result["interpretation"], str)
 
@@ -332,17 +376,18 @@ async def test_robustness_scorer_eval():
 
     @weave.op
     def model(questions: list[str]):
-        perturbed_outputs = [False, True]
-        return ["True"] + perturbed_outputs
+        reference_text = questions[0]
+        texts = questions[1:]
+        return robustness_scorer.score(reference_text=reference_text, texts=texts)
 
-    robustness_scorer = RobustnessScorer()
+    robustness_scorer = WeaveRobustnessScorer()
 
     evaluation = weave.Evaluation(
         dataset=dataset,
         scorers=[robustness_scorer],
     )
     result = await evaluation.evaluate(model)
-    assert truncate(result["RobustnessScorer"]["cohen_h"]["mean"], 5) == 0.49999
+    assert truncate(result["WeaveRobustnessScorer"]["cohen_h"]["mean"], 5) == 0.49999
 
 
 @pytest.mark.asyncio
@@ -374,15 +419,12 @@ async def test_robustness_scorer_eval_with_ground_truths():
     # Simulated LLM model output, matching the dataset structure
     @weave.op
     def model(questions: list[str]):
-        outputs = [
-            "Paris",
-            "Paris",
-            "Lyon",
-        ]
-        return outputs
+        reference_text = questions[0]
+        texts = questions[1:]
+        return robustness_scorer.score(reference_text=reference_text, texts=texts)
 
-    # Instantiate the RobustnessScorer
-    robustness_scorer = RobustnessScorer(use_ground_truths=True)
+    # Instantiate the WeaveRobustnessScorer
+    robustness_scorer = WeaveRobustnessScorer(use_ground_truths=True)
 
     # Perform evaluation using Weave's Evaluation framework
     evaluation = weave.Evaluation(
@@ -392,8 +434,8 @@ async def test_robustness_scorer_eval_with_ground_truths():
     result = await evaluation.evaluate(model)
 
     # Check that Cohen's h is computed as expected
-    assert "RobustnessScorer" in result, "Scorer results are missing."
-    cohen_h_mean = truncate(result["RobustnessScorer"]["cohen_h"]["mean"], 5)
+    assert "WeaveRobustnessScorer" in result, "Scorer results are missing."
+    cohen_h_mean = truncate(result["WeaveRobustnessScorer"]["cohen_h"]["mean"], 5)
     assert cohen_h_mean == 0.24999, f"Unexpected Cohen's h mean: {cohen_h_mean}"
 
 
@@ -419,16 +461,12 @@ async def test_robustness_scorer_non_binary_evaluation():
 
     @weave.op
     def model(questions: list[str]):
-        # Simulated model outputs corresponding to each question
-        outputs = [
-            "The capital of France is Paris.",
-            "Paris is the capital of France.",
-            "France's capital is Berlin.",
-        ]
-        return outputs
+        reference_text = questions[0]
+        texts = questions[1:]
+        return robustness_scorer.score(reference_text=reference_text, texts=texts)
 
-    # Instantiate the RobustnessScorer with binary=False
-    robustness_scorer = RobustnessScorer(use_exact_match=False)
+    # Instantiate the WeaveRobustnessScorer with binary=False
+    robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
 
     # Perform evaluation using Weave's Evaluation framework
     evaluation = weave.Evaluation(
@@ -443,14 +481,14 @@ async def test_robustness_scorer_non_binary_evaluation():
 
     # Print the results
     print("Robustness Scorer Results:")
-    print(result["RobustnessScorer"])
+    print(result["WeaveRobustnessScorer"])
 
     # Assert that the 'cohen_d' is present and is a float
-    assert "cohen_d" in result["RobustnessScorer"]
-    assert isinstance(result["RobustnessScorer"]["cohen_d"]["mean"], float)
+    assert "cohen_d" in result["WeaveRobustnessScorer"]
+    assert isinstance(result["WeaveRobustnessScorer"]["cohen_d"]["mean"], float)
 
     # Optionally, you can check that the effect size is within a reasonable range
-    cohen_d_mean = result["RobustnessScorer"]["cohen_d"]["mean"]
+    cohen_d_mean = result["WeaveRobustnessScorer"]["cohen_d"]["mean"]
     assert (
         0 <= abs(cohen_d_mean) <= 3
     ), f"Cohen's d mean is out of expected range: {cohen_d_mean}"
