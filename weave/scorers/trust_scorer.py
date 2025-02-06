@@ -33,7 +33,7 @@ class TrustScorer(Scorer):
     The TrustScorer evaluates the trustworthiness of model outputs by combining multiple
     specialized scorers into two categories:
 
-    1. Critical Scorers (automatic failure if flagged):
+    1. Critical Scorers (automatic failure if pass is False):
         - ToxicityScorer: Detects harmful, offensive, or inappropriate content
         - HallucinationScorer: Identifies fabricated or unsupported information
         - ContextRelevanceScorer: Ensures output relevance to provided context
@@ -69,18 +69,20 @@ class TrustScorer(Scorer):
 
         # Example output:
         {
-            "flagged": False,
-            "trust_level": "high",
+            "pass": True,
             "extras": {
+                "trust_level": "high_no-issues-found",
+                "critical_issues": [],
+                "advisory_issues": [],
                 "raw_outputs": {
-                    "ToxicityScorer": {"flagged": False, "extras": {"score": 0}},
-                    "HallucinationScorer": {"flagged": False, "extras": {"score": 0.1}},
-                    "ContextRelevanceScorer": {"flagged": False, "extras": {"score": 0.85}},
-                    "FluencyScorer": {"flagged": False, "extras": {"score": 0.95}},
-                    "CoherenceScorer": {"flagged": False, "extras": {"score": 0.9}}
+                    "ToxicityScorer": {"pass": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
+                    "HallucinationScorer": {"pass": True, "extras": {"score": 0.1}},
+                    "ContextRelevanceScorer": {"pass": True, "extras": {"score": 0.85}},
+                    "FluencyScorer": {"pass": True, "extras": {"score": 0.95}},
+                    "CoherenceScorer": {"pass": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
                 },
                 "scores": {
-                    "ToxicityScorer": 0,
+                    "ToxicityScorer": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0},
                     "HallucinationScorer": 0.1,
                     "ContextRelevanceScorer": 0.85,
                     "FluencyScorer": 0.95,
@@ -210,7 +212,7 @@ class TrustScorer(Scorer):
         """Validate input and return error response if invalid."""
         if not output or not output.strip():
             return {
-                "flagged": False,
+                "pass": True,
                 "trust_level": "low",
                 "critical_issues": ["EmptyInput"],
                 "advisory_issues": [],
@@ -303,7 +305,7 @@ class TrustScorer(Scorer):
 
         # Check each scorer's results
         for scorer_name, result in raw_results.items():
-            if result.get("flagged", False):
+            if not result.get("pass", True):
                 scorer_cls = type(self._loaded_scorers[scorer_name])
                 if scorer_cls in self._critical_scorers:
                     critical_issues.append(scorer_name)
@@ -311,8 +313,10 @@ class TrustScorer(Scorer):
                     advisory_issues.append(scorer_name)
 
         # Determine trust level
+        passed = True
         trust_level = "high_no-issues-found"
         if critical_issues:
+            passed = False
             trust_level = "low_critical-issues-found"
         elif advisory_issues:
             trust_level = "medium_advisory-issues-found"
@@ -327,7 +331,7 @@ class TrustScorer(Scorer):
         scores["ToxicityScorer"] = raw_results["ToxicityScorer"]["extras"]
 
         return {
-            "flagged": bool(critical_issues),
+            "pass": passed,
             "trust_level": trust_level,
             "critical_issues": critical_issues,
             "advisory_issues": advisory_issues,
@@ -344,10 +348,10 @@ class TrustScorer(Scorer):
         context: Optional[Union[str, list[str]]] = None, 
         output: Optional[str] = None
     ) -> dict[str, Any]:
-        """Basic scoring that flags any issues."""
+        """Basic scoring that passes if no critical issues are found."""
         result = self._score_with_logic(output=output, context=context, query=query)
         return {
-            "flagged": result["flagged"],
+            "pass": result["pass"],
             "extras": {
                 "trust_level": result["trust_level"],
                 "critical_issues": result["critical_issues"],

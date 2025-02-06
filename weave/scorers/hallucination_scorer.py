@@ -244,29 +244,37 @@ class HallucinationScorer(HuggingFaceScorer):
     Args:
         device: Device to run model on, defaults to "cuda"
         model_name_or_path: Path or name of model weights to load
-        base_url: Optional URL for external API scoring instead of local model
-        debug: Enable debug logging, defaults to False
+
+    Returns:
+        dict: A dictionary containing:
+            - pass (bool): True if no hallucinations detected (score <= threshold)
+            - extras (dict): Contains:
+                - score (float): Hallucination score between 0 and 1, where lower is better
+                - error (str, optional): Error message if something went wrong
+
+    Example:
+        >>> scorer = HallucinationScorer()
+        >>> result = scorer.score(
+        ...     query="What is the capital of France?",
+        ...     context="Paris is the capital of France.",
+        ...     output="Paris is the capital of France."
+        ... )
+        >>> print(result)
+        {
+            'pass': True,
+            'extras': {
+                'score': 0.1
+            }
+        }
     """
 
-    base_url: Optional[str] = None
-    debug: bool = False
-    max_new_tokens: int = 2
     model_max_length: int = 8192
-    do_sample: bool = False
-    temperature: Optional[float] = 0.0
-    num_beams: int = 1
-    top_k: Optional[int] = 20
-    top_p: Optional[float] = 0.7
-    use_torch_compile: bool = False
+    device: str = "auto"
     threshold: float = HALLUCINATION_SCORER_THRESHOLD
     _local_model_path: str = ""
     import_failed: bool = False
 
     def load_model(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
-
         # Lazy import of torch and transformers
         try:
             from transformers import (
@@ -300,17 +308,13 @@ class HallucinationScorer(HuggingFaceScorer):
             self._tokenizer = self.model.tokenzier
             self._tokenizer.model_max_length = self.model_max_length
 
-        if not self.do_sample:
-            self.top_k = None
-            self.top_p = None
-            self.temperature = None
         self.model.eval()
 
     @weave.op
     def score(self, query: str, context: str | list[str], output: str) -> dict[str, Any]:
         if self.import_failed:
             return {
-                "flagged": False,
+                "pass": False,
                 "extras": {
                     "error": "Unable to import required libraries. Please install transformers."
                 },
@@ -345,7 +349,7 @@ class HallucinationScorer(HuggingFaceScorer):
         pred = self.model.predict(pairs)
         score = 1 - pred.item()
         return {
-            "flagged": score >= self.threshold,
+            "pass": score <= self.threshold,
             "extras": {"score": score},
         }
     

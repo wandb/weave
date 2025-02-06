@@ -39,14 +39,14 @@ class OpenAIModerationScorer(LLMScorer):
         model_id (str): The OpenAI model to use for moderation. Defaults to `text-moderation-latest`.
 
     Returns:
-        dict: A dictionary containing the `flagged` status and the detected `categories`.
+        dict: A dictionary containing the `pass` status and the detected `categories`.
 
     Example:
         >>> from weave.scorers.moderation_scorer import OpenAIModerationScorer
         >>> scorer = OpenAIModerationScorer()
         >>> result = await scorer.score("This is some sample text.")
         >>> print(result)
-        {'flagged': False, 'categories': {}}
+        {'pass': True, 'categories': {}}
     """
 
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
@@ -70,12 +70,13 @@ class OpenAIModerationScorer(LLMScorer):
             input=output,
         )
         response = response.results[0]
+        passed = not response.flagged
         categories = {
             k: v
             for k, v in response.categories
             if v and ("/" not in k and "-" not in k)
         }
-        return {"flagged": response.flagged, "categories": categories}
+        return {"pass": passed, "categories": categories}
 
 
 TOXICITY_CATEGORY_THRESHOLD = 2
@@ -118,11 +119,10 @@ class ToxicityScorer(RollingWindowScorer):
                 'Ability': 0,
                 'Violence': 1
             },
-            'flagged': True
+            'pass': False
         }
     """
 
-    base_url: Optional[str] = None
     total_threshold: int = TOXICITY_TOTAL_THRESHOLD
     category_threshold: int = TOXICITY_CATEGORY_THRESHOLD
     max_tokens: int = 512
@@ -138,9 +138,6 @@ class ToxicityScorer(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
         try:
             from transformers import AutoModelForSequenceClassification
         except ImportError:
@@ -161,9 +158,6 @@ class ToxicityScorer(RollingWindowScorer):
         self.model.eval()
 
     def load_tokenizer(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
         try:
             from transformers import AutoTokenizer
         except ImportError:
@@ -193,31 +187,19 @@ class ToxicityScorer(RollingWindowScorer):
             return [predictions]
         return predictions
 
-    def _score_via_api(self, output: str) -> dict[str, Any]:
-        import requests
-
-        assert self.base_url is not None
-        response = requests.post(self.base_url, json={"output": output})
-        response.raise_for_status()
-        return response.json()
-
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
-        # remote scoring
-        if self.base_url:
-            return self._score_via_api(output=output)
-
         # local scoring
-        flagged: bool = False
+        passed: bool = True
         predictions: list[float] = self.predict(output)
         if (sum(predictions) >= self.total_threshold) or any(
             o >= self.category_threshold for o in predictions
         ):
-            flagged = True
+            passed = False
 
         return {
             "extras": dict(zip(self._categories, predictions)),
-            "flagged": flagged,
+            "pass": passed,
         }
 
 BIAS_SCORER_THRESHOLD = 0.65
@@ -250,7 +232,6 @@ class BiasScorer(RollingWindowScorer):
         }
     """
 
-    base_url: Optional[str] = None
     threshold: float = BIAS_SCORER_THRESHOLD
     _categories: list[str] = PrivateAttr(
         default=[
@@ -260,9 +241,6 @@ class BiasScorer(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
         try:
             from transformers import AutoModelForSequenceClassification
         except ImportError:
@@ -284,9 +262,6 @@ class BiasScorer(RollingWindowScorer):
         self.model.eval()
 
     def load_tokenizer(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
         try:
             from transformers import AutoTokenizer
         except ImportError:
@@ -305,21 +280,8 @@ class BiasScorer(RollingWindowScorer):
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
-    def _score_via_api(self, output: str, verbose: bool = False) -> dict[str, Any]:
-        import requests
-
-        assert self.base_url is not None
-        response = requests.post(
-            self.base_url,
-            json={"output": output, "verbose": verbose},
-        )
-        response.raise_for_status()
-        return response.json()
-
     @weave.op
     def score(self, output: str, verbose: bool = False) -> dict[str, Any]:
-        if self.base_url:
-            return self._score_via_api(output, verbose)
         predictions = self.predict(output)
         scores = [o >= self.threshold for o in predictions]
         if verbose:
@@ -328,5 +290,5 @@ class BiasScorer(RollingWindowScorer):
             categories = dict(zip(self._categories, scores))
         return {
             "extras": categories,
-            "flagged": any(scores),
+            "pass": not any(scores),
         }

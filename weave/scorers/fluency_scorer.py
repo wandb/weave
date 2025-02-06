@@ -22,7 +22,10 @@ class FluencyScorer(HuggingFacePipelineScorer):
         >>> result = scorer.score("This text is fluent.")
         >>> print(result)
         {
-            'flagged': True,
+            'pass': True,
+            'extras': {
+                'score': 0.95
+            }
         }
     """
     task: str = "text-classification"
@@ -53,6 +56,5 @@ class FluencyScorer(HuggingFacePipelineScorer):
     def score(self, output: str):
         pipeline_output = self._pipeline(output)[0]
         fluency_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'fluent')
-        if fluency_score <= self.threshold:
-            return {"flagged": True, "extras": {"score": fluency_score}}
-        return {"flagged": False, "extras": {"score": fluency_score}}
+        passed = fluency_score >= self.threshold
+        return {"pass": passed, "extras": {"score": fluency_score}}

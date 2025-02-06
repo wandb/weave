@@ -75,7 +75,6 @@ class OldRelevanceScorer(Scorer):
     """
 
     model_name_or_path: str = ""
-    base_url: Optional[str] = None
     device: str = "auto"
     _classifier: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
@@ -91,9 +90,6 @@ class OldRelevanceScorer(Scorer):
             print(
                 "The `transformers` package is required to use the ContextRelevanceScorer, please run `pip install transformers`"
             )
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
 
         """Initialize the coherence model and tokenizer."""
         self.device = set_device(self.device)
@@ -137,11 +133,11 @@ class OldRelevanceScorer(Scorer):
         except Exception:
             relevance = 0
 
-        flagged = True
+        passed = False
         if relevance > 3:
-            flagged = False
+            passed = True
         return {
-            "flagged": flagged,
+            "pass": passed,
             "extras": {
                 "relevance_id": relevance,
                 "relevance_label": self._id2label.get(relevance, "Unknown"),
@@ -183,28 +179,6 @@ class OldRelevanceScorer(Scorer):
             {"role": "user", "content": context_and_completion},
         ]
 
-    def _score_via_api(
-        self,
-        input: str,
-        output: str,
-        context: Optional[list[str]] = None,
-        chat_history: Optional[list[dict[str, str]]] = None,
-    ) -> dict[str, Any]:
-        import requests
-
-        assert self.base_url is not None
-        response = requests.post(
-            self.base_url,
-            json={
-                "input": input,
-                "output": output,
-                "context": context,
-                "chat_history": chat_history,
-            },
-        )
-        response.raise_for_status()
-        return response.json()
-
     @weave.op
     def score(
         self,
@@ -213,14 +187,13 @@ class OldRelevanceScorer(Scorer):
         context: Optional[list[str]] = None,
         chat_history: Optional[list[dict[str, str]]] = None,
     ) -> dict[str, Any]:
-        if self.base_url:
-            return self._score_via_api(input, output, context, chat_history)
         messages = self._format_messages(
             prompt=input, completion=output, context=context, chat_history=chat_history
         )
         return self.score_messages(messages)
 
-CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.45
+CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
+
 class ContextRelevanceScorer(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
@@ -231,38 +204,39 @@ class ContextRelevanceScorer(HuggingFaceScorer):
 
     Args:
         model_name_or_path (str): Path or name of model weights to load
-        base_url (Optional[str]): Optional URL for external API scoring instead of local model
         device (str): Device to run model on, defaults to "cpu"
         threshold (float): Threshold for relevance classification, defaults to 0.7
         debug (bool): Enable debug logging, defaults to False
 
     Returns:
         dict: A dictionary containing:
-            - flagged (bool): Whether the output was flagged as irrelevant
+            - pass (bool): Whether the output was flagged as relevant (score >= threshold)
             - extras (dict): Contains:
-                - score (float): Overall relevance score
-                - all_spans (list, optional): If verbose=True, includes list of relevant
-                  text spans and their scores
+                - score (float): Overall relevance score between 0 and 1
+                - all_spans (list[dict], optional): If verbose=True, includes list of all relevant
+                  text spans with their scores, where each dict has:
+                    - text (str): The relevant text span
+                    - score (float): The relevance score for this span
 
     Example:
-        >>> scorer = ContextRelevanceScorer(model_name_or_path="path/to/model")
+        >>> scorer = ContextRelevanceScorer()
         >>> result = scorer.score(
         ...     query="What is the capital of France?",
-        ...     documents=["Paris is the capital of France."]
+        ...     context=["Paris is the capital of France."],
+        ...     verbose=True
         ... )
         >>> print(result)
         {
-            'flagged': False,
+            'pass': True,
             'extras': {
                 'score': 0.92,
-                'all_spans': [  # Only included if verbose=True
-                    {'text': 'Paris is the capital of France', 'scores': 0.92}
+                'all_spans': [
+                    {'text': 'Paris is the capital of France', 'score': 0.92}
                 ]
             }
         }
     """
 
-    base_url: Optional[str] = None
     threshold: float = CONTEXT_RELEVANCE_SCORER_THRESHOLD
     model_max_length: int = 1280
 
@@ -387,7 +361,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        res = {"flagged": final_score < self.threshold}
+        res = {"pass": final_score >= self.threshold}
         extras = {"score": final_score}
         if verbose:
             extras["all_spans"] = all_spans  # type: ignore

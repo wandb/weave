@@ -17,7 +17,6 @@ class CoherenceScorer(HuggingFacePipelineScorer):
 
     task: str = "sentiment-analysis"
     model_max_length: int = 1024
-    base_url: Optional[str] = None
     _label2id: dict[str, int] = {
         "Completely Incoherent": 0,
         "Mostly Incoherent": 1,
@@ -27,10 +26,6 @@ class CoherenceScorer(HuggingFacePipelineScorer):
     }
 
     def _load_pipeline(self) -> None:
-        if self.base_url:
-            print(f"Using external API at {self.base_url} for scoring.")
-            return  # Skip local model loading if base_url is provided
-
         # Lazy import of transformers
         from transformers import pipeline
         if os.path.isdir(self.model_name_or_path):
@@ -54,12 +49,12 @@ class CoherenceScorer(HuggingFacePipelineScorer):
         assert self._pipeline is not None
         coherence_output = self._pipeline(inputs={"text": prompt, "text_pair": output})
         coherence_score = 1 - coherence_output["score"]
-        flagged = False
+        passed = True
         if "incoherent" in coherence_output["label"].lower():
-            flagged = True
+            passed = False
 
         return {
-            "flagged": flagged,
+            "pass": passed,
             "extras": {
                 "coherence_label": coherence_output["label"],
                 "coherence_id": self._label2id[coherence_output["label"]],
