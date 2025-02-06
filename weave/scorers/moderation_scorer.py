@@ -78,6 +78,9 @@ class OpenAIModerationScorer(LLMScorer):
         return {"flagged": response.flagged, "categories": categories}
 
 
+TOXICITY_CATEGORY_THRESHOLD = 2
+TOXICITY_TOTAL_THRESHOLD = 5
+
 class ToxicityScorer(RollingWindowScorer):
     """
     Moderation scorer using the Celadon model.
@@ -120,8 +123,8 @@ class ToxicityScorer(RollingWindowScorer):
     """
 
     base_url: Optional[str] = None
-    total_threshold: int = 5
-    category_threshold: int = 2
+    total_threshold: int = TOXICITY_TOTAL_THRESHOLD
+    category_threshold: int = TOXICITY_CATEGORY_THRESHOLD
     max_tokens: int = 512
     overlap: int = 50
     _categories: list[str] = PrivateAttr(
@@ -217,7 +220,7 @@ class ToxicityScorer(RollingWindowScorer):
             "flagged": flagged,
         }
 
-
+BIAS_SCORER_THRESHOLD = 0.65
 class BiasScorer(RollingWindowScorer):
     """
     Moderation scorer that assesses gender and race/origin bias using a custom-trained model.
@@ -248,7 +251,7 @@ class BiasScorer(RollingWindowScorer):
     """
 
     base_url: Optional[str] = None
-    threshold: float = 0.65
+    threshold: float = BIAS_SCORER_THRESHOLD
     _categories: list[str] = PrivateAttr(
         default=[
             "gender_bias",

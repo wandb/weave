@@ -4,6 +4,8 @@ from weave.scorers.llm_scorer import HuggingFacePipelineScorer
 from weave.scorers.llm_utils import set_device, download_model, MODEL_PATHS
 
 
+FLUENCY_SCORER_THRESHOLD = 0.5
+
 class FluencyScorer(HuggingFacePipelineScorer):
     """
     W&B Fluency Scorer
@@ -26,7 +28,7 @@ class FluencyScorer(HuggingFacePipelineScorer):
     task: str = "text-classification"
     model_name_or_path: str = ""
     device: str = "auto"
-    threshold: float = 0.5
+    threshold: float = FLUENCY_SCORER_THRESHOLD
 
     
     def _load_pipeline(self) -> None:

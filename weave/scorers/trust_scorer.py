@@ -18,6 +18,12 @@ from weave.scorers import (
     ContextRelevanceScorer, 
     ToxicityScorer
 )
+from weave.scorers.fluency_scorer import FLUENCY_SCORER_THRESHOLD
+from weave.scorers.hallucination_scorer import HALLUCINATION_SCORER_THRESHOLD
+from weave.scorers.faithfulness_scorer import FAITHFULNESS_SCORER_THRESHOLD
+from weave.scorers.moderation_scorer import TOXICITY_CATEGORY_THRESHOLD, TOXICITY_TOTAL_THRESHOLD
+from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRESHOLD
+
 from pydantic import PrivateAttr, Field
 
 
@@ -92,23 +98,23 @@ class TrustScorer(Scorer):
         description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')"
     )
     context_relevance_threshold: float = Field(
-        default=0.45,
+        default=CONTEXT_RELEVANCE_SCORER_THRESHOLD,
         description="Minimum relevance score between output and context (0-1)"
     )
     hallucination_threshold: float = Field(
-        default=0.5,
+        default=HALLUCINATION_SCORER_THRESHOLD,
         description="Maximum hallucination score allowed in output (0-1)"
     )
     fluency_threshold: float = Field(
-        default=0.5,
+        default=FLUENCY_SCORER_THRESHOLD,
         description="Minimum fluency score required for output (0-1)"
     )
     toxicity_total_threshold: int = Field(
-        default=5,
+        default=TOXICITY_TOTAL_THRESHOLD,
         description="Maximum total toxicity score allowed across all categories"
     )
     toxicity_category_threshold: int = Field(
-        default=2,
+        default=TOXICITY_CATEGORY_THRESHOLD,
         description="Maximum toxicity score allowed per individual category"
     )
     context_relevance_model_name_or_path: str = Field(

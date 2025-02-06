@@ -220,7 +220,7 @@ class OldRelevanceScorer(Scorer):
         )
         return self.score_messages(messages)
 
-
+CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.45
 class ContextRelevanceScorer(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
@@ -263,7 +263,7 @@ class ContextRelevanceScorer(HuggingFaceScorer):
     """
 
     base_url: Optional[str] = None
-    threshold: float = 0.45
+    threshold: float = CONTEXT_RELEVANCE_SCORER_THRESHOLD
     model_max_length: int = 1280
 
     def load_model(self) -> None:
