@@ -5,7 +5,6 @@ check_litellm_installation()
 
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
-    transpose,
 )
 from weave.scorers.guardrails import PromptInjectionLLMGuardrail
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
@@ -46,7 +45,6 @@ __all__ = [
     "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",
-    "transpose",
     "ValidXMLScorer",
     "_validate_scorer_signature",
 ]
