@@ -17,19 +17,20 @@ def google_genai_gemini_postprocess_outputs(
     from PIL import Image
 
     modified_outputs = []
-    for image_data in outputs.generated_images:
-        modified_outputs.append(
-            {
-                "image": {
-                    "gcs_uri": image_data.image.gcs_uri,
-                    "image_bytes": image_data.image.image_bytes,
-                    "mime_type": image_data.image.mime_type,
-                    "image": Image.open(BytesIO(image_data.image.image_bytes)),
-                    "rai_filtered_reason": image_data.rai_filtered_reason,
-                    "enhanced_prompt": image_data.enhanced_prompt,
+    if hasattr(outputs, "generated_images"):
+        for image_data in outputs.generated_images:
+            modified_outputs.append(
+                {
+                    "image": {
+                        "gcs_uri": image_data.image.gcs_uri,
+                        "image_bytes": image_data.image.image_bytes,
+                        "mime_type": image_data.image.mime_type,
+                        "image": Image.open(BytesIO(image_data.image.image_bytes)),
+                        "rai_filtered_reason": image_data.rai_filtered_reason,
+                        "enhanced_prompt": image_data.enhanced_prompt,
+                    }
                 }
-            }
-        )
+            )
 
     return modified_outputs
 
