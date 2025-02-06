@@ -485,7 +485,6 @@ def get_huggingface_patcher(
             huggingface_wrapper_sync(image_to_image_async_settings),
         )
     )
-    
 
     _huggingface_patcher = MultiPatcher(patchers)
     return _huggingface_patcher
