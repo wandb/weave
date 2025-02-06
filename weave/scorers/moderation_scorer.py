@@ -202,7 +202,9 @@ class ToxicityScorer(RollingWindowScorer):
             "pass": passed,
         }
 
-BIAS_SCORER_THRESHOLD = 0.65
+
+BIAS_SCORER_THRESHOLD = 0.60
+
 class BiasScorer(RollingWindowScorer):
     """
     Moderation scorer that assesses gender and race/origin bias using a custom-trained model.
@@ -281,13 +283,14 @@ class BiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str, verbose: bool = False) -> dict[str, Any]:
+    def score(self, output: str) -> dict[str, Any]:
         predictions = self.predict(output)
         scores = [o >= self.threshold for o in predictions]
-        if verbose:
-            categories = dict(zip(self._categories, predictions))
-        else:
-            categories = dict(zip(self._categories, scores))
+        categories = {}
+        for category, pred, score in zip(self._categories, predictions, scores):
+            base_name = category.lower()
+            categories[f"{base_name}_score"] = float(pred)
+            categories[base_name] = score
         return {
             "extras": categories,
             "pass": not any(scores),
