@@ -26,6 +26,7 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {CheckedState} from '@radix-ui/react-checkbox';
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Switch} from '@wandb/weave/components';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
@@ -567,6 +568,36 @@ export const CallsTable: FC<{
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  const headerCheckboxOnCheckedChange = useCallback(
+    (checked: boolean) => {
+      const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+      if (selectedCalls.length === Math.min(tableData.length, maxForTable)) {
+        setSelectedCalls([]);
+      } else {
+        setSelectedCalls(tableData.map(row => row.id).slice(0, maxForTable));
+      }
+    },
+    [isEvaluateTable, tableData, selectedCalls, setSelectedCalls]
+  );
+  const headerChecked = useMemo(() => {
+    return selectedCalls.length === 0
+      ? false
+      : selectedCalls.length === tableData.length
+      ? true
+      : 'indeterminate';
+  }, [selectedCalls, tableData]);
+  const rowCheckboxOnCheckedChange = useCallback(
+    (isSelected: CheckedState, rowId: string) => {
+      if (isSelected) {
+        setSelectedCalls(selectedCalls.filter(id => id !== rowId));
+      } else {
+        setSelectedCalls([...selectedCalls, rowId]);
+      }
+    },
+    [selectedCalls, setSelectedCalls]
+  );
+
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -582,28 +613,8 @@ export const CallsTable: FC<{
           return (
             <Checkbox
               size="small"
-              checked={
-                selectedCalls.length === 0
-                  ? false
-                  : selectedCalls.length === tableData.length
-                  ? true
-                  : 'indeterminate'
-              }
-              onCheckedChange={() => {
-                const maxForTable = isEvaluateTable
-                  ? MAX_EVAL_COMPARISONS
-                  : MAX_SELECT;
-                if (
-                  selectedCalls.length ===
-                  Math.min(tableData.length, maxForTable)
-                ) {
-                  setSelectedCalls([]);
-                } else {
-                  setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, maxForTable)
-                  );
-                }
-              }}
+              checked={headerChecked}
+              onCheckedChange={headerCheckboxOnCheckedChange}
             />
           );
         },
@@ -634,15 +645,9 @@ export const CallsTable: FC<{
                   size="small"
                   disabled={disabled}
                   checked={isSelected}
-                  onCheckedChange={() => {
-                    if (isSelected) {
-                      setSelectedCalls(
-                        selectedCalls.filter(id => id !== rowId)
-                      );
-                    } else {
-                      setSelectedCalls([...selectedCalls, rowId]);
-                    }
-                  }}
+                  onCheckedChange={checked =>
+                    rowCheckboxOnCheckedChange(checked, rowId)
+                  }
                 />
               </span>
             </Tooltip>
@@ -652,7 +657,14 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+  }, [
+    columns.cols,
+    selectedCalls,
+    isEvaluateTable,
+    headerChecked,
+    headerCheckboxOnCheckedChange,
+    rowCheckboxOnCheckedChange,
+  ]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
