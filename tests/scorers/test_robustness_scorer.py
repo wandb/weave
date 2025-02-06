@@ -85,7 +85,8 @@ def test_robustness_scorer_insufficient_outputs():
     texts = []  # No perturbed outputs
     robustness_scorer = WeaveRobustnessScorer()
     with pytest.raises(
-        AssertionError, match="There are no `texts`, there must be at least one text to measure against."
+        AssertionError,
+        match="There are no `texts`, there must be at least one text to measure against.",
     ):
         robustness_scorer.score(reference_text=reference_text, texts=texts)
 
@@ -112,7 +113,9 @@ def test_robustness_scorer_with_boolean_output_and_ground_truths():
         model_name_or_path="",
         use_ground_truths=True,
     )
-    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+    result = robustness_scorer.score(
+        reference_text=reference_text, texts=texts, ground_truths=ground_truths
+    )
     assert truncate(result["cohen_h"], 5) == 0.39182
 
 
@@ -126,7 +129,9 @@ def test_robustness_scorer_with_ground_truths_as_strings():
         model_name_or_path="",
         use_ground_truths=True,
     )
-    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+    result = robustness_scorer.score(
+        reference_text=reference_text, texts=texts, ground_truths=ground_truths
+    )
     assert truncate(result["cohen_h"], 5) == 0.60817
 
 
@@ -144,7 +149,9 @@ def test_robustness_scorer_with_ground_truths_as_booleans():
         model_name_or_path="",
         use_ground_truths=True,
     )
-    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+    result = robustness_scorer.score(
+        reference_text=reference_text, texts=texts, ground_truths=ground_truths
+    )
     assert truncate(result["cohen_h"], 5) == 0.39182
 
 
@@ -156,7 +163,9 @@ def test_robustness_scorer_ground_truths_length_mismatch():
     with pytest.raises(
         AssertionError, match="Length of ground_truths must match the length of output."
     ):
-        robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+        robustness_scorer.score(
+            reference_text=reference_text, texts=texts, ground_truths=ground_truths
+        )
 
 
 def test_robustness_scorer_ground_truths_edge_case():
@@ -165,9 +174,12 @@ def test_robustness_scorer_ground_truths_edge_case():
     ground_truths = ["True"]
     robustness_scorer = WeaveRobustnessScorer(use_ground_truths=True)
     with pytest.raises(
-        AssertionError, match="There are no `texts`, there must be at least one text to measure against."
+        AssertionError,
+        match="There are no `texts`, there must be at least one text to measure against.",
     ):
-        robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+        robustness_scorer.score(
+            reference_text=reference_text, texts=texts, ground_truths=ground_truths
+        )
 
 
 def test_robustness_scorer_non_binary():
@@ -213,7 +225,9 @@ def test_robustness_scorer_non_binary_with_ground_truths():
     robustness_scorer = WeaveRobustnessScorer(use_exact_match=False)
 
     # Run the scorer's `score` method
-    result = robustness_scorer.score(reference_text=reference_text, texts=texts, ground_truths=ground_truths)
+    result = robustness_scorer.score(
+        reference_text=reference_text, texts=texts, ground_truths=ground_truths
+    )
 
     print(result)
 

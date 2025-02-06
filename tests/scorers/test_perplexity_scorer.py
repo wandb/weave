@@ -2,8 +2,7 @@ import pytest  # type: ignore
 
 pytestmark = pytest.mark.skip(reason="Test file ignored")
 
-from weave.scorers import HuggingFacePerplexityScorer#, OpenAIPerplexityScorer
-
+from weave.scorers import HuggingFacePerplexityScorer  # , OpenAIPerplexityScorer
 
 # @pytest.fixture
 # def openai_perplexity_scorer():

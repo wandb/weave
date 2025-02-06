@@ -21,14 +21,15 @@ from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuardScorer
 from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.moderation_scorer import (
-    WeaveBiasScorer,
     OpenAIModerationScorer,
+    WeaveBiasScorer,
     WeaveToxicityScorer,
 )
 from weave.scorers.perplexity_scorer import (
     HuggingFacePerplexityScorer,
-    # OpenAIPerplexityScorer,
 )
+
+# OpenAIPerplexityScorer,
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
@@ -45,8 +46,8 @@ from weave.scorers.string_scorer import (
     StringMatchScorer,
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
-from weave.scorers.xml_scorer import ValidXMLScorer
 from weave.scorers.trust_scorer import WeaveTrustScorer
+from weave.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
     "AccuracyScorer",
@@ -78,4 +79,5 @@ __all__ = [
     "SummarizationScorer",
     "ValidXMLScorer",
     "WeaveTrustScorer",
+    "Scorer",
 ]

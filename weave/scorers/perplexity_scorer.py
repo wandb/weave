@@ -1,12 +1,7 @@
-from typing import Any
-
-from litellm import acompletion
-import numpy as np
-
 import weave
+
 # from weave.scorers.llm_scorer import LLMScorer
 # from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-
 
 
 # class OpenAIPerplexityScorer(LLMScorer):

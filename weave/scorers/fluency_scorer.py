@@ -1,14 +1,15 @@
-import weave
 import os
-from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.utils import download_model, set_device, MODEL_PATHS
 
+import weave
+from weave.scorers.llm_scorer import HuggingFacePipelineScorer
+from weave.scorers.utils import MODEL_PATHS, download_model, set_device
 
 FLUENCY_SCORER_THRESHOLD = 0.5
 
+
 class WeaveFluencyScorer(HuggingFacePipelineScorer):
     """
-    The scorer uses an fine-tuned ModernBert model to score a given text's fluency, 
+    The scorer uses an fine-tuned ModernBert model to score a given text's fluency,
     https://github.com/AnswerDotAI/ModernBERT
 
     Args:
@@ -36,6 +37,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     def _load_pipeline(self) -> None:
         """Loads the _pipeline attribute"""
         from transformers import pipeline
+
         self.device = set_device(self.device)
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
@@ -45,7 +47,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
             self._local_model_path = download_model(MODEL_PATHS["fluency_scorer"])
 
         self._pipeline = pipeline(
-            "text-classification", 
+            "text-classification",
             model=self._local_model_path,
             device=self.device,
             top_k=2,
@@ -54,6 +56,8 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     @weave.op
     def score(self, output: str):
         pipeline_output = self._pipeline(output)[0]
-        fluency_score = next(pred['score'] for pred in pipeline_output if pred['label'] == 'fluent')
+        fluency_score = next(
+            pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
+        )
         passed = fluency_score >= self.threshold
         return {"pass": passed, "extras": {"score": fluency_score}}

@@ -5,25 +5,27 @@ This scorer combines multiple scorers to provide a comprehensive trust evaluatio
 """
 
 import re
-from typing import Optional, Union, Any, Dict, Set, Type
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
+from typing import Any, Dict, Optional, Set, Type, Union
+
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers import (
-    WeaveHallucinationScorer, 
-    WeaveCoherenceScorer, 
-    WeaveFluencyScorer, 
-    WeaveContextRelevanceScorer, 
-    WeaveToxicityScorer
+    WeaveCoherenceScorer,
+    WeaveContextRelevanceScorer,
+    WeaveFluencyScorer,
+    WeaveHallucinationScorer,
+    WeaveToxicityScorer,
 )
+from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRESHOLD
 from weave.scorers.fluency_scorer import FLUENCY_SCORER_THRESHOLD
 from weave.scorers.hallucination_scorer import HALLUCINATION_SCORER_THRESHOLD
-from weave.scorers.faithfulness_scorer import FAITHFULNESS_SCORER_THRESHOLD
-from weave.scorers.moderation_scorer import TOXICITY_CATEGORY_THRESHOLD, TOXICITY_TOTAL_THRESHOLD
-from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRESHOLD
-
-from pydantic import PrivateAttr, Field
+from weave.scorers.moderation_scorer import (
+    TOXICITY_CATEGORY_THRESHOLD,
+    TOXICITY_TOTAL_THRESHOLD,
+)
 
 
 class WeaveTrustScorer(weave.Scorer):
@@ -96,62 +98,64 @@ class WeaveTrustScorer(weave.Scorer):
     # Model configuration
     device: str = Field(
         default="auto",
-        description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')"
+        description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')",
     )
     context_relevance_model_name_or_path: str = Field(
         default="",
         description="Path or name of the context relevance model",
-        validate_default=True
+        validate_default=True,
     )
     hallucination_model_name_or_path: str = Field(
         default="",
         description="Path or name of the hallucination model",
-        validate_default=True
+        validate_default=True,
     )
     toxicity_model_name_or_path: str = Field(
         default="",
         description="Path or name of the toxicity model",
-        validate_default=True
+        validate_default=True,
     )
     fluency_model_name_or_path: str = Field(
         default="",
         description="Path or name of the fluency model",
-        validate_default=True
+        validate_default=True,
     )
     coherence_model_name_or_path: str = Field(
         default="",
         description="Path or name of the coherence model",
-        validate_default=True
+        validate_default=True,
     )
     run_in_parallel: bool = Field(
         default=True,
-        description="Whether to run scorers in parallel for improved performance"
+        description="Whether to run scorers in parallel for improved performance",
     )
 
     # Define scorer categories
     _critical_scorers: Set[Type[weave.Scorer]] = {
         WeaveToxicityScorer,
         WeaveHallucinationScorer,
-        WeaveContextRelevanceScorer
+        WeaveContextRelevanceScorer,
     }
     _advisory_scorers: Set[Type[weave.Scorer]] = {
         WeaveFluencyScorer,
-        WeaveCoherenceScorer
+        WeaveCoherenceScorer,
     }
 
     # Private attributes
     _loaded_scorers: dict[str, weave.Scorer] = PrivateAttr(default_factory=dict)
-    _emoji_pattern: re.Pattern = PrivateAttr(default=re.compile(
-        "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-        "\U00002702-\U000027B0"  # dingbats
-        "\U000024C2-\U0001F251"
-        "]+",
-        flags=re.UNICODE
-    ))
+    _emoji_pattern: re.Pattern = PrivateAttr(
+        default=re.compile(
+            "["
+            "\U0001f600-\U0001f64f"  # emoticons
+            "\U0001f300-\U0001f5ff"  # symbols & pictographs
+            "\U0001f680-\U0001f6ff"  # transport & map symbols
+            "\U0001f1e0-\U0001f1ff"  # flags (iOS)
+            "\U00002702-\U000027b0"  # dingbats
+            "\U000024c2-\U0001f251"
+            "]+",
+            flags=re.UNICODE,
+        )
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize scorers after model validation."""
@@ -161,8 +165,8 @@ class WeaveTrustScorer(weave.Scorer):
     def _load_scorers(self) -> None:
         """Load all scorers with appropriate configurations."""
         base_params = {
-            'column_map': self.column_map,
-            'device': self.device,
+            "column_map": self.column_map,
+            "device": self.device,
         }
 
         # Load all scorers (both critical and advisory)
@@ -173,17 +177,21 @@ class WeaveTrustScorer(weave.Scorer):
 
             # Add specific threshold parameters based on scorer type
             if scorer_cls == WeaveContextRelevanceScorer:
-                scorer_params['threshold'] = CONTEXT_RELEVANCE_SCORER_THRESHOLD
-                scorer_params["model_name_or_path"] = self.context_relevance_model_name_or_path
+                scorer_params["threshold"] = CONTEXT_RELEVANCE_SCORER_THRESHOLD
+                scorer_params["model_name_or_path"] = (
+                    self.context_relevance_model_name_or_path
+                )
             elif scorer_cls == WeaveHallucinationScorer:
-                scorer_params['threshold'] = HALLUCINATION_SCORER_THRESHOLD
-                scorer_params["model_name_or_path"] = self.hallucination_model_name_or_path
+                scorer_params["threshold"] = HALLUCINATION_SCORER_THRESHOLD
+                scorer_params["model_name_or_path"] = (
+                    self.hallucination_model_name_or_path
+                )
             elif scorer_cls == WeaveToxicityScorer:
-                scorer_params['total_threshold'] = TOXICITY_TOTAL_THRESHOLD
-                scorer_params['category_threshold'] = TOXICITY_CATEGORY_THRESHOLD
+                scorer_params["total_threshold"] = TOXICITY_TOTAL_THRESHOLD
+                scorer_params["category_threshold"] = TOXICITY_CATEGORY_THRESHOLD
                 scorer_params["model_name_or_path"] = self.toxicity_model_name_or_path
             elif scorer_cls == WeaveFluencyScorer:
-                scorer_params['threshold'] = FLUENCY_SCORER_THRESHOLD
+                scorer_params["threshold"] = FLUENCY_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = self.fluency_model_name_or_path
             elif scorer_cls == WeaveCoherenceScorer:
                 scorer_params["model_name_or_path"] = self.coherence_model_name_or_path
@@ -200,10 +208,15 @@ class WeaveTrustScorer(weave.Scorer):
         text = self._emoji_pattern.sub(lambda m: f" {m.group(0)} ", text)
 
         # Clean up multiple spaces and normalize whitespace
-        text = ' '.join(text.split())
+        text = " ".join(text.split())
 
         # Ensure proper sentence spacing
-        text = text.replace(' .', '.').replace(' ,', ',').replace(' !', '!').replace(' ?', '?')
+        text = (
+            text.replace(" .", ".")
+            .replace(" ,", ",")
+            .replace(" !", "!")
+            .replace(" ?", "?")
+        )
 
         return text
 
@@ -218,12 +231,14 @@ class WeaveTrustScorer(weave.Scorer):
                 "extras": {
                     "error": "Empty input provided",
                     "raw_outputs": {},
-                    "scores": {}
-                }
+                    "scores": {},
+                },
             }
         return None
 
-    def _filter_inputs_for_scorer(self, scorer: weave.Scorer, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def _filter_inputs_for_scorer(
+        self, scorer: weave.Scorer, inputs: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Filter inputs to match scorer's signature."""
         scorer_params = signature(scorer.score).parameters
         return {k: v for k, v in inputs.items() if k in scorer_params}
@@ -231,8 +246,8 @@ class WeaveTrustScorer(weave.Scorer):
     def _score_all(
         self,
         output: str,
-        context: Optional[Union[str, list[str]]] = None, 
-        query: Optional[str] = None
+        context: Optional[Union[str, list[str]]] = None,
+        query: Optional[str] = None,
     ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results.
 
@@ -245,14 +260,16 @@ class WeaveTrustScorer(weave.Scorer):
 
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
-        processed_context = self._preprocess_text(context) if isinstance(context, str) else context
+        processed_context = (
+            self._preprocess_text(context) if isinstance(context, str) else context
+        )
         processed_query = self._preprocess_text(query) if query else None
 
-        inputs = {'output': processed_output}
+        inputs = {"output": processed_output}
         if processed_context is not None:
-            inputs['context'] = processed_context
+            inputs["context"] = processed_context
         if processed_query is not None:
-            inputs['query'] = processed_query
+            inputs["query"] = processed_query
 
         results = {}
 
@@ -260,7 +277,9 @@ class WeaveTrustScorer(weave.Scorer):
             with ThreadPoolExecutor() as executor:
                 # Schedule each scorer's work concurrently.
                 future_to_scorer = {
-                    executor.submit(scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)): scorer_name
+                    executor.submit(
+                        scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)
+                    ): scorer_name
                     for scorer_name, scorer in self._loaded_scorers.items()
                 }
                 # Collect results as they complete.
@@ -274,7 +293,9 @@ class WeaveTrustScorer(weave.Scorer):
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
                 try:
-                    results[scorer_name] = scorer.score(**self._filter_inputs_for_scorer(scorer, inputs))
+                    results[scorer_name] = scorer.score(
+                        **self._filter_inputs_for_scorer(scorer, inputs)
+                    )
                 except Exception:
                     pass
 
@@ -283,8 +304,8 @@ class WeaveTrustScorer(weave.Scorer):
     def _score_with_logic(
         self,
         output: str,
-        context: Optional[Union[str, list[str]]] = None, 
-        query: Optional[str] = None
+        context: Optional[Union[str, list[str]]] = None,
+        query: Optional[str] = None,
     ) -> dict[str, Any]:
         """Score with nuanced logic for trustworthiness."""
         # Validate input
@@ -334,18 +355,15 @@ class WeaveTrustScorer(weave.Scorer):
             "trust_level": trust_level,
             "critical_issues": critical_issues,
             "advisory_issues": advisory_issues,
-            "extras": {
-                "raw_outputs": raw_results,
-                "scores": scores
-            }
+            "extras": {"raw_outputs": raw_results, "scores": scores},
         }
 
     @weave.op
     def score(
         self,
         query: Optional[str] = None,
-        context: Optional[Union[str, list[str]]] = None, 
-        output: Optional[str] = None
+        context: Optional[Union[str, list[str]]] = None,
+        output: Optional[str] = None,
     ) -> dict[str, Any]:
         """Basic scoring that passes if no critical issues are found."""
         result = self._score_with_logic(output=output, context=context, query=query)
@@ -356,6 +374,6 @@ class WeaveTrustScorer(weave.Scorer):
                 "critical_issues": result["critical_issues"],
                 "advisory_issues": result["advisory_issues"],
                 "raw_outputs": result["extras"]["raw_outputs"],
-                "scores": result["extras"]["scores"]
-            }
+                "scores": result["extras"]["scores"],
+            },
         }

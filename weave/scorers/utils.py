@@ -1,5 +1,5 @@
 import json
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -7,6 +7,7 @@ from weave.scorers.default_models import MODEL_PATHS
 
 if TYPE_CHECKING:
     from torch import device
+
 
 def set_device(device: str = "auto") -> "device":
     """Set the device to use for the model.
@@ -47,14 +48,11 @@ def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> 
     return local_model_path
 
 
-
-
 def get_model_path(model_name: str) -> str:
     """Get the full model path for a scorer."""
     if model_name in MODEL_PATHS:
         return MODEL_PATHS[model_name]
     return model_name
-
 
 
 def stringify(output: Any) -> str:

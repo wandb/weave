@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Any, Optional, Union
+
 from pydantic import Field
 
 import weave
@@ -6,6 +7,7 @@ from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     from torch import Tensor
+
 
 class LLMScorer(weave.Scorer):
     """Score model outputs using a Large Language Model (LLM).
@@ -30,6 +32,7 @@ class LLMScorer(weave.Scorer):
     max_tokens: int = Field(
         ..., description="The maximum number of tokens in the response"
     )
+
 
 class HuggingFacePipelineScorer(weave.Scorer):
     """
@@ -63,7 +66,6 @@ class HuggingFacePipelineScorer(weave.Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
-        from  transformers import pipeline
 
         if self._pipeline is None:
             self._load_pipeline()

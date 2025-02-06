@@ -63,6 +63,7 @@ Provide evaluation results in the following JSON format:
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
+
 class WeaveContextRelevanceScorer(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
@@ -126,7 +127,9 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
             self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
-        assert self._local_model_path, "model_name_or_path local path or artifact path not found"
+        assert (
+            self._local_model_path
+        ), "model_name_or_path local path or artifact path not found"
         self.model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
         )

@@ -30,7 +30,9 @@ def test_context_relevance_scorer_basic(weave_context_relevance_scorer):
         context=context,
     )
 
-    assert result["pass"] == False  # The actual implementation returns False for this case
+    assert (
+        result["pass"] == False
+    )  # The actual implementation returns False for this case
     assert result["extras"]["score"]
 
 
@@ -42,6 +44,7 @@ def test_long_context(weave_context_relevance_scorer):
         context=context,
     )
 
-    assert result["pass"] == False  # The actual implementation returns False for this case
+    assert (
+        result["pass"] == False
+    )  # The actual implementation returns False for this case
     assert result["extras"]["score"] == 0.0
-

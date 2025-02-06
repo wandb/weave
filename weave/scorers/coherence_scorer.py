@@ -31,6 +31,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
     def _load_pipeline(self) -> None:
         # Lazy import of transformers
         from transformers import pipeline
+
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         elif self.model_name_or_path != "":

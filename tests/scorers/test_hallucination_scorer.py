@@ -3,7 +3,6 @@ import json
 import pytest
 from pydantic import BaseModel
 
-import weave
 from weave.scorers import (
     HallucinationFreeScorer,
 )
@@ -71,7 +70,9 @@ def test_weave_hallucination_scorer_long_input(weave_hallucination_scorer):
     context, output = generate_context_and_output(
         total_tokens=5000  # moderately large for a test
     )
-    result = weave_hallucination_scorer.score(query=query, context=context, output=output)
+    result = weave_hallucination_scorer.score(
+        query=query, context=context, output=output
+    )
 
     # We only check that the result structure is valid;
     # the actual flagged/score value depends on how the model scores the content.

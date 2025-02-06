@@ -1,21 +1,20 @@
 import os
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from litellm import amoderation
-
-from pydantic import PrivateAttr, field_validator
+from pydantic import PrivateAttr
 
 import weave
+from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.llm_scorer import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     download_model,
 )
-from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-
 
 if TYPE_CHECKING:
     from torch import Tensor
+
 
 class OpenAIModerationScorer(weave.Scorer):
     """
@@ -49,6 +48,7 @@ class OpenAIModerationScorer(weave.Scorer):
 
 TOXICITY_CATEGORY_THRESHOLD = 2
 TOXICITY_TOTAL_THRESHOLD = 5
+
 
 class WeaveToxicityScorer(RollingWindowScorer):
     """
@@ -116,7 +116,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         if os.path.isdir(self.model_name_or_path):
             self._local_model_path = self.model_name_or_path
         elif self.model_name_or_path != "":
-                self._local_model_path = download_model(self.model_name_or_path)
+            self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
 
@@ -166,13 +166,13 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return {"flagged": response.flagged, "categories": categories}
 
 
-
 BIAS_SCORER_THRESHOLD = 0.60
+
 
 class WeaveBiasScorer(RollingWindowScorer):
     """
 
-    The scorer that assesses gender and race/origin bias using a fine-tuned 
+    The scorer that assesses gender and race/origin bias using a fine-tuned
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
 
     This model is trained from scratch on a custom dataset of 260k samples.

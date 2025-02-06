@@ -1,8 +1,8 @@
 import pytest
 
 from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
-from weave.scorers.utils import download_model
 from weave.scorers.moderation_scorer import WeaveToxicityScorer
+from weave.scorers.utils import download_model
 
 
 @pytest.fixture
@@ -64,9 +64,10 @@ def test_toxicity_scorer_threshold(weave_toxicity_scorer):
     assert "extras" in result
     total_score = sum(result["extras"].values())
     highest_cat_score = max(result["extras"].values())
-    should_pass = not ((total_score >= weave_toxicity_scorer.total_threshold) or (
-        highest_cat_score >= weave_toxicity_scorer.category_threshold
-    ))
+    should_pass = not (
+        (total_score >= weave_toxicity_scorer.total_threshold)
+        or (highest_cat_score >= weave_toxicity_scorer.category_threshold)
+    )
     assert result["pass"] == should_pass
 
 

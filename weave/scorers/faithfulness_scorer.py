@@ -1,8 +1,10 @@
-from weave.scorers.hallucination_scorer import WeaveHallucinationScorer
-from weave.scorers.hallucination_scorer import HALLUCINATION_SCORER_THRESHOLD
-
+from weave.scorers.hallucination_scorer import (
+    HALLUCINATION_SCORER_THRESHOLD,
+    WeaveHallucinationScorer,
+)
 
 FAITHFULNESS_SCORER_THRESHOLD = HALLUCINATION_SCORER_THRESHOLD
+
 
 class WeaveFaithfulnessScorer(WeaveHallucinationScorer):
     """A scorer that evaluates the faithfulness of model outputs to their input context.

@@ -1,5 +1,5 @@
-import os
 import math
+import os
 import random
 import string
 from importlib.util import find_spec
@@ -72,7 +72,9 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
             self._local_model_path = download_model(self.model_name_or_path)
         else:
             self._local_model_path = download_model(MODEL_PATHS["embedding_model"])
-        assert self._local_model_path, "model_name_or_path local path or artifact path not found"
+        assert (
+            self._local_model_path
+        ), "model_name_or_path local path or artifact path not found"
 
         self.embedding_model = SentenceTransformer(self._local_model_path)
 
@@ -150,8 +152,7 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
                 perturbed_similarities = similarities[1:]
             else:
                 similarities = [
-                    1.0 if perturbed == reference_text else 0.0
-                    for perturbed in texts
+                    1.0 if perturbed == reference_text else 0.0 for perturbed in texts
                 ]
                 score_o = 1.0  # reference_text output compared with itself
                 perturbed_similarities = similarities
