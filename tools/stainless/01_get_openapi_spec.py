@@ -24,7 +24,7 @@ def kill_port(port: int) -> None:
         return  # No processes found on that port
 
 
-def wait_for_server(url: str, timeout: int = 15, interval: int = 1) -> bool:
+def wait_for_server(url: str, timeout: int = 30, interval: int = 1) -> bool:
     """Wait for server to become available"""
     end_time = time.time() + timeout
     while time.time() < end_time:
