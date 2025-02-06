@@ -7,97 +7,28 @@ interface ToggleSwitchProps {
 
 const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
   const [activeButton, setActiveButton] = useState<'python' | 'typescript'>(() => {
+    // Check URL first
     const params = new URLSearchParams(window.location.search);
-    return (params.get('programming-language') as 'python' | 'typescript') || 'python';
-  });
-
-  useEffect(() => {
-    const syncWithTabs = () => {
-      const tabElements = document.querySelectorAll('.tabs__item');
-      if (tabElements.length === 0) return; // Exit if no tabs found
-
-      // Find currently selected tab and sync state
-      const selectedTab = Array.from(tabElements).find(
-        tab => tab.getAttribute('aria-selected') === 'true'
-      );
-      if (selectedTab) {
-        if (selectedTab.textContent?.includes('Python')) {
-          setActiveButton('python');
-        } else if (selectedTab.textContent?.includes('TypeScript')) {
-          setActiveButton('typescript');
-        }
-      }
-    };
-
-    // Initial sync with URL parameter
-    const params = new URLSearchParams(window.location.search);
-    const currentLanguage = params.get('programming-language') as 'python' | 'typescript';
-    if (currentLanguage && currentLanguage !== activeButton) {
-      setActiveButton(currentLanguage);
+    const urlValue = params.get('programming-language');
+    if (urlValue === 'python' || urlValue === 'typescript') {
+      return urlValue;
     }
 
-    // Initial sync with tabs
-    syncWithTabs();
+    // Then check localStorage
+    const storedValue = localStorage.getItem('docusaurus.tab.programming-language');
+    if (storedValue === 'python' || storedValue === 'typescript') {
+      return storedValue;
+    }
 
-    // Add mutation observer to watch for tab changes
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.target instanceof Element) {
-          const isSelected = mutation.target.getAttribute('aria-selected') === 'true';
-          if (isSelected) {
-            const isPython = mutation.target.textContent?.includes('Python');
-            const isTypeScript = mutation.target.textContent?.includes('TypeScript');
+    // Finally check DOM for selected tabs
+    const selectedTab = document.querySelector('.tabs__item[aria-selected="true"]');
+    if (selectedTab) {
+      if (selectedTab.textContent?.includes('Python')) return 'python';
+      if (selectedTab.textContent?.includes('TypeScript')) return 'typescript';
+    }
 
-            if (isPython) {
-              setActiveButton('python');
-              const url = new URL(window.location.href);
-              url.searchParams.set('programming-language', 'python');
-              window.history.pushState({}, '', url);
-            } else if (isTypeScript) {
-              setActiveButton('typescript');
-              const url = new URL(window.location.href);
-              url.searchParams.set('programming-language', 'typescript');
-              window.history.pushState({}, '', url);
-            }
-          }
-        }
-      });
-    });
-
-    // Set up observer for tabs container to detect when tabs become available
-    const tabsObserver = new MutationObserver(() => {
-      const tabElements = document.querySelectorAll('.tabs__item');
-      if (tabElements.length > 0) {
-        tabElements.forEach((tab) => {
-          observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
-        });
-        syncWithTabs();
-      }
-    });
-
-    // Observe the document body for changes
-    tabsObserver.observe(document.body, { childList: true, subtree: true });
-
-    // Observe existing tabs if any
-    const existingTabs = document.querySelectorAll('.tabs__item');
-    existingTabs.forEach((tab) => {
-      observer.observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
-    });
-
-    // Cleanup observers on component unmount
-    return () => {
-      observer.disconnect();
-      tabsObserver.disconnect();
-    };
-  }, []);
-
-  const buttonStyle = {
-    '--button-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-800)' : 'var(--ifm-color-gray-100)',
-    '--button-color': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-100)' : 'var(--ifm-color-gray-900)',
-    '--button-active-bg': 'var(--ifm-color-primary)',
-    '--button-active-color': 'var(--ifm-color-white)',
-    '--button-hover-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-700)' : 'var(--ifm-color-gray-200)',
-  } as React.CSSProperties;
+    return 'python';
+  });
 
   const handleButtonClick = (language: 'python' | 'typescript') => {
     setActiveButton(language);
@@ -107,19 +38,70 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ theme }) => {
     url.searchParams.set('programming-language', language);
     window.history.pushState({}, '', url);
 
-    // Find and click the corresponding tab if available
-    const tabElements = document.querySelectorAll('.tabs__item');
-    if (tabElements.length > 0) {
-      tabElements.forEach((tab) => {
-        if (
-          (language === 'python' && tab.textContent?.includes('Python')) ||
-          (language === 'typescript' && tab.textContent?.includes('TypeScript'))
-        ) {
-          (tab as HTMLElement).click();
+    // Update localStorage
+    localStorage.setItem('docusaurus.tab.programming-language', language);
+
+    // Find and click the corresponding tab
+    const tabs = document.querySelectorAll('.tabs__item');
+    tabs.forEach((tab) => {
+      if (
+        (language === 'python' && tab.textContent?.includes('Python')) ||
+        (language === 'typescript' && tab.textContent?.includes('TypeScript'))
+      ) {
+        (tab as HTMLElement).click();
+      }
+    });
+  };
+
+  useEffect(() => {
+    const syncWithExistingTabs = () => {
+      const selectedTab = document.querySelector('.tabs__item[aria-selected="true"]');
+      if (selectedTab && !selectedTab.textContent?.includes(activeButton === 'python' ? 'Python' : 'TypeScript')) {
+        if (selectedTab.textContent?.includes('Python')) {
+          setActiveButton('python');
+        } else if (selectedTab.textContent?.includes('TypeScript')) {
+          setActiveButton('typescript');
+        }
+      }
+    };
+
+    // Initial sync
+    syncWithExistingTabs();
+
+    // Watch for tab changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' &&
+          mutation.attributeName === 'aria-selected' &&
+          mutation.target instanceof Element) {
+          const isSelected = mutation.target.getAttribute('aria-selected') === 'true';
+          if (isSelected) {
+            if (mutation.target.textContent?.includes('Python')) {
+              setActiveButton('python');
+            } else if (mutation.target.textContent?.includes('TypeScript')) {
+              setActiveButton('typescript');
+            }
+          }
         }
       });
-    }
-  };
+    });
+
+    // Observe all tabs
+    const tabs = document.querySelectorAll('.tabs__item');
+    tabs.forEach(tab => {
+      observer.observe(tab, { attributes: true });
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const buttonStyle = {
+    '--button-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-800)' : 'var(--ifm-color-gray-100)',
+    '--button-color': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-100)' : 'var(--ifm-color-gray-900)',
+    '--button-active-bg': 'var(--ifm-color-primary)',
+    '--button-active-color': 'var(--ifm-color-white)',
+    '--button-hover-bg': theme.colorMode === 'dark' ? 'var(--ifm-color-gray-700)' : 'var(--ifm-color-gray-200)',
+  } as React.CSSProperties;
 
   return (
     <div className={styles.toggleSwitch} style={buttonStyle}>
