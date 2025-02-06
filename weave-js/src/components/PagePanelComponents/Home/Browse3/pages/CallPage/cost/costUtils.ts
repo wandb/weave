@@ -77,7 +77,7 @@ export const formatTokenCount = (num: number): string => {
 const MIN_COST = 0.0001;
 const COST_PRECISION = 4;
 export const formatTokenCost = (cost: number): string => {
-  if (cost < MIN_COST) {
+  if (cost !== 0 && cost < MIN_COST) {
     return '<$' + MIN_COST.toFixed(COST_PRECISION);
   }
   return `$${cost.toFixed(COST_PRECISION)}`;
