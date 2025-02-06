@@ -106,7 +106,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: Optional[tuple[str, str]] = None
-        if username is not None and password is not None:
+        if password is not None:
             self._auth = ("api", password)
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
