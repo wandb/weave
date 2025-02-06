@@ -2,7 +2,7 @@ import pytest
 
 from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers.coherence_scorer import WeaveCoherenceScorer
-from weave.scorers.llm_utils import download_model
+from weave.scorers.utils import download_model
 
 
 @pytest.fixture

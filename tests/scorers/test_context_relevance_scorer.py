@@ -4,7 +4,7 @@ import pytest
 
 from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_context_and_output
 from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorer
-from weave.scorers.llm_utils import download_model
+from weave.scorers.utils import download_model
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@ import pytest
 import weave
 from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers import LlamaGuardScorer
-from weave.scorers.llm_utils import download_model
+from weave.scorers.utils import download_model
 
 
 @pytest.fixture

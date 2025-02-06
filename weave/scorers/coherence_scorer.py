@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.llm_utils import MODEL_PATHS, download_model
+from weave.scorers.utils import MODEL_PATHS, download_model
 
 
 class WeaveCoherenceScorer(HuggingFacePipelineScorer):
