@@ -409,10 +409,15 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Stream of calls in JSONL format",
             "content": {
-              "application/json": {
-                "schema": {}
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CallSchema"
+                  }
+                }
               }
             }
           },

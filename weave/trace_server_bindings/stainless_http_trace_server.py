@@ -98,7 +98,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
         username: Optional[str] = None,
         password: Optional[str] = None,
-        debug: bool = False,
+        debug: bool = True,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -302,16 +302,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
-        # TODO: Stainless didn't generate this for some reason
-        return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
-        )
+        raise NotImplementedError("Deprecated")
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        # TODO: Stainless didn't generate this for some reason
-        return self._generic_stream_request(
-            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
-        )
+        if isinstance(req, dict):
+            req = tsi.CallsQueryReq.model_validate(req)
+        req = cast(tsi.CallsQueryReq, req)
+        return self.stainless_client.calls.stream_query(**req)
 
     def calls_query_stats(
         self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
@@ -337,18 +334,13 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     # Op API
 
     def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
-        # TODO: This is not actually implemented in the trace server
-        return self._generic_request(
-            "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
-        )
+        raise NotImplementedError("Not implemented")
 
     def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
-        # TODO: This is not actually implemented in the trace server
-        return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
+        raise NotImplementedError("Not implemented")
 
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
-        # TODO: This is not actually implemented in the trace server
-        return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
+        raise NotImplementedError("Not implemented")
 
     # Obj API
 
@@ -379,10 +371,10 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         return self.stainless_client.objects.query(**req)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        # TODO: For some reason, Stainless didn't generate this
-        return self._generic_request(
-            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
-        )
+        if isinstance(req, dict):
+            req = tsi.ObjDeleteReq.model_validate(req)
+        req = cast(tsi.ObjDeleteReq, req)
+        return self.stainless_client.objects.delete(**req)
 
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
