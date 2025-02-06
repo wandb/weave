@@ -3,10 +3,9 @@ from typing import Any
 from pydantic import Field
 
 import weave
-from weave.scorers import Scorer
 
 
-class RougeScorer(Scorer):
+class RougeScorer(weave.Scorer):
     rouge_scorer: Any = Field(default=None, exclude=True)
 
     def model_post_init(self, __context: Any) -> None:

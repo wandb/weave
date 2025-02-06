@@ -1,7 +1,7 @@
 import weave
 import os
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.llm_utils import set_device, download_model, MODEL_PATHS
+from weave.scorers.utils import download_model, set_device, MODEL_PATHS
 
 
 FLUENCY_SCORER_THRESHOLD = 0.5

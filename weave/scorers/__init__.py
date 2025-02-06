@@ -1,11 +1,9 @@
+from weave.scorers.initialization import check_litellm_installation
+
+# Make sure litellm is available
+check_litellm_installation()
+
 from weave.scorers.accuracy_scorer import AccuracyScorer
-from weave.scorers.base_scorer import (
-    Scorer,
-    _has_oldstyle_scorers,
-    _validate_scorer_signature,
-    auto_summarize,
-    get_scorer_attributes,
-)
 from weave.scorers.bleu_scorer import BLEUScorer
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
@@ -20,13 +18,7 @@ from weave.scorers.hallucination_scorer import (
 )
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuardScorer
-from weave.scorers.llm_scorer import (
-    LLMScorer,
-)
-from weave.scorers.llm_utils import (
-    create,
-    embed,
-)
+from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.moderation_scorer import (
     WeaveBiasScorer,
     OpenAIModerationScorer,
@@ -56,43 +48,33 @@ from weave.scorers.xml_scorer import ValidXMLScorer
 from weave.scorers.trust_scorer import WeaveTrustScorer
 
 __all__ = [
-    "auto_summarize",
-    "create",
-    "create_perturbed_dataset",
-    "embed",
-    "transpose",
-    "get_scorer_attributes",
     "AccuracyScorer",
     "BLEUScorer",
-    "ContextEntityRecallScorer",
-    "ContextRelevancyScorer",
-    "EmbeddingSimilarityScorer",
-    "HallucinationFreeScorer",
-    "HuggingFacePerplexityScorer",
-    "InstructorLLMScorer",
-    "LevenshteinScorer",
-    "LlamaGuardScorer",
-    "LLMHallucinationScorer",
-    "LLMScorer",
     "MultiTaskBinaryClassificationF1",
-    "OpenAIModerationScorer",
-    "OpenAIPerplexityScorer",
-    "PydanticScorer",
-    "RougeScorer",
-    "Scorer",
-    "StringMatchScorer",
-    "SummarizationScorer",
-    "ValidJSONScorer",
-    "ValidXMLScorer",
-    "WeaveBiasScorer",
     "WeaveCoherenceScorer",
     "WeaveContextRelevanceScorer",
     "WeaveFaithfulnessScorer",
     "WeaveFluencyScorer",
+    "HallucinationFreeScorer",
     "WeaveHallucinationScorer",
-    "WeaveRobustnessScorer",
+    "ValidJSONScorer",
+    "LlamaGuardScorer",
+    "LLMScorer",
+    "WeaveBiasScorer",
+    "OpenAIModerationScorer",
     "WeaveToxicityScorer",
+    "HuggingFacePerplexityScorer",
+    "OpenAIPerplexityScorer",
+    "PydanticScorer",
+    "ContextEntityRecallScorer",
+    "ContextRelevancyScorer",
+    "WeaveRobustnessScorer",
+    "create_perturbed_dataset",
+    "RougeScorer",
+    "EmbeddingSimilarityScorer",
+    "LevenshteinScorer",
+    "StringMatchScorer",
+    "SummarizationScorer",
+    "ValidXMLScorer",
     "WeaveTrustScorer",
-    "_has_oldstyle_scorers",
-    "_validate_scorer_signature",
 ]

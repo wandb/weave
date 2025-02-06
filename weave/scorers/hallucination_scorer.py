@@ -1,16 +1,18 @@
 import os
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 import weave
-from weave.scorers.llm_scorer import HuggingFaceScorer, InstructorLLMScorer
-from weave.scorers.llm_utils import (
-    MODEL_PATHS,
-    OPENAI_DEFAULT_MODEL,
-    create,
-    download_model,
-)
+from weave.scorers.llm_scorer import HuggingFaceScorer
+from weave.scorers.utils import MODEL_PATHS, download_model, stringify
+
+from litellm import acompletion
+from pydantic import BaseModel, Field
+
+import weave
+from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
+from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.utils import stringify
 
 DEFAULT_HALLUCINATION_SYSTEM_PROMPT = """
@@ -86,73 +88,6 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 """
 
 
-def get_chat_template_messages(
-    query: str, output: str, context: Optional[str] = None
-) -> list[dict[str, str]]:
-    system_prompt = """The task is to evaluate whether the <output> contains \
-information not supported by the <query> or <context>, or \
-whether the <output> contradicts the information provided in the <query> or <context>.
-
-<definitions>
-The task is to evaluate if the <output>:
-- Contains information that has no basis in the provided <query> or <context> (Faithfulness) OR
-- Makes claims or statements that cannot be verified using the given <query> or <context> (Unsubstantiated Claim) OR
-- Contradicts the information provided in the <query> or <context> (Contradiction)
-
-<example_unsubstantiated_claim>
-<query>What is the capital of France?</query>
-<context>Paris is the capital of France.</context>
-<output>Paris is the capital of France and has a population of 2.2 million people.</output>
-</example_unsubstantiated_claim>
-
-Explanation: The population information is baseless information as its not provided in the <context>.
-
-<contradiction>
-A contradiction occurs when the <output> directly conflicts with information provided in the <query> or <context>.
-
-<example_contradiction>
-<query>What is the speed limit on this highway?</query>
-<context>The speed limit on Highway 101 is 65 mph.</context>
-<output>The speed limit on Highway 101 is 55 mph.</output>
-</example_contradiction>
-
-Explanation: The output contradicts the speed limit stated in the context.
-</contradiction>
-</definitions>
-
-<evaluation_criteria>
-For each output, evaluate:
-1. Faithfulness: Does the <output> strictly adhere to information present in the <query> or <context>? If not, return True.
-2. Baseless Information: Does the <output> include details not supported by the <query> or <context>? If yes, return True.
-3. Contradiction: Does the <output> contradict the information provided in the <query> or <context>? If yes, return True.
-</evaluation_criteria>
-"""
-
-    prompt_template = f"""Does the following <output> meet the criteria for lack of Faithfulness, \
-Unsubstantiated Claim or Contradiction?
-
-<query>
-{query}
-</query>
-
-<context>
-{context}
-</context>
-
-<output>
-{output}
-</output>
-
-Answer only with True or False."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt_template},
-    ]
-
-    return messages
-
-
 class HallucinationReasoning(BaseModel):
     hallucination_type: str = Field(
         description="A short name for the type of hallucination."
@@ -181,14 +116,14 @@ class HallucinationFreeScorer(LLMScorer):
     based on the input data.
 
     Note:
-        - The meaning of "hallucination" can vary from person to person, you will likely want to
-        customize the `system_prompt` and `user_prompt` to fit your specific needs.
-        - This Scorer uses the `InstructorLLMScorer` class to generate structured outputs from the LLM
-        provider's response; you will have to install the `instructor` python package to use it.
-        - The `score` method expects the input column from the dataset to be named "context". It will use
-        this data as the ground-truth to check hallucinations against. If your dataset column has a
-        different name, you can specify a different mapping using the `column_map` argument in the init
-        of LLMHallucinationScorer by passing `column_map={"context": "context"}`.
+        - The meaning of "hallucination" can vary between users. \
+          You may want to customize the `system_prompt` and `user_prompt` to suit your specific needs.
+        - The scorer utilizes the `litellm.acompletion` function to generate structured outputs \
+          from the LLM provider's response.
+        - The `score` method expects the input column from the dataset to be named "context". \
+          It will use this data as the ground-truth to check hallucinations against. \
+          If your dataset's column has a different name, you can specify a different mapping using the \
+          `column_map` argument in the __init__ of HallucinationFreeScorer, for example: `column_map={"context": "context"}`.
 
     Attributes:
         system_prompt (str): The prompt describing the task and defining what a "hallucination" is.
@@ -227,7 +162,12 @@ class HallucinationFreeScorer(LLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return response.model_dump()  # Morgan wants this to be a dict
+        response = HallucinationResponse.model_validate_json(
+            response.choices[0].message.content
+        )
+        return response.model_dump()
+
+
 
 HALLUCINATION_SCORER_THRESHOLD = 0.35
 

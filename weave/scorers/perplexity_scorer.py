@@ -1,59 +1,59 @@
-from typing import TYPE_CHECKING, Union
+from typing import Any
 
+from litellm import acompletion
 import numpy as np
 
 import weave
-from weave.scorers.base_scorer import Scorer
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletion
+# from weave.scorers.llm_scorer import LLMScorer
+# from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 
 
-class OpenAIPerplexityScorer(Scorer):
-    """A scorer that computes perplexity for OpenAI outputs using log probabilities.
-    Reference: https://cookbook.openai.com/examples/using_logprobs#5-calculating-perplexity
-    """
 
-    @weave.op()
-    def score(self, output: Union["ChatCompletion", list]) -> dict:
-        """
-        Computes perplexity for OpenAI outputs using log probabilities.
+# class OpenAIPerplexityScorer(LLMScorer):
+#     """A scorer that computes perplexity for OpenAI outputs using log probabilities.
+#     Reference: https://cookbook.openai.com/examples/using_logprobs#5-calculating-perplexity
+#     """
+#     model_id = OPENAI_DEFAULT_MODEL
 
-        Args:
-            output (Union[ChatCompletion, list]): Either:
-                - An OpenAI `ChatCompletion` object with `logprobs`
-                - A list of log probabilities (`floats`).
+#     @weave.op()
+#     def score(self, output: Any) -> dict:
+#         """
+#         Computes perplexity for OpenAI outputs using log probabilities.
 
-        Returns:
-            dict: A dictionary containing the calculated perplexity.
-        """
-        from openai.types.chat import ChatCompletion
+#         Args:
+#             output (Union[ChatCompletion, list]): Either:
+#                 - An OpenAI `ChatCompletion` object with `logprobs`
+#                 - A list of log probabilities (`floats`).
 
-        if isinstance(output, ChatCompletion):
-            assert (
-                output.choices[0].logprobs is not None
-            ), "Logprobs must be present in the output!"
-            logprobs = [
-                logprob.logprob for logprob in output.choices[0].logprobs.content
-            ]
-        elif isinstance(output, list):
-            assert isinstance(output[0], float), "Logprobs must be a list of floats!"
-            logprobs = output
-        else:
-            raise TypeError("Invalid input type!")
+#         Returns:
+#             dict: A dictionary containing the calculated perplexity.
+#         """
 
-        assert len(logprobs) > 0, "Logprobs must be a non-empty list!"
-        assert all(
-            isinstance(logprob, float) for logprob in logprobs
-        ), "Logprobs must be a list of floats!"
+#         if isinstance(output, ChatCompletion):
+#             assert (
+#                 output.choices[0].logprobs is not None
+#             ), "Logprobs must be present in the output!"
+#             logprobs = [
+#                 logprob.logprob for logprob in output.choices[0].logprobs.content
+#             ]
+#         elif isinstance(output, list):
+#             assert isinstance(output[0], float), "Logprobs must be a list of floats!"
+#             logprobs = output
+#         else:
+#             raise TypeError("Invalid input type!")
 
-        # Correct perplexity calculation
-        nll = -np.mean(logprobs)
-        perplexity = np.exp(nll).item()
-        return {"perplexity": perplexity}
+#         assert len(logprobs) > 0, "Logprobs must be a non-empty list!"
+#         assert all(
+#             isinstance(logprob, float) for logprob in logprobs
+#         ), "Logprobs must be a list of floats!"
+
+#         # Correct perplexity calculation
+#         nll = -np.mean(logprobs)
+#         perplexity = np.exp(nll).item()
+#         return {"perplexity": perplexity}
 
 
-class HuggingFacePerplexityScorer(Scorer):
+class HuggingFacePerplexityScorer(weave.Scorer):
     """A scorer that computes perplexity for Hugging Face outputs using log probabilities."""
 
     @weave.op()

@@ -1,15 +1,12 @@
-import json
 import os
 from importlib.util import find_spec
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import numpy as np
-from pydantic import PrivateAttr
 
 import weave
-from weave.scorers.base_scorer import Scorer
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.llm_utils import MODEL_PATHS, download_model, set_device
+from weave.scorers.utils import MODEL_PATHS, download_model
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.

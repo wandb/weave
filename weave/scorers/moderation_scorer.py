@@ -1,25 +1,21 @@
 import os
 from typing import TYPE_CHECKING, Any, Optional, Union
 
+from litellm import amoderation
+
 from pydantic import PrivateAttr, field_validator
 
 import weave
-from weave.scorers.llm_scorer import LLMScorer, RollingWindowScorer
-from weave.scorers.llm_utils import (
-    _LLM_CLIENTS,
+from weave.scorers.llm_scorer import RollingWindowScorer
+from weave.scorers.utils import (
     MODEL_PATHS,
-    OPENAI_DEFAULT_MODERATION_MODEL,
     download_model,
 )
+from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
+
 
 if TYPE_CHECKING:
     from torch import Tensor
-
-from litellm import amoderation
-
-import weave
-from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-
 
 class OpenAIModerationScorer(weave.Scorer):
     """

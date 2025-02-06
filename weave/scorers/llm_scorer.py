@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from pydantic import Field
 
 import weave
-from weave.scorers.llm_utils import set_device
+from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     from torch import Tensor

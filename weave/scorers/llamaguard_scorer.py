@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, Optional
 from pydantic import PrivateAttr
 
 import weave
-from weave.scorers.base_scorer import Scorer
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -12,7 +11,7 @@ if TYPE_CHECKING:
 
 # https://github.com/meta-llama/llama-recipes/blob/main/src/llama_recipes/inference/prompt_format_utils.py
 # https://github.com/meta-llama/llama-recipes/blob/main/recipes/responsible_ai/llama_guard/llama_guard_text_and_vision_inference.ipynb
-class LlamaGuardScorer(Scorer):
+class LlamaGuardScorer(weave.Scorer):
     """
     Use Meta's LlamaGuard to check if the model output is safe.
 
