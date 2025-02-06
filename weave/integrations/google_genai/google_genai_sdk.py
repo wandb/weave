@@ -5,6 +5,10 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_wrapper_async,
     google_genai_gemini_wrapper_sync,
 )
+from weave.integrations.google_genai.imagen_utils import (
+    google_genai_imagen_wrapper_async,
+    google_genai_imagen_wrapper_sync,
+)
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
@@ -48,6 +52,12 @@ def get_google_genai_patcher(
             "name": base.name
             or "google.genai.models.AsyncModels.generate_content_stream"
         }
+    )
+    generate_images_settings = base.model_copy(
+        update={"name": base.name or "google.genai.models.Models.generate_images"}
+    )
+    generate_images_async_settings = base.model_copy(
+        update={"name": base.name or "google.genai.models.AsyncModels.generate_images"}
     )
 
     _google_genai_patcher = MultiPatcher(
@@ -93,6 +103,16 @@ def get_google_genai_patcher(
                 google_genai_gemini_wrapper_async(
                     generate_content_stream_async_settings
                 ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "Models.generate_images",
+                google_genai_imagen_wrapper_sync(generate_images_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("google.genai.models"),
+                "AsyncModels.generate_images",
+                google_genai_imagen_wrapper_async(generate_images_async_settings),
             ),
         ]
     )
