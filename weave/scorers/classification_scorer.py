@@ -1,7 +1,7 @@
 from typing import Optional
 
 import weave
-from weave.flow.utils import transpose
+from weave.flow.util import transpose
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
