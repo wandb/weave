@@ -110,9 +110,11 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             self._auth = ("api", password)
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
+        print(f"{trace_server_url=}")
+
         self.stainless_client = WeaveTrace(
-            username=username,
-            password=password,
+            username=username if username else "",
+            password=password if password else "",
             base_url=self.trace_server_url,
             http_client=VerboseClient() if debug else DefaultHttpxClient(),
         )
