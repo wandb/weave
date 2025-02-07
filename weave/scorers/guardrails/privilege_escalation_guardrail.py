@@ -55,24 +55,19 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
         from litellm import acompletion
 
         output = stringify(output)
-        response = (
-            acompletion(
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {
-                        "role": "user",
-                        "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(
-                            prompt=output
-                        ),
-                    },
-                ],
-                model=self.model_id,
-                response_format=PrivilegeEscalationGuardrailResponse,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            .choices[0]
-            .message.content
+        response = await acompletion(
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {
+                    "role": "user",
+                    "content": PRIVILEGE_ESCALATION_USER_PROMPT.format(prompt=output),
+                },
+            ],
+            model=self.model_id,
+            response_format=PrivilegeEscalationGuardrailResponse,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
         )
-        response = PrivilegeEscalationGuardrailResponse.model_validate_json(response)
-        return response
+        return PrivilegeEscalationGuardrailResponse.model_validate_json(
+            response.choices[0].message.content
+        )
