@@ -112,7 +112,6 @@ class RestrictedTermsLLMGuardrail(Scorer):
             return "\n".join(reasoning_parts)
         return "No restricted terms detected."
 
-    @weave.op
     def get_anonymized_text(
         self, output: str, analysis: RestrictedTermsAnalysis
     ) -> Union[str, None]:
@@ -131,7 +130,7 @@ class RestrictedTermsLLMGuardrail(Scorer):
         return anonymized_text
 
     @weave.op
-    async def score(self, output: str) -> RestrictedTermsRecognitionResponse:
+    async def score(self, output: str) -> dict[str, Any]:
         analysis: RestrictedTermsAnalysis = await self.analyse_restricted_terms(output)
         reasoning = self.frame_guardrail_reasoning(analysis)
         anonymized_text = self.get_anonymized_text(output, analysis)
