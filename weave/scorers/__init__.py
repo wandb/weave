@@ -1,6 +1,10 @@
+from weave.scorers.initialization import check_litellm_installation
+
+# Make sure litellm is available
+check_litellm_installation()
+
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
-    transpose,
 )
 from weave.scorers.guardrails import (
     PrivilegeEscalationLLMGuardrail,
@@ -9,12 +13,7 @@ from weave.scorers.guardrails import (
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llm_scorer import (
-    InstructorLLMScorer,
     LLMScorer,
-)
-from weave.scorers.llm_utils import (
-    create,
-    embed,
 )
 from weave.scorers.moderation_scorer import OpenAIModerationScorer
 from weave.scorers.pydantic_scorer import PydanticScorer
@@ -32,8 +31,6 @@ from weave.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
     "auto_summarize",
-    "create",
-    "embed",
     "ContextEntityRecallScorer",
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
@@ -52,7 +49,6 @@ __all__ = [
     "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",
-    "transpose",
     "ValidXMLScorer",
     "_validate_scorer_signature",
 ]
