@@ -13,7 +13,7 @@ import {
   TraceObjCreateRes,
   TraceObjSchema,
 } from './traceServerClientTypes';
-import {Loadable} from './wfDataModelHooksInterface';
+import {LoadableWithError} from './wfDataModelHooksInterface';
 
 type TypesAreEqual<T, U> = [T] extends [U]
   ? [U] extends [T]
@@ -28,9 +28,11 @@ describe('Type Tests', () => {
     >;
 
     // Define the expected type structure
-    type ExpectedType = Loadable<
+    type ExpectedType = LoadableWithError<
       Array<TraceObjSchema<TestOnlyExample, 'TestOnlyExample'>>
-    >;
+    > & {
+      refetch: () => void;
+    };
 
     // Type assertion tests
     type AssertTypesAreEqual = TypesAreEqual<
@@ -46,6 +48,7 @@ describe('Type Tests', () => {
     // Additional runtime sample for documentation
     const sampleResult: CollectionObjectsReturn = {
       loading: false,
+      error: null,
       result: [
         {
           project_id: '',
@@ -68,6 +71,7 @@ describe('Type Tests', () => {
           }),
         },
       ],
+      refetch: () => {},
     };
 
     expectType<ExpectedType>(sampleResult);
