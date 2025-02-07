@@ -23,7 +23,7 @@ from weave.trace_server import (
 )
 from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import stainless_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
@@ -518,8 +518,8 @@ def create_client(
             ch_server, DummyIdConverter(), entity
         )
     elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
+        remote_server = stainless_http_trace_server.StainlessHTTPTraceServer(
+            weave_server_flag, username="shawn", password="x" * 40
         )
         server = remote_server
     elif weave_server_flag == ("prod"):
@@ -611,8 +611,8 @@ def network_proxy_client(client):
         orig_post = weave.trace_server.requests.post
         weave.trace_server.requests.post = post
 
-        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+        remote_client = stainless_http_trace_server.StainlessHTTPTraceServer(
+            trace_server_url="", username="shawn", password="x" * 40
         )
         yield (client, remote_client, records)
 
