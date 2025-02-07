@@ -23,6 +23,7 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
+import {opNiceName} from './opNiceName';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -212,14 +213,6 @@ export const OpLink: React.FC<{
       {props.opName}
     </Link>
   );
-};
-
-export const opNiceName = (opName: string) => {
-  let text = opName;
-  if (text.startsWith('op-')) {
-    text = text.slice(3);
-  }
-  return text;
 };
 
 export const opVersionText = (opName: string, versionIndex: number) => {
