@@ -5,11 +5,11 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave import Scorer
+from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.guardrails.prompts import (
     RESTRICTED_TERMS_GUARDRAIL_SYSTEM_PROMPT,
     RESTRICTED_TERMS_GUARDRAIL_USER_PROMPT,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 
 
 class TermMatch(BaseModel):
@@ -80,31 +80,27 @@ class RestrictedTermsLLMGuardrail(Scorer):
             )
 
     @weave.op
-    def analyse_restricted_terms(self, output: str) -> RestrictedTermsAnalysis:
-        import litellm
-        from litellm import completion
+    async def analyse_restricted_terms(self, output: str) -> RestrictedTermsAnalysis:
+        from litellm import acompletion
 
-        litellm.enable_json_schema_validation = True
-        response = (
-            completion(
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {
-                        "role": "user",
-                        "content": self.user_prompt.format(
-                            text=output, custom_terms=", ".join(self.custom_terms)
-                        ),
-                    },
-                ],
-                model=self.model_id,
-                response_format=RestrictedTermsAnalysis,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            .choices[0]
-            .message.content
+        response = await acompletion(
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {
+                    "role": "user",
+                    "content": self.user_prompt.format(
+                        text=output, custom_terms=", ".join(self.custom_terms)
+                    ),
+                },
+            ],
+            model=self.model_id,
+            response_format=RestrictedTermsAnalysis,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
         )
-        return RestrictedTermsAnalysis.model_validate_json(response)
+        return RestrictedTermsAnalysis.model_validate_json(
+            response.choices[0].message.content
+        )
 
     def frame_guardrail_reasoning(self, analysis: RestrictedTermsAnalysis) -> str:
         if analysis.contains_restricted_terms:
@@ -135,8 +131,8 @@ class RestrictedTermsLLMGuardrail(Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, output: str) -> RestrictedTermsRecognitionResponse:
-        analysis: RestrictedTermsAnalysis = self.analyse_restricted_terms(output)
+    async def score(self, output: str) -> RestrictedTermsRecognitionResponse:
+        analysis: RestrictedTermsAnalysis = await self.analyse_restricted_terms(output)
         reasoning = self.frame_guardrail_reasoning(analysis)
         anonymized_text = self.get_anonymized_text(output, analysis)
         return RestrictedTermsRecognitionResponse(
