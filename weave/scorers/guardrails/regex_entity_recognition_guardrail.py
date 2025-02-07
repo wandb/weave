@@ -148,6 +148,7 @@ class RegexEntityRecognitionGuardrail(Scorer):
         # Create a pattern that matches the exact text, case-insensitive
         return rf"\b{escaped_text}\b"
 
+    @weave.op
     def check_regex_model(self, output: str) -> RegexResult:
         if self.custom_terms:
             # Create a temporary RegexModel with only the custom patterns
@@ -158,6 +159,8 @@ class RegexEntityRecognitionGuardrail(Scorer):
             result = temp_model.check(output)
         else:
             # Use the original regex_model if no custom terms provided
+            if self.regex_model is None:
+                raise ValueError("regex_model is not initialized")
             result = self.regex_model.check(output)
         return result
 
