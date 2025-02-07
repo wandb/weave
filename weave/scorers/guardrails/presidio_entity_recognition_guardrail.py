@@ -64,7 +64,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
         from presidio_anonymizer import AnonymizerEngine
 
-        available_entities = self.get_available_entities()
+        available_entities = get_available_entities()
 
         # If show_available_entities is True, print available entities
         if self.show_available_entities:
