@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 import weave
 from weave import Scorer
+from weave.scorers.utils import stringify
 
 if TYPE_CHECKING:
     from presidio_analyzer import AnalyzerEngine, RecognizerResult
@@ -16,6 +17,17 @@ class PresidioEntityRecognitionResponse(BaseModel):
     detected_entities: dict[str, list[str]]
     reason: str
     anonymized_text: Optional[str] = None
+
+
+def get_available_entities() -> list[str]:
+    """Get available entities from Presidio"""
+    from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+
+    registry = RecognizerRegistry()
+    analyzer = AnalyzerEngine(registry=registry)
+    return [
+        recognizer.supported_entities[0] for recognizer in analyzer.registry.recognizers
+    ]
 
 
 class PresidioEntityRecognitionGuardrail(Scorer):
@@ -36,18 +48,6 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         show_available_entities (bool): A flag indicating whether to print available entities.
     """
 
-    @staticmethod
-    def get_available_entities() -> list[str]:
-        """Get available entities from Presidio"""
-        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
-
-        registry = RecognizerRegistry()
-        analyzer = AnalyzerEngine(registry=registry)
-        return [
-            recognizer.supported_entities[0]
-            for recognizer in analyzer.registry.recognizers
-        ]
-
     selected_entities: list[str] = []
     language: str = "en"
     deny_lists: Optional[dict[str, list[str]]] = None
@@ -64,9 +64,10 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
         from presidio_anonymizer import AnonymizerEngine
 
+        available_entities = self.get_available_entities()
+
         # If show_available_entities is True, print available entities
         if self.show_available_entities:
-            available_entities = self.get_available_entities()
             print("\nAvailable entities:")
             print("=" * 25)
             for entity in available_entities:
@@ -75,10 +76,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
         # Initialize default values to all available entities
         if self.selected_entities is None:
-            self.selected_entities = self.get_available_entities()
-
-        # Get available entities dynamically
-        available_entities = self.get_available_entities()
+            self.selected_entities = available_entities
 
         # Filter out invalid entities and warn user
         invalid_entities = [
@@ -176,11 +174,12 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
+        output = stringify(output)
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")
 
         analyzer_results = self._analyzer.analyze(
-            text=str(output), entities=self.selected_entities, language=self.language
+            text=output, entities=self.selected_entities, language=self.language
         )
         detected_entities = self.group_analyzer_results_by_entity_type(
             output, analyzer_results
