@@ -18,6 +18,9 @@ class WeaveScorerResult(BaseModel):
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
 
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode='json')
+
     class Config:
         extra = "allow"
 
