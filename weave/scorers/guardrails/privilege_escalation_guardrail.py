@@ -4,11 +4,11 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave import Scorer
+from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.guardrails.prompts import (
     PRIVILEGE_ESCALATION_SYSTEM_PROMPT,
     PRIVILEGE_ESCALATION_USER_PROMPT,
 )
-from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
 from weave.scorers.utils import stringify
 
 
@@ -38,10 +38,17 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
     max_tokens: int = 1024
 
     def model_post_init(self, __context: Any) -> None:
-        import instructor
-        from litellm import completion
-
-        self._client = instructor.from_litellm(completion)
+        if self.model_id not in [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "o1-preview",
+            "o1-mini",
+            "o1",
+        ]:
+            raise ValueError(
+                "The system prompt for this guardrail was tested with OpenAI models. \
+                If you're using a different model, you may need to adjust the system prompt."
+            )
 
     @weave.op
     async def score(self, output: str) -> PrivilegeEscalationGuardrailResponse:
