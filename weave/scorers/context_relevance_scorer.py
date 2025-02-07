@@ -82,12 +82,9 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         self.model.eval()
 
     def load_tokenizer(self) -> None:
-        try:
-            from transformers import AutoTokenizer
-        except ImportError:
-            print(
-                f"The `transformers` is required to use the {self.__class__.__name__}, please run `pip install transformers torch`"
-            )
+        ensure_hf_imports()
+        from transformers import AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             self._local_model_path,
             model_max_length=self.model_max_length,

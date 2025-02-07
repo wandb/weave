@@ -230,28 +230,28 @@ class WeaveTrustScorer(weave.Scorer):
 
         return text
 
-    def _validate_input(self, output: str) -> Optional[dict[str, Any]]:
-        """Validate input and return error response if invalid."""
-        if not output or not output.strip():
-            return {
-                "pass": True,
-                "trust_level": "low",
-                "critical_issues": ["EmptyInput"],
-                "advisory_issues": [],
-                "extras": {
-                    "error": "Empty input provided",
-                    "raw_outputs": {},
-                    "scores": {},
-                },
-            }
-        return None
+    # def _validate_input(self, output: str) -> Optional[dict[str, Any]]:
+    #     """Validate input and return error response if invalid."""
+    #     if not output or not output.strip():
+    #         return {
+    #             "pass": True,
+    #             "trust_level": "low",
+    #             "critical_issues": ["EmptyInput"],
+    #             "advisory_issues": [],
+    #             "extras": {
+    #                 "error": "Empty input provided",
+    #                 "raw_outputs": {},
+    #                 "scores": {},
+    #             },
+    #         }
+    #     return None
 
-    def _filter_inputs_for_scorer(
-        self, scorer: weave.Scorer, inputs: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Filter inputs to match scorer's signature."""
-        scorer_params = signature(scorer.score).parameters
-        return {k: v for k, v in inputs.items() if k in scorer_params}
+    # def _filter_inputs_for_scorer(
+    #     self, scorer: weave.Scorer, inputs: dict[str, Any]
+    # ) -> dict[str, Any]:
+    #     """Filter inputs to match scorer's signature."""
+    #     scorer_params = signature(scorer.score).parameters
+    #     return {k: v for k, v in inputs.items() if k in scorer_params}
 
     def _score_all(
         self,
@@ -261,9 +261,9 @@ class WeaveTrustScorer(weave.Scorer):
     ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results."""
         # Validate input
-        error_response = self._validate_input(output)
-        if error_response:
-            return {"error": error_response}
+        # error_response = self._validate_input(output)
+        # if error_response:
+        #     return {"error": error_response}
 
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
@@ -285,7 +285,7 @@ class WeaveTrustScorer(weave.Scorer):
                 # Schedule each scorer's work concurrently.
                 future_to_scorer = {
                     executor.submit(
-                        scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)
+                        scorer.score, **inputs
                     ): scorer_name
                     for scorer_name, scorer in self._loaded_scorers.items()
                 }
@@ -303,7 +303,7 @@ class WeaveTrustScorer(weave.Scorer):
             for scorer_name, scorer in self._loaded_scorers.items():
                 try:
                     results[scorer_name] = scorer.score(
-                        **self._filter_inputs_for_scorer(scorer, inputs)
+                        **inputs
                     )
                 except Exception:
                     pass
