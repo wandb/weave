@@ -7,7 +7,7 @@ This scorer combines multiple scorers to provide a comprehensive trust evaluatio
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
-from typing import Any, Dict, Optional, Set, Type, Union
+from typing import Any, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -26,6 +26,10 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
+
+
+class WeaveTrustScorerError(Exception):
+    """Error raised by the WeaveTrustScorer."""
 
 
 class WeaveTrustScorer(weave.Scorer):
@@ -131,12 +135,12 @@ class WeaveTrustScorer(weave.Scorer):
     )
 
     # Define scorer categories
-    _critical_scorers: Set[Type[weave.Scorer]] = {
+    _critical_scorers: set[type[weave.Scorer]] = {
         WeaveToxicityScorer,
         WeaveHallucinationScorer,
         WeaveContextRelevanceScorer,
     }
-    _advisory_scorers: Set[Type[weave.Scorer]] = {
+    _advisory_scorers: set[type[weave.Scorer]] = {
         WeaveFluencyScorer,
         WeaveCoherenceScorer,
     }
@@ -237,8 +241,8 @@ class WeaveTrustScorer(weave.Scorer):
         return None
 
     def _filter_inputs_for_scorer(
-        self, scorer: weave.Scorer, inputs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, scorer: weave.Scorer, inputs: dict[str, Any]
+    ) -> dict[str, Any]:
         """Filter inputs to match scorer's signature."""
         scorer_params = signature(scorer.score).parameters
         return {k: v for k, v in inputs.items() if k in scorer_params}
@@ -288,7 +292,9 @@ class WeaveTrustScorer(weave.Scorer):
                     try:
                         results[scorer_name] = future.result()
                     except Exception as e:
-                        raise Exception(f"Error calling {scorer_name}: {e}")
+                        raise WeaveTrustScorerError(
+                            f"Error calling {scorer_name}: {e}", errors=e
+                        )
         else:
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
