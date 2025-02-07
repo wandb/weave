@@ -47,7 +47,8 @@ def set_device(device: str = "auto") -> "device":
             device = "cpu"
     return torch.device(device)
 
-def download_model(artifact_path: str) -> Path:
+
+def download_model(artifact_path: Union[str, Path]) -> Path:
     try:
         from wandb import Api
     except ImportError:
@@ -58,12 +59,13 @@ def download_model(artifact_path: str) -> Path:
     api = Api()
     art = api.artifact(
         type="model",
-        name=artifact_path,
+        name=str(artifact_path),
     )
-    model_name = artifact_path.split("/")[-1].replace(":", "_")
+    model_name = str(artifact_path).split("/")[-1].replace(":", "_")
     local_model_path = WEAVE_SCORERS_DIR / model_name
     art.download(local_model_path)
     return Path(local_model_path)
+
 
 def get_model_path(model_name: str) -> str:
     """Get the full model path for a scorer."""
