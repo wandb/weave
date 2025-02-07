@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Optional
 
+from presidio_analyzer import EntityRecognizer
 from pydantic import BaseModel
 
 import weave
@@ -35,8 +36,8 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             corresponding deny lists.
         regex_patterns (Optional[dict[str, list[dict[str, str]]]]): A dictionary of entity
             types and their corresponding regex patterns.
-        custom_recognizers (Optional[list[Any]]): A list of custom recognizers to add to the
-            analyzer.
+        custom_recognizers (Optional[list[dict[str, Any]]]): A list of dictionaries representing
+            custom recognizers to add to the analyzer.
         show_available_entities (bool): A flag indicating whether to print available entities.
     """
 
@@ -52,25 +53,24 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             for recognizer in analyzer.registry.recognizers
         ]
 
-    selected_entities: list[str]
-    language: str
-    _analyzer: "AnalyzerEngine"
-    _anonymizer: "AnonymizerEngine"
+    selected_entities: list[str] = []
+    language: str = "en"
+    deny_lists: Optional[dict[str, list[str]]] = None
+    regex_patterns: Optional[dict[str, list[dict[str, str]]]] = None
+    custom_recognizers: Optional[list[dict[str, Any]]] = None
+    show_available_entities: bool = False
+    _analyzer: Optional["AnalyzerEngine"] = None
+    _anonymizer: Optional["AnonymizerEngine"] = None
 
-    def __init__(
-        self,
-        selected_entities: Optional[list[str]] = None,
-        language: str = "en",
-        deny_lists: Optional[dict[str, list[str]]] = None,
-        regex_patterns: Optional[dict[str, list[dict[str, str]]]] = None,
-        custom_recognizers: Optional[list[Any]] = None,
-        show_available_entities: bool = False,
-    ):
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+
+    def model_post_init(self, __context: Any) -> None:
         from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
         from presidio_anonymizer import AnonymizerEngine
 
         # If show_available_entities is True, print available entities
-        if show_available_entities:
+        if self.show_available_entities:
             available_entities = self.get_available_entities()
             print("\nAvailable entities:")
             print("=" * 25)
@@ -79,42 +79,45 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             print("=" * 25 + "\n")
 
         # Initialize default values to all available entities
-        if selected_entities is None:
-            selected_entities = self.get_available_entities()
+        if self.selected_entities is None:
+            self.selected_entities = self.get_available_entities()
 
         # Get available entities dynamically
         available_entities = self.get_available_entities()
 
         # Filter out invalid entities and warn user
-        invalid_entities = [e for e in selected_entities if e not in available_entities]
-        valid_entities = [e for e in selected_entities if e in available_entities]
+        invalid_entities = [
+            e for e in self.selected_entities if e not in available_entities
+        ]
+        valid_entities = [e for e in self.selected_entities if e in available_entities]
 
         if invalid_entities:
             print(
                 f"\nWarning: The following entities are not available and will be ignored: {invalid_entities}"
             )
             print(f"Continuing with valid entities: {valid_entities}")
-            selected_entities = valid_entities
+            self.selected_entities = valid_entities
 
         # Initialize analyzer with default recognizers
-        analyzer = AnalyzerEngine()
+        self._analyzer = AnalyzerEngine()
 
         # Add custom recognizers if provided
-        if custom_recognizers:
-            for recognizer in custom_recognizers:
-                analyzer.registry.add_recognizer(recognizer)
+        if self.custom_recognizers:
+            for recognizer_data in self.custom_recognizers:
+                recognizer = EntityRecognizer.from_dict(recognizer_data)
+                self._analyzer.registry.add_recognizer(recognizer)
 
         # Add deny list recognizers if provided
-        if deny_lists:
-            for entity_type, tokens in deny_lists.items():
+        if self.deny_lists:
+            for entity_type, tokens in self.deny_lists.items():
                 deny_list_recognizer = PatternRecognizer(
                     supported_entity=entity_type, deny_list=tokens
                 )
-                analyzer.registry.add_recognizer(deny_list_recognizer)
+                self._analyzer.registry.add_recognizer(deny_list_recognizer)
 
         # Add regex pattern recognizers if provided
-        if regex_patterns:
-            for entity_type, patterns in regex_patterns.items():
+        if self.regex_patterns:
+            for entity_type, patterns in self.regex_patterns.items():
                 presidio_patterns = [
                     Pattern(
                         name=pattern.get("name", f"pattern_{i}"),
@@ -126,15 +129,9 @@ class PresidioEntityRecognitionGuardrail(Scorer):
                 regex_recognizer = PatternRecognizer(
                     supported_entity=entity_type, patterns=presidio_patterns
                 )
-                analyzer.registry.add_recognizer(regex_recognizer)
+                self._analyzer.registry.add_recognizer(regex_recognizer)
 
-        # Initialize Presidio engines
-        anonymizer = AnonymizerEngine()
-
-        # Call parent class constructor with all fields
-        super().__init__(selected_entities=selected_entities, language=language)
-        self._analyzer = analyzer
-        self._anonymizer = anonymizer
+        self._anonymizer = AnonymizerEngine()
 
     def group_analyzer_results_by_entity_type(
         self, output: str, analyzer_results: list[Any]
@@ -175,7 +172,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         detected_entities: dict[str, list[str]],
     ) -> Optional[str]:
         anonymized_text = None
-        if detected_entities:
+        if detected_entities and self._anonymizer is not None:
             anonymized_result = self._anonymizer.anonymize(
                 text=output, analyzer_results=analyzer_results
             )
@@ -184,6 +181,9 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
     @weave.op
     def score(self, output: str) -> dict[str, Any]:
+        if self._analyzer is None:
+            raise ValueError("Analyzer is not initialized")
+
         analyzer_results = self._analyzer.analyze(
             text=str(output), entities=self.selected_entities, language=self.language
         )
