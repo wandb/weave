@@ -1,5 +1,9 @@
 # Prompts
 
+:::important
+Curremtly, this feature is only accessible through the Python SDK. All code examples on this page are provided in Python.
+:::
+
 Creating, evaluating, and refining prompts is a core activity for AI engineers.
 Small changes to a prompt can have big impacts on your application's behavior.
 Weave lets you create prompts, save and retrieve them, and evolve them over time.
