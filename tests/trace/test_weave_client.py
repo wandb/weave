@@ -531,7 +531,7 @@ def test_get_calls_limit_offset(client):
 
 
 def test_get_calls_by_op_version_alias(client):
-    @weave.op
+    @weave.op(name="my-op")
     def my_op(x):
         return x
 
@@ -539,12 +539,19 @@ def test_get_calls_by_op_version_alias(client):
 
     my_op(1)
 
-    @weave.op
-    def my_op(x):
+    @weave.op(name="my-op")
+    def my_op2(x):
         return x + 1
 
-    ref2 = weave.publish(my_op, "my-op")
-    my_op(2)
+    ref2 = weave.publish(my_op2, "my-op")
+    my_op2(2)
+
+    @weave.op(name="second-op")
+    def second_op(x):
+        return x + 2
+
+    ref3 = weave.publish(second_op, "second-op")
+    second_op(1)
 
     calls = client.get_calls(filter={"op_names": [ref.uri()]})
     assert len(calls) == 1
@@ -554,15 +561,46 @@ def test_get_calls_by_op_version_alias(client):
 
     # with version alias
     ref_with_alias = make_ref_with_alias(ref, "v0")
-    print(f"{ref_with_alias}")
     calls = client.get_calls(filter={"op_names": [ref_with_alias]})
     assert len(calls) == 1
 
     # ref with 'latest' alias
     ref_with_latest = make_ref_with_alias(ref, "latest")
-    print(f"{ref_with_latest}")
     calls = client.get_calls(filter={"op_names": [ref_with_latest]})
     assert len(calls) == 1
+    # should be the second op
+    assert calls[0].op_name == ref2.uri()
+
+    # multiple specific op names with aliases
+    ref_with_alias2 = make_ref_with_alias(ref2, "v1")
+    calls = client.get_calls(filter={"op_names": [ref_with_alias, ref_with_alias2]})
+    assert len(calls) == 2
+
+    # multiple op names with aliases and latest
+    ref_with_latest2 = make_ref_with_alias(ref2, "latest")
+    calls = client.get_calls(
+        filter={"op_names": [ref_with_alias, ref_with_alias2, ref_with_latest]}
+    )
+    assert len(calls) == 2
+
+    # with duplicate op version names
+    calls = client.get_calls(filter={"op_names": [ref_with_alias, ref_with_alias]})
+    assert len(calls) == 1
+    assert calls[0].op_name == ref.uri()
+
+    # duplicate mixed w/ latest
+    calls = client.get_calls(
+        filter={
+            "op_names": [
+                ref_with_alias,
+                ref_with_latest,
+                ref_with_alias2,
+                ref_with_latest2,
+                ref3.uri(),
+            ]
+        }
+    )
+    assert len(calls) == 3
 
 
 def test_calls_delete(client):

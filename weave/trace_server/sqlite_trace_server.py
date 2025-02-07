@@ -245,22 +245,51 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         ).calls
         return tsi.CallReadRes(call=calls[0] if calls else None)
 
+    @staticmethod
+    def _resolve_op_alias(
+        op_names: list[str],
+    ) -> tuple[list[str], list[str], list[str], list[str]]:
+        """Given a list of op_names, return bucketed by kind of digest
+        - non-wildcarded names: op_name = "weave-trace-internal:///<project_id>/op/<object_id>:<digest>"
+        - wildcarded names: op_name = "weave-trace-internal:///<project_id>/op/<object_id>:*"
+        - latest names: op_name = "weave-trace-internal:///<project_id>/op/<object_id>:latest"
+        - version alias names: op_name = "weave-trace-internal:///<project_id>/op/<object_id>:<version number>"
+        """
+        non_wildcarded_names: list[str] = []
+        wildcarded_names: list[str] = []
+        latest_names: list[str] = []
+        version_alias_names: list[str] = []
+
+        for name in op_names:
+            uri_start = name.index(":///")
+            version_str = name[name.index(":", uri_start + 4) :]
+            if version_str == WILDCARD_ARTIFACT_VERSION_AND_PATH:
+                wildcarded_names.append(name)
+            elif version_str == ":latest":
+                latest_names.append(name)
+            elif digest_is_version_like(version_str[1:])[0]:
+                version_alias_names.append(name)
+            else:
+                non_wildcarded_names.append(name)
+
+        return non_wildcarded_names, wildcarded_names, latest_names, version_alias_names
+
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
+        pre_query = ""
         if filter:
             if filter.op_names:
                 or_conditions: list[str] = []
 
-                non_wildcarded_names: list[str] = []
-                wildcarded_names: list[str] = []
-                for name in filter.op_names:
-                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                        wildcarded_names.append(name)
-                    else:
-                        non_wildcarded_names.append(name)
+                (
+                    non_wildcarded_names,
+                    wildcarded_names,
+                    latest_names,
+                    version_alias_names,
+                ) = self._resolve_op_alias(filter.op_names)
 
                 if non_wildcarded_names:
                     in_expr = ", ".join(f"'{x}'" for x in non_wildcarded_names)
@@ -269,6 +298,32 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 for name_ndx, name in enumerate(wildcarded_names):
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
                     or_conditions.append(f"op_name LIKE '{like_name}'")
+
+                if latest_names or version_alias_names:
+                    objects_table_conds = []
+                    for name in latest_names:
+                        name_and_latest = name.split("op/")[1]
+                        object_id, _ = name_and_latest.split(":")
+                        objects_table_conds.append(
+                            f"(object_id = '{object_id}' AND is_latest = 1)"
+                        )
+                    for name in version_alias_names:
+                        name_and_version = name.split("op/")[1]
+                        object_id, version_raw = name_and_version.split(":")
+                        version = version_raw.replace("v", "")
+                        objects_table_conds.append(
+                            f"(object_id = '{object_id}' AND version_index = {version})"
+                        )
+                    pre_query = """
+                    WITH pre_query_op_names AS (
+                    SELECT 'weave-trace-internal:///' || project_id || '/op/' || object_id || ':' || digest AS op_name
+                    FROM objects WHERE
+                    """
+                    pre_query += " OR ".join(objects_table_conds) + ")"
+
+                    or_conditions.append(
+                        "op_name IN (select op_name from pre_query_op_names)"
+                    )
 
                 if or_conditions:
                     conds.append("(" + " OR ".join(or_conditions) + ")")
@@ -395,7 +450,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             select_columns += [
                 rcol for rcol in required_columns if rcol not in select_columns
             ]
-        query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+        query = (
+            pre_query
+            + f"\nSELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+        )
 
         conditions_part = " AND ".join(conds)
 
