@@ -1,12 +1,9 @@
-import os
-from importlib.util import find_spec
 from typing import Any, Union
 
 import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, download_model
 
 RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
 Your goal is to provide a single relevance score and classification based on comprehensive analysis.
@@ -112,21 +109,18 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
     model_max_length: int = 1280
 
     def load_model(self) -> None:
-        try:
-            if find_spec("torch") is None:
-                raise ImportError("torch is required but not installed")
-            from transformers import AutoModelForTokenClassification
-        except ImportError:
-            print(
-                "The `transformers` and `torch` packages are required to use the ContextRelevanceScorer, please run `pip install transformers torch`"
-            )
-        """Initialize the model, tokenizer and device after pydantic initialization."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["relevance_scorer"])
+        from weave.scorers.utils import (
+            MODEL_PATHS,
+            ensure_hf_imports,
+            load_hf_model_weights,
+        )
+
+        ensure_hf_imports()
+        from transformers import AutoModelForTokenClassification
+
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
+        )
         assert (
             self._local_model_path
         ), "model_name_or_path local path or artifact path not found"

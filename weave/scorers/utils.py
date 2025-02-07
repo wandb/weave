@@ -74,3 +74,46 @@ def stringify(output: Any) -> str:
         return output.model_dump_json(indent=2)
     else:
         raise TypeError(f"Unsupported model output type: {type(output)}")
+
+
+# --- HF Utilities ---
+
+
+def ensure_hf_imports() -> None:
+    """Ensure that the required packages for Hugging Face models are installed."""
+    try:
+        import torch
+        import transformers
+    except ImportError as e:
+        raise ImportError(
+            "The 'transformers' and 'torch' packages are required for HF models. Please install them using 'pip install transformers torch'."
+        ) from e
+
+
+def load_hf_model_weights(model_name_or_path: str, default_model: str = None) -> str:
+    """Load the local model weights for a Hugging Face model.
+
+    If model_name_or_path is a directory, it is assumed to be the local model weights path.
+    If model_name_or_path is provided (non-empty), it is used to download the model using the existing download_model function.
+    If no model_name_or_path is provided, and a default_model is supplied, it downloads the default model.
+
+    Args:
+        model_name_or_path (str): The path or name of the model.
+        default_model (str, optional): The default model artifact to use if model_name_or_path is empty.
+
+    Returns:
+        str: The local model weights path.
+
+    Raises:
+        ValueError: If neither a model_name_or_path nor a default_model is provided.
+    """
+    import os
+
+    if os.path.isdir(model_name_or_path):
+        return model_name_or_path
+    elif model_name_or_path:
+        return download_model(model_name_or_path)
+    elif default_model:
+        return download_model(default_model)
+    else:
+        raise ValueError("No model path provided and no default model available.")

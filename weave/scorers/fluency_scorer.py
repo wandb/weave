@@ -1,8 +1,11 @@
-import os
-
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.utils import MODEL_PATHS, download_model, set_device
+from weave.scorers.utils import (
+    MODEL_PATHS,
+    ensure_hf_imports,
+    load_hf_model_weights,
+    set_device,
+)
 
 FLUENCY_SCORER_THRESHOLD = 0.5
 
@@ -35,17 +38,14 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     threshold: float = FLUENCY_SCORER_THRESHOLD
 
     def _load_pipeline(self) -> None:
-        """Loads the _pipeline attribute"""
+        """Loads the _pipeline attribute using HF utilities"""
         from transformers import pipeline
 
+        ensure_hf_imports()
         self.device = set_device(self.device)
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["fluency_scorer"])
-
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["fluency_scorer"]
+        )
         self._pipeline = pipeline(
             "text-classification",
             model=self._local_model_path,

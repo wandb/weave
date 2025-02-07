@@ -62,7 +62,9 @@ class HuggingFacePerplexityScorer(weave.Scorer):
                 - "input_ids" (torch.Tensor): Input IDs (ground truth) with shape (batch_size, seq_length).
 
         Returns:
-            dict: A dictionary containing the calculated perplexity.
+            dict: A unified dictionary containing:
+                  - "pass": Always True (no threshold defined for perplexity).
+                  - "extras": A dictionary with 'perplexity'.
         """
         import torch
         import torch.nn.functional as F
@@ -71,12 +73,8 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         input_ids = output["input_ids"]
 
         # Shift logits and labels for causal language modeling
-        shift_logits = logits[
-            :, :-1, :
-        ]  # Ignore the last logit (no next token to predict)
-        shift_labels = input_ids[
-            :, 1:
-        ]  # Ignore the first input token (no previous context)
+        shift_logits = logits[:, :-1, :]
+        shift_labels = input_ids[:, 1:]
 
         # Compute log probabilities
         log_probs = F.log_softmax(shift_logits, dim=-1)
@@ -84,7 +82,7 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         # Gather log probabilities corresponding to the actual tokens
         token_log_probs = torch.gather(
             log_probs, dim=-1, index=shift_labels.unsqueeze(-1)
-        ).squeeze(-1)  # Shape: (batch_size, seq_length - 1)
+        ).squeeze(-1)
 
         # Compute negative log-likelihood (NLL)
         nll = -token_log_probs.mean().item()
@@ -92,4 +90,4 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         # Compute perplexity
         perplexity = torch.exp(torch.tensor(nll)).item()
 
-        return {"perplexity": perplexity}
+        return {"pass": True, "extras": {"perplexity": perplexity}}
