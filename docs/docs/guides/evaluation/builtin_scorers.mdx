@@ -14,8 +14,7 @@ import TabItem from '@theme/TabItem';
     ```
 
     **LLM-evaluators**
-
-    The pre-defined scorers that leverage LLMs now automatically integrate with litellm.
+    Update Feb 2025: The pre-defined scorers that leverage LLMs now automatically integrate with litellm.
     You no longer need to pass an LLM client; just set the `model_id`. 
     See the supported models [here](https://docs.litellm.ai/docs/providers).
 
@@ -81,7 +80,7 @@ import TabItem from '@theme/TabItem';
     from weave.scorers import SummarizationScorer
 
     scorer = SummarizationScorer(
-        model_id="openai/gpt-4o" # or any other model supported by litellm
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
     )
     ```
 
@@ -89,7 +88,7 @@ import TabItem from '@theme/TabItem';
 
     This scorer evaluates summaries in two ways:
 
-    1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary to estimate its information density. An LLM extracts the entities.
+    1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary in order to estimate the "information density" of the summary. Uses an LLM to extract the entities. Similar to how entity density is used in the Chain of Density paper, https://arxiv.org/abs/2309.04269
     2. **Quality Grading:** An LLM evaluator grades the summary as `poor`, `ok`, or `excellent`. These grades are then mapped to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) for aggregate performance evaluation.
 
     **Customization:**
@@ -115,7 +114,7 @@ import TabItem from '@theme/TabItem';
 
     # Initialize scorer
     summarization_scorer = SummarizationScorer(
-        model_id="openai/gpt-4o" # or any other model supported by litellm
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
     )
     # Create dataset
     dataset = [
@@ -167,7 +166,7 @@ import TabItem from '@theme/TabItem';
 
     # Initialize scorer
     moderation_scorer = OpenAIModerationScorer(
-        model_id="openai/text-embedding-3-small" # or any other model supported by litellm
+        model_id="openai/text-embedding-3-small"  # or any other model supported by litellm
     )
 
     # Create dataset
@@ -194,7 +193,7 @@ import TabItem from '@theme/TabItem';
     from weave.scorers import EmbeddingSimilarityScorer
 
     similarity_scorer = EmbeddingSimilarityScorer(
-        model_id="openai/text-embedding-3-small", # or any other model supported by litellm
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
         target_column="reference_text",  # the dataset column to compare the output against
         threshold=0.4  # the cosine similarity threshold
     )
@@ -214,7 +213,7 @@ import TabItem from '@theme/TabItem';
 
     # Initialize scorer
     similarity_scorer = EmbeddingSimilarityScorer(
-        model_id="openai/text-embedding-3-small", # or any other model supported by litellm
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
         target_column="reference_text",
         threshold=0.7
     )
@@ -377,7 +376,7 @@ import TabItem from '@theme/TabItem';
     from weave.scorers import ContextRelevancyScorer
 
     relevancy_scorer = ContextRelevancyScorer(
-        model_id="openai/gpt-4o", # or any other model supported by litellm
+        model_id="openai/gpt-4o",  # or any other model supported by litellm
         relevancy_prompt="""
     Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
 
