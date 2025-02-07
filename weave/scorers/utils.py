@@ -1,4 +1,5 @@
 import json
+from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
@@ -81,13 +82,10 @@ def stringify(output: Any) -> str:
 
 def ensure_hf_imports() -> None:
     """Ensure that the required packages for Hugging Face models are installed."""
-    try:
-        import torch
-        import transformers
-    except ImportError as e:
+    if find_spec("torch") is None or find_spec("transformers") is None:
         raise ImportError(
             "The 'transformers' and 'torch' packages are required for HF models. Please install them using 'pip install transformers torch'."
-        ) from e
+        )
 
 
 def load_hf_model_weights(model_name_or_path: str, default_model: str = None) -> str:
