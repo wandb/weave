@@ -1,8 +1,10 @@
+import {GOLD_300, MOON_800} from '@wandb/weave/common/css/globals.styles';
 import _ from 'lodash';
 import React, {useState} from 'react';
 import {Label} from 'semantic-ui-react';
 
 import * as GQLTypes from '../types/graphql';
+import {regexMatchHighlight} from '../util/fuzzyMatch';
 import {SingleLineText} from './elements/Text';
 import * as S from './Tags.styles';
 
@@ -18,6 +20,7 @@ interface TagProps {
   noun?: 'tag' | 'alias' | 'protected-alias';
   canDelete?: boolean;
   showColor?: boolean;
+  highlightedText?: string;
 
   onDelete?(e: React.MouseEvent<HTMLElement>): void;
   onClick?(): void;
@@ -53,7 +56,16 @@ function colorIndexToName(showColor: boolean, index?: number): string {
 }
 
 export const Tag: React.FC<TagProps> = React.memo(
-  ({size: propsSize, tag, noun, canDelete, showColor, onDelete, onClick}) => {
+  ({
+    size: propsSize,
+    tag,
+    noun,
+    canDelete,
+    showColor,
+    onDelete,
+    onClick,
+    highlightedText,
+  }) => {
     const [showDeleteAlert, setShowDeleteAlert] = useState(false);
     const size = propsSize || 'large';
     noun = noun ?? 'tag';
@@ -80,7 +92,14 @@ export const Tag: React.FC<TagProps> = React.memo(
           size={size}
           $pos="left"
         />
-        <SingleLineText alignSelf={'center'}>{tag.name}</SingleLineText>
+        <SingleLineText alignSelf={'center'}>
+          {highlightedText
+            ? regexMatchHighlight(tag.name, new RegExp(highlightedText, 'i'), {
+                backgroundColor: GOLD_300,
+                color: MOON_800,
+              })
+            : tag.name}
+        </SingleLineText>
         {canDelete && onDelete && (
           <S.Icon
             className="delete-tag"
@@ -110,10 +129,11 @@ interface TagsProps {
 
   deleteTag?(tag: GQLTypes.Tag): void;
   onClick?(tag: string): void;
+  highlightedText?: string;
 }
 
 export const Tags: React.FC<TagsProps> = React.memo(
-  ({size, tags, enableDelete, noun, deleteTag, onClick}) => {
+  ({size, tags, enableDelete, noun, deleteTag, onClick, highlightedText}) => {
     return (
       <span className="run-tags">
         {_.sortBy(tags, 'name').map(tag => (
@@ -133,6 +153,7 @@ export const Tags: React.FC<TagsProps> = React.memo(
             }
             onClick={() => onClick?.(tag.name)}
             noun={noun}
+            highlightedText={highlightedText}
           />
         ))}
       </span>

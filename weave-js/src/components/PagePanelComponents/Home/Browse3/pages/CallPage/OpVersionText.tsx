@@ -4,7 +4,7 @@
 
 import React from 'react';
 
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {useWFHooks} from '../wfReactInterface/context';
 import {refUriToOpVersionKey} from '../wfReactInterface/utilities';
 

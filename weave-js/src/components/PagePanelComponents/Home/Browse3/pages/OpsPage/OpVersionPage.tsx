@@ -14,13 +14,9 @@ import {
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {OpCodeViewer} from '../../OpCodeViewer';
 import {DeleteModal, useShowDeleteButton} from '../common/DeleteModal';
-import {
-  CallsLink,
-  opNiceName,
-  OpVersionsLink,
-  opVersionText,
-} from '../common/Links';
+import {CallsLink, OpVersionsLink, opVersionText} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
+import {opNiceName} from '../common/opNiceName';
 import {
   ScrollableTabContent,
   SimplePageLayoutWithHeader,

@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   opVersionKeyToRefUri,

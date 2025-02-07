@@ -16,12 +16,8 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
 import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_OPERATIONS} from '../common/EmptyContent';
-import {
-  CallsLink,
-  opNiceName,
-  OpVersionLink,
-  OpVersionsLink,
-} from '../common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';

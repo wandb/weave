@@ -321,7 +321,6 @@ export class WeaveExpressionState {
         this.trace(`...live updating expression`);
         this.setExpression(newExpr as NodeOrVoidNode);
       }
-      return;
     }
 
     if (ReactEditor.isFocused(this.editor)) {

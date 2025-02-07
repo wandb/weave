@@ -12,7 +12,7 @@ import {
 import {useCallsForQuery} from '../../../CallsPage/callsTableQuery';
 import {useEvaluationsFilter} from '../../../CallsPage/evaluationsFilter';
 import {Id} from '../../../common/Id';
-import {opNiceName} from '../../../common/Links';
+import {opNiceName} from '../../../common/opNiceName';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {
   CallSchema,

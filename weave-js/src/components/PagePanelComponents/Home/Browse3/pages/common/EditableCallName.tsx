@@ -5,7 +5,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {StyledTextArea} from '../../StyledTextarea';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {opNiceName} from './Links';
+import {opNiceName} from './opNiceName';
 
 export const EditableCallName: React.FC<{
   call: CallSchema;

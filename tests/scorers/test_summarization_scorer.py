@@ -1,5 +1,5 @@
 import pytest
-from openai import OpenAI
+from pydantic import BaseModel
 
 import weave
 from weave.scorers import (
@@ -12,35 +12,44 @@ from weave.scorers.summarization_scorer import (
 
 
 @pytest.fixture
-def mock_create(monkeypatch):
-    def _mock_create(*args, **kwargs):
-        response_model = kwargs.get("response_model")
-        if response_model == EntityExtractionResponse:
-            return EntityExtractionResponse(entities=["entity1", "entity2"])
-        elif response_model == SummarizationEvaluationResponse:
-            return SummarizationEvaluationResponse(
-                think_step_by_step="This is some reasoning.",
-                summarization_evaluation="excellent",
+def summarization_scorer(monkeypatch):
+    async def _mock_acompletion(*args, **kwargs):
+        response_format = kwargs.get("response_format")
+        if response_format == EntityExtractionResponse:
+            content = '{"entities": ["entity1", "entity2"]}'
+        elif response_format == SummarizationEvaluationResponse:
+            content = (
+                '{"think_step_by_step": "This is some reasoning.", '
+                '"summarization_evaluation": "excellent"}'
             )
 
-    # Patch the 'create' function wherever it is called
-    monkeypatch.setattr("weave.scorers.summarization_scorer.create", _mock_create)
+        class Message(BaseModel):
+            content: str
 
+        class Choice(BaseModel):
+            message: Message
 
-@pytest.fixture
-def summarization_scorer(mock_create):
+        class Response(BaseModel):
+            choices: list[Choice]
+
+        return Response(choices=[Choice(message=Message(content=content))])
+
+    monkeypatch.setattr(
+        "weave.scorers.summarization_scorer.acompletion", _mock_acompletion
+    )
+
     return SummarizationScorer(
-        client=OpenAI(api_key="DUMMY_API_KEY"),
         model_id="gpt-4o",
         temperature=0.7,
         max_tokens=1024,
     )
 
 
-def test_summarization_scorer_evaluate_summary(summarization_scorer, mock_create):
+@pytest.mark.asyncio
+async def test_summarization_scorer_evaluate_summary(summarization_scorer):
     input_text = "This is the original text."
     summary_text = "This is the summary."
-    result = summarization_scorer.evaluate_summary(
+    result = await summarization_scorer._evaluate_summary(
         input=input_text, summary=summary_text
     )
     assert isinstance(result, SummarizationEvaluationResponse)
@@ -71,9 +80,10 @@ def test_summarization_scorer_initialization(summarization_scorer):
     assert summarization_scorer.max_tokens == 1024
 
 
-def test_summarization_scorer_extract_entities(summarization_scorer):
+@pytest.mark.asyncio
+async def test_summarization_scorer_extract_entities(summarization_scorer):
     text = "This is a sample text with entities."
-    entities = summarization_scorer.extract_entities(text)
+    entities = await summarization_scorer._extract_entities(text)
     assert isinstance(entities, list)
     assert len(entities) == 2
     assert "entity1" in entities
