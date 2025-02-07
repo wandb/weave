@@ -9,7 +9,7 @@ import styled from 'styled-components';
 import {MOON_250, MOON_500} from '../../../../../../common/css/color.styles';
 import {Icon, IconParentBackUp} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
-import {opNiceName} from '../common/Links';
+import {opNiceName} from '../common/opNiceName';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCostStats} from './cost/TraceCostStats';
