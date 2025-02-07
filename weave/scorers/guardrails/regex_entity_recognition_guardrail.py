@@ -4,8 +4,8 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel
 
 import weave
-from weave.flow.model import Model
 from weave import Scorer
+from weave.flow.model import Model
 from weave.scorers.utils import stringify
 
 DEFAULT_PATTERNS = {
@@ -127,34 +127,18 @@ class RegexEntityRecognitionGuardrail(Scorer):
         aggregate_redaction (bool): Whether to aggregate redactions.
     """
 
-    regex_model: RegexModel
-    patterns: dict[str, str] = {}
+    regex_model: Optional[RegexModel] = None
+    patterns: Optional[dict[str, str]] = None
     should_anonymize: bool = False
     custom_terms: Optional[list[str]] = None
     aggregate_redaction: bool = True
 
-    def __init__(
-        self,
-        should_anonymize: bool = False,
-        custom_terms: Optional[list[str]] = None,
-        aggregate_redaction: bool = True,
-        patterns: Optional[dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> None:
-        patterns = patterns.copy() if patterns else DEFAULT_PATTERNS
-        if kwargs.get("patterns"):
-            patterns.update(kwargs["patterns"])
-
-        # Create the RegexModel instance
-        regex_model = RegexModel(patterns=patterns)
-
-        # Initialize the base class with both the regex_model and patterns
-        super().__init__(
-            regex_model=regex_model,
-            patterns=patterns,
-            should_anonymize=should_anonymize,
-            custom_terms=custom_terms,
-            aggregate_redaction=aggregate_redaction,
+    def model_post_init(self, __context: Any) -> None:
+        self.patterns = DEFAULT_PATTERNS if self.patterns is None else self.patterns
+        self.regex_model = (
+            RegexModel(patterns=self.patterns)
+            if self.regex_model is None
+            else self.regex_model
         )
 
     def text_to_pattern(self, text: str) -> str:
@@ -213,7 +197,7 @@ class RegexEntityRecognitionGuardrail(Scorer):
         reasonings = self.get_reasonings(result)
         anonymized_text = self.get_anonymized_text(output, result)
         return RegexEntityRecognitionResponse(
-            flagged=result.passed,
+            flagged=not result.passed,
             detected_entities=result.matched_patterns,
             reason="\n".join(reasonings),
             anonymized_text=anonymized_text,

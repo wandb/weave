@@ -1,31 +1,23 @@
-import pytest
-
 from weave.scorers.guardrails.regex_entity_recognition_guardrail import (
     RegexEntityRecognitionGuardrail,
     RegexEntityRecognitionResponse,
 )
 
 
-@pytest.fixture
-def regex_entity_recognition_guardrail():
-    return RegexEntityRecognitionGuardrail(
+def test_regex_entity_recognition_guardrail():
+    result = RegexEntityRecognitionGuardrail(
         should_anonymize=True,
-        custom_patterns={
-            "employee_id": r"EMP\d{6}",
+        patterns={
+            "employee_id": r"EMP:\d{6}",
             "project_code": r"PRJ-[A-Z]{2}-\d{4}",
         },
-    )
-
-
-def test_regex_entity_recognition_guardrail(regex_entity_recognition_guardrail):
-    result = regex_entity_recognition_guardrail.score(
-        "EMP:123456 is assigned to PRJ-AB-1234."
-    )
+    ).score("EMP:123456 is assigned to PRJ-AB-1234.")
     # we should be able to do this validation
     _ = RegexEntityRecognitionResponse.model_validate(result)
 
-    assert result["flagged"] == False
-    assert (
-        result["anonymized_text"]
-        == "EMP:[redacted] is [redacted] to PRJ-AB-[redacted]."
-    )
+    assert result["flagged"] == True
+    assert result["detected_entities"] == {
+        "employee_id": ["EMP:123456"],
+        "project_code": ["PRJ-AB-1234"],
+    }
+    assert result["anonymized_text"] == "[redacted] is assigned to [redacted]."
