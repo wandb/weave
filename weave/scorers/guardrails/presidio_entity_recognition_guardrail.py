@@ -24,11 +24,6 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     by leveraging Presidio's AnalyzerEngine and AnonymizerEngine to perform these tasks.
 
     Attributes:
-        selected_entities (list[str]): A list of entity types to detect in the text.
-        should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
-        language (str): The language of the text to be analyzed.
-
-    Args:
         selected_entities (Optional[list[str]]): A list of entity types to detect in the text.
         should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
         language (str): The language of the text to be analyzed.
