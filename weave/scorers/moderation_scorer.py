@@ -168,22 +168,19 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    async def score(self, output: str) -> dict:
-        """
-        Score the output.
+    def score(self, output: str) -> dict[str, Any]:
+        # local scoring
+        passed: bool = True
+        predictions: list[float] = self.predict(output)
+        if (sum(predictions) >= self.total_threshold) or any(
+            o >= self.category_threshold for o in predictions
+        ):
+            passed = False
 
-        Args:
-            output: text to score, must be a string
-        """
-        check_score_param_type(output, str, "output", self)
-        response = await amoderation(
-            model=self.model_id,
-            input=output,
-        )
-        response = response.results[0]
-        categories = {k: v for k, v in response.categories.model_dump().items() if v}
-        return {"flagged": response.flagged, "categories": categories}
-
+        return {
+            "extras": dict(zip(self._categories, predictions)),
+            "pass": passed,
+        }
 
 BIAS_SCORER_THRESHOLD = 0.60
 
