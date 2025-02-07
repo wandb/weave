@@ -186,14 +186,14 @@ import TabItem from '@theme/TabItem';
 
     similarity_scorer = EmbeddingSimilarityScorer(
         model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
-        target_column="reference_text",  # the dataset column to compare the output against
         threshold=0.4  # the cosine similarity threshold
     )
     ```
 
+    Note: You can use `column_map` to map the `target` column to a different name.
+
     **Parameters:**
 
-    - `target`: This scorer expects a `target` column in your dataset. It calculates the cosine similarity of the embeddings of the `target` text to the AI system output. Use the `column_map` attribute if the column has a different name.
     - `threshold` (float): The minimum cosine similarity score (between -1 and 1) needed to consider the two texts similar (defaults to `0.5`).
 
     Here is an example usage in the context of an evaluation:
@@ -206,18 +206,17 @@ import TabItem from '@theme/TabItem';
     # Initialize scorer
     similarity_scorer = EmbeddingSimilarityScorer(
         model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
-        target_column="reference_text",
         threshold=0.7
     )
     # Create dataset
     dataset = [
         {
             "input": "He's name is John",
-            "reference": "John likes various types of cheese.",
+            "target": "John likes various types of cheese.",
         },
         {
             "input": "He's name is Pepe.",
-            "reference": "Pepe likes various types of cheese.",
+            "target": "Pepe likes various types of cheese.",
         },
     ]
     # Define model
