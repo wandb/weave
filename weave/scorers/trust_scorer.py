@@ -331,12 +331,12 @@ class WeaveTrustScorer(weave.Scorer):
             trust_level = "medium_advisory-issues-found"
 
         # Extract scores where available
-        scores = {
-            name: result["extras"]["score"]
-            for name, result in raw_results.items()
-            if "extras" in result and "score" in result["extras"]
-        }
-        scores["WeaveToxicityScorer"] = raw_results["WeaveToxicityScorer"]["extras"]
+        scores = {}
+        for name, result in raw_results.items():
+            if name == "WeaveToxicityScorer":
+                scores[name] = result.extras  # Toxicity returns category scores
+            elif hasattr(result, "extras") and "score" in result.extras:
+                scores[name] = result.extras["score"]
 
         return {
             "passed": passed,
