@@ -1,6 +1,4 @@
 import weave
-from weave.scorers.utils import WeaveScorerResult
-
 
 class HuggingFacePerplexityScorer(weave.Scorer):
     """A scorer that computes perplexity for Hugging Face outputs using log probabilities."""
@@ -44,4 +42,4 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         # Compute perplexity
         perplexity = torch.exp(torch.tensor(nll)).item()
 
-        return WeaveScorerResult(passed=True, extras={"perplexity": perplexity})
+        return {"perplexity": perplexity}
