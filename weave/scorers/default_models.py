@@ -1,6 +1,7 @@
 """Default model configurations for different LLM providers."""
 
 import os
+import Path
 
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -15,6 +16,12 @@ DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.7
 
 LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "weave_models")
+
+WEAVE_SCORERS_DIR = Path(
+    os.environ.get(
+        "WEAVE_SCORERS_DIR", str(Path.home() / ".cache" / "wandb" / "weave-scorers")
+    )
+)
 
 # Model paths for various scorers
 MODEL_PATHS = {

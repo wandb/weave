@@ -1,10 +1,11 @@
 import json
 from importlib.util import find_spec
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from weave.scorers.default_models import MODEL_PATHS
+from weave.scorers.default_models import MODEL_PATHS, WEAVE_SCORERS_DIR
 
 if TYPE_CHECKING:
     from torch import device
@@ -46,20 +47,23 @@ def set_device(device: str = "auto") -> "device":
             device = "cpu"
     return torch.device(device)
 
-
-def download_model(model_name_or_path: str, local_dir: str = "weave_models") -> str:
-    from wandb import Api
+def download_model(artifact_path: str) -> Path:
+    try:
+        from wandb import Api
+    except ImportError:
+        raise ImportError(
+            "The `wandb` package is required to download models, please run `pip install wandb`"
+        )
 
     api = Api()
     art = api.artifact(
         type="model",
-        name=model_name_or_path,
+        name=artifact_path,
     )
-    model_name = model_name_or_path.split("/")[-1].replace(":", "_")
-    local_model_path = f"{local_dir}/{model_name}"
+    model_name = artifact_path.split("/")[-1].replace(":", "_")
+    local_model_path = WEAVE_SCORERS_DIR / model_name
     art.download(local_model_path)
-    return local_model_path
-
+    return Path(local_model_path)
 
 def get_model_path(model_name: str) -> str:
     """Get the full model path for a scorer."""
