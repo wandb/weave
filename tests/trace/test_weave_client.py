@@ -530,6 +530,41 @@ def test_get_calls_limit_offset(client):
         assert call.inputs["a"] == 7 + i
 
 
+def test_get_calls_by_op_version_alias(client):
+    @weave.op
+    def my_op(x):
+        return x
+
+    ref = weave.publish(my_op, "my-op")
+
+    my_op(1)
+
+    @weave.op
+    def my_op(x):
+        return x + 1
+
+    ref2 = weave.publish(my_op, "my-op")
+    my_op(2)
+
+    calls = client.get_calls(filter={"op_names": [ref.uri()]})
+    assert len(calls) == 1
+
+    def make_ref_with_alias(ref, version):
+        return ":".join(ref.uri().split(":")[:-1]) + f":{version}"
+
+    # with version alias
+    ref_with_alias = make_ref_with_alias(ref, "v0")
+    print(f"{ref_with_alias}")
+    calls = client.get_calls(filter={"op_names": [ref_with_alias]})
+    assert len(calls) == 1
+
+    # ref with 'latest' alias
+    ref_with_latest = make_ref_with_alias(ref, "latest")
+    print(f"{ref_with_latest}")
+    calls = client.get_calls(filter={"op_names": [ref_with_latest]})
+    assert len(calls) == 1
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
