@@ -27,6 +27,7 @@ const SidebarWrapper = styled.div`
     display: flex;
     align-items: center;
   }
+  cursor: pointer;
 `;
 SidebarWrapper.displayName = 'S.SidebarWrapper';
 
@@ -109,6 +110,27 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}
             />
+          );
+        }
+
+        if (item.onClick) {
+          return (
+            <SidebarWrapper
+              key={item.name}
+              className="night-aware"
+              onClick={item.onClick}
+              data-test={item.slug + '-tab'}>
+              <SidebarButton>
+                <ItemIcon color={colorIconBg}>
+                  <Icon
+                    name={item.iconName}
+                    color={colorIcon}
+                    role="presentation"
+                  />
+                </ItemIcon>
+                <ItemLabel color={colorText}>{item.name}</ItemLabel>
+              </SidebarButton>
+            </SidebarWrapper>
           );
         }
 
