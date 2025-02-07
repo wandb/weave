@@ -1222,6 +1222,23 @@ body .ui.selection.dropdown .menu {
   display: none;
 }
 
+// This is CSS weirdness to hide the Intercom launcher and just use our button.
+//
+// -- First line (.intercom-lightweight-app)
+// Hides the intercom lightweight app.
+// This is the loader which is displayed before the widget is actively loaded by the user.
+// Looks the same as the full button but is just for display until the user clicks it.
+//
+// -- Second line (w/ positions)
+// Targets the second child of the intercom-container when the modal isn't open.
+// Detect modal isn't open by checking if the fourth child exists.
+// The button container has a generated class name which is why we're relying on position.
+.intercom-lightweight-app,
+.intercom-app:not(:has(> *:nth-child(4))) > *:nth-child(2) {
+  display: none;
+}
+
+
 /*******************
   end of Base.less
 *******************/
