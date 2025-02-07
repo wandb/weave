@@ -11,6 +11,7 @@ from weave.scorers.utils import (
     MODEL_PATHS,
     download_model,
     check_score_param_type,
+    ScorerResult,
 )
 
 if TYPE_CHECKING:
@@ -168,7 +169,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str) -> dict[str, Any]:
+    def score(self, output: str) -> ScorerResult:
         # local scoring
         passed: bool = True
         predictions: list[float] = self.predict(output)
@@ -177,10 +178,10 @@ class WeaveToxicityScorer(RollingWindowScorer):
         ):
             passed = False
 
-        return {
-            "extras": dict(zip(self._categories, predictions)),
-            "pass": passed,
-        }
+        return ScorerResult(
+            extras=dict(zip(self._categories, predictions)),
+            passed=passed,
+        )
 
 BIAS_SCORER_THRESHOLD = 0.60
 
@@ -266,7 +267,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str) -> dict[str, Any]:
+    def score(self, output: str) -> ScorerResult:
         """
         Score the output.
 
@@ -283,7 +284,7 @@ class WeaveBiasScorer(RollingWindowScorer):
             base_name = category.lower()
             categories[f"{base_name}_score"] = float(pred)
             categories[base_name] = score
-        return {
-            "extras": categories,
-            "pass": not any(scores),
-        }
+        return ScorerResult(
+            extras=categories,
+            passed=not any(scores),
+        )

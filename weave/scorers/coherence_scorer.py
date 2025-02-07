@@ -3,7 +3,13 @@ from typing import Any, Optional, Union
 
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights, ensure_hf_imports, check_score_param_type
+from weave.scorers.utils import (
+    MODEL_PATHS,
+    load_hf_model_weights,
+    ensure_hf_imports,
+    check_score_param_type,
+    ScorerResult,
+)
 
 
 class WeaveCoherenceScorer(HuggingFacePipelineScorer):
@@ -45,7 +51,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         )
 
     @weave.op
-    def score_messages(self, prompt: str, output: str) -> dict[str, Any]:
+    def score_messages(self, prompt: str, output: str) -> ScorerResult:
         """Score a prompt response pair."""
         assert self._pipeline is not None
         coherence_output = self._pipeline(inputs={"text": prompt, "text_pair": output})
@@ -53,14 +59,14 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         if "incoherent" in coherence_output["label"].lower():
             passed = False
 
-        return {
-            "pass": passed,
-            "extras": {
+        return ScorerResult(
+            passed=passed,
+            extras={
                 "coherence_label": coherence_output["label"],
                 "coherence_id": self._label2id[coherence_output["label"]],
                 "score": coherence_output["score"],
             },
-        }
+        )
 
     def _format_chat_history(self, chat_history: list[dict[str, str]]) -> str:
         """Format the chat history for the prompt."""
@@ -79,7 +85,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         output: str,
         chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[Union[str, list[str]]] = None,
-    ) -> dict[str, Any]:
+    ) -> ScorerResult:
         """
         Score the Coherence of the query and output.
 

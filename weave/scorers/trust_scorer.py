@@ -26,7 +26,7 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
-from weave.scorers.utils import check_score_param_type
+from weave.scorers.utils import check_score_param_type, ScorerResult
 
 
 class WeaveTrustScorerError(Exception):
@@ -36,11 +36,13 @@ class WeaveTrustScorerError(Exception):
 class WeaveTrustScorer(weave.Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.
 
-    For best performance run this Scorer on a GPU. The model weigths for 5 small language models
+    For best performance run this Scorer on a GPU. The model weights for 5 small language models
     will be downloaded automatically from W&B Artifacts when this Scorer is initialized.
 
     The TrustScorer evaluates the trustworthiness of model outputs by combining multiple
     specialized scorers into two categories.
+
+    Note: This scorer is suited for RAG pipelines. It requires query, context and output keys to score correctly.
 
     1. Critical Scorers (automatic failure if pass is False):
         - WeaveToxicityScorer: Detects harmful, offensive, or inappropriate content
@@ -348,7 +350,7 @@ class WeaveTrustScorer(weave.Scorer):
         query: str,
         context: Union[str, list[str]],
         output: str,  # Pass the output of a LLM to this parameter for example
-    ) -> dict[str, Any]:
+    ) -> ScorerResult:
         """
         Score the query, context and output against 5 different scorers.
 
@@ -361,13 +363,13 @@ class WeaveTrustScorer(weave.Scorer):
         check_score_param_type(context, (str, list), "context", self)
         check_score_param_type(output, str, "output", self)
         result = self._score_with_logic(query=query, context=context, output=output)
-        return {
-            "pass": result["pass"],
-            "extras": {
+        return ScorerResult(
+            passed=result["pass"],
+            extras={
                 "trust_level": result["trust_level"],
                 "critical_issues": result["critical_issues"],
                 "advisory_issues": result["advisory_issues"],
                 "raw_outputs": result["extras"]["raw_outputs"],
                 "scores": result["extras"]["scores"],
             },
-        }
+        )

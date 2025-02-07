@@ -5,7 +5,8 @@ from weave.scorers.utils import (
     ensure_hf_imports,
     load_hf_model_weights,
     set_device,
-    check_score_param_type
+    check_score_param_type,
+    ScorerResult,
 )
 
 FLUENCY_SCORER_THRESHOLD = 0.5
@@ -57,7 +58,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
         )
 
     @weave.op
-    def score(self, output: str):
+    def score(self, output: str) -> ScorerResult:
         """
         Score the fluency of the text.
 
@@ -70,4 +71,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
             pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
         )
         passed = fluency_score >= self.threshold
-        return {"pass": passed, "extras": {"score": fluency_score}}
+        return ScorerResult(
+            passed=passed,
+            extras={"score": fluency_score},
+        )

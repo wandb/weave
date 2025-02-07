@@ -2,12 +2,20 @@ import json
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weave.scorers.default_models import MODEL_PATHS
 
 if TYPE_CHECKING:
     from torch import device
+
+class ScorerResult(BaseModel):
+    """The result of a weave.Scorer.score method."""
+    passed: bool = Field(description="Whether the scorer passed or not")
+    extras: dict[str, Any] = Field(description="Any extra information from the scorer like numerical scores, model outputs, etc.")
+
+    class Config:
+        extra = "allow"
 
 
 def set_device(device: str = "auto") -> "device":
