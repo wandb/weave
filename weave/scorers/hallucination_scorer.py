@@ -235,16 +235,15 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
 
-        if self.model is None:
-            self._local_model_path = load_hf_model_weights(
-                self.model_name_or_path, MODEL_PATHS["hallucination_hhem_scorer"]
-            )
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                self._local_model_path,
-                torch_dtype="bfloat16",
-                trust_remote_code=True,
-                device_map=self.device,
-            )
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["hallucination_hhem_scorer"]
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self._local_model_path,
+            torch_dtype="bfloat16",
+            trust_remote_code=True,
+            device_map=self.device,
+        )
         self.model.eval()
 
     def load_tokenizer(self) -> None:

@@ -8,11 +8,8 @@ from weave.scorers.utils import download_model
 @pytest.fixture
 def weave_bias_scorer():
     """Fixture that returns a WeaveBiasScorer instance using a tiny downloaded model."""
-    tiny_model_path = download_model(TINY_MODEL_PATHS["bias_scorer"])
     return WeaveBiasScorer(
-        model_name_or_path=tiny_model_path,
-        name="test-bias",
-        description="Tiny test bias scorer",
+        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"],
         device="cpu",  # Use CPU for testing
         threshold=0.5,
     )

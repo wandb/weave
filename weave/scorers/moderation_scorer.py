@@ -11,7 +11,8 @@ from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
     check_score_param_type,
-    download_model,
+    load_hf_model_weights,
+    ensure_hf_imports
 )
 
 if TYPE_CHECKING:
@@ -121,20 +122,11 @@ class WeaveToxicityScorer(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        try:
-            from transformers import AutoModelForSequenceClassification
-        except ImportError:
-            print(
-                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
-        """Initialize the toxicity model and tokenizer."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
-
+        ensure_hf_imports()
+        from transformers import AutoModelForSequenceClassification
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
+        )
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
@@ -230,21 +222,11 @@ class WeaveBiasScorer(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        try:
-            from transformers import AutoModelForSequenceClassification
-        except ImportError:
-            print(
-                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
-
-        """Initialize the bias model and tokenizer."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["bias_scorer"])
-
+        ensure_hf_imports()
+        from transformers import AutoModelForSequenceClassification
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["bias_scorer"]
+        )
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )

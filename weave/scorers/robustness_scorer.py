@@ -9,7 +9,7 @@ import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, check_score_param_type, download_model
+from weave.scorers.utils import MODEL_PATHS, check_score_param_type, load_hf_model_weights, ensure_hf_imports
 
 
 class WeaveRobustnessScorer(HuggingFaceScorer):
@@ -57,25 +57,11 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
     embedding_model: Optional[Any] = None
 
     def load_model(self) -> None:
-        try:
-            if find_spec("sentence_transformers") is None:
-                raise ImportError("sentence_transformers is required but not installed")
-            from sentence_transformers import SentenceTransformer
-        except ImportError:
-            print(
-                "The `sentence_transformers` package is required to use the RobustnessScorer, please run `pip install sentence-transformers`"
-            )
-        """Initialize the model, tokenizer and device after pydantic initialization."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["embedding_model"])
-        assert (
-            self._local_model_path
-        ), "model_name_or_path local path or artifact path not found"
-
+        ensure_hf_imports()
+        from sentence_transformers import SentenceTransformer
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["embedding_model"]
+        )
         self.embedding_model = SentenceTransformer(self._local_model_path)
 
     def load_tokenizer(self) -> None:
