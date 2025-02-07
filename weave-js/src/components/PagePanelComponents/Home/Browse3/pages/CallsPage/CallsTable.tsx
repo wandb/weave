@@ -562,11 +562,17 @@ export const CallsTable: FC<{
     });
   }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
+  // Store selection as a keyed object so that updating one row only changes one key.
+  const [selectedCallsMap, setSelectedCallsMap] = useState<
+    Record<string, boolean>
+  >({});
+  // Create a derived array of selected call IDs when needed (e.g. for bulk actions)
+  const selectedCallsArray = useMemo(
+    () => Object.keys(selectedCallsMap).filter(key => selectedCallsMap[key]),
+    [selectedCallsMap]
+  );
+
   // Selection Management
-  const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
-  const clearSelectedCalls = useCallback(() => {
-    setSelectedCalls([]);
-  }, [setSelectedCalls]);
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -579,26 +585,31 @@ export const CallsTable: FC<{
         disableExport: true,
         display: 'flex',
         renderHeader: (params: any) => {
+          const selectedCount = Object.keys(selectedCallsMap).filter(
+            key => selectedCallsMap[key]
+          ).length;
           return (
             <Checkbox
               size="small"
               checked={
-                selectedCalls.length === 0
+                selectedCount === 0
                   ? false
-                  : selectedCalls.length === tableData.length
+                  : selectedCount === tableData.length
                   ? true
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                if (
-                  selectedCalls.length ===
-                  Math.min(tableData.length, MAX_SELECT)
-                ) {
-                  setSelectedCalls([]);
+                if (selectedCount === Math.min(tableData.length, MAX_SELECT)) {
+                  setSelectedCallsMap({});
                 } else {
-                  setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, MAX_SELECT)
-                  );
+                  const newMap = tableData
+                    .map(row => row.id)
+                    .slice(0, MAX_SELECT)
+                    .reduce((acc, id) => {
+                      acc[id] = true;
+                      return acc;
+                    }, {} as Record<string, boolean>);
+                  setSelectedCallsMap(newMap);
                 }
               }}
             />
@@ -606,42 +617,34 @@ export const CallsTable: FC<{
         },
         renderCell: (params: any) => {
           const rowId = params.id as string;
-          const isSelected = selectedCalls.includes(rowId);
-          const disabled = !isSelected && selectedCalls.length >= MAX_SELECT;
-          const tooltipText =
-            selectedCalls.length >= MAX_SELECT && !isSelected
-              ? `Selection limited to ${MAX_SELECT} items`
-              : '';
-
+          const isSelected = selectedCallsMap[rowId] ?? false;
+          const selectedCount = Object.keys(selectedCallsMap).filter(
+            key => selectedCallsMap[key]
+          ).length;
+          const disabled = !isSelected && selectedCount >= MAX_SELECT;
+          const tooltipText = disabled
+            ? `Selection limited to ${MAX_SELECT} items`
+            : '';
           return (
-            <Tooltip title={tooltipText} placement="right" arrow>
-              {/* https://mui.com/material-ui/react-tooltip/ */}
-              {/* By default disabled elements like <button> do not trigger user interactions */}
-              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
-              <span>
-                <Checkbox
-                  size="small"
-                  disabled={disabled}
-                  checked={isSelected}
-                  onCheckedChange={() => {
-                    if (isSelected) {
-                      setSelectedCalls(
-                        selectedCalls.filter(id => id !== rowId)
-                      );
-                    } else {
-                      setSelectedCalls([...selectedCalls, rowId]);
-                    }
-                  }}
-                />
-              </span>
-            </Tooltip>
+            <CallCheckboxCell
+              rowId={rowId}
+              isSelected={isSelected}
+              disabled={disabled}
+              tooltipText={tooltipText}
+              onToggle={() => {
+                setSelectedCallsMap(prev => ({
+                  ...prev,
+                  [rowId]: !prev[rowId],
+                }));
+              }}
+            />
           );
         },
       },
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCallsMap, tableData]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -751,8 +754,10 @@ export const CallsTable: FC<{
               filterModel={filterModel}
               columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}
-              selectedCalls={selectedCalls}
-              clearSelectedCalls={clearSelectedCalls}
+              selectedCalls={selectedCallsArray}
+              clearSelectedCalls={() => {
+                setSelectedCallsMap({});
+              }}
             />
           )}
           <div className="flex items-center gap-6">
@@ -811,38 +816,38 @@ export const CallsTable: FC<{
                   router.compareEvaluationsUri(
                     entity,
                     project,
-                    selectedCalls,
+                    selectedCallsArray,
                     null
                   )
                 );
               }}
-              disabled={selectedCalls.length === 0}
+              disabled={selectedCallsArray.length === 0}
             />
           ) : (
             <CompareTracesTableButton
               onClick={() => {
                 history.push(
-                  router.compareCallsUri(entity, project, selectedCalls)
+                  router.compareCallsUri(entity, project, selectedCallsArray)
                 );
               }}
-              disabled={selectedCalls.length < 2}
+              disabled={selectedCallsArray.length < 2}
             />
           )}
-          {!isReadonly && selectedCalls.length !== 0 && (
+          {!isReadonly && selectedCallsArray.length !== 0 && (
             <>
               <div className="flex-none">
                 <BulkDeleteButton
                   onClick={() => setDeleteConfirmModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
+                  disabled={selectedCallsArray.length === 0}
                 />
                 <ConfirmDeleteModal
                   calls={tableData
-                    .filter(row => selectedCalls.includes(row.id))
+                    .filter(row => selectedCallsMap[row.id])
                     .map(traceCallToUICallSchema)}
                   confirmDelete={deleteConfirmModalOpen}
                   setConfirmDelete={setDeleteConfirmModalOpen}
                   onDeleteCallback={() => {
-                    setSelectedCalls([]);
+                    setSelectedCallsMap({});
                   }}
                 />
               </div>
@@ -852,7 +857,7 @@ export const CallsTable: FC<{
 
           <div className="flex-none">
             <ExportSelector
-              selectedCalls={selectedCalls}
+              selectedCalls={selectedCallsArray}
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
@@ -1158,3 +1163,37 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
+
+const CallCheckboxCell = React.memo(
+  function CallCheckboxCell({
+    rowId,
+    isSelected,
+    disabled,
+    tooltipText,
+    onToggle,
+  }: {
+    rowId: string;
+    isSelected: boolean;
+    disabled: boolean;
+    tooltipText: string;
+    onToggle: () => void;
+  }) {
+    console.log('CallCheckboxCell', {rowId, isSelected, disabled, tooltipText});
+    return (
+      <Tooltip title={tooltipText} placement="right" arrow>
+        <span>
+          <Checkbox
+            size="small"
+            disabled={disabled}
+            checked={isSelected}
+            onCheckedChange={onToggle}
+          />
+        </span>
+      </Tooltip>
+    );
+  },
+  (prevProps, nextProps) =>
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.tooltipText === nextProps.tooltipText
+);
