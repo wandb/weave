@@ -4,6 +4,8 @@ import sys
 import time
 import timeit
 
+import pytest
+
 import weave
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
@@ -160,43 +162,43 @@ def speed_test(client, count=5):
     return wait_time_s, queue_time_s
 
 
-# def test_client_parallelism_setting(client_creator):
-#     with client_creator() as client:
-#         assert client.future_executor._max_workers == None
-#         assert client.future_executor._executor._max_workers > 0
+def test_client_parallelism_setting(client_creator):
+    with client_creator() as client:
+        assert client.future_executor._max_workers == None
+        assert client.future_executor._executor._max_workers > 0
 
-#     parse_and_apply_settings(UserSettings(client_parallelism=0))
-#     with client_creator() as client:
-#         assert client.future_executor._max_workers == 0
-#         assert client.future_executor._executor == None
-#         wait_time_0, queue_time_0 = speed_test(client)
+    parse_and_apply_settings(UserSettings(client_parallelism=0))
+    with client_creator() as client:
+        assert client.future_executor._max_workers == 0
+        assert client.future_executor._executor == None
+        wait_time_0, queue_time_0 = speed_test(client)
 
-#     parse_and_apply_settings(UserSettings(client_parallelism=1))
-#     with client_creator() as client:
-#         assert client.future_executor._max_workers == 1
-#         assert client.future_executor._executor._max_workers == 1
-#         wait_time_1, queue_time_1 = speed_test(client)
+    parse_and_apply_settings(UserSettings(client_parallelism=1))
+    with client_creator() as client:
+        assert client.future_executor._max_workers == 1
+        assert client.future_executor._executor._max_workers == 1
+        wait_time_1, queue_time_1 = speed_test(client)
 
-#     # Assert that the queue time is much less for 1 than 0
-#     assert queue_time_0 > queue_time_1
-#     # Assert that the total time is about the same
-#     assert wait_time_0 + queue_time_0 == pytest.approx(
-#         wait_time_1 + queue_time_1, abs=0.1
-#     )
+    # Assert that the queue time is much less for 1 than 0
+    assert queue_time_0 > queue_time_1
+    # Assert that the total time is about the same
+    assert wait_time_0 + queue_time_0 == pytest.approx(
+        wait_time_1 + queue_time_1, abs=0.1
+    )
 
-#     parse_and_apply_settings(UserSettings(client_parallelism=10))
-#     with client_creator() as client:
-#         assert client.future_executor._max_workers == 10
-#         assert client.future_executor._executor._max_workers == 10
-#         wait_time_10, queue_time_10 = speed_test(client)
+    parse_and_apply_settings(UserSettings(client_parallelism=10))
+    with client_creator() as client:
+        assert client.future_executor._max_workers == 10
+        assert client.future_executor._executor._max_workers == 10
+        wait_time_10, queue_time_10 = speed_test(client)
 
-#     # Assert that the queue time is about the same for 10 and 1
-#     assert queue_time_1 == pytest.approx(queue_time_10, abs=0.1)
-#     # Assert that the wait time is much less for 10 than 1
-#     assert wait_time_1 > wait_time_10
+    # Assert that the queue time is about the same for 10 and 1
+    assert queue_time_1 == pytest.approx(queue_time_10, abs=0.1)
+    # Assert that the wait time is much less for 10 than 1
+    assert wait_time_1 > wait_time_10
 
-#     # Test explicit None
-#     parse_and_apply_settings(UserSettings(client_parallelism=None))
-#     with client_creator() as client:
-#         assert client.future_executor._max_workers == None
-#         assert client.future_executor._executor._max_workers > 0
+    # Test explicit None
+    parse_and_apply_settings(UserSettings(client_parallelism=None))
+    with client_creator() as client:
+        assert client.future_executor._max_workers == None
+        assert client.future_executor._executor._max_workers > 0
