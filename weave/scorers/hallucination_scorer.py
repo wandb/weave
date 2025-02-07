@@ -244,7 +244,7 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
                 trust_remote_code=True,
                 device_map=self.device,
             )
-            self._tokenizer = self.model.tokenzier
+            self._tokenizer = self.model.tokenzier  # Deliberately misspelled "tokenzier", from original model
             self._tokenizer.model_max_length = self.model_max_length
 
         self.model.eval()
