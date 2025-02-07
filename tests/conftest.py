@@ -519,7 +519,7 @@ def create_client(
         )
     elif weave_server_flag.startswith("http"):
         remote_server = stainless_http_trace_server.StainlessHTTPTraceServer(
-            weave_server_flag,
+            weave_server_flag, username="shawn", password="x" * 40
         )
         server = remote_server
     elif weave_server_flag == ("prod"):
@@ -612,7 +612,7 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = post
 
         remote_client = stainless_http_trace_server.StainlessHTTPTraceServer(
-            trace_server_url="http://www.wandb.ai"
+            trace_server_url="", username="shawn", password="x" * 40
         )
         yield (client, remote_client, records)
 
