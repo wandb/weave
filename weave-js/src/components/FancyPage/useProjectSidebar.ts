@@ -42,10 +42,10 @@ export const useProjectSidebar = (
 
   return useMemo(() => {
     const weaveOnlyMenu = [
+      'weave/scorers',
       'weave/leaderboards',
       'weave/operations',
       'weave/objects',
-      'weave/scorers',
     ];
     if (isWandbAdmin) {
       weaveOnlyMenu.push('weave/mods');
