@@ -126,7 +126,6 @@ def init_weave(
     # moved to InitializedClient.__init__
     autopatch.autopatch(autopatch_settings)
 
-
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
         from weave.trace.pii_redaction import track_pii_redaction_enabled
