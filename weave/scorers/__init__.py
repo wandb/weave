@@ -12,7 +12,11 @@ from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llm_scorer import (
     LLMScorer,
 )
-from weave.scorers.moderation_scorer import OpenAIModerationScorer
+from weave.scorers.moderation_scorer import (
+    OpenAIModerationScorer,
+    WeaveBiasScorer,
+    WeaveToxicityScorer,
+)
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
@@ -46,5 +50,7 @@ __all__ = [
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
+    "WeaveBiasScorer",
+    "WeaveToxicityScorer",
     "_validate_scorer_signature",
 ]
