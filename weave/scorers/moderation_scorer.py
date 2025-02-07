@@ -10,6 +10,7 @@ from weave.scorers.llm_scorer import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     download_model,
+    check_score_param_type,
 )
 
 if TYPE_CHECKING:
@@ -23,6 +24,8 @@ class OpenAIModerationScorer(weave.Scorer):
     This scorer sends the provided output to the OpenAI moderation API and returns a structured response
     indicating whether the output contains unsafe content.
 
+    Note: Pass the text to be scored to this Scorer's `output` parameter in the `score` method.
+
     Attributes:
         model_id (str): The OpenAI moderation model identifier to be used. Defaults to `OPENAI_DEFAULT_MODERATION_MODEL`.
     """
@@ -30,7 +33,14 @@ class OpenAIModerationScorer(weave.Scorer):
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
 
     @weave.op
-    async def score(self, output: Any) -> dict:
+    async def score(self, output: str) -> dict:
+        """
+        Score the given text against the OpenAI moderation API.
+
+        Args:
+            output: text to check for moderation, must be a string
+        """
+        check_score_param_type(output, str, "output", self)
         response = await amoderation(
             model=self.model_id,
             input=output,
@@ -70,6 +80,8 @@ class WeaveToxicityScorer(RollingWindowScorer):
         device (str): The device to use for inference. Defaults to `"cuda"` if available, otherwise `"cpu"`.
         max_tokens (int): Maximum number of tokens per window. Defaults to `512`.
         overlap (int): Number of overlapping tokens between windows. Defaults to `50`.
+
+    Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
         dict[str, Any]: A dictionary containing the `categories` with their respective scores and a `flagged` boolean.
@@ -156,7 +168,14 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    async def score(self, output: Any) -> dict:
+    async def score(self, output: str) -> dict:
+        """
+        Score the output.
+
+        Args:
+            output: text to score, must be a string
+        """
+        check_score_param_type(output, str, "output", self)
         response = await amoderation(
             model=self.model_id,
             input=output,
@@ -171,7 +190,6 @@ BIAS_SCORER_THRESHOLD = 0.60
 
 class WeaveBiasScorer(RollingWindowScorer):
     """
-
     The scorer that assesses gender and race/origin bias using a fine-tuned
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
 
@@ -185,6 +203,8 @@ class WeaveBiasScorer(RollingWindowScorer):
         device (str): The device to use for inference. Defaults to `None`, which will use `cuda` if available.
         threshold (float): The threshold for the bias score to flag the input. Defaults to `0.5`.
         pipeline_kwargs (dict[str, Any]): Additional keyword arguments for the pipeline. Defaults to `{"top_k": 2}`.
+
+    Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
         dict[str, Any]: A dictionary indicating whether each bias category is detected.
@@ -249,8 +269,17 @@ class WeaveBiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, text: str, output: Any) -> dict[str, Any]:
-        predictions = self.predict(text)
+    def score(self, output: str) -> dict[str, Any]:
+        """
+        Score the output.
+
+        Args:
+            output: text to score, must be a string
+
+        Returns:
+        """
+        check_score_param_type(output, str, "output", self)
+        predictions = self.predict(output)
         scores = [o >= self.threshold for o in predictions]
         categories = {}
         for category, pred, score in zip(self._categories, predictions, scores):

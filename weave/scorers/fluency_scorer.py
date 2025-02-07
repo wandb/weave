@@ -5,6 +5,7 @@ from weave.scorers.utils import (
     ensure_hf_imports,
     load_hf_model_weights,
     set_device,
+    check_score_param_type
 )
 
 FLUENCY_SCORER_THRESHOLD = 0.5
@@ -18,6 +19,8 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     Args:
         threshold (float): The threshold for the non-fluent score. Defaults to 0.5.
         device (str): The device to use for inference. Defaults to "auto".
+
+    Note: This Scorer's `score` method expects the text to be passed as a string to its `output` parameter.
 
     Example:
         >>> from weave.scorers.fluency_scorer import WeaveFluencyScorer
@@ -55,6 +58,13 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
 
     @weave.op
     def score(self, output: str):
+        """
+        Score the fluency of the text.
+
+        Args:
+            output: str, The text to score, must be a string
+        """
+        check_score_param_type(output, str, "output", self)
         pipeline_output = self._pipeline(output)[0]
         fluency_score = next(
             pred["score"] for pred in pipeline_output if pred["label"] == "fluent"

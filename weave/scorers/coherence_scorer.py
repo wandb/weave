@@ -1,9 +1,9 @@
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
-from weave.scorers.utils import MODEL_PATHS, download_model
+from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights, ensure_hf_imports, check_score_param_type
 
 
 class WeaveCoherenceScorer(HuggingFacePipelineScorer):
@@ -30,15 +30,12 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
 
     def _load_pipeline(self) -> None:
         # Lazy import of transformers
+        ensure_hf_imports()
         from transformers import pipeline
 
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["coherence_scorer"])
-
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["coherence_scorer"]
+        )
         self._pipeline = pipeline(
             task=self.task,
             model=self._local_model_path,
@@ -70,9 +67,9 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         formatted_chat_history = ""
         for turn in chat_history:
             if turn["role"] == "user":
-                formatted_chat_history += f"{turn['text']}\n<extra_id_1>Assistant\n"
+                formatted_chat_history += f"{turn['content']}\n<extra_id_1>Assistant\n"
             else:
-                formatted_chat_history += f"{turn['text']}\n<extra_id_1>User\n"
+                formatted_chat_history += f"{turn['content']}\n<extra_id_1>User\n"
         return formatted_chat_history
 
     @weave.op
@@ -81,12 +78,27 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         query: str,
         output: str,
         chat_history: Optional[list[dict[str, str]]] = None,
-        context: Optional[str] = None,
+        context: Optional[Union[str, list[str]]] = None,
     ) -> dict[str, Any]:
+        """
+        Score the Coherence of the query and output.
+
+        Args:
+            query: text to score, must be a string
+            output: text to score, must be a string
+            chat_history: [optional] chat history to score, must be a list of dictionaries with keys `role` and `content`
+            context: [optional] context to score, must be a string
+        """
+        check_score_param_type(output, str, "output", self)
+        check_score_param_type(query, str, "query", self)
         prompt = query
-        if chat_history is not None:
+        if chat_history:
+            check_score_param_type(chat_history, list, "chat_history", self)
             history = self._format_chat_history(chat_history)
             prompt = f"{history}{query}"
-        if context is not None:
+        if context:
+            check_score_param_type(context, (list, str), "context", self)
+            if isinstance(context, list):
+                context = "\n\n".join(context)
             prompt = f"{query}\n\n{context}"
         return self.score_messages(prompt, output)
