@@ -119,6 +119,8 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
               key={item.name}
               className="night-aware"
               onClick={item.onClick}
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
               data-test={item.slug + '-tab'}>
               <SidebarButton>
                 <ItemIcon color={colorIconBg}>
