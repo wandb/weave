@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,7 @@ from weave.scorers.guardrails.prompts import (
     PRIVILEGE_ESCALATION_USER_PROMPT,
 )
 from weave.scorers.llm_utils import OPENAI_DEFAULT_MODEL
+from weave.scorers.utils import stringify
 
 
 class PrivilegeEscalationGuardrailResponse(BaseModel):
@@ -35,7 +36,6 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = 0.0
     max_tokens: int = 1024
-    _client: Union["Instructor", None] = None
 
     def model_post_init(self, __context: Any) -> None:
         import instructor
@@ -44,14 +44,12 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
         self._client = instructor.from_litellm(completion)
 
     @weave.op
-    def score(self, output: str) -> PrivilegeEscalationGuardrailResponse:
-        import litellm
-        from litellm import completion
+    async def score(self, output: str) -> PrivilegeEscalationGuardrailResponse:
+        from litellm import acompletion
 
-        litellm.enable_json_schema_validation = True
-
+        output = stringify(output)
         response = (
-            completion(
+            acompletion(
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {
@@ -69,5 +67,5 @@ class PrivilegeEscalationLLMGuardrail(Scorer):
             .choices[0]
             .message.content
         )
-
-        return PrivilegeEscalationGuardrailResponse.model_validate_json(response)
+        response = PrivilegeEscalationGuardrailResponse.model_validate_json(response)
+        return response
