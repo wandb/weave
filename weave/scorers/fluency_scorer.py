@@ -66,7 +66,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
             output: str, The text to score, must be a string
         """
         check_score_param_type(output, str, "output", self)
-        pipeline_output = self._pipeline(output)[0]
+        pipeline_output = self._pipeline(output)[0]  # type: ignore
         fluency_score = next(
             pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
         )

@@ -1,6 +1,6 @@
 import json
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -100,7 +100,9 @@ def ensure_hf_imports() -> None:
         )
 
 
-def load_hf_model_weights(model_name_or_path: str, default_model: str = None) -> str:
+def load_hf_model_weights(
+    model_name_or_path: str, default_model: Optional[str] = None
+) -> str:
     """Load the local model weights for a Hugging Face model.
 
     If model_name_or_path is a directory, it is assumed to be the local model weights path.
