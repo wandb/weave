@@ -2,7 +2,6 @@ import pytest
 
 from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 from weave.scorers.moderation_scorer import WeaveBiasScorer
-from weave.scorers.utils import download_model
 
 
 @pytest.fixture

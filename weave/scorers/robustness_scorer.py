@@ -1,15 +1,18 @@
 import math
-import os
 import random
 import string
-from importlib.util import find_spec
 from typing import Any, Optional, Union
 
 import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, check_score_param_type, load_hf_model_weights, ensure_hf_imports
+from weave.scorers.utils import (
+    MODEL_PATHS,
+    check_score_param_type,
+    ensure_hf_imports,
+    load_hf_model_weights,
+)
 
 
 class WeaveRobustnessScorer(HuggingFaceScorer):
@@ -59,6 +62,7 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
     def load_model(self) -> None:
         ensure_hf_imports()
         from sentence_transformers import SentenceTransformer
+
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["embedding_model"]
         )

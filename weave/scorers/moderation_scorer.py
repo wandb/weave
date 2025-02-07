@@ -1,4 +1,3 @@
-import os
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
@@ -11,8 +10,8 @@ from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
     check_score_param_type,
+    ensure_hf_imports,
     load_hf_model_weights,
-    ensure_hf_imports
 )
 
 if TYPE_CHECKING:
@@ -55,9 +54,7 @@ class OpenAIModerationScorer(weave.Scorer):
             for k, v in response.categories
             if v and ("/" not in k and "-" not in k)
         }
-        return WeaveScorerResult(
-            passed=passed, extras={"categories": categories}
-        )
+        return WeaveScorerResult(passed=passed, extras={"categories": categories})
 
 
 TOXICITY_CATEGORY_THRESHOLD = 2
@@ -124,6 +121,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
     def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
+
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
@@ -224,6 +222,7 @@ class WeaveBiasScorer(RollingWindowScorer):
     def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
+
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )

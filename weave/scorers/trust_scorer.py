@@ -32,6 +32,10 @@ from weave.scorers.utils import WeaveScorerResult, check_score_param_type
 class WeaveTrustScorerError(Exception):
     """Error raised by the WeaveTrustScorer."""
 
+    def __init__(self, message: str, errors: Optional[Exception] = None):
+        super().__init__(message)
+        self.errors = errors
+
 
 class WeaveTrustScorer(weave.Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.

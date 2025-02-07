@@ -253,7 +253,9 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         self._tokenizer.model_max_length = self.model_max_length
 
     @weave.op
-    def score(self, query: str, context: str | list[str], output: str) -> WeaveScorerResult:
+    def score(
+        self, query: str, context: str | list[str], output: str
+    ) -> WeaveScorerResult:
         """
         Score the hallucination of the query and context.
 

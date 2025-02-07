@@ -44,6 +44,4 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         # Compute perplexity
         perplexity = torch.exp(torch.tensor(nll)).item()
 
-        return WeaveScorerResult(
-            passed=True, extras={"perplexity": perplexity}
-        )
+        return WeaveScorerResult(passed=True, extras={"perplexity": perplexity})
