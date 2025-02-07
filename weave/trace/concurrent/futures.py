@@ -219,7 +219,7 @@ class FutureExecutor:
         """
         wrapped = self._make_deadlock_safe(f)
 
-        logger.debug(
+        print(
             f"Submitting function {f.__name__=} to threadpool, with {args=}, {kwargs=}"
         )
 
