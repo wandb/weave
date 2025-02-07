@@ -45,6 +45,7 @@ export const useProjectSidebar = (
       'weave/leaderboards',
       'weave/operations',
       'weave/objects',
+      'weave/scorers',
     ];
     if (isWandbAdmin) {
       weaveOnlyMenu.push('weave/mods');
