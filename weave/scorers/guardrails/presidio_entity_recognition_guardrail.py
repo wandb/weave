@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from pydantic import BaseModel
 
 import weave
-from weave.scorers import Scorer
+from weave import Scorer
 
 if TYPE_CHECKING:
     from presidio_analyzer import AnalyzerEngine, RecognizerResult
@@ -136,7 +136,6 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         self._analyzer = analyzer
         self._anonymizer = anonymizer
 
-    @weave.op
     def group_analyzer_results_by_entity_type(
         self, output: str, analyzer_results: list[Any]
     ) -> dict[str, list[str]]:
@@ -150,7 +149,6 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             detected_entities[entity_type].append(text_slice)
         return detected_entities
 
-    @weave.op
     def create_reason(self, detected_entities: dict[str, list[str]]) -> str:
         """Create explanation for why the text was flagged"""
         explanation_parts = []
@@ -170,7 +168,6 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
         return "\n".join(explanation_parts)
 
-    @weave.op
     def anonymize_text(
         self,
         output: str,
@@ -186,7 +183,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, output: str) -> PresidioEntityRecognitionResponse:
+    def score(self, output: str) -> dict[str, Any]:
         analyzer_results = self._analyzer.analyze(
             text=str(output), entities=self.selected_entities, language=self.language
         )
