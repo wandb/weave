@@ -318,9 +318,9 @@ class WeaveTrustScorer(weave.Scorer):
     ) -> dict[str, Any]:
         """Score with nuanced logic for trustworthiness."""
         # Validate input
-        error_response = self._validate_input(output)
-        if error_response:
-            return error_response
+        # error_response = self._validate_input(output)
+        # if error_response:
+        #     return error_response
 
         raw_results = self._score_all(output=output, context=context, query=query)
 
