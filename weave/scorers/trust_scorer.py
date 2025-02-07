@@ -82,17 +82,17 @@ class WeaveTrustScorer(weave.Scorer):
 
         # Example output:
         {
-            "pass": True,
+            "passed": True,
             "extras": {
                 "trust_level": "high_no-issues-found",
                 "critical_issues": [],
                 "advisory_issues": [],
                 "raw_outputs": {
-                    "WeaveToxicityScorer": {"pass": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
-                    "WeaveHallucinationScorer": {"pass": True, "extras": {"score": 0.1}},
-                    "WeaveContextRelevanceScorer": {"pass": True, "extras": {"score": 0.85}},
-                    "WeaveFluencyScorer": {"pass": True, "extras": {"score": 0.95}},
-                    "WeaveCoherenceScorer": {"pass": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
+                    "WeaveToxicityScorer": {"passed": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
+                    "WeaveHallucinationScorer": {"passed": True, "extras": {"score": 0.1}},
+                    "WeaveContextRelevanceScorer": {"passed": True, "extras": {"score": 0.85}},
+                    "WeaveFluencyScorer": {"passed": True, "extras": {"score": 0.95}},
+                    "WeaveCoherenceScorer": {"passed": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
                 },
                 "scores": {
                     "WeaveToxicityScorer": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0},
@@ -310,7 +310,7 @@ class WeaveTrustScorer(weave.Scorer):
 
         # Check each scorer's results
         for scorer_name, result in raw_results.items():
-            if not result.get("pass", True):
+            if not result.passed:
                 scorer_cls = type(self._loaded_scorers[scorer_name])
                 if scorer_cls in self._critical_scorers:
                     critical_issues.append(scorer_name)
@@ -335,7 +335,7 @@ class WeaveTrustScorer(weave.Scorer):
         scores["WeaveToxicityScorer"] = raw_results["WeaveToxicityScorer"]["extras"]
 
         return {
-            "pass": passed,
+            "passed": passed,
             "trust_level": trust_level,
             "critical_issues": critical_issues,
             "advisory_issues": advisory_issues,
@@ -362,7 +362,7 @@ class WeaveTrustScorer(weave.Scorer):
         check_score_param_type(output, str, "output", self)
         result = self._score_with_logic(query=query, context=context, output=output)
         return WeaveScorerResult(
-            passed=result["pass"],
+            passed=result["passed"],
             extras={
                 "trust_level": result["trust_level"],
                 "critical_issues": result["critical_issues"],

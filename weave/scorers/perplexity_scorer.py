@@ -1,51 +1,5 @@
 import weave
-
-# from weave.scorers.llm_scorer import LLMScorer
-# from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-
-
-# class OpenAIPerplexityScorer(LLMScorer):
-#     """A scorer that computes perplexity for OpenAI outputs using log probabilities.
-#     Reference: https://cookbook.openai.com/examples/using_logprobs#5-calculating-perplexity
-#     """
-#     model_id = OPENAI_DEFAULT_MODEL
-
-#     @weave.op()
-#     def score(self, output: Any) -> dict:
-#         """
-#         Computes perplexity for OpenAI outputs using log probabilities.
-
-#         Args:
-#             output (Union[ChatCompletion, list]): Either:
-#                 - An OpenAI `ChatCompletion` object with `logprobs`
-#                 - A list of log probabilities (`floats`).
-
-#         Returns:
-#             dict: A dictionary containing the calculated perplexity.
-#         """
-
-#         if isinstance(output, ChatCompletion):
-#             assert (
-#                 output.choices[0].logprobs is not None
-#             ), "Logprobs must be present in the output!"
-#             logprobs = [
-#                 logprob.logprob for logprob in output.choices[0].logprobs.content
-#             ]
-#         elif isinstance(output, list):
-#             assert isinstance(output[0], float), "Logprobs must be a list of floats!"
-#             logprobs = output
-#         else:
-#             raise TypeError("Invalid input type!")
-
-#         assert len(logprobs) > 0, "Logprobs must be a non-empty list!"
-#         assert all(
-#             isinstance(logprob, float) for logprob in logprobs
-#         ), "Logprobs must be a list of floats!"
-
-#         # Correct perplexity calculation
-#         nll = -np.mean(logprobs)
-#         perplexity = np.exp(nll).item()
-#         return {"perplexity": perplexity}
+from weave.scorers.utils import WeaveScorerResult
 
 
 class HuggingFacePerplexityScorer(weave.Scorer):
@@ -63,7 +17,7 @@ class HuggingFacePerplexityScorer(weave.Scorer):
 
         Returns:
             dict: A unified dictionary containing:
-                  - "pass": Always True (no threshold defined for perplexity).
+                  - "passed": Always True (no threshold defined for perplexity).
                   - "extras": A dictionary with 'perplexity'.
         """
         import torch
@@ -90,4 +44,6 @@ class HuggingFacePerplexityScorer(weave.Scorer):
         # Compute perplexity
         perplexity = torch.exp(torch.tensor(nll)).item()
 
-        return {"pass": True, "extras": {"perplexity": perplexity}}
+        return WeaveScorerResult(
+            passed=True, extras={"perplexity": perplexity}
+        )

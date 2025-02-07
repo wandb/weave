@@ -54,7 +54,9 @@ class OpenAIModerationScorer(weave.Scorer):
             for k, v in response.categories
             if v and ("/" not in k and "-" not in k)
         }
-        return {"pass": passed, "categories": categories}
+        return WeaveScorerResult(
+            passed=passed, extras={"categories": categories}
+        )
 
 
 TOXICITY_CATEGORY_THRESHOLD = 2
