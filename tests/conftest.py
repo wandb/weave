@@ -381,6 +381,11 @@ class InMemoryWeaveLogCollector(logging.Handler):
             and not record.msg.startswith(
                 "Task failed: HTTPError: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
             )
+            # (AT): This seems to be the same issue as above, but manifesting as a different error
+            # after integrating Stainless
+            and not record.msg.startswith(
+                "Task failed: BadRequestError: Error code: 400 - 'detail': 'API key must be exactly 40 characters long'"
+            )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
             and not "legacy" in record.name
