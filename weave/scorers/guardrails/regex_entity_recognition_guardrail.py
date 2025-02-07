@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import weave
 from weave.flow.model import Model
 from weave import Scorer
+from weave.scorers.utils import stringify
 
 DEFAULT_PATTERNS = {
     "EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
@@ -65,7 +66,6 @@ class RegexModel(Model):
             for name, pattern in normalized_patterns.items()
         }
 
-    @weave.op
     def check(self, text: str) -> RegexResult:
         """
         Check text against all patterns and return detailed results.
@@ -164,7 +164,6 @@ class RegexEntityRecognitionGuardrail(Scorer):
         # Create a pattern that matches the exact text, case-insensitive
         return rf"\b{escaped_text}\b"
 
-    @weave.op
     def check_regex_model(self, output: str) -> RegexResult:
         if self.custom_terms:
             # Create a temporary RegexModel with only the custom patterns
@@ -178,7 +177,6 @@ class RegexEntityRecognitionGuardrail(Scorer):
             result = self.regex_model.check(output)
         return result
 
-    @weave.op
     def get_reasonings(self, result: RegexResult) -> list[str]:
         explanation_parts = []
         if result.matched_patterns:
@@ -194,7 +192,6 @@ class RegexEntityRecognitionGuardrail(Scorer):
                 explanation_parts.append(f"- {pattern}")
         return explanation_parts
 
-    @weave.op
     def get_anonymized_text(self, output: str, result: RegexResult) -> Union[str, None]:
         anonymized_text = None
         if getattr(self, "should_anonymize", False) and result.matched_patterns:
@@ -211,6 +208,7 @@ class RegexEntityRecognitionGuardrail(Scorer):
 
     @weave.op
     def score(self, output: str) -> RegexEntityRecognitionResponse:
+        output = stringify(output)
         result: RegexResult = self.check_regex_model(output)
         reasonings = self.get_reasonings(result)
         anonymized_text = self.get_anonymized_text(output, result)
