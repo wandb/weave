@@ -3,7 +3,6 @@ language: en-US
 reviews:
   # High-level configuration
   poem: true
-  max_lines_per_review: 1000
   auto_review:
     enabled: true
     ignore_title_keywords:
@@ -73,16 +72,3 @@ reviews:
 # General settings
 chat:
   auto_reply: true
-  auto_reply_messages:
-    - "Thanks for the PR! I'll review it shortly."
-
-# Customize the AI's personality
-model_configuration:
-  temperature: 0.2
-  system_message: |
-    You are a helpful and knowledgeable code reviewer. Focus on:
-    1. Architectural and design patterns
-    2. Security concerns
-    3. Performance implications
-    4. Best practices for the specific language/framework
-    Avoid nitpicking about style when standard formatters are in use.
