@@ -26,13 +26,17 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
+from weave.scorers.utils import check_score_param_type
 
 
 class WeaveTrustScorer(weave.Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.
 
+    For best performance run this Scorer on a GPU. The model weigths for 5 small language models
+    will be downloaded automatically from W&B Artifacts when this Scorer is initialized.
+
     The TrustScorer evaluates the trustworthiness of model outputs by combining multiple
-    specialized scorers into two categories:
+    specialized scorers into two categories.
 
     1. Critical Scorers (automatic failure if pass is False):
         - WeaveToxicityScorer: Detects harmful, offensive, or inappropriate content
@@ -50,12 +54,14 @@ class WeaveTrustScorer(weave.Scorer):
 
     Args:
         device (str): Device for model inference ("cpu", "cuda", "mps", "auto"). Defaults to "auto".
-        context_relevance_threshold (float): Minimum relevance score (0-1). Defaults to 0.45.
-        hallucination_threshold (float): Maximum hallucination score (0-1). Defaults to 0.5.
-        fluency_threshold (float): Minimum fluency score (0-1). Defaults to 0.5.
-        toxicity_total_threshold (int): Maximum total toxicity score. Defaults to 5.
-        toxicity_category_threshold (int): Maximum per-category toxicity score. Defaults to 2.
-        run_in_parallel (bool): Flag to toggle parallel scoring. Defaults to True.
+        context_relevance_model_name_or_path (str, optional): Local path or W&B Artifact path for the context relevance model.
+        hallucination_model_name_or_path (str, optional): Local path or W&B Artifact path for the hallucination model.
+        toxicity_model_name_or_path (str, optional): Local path or W&B Artifact path for the toxicity model.
+        fluency_model_name_or_path (str, optional): Local path or W&B Artifact path for the fluency model.
+        coherence_model_name_or_path (str, optional): Local path or W&B Artifact path for the coherence model.
+        run_in_parallel (bool): Whether to run scorers in parallel or sequentially, useful for debugging. Defaults to True.
+
+    Note: The `output` parameter of this Scorer's `score` method expects the output of a LLM or AI system.
 
     Example:
         ```python
@@ -127,7 +133,7 @@ class WeaveTrustScorer(weave.Scorer):
     )
     run_in_parallel: bool = Field(
         default=True,
-        description="Whether to run scorers in parallel for improved performance",
+        description="Whether to run scorers in parallel or sequentially, useful for debugging.",
     )
 
     # Define scorer categories
@@ -249,10 +255,7 @@ class WeaveTrustScorer(weave.Scorer):
         context: Optional[Union[str, list[str]]] = None,
         query: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Run all applicable scorers and return their raw results.
-
-        Runs in parallel if run_in_parallel is True, otherwise runs sequentially.
-        """
+        """Run all applicable scorers and return their raw results."""
         # Validate input
         error_response = self._validate_input(output)
         if error_response:
@@ -303,9 +306,9 @@ class WeaveTrustScorer(weave.Scorer):
 
     def _score_with_logic(
         self,
-        output: str,
-        context: Optional[Union[str, list[str]]] = None,
-        query: Optional[str] = None,
+        query: Optional[str],
+        context: Optional[Union[str, list[str]]],
+        output: str
     ) -> dict[str, Any]:
         """Score with nuanced logic for trustworthiness."""
         # Validate input
@@ -347,7 +350,6 @@ class WeaveTrustScorer(weave.Scorer):
             for name, result in raw_results.items()
             if "extras" in result and "score" in result["extras"]
         }
-
         scores["WeaveToxicityScorer"] = raw_results["WeaveToxicityScorer"]["extras"]
 
         return {
@@ -361,12 +363,22 @@ class WeaveTrustScorer(weave.Scorer):
     @weave.op
     def score(
         self,
-        query: Optional[str] = None,
-        context: Optional[Union[str, list[str]]] = None,
-        output: Optional[str] = None,
+        query: str,
+        context: Union[str, list[str]],
+        output: str,  # Pass the output of a LLM to this parameter for example
     ) -> dict[str, Any]:
-        """Basic scoring that passes if no critical issues are found."""
-        result = self._score_with_logic(output=output, context=context, query=query)
+        """
+        Score the query, context and output against 5 different scorers.
+
+        Args:
+            query: str, The query to score the context against
+            context: Union[str, list[str]], The context to score the query against
+            output: str, The output to score, e.g. the output of a LLM
+        """
+        check_score_param_type(query, str, "query", self)
+        check_score_param_type(context, (str, list), "context", self)
+        check_score_param_type(output, str, "output", self)
+        result = self._score_with_logic(query=query, context=context, output=output)
         return {
             "pass": result["pass"],
             "extras": {

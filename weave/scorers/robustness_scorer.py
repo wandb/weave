@@ -9,7 +9,7 @@ import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, download_model
+from weave.scorers.utils import MODEL_PATHS, download_model, check_score_param_type
 
 
 class WeaveRobustnessScorer(HuggingFaceScorer):
@@ -82,6 +82,150 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
         pass
 
     @weave.op
+    def compute_cohens_h(
+        self, score_o: float, perturbed_similarities: list[float]
+    ) -> float:
+        """
+        Computes Cohen's h for use_exact_match scores.
+
+        Cohen's h measures the effect size for proportions, suitable for use_exact_match data.
+        It is calculated using the arcsine transformation of the proportions.
+
+        Args:
+            score_o (float): The similarity score of the reference_text output (0 or 1).
+            perturbed_similarities (List[float]): Similarity scores of perturbed outputs (0s and 1s).
+
+        Returns:
+            float: The absolute value of Cohen's h normalized by π.
+
+        To make it easier to interpret, we use the following thresholds:
+            - **d ≤ 0.1592**: Small effect
+            - **0.1592 < d ≤ 0.3820**: Medium effect
+            - **0.3820 < d**: Large effect
+
+        Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case.
+
+        """
+
+        def psi(score: float) -> float:
+            """Arcsine transformation used in Cohen's h calculation."""
+            return 2 * math.asin(math.sqrt(score))
+
+        # Average perturbed similarities
+        score_p = sum(perturbed_similarities) / len(perturbed_similarities)
+
+        # Compute Cohen's h and normalize by π
+        h = abs((psi(score_p) - psi(score_o)) / math.pi)
+
+        return h
+
+    @weave.op
+    def compute_cohens_d(
+        self, score_o: float, perturbed_similarities: list[float]
+    ) -> float:
+        """
+        Computes Cohen's d for continuous scores.
+
+        Cohen's d measures the effect size for the differences between two means,
+        suitable for continuous data. In this context, it quantifies the impact
+        of perturbations on the similarity scores.
+
+        Args:
+            score_o (float): The similarity score of the reference_text output (usually 1.0).
+            perturbed_similarities (List[float]): Similarity scores of perturbed outputs.
+
+        Returns:
+            float: The computed Cohen's d value.
+
+        To make it easier to interpret, we use the following thresholds:
+            - **d ≤ 0.2**: Small effect
+            - **0.2 < d ≤ 0.8**: Medium effect
+            - **0.8 < d**: Large effect
+
+        Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case. Refer to the notes below for more details.
+
+        Notes:
+            - A positive Cohen's d indicates that the reference_text score is higher than
+              the perturbed scores on average, suggesting that perturbations decrease
+              the similarity.
+            - A negative Cohen's d indicates that the perturbed scores are higher,
+              which may suggest unexpected behavior.
+            - Interpretation should consider the practical significance and context,
+              especially with small sample sizes.
+            - If the standard deviation of the differences is zero, the effect size is 0.
+            - If the standard deviation is very close to zero and the mean difference is also close to zero, the effect size will be large which is counter intuitive. Either increase the number of perturbed outputs or use `use_exact_match` scoring in such cases. Alternatively, interpret the results accordingly.
+
+        """
+        differences = [score_o - s for s in perturbed_similarities]
+        mean_diff = np.mean(differences)
+        std_diff = np.std(differences, ddof=1)  # Sample standard deviation
+
+        if std_diff < self.cohen_d_threshold:
+            return 0.0  # No variability in differences; negligible effect
+        else:
+            return (mean_diff / std_diff).item()
+
+    @weave.op
+    def compute_similarity(self, text1: str, text2: str) -> float:
+        """
+        Computes similarity between two texts based on the specified metric.
+
+        Args:
+            text1 (str): The first text string.
+            text2 (str): The second text string.
+
+        Returns:
+            float: Similarity score between 0 and 1.
+
+        Raises:
+            ValueError: If an unsupported similarity metric is specified.
+
+        Supported Similarity Metrics:
+            - **"cosine"**: Cosine similarity between sentence embeddings.
+
+        Notes:
+            - Requires the embedding model to be loaded (when `use_exact_match=False`).
+            - Cosine similarity is computed using sentence embeddings from the specified model.
+            - You can use any other embedding model by setting the `embedding_model_name` attribute which is compatible with `SentenceTransformer`. This flexibility will allow you to use the right embedding representation for your use case.
+
+        """
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+        except ImportError as e:
+            raise ImportError(
+                "The `sklearn` package is required to use `RobustnessScorer` with cosine similarity scoring. (`use_exact_match=False`)"
+                "Please install it by running `pip install scikit-learn`."
+            ) from e
+
+        # Ensure the embedding model is loaded
+        if self.embedding_model is None:
+            raise ValueError("Embedding model is not initialized.")
+
+        # Compute cosine similarity between sentence embeddings
+        embeddings = self.embedding_model.encode([text1, text2])
+        sim = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+        return sim.item()
+
+    def get_cohen_h_interpretation(self, h: float) -> str:
+        if h == 0.0:
+            return "No effect"
+
+        if h <= 0.1592:
+            return "Small effect"
+        elif h <= 0.3820:
+            return "Medium effect"
+        else:
+            return "Large effect"
+
+    def get_cohen_d_interpretation(self, d: float) -> str:
+        if d <= 0.2:
+            return "Small effect"
+        elif d <= 0.8:
+            return "Medium effect"
+        else:
+            return "Large effect"
+        
+    @weave.op
     def score(
         self,
         reference_text: Union[str, bool],
@@ -92,7 +236,7 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
         Computes the robustness score of the model's outputs.
 
         Args:
-            reference_text (Union[str, bool]): The reference text to check against.
+            reference_text (Union[str, bool]): The reference text or bool values to check against.
             texts (List[Union[str, bool]]): A list containing outputs to measure against.
             ground_truths (Optional[List[Union[str, bool]]]): Optional list of ground truths corresponding to each output.
 
@@ -112,6 +256,10 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
             AssertionError: If the inputs are invalid or inconsistent.
             ValueError: If an unsupported similarity metric is specified.
         """
+        check_score_param_type(reference_text, (str, bool), "reference_text", self)
+        check_score_param_type(texts, list, "texts", self)
+        if ground_truths:
+            check_score_param_type(ground_truths, list, "ground_truths", self)
         assert (
             len(texts) > 1
         ), "There are no `texts`, there must be at least one text to measure against."
@@ -197,150 +345,6 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
             if self.return_interpretation:
                 result["interpretation"] = self.get_cohen_h_interpretation(h)
             return result
-
-    @weave.op()
-    def compute_cohens_h(
-        self, score_o: float, perturbed_similarities: list[float]
-    ) -> float:
-        """
-        Computes Cohen's h for use_exact_match scores.
-
-        Cohen's h measures the effect size for proportions, suitable for use_exact_match data.
-        It is calculated using the arcsine transformation of the proportions.
-
-        Args:
-            score_o (float): The similarity score of the reference_text output (0 or 1).
-            perturbed_similarities (List[float]): Similarity scores of perturbed outputs (0s and 1s).
-
-        Returns:
-            float: The absolute value of Cohen's h normalized by π.
-
-        To make it easier to interpret, we use the following thresholds:
-            - **d ≤ 0.1592**: Small effect
-            - **0.1592 < d ≤ 0.3820**: Medium effect
-            - **0.3820 < d**: Large effect
-
-        Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case.
-
-        """
-
-        def psi(score: float) -> float:
-            """Arcsine transformation used in Cohen's h calculation."""
-            return 2 * math.asin(math.sqrt(score))
-
-        # Average perturbed similarities
-        score_p = sum(perturbed_similarities) / len(perturbed_similarities)
-
-        # Compute Cohen's h and normalize by π
-        h = abs((psi(score_p) - psi(score_o)) / math.pi)
-
-        return h
-
-    @weave.op()
-    def compute_cohens_d(
-        self, score_o: float, perturbed_similarities: list[float]
-    ) -> float:
-        """
-        Computes Cohen's d for continuous scores.
-
-        Cohen's d measures the effect size for the differences between two means,
-        suitable for continuous data. In this context, it quantifies the impact
-        of perturbations on the similarity scores.
-
-        Args:
-            score_o (float): The similarity score of the reference_text output (usually 1.0).
-            perturbed_similarities (List[float]): Similarity scores of perturbed outputs.
-
-        Returns:
-            float: The computed Cohen's d value.
-
-        To make it easier to interpret, we use the following thresholds:
-            - **d ≤ 0.2**: Small effect
-            - **0.2 < d ≤ 0.8**: Medium effect
-            - **0.8 < d**: Large effect
-
-        Note that the interpretation is a rule of thumb and may not be appropriate for small sample sizes. Feel free to interpret the results according to your use case. Refer to the notes below for more details.
-
-        Notes:
-            - A positive Cohen's d indicates that the reference_text score is higher than
-              the perturbed scores on average, suggesting that perturbations decrease
-              the similarity.
-            - A negative Cohen's d indicates that the perturbed scores are higher,
-              which may suggest unexpected behavior.
-            - Interpretation should consider the practical significance and context,
-              especially with small sample sizes.
-            - If the standard deviation of the differences is zero, the effect size is 0.
-            - If the standard deviation is very close to zero and the mean difference is also close to zero, the effect size will be large which is counter intuitive. Either increase the number of perturbed outputs or use `use_exact_match` scoring in such cases. Alternatively, interpret the results accordingly.
-
-        """
-        differences = [score_o - s for s in perturbed_similarities]
-        mean_diff = np.mean(differences)
-        std_diff = np.std(differences, ddof=1)  # Sample standard deviation
-
-        if std_diff < self.cohen_d_threshold:
-            return 0.0  # No variability in differences; negligible effect
-        else:
-            return (mean_diff / std_diff).item()
-
-    @weave.op()
-    def compute_similarity(self, text1: str, text2: str) -> float:
-        """
-        Computes similarity between two texts based on the specified metric.
-
-        Args:
-            text1 (str): The first text string.
-            text2 (str): The second text string.
-
-        Returns:
-            float: Similarity score between 0 and 1.
-
-        Raises:
-            ValueError: If an unsupported similarity metric is specified.
-
-        Supported Similarity Metrics:
-            - **"cosine"**: Cosine similarity between sentence embeddings.
-
-        Notes:
-            - Requires the embedding model to be loaded (when `use_exact_match=False`).
-            - Cosine similarity is computed using sentence embeddings from the specified model.
-            - You can use any other embedding model by setting the `embedding_model_name` attribute which is compatible with `SentenceTransformer`. This flexibility will allow you to use the right embedding representation for your use case.
-
-        """
-        try:
-            from sklearn.metrics.pairwise import cosine_similarity
-        except ImportError as e:
-            raise ImportError(
-                "The `sklearn` package is required to use `RobustnessScorer` with cosine similarity scoring. (`use_exact_match=False`)"
-                "Please install it by running `pip install scikit-learn`."
-            ) from e
-
-        # Ensure the embedding model is loaded
-        if self.embedding_model is None:
-            raise ValueError("Embedding model is not initialized.")
-
-        # Compute cosine similarity between sentence embeddings
-        embeddings = self.embedding_model.encode([text1, text2])
-        sim = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-        return sim.item()
-
-    def get_cohen_h_interpretation(self, h: float) -> str:
-        if h == 0.0:
-            return "No effect"
-
-        if h <= 0.1592:
-            return "Small effect"
-        elif h <= 0.3820:
-            return "Medium effect"
-        else:
-            return "Large effect"
-
-    def get_cohen_d_interpretation(self, d: float) -> str:
-        if d <= 0.2:
-            return "Small effect"
-        elif d <= 0.8:
-            return "Medium effect"
-        else:
-            return "Large effect"
 
 
 def get_keyboard_adjacent(char: str) -> list[str]:

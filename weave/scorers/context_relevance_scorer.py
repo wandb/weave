@@ -6,60 +6,8 @@ import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, download_model
+from weave.scorers.utils import MODEL_PATHS, download_model, check_score_param_type
 
-RELEVANCE_INSTRUCTIONS = """You are an expert evaluator assessing the relevance of LLM-generated outputs relative to their input context.
-Your goal is to provide a single relevance score and classification based on comprehensive analysis.
-Relevance measures how effectively a generated output addresses its input context across three core dimensions:
-
-1. **Semantic Alignment**
-   - How directly does the output address key input requirements?
-   - Does it maintain topical focus?
-   - Does it provide complete coverage of necessary information?
-   - Is unnecessary content avoided?
-
-2. **Structural Coherence**
-   - Does the output flow logically and show internal consistency?
-   - Is the presentation of information clear and organized?
-   - Is there a good balance between completeness and conciseness?
-
-3. **Contextual Integration**
-   - How well does the output use the provided context?
-   - Does the output align with the broader discourse?
-   - Is it consistent with background information?
-   - Does it fulfill task-specific requirements?
-
-## Evaluation Process
-
-1. Review all input context (instructions, prompts, documents, chat history)
-2. Identify core requirements and purpose
-3. Analyze the LLM output across all three dimensions
-4. Assign a single relevance score (1-5):
-   - 5: Exceptional relevance across all dimensions
-   - 4: Strong relevance with minor gaps
-   - 3: Adequate relevance with some issues
-   - 2: Significant relevance issues
-   - 1: Major relevance problems
-5. Classify as relevant (score ≥ 3.5) or not relevant (score < 3.5)
-
-## Task-Specific Considerations
-
-- **Summarization**: Focus on key information selection and density
-- **Q&A**: Emphasize answer accuracy and completeness
-- **Chat**: Consider conversation flow and context maintenance
-- **RAG**: Evaluate retrieved information integration
-
-## Output Format
-
-Provide evaluation results in the following JSON format:
-
-```json
-{
-  "relevance": [score from 1-5],
-  "relevant": [true/false]
-}
-```
-"""
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
@@ -67,7 +15,8 @@ CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 class WeaveContextRelevanceScorer(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
-    The scorer uses a fine-tuned deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
+    The scorer uses a fine-tuned deberta-small-long-nli model from tasksource;
+    https://huggingface.co/tasksource/deberta-small-long-nli
 
     This scorer uses a fine-tuned model to analyze whether outputs are semantically relevant to their
     input queries and context. It processes text in chunks and returns both binary relevance flags
@@ -78,6 +27,9 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         device (str): Device to run model on, defaults to "cpu"
         threshold (float): Threshold for relevance classification, defaults to 0.7
         debug (bool): Enable debug logging, defaults to False
+
+    Note: This Scorer's `score` method expects the context to be passed to its `output` parameter as 
+    a string or list of strings.
 
     Returns:
         dict: A dictionary containing:
@@ -210,17 +162,28 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
     def score(
         self,
         query: str,
-        context: Union[str, list[str]],
+        output: Union[str, list[str]],  # Pass the context to the `output` parameter
         verbose: bool = False,
     ) -> dict[str, Any]:
-        """Score multiple documents and compute weighted average relevance."""
+        """
+        Scores the relevance of the context against the query. Uses a weighted average of 
+        relevant tokens in the context against the query to compute a final score.
+
+        Args:
+            query: str, The query to score the context against, must be a string
+            output: Union[str, list[str]], The context to score, must be a string or list of strings
+            verbose: bool, Whether to return all relevant spans from the output
+        """
+        check_score_param_type(query, str, "query", self)
+        check_score_param_type(output, (str, list), "output", self)
+
         all_spans = []
         total_weighted_score = 0.0
         total_length = 0
 
-        if isinstance(context, str):
-            context = [context]
-        for doc in context:
+        if isinstance(output, str):
+            output = [output]
+        for doc in output:
             spans, relevant_tokens, total_tokens = self._score_document(
                 query, doc, self.threshold
             )
@@ -234,9 +197,9 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        res = {"pass": final_score >= self.threshold}
+        result = {"pass": final_score >= self.threshold}
         extras = {"score": final_score}
         if verbose:
             extras["all_spans"] = all_spans  # type: ignore
-        res["extras"] = extras  # type: ignore
-        return res
+        result["extras"] = extras  # type: ignore
+        return result
