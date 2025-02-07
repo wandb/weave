@@ -6,7 +6,7 @@ import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    ScorerResult,
+    WeaveScorerResult,
     check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
@@ -155,7 +155,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         query: str,
         output: Union[str, list[str]],  # Pass the context to the `output` parameter
         verbose: bool = False,
-    ) -> ScorerResult:
+    ) -> WeaveScorerResult:
         """
         Scores the relevance of the context against the query. Uses a weighted average of
         relevant tokens in the context against the query to compute a final score.
@@ -191,7 +191,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         extras = {"score": final_score}
         if verbose:
             extras["all_spans"] = all_spans  # type: ignore
-        return ScorerResult(
+        return WeaveScorerResult(
             passed=final_score >= self.threshold,
             extras=extras,
         )

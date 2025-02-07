@@ -26,7 +26,7 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
-from weave.scorers.utils import ScorerResult, check_score_param_type
+from weave.scorers.utils import WeaveScorerResult, check_score_param_type
 
 
 class WeaveTrustScorerError(Exception):
@@ -348,7 +348,7 @@ class WeaveTrustScorer(weave.Scorer):
         query: str,
         context: Union[str, list[str]],
         output: str,  # Pass the output of a LLM to this parameter for example
-    ) -> ScorerResult:
+    ) -> WeaveScorerResult:
         """
         Score the query, context and output against 5 different scorers.
 
@@ -361,7 +361,7 @@ class WeaveTrustScorer(weave.Scorer):
         check_score_param_type(context, (str, list), "context", self)
         check_score_param_type(output, str, "output", self)
         result = self._score_with_logic(query=query, context=context, output=output)
-        return ScorerResult(
+        return WeaveScorerResult(
             passed=result["pass"],
             extras={
                 "trust_level": result["trust_level"],

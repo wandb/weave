@@ -4,7 +4,7 @@ import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    ScorerResult,
+    WeaveScorerResult,
     check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
@@ -50,7 +50,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         )
 
     @weave.op
-    def score_messages(self, prompt: str, output: str) -> ScorerResult:
+    def score_messages(self, prompt: str, output: str) -> WeaveScorerResult:
         """Score a prompt response pair."""
         assert self._pipeline is not None
         coherence_output = self._pipeline(inputs={"text": prompt, "text_pair": output})
@@ -58,7 +58,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         if "incoherent" in coherence_output["label"].lower():
             passed = False
 
-        return ScorerResult(
+        return WeaveScorerResult(
             passed=passed,
             extras={
                 "coherence_label": coherence_output["label"],
@@ -84,7 +84,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         output: str,
         chat_history: Optional[list[dict[str, str]]] = None,
         context: Optional[Union[str, list[str]]] = None,
-    ) -> ScorerResult:
+    ) -> WeaveScorerResult:
         """
         Score the Coherence of the query and output.
 

@@ -6,7 +6,7 @@ from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.llm_scorer import HuggingFaceScorer, LLMScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    ScorerResult,
+    WeaveScorerResult,
     check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
@@ -254,7 +254,7 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         self._tokenizer.model_max_length = self.model_max_length
 
     @weave.op
-    def score(self, query: str, context: str | list[str], output: str) -> ScorerResult:
+    def score(self, query: str, context: str | list[str], output: str) -> WeaveScorerResult:
         """
         Score the hallucination of the query and context.
 
@@ -268,7 +268,7 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         check_score_param_type(output, str, "output", self)
 
         if self.import_failed:
-            return ScorerResult(
+            return WeaveScorerResult(
                 passed=False,
                 extras={
                     "error": "Unable to import required libraries. Please install transformers."
@@ -301,7 +301,7 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         pairs = [(inps, outs)]
         pred = self.model.predict(pairs)
         score = 1 - pred.item()
-        return ScorerResult(
+        return WeaveScorerResult(
             passed=score <= self.threshold,
             extras={"score": score},
         )

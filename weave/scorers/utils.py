@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from torch import device
 
 
-class ScorerResult(BaseModel):
+class WeaveScorerResult(BaseModel):
     """The result of a weave.Scorer.score method."""
 
     passed: bool = Field(description="Whether the scorer passed or not")

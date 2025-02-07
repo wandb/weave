@@ -9,7 +9,7 @@ from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.llm_scorer import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    ScorerResult,
+    WeaveScorerResult,
     check_score_param_type,
     download_model,
 )
@@ -169,7 +169,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str) -> ScorerResult:
+    def score(self, output: str) -> WeaveScorerResult:
         # local scoring
         passed: bool = True
         predictions: list[float] = self.predict(output)
@@ -178,7 +178,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         ):
             passed = False
 
-        return ScorerResult(
+        return WeaveScorerResult(
             extras=dict(zip(self._categories, predictions)),
             passed=passed,
         )
@@ -268,7 +268,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
-    def score(self, output: str) -> ScorerResult:
+    def score(self, output: str) -> WeaveScorerResult:
         """
         Score the output.
 
@@ -285,7 +285,7 @@ class WeaveBiasScorer(RollingWindowScorer):
             base_name = category.lower()
             categories[f"{base_name}_score"] = float(pred)
             categories[base_name] = score
-        return ScorerResult(
+        return WeaveScorerResult(
             extras=categories,
             passed=not any(scores),
         )
