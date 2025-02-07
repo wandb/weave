@@ -9,10 +9,14 @@ from weave.scorers.default_models import MODEL_PATHS
 if TYPE_CHECKING:
     from torch import device
 
+
 class ScorerResult(BaseModel):
     """The result of a weave.Scorer.score method."""
+
     passed: bool = Field(description="Whether the scorer passed or not")
-    extras: dict[str, Any] = Field(description="Any extra information from the scorer like numerical scores, model outputs, etc.")
+    extras: dict[str, Any] = Field(
+        description="Any extra information from the scorer like numerical scores, model outputs, etc."
+    )
 
     class Config:
         extra = "allow"
@@ -87,6 +91,7 @@ def stringify(output: Any) -> str:
 
 # --- HF Utilities ---
 
+
 def ensure_hf_imports() -> None:
     """Ensure that the required packages for Hugging Face models are installed."""
     if find_spec("torch") is None or find_spec("transformers") is None:
@@ -124,7 +129,12 @@ def load_hf_model_weights(model_name_or_path: str, default_model: str = None) ->
         raise ValueError("No model path provided and no default model available.")
 
 
-def check_score_param_type(param_value: Any, expected_type: Union[type, tuple[type, ...]], param_name: str, class_instance: Any) -> None:
+def check_score_param_type(
+    param_value: Any,
+    expected_type: Union[type, tuple[type, ...]],
+    param_name: str,
+    class_instance: Any,
+) -> None:
     """
     Check if what is passed to a parameter of the `score` method is of the expected type.
 
@@ -137,7 +147,8 @@ def check_score_param_type(param_value: Any, expected_type: Union[type, tuple[ty
     class_name = class_instance.__class__.__name__
     if not isinstance(param_value, expected_type):
         expected_type_names = (
-            expected_type.__name__ if isinstance(expected_type, type)
+            expected_type.__name__
+            if isinstance(expected_type, type)
             else " or ".join(t.__name__ for t in expected_type)
         )
         raise TypeError(

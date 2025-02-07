@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
 from pydantic import PrivateAttr
@@ -9,9 +9,9 @@ from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.llm_scorer import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    download_model,
-    check_score_param_type,
     ScorerResult,
+    check_score_param_type,
+    download_model,
 )
 
 if TYPE_CHECKING:
@@ -182,6 +182,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
             extras=dict(zip(self._categories, predictions)),
             passed=passed,
         )
+
 
 BIAS_SCORER_THRESHOLD = 0.60
 

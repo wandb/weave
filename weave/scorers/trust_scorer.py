@@ -26,7 +26,7 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
-from weave.scorers.utils import check_score_param_type, ScorerResult
+from weave.scorers.utils import ScorerResult, check_score_param_type
 
 
 class WeaveTrustScorerError(Exception):
@@ -246,7 +246,6 @@ class WeaveTrustScorer(weave.Scorer):
         query: Optional[str] = None,
     ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results."""
-
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
         processed_context = (
@@ -296,10 +295,9 @@ class WeaveTrustScorer(weave.Scorer):
         self,
         query: Optional[str],
         context: Optional[Union[str, list[str]]],
-        output: str
+        output: str,
     ) -> dict[str, Any]:
         """Score with nuanced logic for trustworthiness."""
-
         raw_results = self._score_all(output=output, context=context, query=query)
 
         # Handle error case

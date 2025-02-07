@@ -2,11 +2,11 @@ import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
+    ScorerResult,
+    check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
     set_device,
-    check_score_param_type,
-    ScorerResult,
 )
 
 FLUENCY_SCORER_THRESHOLD = 0.5

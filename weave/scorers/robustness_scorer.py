@@ -9,7 +9,7 @@ import numpy as np
 
 import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
-from weave.scorers.utils import MODEL_PATHS, download_model, check_score_param_type
+from weave.scorers.utils import MODEL_PATHS, check_score_param_type, download_model
 
 
 class WeaveRobustnessScorer(HuggingFaceScorer):
@@ -224,7 +224,7 @@ class WeaveRobustnessScorer(HuggingFaceScorer):
             return "Medium effect"
         else:
             return "Large effect"
-        
+
     @weave.op
     def score(
         self,

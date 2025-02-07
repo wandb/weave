@@ -6,12 +6,11 @@ import weave
 from weave.scorers.llm_scorer import HuggingFaceScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
+    ScorerResult,
     check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
-    ScorerResult,
 )
-
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
@@ -32,7 +31,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         threshold (float): Threshold for relevance classification, defaults to 0.7
         debug (bool): Enable debug logging, defaults to False
 
-    Note: This Scorer's `score` method expects the context to be passed to its `output` parameter as 
+    Note: This Scorer's `score` method expects the context to be passed to its `output` parameter as
     a string or list of strings.
 
     Returns:
@@ -158,7 +157,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         verbose: bool = False,
     ) -> ScorerResult:
         """
-        Scores the relevance of the context against the query. Uses a weighted average of 
+        Scores the relevance of the context against the query. Uses a weighted average of
         relevant tokens in the context against the query to compute a final score.
 
         Args:

@@ -1,14 +1,13 @@
-import os
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import weave
 from weave.scorers.llm_scorer import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    load_hf_model_weights,
-    ensure_hf_imports,
-    check_score_param_type,
     ScorerResult,
+    check_score_param_type,
+    ensure_hf_imports,
+    load_hf_model_weights,
 )
 
 
