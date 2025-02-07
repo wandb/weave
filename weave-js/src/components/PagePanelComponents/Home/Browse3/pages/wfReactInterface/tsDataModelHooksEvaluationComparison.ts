@@ -386,7 +386,7 @@ const fetchEvaluationSummaryData = async (
       };
     }
 
-    // Total Tokens
+    // Total Tokens and Avg Tokens
     // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
     const summary = evaluationCallCache[evalCall.callId].summary;
@@ -394,16 +394,29 @@ const fetchEvaluationSummaryData = async (
       ? sum(Object.values(summary.usage ?? {}).map(v => v.total_tokens))
       : null;
     if (totalTokens != null) {
-      const metricId = metricDefinitionId(totalTokensMetricDimension);
-      result.summaryMetrics[metricId] = {
+      const totalMetricId = metricDefinitionId(totalTokensMetricDimension);
+      result.summaryMetrics[totalMetricId] = {
         ...totalTokensMetricDimension,
       };
-      evalCall.summaryMetrics[metricId] = {
+      evalCall.summaryMetrics[totalMetricId] = {
         value: totalTokens,
         sourceCallId: evalCallId,
       };
-      result.scoreMetrics[metricId] = {
+      result.scoreMetrics[totalMetricId] = {
         ...totalTokensMetricDimension,
+      };
+
+      const avgMetricId = metricDefinitionId(avgTokensMetricDimension);
+      result.summaryMetrics[avgMetricId] = {
+        ...avgTokensMetricDimension,
+      };
+      const avgTokens = totalTokens / Object.values(summary.usage ?? {}).length;
+      evalCall.summaryMetrics[avgMetricId] = {
+        value: avgTokens,
+        sourceCallId: evalCallId,
+      };
+      result.scoreMetrics[avgMetricId] = {
+        ...avgTokensMetricDimension,
       };
     }
   });
@@ -781,10 +794,19 @@ const modelLatencyMetricDimension: MetricDefinition = {
 const totalTokensMetricDimension: MetricDefinition = {
   source: 'derived',
   scoreType: 'continuous',
-  metricSubPath: ['Total Tokens (avg)'],
+  metricSubPath: ['Total Tokens'],
   shouldMinimize: true,
   unit: '',
 };
+
+const avgTokensMetricDimension: MetricDefinition = {
+  source: 'derived',
+  scoreType: 'continuous',
+  metricSubPath: ['Avg Tokens'],
+  shouldMinimize: true,
+  unit: '',
+};
+
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
