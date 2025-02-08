@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -8,8 +8,8 @@ from weave.scorers.utils import set_device
 if TYPE_CHECKING:
     from torch import Tensor
     from transformers.modeling_utils import PreTrainedModel
-    from transformers.tokenization_utils import PreTrainedTokenizer
     from transformers.pipelines.base import Pipeline
+    from transformers.tokenization_utils import PreTrainedTokenizer
 
 
 class LLMScorer(weave.Scorer):

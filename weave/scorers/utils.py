@@ -130,9 +130,9 @@ def load_hf_model_weights(
     if os.path.isdir(model_name_or_path):
         return model_name_or_path
     elif model_name_or_path:
-        return download_model(model_name_or_path)
+        return str(download_model(model_name_or_path))
     elif default_model:
-        return download_model(default_model)
+        return str(download_model(default_model))
     else:
         raise ValueError("No model path provided and no default model available.")
 
