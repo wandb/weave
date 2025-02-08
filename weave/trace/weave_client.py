@@ -292,7 +292,7 @@ def _make_calls_iterator(
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(project_id=project_id, filter=filter)
+            CallsQueryStatsReq(project_id=project_id, filter=filter, query=query)
         )
         if limit_override is not None:
             offset = offset_override or 0
