@@ -107,7 +107,7 @@ class HuggingFaceScorer(weave.Scorer):
             print("Using user-provided model.")
 
         if self._tokenizer is None:
-            self.load_tokenizer()
+            self._load_tokenizer()
         else:
             print("Using user-provided tokenizer.")
 
