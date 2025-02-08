@@ -18,10 +18,10 @@ class RollingWindowScorerMock(RollingWindowScorer):
     max_tokens: int = 10
     overlap: int = 0
 
-    def load_model(self):
+    def _load_model(self):
         self._model = MockModel()
 
-    def load_tokenizer(self):
+    def _load_tokenizer(self):
         self._tokenizer = RandomTokenizer()
 
     def predict_chunk(self, input_ids: Tensor) -> list[float]:
