@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -132,12 +132,18 @@ class RollingWindowScorer(HuggingFaceScorer):
         max_tokens: Maximum number of tokens per window.
         overlap: Number of overlapping tokens between consecutive windows.
         device: The device to use for inference.
-        aggregation_method: The method to aggregate predictions ("max" or "average").
+        aggregation_method: The method to aggregate predictions ("max" or "mean").
     """
 
     max_tokens: int = 512  # Default maximum tokens per window
-    overlap: int = 50
-    aggregation_method: str = "max"  # New class attribute for aggregation method
+    overlap: int = Field(
+        default=50,
+        description="The number of overlapping tokens between consecutive windows",
+    )
+    aggregation_method: Literal["max", "mean"] = Field(
+        default="max",
+        description="The method to aggregate predictions",
+    )
 
     def _tokenize_input(self, prompt: str) -> "Tensor":
         """
@@ -154,7 +160,7 @@ class RollingWindowScorer(HuggingFaceScorer):
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
-    def _predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
     def _aggregate_predictions(
@@ -179,7 +185,7 @@ class RollingWindowScorer(HuggingFaceScorer):
             category_scores = [pred[i] for pred in all_predictions]
             if self.aggregation_method == "max":
                 aggregated.append(max(category_scores))
-            elif self.aggregation_method == "average":
+            elif self.aggregation_method == "mean":
                 aggregated.append(sum(category_scores) / len(category_scores))
             else:
                 raise ValueError(
@@ -201,14 +207,14 @@ class RollingWindowScorer(HuggingFaceScorer):
         total_tokens: int = input_ids.size(1)
 
         if total_tokens <= self.max_tokens:
-            return self._predict_chunk(input_ids)
+            return self.predict_chunk(input_ids)
 
         all_predictions: list[list[float]] = []
         stride: int = self.max_tokens - self.overlap
 
         for i in range(0, total_tokens - self.overlap, stride):
             chunk_input_ids = input_ids[:, i : i + self.max_tokens]
-            chunk_predictions = self._predict_chunk(chunk_input_ids)
+            chunk_predictions = self.predict_chunk(chunk_input_ids)
             all_predictions.append(chunk_predictions)
         # Aggregate predictions using the specified aggregation method
         final_predictions: list[float] = self._aggregate_predictions(all_predictions)

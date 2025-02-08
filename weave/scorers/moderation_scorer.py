@@ -148,7 +148,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def _predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 
@@ -258,7 +258,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def _predict_chunk(self, input_ids: "Tensor") -> list[float]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
 
         with torch.inference_mode():
