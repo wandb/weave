@@ -138,7 +138,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         )
         self._model.eval()
 
-    def load_tokenizer(self) -> None:
+    def _load_tokenizer(self) -> None:
         try:
             from transformers import AutoTokenizer
         except ImportError:
@@ -248,7 +248,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         )
         self._model.eval()
 
-    def load_tokenizer(self) -> None:
+    def _load_tokenizer(self) -> None:
         try:
             from transformers import AutoTokenizer
         except ImportError:
