@@ -148,7 +148,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def _predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 
@@ -172,7 +172,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
     def score(self, output: str) -> WeaveScorerResult:
         # local scoring
         passed: bool = True
-        predictions: list[float] = self.predict(output)
+        predictions: list[float] = self._predict(output)
         if (sum(predictions) >= self.total_threshold) or any(
             o >= self.category_threshold for o in predictions
         ):
@@ -258,7 +258,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[float]:
+    def _predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
 
         with torch.inference_mode():
@@ -278,7 +278,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         Returns:
         """
         check_score_param_type(output, str, "output", self)
-        predictions = self.predict(output)
+        predictions = self._predict(output)
         scores = [o >= self.threshold for o in predictions]
         categories = {}
         for category, pred, score in zip(self._categories, predictions, scores):

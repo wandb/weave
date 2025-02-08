@@ -139,7 +139,7 @@ class RollingWindowScorer(HuggingFaceScorer):
     overlap: int = 50
     aggregation_method: str = "max"  # New class attribute for aggregation method
 
-    def tokenize_input(self, prompt: str) -> "Tensor":
+    def _tokenize_input(self, prompt: str) -> "Tensor":
         """
         Tokenize the input prompt without truncation.
 
@@ -154,10 +154,10 @@ class RollingWindowScorer(HuggingFaceScorer):
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def _predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
-    def aggregate_predictions(
+    def _aggregate_predictions(
         self, all_predictions: list[list[Union[int, float]]]
     ) -> list[float]:
         """
@@ -188,7 +188,7 @@ class RollingWindowScorer(HuggingFaceScorer):
 
         return aggregated
 
-    def predict_long(self, input_ids: "Tensor") -> list[float]:
+    def _predict_long(self, input_ids: "Tensor") -> list[float]:
         """
         Handle prediction for long inputs by processing in overlapping windows.
 
@@ -201,21 +201,21 @@ class RollingWindowScorer(HuggingFaceScorer):
         total_tokens: int = input_ids.size(1)
 
         if total_tokens <= self.max_tokens:
-            return self.predict_chunk(input_ids)
+            return self._predict_chunk(input_ids)
 
         all_predictions: list[list[float]] = []
         stride: int = self.max_tokens - self.overlap
 
         for i in range(0, total_tokens - self.overlap, stride):
             chunk_input_ids = input_ids[:, i : i + self.max_tokens]
-            chunk_predictions = self.predict_chunk(chunk_input_ids)
+            chunk_predictions = self._predict_chunk(chunk_input_ids)
             all_predictions.append(chunk_predictions)
         # Aggregate predictions using the specified aggregation method
-        final_predictions: list[float] = self.aggregate_predictions(all_predictions)
+        final_predictions: list[float] = self._aggregate_predictions(all_predictions)
 
         return final_predictions
 
-    def predict(self, prompt: str) -> list[float]:
+    def _predict(self, prompt: str) -> list[float]:
         """
         Predict scores for the input prompt, handling long inputs if necessary.
 
@@ -231,5 +231,5 @@ class RollingWindowScorer(HuggingFaceScorer):
             >>> print(predictions)
             [0.5, 0.3, 0.0, 0.2, 0.7]
         """
-        input_ids: Tensor = self.tokenize_input(prompt)
-        return self.predict_long(input_ids)
+        input_ids: Tensor = self._tokenize_input(prompt)
+        return self._predict_long(input_ids)
