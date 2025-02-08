@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import set_device
@@ -95,28 +95,28 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    model: Any = None
-    tokenizer: Any = None
+    _model: Any = PrivateAttr(default=None)
+    _tokenizer: Any = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
         self.device = set_device(self.device)
-        if self.model is None:
-            self.load_model()
+        if self._model is None:
+            self._load_model()
         else:
             print("Using user-provided model.")
 
-        if self.tokenizer is None:
+        if self._tokenizer is None:
             self.load_tokenizer()
         else:
             print("Using user-provided tokenizer.")
 
-    def load_model(self) -> None:
-        raise NotImplementedError("Subclasses must implement the `load_model` method.")
+    def _load_model(self) -> None:
+        raise NotImplementedError("Subclasses must implement the `_load_model` method.")
 
-    def load_tokenizer(self) -> None:
+    def _load_tokenizer(self) -> None:
         raise NotImplementedError(
-            "Subclasses must implement the `load_tokenizer` method."
+            "Subclasses must implement the `_load_tokenizer` method."
         )
 
     @weave.op
@@ -149,8 +149,8 @@ class RollingWindowScorer(HuggingFaceScorer):
         Returns:
             A tensor of tokenized input IDs.
         """
-        assert self.tokenizer is not None
-        return self.tokenizer(
+        assert self._tokenizer is not None
+        return self._tokenizer(
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 
