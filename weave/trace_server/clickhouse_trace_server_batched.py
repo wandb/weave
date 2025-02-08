@@ -127,7 +127,7 @@ MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
-MAX_DELETE_CALLS_COUNT = 100
+MAX_DELETE_CALLS_COUNT = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
@@ -922,7 +922,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = self._query_stream(query, parameters=pb.get_params())
 
         for row in res:
-            yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
+            yield tsi.TableRowSchema(
+                digest=row[0], val=json.loads(row[1]), original_index=row[2]
+            )
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         parameters: dict[str, Any] = {
