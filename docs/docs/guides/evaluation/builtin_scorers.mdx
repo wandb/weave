@@ -14,8 +14,9 @@ import TabItem from '@theme/TabItem';
     ```
 
     **LLM-evaluators**
-
-    The pre-defined scorers that use LLMs support the OpenAI, Anthropic, Google GenerativeAI and MistralAI clients. They also use `weave`'s `InstructorLLMScorer` class, so you'll need to install the [`instructor`](https://github.com/instructor-ai/instructor) Python package to be able to use them. You can get all necessary dependencies with `pip install "weave[scorers]"`
+    Update Feb 2025: The pre-defined scorers that leverage LLMs now automatically integrate with litellm.
+    You no longer need to pass an LLM client; just set the `model_id`. 
+    See the supported models [here](https://docs.litellm.ai/docs/providers).
 
     ## `HallucinationFreeScorer`
 
@@ -24,12 +25,7 @@ import TabItem from '@theme/TabItem';
     ```python
     from weave.scorers import HallucinationFreeScorer
 
-    llm_client = ... # initialize your LLM client here
-
-    scorer = HallucinationFreeScorer(
-        client=llm_client,
-        model_id="gpt-4o"
-    )
+    scorer = HallucinationFreeScorer()
     ```
 
     **Customization:**
@@ -44,15 +40,12 @@ import TabItem from '@theme/TabItem';
 
     ```python
     import asyncio
-    from openai import OpenAI
     import weave
     from weave.scorers import HallucinationFreeScorer
 
-    # Initialize clients and scorers
-    llm_client = OpenAI()
+    # Initialize scorer with a column mapping if needed.
     hallucination_scorer = HallucinationFreeScorer(
-        client=llm_client,
-        model_id="gpt-4o",
+        model_id="openai/gpt-4o", # or any other model supported by litellm
         column_map={"context": "input", "output": "other_col"}
     )
 
@@ -73,7 +66,8 @@ import TabItem from '@theme/TabItem';
     )
     result = asyncio.run(evaluation.evaluate(model))
     print(result)
-    # {'HallucinationFreeScorer': {'has_hallucination': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 1.4395725727081299}}
+    # Example output:
+    # {'HallucinationFreeScorer': {'has_hallucination': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
@@ -85,11 +79,8 @@ import TabItem from '@theme/TabItem';
     ```python
     from weave.scorers import SummarizationScorer
 
-    llm_client = ... # initialize your LLM client here
-
     scorer = SummarizationScorer(
-        client=llm_client,
-        model_id="gpt-4o"
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
     )
     ```
 
@@ -98,23 +89,21 @@ import TabItem from '@theme/TabItem';
     This scorer evaluates summaries in two ways:
 
     1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary in order to estimate the "information density" of the summary. Uses an LLM to extract the entities. Similar to how entity density is used in the Chain of Density paper, https://arxiv.org/abs/2309.04269
-
-    2. **Quality Grading:** Uses an LLM-evaluator to grade the summary as `poor`, `ok`, or `excellent`. These grades are converted to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) so you can calculate averages.
+    2. **Quality Grading:** An LLM evaluator grades the summary as `poor`, `ok`, or `excellent`. These grades are then mapped to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) for aggregate performance evaluation.
 
     **Customization:**
 
-    - Adjust `summarization_evaluation_system_prompt` and `summarization_evaluation_prompt` to define what makes a good summary.
+    - Adjust `summarization_evaluation_system_prompt` and `summarization_evaluation_prompt` to tailor the evaluation process.
 
     **Notes:**
 
-    - This scorer uses the `InstructorLLMScorer` class.
-    - The `score` method expects the original text that was summarized to be present in the `input` column of the dataset. Use the `column_map` class attribute to map `input` to the correct dataset column if needed.
+    - The scorer uses litellm internally.
+    - The `score` method expects the original text (the one being summarized) to be present in the `input` column. Use `column_map` if your dataset uses a different name.
 
-    Here you have an example usage of the `SummarizationScorer` in the context of an evaluation:
+    Here you have an example usage in the context of an evaluation:
 
     ```python
     import asyncio
-    from openai import OpenAI
     import weave
     from weave.scorers import SummarizationScorer
 
@@ -123,24 +112,21 @@ import TabItem from '@theme/TabItem';
         async def predict(self, input: str) -> str:
             return "This is a summary of the input text."
 
-    # Initialize clients and scorers
-    llm_client = OpenAI()
-    model = SummarizationModel()
+    # Initialize scorer
     summarization_scorer = SummarizationScorer(
-        client=llm_client,
-        model_id="gpt-4o",
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
     )
     # Create dataset
     dataset = [
         {"input": "The quick brown fox jumps over the lazy dog."},
         {"input": "Artificial Intelligence is revolutionizing various industries."}
     ]
-
     # Run evaluation
     evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
-    results = asyncio.run(evaluation.evaluate(model))
+    results = asyncio.run(evaluation.evaluate(SummarizationModel()))
     print(results)
-    # {'SummarizationScorer': {'is_entity_dense': {'true_count': 0, 'true_fraction': 0.0}, 'summarization_eval_score': {'mean': 0.0}, 'entity_density': {'mean': 0.0}}, 'model_latency': {'mean': 6.210803985595703e-05}}
+    # Example output:
+    # {'SummarizationScorer': {'is_entity_dense': {'true_count': 0, 'true_fraction': 0.0}, 'summarization_eval_score': {'mean': 0.0}, 'entity_density': {'mean': 0.0}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
@@ -151,30 +137,19 @@ import TabItem from '@theme/TabItem';
 
     ```python
     from weave.scorers import OpenAIModerationScorer
-    from openai import OpenAI
 
-    oai_client = OpenAI() # initialize your LLM client here
-
-    scorer = OpenAIModerationScorer(
-        client=oai_client,
-        model_id="text-embedding-3-small"
-    )
+    scorer = OpenAIModerationScorer()
     ```
 
     **How It Works:**
 
-    - Sends the AI's output to the OpenAI Moderation endpoint and returns a dictionary indicating whether the content is flagged and details about the categories involved.
+    - Sends the AI's output to the OpenAI Moderation endpoint and returns a structured response indicating if the content is flagged.
 
     **Notes:**
-
-    - Requires the `openai` Python package.
-    - The client must be an instance of OpenAI's `OpenAI` or `AsyncOpenAI` client.
-
-    Here you have an example in the context of an evaluation:
+    Here is an example in the context of an evaluation:
 
     ```python
     import asyncio
-    from openai import OpenAI
     import weave
     from weave.scorers import OpenAIModerationScorer
 
@@ -183,10 +158,8 @@ import TabItem from '@theme/TabItem';
         async def predict(self, input: str) -> str:
             return input
 
-    # Initialize clients and scorers
-    client = OpenAI()
-    model = MyModel()
-    moderation_scorer = OpenAIModerationScorer(client=client)
+    # Initialize scorer
+    moderation_scorer = OpenAIModerationScorer()
 
     # Create dataset
     dataset = [
@@ -196,67 +169,56 @@ import TabItem from '@theme/TabItem';
 
     # Run evaluation
     evaluation = weave.Evaluation(dataset=dataset, scorers=[moderation_scorer])
-    results = asyncio.run(evaluation.evaluate(model))
+    results = asyncio.run(evaluation.evaluate(MyModel()))
     print(results)
-    # {'OpenAIModerationScorer': {'flagged': {'true_count': 1, 'true_fraction': 0.5}, 'categories': {'violence': {'true_count': 1, 'true_fraction': 1.0}}}, 'model_latency': {'mean': 9.500980377197266e-05}}
+    # Example output:
+    # {'OpenAIModerationScorer': {'flagged': {'true_count': 1, 'true_fraction': 0.5}, 'categories': {'violence': {'true_count': 1, 'true_fraction': 1.0}}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
 
     ## `EmbeddingSimilarityScorer`
 
-    The `EmbeddingSimilarityScorer` computes the cosine similarity between the embeddings of the AI system's output and a target text from your dataset. It's useful for measuring how similar the AI's output is to a reference text.
+    The `EmbeddingSimilarityScorer` computes the cosine similarity between the embeddings of the AI system's output and a target text from your dataset. It is useful for measuring how similar the AI's output is to a reference text.
 
     ```python
     from weave.scorers import EmbeddingSimilarityScorer
 
-    llm_client = ...  # initialise your LlM client
-
     similarity_scorer = EmbeddingSimilarityScorer(
-        client=llm_client
-        target_column="reference_text",  # the dataset column to compare the output against
-        threshold=0.4  # the cosine similarity threshold to use
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
+        threshold=0.4  # the cosine similarity threshold
     )
     ```
 
+    Note: You can use `column_map` to map the `target` column to a different name.
+
     **Parameters:**
 
-    - `target`: This scorer expects a `target` column in your dataset, it will calculate the cosine similarity of the embeddings of the `target` column to the AI system output. If your dataset doesn't contain a column called `target` you can use the scorers `column_map` attribute to map `target` to the appropriate column name in your dataset. See the Column Mapping section for more.
-    - `threshold` (float): The minimum cosine similarity score between the embedding of the AI system output and the embdedding of the `target`, above which the 2 samples are considered "similar", (defaults to `0.5`). `threshold` can be in a range from -1 to 1:
-    - 1 indicates identical direction.
-    - 0 indicates orthogonal vectors.
-    - -1 indicates opposite direction.
+    - `threshold` (float): The minimum cosine similarity score (between -1 and 1) needed to consider the two texts similar (defaults to `0.5`).
 
-    The correct cosine similarity threshold to set can fluctuate quite a lot depending on your use case, we advise exploring different thresholds.
-
-    Here you have an example usage of the `EmbeddingSimilarityScorer` in the context of an evaluation:
+    Here is an example usage in the context of an evaluation:
 
     ```python
     import asyncio
-    from openai import OpenAI
     import weave
     from weave.scorers import EmbeddingSimilarityScorer
 
-    # Initialize clients and scorers
-    client = OpenAI()
+    # Initialize scorer
     similarity_scorer = EmbeddingSimilarityScorer(
-        client=client,
-        threshold=0.7,
-        column_map={"target": "reference"}
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
+        threshold=0.7
     )
-
     # Create dataset
     dataset = [
         {
             "input": "He's name is John",
-            "reference": "John likes various types of cheese.",
+            "target": "John likes various types of cheese.",
         },
         {
             "input": "He's name is Pepe.",
-            "reference": "Pepe likes various types of cheese.",
+            "target": "Pepe likes various types of cheese.",
         },
     ]
-
     # Define model
     @weave.op
     def model(input: str) -> str:
@@ -269,14 +231,15 @@ import TabItem from '@theme/TabItem';
     )
     result = asyncio.run(evaluation.evaluate(model))
     print(result)
-    # {'EmbeddingSimilarityScorer': {'is_similar': {'true_count': 1, 'true_fraction': 0.5}, 'similarity_score': {'mean': 0.8448514031462045}}, 'model_latency': {'mean': 0.45862746238708496}}
+    # Example output:
+    # {'EmbeddingSimilarityScorer': {'is_similar': {'true_count': 1, 'true_fraction': 0.5}, 'similarity_score': {'mean': 0.844851403}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
 
     ## `ValidJSONScorer`
 
-    The ValidJSONScorer checks whether the AI system's output is valid JSON. This scorer is useful when you expect the output to be in JSON format and need to verify its validity.
+    The `ValidJSONScorer` checks whether the AI system's output is valid JSON. This scorer is useful when you expect the output to be in JSON format and need to verify its validity.
 
     ```python
     from weave.scorers import ValidJSONScorer
@@ -284,7 +247,7 @@ import TabItem from '@theme/TabItem';
     json_scorer = ValidJSONScorer()
     ```
 
-    Here you have an example usage of the `ValidJSONScorer` in the context of an evaluation:
+    Here is an example in the context of an evaluation:
 
     ```python
     import asyncio
@@ -309,14 +272,15 @@ import TabItem from '@theme/TabItem';
     evaluation = weave.Evaluation(dataset=dataset, scorers=[json_scorer])
     results = asyncio.run(evaluation.evaluate(model))
     print(results)
-    # {'ValidJSONScorer': {'json_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 8.58306884765625e-05}}
+    # Example output:
+    # {'ValidJSONScorer': {'json_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
 
     ## `ValidXMLScorer`
 
-    The `ValidXMLScorer` checks whether the AI system's output is valid XML. This is useful when expecting XML-formatted outputs.
+    The `ValidXMLScorer` checks whether the AI system's output is valid XML. It is useful when expecting XML-formatted outputs.
 
     ```python
     from weave.scorers import ValidXMLScorer
@@ -324,7 +288,7 @@ import TabItem from '@theme/TabItem';
     xml_scorer = ValidXMLScorer()
     ```
 
-    Here you have an example usage of the `ValidXMLScorer` in the context of an evaluation:
+    Here is an example in the context of an evaluation:
 
     ```python
     import asyncio
@@ -348,7 +312,8 @@ import TabItem from '@theme/TabItem';
     evaluation = weave.Evaluation(dataset=dataset, scorers=[xml_scorer])
     results = asyncio.run(evaluation.evaluate(model))
     print(results)
-    # {'ValidXMLScorer': {'xml_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': 8.20159912109375e-05}}
+    # Example output:
+    # {'ValidXMLScorer': {'xml_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
     ```
 
     ---
@@ -372,44 +337,45 @@ import TabItem from '@theme/TabItem';
 
     ## RAGAS - `ContextEntityRecallScorer`
 
-    The `ContextEntityRecallScorer` estimates context recall by extracting entities from both the AI system's output and the provided context, then computing the recall score. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library
+    The `ContextEntityRecallScorer` estimates context recall by extracting entities from both the AI system's output and the provided context, then computing the recall score. It is based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
 
     ```python
     from weave.scorers import ContextEntityRecallScorer
 
-    llm_client = ...  # initialise your LlM client
-
     entity_recall_scorer = ContextEntityRecallScorer(
-        client=llm_client
-        model_id="your-model-id"
+        model_id="openai/gpt-4o"
     )
     ```
 
     **How It Works:**
 
     - Uses an LLM to extract unique entities from the output and context and calculates recall.
-    - **Recall** indicates the proportion of important entities from the context that are captured in the output, helping to assess the model's effectiveness in retrieving relevant information.
+    - **Recall** indicates the proportion of important entities from the context that are captured in the output.
     - Returns a dictionary with the recall score.
 
     **Notes:**
 
-    - Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
+    - Expects a `context` column in your dataset. Use the `column_map` attribute if the column name is different.
 
     ---
 
     ## RAGAS - `ContextRelevancyScorer`
 
-    The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It helps determine if the context used is appropriate for generating the output. Based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
+    The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It is based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
 
     ```python
     from weave.scorers import ContextRelevancyScorer
 
-    llm_client = ...  # initialise your LlM client
-
     relevancy_scorer = ContextRelevancyScorer(
-        llm_client = ...  # initialise your LlM client
-        model_id="your-model-id"
-        )
+        model_id="openai/gpt-4o",  # or any other model supported by litellm
+        relevancy_prompt="""
+    Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
+
+    Question: {question}
+    Context: {context}
+    Relevancy Score (0-1):
+    """
+    )
     ```
 
     **How It Works:**
@@ -419,15 +385,14 @@ import TabItem from '@theme/TabItem';
 
     **Notes:**
 
-    - Expects a `context` column in your dataset, use `column_map` to map `context` to another dataset column if needed.
+    - Expects a `context` column in your dataset. Use `column_map` if a different name is used.
     - Customize the `relevancy_prompt` to define how relevancy is assessed.
 
-    Here you have an example usage of `ContextEntityRecallScorer` and `ContextRelevancyScorer` in the context of an evaluation:
+    Here is an example usage in the context of an evaluation:
 
     ```python
     import asyncio
     from textwrap import dedent
-    from openai import OpenAI
     import weave
     from weave.scorers import ContextEntityRecallScorer, ContextRelevancyScorer
 
@@ -437,9 +402,6 @@ import TabItem from '@theme/TabItem';
             "Retrieve relevant context"
             return "Paris is the capital of France."
 
-
-    model = RAGModel()
-
     # Define prompts
     relevancy_prompt: str = dedent("""
         Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
@@ -448,20 +410,9 @@ import TabItem from '@theme/TabItem';
         Context: {context}
         Relevancy Score (0-1):
         """)
-
-    # Initialize clients and scorers
-    llm_client = OpenAI()
-    entity_recall_scorer = ContextEntityRecallScorer(
-        client=client,
-        model_id="gpt-4o",
-    )
-
-    relevancy_scorer = ContextRelevancyScorer(
-        client=llm_client,
-        model_id="gpt-4o",
-        relevancy_prompt=relevancy_prompt
-    )
-
+    # Initialize scorers
+    entity_recall_scorer = ContextEntityRecallScorer()
+    relevancy_scorer = ContextRelevancyScorer(relevancy_prompt=relevancy_prompt)
     # Create dataset
     dataset = [
         {
@@ -473,17 +424,18 @@ import TabItem from '@theme/TabItem';
             "context": "William Shakespeare wrote many famous plays."
         }
     ]
-
     # Run evaluation
     evaluation = weave.Evaluation(
         dataset=dataset,
         scorers=[entity_recall_scorer, relevancy_scorer]
     )
-    results = asyncio.run(evaluation.evaluate(model))
+    results = asyncio.run(evaluation.evaluate(RAGModel()))
     print(results)
-    # {'ContextEntityRecallScorer': {'recall': {'mean': 0.3333333333333333}}, 'ContextRelevancyScorer': {'relevancy_score': {'mean': 0.5}}, 'model_latency': {'mean': 9.393692016601562e-05}}
+    # Example output:
+    # {'ContextEntityRecallScorer': {'recall': {'mean': ...}}, 
+    # 'ContextRelevancyScorer': {'relevancy_score': {'mean': ...}}, 
+    # 'model_latency': {'mean': ...}}
     ```
-
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
@@ -491,3 +443,14 @@ import TabItem from '@theme/TabItem';
     ```
   </TabItem>
 </Tabs>
+
+**Note:** The built-in scorers were calibrated using OpenAI models (e.g. `openai/gpt-4o`, `openai/text-embedding-3-small`). If you wish to experiment with other providers, you can simply update the `model_id`. For example, to use an Anthropic model:
+
+```python
+from weave.scorers import SummarizationScorer
+
+# Switch to Anthropic's Claude model
+summarization_scorer = SummarizationScorer(
+    model_id="anthropic/claude-3-5-sonnet-20240620"
+)
+```

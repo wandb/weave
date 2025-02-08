@@ -1,5 +1,5 @@
 import {useDeepMemo} from '@wandb/weave/hookUtils';
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
 
 import {builtinObjectClassRegistry} from './generatedBuiltinObjectClasses.zod';
@@ -11,7 +11,7 @@ import {
   TraceObjQueryReq,
   TraceObjSchema,
 } from './traceServerClientTypes';
-import {Loadable} from './wfDataModelHooksInterface';
+import {LoadableWithError} from './wfDataModelHooksInterface';
 
 type BuiltinObjectClassRegistry = typeof builtinObjectClassRegistry;
 type BuiltinObjectClassRegistryKeys = keyof BuiltinObjectClassRegistry;
@@ -23,6 +23,14 @@ export type TraceObjSchemaForBaseObjectClass<
   C extends BuiltinObjectClassRegistryKeys
 > = TraceObjSchema<BaseObjectClassType<C>, C>;
 
+type BaseObjectInstancesState<C extends BuiltinObjectClassRegistryKeys> =
+  LoadableWithError<Array<TraceObjSchemaForBaseObjectClass<C>>>;
+
+type BaseObjectInstancesResult<C extends BuiltinObjectClassRegistryKeys> =
+  BaseObjectInstancesState<C> & {
+    refetch: () => void;
+  };
+
 // Notice: this is still `base` object class, not `builtin` object class.
 // This means we can search by base object class, but not builtin object class today.
 // See https://github.com/wandb/weave/pull/3229 for more details.
@@ -33,34 +41,57 @@ export const useBaseObjectInstances = <
 >(
   baseObjectClassName: C,
   req: TraceObjQueryReq
-): Loadable<Array<TraceObjSchemaForBaseObjectClass<C>>> => {
-  const [objects, setObjects] = useState<
-    Array<TraceObjSchemaForBaseObjectClass<C>>
-  >([]);
+): BaseObjectInstancesResult<C> => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
   const deepReq = useDeepMemo(req);
   const currReq = useRef(deepReq);
-  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<BaseObjectInstancesState<C>>({
+    loading: true,
+    result: null,
+    error: null,
+  });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
+    if (doReload) {
+      setDoReload(false);
+    }
+    setResult({
+      loading: true,
+      result: null,
+      error: null,
+    });
     currReq.current = deepReq;
-    getBaseObjectInstances(client, baseObjectClassName, deepReq).then(
-      collectionObjects => {
+    getBaseObjectInstances(client, baseObjectClassName, deepReq)
+      .then(collectionObjects => {
         if (isMounted && currReq.current === deepReq) {
-          setObjects(collectionObjects);
-          setLoading(false);
+          setResult({
+            loading: false,
+            result: collectionObjects,
+            error: null,
+          });
         }
-      }
-    );
+      })
+      .catch(error => {
+        if (isMounted && currReq.current === deepReq) {
+          setResult({
+            loading: false,
+            result: null,
+            error,
+          });
+        }
+      });
     return () => {
       isMounted = false;
     };
-  }, [client, baseObjectClassName, deepReq]);
+  }, [client, baseObjectClassName, deepReq, doReload]);
 
-  return {result: objects, loading};
+  return {...result, refetch};
 };
 
 const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
