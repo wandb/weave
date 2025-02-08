@@ -7,7 +7,11 @@ from tests.trace.util import client_is_sqlite
 from weave import Scorer
 from weave.trace.op import Op
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsQueryReq, CallsQueryStatsReq
+from weave.trace_server.trace_server_interface import (
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    Query,
+)
 
 
 def assert_number_of_calls(client: WeaveClient, count: int):
@@ -37,6 +41,12 @@ def eq_expr(field: str, value: str) -> str:
 
 def call_ids(calls: list[weave.Call]) -> list[str]:
     return [c.id for c in calls]
+
+
+def stats_query(client: WeaveClient, query: Query) -> CallsQueryStatsReq:
+    return client.server.calls_query_stats(
+        CallsQueryStatsReq(project_id=client._project_id(), query=query)
+    ).count
 
 
 async def perform_scorer_tests(
@@ -117,68 +127,63 @@ async def perform_scorer_tests(
     expected_ids = call_ids(
         [call_scored_by_s0_v0, call_scored_by_s0_v0_and_s1_v0, call_scored_by_s0_v1]
     )
+    query = {"$expr": exists_expr(output_field_for_name(s0_name))}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client._project_id(),
-            query={"$expr": exists_expr(output_field_for_name(s0_name))},
-        )
+        CallsQueryReq(project_id=client._project_id(), query=query)
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_name])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
-    assert len(calls_high_level) == len(calls_low_level)
+    count = stats_query(client, query)
+    assert len(calls_high_level) == len(calls_low_level) == count
 
     # 2. Query for calls that have been scored by s0:v0
     expected_ids = call_ids([call_scored_by_s0_v0, call_scored_by_s0_v0_and_s1_v0])
+    query = {"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v0_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client._project_id(),
-            query={"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v0_uri)},
-        )
+        CallsQueryReq(project_id=client._project_id(), query=query)
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_v0_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
-    assert len(calls_high_level) == len(calls_low_level)
+    count = stats_query(client, query)
+    assert len(calls_high_level) == len(calls_low_level) == count
 
     # 3. Query for calls that have been scored by s0:v1
     expected_ids = call_ids([call_scored_by_s0_v1])
+    query = {"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v1_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client._project_id(),
-            query={"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v1_uri)},
-        )
+        CallsQueryReq(project_id=client._project_id(), query=query)
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_v1_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
-    assert len(calls_high_level) == len(calls_low_level)
+    count = stats_query(client, query)
+    assert len(calls_high_level) == len(calls_low_level) == count
 
     # 4. Query for calls that have been scored by s1:*
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
+    query = {"$expr": exists_expr(output_field_for_name(s1_name))}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client._project_id(),
-            query={"$expr": exists_expr(output_field_for_name(s1_name))},
-        )
+        CallsQueryReq(project_id=client._project_id(), query=query)
     ).calls
     calls_high_level = client.get_calls(scored_by=[s1_name])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
-    assert len(calls_high_level) == len(calls_low_level)
+    count = stats_query(client, query)
+    assert len(calls_high_level) == len(calls_low_level) == count
 
     # 5. Query for calls that have been scored by s1:v0
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
+    query = {"$expr": eq_expr(runnable_ref_field_for_name(s1_name), s1_v0_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client._project_id(),
-            query={"$expr": eq_expr(runnable_ref_field_for_name(s1_name), s1_v0_uri)},
-        )
+        CallsQueryReq(project_id=client._project_id(), query=query)
     ).calls
     calls_high_level = client.get_calls(scored_by=[s1_v0_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
-    assert len(calls_high_level) == len(calls_low_level)
+    count = stats_query(client, query)
+    assert len(calls_high_level) == len(calls_low_level) == count
 
 
 @pytest.mark.asyncio
