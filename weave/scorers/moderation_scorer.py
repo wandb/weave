@@ -1,4 +1,3 @@
-import os
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
@@ -11,7 +10,8 @@ from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
     check_score_param_type,
-    download_model,
+    ensure_hf_imports,
+    load_hf_model_weights,
 )
 
 if TYPE_CHECKING:
@@ -119,33 +119,21 @@ class WeaveToxicityScorer(RollingWindowScorer):
     )
 
     def _load_model(self) -> None:
-        try:
-            from transformers import AutoModelForSequenceClassification
-        except ImportError:
-            print(
-                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
-        """Initialize the toxicity model and tokenizer."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
+        ensure_hf_imports()
+        from transformers import AutoModelForSequenceClassification
 
-        self._model = AutoModelForSequenceClassification.from_pretrained(
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._model.eval()
+        self.model.eval()
 
     def _load_tokenizer(self) -> None:
-        try:
-            from transformers import AutoTokenizer
-        except ImportError:
-            print(
-                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        from transformers import AutoTokenizer
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
@@ -228,34 +216,21 @@ class WeaveBiasScorer(RollingWindowScorer):
     )
 
     def _load_model(self) -> None:
-        try:
-            from transformers import AutoModelForSequenceClassification
-        except ImportError:
-            print(
-                "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
+        ensure_hf_imports()
+        from transformers import AutoModelForSequenceClassification
 
-        """Initialize the bias model and tokenizer."""
-        if os.path.isdir(self.model_name_or_path):
-            self._local_model_path = self.model_name_or_path
-        elif self.model_name_or_path != "":
-            self._local_model_path = download_model(self.model_name_or_path)
-        else:
-            self._local_model_path = download_model(MODEL_PATHS["bias_scorer"])
-
-        self._model = AutoModelForSequenceClassification.from_pretrained(
+        self._local_model_path = load_hf_model_weights(
+            self.model_name_or_path, MODEL_PATHS["bias_scorer"]
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self._model.eval()
+        self.model.eval()
 
     def _load_tokenizer(self) -> None:
-        try:
-            from transformers import AutoTokenizer
-        except ImportError:
-            print(
-                f"The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
-            )
-        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        from transformers import AutoTokenizer
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
