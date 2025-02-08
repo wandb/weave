@@ -118,7 +118,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         ]
     )
 
-    def load_model(self) -> None:
+    def _load_model(self) -> None:
         try:
             from transformers import AutoModelForSequenceClassification
         except ImportError:
@@ -133,10 +133,10 @@ class WeaveToxicityScorer(RollingWindowScorer):
         else:
             self._local_model_path = download_model(MODEL_PATHS["toxicity_scorer"])
 
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self.model.eval()
+        self._model.eval()
 
     def load_tokenizer(self) -> None:
         try:
@@ -145,7 +145,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
             print(
                 "The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
             )
-        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
@@ -162,7 +162,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
 
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
             predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
         if isinstance(predictions, int):
             return [predictions]
@@ -227,7 +227,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         ]
     )
 
-    def load_model(self) -> None:
+    def _load_model(self) -> None:
         try:
             from transformers import AutoModelForSequenceClassification
         except ImportError:
@@ -243,10 +243,10 @@ class WeaveBiasScorer(RollingWindowScorer):
         else:
             self._local_model_path = download_model(MODEL_PATHS["bias_scorer"])
 
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self.model.eval()
+        self._model.eval()
 
     def load_tokenizer(self) -> None:
         try:
@@ -255,7 +255,7 @@ class WeaveBiasScorer(RollingWindowScorer):
             print(
                 f"The `transformers` package is required to use {self.__class__.__name__}, please run `pip install transformers`"
             )
-        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
@@ -263,7 +263,7 @@ class WeaveBiasScorer(RollingWindowScorer):
 
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
