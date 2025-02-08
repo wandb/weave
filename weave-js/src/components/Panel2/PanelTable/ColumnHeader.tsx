@@ -153,7 +153,7 @@ export const ColumnHeader: React.FC<{
   setCountColumnId,
 }) => {
   const weave = useWeaveContext();
-  const {stack} = usePanelContext();
+  const {stack, setUseColorsNode} = usePanelContext();
   const {columnFormat} = useContext(WeaveFormatContext);
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
@@ -279,6 +279,7 @@ export const ColumnHeader: React.FC<{
     );
     recordEvent('UNGROUP');
     updateTableState(newTableState);
+    setUseColorsNode(true);
   }, [
     countColumnId,
     setCountColumnId,
@@ -289,6 +290,7 @@ export const ColumnHeader: React.FC<{
     weave,
     stack,
     updateTableState,
+    setUseColorsNode,
   ]);
 
   const selectedNode = useMemo(
@@ -370,6 +372,7 @@ export const ColumnHeader: React.FC<{
             stack
           );
           updateTableState(newTableState);
+          setUseColorsNode(false);
         },
       });
     } else if (isGroupCol) {
