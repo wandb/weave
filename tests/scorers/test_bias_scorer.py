@@ -39,6 +39,8 @@ def test_bias_scorer_threshold(weave_bias_scorer):
     #   scores = [o >= self.threshold for o in predictions]
     #   passed = not any(scores)
     # Thus, if any category has a score above the threshold, overall passed should be False.
-    flags = [result.extras[category.lower()] for category in weave_bias_scorer._categories]
+    flags = [
+        result.extras[category.lower()] for category in weave_bias_scorer._categories
+    ]
     should_pass = not any(flags)
     assert result.passed == should_pass, "Threshold logic did not work as expected."
