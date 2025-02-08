@@ -126,6 +126,7 @@ async def perform_scorer_tests(
     calls_high_level = client.get_calls(scored_by=[s0_name])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
+    assert len(calls_high_level) == len(calls_low_level)
 
     # 2. Query for calls that have been scored by s0:v0
     expected_ids = call_ids([call_scored_by_s0_v0, call_scored_by_s0_v0_and_s1_v0])
@@ -138,6 +139,7 @@ async def perform_scorer_tests(
     calls_high_level = client.get_calls(scored_by=[s0_v0_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
+    assert len(calls_high_level) == len(calls_low_level)
 
     # 3. Query for calls that have been scored by s0:v1
     expected_ids = call_ids([call_scored_by_s0_v1])
@@ -150,6 +152,7 @@ async def perform_scorer_tests(
     calls_high_level = client.get_calls(scored_by=[s0_v1_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
+    assert len(calls_high_level) == len(calls_low_level)
 
     # 4. Query for calls that have been scored by s1:*
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
@@ -162,6 +165,7 @@ async def perform_scorer_tests(
     calls_high_level = client.get_calls(scored_by=[s1_name])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
+    assert len(calls_high_level) == len(calls_low_level)
 
     # 5. Query for calls that have been scored by s1:v0
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
@@ -174,6 +178,7 @@ async def perform_scorer_tests(
     calls_high_level = client.get_calls(scored_by=[s1_v0_uri])
     assert call_ids(calls_low_level) == expected_ids
     assert call_ids(calls_high_level) == expected_ids
+    assert len(calls_high_level) == len(calls_low_level)
 
 
 @pytest.mark.asyncio
