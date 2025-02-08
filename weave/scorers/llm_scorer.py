@@ -7,6 +7,9 @@ from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     from torch import Tensor
+    from transformers.modeling_utils import PreTrainedModel
+    from transformers.tokenization_utils import PreTrainedTokenizer
+    from transformers.pipelines.base import Pipeline
 
 
 class LLMScorer(weave.Scorer):
@@ -72,7 +75,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _pipeline: Optional[Any] = None
+    _pipeline: Pipeline = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
@@ -95,8 +98,8 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _model: Any = PrivateAttr(default=None)
-    _tokenizer: Any = PrivateAttr(default=None)
+    _model: PreTrainedModel = PrivateAttr(default=None)
+    _tokenizer: PreTrainedTokenizer = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
