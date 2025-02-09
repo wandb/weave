@@ -300,17 +300,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
-      # - name: Run nox (Clickhouse Only)
-      #   env:
-      #     WEAVE_SENTRY_ENV: ci
-      #     CI: 1
-      #     WB_SERVER_HOST: http://wandbservice
-      #     WF_CLICKHOUSE_HOST: localhost
-      #     WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-      #   run: |
-      #     nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-      #       -m "weave_client and not skip_clickhouse_client" \
-      #       --weave-server=clickhouse
+      - name: Run nox (Clickhouse Only)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "weave_client and not skip_clickhouse_client" \
+            --weave-server=clickhouse
       - name: Run nox
         env:
           WEAVE_SENTRY_ENV: ci
