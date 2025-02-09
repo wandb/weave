@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import json
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 import click
 import httpx
@@ -25,13 +26,13 @@ def header(text: str):
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """Weave code generation tools"""
 
 
-@cli.command()
+@cli.command()  # type: ignore
 @click.option("-o", "--output-file", help="Output file path for the OpenAPI spec")
-def get_openapi_spec(output_file: str | None = None):
+def get_openapi_spec(output_file: str | None = None) -> None:
     """Spin up a local FastAPI app and get the OpenAPI spec"""
     header("Getting OpenAPI spec")
 
@@ -82,7 +83,7 @@ def get_openapi_spec(output_file: str | None = None):
             server.wait()
 
 
-@cli.command()
+@cli.command()  # type: ignore
 @click.option("--python-path", help="Path to the Python code generation output")
 @click.option("--node-path", help="Path to the Node.js code generation output")
 @click.option("--typescript-path", help="Path to the TypeScript code generation output")
@@ -90,7 +91,7 @@ def generate_code(
     python_path: str | None = None,
     node_path: str | None = None,
     typescript_path: str | None = None,
-):
+) -> None:
     """Generate code from the OpenAPI spec"""
     header("Generating code with Stainless")
     cmd = [
@@ -111,27 +112,20 @@ def generate_code(
     subprocess.run(cmd, check=True)
 
 
-@cli.command()
+@cli.command()  # type: ignore
 @click.argument("repo_path", type=click.Path(exists=True))
 @click.argument("package_name")
 @click.option("--release", is_flag=True, help="Update to the latest version")
-def update_pyproject(repo_path: str, package_name: str, release: bool = False):
+def update_pyproject(repo_path: Path, package_name: str, release: bool = False) -> None:
     """Update the pyproject.toml file with the latest version of the generated code"""
     header("Updating pyproject.toml")
-    pyproject_path = next(
-        (Path(arg) for arg in sys.argv if arg.endswith("pyproject.toml")), None
-    )
-
-    repo_path = Path(repo_path)
     if release:
         version = _get_package_version(repo_path)
-        _update_pyproject_toml(package_name, version, True, pyproject_path)
+        _update_pyproject_toml(package_name, version, True)
         print(f"Updated {package_name} dependency to version: {version}")
     else:
         sha, remote_url = _get_repo_info(repo_path)
-        _update_pyproject_toml(
-            package_name, f"{remote_url}@{sha}", False, pyproject_path
-        )
+        _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
         print(f"Updated {package_name} dependency to SHA: {sha}")
 
 
@@ -184,23 +178,22 @@ def _get_package_version(repo_path: Path) -> str:
 
 
 def _update_pyproject_toml(
-    package_name: str,
+    package: str,
     value: str,
     is_version: bool,
-    pyproject_path: Optional[Path] = None,
 ) -> None:
-    pyproject_path = pyproject_path or Path("pyproject.toml")
+    pyproject_path = Path("pyproject.toml")
 
     with open(pyproject_path) as f:
         doc = tomlkit.parse(f.read())
 
     dependencies = doc["project"]["dependencies"]
     for i, dep in enumerate(dependencies):
-        if dep.startswith(package_name):
+        if dep.startswith(package):
             if is_version:
-                dependencies[i] = f"{package_name}=={value}"
+                dependencies[i] = f"{package}=={value}"
             else:
-                dependencies[i] = f"{package_name} @ git+{value}"
+                dependencies[i] = f"{package} @ git+{value}"
 
     with open(pyproject_path, "w") as f:
         f.write(tomlkit.dumps(doc))
