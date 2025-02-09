@@ -1,13 +1,13 @@
 import json
 from typing import Any
 
-from weave.trace_server.interface.builtin_object_classes.actions import (
-    LlmJudgeActionConfig,
-)
 from weave.trace_server.trace_server_interface import (
     CallSchema,
     CompletionsCreateReq,
     TraceServerInterface,
+)
+from weave.tsi.builtin_object_classes.actions import (
+    LlmJudgeActionConfig,
 )
 
 

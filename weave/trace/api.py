@@ -26,7 +26,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace_server.interface.builtin_object_classes import leaderboard
+from weave.tsi.builtin_object_classes import leaderboard
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None

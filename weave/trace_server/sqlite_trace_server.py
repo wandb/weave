@@ -26,7 +26,6 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
@@ -46,6 +45,7 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.tsi import query as tsi_query
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15

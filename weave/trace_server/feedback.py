@@ -3,10 +3,16 @@ from pydantic import ValidationError
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
+from weave.trace_server.orm import Column, Table
+from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
+from weave.trace_server.validation import (
+    validate_purge_req_multiple,
+    validate_purge_req_one,
+)
+from weave.tsi.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
 )
-from weave.trace_server.interface.feedback_types import (
+from weave.tsi.feedback_types import (
     ANNOTATION_FEEDBACK_TYPE_PREFIX,
     FEEDBACK_PAYLOAD_SCHEMAS,
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -14,12 +20,6 @@ from weave.trace_server.interface.feedback_types import (
     RunnablePayloadSchema,
     feedback_type_is_annotation,
     feedback_type_is_runnable,
-)
-from weave.trace_server.orm import Column, Table
-from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
-from weave.trace_server.validation import (
-    validate_purge_req_multiple,
-    validate_purge_req_one,
 )
 
 TABLE_FEEDBACK = Table(
