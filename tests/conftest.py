@@ -386,10 +386,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
             and not record.msg.startswith(
                 "Task failed: BadRequestError: Error code: 400 - ***'detail': 'API key must be exactly 40 characters long'***"
             )
-            and not (
-                '''"detail": "API key must be exactly 40 characters long"'''
-                in record.msg
-            )
+            and not ("API key must be exactly 40 characters long" in record.msg)
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
             and not "legacy" in record.name
