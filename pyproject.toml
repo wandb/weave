@@ -129,7 +129,7 @@ test = [
 
 [project.scripts]
 weave = "weave.trace.cli:cli"
-generate = "tools.stainless.do_everything:main"
+codegen = "tools.codegen.generate:cli"
 
 
 [project.urls]

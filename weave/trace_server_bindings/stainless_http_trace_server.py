@@ -1,3 +1,6 @@
+# This file began as a copy of the remote_http_trace_server.py file in the trace_server_bindings directory.
+# It has been modified to use the stainless generated client instead of the remote_http_trace_server.
+
 import io
 import json
 import logging
