@@ -125,15 +125,15 @@ class WeaveToxicityScorer(RollingWindowScorer):
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self.model.eval()
+        self._model.eval()
 
     def _load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
@@ -222,15 +222,15 @@ class WeaveBiasScorer(RollingWindowScorer):
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, device_map=self.device, trust_remote_code=True
         )
-        self.model.eval()
+        self._model.eval()
 
     def _load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
         print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
