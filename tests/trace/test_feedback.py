@@ -7,12 +7,12 @@ from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.trace_server_interface import (
+from weave.tsi import trace_server_interface as tsi
+from weave.tsi.trace_server_interface import (
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
 )
-from weave.tsi import trace_server_interface as tsi
 
 
 def test_client_feedback(client) -> None:
@@ -418,9 +418,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids
-        ), f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        assert found_ids == asc_ids, (
+            f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -437,9 +437,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids[::-1]
-        ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        assert found_ids == asc_ids[::-1], (
+            f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        )
 
 
 @pytest.mark.asyncio
@@ -486,9 +486,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == eq_ids
-        ), f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        assert found_ids == eq_ids, (
+            f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -506,9 +506,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == gt_ids
-        ), f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        assert found_ids == gt_ids, (
+            f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        )
 
 
 class MatchAnyDatetime:

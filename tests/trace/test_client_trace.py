@@ -34,12 +34,12 @@ from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
-from weave.trace_server.trace_server_interface_util import (
+from weave.tsi import trace_server_interface as tsi
+from weave.tsi.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
-from weave.tsi import trace_server_interface as tsi
 
 ## Hacky interface compatibility helpers
 

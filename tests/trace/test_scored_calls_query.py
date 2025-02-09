@@ -7,7 +7,7 @@ from tests.trace.util import client_is_sqlite
 from weave import Scorer
 from weave.trace.op import Op
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import (
+from weave.tsi.trace_server_interface import (
     CallsQueryReq,
     CallsQueryStatsReq,
     Query,

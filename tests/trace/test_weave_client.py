@@ -9,7 +9,7 @@ import pytest
 import requests
 
 import weave
-import weave.trace_server.trace_server_interface as tsi
+import weave.tsi.trace_server_interface as tsi
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -34,7 +34,7 @@ from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
-from weave.trace_server.trace_server_interface import (
+from weave.tsi.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     RefsReadBatchReq,

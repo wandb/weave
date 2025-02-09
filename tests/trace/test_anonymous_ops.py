@@ -1,5 +1,5 @@
 from weave.trace import weave_client
-from weave.trace_server.trace_server_interface import CallsQueryReq
+from weave.tsi.trace_server_interface import CallsQueryReq
 
 
 def test_named_op(client: weave_client.WeaveClient) -> str:

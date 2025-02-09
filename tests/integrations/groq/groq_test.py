@@ -9,7 +9,7 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.tsi.trace_server_interface import CallsFilter
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
