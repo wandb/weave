@@ -6,8 +6,8 @@ from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.settings import _context_vars
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.tsi import trace_server_interface as tsi
 
 
 @contextmanager

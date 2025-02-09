@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from typing import Any, Optional, cast
 
 from weave.trace_server import refs_internal as ri
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 def make_feedback_query_req(

@@ -4,11 +4,11 @@ from weave.trace import autopatch, errors, init_message, trace_sentry, weave_cli
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import use_server_cache
 from weave.trace_server import sqlite_trace_server
-from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import stainless_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.tsi.trace_server_interface import TraceServerInterface
 
 
 class InitializedClient:

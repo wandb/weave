@@ -1,6 +1,5 @@
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     _make_conditions_part,
@@ -10,6 +9,7 @@ from weave.trace_server.objects_query_builder import (
     _make_sort_part,
     make_objects_val_query_and_parameters,
 )
+from weave.tsi import trace_server_interface as tsi
 
 
 def test_make_limit_part():

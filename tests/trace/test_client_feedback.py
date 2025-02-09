@@ -1,7 +1,7 @@
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.tsi import trace_server_interface as tsi
 from weave.tsi.query import Query
 
 

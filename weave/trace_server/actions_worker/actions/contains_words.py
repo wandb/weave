@@ -1,12 +1,12 @@
 import json
 from typing import Any
 
-from weave.trace_server.trace_server_interface import (
-    CallSchema,
-    TraceServerInterface,
-)
 from weave.tsi.builtin_object_classes.actions import (
     ContainsWordsActionConfig,
+)
+from weave.tsi.trace_server_interface import (
+    CallSchema,
+    TraceServerInterface,
 )
 
 

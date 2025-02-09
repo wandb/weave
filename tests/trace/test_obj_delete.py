@@ -2,7 +2,7 @@ import pytest
 
 import weave
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:

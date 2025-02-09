@@ -12,16 +12,6 @@ from weave.trace_server.refs_internal import (
     InternalOpRef,
     parse_internal_uri,
 )
-from weave.trace_server.trace_server_interface import (
-    ActionsExecuteBatchReq,
-    CallSchema,
-    CallsFilter,
-    CallsQueryReq,
-    FeedbackCreateReq,
-    FeedbackCreateRes,
-    ObjReadReq,
-    TraceServerInterface,
-)
 from weave.tsi.builtin_object_classes.actions import (
     ActionConfigType,
     ActionSpec,
@@ -31,6 +21,16 @@ from weave.tsi.builtin_object_classes.actions import (
 from weave.tsi.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     RunnablePayloadSchema,
+)
+from weave.tsi.trace_server_interface import (
+    ActionsExecuteBatchReq,
+    CallSchema,
+    CallsFilter,
+    CallsQueryReq,
+    FeedbackCreateReq,
+    FeedbackCreateRes,
+    ObjReadReq,
+    TraceServerInterface,
 )
 
 ActionFnType = Callable[[str, ActionSpec, CallSchema, TraceServerInterface], Any]

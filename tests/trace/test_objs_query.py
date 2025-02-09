@@ -2,7 +2,7 @@ import base64
 
 import weave
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: int):

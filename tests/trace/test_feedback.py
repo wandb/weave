@@ -6,13 +6,13 @@ import weave
 from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
 )
+from weave.tsi import trace_server_interface as tsi
 
 
 def test_client_feedback(client) -> None:

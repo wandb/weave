@@ -11,7 +11,7 @@ from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 def flatten_calls(

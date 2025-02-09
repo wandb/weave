@@ -69,7 +69,13 @@ from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.tsi.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
+)
+from weave.tsi.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
@@ -104,12 +110,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TraceServerInterface,
-)
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
-from weave.tsi.feedback_types import (
-    RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    runnable_feedback_output_selector,
-    runnable_feedback_runnable_ref_selector,
 )
 
 if TYPE_CHECKING:

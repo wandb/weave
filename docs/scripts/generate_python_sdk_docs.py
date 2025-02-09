@@ -267,10 +267,7 @@ def main():
     from weave.trace import feedback, util
     from weave.trace import op as OpSpec
     from weave.trace import weave_client as client
-    from weave.trace_server import (
-        trace_server_interface,
-    )
-    from weave.tsi import query
+    from weave.tsi import query, trace_server_interface
 
     module_root_path = weave.__file__.split("/weave/__init__.py")[0]
     for module in [

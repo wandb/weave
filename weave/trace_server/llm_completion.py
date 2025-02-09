@@ -1,11 +1,11 @@
 from typing import Optional
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.tsi import trace_server_interface as tsi
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 

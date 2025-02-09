@@ -14,7 +14,7 @@ from weave.trace.settings import (
     server_cache_size_limit,
     use_server_cache,
 )
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 

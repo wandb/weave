@@ -1,10 +1,10 @@
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
 from weave.trace_server.orm import combine_conditions
 from weave.trace_server.trace_server_common import digest_is_version_like
+from weave.tsi import trace_server_interface as tsi
 
 VALID_OBJECT_SORT_FIELDS = {"created_at", "object_id"}
 VALID_SORT_DIRECTIONS = {"asc", "desc"}

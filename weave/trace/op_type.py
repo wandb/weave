@@ -25,7 +25,7 @@ from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace_server.trace_server_interface_util import str_digest
+from weave.tsi.trace_server_interface_util import str_digest
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")

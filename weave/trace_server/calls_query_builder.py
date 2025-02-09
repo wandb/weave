@@ -33,7 +33,6 @@ from typing import Literal, Optional, cast
 import sqlparse
 from pydantic import BaseModel, Field
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -43,10 +42,11 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
-from weave.trace_server.trace_server_interface_util import (
+from weave.tsi import query as tsi_query
+from weave.tsi import trace_server_interface as tsi
+from weave.tsi.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
-from weave.tsi import query as tsi_query
 
 logger = logging.getLogger(__name__)
 
