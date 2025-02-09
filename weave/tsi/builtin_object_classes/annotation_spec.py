@@ -4,7 +4,7 @@ import jsonschema
 from pydantic import BaseModel, Field, create_model, field_validator, model_validator
 from pydantic.fields import FieldInfo
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.tsi.builtin_object_classes import base_object_def
 
 SUPPORTED_PRIMITIVES = (int, float, bool, str)
 

@@ -1,6 +1,5 @@
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import (
     Column,
     ParamBuilder,
@@ -8,6 +7,7 @@ from weave.trace_server.orm import (
     _transform_external_field_to_internal_field,
     combine_conditions,
 )
+from weave.tsi import trace_server_interface as tsi
 
 
 def test_parambuilder_clickhouse():

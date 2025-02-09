@@ -33,9 +33,7 @@ from typing import Literal, Optional, cast
 import sqlparse
 from pydantic import BaseModel, Field
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidFieldError
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
@@ -44,7 +42,9 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
-from weave.trace_server.trace_server_interface_util import (
+from weave.tsi import query as tsi_query
+from weave.tsi import trace_server_interface as tsi
+from weave.tsi.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 
@@ -640,14 +640,14 @@ class CallsQuery(BaseModel):
             )
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
+        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}

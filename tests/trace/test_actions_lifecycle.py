@@ -3,10 +3,10 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.interface.builtin_object_classes.actions import (
+from weave.tsi.builtin_object_classes.actions import (
     ActionSpec,
 )
-from weave.trace_server.trace_server_interface import (
+from weave.tsi.trace_server_interface import (
     ActionsExecuteBatchReq,
     FeedbackCreateReq,
 )

@@ -11,7 +11,7 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 class BlockingTraceServer(tsi.TraceServerInterface):

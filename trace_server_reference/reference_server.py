@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 SERVICE_TAG_NAME = "Service"
 CALLS_TAG_NAME = "Calls"

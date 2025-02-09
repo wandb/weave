@@ -1,6 +1,6 @@
 from typing import Any
 
-from weave.trace_server.interface.query import (
+from weave.tsi.query import (
     GetFieldOperator,
     LiteralOperation,
     NotOperation,

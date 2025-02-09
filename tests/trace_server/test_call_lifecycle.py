@@ -2,7 +2,7 @@ import datetime
 import uuid
 
 from weave.trace import weave_client
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 def test_call_update_out_of_order(client: weave_client.WeaveClient):

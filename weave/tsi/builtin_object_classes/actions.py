@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional, Union
 import jsonschema
 from pydantic import BaseModel, Field, field_validator
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.tsi.builtin_object_classes import base_object_def
 
 
 class LlmJudgeActionConfig(BaseModel):

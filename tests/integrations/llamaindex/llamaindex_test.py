@@ -9,7 +9,7 @@ from weave.integrations.integration_utilities import (
     flattened_calls_to_names,
 )
 from weave.trace.weave_client import Call
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.tsi.trace_server_interface import CallsFilter
 
 
 def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:

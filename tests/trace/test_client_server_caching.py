@@ -9,7 +9,7 @@ import PIL
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
-from weave.trace_server.trace_server_interface import (
+from weave.tsi.trace_server_interface import (
     ObjReadReq,
     ObjReadRes,
     ObjSchema,

@@ -2,7 +2,6 @@ import base64
 import re
 from datetime import datetime
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
@@ -16,6 +15,7 @@ from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
+from weave.tsi import trace_server_interface as tsi
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -219,9 +219,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["ORG"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -462,7 +462,7 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
+        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
     """
     return raw_sql
 

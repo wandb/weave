@@ -7,7 +7,7 @@ from weave.integrations.integration_utilities import (
     flattened_calls_to_names,
 )
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.tsi import trace_server_interface as tsi
 
 
 @pytest.mark.skip_clickhouse_client

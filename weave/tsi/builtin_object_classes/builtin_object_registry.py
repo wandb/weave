@@ -1,12 +1,12 @@
-from weave.trace_server.interface.builtin_object_classes.actions import ActionSpec
-from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
+from weave.tsi.builtin_object_classes.actions import ActionSpec
+from weave.tsi.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
 )
-from weave.trace_server.interface.builtin_object_classes.base_object_def import (
+from weave.tsi.builtin_object_classes.base_object_def import (
     BaseObject,
 )
-from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
-from weave.trace_server.interface.builtin_object_classes.test_only_example import (
+from weave.tsi.builtin_object_classes.leaderboard import Leaderboard
+from weave.tsi.builtin_object_classes.test_only_example import (
     TestOnlyExample,
     TestOnlyNestedBaseObject,
 )

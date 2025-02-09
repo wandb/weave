@@ -14,8 +14,8 @@ from weave.trace.refs import parse_object_uri, parse_uri
 from weave.trace.rich import pydantic_util
 from weave.trace.rich.container import AbstractRichContainer
 from weave.trace.rich.refs import Refs
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
+from weave.tsi import trace_server_interface as tsi
+from weave.tsi.query import Query
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):

@@ -22,11 +22,11 @@ from weave.trace_server import (
     sqlite_trace_server,
 )
 from weave.trace_server import environment as ts_env
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import stainless_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.tsi import trace_server_interface as tsi
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"

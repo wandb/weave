@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic import create_model
 
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+from weave.tsi.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
 

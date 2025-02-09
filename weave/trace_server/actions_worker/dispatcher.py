@@ -6,23 +6,23 @@ from weave.trace_server.actions_worker.actions.contains_words import (
     do_contains_words_action,
 )
 from weave.trace_server.actions_worker.actions.llm_judge import do_llm_judge_action
-from weave.trace_server.interface.builtin_object_classes.actions import (
-    ActionConfigType,
-    ActionSpec,
-    ContainsWordsActionConfig,
-    LlmJudgeActionConfig,
-)
-from weave.trace_server.interface.feedback_types import (
-    RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    RunnablePayloadSchema,
-)
 from weave.trace_server.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
     InternalOpRef,
     parse_internal_uri,
 )
-from weave.trace_server.trace_server_interface import (
+from weave.tsi.builtin_object_classes.actions import (
+    ActionConfigType,
+    ActionSpec,
+    ContainsWordsActionConfig,
+    LlmJudgeActionConfig,
+)
+from weave.tsi.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    RunnablePayloadSchema,
+)
+from weave.tsi.trace_server_interface import (
     ActionsExecuteBatchReq,
     CallSchema,
     CallsFilter,
