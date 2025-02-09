@@ -219,10 +219,6 @@ class FutureExecutor:
         """
         wrapped = self._make_deadlock_safe(f)
 
-        print(
-            f"Submitting function {f.__name__=} to threadpool, with {args=}, {kwargs=}"
-        )
-
         if self._executor is None or self._in_thread_context.get():
             return self._execute_directly(wrapped, *args, **kwargs)
 
