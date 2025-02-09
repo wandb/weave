@@ -92,6 +92,7 @@ def generate_code(
     typescript_path: str | None = None,
 ):
     """Generate code from the OpenAPI spec"""
+    header("Generating code with Stainless")
     cmd = [
         "node",
         f"{CODEGEN_BUNDLE_PATH}",
@@ -116,6 +117,7 @@ def generate_code(
 @click.option("--release", is_flag=True, help="Update to the latest version")
 def update_pyproject(repo_path: str, package_name: str, release: bool = False):
     """Update the pyproject.toml file with the latest version of the generated code"""
+    header("Updating pyproject.toml")
     pyproject_path = next(
         (Path(arg) for arg in sys.argv if arg.endswith("pyproject.toml")), None
     )
