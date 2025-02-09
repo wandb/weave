@@ -2,7 +2,7 @@ import pytest
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.interface.query import Query
+from weave.tsi.query import Query
 
 
 def test_feedback_apis(client):

@@ -22,7 +22,7 @@ from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.builtin_object_classes.test_only_example import (
+from weave.tsi.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
 
