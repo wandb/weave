@@ -100,6 +100,15 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     pageSize: 50,
   });
 
+  // Reset sort model and pagination if we enter edit mode with sorting applied.
+  useEffect(() => {
+    if (isEditing && sortModel.length > 0) {
+      setPaginationModel({page: 0, pageSize: 50});
+      setSortModel([]);
+      setSortBy([]);
+    }
+  }, [isEditing, sortModel]);
+
   const sharedRef = useContext(WeaveCHTableSourceRefContext);
 
   const history = useHistory();
@@ -260,14 +269,16 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
 
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
-      return loadedRows.map(row => {
+      return loadedRows.map((row, i) => {
         const digest = row.digest;
+        const absoluteIndex =
+          i + paginationModel.pageSize * paginationModel.page;
         const value = flattenObjectPreservingWeaveTypes(row.val);
-        const editedRow = editedRows.get(row.original_index);
+        const editedRow = editedRows.get(absoluteIndex);
         return {
           ___weave: {
-            id: `${digest}_${row.original_index}`,
-            index: row.original_index,
+            id: `${digest}_${absoluteIndex}`,
+            index: absoluteIndex,
             isNew: false,
             serverValue: value,
           },
@@ -276,7 +287,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       });
     }
     return [];
-  }, [loadedRows, fetchQueryLoaded, editedRows]);
+  }, [loadedRows, fetchQueryLoaded, editedRows, paginationModel]);
 
   const combinedRows = useMemo(() => {
     if (
@@ -393,7 +404,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       flex: columnWidths[field as string] ? undefined : 1,
       minWidth: 100,
       editable: isEditing,
-      sortable: true,
+      sortable: !isEditing,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {

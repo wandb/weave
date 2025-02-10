@@ -51,11 +51,9 @@ def test_table_query(client: WeaveClient):
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     assert result_vals == data
     assert result_digests == row_digests
-    assert result_indices == list(range(len(data)))
 
 
 def test_table_query_stream(client: WeaveClient):
@@ -75,11 +73,9 @@ def test_table_query_stream(client: WeaveClient):
 
     result_vals = [r.val for r in rows]
     result_digests = [r.digest for r in rows]
-    result_indices = [r.original_index for r in rows]
 
     assert result_vals == data
     assert result_digests == row_digests
-    assert result_indices == list(range(len(data)))
 
 
 def test_table_query_invalid_digest(client: WeaveClient):
@@ -106,11 +102,9 @@ def test_table_query_filter_by_row_digests(client: WeaveClient):
     )
 
     result_digests = [r.digest for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     assert len(result_digests) == 3
     assert result_digests == filtered_digests
-    assert result_indices == [2, 3, 4]
 
 
 def test_table_query_invalid_row_digest(client: WeaveClient):
@@ -136,12 +130,10 @@ def test_table_query_limit(client: WeaveClient):
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     assert len(result_vals) == limit
     assert result_digests == row_digests[:limit]
     assert result_vals == list(data[:limit])
-    assert result_indices == list(range(limit))
 
 
 def test_table_query_offset(client: WeaveClient):
@@ -154,12 +146,10 @@ def test_table_query_offset(client: WeaveClient):
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     assert len(result_vals) == len(data) - offset
     assert result_digests == row_digests[offset:]
     assert result_vals == list(data[offset:])
-    assert result_indices == list(range(offset, len(data)))
 
 
 def test_table_query_sort_by_column(client: WeaveClient):
@@ -175,17 +165,12 @@ def test_table_query_sort_by_column(client: WeaveClient):
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
-    id_to_index = {d["id"]: i for i, d in enumerate(data)}
-    expected_indices = [id_to_index[d["id"]] for d in sorted_data]
-
     assert result_vals == sorted_data
     assert [r.val["id"] for r in res.rows] != [
         d["id"] for d in data
     ]  # Ensure order is different from original (assertion on the test itself)
-    assert result_indices == expected_indices
 
 
 def test_table_query_sort_by_nested_column(client: WeaveClient):
@@ -200,14 +185,13 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
     )
 
     result_vals = [r.val for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     sorted_data = sorted(data, key=lambda x: x["nested_col"]["prop_a"])
-    id_to_index = {d["id"]: i for i, d in enumerate(data)}
-    expected_indices = [id_to_index[d["id"]] for d in sorted_data]
-
     assert result_vals == sorted_data
-    assert result_indices == expected_indices
+
+    assert [r.val["id"] for r in res.rows] != [
+        d["id"] for d in data
+    ]  # Ensure order is different from original (assertion on the test itself)
 
 
 def test_table_query_combined(client: WeaveClient):
@@ -226,16 +210,13 @@ def test_table_query_combined(client: WeaveClient):
     )
 
     result_vals = [r.val for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
+    result_digests = [r.digest for r in res.rows]
 
     sorted_data = sorted(data, key=lambda x: x["id"], reverse=True)
     expected_data = sorted_data[offset : offset + limit]
-    id_to_index = {d["id"]: i for i, d in enumerate(data)}
-    expected_indices = [id_to_index[d["id"]] for d in expected_data]
 
     assert len(res.rows) == limit
     assert result_vals == expected_data
-    assert result_indices == expected_indices
 
 
 def test_table_query_multiple_sort_criteria(client: WeaveClient):
@@ -252,14 +233,12 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
         )
     )
     result_vals = [r.val for r in res.rows]
-    result_indices = [r.original_index for r in res.rows]
 
     sorted_data = sorted(data, key=lambda x: (x["col_0"], -x["id"]))
-    id_to_index = {d["id"]: i for i, d in enumerate(data)}
-    expected_indices = [id_to_index[d["id"]] for d in sorted_data]
-
     assert result_vals == sorted_data
-    assert result_indices == expected_indices
+    assert [r.val["id"] for r in res.rows] != [
+        d["id"] for d in data
+    ]  # Ensure order is different from original  (assertion on the test itself)
 
 
 def test_table_query_stats(client: WeaveClient):
@@ -326,23 +305,22 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     res2 = generate_duplication_simple_table_data(client, 10, 2)
     res3 = generate_duplication_simple_table_data(client, 10, 3)
 
-    # Test res1 (copy_count=1)
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res1["digest"],
         )
     )
+
     stats_res = client.server.table_query_stats(
         tsi.TableQueryStatsReq(
             project_id=client._project_id(),
             digest=res1["digest"],
         )
     )
-    assert len(res.rows) == stats_res.count == 10
-    assert [r.original_index for r in res.rows] == list(range(10))
 
-    # Test filtered query for res1
+    assert len(res.rows) == stats_res.count == 10
+
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
@@ -350,26 +328,25 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             filter=tsi.TableRowFilter(row_digests=[res1["row_digests"][0]]),
         )
     )
-    assert len(res.rows) == 1
-    assert [r.original_index for r in res.rows] == [0]
 
-    # Test res2 (copy_count=2)
+    assert len(res.rows) == 1
+
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res2["digest"],
         )
     )
+
     stats_res = client.server.table_query_stats(
         tsi.TableQueryStatsReq(
             project_id=client._project_id(),
             digest=res2["digest"],
         )
     )
-    assert len(res.rows) == stats_res.count == 20
-    assert [r.original_index for r in res.rows] == list(range(20))
 
-    # Test filtered query for res2
+    assert len(res.rows) == stats_res.count == 20
+
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
@@ -377,26 +354,25 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             filter=tsi.TableRowFilter(row_digests=[res2["row_digests"][0]]),
         )
     )
-    assert len(res.rows) == 2
-    assert [r.original_index for r in res.rows] == [0, 1]
 
-    # Test res3 (copy_count=3)
+    assert len(res.rows) == 2
+
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res3["digest"],
         )
     )
+
     stats_res = client.server.table_query_stats(
         tsi.TableQueryStatsReq(
             project_id=client._project_id(),
             digest=res3["digest"],
         )
     )
-    assert len(res.rows) == stats_res.count == 30
-    assert [r.original_index for r in res.rows] == list(range(30))
 
-    # Test filtered query for res3
+    assert len(res.rows) == stats_res.count == 30
+
     res = client.server.table_query(
         tsi.TableQueryReq(
             project_id=client._project_id(),
@@ -404,8 +380,8 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             filter=tsi.TableRowFilter(row_digests=[res3["row_digests"][0]]),
         )
     )
+
     assert len(res.rows) == 3
-    assert [r.original_index for r in res.rows] == [0, 1, 2]
 
 
 def test_duplicate_table_with_identical_rows(client: WeaveClient):
@@ -420,6 +396,8 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         )
     )
 
+    assert len(res1.row_digests) == 10
+
     # now create the same table with the same data
     res2 = client.server.table_create(
         tsi.TableCreateReq(
@@ -430,7 +408,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         )
     )
 
-    assert len(res1.row_digests) == 10
+    assert len(res2.row_digests) == 10
 
     # this is the same table!
     assert res1.digest == res2.digest
@@ -445,4 +423,3 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
 
     # this is the same table, so we should get the same number of rows
     assert len(res.rows) == 10
-    assert [r.original_index for r in res.rows] == list(range(10))
