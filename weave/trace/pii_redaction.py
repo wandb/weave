@@ -57,7 +57,10 @@ def redact_pii(
 
     return redact_recursive(data)
 
-def track_pii_redaction_enabled(username: str, entity_name: str, project_name: str):
+
+def track_pii_redaction_enabled(
+    username: str, entity_name: str, project_name: str
+) -> None:
     trace_sentry.global_trace_sentry.track_event(
         "pii_redaction_enabled",
         {

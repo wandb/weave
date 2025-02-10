@@ -1085,6 +1085,7 @@ class WeaveClient:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
+
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
             inputs_json = to_json(
@@ -1197,6 +1198,7 @@ class WeaveClient:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
+
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
             output_json = to_json(
