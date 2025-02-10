@@ -611,7 +611,6 @@ class TableUpdateRes(BaseModel):
 class TableRowSchema(BaseModel):
     digest: str
     val: Any
-    original_index: Optional[int] = None
 
 
 class TableCreateRes(BaseModel):
