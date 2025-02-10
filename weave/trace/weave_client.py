@@ -46,7 +46,6 @@ from weave.trace.object_record import (
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.pii_redaction import redact_pii
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -1085,6 +1084,7 @@ class WeaveClient:
         def send_start_call() -> None:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
             inputs_json = to_json(
@@ -1196,6 +1196,7 @@ class WeaveClient:
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
             output_json = to_json(
