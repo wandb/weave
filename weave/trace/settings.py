@@ -172,6 +172,7 @@ def should_redact_pii() -> bool:
 def redact_pii_fields() -> list[str]:
     return _list_str("redact_pii_fields")
 
+
 def use_server_cache() -> bool:
     return _should("use_server_cache")
 
@@ -218,10 +219,12 @@ def _optional_int(name: str) -> Optional[int]:
         return int(env)
     return _context_vars[name].get()
 
+
 def _list_str(name: str) -> list[str]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return env.split(",")
     return _context_vars[name].get() or []
+
 
 def _optional_str(name: str) -> Optional[str]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):

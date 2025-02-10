@@ -29,8 +29,8 @@ DEFAULT_REDACTED_FIELDS = [
 
 
 def redact_pii(
-    data: dict[str, Any],
-) -> dict[str, Any]:
+    data: dict[str, Any] | str,
+) -> dict[str, Any] | str:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     fields = redact_pii_fields()

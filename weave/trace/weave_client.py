@@ -1087,7 +1087,9 @@ class WeaveClient:
             if should_redact_pii():
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
-            inputs_json = to_json(maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False)
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1196,7 +1198,9 @@ class WeaveClient:
             if should_redact_pii():
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
-            output_json = to_json(maybe_redacted_output_as_refs, project_id, self, use_dictify=False)
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
