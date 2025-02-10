@@ -44,6 +44,7 @@ class AutopatchSettings(BaseModel):
     )
     google_genai_sdk: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    huggingface: IntegrationSettings = Field(default_factory=IntegrationSettings)
     instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -71,6 +72,9 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
+    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
+        get_huggingface_patcher,
+    )
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -97,6 +101,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
+    get_huggingface_patcher(settings.huggingface).attempt_patch()
 
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -114,6 +119,9 @@ def reset_autopatch() -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
+    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
+        get_huggingface_patcher,
+    )
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -140,6 +148,7 @@ def reset_autopatch() -> None:
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
+    get_huggingface_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()

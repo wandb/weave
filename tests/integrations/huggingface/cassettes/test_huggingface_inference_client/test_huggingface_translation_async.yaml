@@ -1,0 +1,41 @@
+interactions:
+- request:
+    body: null
+    headers:
+      user-agent:
+      - unknown/None; hf_hub/0.28.1; python/3.12.8
+    method: POST
+    uri: https://api-inference.huggingface.co/models/Helsinki-NLP/opus-mt-en-fr
+  response:
+    body:
+      string: "[{\"translation_text\":\"Je m'appelle Wolfgang et je vis \xE0 Berlin.\"}]"
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '67'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 06 Feb 2025 08:19:50 GMT
+      Vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      - origin, access-control-request-method, access-control-request-headers
+      x-compute-time:
+      - '0.249'
+      x-compute-type:
+      - cache
+      x-proxied-host:
+      - internal.api-inference.huggingface.co
+      x-proxied-path:
+      - /
+      x-request-id:
+      - 7fGCFe
+      x-sha:
+      - dd7f6540a7a48a7f4db59e5c0b9c42c8eea67f18
+    status:
+      code: 200
+      message: OK
+version: 1
