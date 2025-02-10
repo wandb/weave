@@ -1021,14 +1021,14 @@ class WeaveClient:
         inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
 
         if should_redact_pii():
-            prepared_inputs = redact_pii(inputs_sensitive_keys_redacted)
+            inputs_redacted = redact_pii(inputs_sensitive_keys_redacted)
         else:
-            prepared_inputs = inputs_sensitive_keys_redacted
+            inputs_redacted = inputs_sensitive_keys_redacted
 
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(prepared_inputs)
+            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
         else:
-            inputs_postprocessed = prepared_inputs
+            inputs_postprocessed = inputs_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1129,14 +1129,14 @@ class WeaveClient:
         original_output = output
 
         if should_redact_pii():
-            prepared_output = redact_pii(original_output)
+            output_redacted = redact_pii(original_output)
         else:
-            prepared_output = original_output
+            output_redacted = original_output
 
         if op is not None and op.postprocess_output:
-            postprocessed_output = op.postprocess_output(prepared_output)
+            postprocessed_output = op.postprocess_output(output_redacted)
         else:
-            postprocessed_output = prepared_output
+            postprocessed_output = output_redacted
 
         if _global_postprocess_output:
             postprocessed_output = _global_postprocess_output(postprocessed_output)
