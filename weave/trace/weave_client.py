@@ -44,7 +44,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -1186,20 +1186,34 @@ class WeaveClient:
 
         def send_end_call() -> None:
             output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=summary,
-                        exception=exception_str,
+            try:
+                self.server.call_end(
+                    CallEndReq(
+                        end=EndedCallSchemaForInsert(
+                            project_id=project_id,
+                            id=call.id,
+                            ended_at=ended_at,
+                            output=output_json,
+                            summary=summary,
+                            exception=exception_str,
+                        )
                     )
                 )
-            )
+            except Exception:
+                raise
+            else:
+                return True
 
-        self.future_executor.defer(send_end_call)
+        fut = self.future_executor.defer(send_end_call)
+
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    print_call_link(call)
+            except Exception:
+                pass
+
+        fut.add_done_callback(on_complete)
 
         call_context.pop_call(call.id)
 
