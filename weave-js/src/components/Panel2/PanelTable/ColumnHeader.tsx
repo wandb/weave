@@ -484,7 +484,11 @@ export const ColumnHeader: React.FC<{
           name: 'Remove all right',
           icon: 'next',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToRight(tableState, colId, stack);
+            const newTableState = Table.removeColumnsToRight(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_RIGHT');
             updateTableState(newTableState);
           },
@@ -494,7 +498,11 @@ export const ColumnHeader: React.FC<{
           name: 'Remove all left',
           icon: 'previous',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToLeft(tableState, colId, stack);
+            const newTableState = Table.removeColumnsToLeft(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_LEFT');
             updateTableState(newTableState);
           },
