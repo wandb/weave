@@ -64,7 +64,7 @@ image:
   tag: 24.8
 
 ## @param clusterName ClickHouse cluster name
-clusterName: cluster_1S_3R
+clusterName: weave_cluster
 
 ## @param shards Number of ClickHouse shards to deploy
 shards: 1
@@ -237,6 +237,11 @@ defaultConfigurationOverrides: |
 zookeeper:
   enabled: false
 ```
+
+W&B recommends keep the `clusterName` in the `values.yaml`  with the value `weave_cluster`
+This is the cluster name expected by the W&B Weave when executing the Database Migration.
+In case you want to use a different name, please refer to the [Setting clusterName](#setting-clustername) section of this documentation.
+
 ### Provide S3 Credentials
 
 You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having ClickHouse fetch the data from environment variables or an EC2 instance:
@@ -282,6 +287,15 @@ Confirm that ClickHouse is deployed using the following command:
 kubectl get pods -n <NAMESPACE>
 ```
 
+You should see the following pods
+
+```bash
+NAME                                 READY   STATUS    RESTARTS   AGE
+clickhouse-shard0-0                  1/1     Running   0          9m59s
+clickhouse-shard0-1                  1/1     Running   0          10m
+clickhouse-shard0-2                  1/1     Running   0          10m
+```
+
 ## Deploy Weave
 
 Weave is already available for automatic deployment via [W&B Operator](https://docs.wandb.ai/guides/hosting/operator/#wb-kubernetes-operator). With the W&B Platform installed, the next steps would be as follows:
@@ -321,12 +335,40 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
             password: <password>
             user: <username>
             database: wandb_weave
+            # This option must be true if replicating data across multiple nodes
+            replicated: true
 
           weave-trace:
             enabled: true
         [...]
         weave-trace:
           install: true
+        [...]
+    ```
+
+### Setting clusterName
+
+The `clusterName` in the `values.yaml` must be `weave_cluster` or the database migraiton will fail.
+In case a different cluster name is used, the environment variable `WF_CLICKHOUSE_REPLICATED_CLUSTER` should be configured in the `weave-trace.extraEnv` with the name choosen according to the example.
+
+    ```yaml
+        [...]
+          clickhouse:
+            host: <release-name>-headless.<namespace>.svc.cluster.local
+            port: 8123
+            password: <password>
+            user: <username>
+            database: wandb_weave
+            # This option must be true if replicating data across multiple nodes
+            replicated: true
+
+          weave-trace:
+            enabled: true
+        [...]
+        weave-trace:
+          install: true
+          extraEnv:
+            WF_CLICKHOUSE_REPLICATED_CLUSTER: "different_cluster_name"
         [...]
     ```
 
@@ -345,7 +387,7 @@ spec:
   values:
     global:
       license: eyJhbGnUzaHgyQjQyQWhEU3...ZieKQ2x5GGfw
-      host: https://abc-wandb.sandbox-gcp.wandb.ml
+      host: https://wandb.example.com
 
       bucket:
         name: abc-wandb-moving-pipefish
@@ -365,6 +407,8 @@ spec:
         password: <password>
         user: <username>
         database: wandb_weave
+        # This option must be true if replicating data across multiple nodes
+        replicated: true
 
       weave-trace:
         enabled: true
@@ -379,9 +423,14 @@ spec:
       install: true
 ```
 
-3. With the Custom Resource (CR) prepared, apply the new configuration:
+1. With the Custom Resource (CR) prepared, apply the new configuration:
 
     ```bash
     kubectl apply -n <NAMESPACE> -f wandb.yaml
     ```
 
+## Accessing Weave
+
+With the deployment up and running, when accessing W&B endpoint configured in the `host` option, you should see the Weave licensing enabled.
+
+![Weave](../../media/weave-self-managed/weave-org-dashboard.png)
