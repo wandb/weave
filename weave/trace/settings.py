@@ -66,9 +66,6 @@ class UserSettings(BaseModel):
 
     If True, redacts PII from trace data before sending to the server.
     Can be overrided with the environment variable `WEAVE_REDACT_PII`
-
-    WARNING: PII redaction is an experimental feature, and may not always work.
-    It will also introduce significant performance overhead when redacting large payloads.
     """
 
     redact_pii_fields: list[str] = []
