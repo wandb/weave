@@ -24,6 +24,9 @@ from weave.trace_server import (
 from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -203,6 +206,14 @@ def _check_server_up(host, port) -> bool:
                 "run",
                 "-d",
                 "--rm",
+                "-e",
+                "CLICKHOUSE_DB=default",
+                "-e",
+                "CLICKHOUSE_USER=default",
+                "-e",
+                "CLICKHOUSE_PASSWORD=",
+                "-e",
+                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
                 "-p",
                 f"{port}:8123",
                 "--name",
@@ -515,6 +526,9 @@ def create_client(
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
+        # This is disabled by default, but we explicitly enable it here for testing
+        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+        server = CachingMiddlewareTraceServer.from_env(server)
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)
         )

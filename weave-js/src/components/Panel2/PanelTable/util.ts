@@ -458,3 +458,15 @@ export const useBaseTableData = (
 export const tableIsPanelVariable = (stack: Stack) => {
   return stack && stack.find(node => node.name === 'input') !== undefined;
 };
+
+export const getColumnVariables = (currentTableState: Table.TableState) => {
+  return Object.keys(currentTableState.columns).reduce(
+    (acc: {[key: string]: NodeOrVoidNode}, colId) => {
+      const columnName =
+        currentTableState.columnNames[colId] || colId.replace(/-/g, '');
+      acc[columnName] = currentTableState.columnSelectFunctions[colId];
+      return acc;
+    },
+    {}
+  );
+};

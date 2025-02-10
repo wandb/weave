@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   MOON_200,
   MOON_700,
@@ -22,6 +23,7 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
 import {WFHighLevelOpVersionFilter} from '../OpsPage/opsPageTypes';
 import {Id} from './Id';
+import {opNiceName} from './opNiceName';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -211,14 +213,6 @@ export const OpLink: React.FC<{
       {props.opName}
     </Link>
   );
-};
-
-export const opNiceName = (opName: string) => {
-  let text = opName;
-  if (text.startsWith('op-')) {
-    text = text.slice(3);
-  }
-  return text;
 };
 
 export const opVersionText = (opName: string, versionIndex: number) => {
@@ -419,21 +413,31 @@ export const CustomLink: React.FC<{
 export const CallsLink: React.FC<{
   entity: string;
   project: string;
-  callCount: number;
+  callCount?: number;
   countIsLimited?: boolean;
   filter?: WFHighLevelCallFilter;
+  gridFilters?: GridFilterModel;
   neverPeek?: boolean;
   variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
+  let label = 'View Calls';
+  if (props.callCount != null) {
+    label = props.callCount.toString();
+    label += props.countIsLimited ? '+' : '';
+    label += maybePluralizeWord(props.callCount, 'call');
+  }
   return (
     <Link
       $variant={props.variant}
-      to={router.callsUIUrl(props.entity, props.project, props.filter)}>
-      {props.callCount}
-      {props.countIsLimited ? '+' : ''}{' '}
-      {maybePluralizeWord(props.callCount, 'call')}
+      to={router.callsUIUrl(
+        props.entity,
+        props.project,
+        props.filter,
+        props.gridFilters
+      )}>
+      {label}
     </Link>
   );
 };

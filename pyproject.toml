@@ -47,6 +47,7 @@ dependencies = [
   "jsonschema>=4.23.0",           # Used by scorers for field validation
   "presidio-analyzer==2.2.357",   # Used for PII redaction
   "presidio-anonymizer==2.2.357", # Used for PII redaction
+  "diskcache==5.6.3",             # Used for data caching
 ]
 
 [project.optional-dependencies]
@@ -57,6 +58,7 @@ cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 groq = ["groq>=0.13.0"]
+huggingface = ["huggingface-hub>=0.28.1"]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
@@ -77,21 +79,12 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
-scorers = ["Levenshtein>=0.26.0", "instructor>=1.5.2"]
-scorers_tests = [
-  "instructor>=1.5.2",
-  "Levenshtein>=0.26.0",
-  "openai>=1.0.0",
-  "google-generativeai>=0.8.0",
-  "mistralai>=1.0.3",
-  "anthropic>=0.30.0",
-  "litellm>=1.58.2",
-]
+scorers = ["Levenshtein>=0.26.0","litellm>=1.58"]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
 modal = ["modal", "python-dotenv"]
-vertexai = ["vertexai>=1.70.0"]
+vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
   "nox",
@@ -234,7 +227,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.33-dev0"
+current_version = "0.51.34-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

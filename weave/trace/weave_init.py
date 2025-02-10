@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.settings import should_redact_pii
+from weave.trace.settings import use_server_cache, should_redact_pii
 from weave.trace_server import sqlite_trace_server
+from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
 
 class InitializedClient:
@@ -103,22 +107,18 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    server: TraceServerInterface = remote_server
+    if use_server_cache():
+        server = CachingMiddlewareTraceServer.from_env(server)
 
-    # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
-        entity_name, project_name, remote_server, ensure_project_exists
+        entity_name, project_name, server, ensure_project_exists
     )
+
     # If the project name was formatted by init, update the project name
     project_name = client.project
 
     _current_inited_client = InitializedClient(client)
-    # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
-
-    # init_client = InitializedClient(client)  # type: ignore
 
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be

@@ -2,15 +2,14 @@ from datetime import datetime
 
 import pytest
 
+from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def test_cost_apis(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # dont run this test for sqlite
         return
 
@@ -143,8 +142,7 @@ def test_cost_apis(client):
 
 
 def test_purge_only_ids(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # dont run this test for sqlite
         return
 
