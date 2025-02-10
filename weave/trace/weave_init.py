@@ -130,6 +130,7 @@ def init_weave(
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
         from weave.trace.pii_redaction import track_pii_redaction_enabled
+
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
     try:
