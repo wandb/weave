@@ -841,11 +841,7 @@ export function insertColumnLeft(
   });
 }
 
-export function removeColumn(
-  ts: TableState,
-  colId: string,
-  stack: Stack | undefined = undefined
-) {
+export function removeColumn(ts: TableState, colId: string, stack?: Stack) {
   if (ts.groupBy.includes(colId)) {
     // We don't allow removing the group by column. The UI
     // removeColumnsToLeft and removeColumnsToRight from
