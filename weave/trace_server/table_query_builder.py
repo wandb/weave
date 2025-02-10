@@ -5,7 +5,7 @@ from weave.trace_server.orm import ParamBuilder
 # Constants for table and column names
 TABLE_ROWS_ALIAS = "tr"
 VAL_DUMP_COLUMN_NAME = "val_dump"
-ROW_ORDER_COLUMN_NAME = "original_index"
+ROW_ORDER_COLUMN_NAME = "row_order"
 
 
 def make_natural_sort_table_query(
@@ -36,22 +36,21 @@ def make_natural_sort_table_query(
             row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}}, {{{pb.add_param(limit)}: Int64}})"
 
     query = f"""
-    SELECT DISTINCT tr.digest, tr.val_dump, t.original_index + {{{pb.add_param(offset or 0)}: Int64}} - 1 as original_index
+    SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
     FROM table_rows tr
     INNER JOIN (
-        SELECT row_digest, original_index
+        SELECT row_digest, row_number() OVER () AS row_order
         FROM (
-            SELECT {row_digests_selection} as row_digests,
-                   arrayEnumerate(row_digests) as original_indices
+            SELECT {row_digests_selection} as row_digests
             FROM tables
             WHERE project_id = {{{project_id_name}: String}}
             AND digest = {{{digest_name}: String}}
             LIMIT 1
         )
-        ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
+        ARRAY JOIN row_digests AS row_digest
     ) AS t ON tr.digest = t.row_digest
     WHERE tr.project_id = {{{project_id_name}: String}}
-    ORDER BY original_index ASC
+    ORDER BY row_order ASC
     """
 
     return query
@@ -89,21 +88,20 @@ def make_standard_table_query(
     )
 
     query = f"""
-    SELECT tr.digest, tr.val_dump, tr.original_index FROM
+    SELECT tr.digest, tr.val_dump, tr.row_order FROM
     (
-        SELECT DISTINCT tr.digest, tr.val_dump, t.original_index
+        SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
         FROM table_rows tr
         INNER JOIN (
-            SELECT row_digest, original_index - 1 as original_index
+            SELECT row_digest, row_number() OVER () AS row_order
             FROM (
-                SELECT row_digests,
-                       arrayEnumerate(row_digests) as original_indices
+                SELECT row_digests
                 FROM tables
                 WHERE project_id = {{{project_id_name}: String}}
                 AND digest = {{{digest_name}: String}}
                 LIMIT 1
             )
-            ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
+            ARRAY JOIN row_digests AS row_digest
         ) AS t ON tr.digest = t.row_digest
         WHERE tr.project_id = {{{project_id_name}: String}}
         {sql_safe_filter_clause}
