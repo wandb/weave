@@ -903,7 +903,7 @@ export function removeColumnsToLeft(
   if (colIndex === -1) {
     throw new Error('invalid remove col id' + colId);
   }
-  for (let i = colIndex - 1; i > 0; i--) {
+  for (let i = colIndex - 1; i >= 0; i--) {
     ts = removeColumn(ts, ts.order[i], stack);
   }
   return ts;
