@@ -167,6 +167,8 @@ const PanelRunHistoryTablesStepper: React.FC<
   const exampleRowRefined = useNodeWithServerType(exampleRow);
   let defaultNode: NodeOrVoidNode = voidNode();
   if (currentStep) {
+    // This performs the following weave expression:
+    // runs.history.concat.filter((row) => row._step == <current-step>)[<table-history-key>].concat
     defaultNode = opConcat({
       arr: opTableRows({
         table: opFileTable({
