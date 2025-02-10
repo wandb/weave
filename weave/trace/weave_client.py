@@ -1184,25 +1184,21 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_end_call() -> bool:
             output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
-            try:
-                self.server.call_end(
-                    CallEndReq(
-                        end=EndedCallSchemaForInsert(
-                            project_id=project_id,
-                            id=call.id,
-                            ended_at=ended_at,
-                            output=output_json,
-                            summary=summary,
-                            exception=exception_str,
-                        )
+            self.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=summary,
+                        exception=exception_str,
                     )
                 )
-            except Exception:
-                raise
-            else:
-                return True
+            )
+            return True
 
         fut = self.future_executor.defer(send_end_call)
 
