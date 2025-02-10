@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.pii_redaction import track_pii_redaction_enabled
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server.trace_server_interface import TraceServerInterface
@@ -127,16 +128,9 @@ def init_weave(
 
     username = get_username()
 
-    # This is a temporary event to track the number of users who have enabled PII redacting.
+    # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
-        trace_sentry.global_trace_sentry.track_event(
-            "pii_redaction_enabled",
-            {
-                "entity_name": entity_name,
-                "project_name": project_name,
-            },
-            username,
-        )
+        track_pii_redaction_enabled(username, entity_name, project_name)
 
     try:
         min_required_version = (

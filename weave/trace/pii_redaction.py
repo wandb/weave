@@ -4,6 +4,7 @@ from typing import Any
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
+from weave.trace import trace_sentry
 from weave.trace.settings import redact_pii_fields
 
 DEFAULT_REDACTED_FIELDS = [
@@ -55,3 +56,13 @@ def redact_pii(
             pass
 
     return redact_recursive(data)
+
+def track_pii_redaction_enabled(username: str, entity_name: str, project_name: str):
+    trace_sentry.global_trace_sentry.track_event(
+        "pii_redaction_enabled",
+        {
+            "entity_name": entity_name,
+            "project_name": project_name,
+        },
+        username,
+    )
