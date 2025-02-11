@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 
 import weave
 from weave import Scorer
@@ -47,7 +47,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         regex_patterns (Optional[dict[str, list[dict[str, str]]]]): A dictionary of entity
             types and their corresponding regex patterns.
         custom_recognizers (Optional[list[EntityRecognizer]]): A list of custom recognizers to add to the
-            analyzer.
+            analyzer that are of type `presidio.EntityRecognizer`.
     """
 
     @property
@@ -62,9 +62,25 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             for recognizer in analyzer.registry.recognizers
         ]
 
-    selected_entities: list[str]
-    should_anonymize: bool
-    language: str
+    selected_entities: list[str] = Field(
+        default_factory=get_available_entities,
+        description="A list of entity types to detect in the text.",
+    )
+    should_anonymize: bool = Field(
+        default=True,
+        description="A flag indicating whether detected entities should be anonymized.",
+    )
+    language: str = Field(
+        default="en", description="The language of the text to be analyzed."
+    )
+    deny_lists: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="A dictionary of entity types and their corresponding deny lists.",
+    )
+    regex_patterns: dict[str, list[dict[str, str]]] = Field(
+        default_factory=dict,
+        description="A dictionary of entity types and their corresponding regex patterns.",
+    )
     _analyzer: "AnalyzerEngine" = PrivateAttr(None)
     _anonymizer: "AnonymizerEngine" = PrivateAttr(None)
 
@@ -138,6 +154,8 @@ class PresidioEntityRecognitionGuardrail(Scorer):
             selected_entities=selected_entities,
             language=language,
             should_anonymize=should_anonymize,
+            deny_lists=deny_lists,
+            regex_patterns=regex_patterns,
         )
         self._analyzer = analyzer
         self._anonymizer = anonymizer
