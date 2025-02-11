@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-from weave.scorers.llm_scorer import HuggingFaceScorer, LLMScorer
+from weave.scorers.llm_scorer import HuggingFacePipelineScorer, LLMScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
@@ -187,7 +187,7 @@ class HallucinationFreeScorer(LLMScorer):
 HALLUCINATION_SCORER_THRESHOLD = 0.35
 
 
-class WeaveHallucinationScorer(HuggingFaceScorer):
+class WeaveHallucinationScorer(HuggingFacePipelineScorer):
     """
     A scorer that detects hallucinations in the output, given an query and context. This scorer
     uses the HHEM 2.1 model from Vectara, https://huggingface.co/vectara/hallucination_evaluation_model
@@ -231,26 +231,18 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
     _local_model_path: str = ""
     import_failed: bool = False
 
-    def load_model(self) -> None:
+    def load_pipeline(self) -> None:
         ensure_hf_imports()
-        from transformers import AutoModelForSequenceClassification
+        from transformers import pipeline
 
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["hallucination_hhem_scorer"]
         )
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path,
-            torch_dtype="bfloat16",
+        self._pipeline = pipeline(
+            "pair-classification",
+            model=self._local_model_path,
             trust_remote_code=True,
-            device_map=self.device,
         )
-        self.model.eval()
-
-    def load_tokenizer(self) -> None:
-        self._tokenizer = (
-            self.model.tokenzier
-        )  # Deliberately misspelled "tokenzier", from original model
-        self._tokenizer.model_max_length = self.model_max_length
 
     @weave.op
     def score(
@@ -267,6 +259,7 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         check_score_param_type(query, str, "query", self)
         check_score_param_type(context, (str, list), "context", self)
         check_score_param_type(output, str, "output", self)
+        tokenizer = self._pipeline.tokenizer
 
         if self.import_failed:
             return WeaveScorerResult(
@@ -280,8 +273,8 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
         inps = query + "\n\n" + context_str
         outs = output
 
-        inps_toks = self._tokenizer(inps, truncation=False)
-        outs_toks = self._tokenizer(outs, truncation=False)
+        inps_toks = tokenizer(inps, truncation=False)
+        outs_toks = tokenizer(outs, truncation=False)
 
         len_inps = len(inps_toks.input_ids)
         len_outs = len(outs_toks.input_ids)
@@ -296,12 +289,12 @@ class WeaveHallucinationScorer(HuggingFaceScorer):
                 inps_input_ids = inps_toks.input_ids[:975]
                 out_input_ids = outs_toks.input_ids[: self.model_max_length - 1025]
 
-            inps = self._tokenizer.decode(inps_input_ids)
-            outs = self._tokenizer.decode(out_input_ids)
+            inps = tokenizer.decode(inps_input_ids)
+            outs = tokenizer.decode(out_input_ids)
 
-        pairs = [(inps, outs)]
-        pred = self.model.predict(pairs)
-        score = 1 - pred.item()
+        pair = (inps, outs)
+        pred = self._pipeline(pair)
+        score = 1 - pred
         return WeaveScorerResult(
             passed=score <= self.threshold,
             extras={"score": score},
