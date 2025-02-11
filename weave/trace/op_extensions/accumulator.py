@@ -263,9 +263,13 @@ def add_accumulator(
         on_finish: FinishCallbackType,
         inputs: dict,
     ) -> (
+        # Iterator[V] returned when value is Iterator[V] and not `should_accumulate`
         Iterator[V]
+        # Coroutine[Any, Any, Iterator[V]] returned when value is Coroutine[Any, Any, Iterator[V]] and not `should_accumulate`
         | Coroutine[Any, Any, Iterator[V]]
+        # _IteratorWrapper[V] returned when value is Iterator[V] and `should_accumulate`
         | _IteratorWrapper[V]
+        # Coroutine[Any, Any, _IteratorWrapper[V]] returned when value is Coroutine[Any, Any, Iterator[V]] and `should_accumulate`
         | Coroutine[Any, Any, _IteratorWrapper[V]]
     ):
         def wrapped_on_finish(final_value: Any, e: BaseException | None = None) -> None:
