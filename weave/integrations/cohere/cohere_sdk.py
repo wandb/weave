@@ -131,6 +131,7 @@ def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         user_provided_postprocess_output = op_kwargs.pop("postprocess_output")
+
         def postprocess_output(response: Any) -> Any:
             try:
                 from cohere.v2.types.non_streamed_chat_response2 import (
@@ -148,8 +149,8 @@ def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
             except:
                 pass  # prompt to upgrade cohere sdk
             if user_provided_postprocess_output:
-                new_output = user_provided_postprocess_output(new_output)
-            return new_output
+                response = user_provided_postprocess_output(response)
+            return response
 
         op_kwargs["postprocess_output"] = postprocess_output
 
