@@ -140,8 +140,8 @@ class RollingWindowScorer(HuggingFaceScorer):
         Returns:
             A tensor of tokenized input IDs.
         """
-        assert self.tokenizer is not None
-        return self.tokenizer(
+        assert self._tokenizer is not None
+        return self._tokenizer(
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
 

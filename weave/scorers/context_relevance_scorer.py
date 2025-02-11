@@ -85,7 +85,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         ensure_hf_imports()
         from transformers import AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self._tokenizer = AutoTokenizer.from_pretrained(
             self._local_model_path,
             model_max_length=self.model_max_length,
         )
@@ -97,8 +97,8 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         """Score a single document."""
         import torch
 
-        input_text = query + f" {self.tokenizer.sep_token} " + document
-        model_inputs = self.tokenizer(
+        input_text = query + f" {self._tokenizer.sep_token} " + document
+        model_inputs = self._tokenizer(
             input_text,
             truncation=True,
             max_length=self.model_max_length,
@@ -143,7 +143,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         token_ids = model_inputs["input_ids"].cpu().numpy()[0]
 
         for start, end in zip(starts, ends):
-            span_text = self.tokenizer.decode(token_ids[start:end])
+            span_text = self._tokenizer.decode(token_ids[start:end])
             span_prob = positive_probs[start:end].mean()
             spans_with_probs.append({"text": span_text, "score": float(span_prob)})
 
