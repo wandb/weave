@@ -1,0 +1,55 @@
+interactions:
+- request:
+    body: '{"inputs": null, "parameters": {"model": "google/tapas-base-finetuned-wtq"},
+      "query": "How many stars does the transformers repository have?", "table": {"Repository":
+      ["Transformers", "Datasets", "Tokenizers"], "Stars": ["36542", "4512", "3934"]}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '247'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - 4b9c888a-251d-44a2-a041-2e9adc45c640
+      user-agent:
+      - unknown/None; hf_hub/0.28.1; python/3.12.8
+    method: POST
+    uri: https://api-inference.huggingface.co/models/google/tapas-base-finetuned-wtq
+  response:
+    body:
+      string: '{"answer":"AVERAGE > 36542","coordinates":[[0,1]],"cells":["36542"],"aggregator":"AVERAGE"}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '91'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 06 Feb 2025 08:04:18 GMT
+      access-control-allow-credentials:
+      - 'true'
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      - origin, access-control-request-method, access-control-request-headers
+      x-compute-time:
+      - '1.421'
+      x-compute-type:
+      - cache
+      x-proxied-host:
+      - internal.api-inference.huggingface.co
+      x-proxied-path:
+      - /
+      x-request-id:
+      - MnRduX
+      x-sha:
+      - e3dde1905dea877b0df1a5c057533e48327dee77
+    status:
+      code: 200
+      message: OK
+version: 1
