@@ -1,5 +1,9 @@
 # HuggingFace Hub
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_huggingface.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 [Hugging Face Hub](https://hf.co/) is a machine learning platform for creators and collaborators containing pre-trained models and datasets for your projects.
 The `huggingface_hub` library provides a unified interface to run inference across multiple services for models hosted on the Hugging Face Hub which can be called
 with the [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client) object.
