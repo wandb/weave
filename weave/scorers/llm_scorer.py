@@ -92,12 +92,12 @@ class HuggingFaceScorer(weave.Scorer):
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
         self.device = set_device(self.device)
-        if self.model is None:
+        if self._model is None:
             self.load_model()
         else:
             print("Using user-provided model.")
 
-        if self.tokenizer is None:
+        if self._tokenizer is None:
             self.load_tokenizer()
         else:
             print("Using user-provided tokenizer.")
