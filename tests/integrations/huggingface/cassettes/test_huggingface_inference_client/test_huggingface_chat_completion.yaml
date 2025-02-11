@@ -1,0 +1,59 @@
+interactions:
+- request:
+    body: '{"model": "meta-llama/Llama-3.2-11B-Vision-Instruct", "max_tokens": 500,
+      "seed": 42, "stream": false, "messages": [{"role": "user", "content": [{"type":
+      "image_url", "image_url": {"url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"}},
+      {"type": "text", "text": "Describe this image in one sentence."}]}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '351'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - c1755c47-504f-4caa-903f-9ea2932b2af2
+      user-agent:
+      - unknown/None; hf_hub/0.28.1; python/3.12.8
+    method: POST
+    uri: https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
+  response:
+    body:
+      string: '{"object":"chat.completion","id":"","created":1738817179,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        image appears to be a classic depiction of the Statue of Liberty, a iconic
+        landmark and symbol of freedom, standing tall with the Manhattan skyline in
+        the background."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":33,"total_tokens":77}}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '496'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 06 Feb 2025 04:50:22 GMT
+      access-control-allow-credentials:
+      - 'true'
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      - origin, access-control-request-method, access-control-request-headers
+      x-compute-time:
+      - '2.251821129'
+      x-compute-type:
+      - cache
+      x-proxied-host:
+      - internal.api-inference.huggingface.co
+      x-proxied-path:
+      - /v1/chat/completions
+      x-request-id:
+      - D4WMie
+      x-sha:
+      - 9eb2daaa8597bf192a8b0e73f848f3a102794df5
+    status:
+      code: 200
+      message: OK
+version: 1

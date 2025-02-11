@@ -781,7 +781,7 @@ const modelLatencyMetricDimension: MetricDefinition = {
 const totalTokensMetricDimension: MetricDefinition = {
   source: 'derived',
   scoreType: 'continuous',
-  metricSubPath: ['Total Tokens (avg)'],
+  metricSubPath: ['Total Tokens'],
   shouldMinimize: true,
   unit: '',
 };

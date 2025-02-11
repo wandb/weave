@@ -241,6 +241,7 @@ jobs:
             "cohere",
             "dspy",
             "groq",
+            "huggingface",
             "google_ai_studio",
             "instructor",
             "langchain",
