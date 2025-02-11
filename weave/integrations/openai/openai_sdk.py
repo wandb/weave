@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
@@ -308,6 +309,9 @@ def openai_on_input_handler(
     return None
 
 
+should_skip_last = contextvars.ContextVar("should_skip_last", default=False)
+
+
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
@@ -315,25 +319,32 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                skip_last = False
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
+                    skip_last = True
+
+                token = should_skip_last.set(skip_last)
+                res = fn(*args, **kwargs)
+                should_skip_last.reset(token)
+                return res
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
+        def make_accumulator(inputs: dict) -> Callable[[Any, Any], Any]:
+            skip_last = should_skip_last.get()
+
+            def _accumulator(acc: Any, value: Any) -> Any:
+                return openai_accumulator(acc, value, skip_last=skip_last)
+
+            return _accumulator
 
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op = add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
+            make_accumulator=make_accumulator,
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
@@ -352,25 +363,32 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
             async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                skip_last = False
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
+                    skip_last = True
+
+                token = should_skip_last.set(skip_last)
+                res = await fn(*args, **kwargs)
+                should_skip_last.reset(token)
+                return res
 
             return _wrapper
 
-        def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
+        def make_accumulator(inputs: dict) -> Callable[[Any, Any], Any]:
+            skip_last = should_skip_last.get()
+
+            def _accumulator(acc: Any, value: Any) -> Any:
+                return openai_accumulator(acc, value, skip_last=skip_last)
+
+            return _accumulator
 
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op = add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
+            make_accumulator=make_accumulator,
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
