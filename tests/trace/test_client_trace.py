@@ -35,7 +35,6 @@ from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -2165,8 +2164,7 @@ def test_call_query_stream_columns(client):
 
 
 def test_call_query_stream_columns_with_costs(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # dont run this test for sqlite
         return
 

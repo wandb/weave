@@ -241,6 +241,7 @@ jobs:
             "cohere",
             "dspy",
             "groq",
+            "huggingface",
             "google_ai_studio",
             "instructor",
             "langchain",
@@ -251,7 +252,7 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "scorers_tests",
+            "scorers",
             "pandas-test",
           ]
       fail-fast: false
@@ -276,6 +277,11 @@ jobs:
           --health-start-period=10s
       weave_clickhouse:
         image: clickhouse/clickhouse-server
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
         ports:
           - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
@@ -314,6 +320,7 @@ jobs:
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

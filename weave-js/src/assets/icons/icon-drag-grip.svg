@@ -1,8 +1,8 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M16.5 6.5C17.3284 6.5 18 5.82843 18 5C18 4.17157 17.3284 3.5 16.5 3.5C15.6716 3.5 15 4.17157 15 5C15 5.82843 15.6716 6.5 16.5 6.5Z" fill="currentColor"/>
-<path d="M9 12C9 12.8284 8.32843 13.5 7.5 13.5C6.67157 13.5 6 12.8284 6 12C6 11.1716 6.67157 10.5 7.5 10.5C8.32843 10.5 9 11.1716 9 12Z" fill="currentColor"/>
-<path d="M18 19C18 19.8284 17.3284 20.5 16.5 20.5C15.6716 20.5 15 19.8284 15 19C15 18.1716 15.6716 17.5 16.5 17.5C17.3284 17.5 18 18.1716 18 19Z" fill="currentColor"/>
-<path d="M7.5 6.5C8.32843 6.5 9 5.82843 9 5C9 4.17157 8.32843 3.5 7.5 3.5C6.67157 3.5 6 4.17157 6 5C6 5.82843 6.67157 6.5 7.5 6.5Z" fill="currentColor"/>
-<path d="M9 19C9 19.8284 8.32843 20.5 7.5 20.5C6.67157 20.5 6 19.8284 6 19C6 18.1716 6.67157 17.5 7.5 17.5C8.32843 17.5 9 18.1716 9 19Z" fill="currentColor"/>
-<path d="M16.5 13.5C17.3284 13.5 18 12.8284 18 12C18 11.1716 17.3284 10.5 16.5 10.5C15.6716 10.5 15 11.1716 15 12C15 12.8284 15.6716 13.5 16.5 13.5Z" fill="currentColor"/>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" preserveAspectRatio="xMidYMid meet">
+  <path d="M17.5 5C17.5 5.55228 17.0523 6 16.5 6C15.9477 6 15.5 5.55228 15.5 5C15.5 4.44772 15.9477 4 16.5 4C17.0523 4 17.5 4.44772 17.5 5Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <path d="M8.5 12C8.5 12.5523 8.05228 13 7.5 13C6.94772 13 6.5 12.5523 6.5 12C6.5 11.4477 6.94772 11 7.5 11C8.05228 11 8.5 11.4477 8.5 12Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <path d="M17.5 19C17.5 19.5523 17.0523 20 16.5 20C15.9477 20 15.5 19.5523 15.5 19C15.5 18.4477 15.9477 18 16.5 18C17.0523 18 17.5 18.4477 17.5 19Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <path d="M8.5 5C8.5 5.55228 8.05229 6 7.5 6C6.94772 6 6.5 5.55228 6.5 5C6.5 4.44772 6.94772 4 7.5 4C8.05229 4 8.5 4.44772 8.5 5Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <path d="M8.5 19C8.5 19.5523 8.05229 20 7.5 20C6.94772 20 6.5 19.5523 6.5 19C6.5 18.4477 6.94772 18 7.5 18C8.05229 18 8.5 18.4477 8.5 19Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <path d="M17.5 12C17.5 12.5523 17.0523 13 16.5 13C15.9477 13 15.5 12.5523 15.5 12C15.5 11.4477 15.9477 11 16.5 11C17.0523 11 17.5 11.4477 17.5 12Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
 </svg>
