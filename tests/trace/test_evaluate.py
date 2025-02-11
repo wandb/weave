@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import pytest
 
@@ -286,6 +287,43 @@ def test_scorer_name_sanitization(scorer_name):
 
     result = asyncio.run(evaluation.evaluate(model))
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
+
+
+def test_sync_eval_parallelism(client):
+    @weave.op()
+    def sync_op(a):
+        time.sleep(1)
+        return a
+
+    @weave.op()
+    def score(output):
+        return 1
+
+    dataset = [
+        {"a": 1},
+        {"a": 2},
+        {"a": 3},
+        {"a": 4},
+        {"a": 5},
+        {"a": 6},
+        {"a": 7},
+        {"a": 8},
+        {"a": 9},
+        {"a": 10},
+    ]
+
+    # 10 rows, should complete in <5 seconds. if sync, 10+
+
+    now = time.time()
+
+    evaluation = Evaluation(dataset=dataset, scorers=[score])
+    result = asyncio.run(evaluation.evaluate(sync_op))
+    assert result == {
+        "output": {"mean": 5.5},
+        "score": {"mean": 1.0},
+        "model_latency": {"mean": pytest.approx(1, abs=1)},
+    }
+    assert time.time() - now < 5
 
 
 def test_evaluate_table_lazy_iter(client):
