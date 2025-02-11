@@ -84,6 +84,7 @@ def test_print_call_link_env(client):
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
     func()
+    client.future_executor.flush()
     time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     output = captured_stdout.getvalue()
@@ -91,6 +92,7 @@ def test_print_call_link_env(client):
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
     func()
+    client.future_executor.flush()
     time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     output = captured_stdout.getvalue()
