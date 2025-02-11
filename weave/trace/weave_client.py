@@ -292,7 +292,7 @@ def _make_calls_iterator(
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(project_id=project_id, filter=filter)
+            CallsQueryStatsReq(project_id=project_id, filter=filter, query=query)
         )
         if limit_override is not None:
             offset = offset_override or 0
@@ -308,6 +308,40 @@ def _make_calls_iterator(
         limit=limit_override,
         offset=offset_override,
     )
+
+
+def _add_scored_by_to_calls_query(
+    scored_by: list[str] | str | None, query: Query | None
+) -> Query | None:
+    # This logic might be pushed down to the server soon, but for now it lives here:
+    if not scored_by:
+        return query
+
+    if isinstance(scored_by, str):
+        scored_by = [scored_by]
+    exprs = []
+    if query is not None:
+        exprs.append(query["$expr"])
+    for name in scored_by:
+        ref = maybe_parse_uri(name)
+        if ref and isinstance(ref, ObjectRef):
+            uri = name
+            scorer_name = ref.name
+            exprs.append(
+                {
+                    "$eq": (
+                        get_field_expr(
+                            runnable_feedback_runnable_ref_selector(scorer_name)
+                        ),
+                        literal_expr(uri),
+                    )
+                }
+            )
+        else:
+            exprs.append(
+                exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
+            )
+    return Query.model_validate({"$expr": {"$and": exprs}})
 
 
 class OpNameError(ValueError):
@@ -881,35 +915,7 @@ class WeaveClient:
         if filter is None:
             filter = CallsFilter()
 
-        # This logic might be pushed down to the server soon, but for now it lives here:
-        if scored_by:
-            if isinstance(scored_by, str):
-                scored_by = [scored_by]
-            exprs = []
-            if query is not None:
-                exprs.append(query["$expr"])
-            for name in scored_by:
-                ref = maybe_parse_uri(name)
-                if ref and isinstance(ref, ObjectRef):
-                    uri = name
-                    scorer_name = ref.name
-                    exprs.append(
-                        {
-                            "$eq": (
-                                get_field_expr(
-                                    runnable_feedback_runnable_ref_selector(scorer_name)
-                                ),
-                                literal_expr(uri),
-                            )
-                        }
-                    )
-                else:
-                    exprs.append(
-                        exists_expr(
-                            get_field_expr(runnable_feedback_output_selector(name))
-                        )
-                    )
-            query = Query.model_validate({"$expr": {"$and": exprs}})
+        query = _add_scored_by_to_calls_query(scored_by, query)
 
         return _make_calls_iterator(
             self.server,

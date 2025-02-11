@@ -27,8 +27,8 @@ from typing import Any, Callable, Optional
 # `_fallback_load_lock` is a global lock that is used to ensure thread-safe image loading when per-instance locking fails
 _patched = False
 _original_methods: dict[str, Optional[Callable]] = {"load": None}
-_new_lock_lock = threading.Lock()
-_fallback_load_lock = threading.Lock()
+_new_lock_lock = threading.RLock()
+_fallback_load_lock = threading.RLock()
 
 
 def apply_threadsafe_patch_to_pil_image() -> None:
@@ -86,7 +86,7 @@ def _apply_threadsafe_patch() -> None:
                     # Double-check pattern: verify the attribute still doesn't exist
                     # after acquiring the lock to prevent race conditions
                     if not hasattr(self, "_weave_load_lock"):
-                        setattr(self, "_weave_load_lock", threading.Lock())
+                        setattr(self, "_weave_load_lock", threading.RLock())
             lock = getattr(self, "_weave_load_lock")
 
         except Exception:
