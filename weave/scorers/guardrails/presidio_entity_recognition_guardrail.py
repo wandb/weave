@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from pydantic import BaseModel
 
 import weave
-from weave.scorers import Scorer
+from weave import Scorer
 
 if TYPE_CHECKING:
     from presidio_analyzer import AnalyzerEngine, RecognizerResult
