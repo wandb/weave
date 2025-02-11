@@ -41,7 +41,7 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     device: str = "auto"
     threshold: float = FLUENCY_SCORER_THRESHOLD
 
-    def _load_pipeline(self) -> None:
+    def load_pipeline(self) -> None:
         """Loads the _pipeline attribute using HF utilities"""
         from transformers import pipeline
 

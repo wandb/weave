@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     from torch import Tensor
+    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer
 
 
 class LLMScorer(weave.Scorer):
@@ -62,15 +63,15 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _pipeline: Optional[Any] = None
+    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None, description="The pipeline to use for the model")
 
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
 
         if self._pipeline is None:
-            self._load_pipeline()
+            self.load_pipeline()
 
-    def _load_pipeline(self) -> None:
+    def load_pipeline(self) -> None:
         raise NotImplementedError(
             "Subclasses must implement the `_load_pipeline` method."
         )
@@ -85,8 +86,8 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    model: Any = None
-    tokenizer: Any = None
+    _model: Optional["PreTrainedModel"] = PrivateAttr(default=None, description="The model to use for the scorer")
+    _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None, description="The tokenizer to use for the scorer")
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""

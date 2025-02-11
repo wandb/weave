@@ -33,7 +33,7 @@ class WeaveCoherenceScorer(HuggingFacePipelineScorer):
         "Perfectly Coherent": 4,
     }
 
-    def _load_pipeline(self) -> None:
+    def load_pipeline(self) -> None:
         # Lazy import of transformers
         ensure_hf_imports()
         from transformers import pipeline
