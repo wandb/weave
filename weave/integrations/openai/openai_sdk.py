@@ -309,12 +309,10 @@ def openai_on_input_handler(
     return None
 
 
-should_skip_last = contextvars.ContextVar("should_skip_last", default=False)
-
-
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
+        should_skip_last = contextvars.ContextVar("should_skip_last", default=False)
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -359,6 +357,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         "We need to do this so we can check if `stream` is used"
+        should_skip_last = contextvars.ContextVar(
+            "should_skip_last_async", default=False
+        )
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
