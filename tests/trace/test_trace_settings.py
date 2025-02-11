@@ -23,9 +23,9 @@ def test_disabled_setting(client):
     parse_and_apply_settings(UserSettings(disabled=False))
     enabled_time = timeit.timeit(func, number=10)
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_disabled_env(client):
@@ -35,9 +35,9 @@ def test_disabled_env(client):
     os.environ["WEAVE_DISABLED"] = "false"
     enabled_time = timeit.timeit(func, number=10)
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_disabled_env_client():
@@ -67,12 +67,16 @@ def test_print_call_link_setting(client):
 
     parse_and_apply_settings(UserSettings(print_call_link=False))
     func()
+    client.future_executor.flush()
+    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI not in output
 
     parse_and_apply_settings(UserSettings(print_call_link=True))
     func()
+    client.future_executor.flush()
+    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI in output
