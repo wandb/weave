@@ -145,3 +145,28 @@ export const callTreeCellClicked = makeTrackEvent<
     };
   }
 >('Weave call tree cell clicked');
+
+export const metricsPlotsViewed = makeTrackEvent<
+  {
+    entity: string;
+    project: string;
+    latency: number;
+  },
+  {
+    _description: `User viewed metrics plots`;
+    _location: '';
+    _motivation: 'Used for tracking metrics plots';
+    entity: {
+      description: 'Entity of call';
+      exampleValues: ['my-entity'];
+    };
+    project: {
+      description: 'Project of call';
+      exampleValues: ['my-project'];
+    };
+    latency: {
+      description: 'Latency of calls stream query (ms)';
+      exampleValues: [1000, 500];
+    };
+  }
+>('Weave metrics plots viewed');
