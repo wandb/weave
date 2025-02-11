@@ -3,6 +3,7 @@ language: en-US
 reviews:
   # High-level configuration
   poem: true
+  review_status: false
   auto_review:
     enabled: true
     ignore_title_keywords:
