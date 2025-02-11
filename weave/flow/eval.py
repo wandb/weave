@@ -274,7 +274,6 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        # with console.status("Evaluating...") as status:
         dataset = self._post_init_dataset
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
@@ -283,9 +282,6 @@ class Evaluation(Object):
         ):
             n_complete += 1
             print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -300,16 +296,6 @@ class Evaluation(Object):
 
     @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
-        # The need for this pattern is quite unfortunate and highlights a gap in our
-        # data model. As a user, I just want to pass a list of data `eval_rows` to
-        # summarize. Under the hood, Weave should choose the appropriate storage
-        # format (in this case `Table`) and serialize it that way. Right now, it is
-        # just a huge list of dicts. The fact that "as a user" I need to construct
-        # `weave.Table` at all is a leaky abstraction. Moreover, the need to
-        # construct `EvaluationResults` just so that tracing and the UI works is
-        # also bad. In the near-term, this will at least solve the problem of
-        # breaking summarization with big datasets, but this is not the correct
-        # long-term solution.
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 

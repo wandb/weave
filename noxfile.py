@@ -54,6 +54,7 @@ def lint(session):
         "bedrock",
         "scorers",
         "pandas-test",
+        "huggingface",
     ],
 )
 def tests(session, shard):
