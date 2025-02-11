@@ -65,6 +65,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     selected_entities: list[str] = Field(
         default_factory=get_available_entities,
         description="A list of entity types to detect in the text.",
+        examples=[["EMAIL_ADDRESS"]],
     )
     should_anonymize: bool = Field(
         default=True,
@@ -76,10 +77,18 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     deny_lists: dict[str, list[str]] = Field(
         default_factory=dict,
         description="A dictionary of entity types and their corresponding deny lists.",
+        examples=[{"EMAIL_ADDRESS": ["test@example.com"]}],
     )
     regex_patterns: dict[str, list[dict[str, str]]] = Field(
         default_factory=dict,
         description="A dictionary of entity types and their corresponding regex patterns.",
+        examples=[
+            {
+                "EMAIL_ADDRESS": [
+                    {"pattern": r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"}
+                ]
+            }
+        ],
     )
     _analyzer: "AnalyzerEngine" = PrivateAttr(None)
     _anonymizer: "AnonymizerEngine" = PrivateAttr(None)
