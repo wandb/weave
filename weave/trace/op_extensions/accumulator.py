@@ -281,6 +281,7 @@ def add_accumulator(
                 async def _build_iterator_from_accumulator_for_op_coro() -> (
                     _IteratorWrapper[V]
                 ):
+                    nonlocal value
                     value = typing.cast(Coroutine[Any, Any, Iterator[V]], value)
                     awaited_value = await value
                     return _build_iterator_from_accumulator_for_op(
@@ -302,6 +303,8 @@ def add_accumulator(
             if inspect.iscoroutine(value):
 
                 async def wrapped_on_finish_coro() -> Iterator[V]:
+                    nonlocal value
+                    value = typing.cast(Coroutine[Any, Any, Iterator[V]], value)
                     awaited_value = await value
                     wrapped_on_finish(awaited_value)
                     return awaited_value
