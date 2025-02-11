@@ -36,7 +36,6 @@ const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
       ([k, v]) =>
         v != null &&
         v !== undefined &&
-        v !== false &&
         (_.isArray(v) ? v.length > 0 : true) &&
         (typeof v === 'string' ? v.length > 0 : true)
     )
