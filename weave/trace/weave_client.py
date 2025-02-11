@@ -1076,10 +1076,10 @@ class WeaveClient:
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
         def send_start_call() -> None:
+            started_at = datetime.datetime.now(tz=datetime.timezone.utc)
             inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
                 CallStartReq(
