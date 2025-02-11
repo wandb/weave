@@ -97,7 +97,7 @@ def cohere_wrapper(settings: OpSettings) -> Callable:
 def cohere_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
-        user_provided_postprocess_output = op_kwargs.pop("postprocess_output")
+        user_provided_postprocess_output = op_kwargs.pop("postprocess_output", None)
 
         def postprocess_output(response: Any) -> Any:
             try:
@@ -130,7 +130,7 @@ def cohere_wrapper_v2(settings: OpSettings) -> Callable:
 def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
-        user_provided_postprocess_output = op_kwargs.pop("postprocess_output")
+        user_provided_postprocess_output = op_kwargs.pop("postprocess_output", None)
 
         def postprocess_output(response: Any) -> Any:
             try:

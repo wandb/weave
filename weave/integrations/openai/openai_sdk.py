@@ -329,7 +329,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        final_op = add_accumulator(
+        op = add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
@@ -337,7 +337,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
-        return _add_stream_options(final_op)
+        return _add_stream_options(op)
 
     return wrapper
 
@@ -366,7 +366,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        final_op = add_accumulator(
+        op = add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
@@ -375,7 +375,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             on_finish_post_processor=openai_on_finish_post_processor,
         )
 
-        return _add_stream_options(final_op)
+        return _add_stream_options(op)
 
     return wrapper
 
