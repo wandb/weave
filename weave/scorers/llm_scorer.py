@@ -63,7 +63,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None, description="The pipeline to use for the model")
+    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
         self.device = set_device(self.device)
@@ -86,8 +86,8 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _model: Optional["PreTrainedModel"] = PrivateAttr(default=None, description="The model to use for the scorer")
-    _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None, description="The tokenizer to use for the scorer")
+    _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
+    _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
