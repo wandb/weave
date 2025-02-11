@@ -1,0 +1,82 @@
+interactions:
+- request:
+    body: null
+    headers:
+      user-agent:
+      - unknown/None; hf_hub/0.28.1; python/3.12.8
+    method: POST
+    uri: https://api-inference.huggingface.co/models/google/tapas-base-finetuned-wtq
+  response:
+    body:
+      string: '{"error":"Model google/tapas-base-finetuned-wtq is currently loading","estimated_time":20.0}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '92'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 06 Feb 2025 08:03:12 GMT
+      Vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      - origin, access-control-request-method, access-control-request-headers
+      x-proxied-host:
+      - internal.api-inference.huggingface.co
+      x-proxied-path:
+      - /
+      x-request-id:
+      - xhQgKV
+    status:
+      code: 503
+      message: Service Unavailable
+- request:
+    body: null
+    headers:
+      X-wait-for-model:
+      - '1'
+      user-agent:
+      - unknown/None; hf_hub/0.28.1; python/3.12.8
+    method: POST
+    uri: https://api-inference.huggingface.co/models/google/tapas-base-finetuned-wtq
+  response:
+    body:
+      string: '{"answer":"AVERAGE > 36542","coordinates":[[0,1]],"cells":["36542"],"aggregator":"AVERAGE"}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Expose-Headers:
+      - x-compute-type, x-compute-time
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 06 Feb 2025 08:03:29 GMT
+      Server:
+      - uvicorn
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      - origin, access-control-request-method, access-control-request-headers
+      x-compute-characters:
+      - '126'
+      x-compute-time:
+      - '1.421'
+      x-compute-type:
+      - cpu
+      x-proxied-host:
+      - internal.api-inference.huggingface.co
+      x-proxied-path:
+      - /
+      x-request-id:
+      - VzYX7i
+      x-sha:
+      - e3dde1905dea877b0df1a5c057533e48327dee77
+    status:
+      code: 200
+      message: OK
+version: 1
