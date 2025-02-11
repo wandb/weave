@@ -11,7 +11,7 @@ import {
   useSecrets,
 } from '@wandb/weave/common/hooks/useSecrets';
 import {TargetBlank} from '@wandb/weave/common/util/links';
-import React, {useCallback, useEffect, useMemo, useState, useRef} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router';
 import {Link} from 'react-router-dom';
 
@@ -205,7 +205,7 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       iframe.src = modUrl;
       return () => window.removeEventListener('message', authListener);
     },
-    [modUrl]
+    [modUrl, history]
   );
 
   useEffect(() => {
@@ -214,7 +214,7 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
       return;
     }
     return setupIframeAuth(iframe);
-  }, [setupIframeAuth, iframeRef.current]);
+  }, [setupIframeAuth]);
 
   return (
     <iframe
