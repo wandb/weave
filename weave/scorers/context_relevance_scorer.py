@@ -76,10 +76,10 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         assert (
             self._local_model_path
         ), "model_name_or_path local path or artifact path not found"
-        self.model = AutoModelForTokenClassification.from_pretrained(
+        self._model = AutoModelForTokenClassification.from_pretrained(
             self._local_model_path, device_map=self.device
         )
-        self.model.eval()
+        self._model.eval()
 
     def load_tokenizer(self) -> None:
         ensure_hf_imports()
@@ -125,7 +125,7 @@ class WeaveContextRelevanceScorer(HuggingFaceScorer):
         combined_mask[start:end] = False
 
         with torch.inference_mode():
-            results = self.model(**model_inputs)
+            results = self._model(**model_inputs)
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
