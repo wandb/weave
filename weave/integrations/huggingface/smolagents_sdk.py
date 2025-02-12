@@ -85,6 +85,18 @@ def get_smolagents_patcher(
                 )
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "MultiStepAgent.write_memory_to_messages",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.MultiStepAgent.write_memory_to_messages"
+                    }
+                )
+            ),
+        ),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
