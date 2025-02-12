@@ -1,0 +1,428 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools:\n- sql_engine: Allows you to perform SQL queries on the table.
+      Returns a string representation of the result.\nThe table is named ''receipts''.
+      Its description is as follows:\n    Columns:\n    - receipt_id: INTEGER\n    -
+      customer_name: VARCHAR(16)\n    - price: FLOAT\n    - tip: FLOAT\n    Takes
+      inputs: {''query'': {''type'': ''string'', ''description'': ''The query to perform.
+      This should be correct SQL.''}}\n    Returns an output of type: string\n- final_answer:
+      Provides a final answer to the given problem.\n    Takes inputs: {''answer'':
+      {''type'': ''any'', ''description'': ''The final answer to the problem''}}\n    Returns
+      an output of type: any\n\nHere are the rules you should always follow to solve
+      your task:\n1. Always provide a ''Thought:'' sequence, and a ''Code:\\n```py''
+      sequence ending with ''```<end_code>'' sequence, else you will fail.\n2. Use
+      only variables that you have defined!\n3. Always use the right arguments for
+      the tools. DO NOT pass the arguments as a dict as in ''answer = wiki({''query'':
+      \"What is the place where James Bond lives?\"})'', but use the arguments directly
+      as in ''answer = wiki(query=\"What is the place where James Bond lives?\")''.\n4.
+      Take care to not chain too many sequential tool calls in the same code block,
+      especially when the output format is unpredictable. For instance, a call to
+      search has an unpredictable return format, so do not have another tool call
+      that depends on its output in the same block: rather output results with print()
+      to use them in the next block.\n5. Call a tool only when needed, and never re-do
+      a tool call that you previously did with the exact same parameters.\n6. Don''t
+      name any new variable with the same name as a tool: for instance don''t name
+      a variable ''final_answer''.\n7. Never create any notional variables in our
+      code, as having these in your logs will derail you from the true variables.\n8.
+      You can use imports in your code, but only from the following list of modules:
+      [''re'', ''unicodedata'', ''random'', ''math'', ''time'', ''itertools'', ''statistics'',
+      ''queue'', ''collections'', ''stat'', ''datetime'']\n9. The state persists between
+      code executions: so if in one step you''ve created variables or imported modules,
+      these will all persist.\n10. Don''t give up! You''re in charge of solving the
+      task, not providing directions to solve it.\n\nNow Begin! If you solve the task
+      correctly, you will receive a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nCan you give me the name of the client who got the most expensive receipt?"}]}],"model":"gpt-4o-mini","stop":["<end_code>","Observation:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '9080'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.61.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.61.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFRta9swEP6eX3HoUwJJyeuyBvqhKxkdtIw1od2Lh6PIZ1udLGnSuUkp
+        /e/DshunrIN9Eeaee+6eOz3yUweAyYQtgImckyisGnwYzs4vd3ff71ar29Htt8l4NznP6J7LvbpY
+        s37FMNt7FPTCOhGmsApJGl3DwiEnrKqO5pPTyex0NpsEoDAJqoqWWRpMzaCQWg7Gw/F0MJwPRu8b
+        dm6kQM8W8KMDAPAUzkqnTnDPFjDsv0QK9J5nyBaHJADmjKoijHsvPXFNrN+CwmhCHaSvc1NmOS1g
+        bSCVOgHKETQvEEwavoWSqAl2uYHMUAgVxhPg3qL28gHBoUBpqQ+fYCeVAosuNa4ADqsvV/C7RPcI
+        ZMCjQlEXEKUnU6CrG3HvjZDVrmAnKa9b8L0sygKskwIhdaYI4aaVB+JbhScvHUuPAd743ypGnUmN
+        GyBjVNUX9yhKqhKkr9WcRDrSFybBRaQ3m419jHSt8gwitlpeLS/WB4lxkPjx5vN12/zucnmzbKSd
+        QbdhXJ9/7YZY73V6L2KRrlYWH1YWN0s9g1ZwN0g4C2cv0tZJTd03ab2g+vg+Haal55WndKlUE38+
+        GESZzDqz9Q1+iKdSS5/HDrk3ujKDJ2NZQJ87AD+DEctX3mLWmcJSTOYX6qrgeDgf1QVZ+wBa+HTS
+        gGSIqyPa6N20/0bFOEHiUvkjMzPBRY5Jy22dz8tEmiOgczT333Leql3PLnX2P+VbQAi0hElsHSZS
+        vB65TXNY/SD+lXbYcxDMPLoHKTAmia66iwRTXqr62TL/6AmLOJU6QxesUaWkNp6PMZnz7WwqWOe5
+        8wcAAP//AwDrkinjyQQAAA==
+    headers:
+      CF-RAY:
+      - 910c38750a566bbb-SIN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 12 Feb 2025 11:25:55 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=0XB5VZQ.SkrZ697Pjk780VeCvy3kIGAPq_cPbQpOpX0-1739359555-1.0.1.1-UJgSLNu4lT3wF2DNB0.ODrLH1A_bpz_.UYp1edm5MxUbzyWFZGj2QA_0CGPLJnJ2Gb8ZDk4sZZsx5aDHh_uUDA;
+        path=/; expires=Wed, 12-Feb-25 11:55:55 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=VKPiOy7rtePXctJk3cK3kFh9j59zCnlwAPKYEw2FzsU-1739359555442-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2323'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149997816'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_bc9b62a097c864ee0a0f31e7210c5064
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":[{"type":"text","text":"You are
+      an expert assistant who can solve any task using code blobs. You will be given
+      a task to solve as best you can.\nTo do so, you have been given access to a
+      list of tools: these tools are basically Python functions which you can call
+      with code.\nTo solve the task, you must plan forward to proceed in a series
+      of steps, in a cycle of ''Thought:'', ''Code:'', and ''Observation:'' sequences.\n\nAt
+      each step, in the ''Thought:'' sequence, you should first explain your reasoning
+      towards solving the task and the tools that you want to use.\nThen in the ''Code:''
+      sequence, you should write the code in simple Python. The code sequence must
+      end with ''<end_code>'' sequence.\nDuring each intermediate step, you can use
+      ''print()'' to save whatever important information you will then need.\nThese
+      print outputs will then appear in the ''Observation:'' field, which will be
+      available as input for the next step.\nIn the end you have to return a final
+      answer using the `final_answer` tool.\n\nHere are a few examples using notional
+      tools:\n---\nTask: \"Generate an image of the oldest person in this document.\"\n\nThought:
+      I will proceed step by step and use the following tools: `document_qa` to find
+      the oldest person in the document, then `image_generator` to generate an image
+      according to the answer.\nCode:\n```py\nanswer = document_qa(document=document,
+      question=\"Who is the oldest person mentioned?\")\nprint(answer)\n```<end_code>\nObservation:
+      \"The oldest person in the document is John Doe, a 55 year old lumberjack living
+      in Newfoundland.\"\n\nThought: I will now generate an image showcasing the oldest
+      person.\nCode:\n```py\nimage = image_generator(\"A portrait of John Doe, a 55-year-old
+      man living in Canada.\")\nfinal_answer(image)\n```<end_code>\n\n---\nTask: \"What
+      is the result of the following operation: 5 + 3 + 1294.678?\"\n\nThought: I
+      will use python code to compute the result of the operation and then return
+      the final answer using the `final_answer` tool\nCode:\n```py\nresult = 5 + 3
+      + 1294.678\nfinal_answer(result)\n```<end_code>\n\n---\nTask:\n\"Answer the
+      question in the variable `question` about the image stored in the variable `image`.
+      The question is in French.\nYou have been provided with these additional arguments,
+      that you can access using the keys as variables in your python code:\n{''question'':
+      ''Quel est l''animal sur l''image?'', ''image'': ''path/to/image.jpg''}\"\n\nThought:
+      I will use the following tools: `translator` to translate the question into
+      English and then `image_qa` to answer the question on the input image.\nCode:\n```py\ntranslated_question
+      = translator(question=question, src_lang=\"French\", tgt_lang=\"English\")\nprint(f\"The
+      translated question is {translated_question}.\")\nanswer = image_qa(image=image,
+      question=translated_question)\nfinal_answer(f\"The answer is {answer}\")\n```<end_code>\n\n---\nTask:\nIn
+      a 1979 interview, Stanislaus Ulam discusses with Martin Sherwin about other
+      great physicists of his time, including Oppenheimer.\nWhat does he say was the
+      consequence of Einstein learning too much math on his creativity, in one word?\n\nThought:
+      I need to find and read the 1979 interview of Stanislaus Ulam with Martin Sherwin.\nCode:\n```py\npages
+      = search(query=\"1979 interview Stanislaus Ulam Martin Sherwin physicists Einstein\")\nprint(pages)\n```<end_code>\nObservation:\nNo
+      result found for query \"1979 interview Stanislaus Ulam Martin Sherwin physicists
+      Einstein\".\n\nThought: The query was maybe too restrictive and did not find
+      any results. Let''s try again with a broader query.\nCode:\n```py\npages = search(query=\"1979
+      interview Stanislaus Ulam\")\nprint(pages)\n```<end_code>\nObservation:\nFound
+      6 pages:\n[Stanislaus Ulam 1979 interview](https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/)\n\n[Ulam
+      discusses Manhattan Project](https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/)\n\n(truncated)\n\nThought:
+      I will read the first 2 pages to know more.\nCode:\n```py\nfor url in [\"https://ahf.nuclearmuseum.org/voices/oral-histories/stanislaus-ulams-interview-1979/\",
+      \"https://ahf.nuclearmuseum.org/manhattan-project/ulam-manhattan-project/\"]:\n    whole_page
+      = visit_webpage(url)\n    print(whole_page)\n    print(\"\\n\" + \"=\"*80 +
+      \"\\n\")  # Print separator between pages\n```<end_code>\nObservation:\nManhattan
+      Project Locations:\nLos Alamos, NM\nStanislaus Ulam was a Polish-American mathematician.
+      He worked on the Manhattan Project at Los Alamos and later helped design the
+      hydrogen bomb. In this interview, he discusses his work at\n(truncated)\n\nThought:
+      I now have the final answer: from the webpages visited, Stanislaus Ulam says
+      of Einstein: \"He learned too much mathematics and sort of diminished, it seems
+      to me personally, it seems to me his purely physics creativity.\" Let''s answer
+      in one word.\nCode:\n```py\nfinal_answer(\"diminished\")\n```<end_code>\n\n---\nTask:
+      \"Which city has the highest population: Guangzhou or Shanghai?\"\n\nThought:
+      I need to get the populations for both cities and compare them: I will use the
+      tool `search` to get the population of both cities.\nCode:\n```py\nfor city
+      in [\"Guangzhou\", \"Shanghai\"]:\n    print(f\"Population {city}:\", search(f\"{city}
+      population\")\n```<end_code>\nObservation:\nPopulation Guangzhou: [''Guangzhou
+      has a population of 15 million inhabitants as of 2021.'']\nPopulation Shanghai:
+      ''26 million (2019)''\n\nThought: Now I know that Shanghai has the highest population.\nCode:\n```py\nfinal_answer(\"Shanghai\")\n```<end_code>\n\n---\nTask:
+      \"What is the current age of the pope, raised to the power 0.36?\"\n\nThought:
+      I will use the tool `wiki` to get the age of the pope, and confirm that with
+      a web search.\nCode:\n```py\npope_age_wiki = wiki(query=\"current pope age\")\nprint(\"Pope
+      age as per wikipedia:\", pope_age_wiki)\npope_age_search = web_search(query=\"current
+      pope age\")\nprint(\"Pope age as per google search:\", pope_age_search)\n```<end_code>\nObservation:\nPope
+      age: \"The pope Francis is currently 88 years old.\"\n\nThought: I know that
+      the pope is 88 years old. Let''s compute the result using python code.\nCode:\n```py\npope_current_age
+      = 88 ** 0.36\nfinal_answer(pope_current_age)\n```<end_code>\n\nAbove example
+      were using notional tools that might not exist for you. On top of performing
+      computations in the Python code snippets that you create, you only have access
+      to these tools:\n- sql_engine: Allows you to perform SQL queries on the table.
+      Returns a string representation of the result.\nThe table is named ''receipts''.
+      Its description is as follows:\n    Columns:\n    - receipt_id: INTEGER\n    -
+      customer_name: VARCHAR(16)\n    - price: FLOAT\n    - tip: FLOAT\n    Takes
+      inputs: {''query'': {''type'': ''string'', ''description'': ''The query to perform.
+      This should be correct SQL.''}}\n    Returns an output of type: string\n- final_answer:
+      Provides a final answer to the given problem.\n    Takes inputs: {''answer'':
+      {''type'': ''any'', ''description'': ''The final answer to the problem''}}\n    Returns
+      an output of type: any\n\nHere are the rules you should always follow to solve
+      your task:\n1. Always provide a ''Thought:'' sequence, and a ''Code:\\n```py''
+      sequence ending with ''```<end_code>'' sequence, else you will fail.\n2. Use
+      only variables that you have defined!\n3. Always use the right arguments for
+      the tools. DO NOT pass the arguments as a dict as in ''answer = wiki({''query'':
+      \"What is the place where James Bond lives?\"})'', but use the arguments directly
+      as in ''answer = wiki(query=\"What is the place where James Bond lives?\")''.\n4.
+      Take care to not chain too many sequential tool calls in the same code block,
+      especially when the output format is unpredictable. For instance, a call to
+      search has an unpredictable return format, so do not have another tool call
+      that depends on its output in the same block: rather output results with print()
+      to use them in the next block.\n5. Call a tool only when needed, and never re-do
+      a tool call that you previously did with the exact same parameters.\n6. Don''t
+      name any new variable with the same name as a tool: for instance don''t name
+      a variable ''final_answer''.\n7. Never create any notional variables in our
+      code, as having these in your logs will derail you from the true variables.\n8.
+      You can use imports in your code, but only from the following list of modules:
+      [''re'', ''unicodedata'', ''random'', ''math'', ''time'', ''itertools'', ''statistics'',
+      ''queue'', ''collections'', ''stat'', ''datetime'']\n9. The state persists between
+      code executions: so if in one step you''ve created variables or imported modules,
+      these will all persist.\n10. Don''t give up! You''re in charge of solving the
+      task, not providing directions to solve it.\n\nNow Begin! If you solve the task
+      correctly, you will receive a reward of $1,000,000."}]},{"role":"user","content":[{"type":"text","text":"New
+      task:\nCan you give me the name of the client who got the most expensive receipt?"}]},{"role":"assistant","content":[{"type":"text","text":"Thought:
+      To find the name of the client who got the most expensive receipt, I will perform
+      a SQL query to select the customer name associated with the maximum price from
+      the receipts table. I will use the `sql_engine` tool to execute this query.\n\nCode:\n```py\nquery
+      = \"SELECT customer_name FROM receipts WHERE price = (SELECT MAX(price) FROM
+      receipts)\"\nmost_expensive_client = sql_engine(query=query)\nprint(most_expensive_client)\n```"},{"type":"text","text":"Calling
+      tools:\n[{''id'': ''call_1'', ''type'': ''function'', ''function'': {''name'':
+      ''python_interpreter'', ''arguments'': ''query = \"SELECT customer_name FROM
+      receipts WHERE price = (SELECT MAX(price) FROM receipts)\"\\nmost_expensive_client
+      = sql_engine(query=query)\\nprint(most_expensive_client)''}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_1\nObservation:\nExecution logs:\n\n(''Woodrow Wilson'',)\nLast output
+      from code snippet:\nNone"}]}],"model":"gpt-4o-mini","stop":["<end_code>","Observation:"]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '10057'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=0XB5VZQ.SkrZ697Pjk780VeCvy3kIGAPq_cPbQpOpX0-1739359555-1.0.1.1-UJgSLNu4lT3wF2DNB0.ODrLH1A_bpz_.UYp1edm5MxUbzyWFZGj2QA_0CGPLJnJ2Gb8ZDk4sZZsx5aDHh_uUDA;
+        _cfuvid=VKPiOy7rtePXctJk3cK3kFh9j59zCnlwAPKYEw2FzsU-1739359555442-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.61.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.61.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//dJNNT9tAEIbv+RWjPbVSgpLgEMitHxeK2l6QODSVWXbH8ZT1znZnTIgq
+        /ntlJyRBwMXSzjPvq/nyvwGAIW8WYFxt1TUpjD6PZ5+u4tnPs/riUW4Kurr/enlfF/x9881fm2Gn
+        4Ls/6PRZdeK4SQGVOG6xy2gVO9fJ/PTidHYxm531oGGPoZOtko4KHjUUaTQdT4vReD6anO/UNZND
+        MQv4NQAA+Nd/uzqjx0ezgPHwOdKgiF2hWeyTAEzm0EWMFSFRG9UMD9BxVIx96dc1t6taF3BdI2SU
+        NihUmRvQGiFlfCBuBf62mDdA0ZOzigJaW+0zXCCMCmvSun83LAr4mDAKPXSGDikpkMDS3DD7zGu4
+        oSAcl+YEfvB6CJewphAgo7Y5gtYkYKU3qyjaADbKGvPJMi7jF/a4WMbb29u0WcYel1v84bX9xz7x
+        uO2MVSu2G31sQ9jFn/ZzDLxKme9kx/fxiiJJXWa0wrGbmSgn09OnAcDvfl/tixWYlLlJWirfY+wM
+        p9P5ZGtoDndywMV8B5XVhiPZ6eR8+IZj6VEtBTnauXHW1eiPtOPifN+DbT3xgY0HR62/rugt+237
+        FFdHLu/aH4BzmBR9mTJ6ci+7PqRl7H6l99L2o+4LNoL5gRyWSpi7dXisbBu2B25kI4pNWVFcYU6Z
+        tldepXI+RT+3d7PCmcHT4D8AAAD//wMAgcSRQ/MDAAA=
+    headers:
+      CF-RAY:
+      - 910c3887fcdf6bbb-SIN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 12 Feb 2025 11:25:57 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1852'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149997611'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_969d904ae63dd92db4f2da913f25830c
+    status:
+      code: 200
+      message: OK
+version: 1

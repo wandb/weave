@@ -55,11 +55,12 @@ cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 groq = ["groq>=0.13.0"]
-huggingface = [
-  "huggingface-hub>=0.28.1",
+huggingface = ["huggingface-hub>=0.28.1"]
+smolagents = [
   "openai>=1.0.0",
   "litellm>=1.58",
-  "smolagents==1.8.1",
+  "smolagents>=1.8.1",
+  "huggingface-hub>=0.28.1",
 ]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",

@@ -70,7 +70,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.huggingface.huggingface_inference_client_sdk import (
         get_huggingface_patcher,
     )
-    from weave.integrations.huggingface.smolagents_sdk import get_smolagents_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -115,7 +115,7 @@ def reset_autopatch() -> None:
     from weave.integrations.huggingface.huggingface_inference_client_sdk import (
         get_huggingface_patcher,
     )
-    from weave.integrations.huggingface.smolagents_sdk import get_smolagents_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (

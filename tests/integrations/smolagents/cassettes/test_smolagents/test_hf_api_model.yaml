@@ -316,13 +316,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Wed, 12 Feb 2025 11:06:49 GMT
+      - Wed, 12 Feb 2025 11:25:49 GMT
       ETag:
       - W/"388c0fea924c2d4f9b4f2762c064907631858077e46f3dca2a0e1dd2dd1cbac5"
       Expires:
-      - Wed, 12 Feb 2025 11:11:49 GMT
+      - Wed, 12 Feb 2025 11:30:49 GMT
       Source-Age:
-      - '245'
+      - '181'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -332,19 +332,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '15'
+      - '14'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 7598f0f6cee916c8a38f20788384e5005b456eb8
+      - ae17006f1334a3b604a4b7fc572a2026adc907e4
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - E060:6D163:18D24C:1A1B4A:67AC42BD
       X-Served-By:
-      - cache-sin-wsss1830041-SIN
+      - cache-sin-wsss1830036-SIN
       X-Timer:
-      - S1739358410.747251,VS0,VE0
+      - S1739359549.485459,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -365,7 +365,7 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - af6a6712-fa19-4676-98ea-2a9e6584bab9
+      - f56757bf-d61d-48e7-8368-9c42ecd5821c
       user-agent:
       - unknown/None; hf_hub/0.28.1; python/3.12.8
     method: POST
@@ -382,7 +382,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 12 Feb 2025 11:06:51 GMT
+      - Wed, 12 Feb 2025 11:25:52 GMT
       access-control-allow-credentials:
       - 'true'
       vary:
@@ -397,7 +397,7 @@ interactions:
       x-proxied-path:
       - /v1/chat/completions
       x-request-id:
-      - 6-59cw
+      - a34V0H
       x-sha:
       - 381fc969f78efac66bc87ff7ddeadb7e73c218a7
     status:
