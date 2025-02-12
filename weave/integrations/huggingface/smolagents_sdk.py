@@ -108,34 +108,10 @@ def get_smolagents_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("smolagents"),
-            "CodeAgent.initialize_system_prompt",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.CodeAgent.initialize_system_prompt"
-                    }
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
             "ToolCallingAgent.step",
             smolagents_wrapper(
                 base.model_copy(
                     update={"name": base.name or "smolagents.ToolCallingAgent.step"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
-            "ToolCallingAgent.initialize_system_prompt",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.ToolCallingAgent.initialize_system_prompt"
-                    }
                 )
             ),
         ),
