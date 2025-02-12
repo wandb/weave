@@ -801,8 +801,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             items: ArrowWeaveList = ArrowWeaveList(
                 arr.flatten(), self.object_type.object_type, self._artifact
             )._map_column(fn, pre_fn, path + (PathItemList(),))
-            # print("SELF OBJECT TYPE", self.object_type)
-            # print("SELF ARROW DATA TYPE", self._arrow_data.type)
 
             new_offsets = offsets_starting_at_zero(self._arrow_data)
             result_array = safe_list_array_from_arrays(
