@@ -1,7 +1,7 @@
 # Prompts
 
 :::important
-Curremtly, this feature is only accessible through the Python SDK. All code examples on this page are provided in Python.
+Currently, this feature is only accessible through the Python SDK. All code examples on this page are provided in Python.
 :::
 
 Creating, evaluating, and refining prompts is a core activity for AI engineers.
