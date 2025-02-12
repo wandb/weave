@@ -1,11 +1,12 @@
 """Helpers for printing HTTP requests and responses."""
 
+from contextlib import contextmanager
 import datetime
 import json
 import os
 import threading
 from time import time
-from typing import Any, Optional, Union
+from typing import Any, Iterator, Optional, Union
 
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
@@ -13,6 +14,8 @@ from requests.adapters import HTTPAdapter
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.text import Text
+
+from weave.trace.settings import client_parallelism
 
 console = Console()
 
@@ -147,16 +150,18 @@ class LoggingHTTPAdapter(HTTPAdapter):
         return response
 
 
-session = Session()
-if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
-    adapter = LoggingHTTPAdapter()
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+thread_local = threading.local()
+
+
+def get_session() -> Session:
+    if not hasattr(thread_local, "session"):
+        thread_local.session = Session()
+    return thread_local.session
 
 
 def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
     """Send a GET request with optional logging."""
-    return session.get(url, params=params, **kwargs)
+    return get_session().get(url, params=params, **kwargs)
 
 
 def post(
@@ -166,4 +171,4 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return session.post(url, data=data, json=json, **kwargs)
+    return get_session().post(url, data=data, json=json, **kwargs)

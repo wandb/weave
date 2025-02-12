@@ -34,6 +34,7 @@ import concurrent.futures
 import logging
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
+import random
 from threading import Lock
 from typing import Any, Callable, TypeVar
 
@@ -68,6 +69,7 @@ class FutureExecutor:
         max_workers: int | None = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
+        self._id = random.randint(0, 1000000)
         self._max_workers = max_workers
         self._executor: ContextAwareThreadPoolExecutor | None = None
         if max_workers != 0:
