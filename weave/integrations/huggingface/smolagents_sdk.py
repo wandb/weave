@@ -196,10 +196,7 @@ def get_smolagents_patcher(
             "Tool",
             smolagents_wrapper(
                 base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.Tool.__call__"
-                    }
+                    update={"name": base.name or "smolagents.Tool.__call__"}
                 )
             ),
         ),
@@ -208,10 +205,7 @@ def get_smolagents_patcher(
             "PipelineTool.encode",
             smolagents_wrapper(
                 base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.PipelineTool.encode"
-                    }
+                    update={"name": base.name or "smolagents.PipelineTool.encode"}
                 )
             ),
         ),
@@ -220,10 +214,7 @@ def get_smolagents_patcher(
             "PipelineTool.decode",
             smolagents_wrapper(
                 base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.PipelineTool.decode"
-                    }
+                    update={"name": base.name or "smolagents.PipelineTool.decode"}
                 )
             ),
         ),
@@ -232,10 +223,7 @@ def get_smolagents_patcher(
             "PipelineTool.forward",
             smolagents_wrapper(
                 base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.PipelineTool.forward"
-                    }
+                    update={"name": base.name or "smolagents.PipelineTool.forward"}
                 )
             ),
         ),
@@ -244,10 +232,92 @@ def get_smolagents_patcher(
             "PipelineTool",
             smolagents_wrapper(
                 base.model_copy(
+                    update={"name": base.name or "smolagents.PipelineTool.__call__"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PythonInterpreterTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
                     update={
-                        "name": base.name
-                        or "smolagents.PipelineTool.__call__"
+                        "name": base.name or "smolagents.PythonInterpreterTool.forward"
                     }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "FinalAnswerTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.FinalAnswerTool.forward"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "UserInputTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.UserInputTool.forward"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "DuckDuckGoSearchTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name or "smolagents.DuckDuckGoSearchTool.forward"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "GoogleSearchTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.GoogleSearchTool.forward"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "VisitWebpageTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.VisitWebpageTool.forward"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "SpeechToTextTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.SpeechToTextTool.forward"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "SpeechToTextTool.encode",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.SpeechToTextTool.encode"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "SpeechToTextTool.decode",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.SpeechToTextTool.decode"}
                 )
             ),
         ),
