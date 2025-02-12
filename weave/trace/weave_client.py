@@ -10,6 +10,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
+import threading
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -670,6 +671,9 @@ class Call:
         )
 
 
+images = set()
+
+
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> WeaveObject:
@@ -752,7 +756,7 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
-    future_executor: FutureExecutor
+    # future_executor: FutureExecutor
 
     """
     A client for interacting with the Weave trace server.
@@ -775,7 +779,8 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.future_executor = FutureExecutor(max_workers=client_parallelism())
+        self._future_executor_local = threading.local()
+        self._future_executor = FutureExecutor(max_workers=client_parallelism())
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -786,6 +791,16 @@ class WeaveClient:
         self._server_is_flushable = False
         if isinstance(self.server, RemoteHTTPTraceServer):
             self._server_is_flushable = self.server.should_batch
+
+    @property
+    def future_executor(self) -> FutureExecutor:
+        # return self._future_executor
+
+        if not hasattr(self._future_executor_local, "future_executor"):
+            self._future_executor_local.future_executor = FutureExecutor(
+                max_workers=client_parallelism()
+            )
+        return self._future_executor_local.future_executor
 
     ################ High Level Convenience Methods ################
 
@@ -1873,7 +1888,23 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        return self.future_executor.defer(self.server.file_create, req)
+        import base64
+        from threading import current_thread
+        from datetime import datetime
+
+        thread = current_thread()
+        name = base64.b64encode(req.content).decode("utf-8")
+        print(
+            "send_file_create",
+            datetime.now(),
+            name[-10:],
+            thread.name,
+            name in images,
+            len(images),
+        )
+        images.add(name)
+        out = self.future_executor.defer(self.server.file_create, req)
+        return out
 
 
 def safe_current_wb_run_id() -> str | None:

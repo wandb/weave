@@ -34,6 +34,7 @@ import concurrent.futures
 import logging
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
+import random
 from threading import Lock
 from typing import Any, Callable, TypeVar
 
@@ -68,6 +69,7 @@ class FutureExecutor:
         max_workers: int | None = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
     ):
+        self._id = random.randint(0, 1000000)
         self._max_workers = max_workers
         self._executor: ContextAwareThreadPoolExecutor | None = None
         if max_workers != 0:
@@ -196,7 +198,7 @@ class FutureExecutor:
         """
 
         def wrapped_f(*args: Any, **kwargs: Any) -> T:
-            token = self._in_thread_context.set(True)
+            token = self._in_thread_context.set(False)
             try:
                 return f(*args, **kwargs)
             finally:
@@ -231,6 +233,7 @@ class FutureExecutor:
 
         with self._active_futures_lock:
             self._active_futures.append(future)
+            print("active futures - append", self._id, len(self._active_futures))
         future.add_done_callback(self._future_done_callback)
 
         return future
