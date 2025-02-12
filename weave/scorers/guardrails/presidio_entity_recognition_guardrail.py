@@ -41,30 +41,11 @@ class PresidioEntityRecognitionGuardrail(Scorer):
         selected_entities (list[str]): A list of entity types to detect in the text.
         should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
         language (str): The language of the text to be analyzed.
-
-    Args:
-        selected_entities (Optional[list[str]]): A list of entity types to detect in the text.
-        language (str): The language of the text to be analyzed.
-        should_anonymize (bool): A flag indicating whether detected entities should be anonymized.
-        deny_lists (Optional[dict[str, list[str]]]): A dictionary of entity types and their
-            corresponding deny lists.
-        regex_patterns (Optional[dict[str, list[dict[str, str]]]]): A dictionary of entity
-            types and their corresponding regex patterns.
-        custom_recognizers (Optional[list[EntityRecognizer]]): A list of custom recognizers to add to the
+        analyzer (AnalyzerEngine): The analyzer engine to use for entity recognition.
+        anonymizer (AnonymizerEngine): The anonymizer engine to use for anonymization.
+        custom_recognizers (list[EntityRecognizer]): A list of custom recognizers to add to the
             analyzer that are of type `presidio.EntityRecognizer`.
     """
-
-    @property
-    def available_entities(self) -> list[str]:
-        """Get available entities from Presidio"""
-        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
-
-        registry = RecognizerRegistry()
-        analyzer = AnalyzerEngine(registry=registry)
-        return [
-            recognizer.supported_entities[0]
-            for recognizer in analyzer.registry.recognizers
-        ]
 
     selected_entities: list[str] = Field(
         default_factory=get_available_entities,
@@ -98,44 +79,39 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     anonymizer: AnonymizerEngine = Field(default_factory=AnonymizerEngine)
     custom_recognizers: list[EntityRecognizer] = Field(default_factory=list)
 
-    def __init__(
-        self,
-        selected_entities: list[str] = [],
-        language: str = "en",
-        should_anonymize: bool = True,
-        deny_lists: dict[str, list[str]] = {},
-        regex_patterns: dict[str, list[dict[str, str]]] = {},
-        custom_recognizers: list[EntityRecognizer] = [],
-    ):
+    @property
+    def available_entities(self) -> list[str]:
+        """Get available entities from Presidio"""
+        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+
+        registry = RecognizerRegistry()
+        analyzer = AnalyzerEngine(registry=registry)
+        return [
+            recognizer.supported_entities[0]
+            for recognizer in analyzer.registry.recognizers
+        ]
+
+    def model_post_init(self, __context: Any) -> None:
         # Get available entities dynamically
         available_entities = self.available_entities
 
         # Initialize default values to all available entities
-        if not selected_entities:
-            selected_entities = available_entities
+        if not self.selected_entities:
+            self.selected_entities = available_entities
 
         # Filter out invalid entities and warn user
-        invalid_entities = [e for e in selected_entities if e not in available_entities]
-        valid_entities = [e for e in selected_entities if e in available_entities]
+        invalid_entities = [
+            e for e in self.selected_entities if e not in available_entities
+        ]
+        valid_entities = [e for e in self.selected_entities if e in available_entities]
 
         if invalid_entities:
             print(
                 f"\nWarning: The following entities are not available and will be ignored: {invalid_entities}"
             )
             print(f"Continuing with valid entities: {valid_entities}")
-            selected_entities = valid_entities
+            self.selected_entities = valid_entities
 
-        # Call parent class constructor with all fields
-        super().__init__(
-            selected_entities=selected_entities,
-            language=language,
-            should_anonymize=should_anonymize,
-            deny_lists=deny_lists,
-            regex_patterns=regex_patterns,
-            custom_recognizers=custom_recognizers,
-        )
-
-    def model_post_init(self, __context: Any) -> None:
         # Add custom recognizers if provided
         if self.custom_recognizers:
             for recognizer in self.custom_recognizers:
