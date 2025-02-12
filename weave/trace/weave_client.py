@@ -1896,11 +1896,11 @@ class WeaveClient:
         name = base64.b64encode(req.content).decode("utf-8")
         print(
             "send_file_create",
-            datetime.now(),
-            name[-10:],
+            datetime.now().strftime("%M:%S.%f")[:-3],
+            name[-30:],
             thread.name,
-            name in images,
-            len(images),
+            "seen={}".format(name in images),
+            "len={}".format(len(images)),
         )
         images.add(name)
         out = self.future_executor.defer(self.server.file_create, req)
