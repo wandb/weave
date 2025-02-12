@@ -295,6 +295,9 @@ const ObjectVersionPageInner: React.FC<{
                   entity={entityName}
                   project={projectName}
                   neverPeek
+                  filter={{
+                    traceRootsOnly: false,
+                  }}
                   gridFilters={{
                     items: [
                       {
