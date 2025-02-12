@@ -241,7 +241,6 @@ class WeaveHallucinationScorer(HuggingFacePipelineScorer):
         self._pipeline = pipeline(
             self.task,
             model=self._local_model_path,
-            trust_remote_code=True,
             device=self.device,
         )
 
