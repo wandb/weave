@@ -1,21 +1,21 @@
-# Google Gemini
+# Google 
 
 :::tip
 For the latest tutorials, visit [Weights & Biases on Google Cloud](https://wandb.ai/site/partners/googlecloud/).
 :::
 
 :::note
-Do you want to experiment with Google Gemini models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+Do you want to experiment with Google AI models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
 :::
 
-Google offers two ways of calling Gemini via API:
+This page describes how to use W&B Weave with the Google Vertex AI API and the Google Gemini API.
 
-1. Via the [Vertex APIs](https://cloud.google.com/vertex-ai/docs).
-2. Via the [Gemini API SDK](https://ai.google.dev/gemini-api/docs/quickstart?lang=python).
+You can use Weave to to evaluate, monitor, and iterate on your Google GenAI applications. Weave automatically captures traces for the:
 
-## Tracing
+1. [Google Vertex AI API](https://cloud.google.com/vertex-ai/docs), which provides access to Google’s Gemini models and [various partner models](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models).
+2. [Google Gemini API](https://ai.google.dev/gemini-api/docs/quickstart?lang=python), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.
 
-It’s important to store traces of language model applications in a central location, both during development and in production. These traces can be useful for debugging, and as a dataset that will help you improve your application.
+## Get started
 
 Weave will automatically capture traces for [Gemini API SDK](https://ai.google.dev/gemini-api/docs/quickstart?lang=python). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
@@ -120,3 +120,4 @@ Given a weave reference to any `weave.Model` object, you can spin up a fastapi s
 ```shell
 weave serve weave:///your_entity/project-name/YourModel:<hash>
 ```
+
