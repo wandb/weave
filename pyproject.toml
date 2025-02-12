@@ -61,6 +61,7 @@ smolagents = [
   "litellm>=1.58",
   "smolagents>=1.8.1",
   "huggingface-hub>=0.28.1",
+  "SQLAlchemy>=2.0.38",
 ]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
