@@ -1864,7 +1864,8 @@ class WeaveClient:
         """
         An optional flushing method for the client.
         Forces all background tasks to be processed, which ensures parallel processing
-        during main thread execution.
+        during main thread execution. Can improve performance when user code
+        completes before data has been uploaded to the server.
         """
         self._flush()
 
