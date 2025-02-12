@@ -225,9 +225,8 @@ class WeaveHallucinationScorer(HuggingFacePipelineScorer):
             }
         }
     """
-
+    task: str = "pair-classification"
     model_max_length: int = 8192
-    device: str = "auto"
     threshold: float = HALLUCINATION_SCORER_THRESHOLD
     _local_model_path: str = ""
     import_failed: bool = False
@@ -240,7 +239,7 @@ class WeaveHallucinationScorer(HuggingFacePipelineScorer):
             self.model_name_or_path, MODEL_PATHS["hallucination_hhem_scorer"]
         )
         self._pipeline = pipeline(
-            "pair-classification",
+            self.task,
             model=self._local_model_path,
             trust_remote_code=True,
             device=self.device,
