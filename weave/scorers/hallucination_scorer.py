@@ -242,6 +242,7 @@ class WeaveHallucinationScorer(HuggingFacePipelineScorer):
             self.task,
             model=self._local_model_path,
             device=self.device,
+            trust_remote_code=True,
         )
 
     @weave.op
