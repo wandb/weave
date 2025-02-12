@@ -191,6 +191,66 @@ def get_smolagents_patcher(
                 )
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "Tool",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.Tool.__call__"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PipelineTool.encode",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.PipelineTool.encode"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PipelineTool.decode",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.PipelineTool.decode"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PipelineTool.forward",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.PipelineTool.forward"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PipelineTool",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.PipelineTool.__call__"
+                    }
+                )
+            ),
+        ),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
