@@ -678,7 +678,7 @@ export const opGroupby = makeListOp({
     engine
   ) => {
     const tableRows: any[] = inputs.arr;
-    // console.log('OP GROUP BY RESOLVER', tableRows.length);
+    // console.log('OP GROUP BY RESOLVER', tableRows.length, "");
     const groupByFn = inputs.groupByFn;
     const groupSafeKeyFn =
       groupByFn.nodeType === 'void' ? groupByFn : toSafeCall(groupByFn);
