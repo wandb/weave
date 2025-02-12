@@ -1,12 +1,11 @@
-import io
 import os
-import sys
 import time
 import timeit
 
 import pytest
 
 import weave
+from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 
@@ -62,44 +61,37 @@ def test_disabled_env_client():
 
 
 def test_print_call_link_setting(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        parse_and_apply_settings(UserSettings(print_call_link=False))
+        func()
 
-    parse_and_apply_settings(UserSettings(print_call_link=False))
-    func()
-    client.future_executor.flush()
-    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        parse_and_apply_settings(UserSettings(print_call_link=True))
+        func()
 
-    parse_and_apply_settings(UserSettings(print_call_link=True))
-    func()
-    client.future_executor.flush()
-    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
-
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
 def test_print_call_link_env(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
+        func()
 
-    os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
-    func()
-    client.future_executor.flush()
-    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
+        func()
 
-    os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
-    func()
-    client.future_executor.flush()
-    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
+    assert TRACE_CALL_EMOJI in captured.getvalue()
 
-    output = captured_stdout.getvalue()
+    output = captured.getvalue()
     assert TRACE_CALL_EMOJI in output
 
 

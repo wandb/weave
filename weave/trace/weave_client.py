@@ -63,6 +63,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -1116,6 +1117,9 @@ class WeaveClient:
     ) -> None:
         from weave.trace.api import _global_postprocess_output
 
+        # Capture the setting value in the current context
+        should_print = should_print_call_link()
+
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
@@ -1205,7 +1209,9 @@ class WeaveClient:
         def on_complete(f: Future) -> None:
             try:
                 if f.result() and not call_context.get_current_call():
-                    print_call_link(call)
+                    # Use the captured setting value
+                    if should_print:
+                        print_call_link(call)
             except Exception:
                 pass
 
