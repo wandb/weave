@@ -139,6 +139,58 @@ def get_smolagents_patcher(
                 )
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "HfApiModel",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.HfApiModel.__call__"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "TransformersModel",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name or "smolagents.TransformersModel.__call__"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "LiteLLMModel",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.LiteLLMModel.__call__"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "OpenAIServerModel",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name or "smolagents.OpenAIServerModel.__call__"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "AzureOpenAIServerModel",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.AzureOpenAIServerModel.__call__"
+                    }
+                )
+            ),
+        ),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
