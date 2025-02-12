@@ -10,7 +10,7 @@ Do you want to experiment with Google AI models on Weave without any set up? Try
 
 This page describes how to use W&B Weave with the Google Vertex AI API and the Google Gemini API.
 
-You can use Weave to to evaluate, monitor, and iterate on your Google GenAI applications. Weave automatically captures traces for the:
+You can use Weave to evaluate, monitor, and iterate on your Google GenAI applications. Weave automatically captures traces for the:
 
 1. [Google Vertex AI API](https://cloud.google.com/vertex-ai/docs), which provides access to Google’s Gemini models and [various partner models](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-partner-models).
 2. [Google Gemini API](https://ai.google.dev/gemini-api/docs/quickstart?lang=python), which is accessible via Python SDK, Node.js SDK, Go SDK, and REST.

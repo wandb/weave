@@ -29,7 +29,7 @@ Learn more about advanced Azure with Weave topics using the resources below.
 
 ### Use the Azure AI Model Inference API with Weave
 
-Learn how to to use the [Azure AI Model Inference API] with Weave to gain insights into Azure models in [this guide](https://wandb.ai/byyoung3/ML-NEWS2/reports/A-guide-to-using-the-Azure-AI-model-inference-API--Vmlldzo4OTY1MjEy#tutorial:-implementing-azure-ai-model-inference-api-with-w&b-weave-).
+Learn how to use the [Azure AI Model Inference API] with Weave to gain insights into Azure models in [this guide](https://wandb.ai/byyoung3/ML-NEWS2/reports/A-guide-to-using-the-Azure-AI-model-inference-API--Vmlldzo4OTY1MjEy#tutorial:-implementing-azure-ai-model-inference-api-with-w&b-weave-).
 
 ### Trace Azure OpenAI models with Weave
 
