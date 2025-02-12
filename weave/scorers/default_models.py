@@ -19,7 +19,7 @@ LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "weave_mod
 # Model paths for various scorers
 MODEL_PATHS = {
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_scorer:v1",
-    "hallucination_hhem_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer:v1",
+    "hallucination_hhem_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer:v0",
     "faithfulness_scorer": "c-metrics/weave-scorers/faithfulness_scorer:v1",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
     "fluency_scorer": "c-metrics/weave-scorers/fluency_scorer:v0",
