@@ -32,6 +32,7 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+import threading
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
@@ -77,7 +78,26 @@ class FutureExecutor:
         self._active_futures: list[Future] = []
         self._active_futures_lock = Lock()
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
+        self._set_keepalive_task()
         atexit.register(self._shutdown)
+
+    def _set_keepalive_task(self) -> None:
+        """
+        This task keeps the executor from shutting down while there’s work pending.
+
+        This is necessary because the executor will shut down if the user main
+        thread exits, preventing additional deferred tasks from being executed.
+        """
+        self._keep_alive_event = threading.Event()
+
+        def keep_alive() -> None:
+            # Block here until shutdown signals us to exit.
+            self._keep_alive_event.wait()
+
+        if self._executor:
+            self._executor.submit(keep_alive)
+        else:
+            raise RuntimeError("Executor not initialized")
 
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
@@ -184,7 +204,8 @@ class FutureExecutor:
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
-        if self._executor:
+        if self._executor is not None:
+            self._keep_alive_event.set()
             self._executor.shutdown(wait=True)
 
     def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
