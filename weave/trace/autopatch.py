@@ -70,7 +70,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.huggingface.huggingface_inference_client_sdk import (
         get_huggingface_patcher,
     )
-    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -81,6 +80,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher(settings.openai).attempt_patch()
@@ -115,7 +115,6 @@ def reset_autopatch() -> None:
     from weave.integrations.huggingface.huggingface_inference_client_sdk import (
         get_huggingface_patcher,
     )
-    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -126,6 +125,7 @@ def reset_autopatch() -> None:
     from weave.integrations.mistral import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher().undo_patch()
