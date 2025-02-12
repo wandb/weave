@@ -1860,6 +1860,14 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def flush(self) -> None:
+        """
+        An optional flushing method for the client.
+        Forces all background tasks to be processed, which ensures parallel processing
+        during main thread execution.
+        """
+        self._flush()
+
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():

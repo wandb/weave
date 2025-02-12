@@ -27,7 +27,6 @@ from weave.flow.scorer import (
     get_scorer_attributes,
 )
 from weave.flow.util import make_memorable_name, transpose
-from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
@@ -301,10 +300,6 @@ class Evaluation(Object):
         summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
-
-        client = get_weave_client()
-        if client:
-            client._flush()
 
         return summary
 
