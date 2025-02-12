@@ -1,6 +1,3 @@
-import asyncio
-import os
-
 import pytest
 
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -12,18 +9,18 @@ from weave.integrations.integration_utilities import op_name_from_ref
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_text_to_sql_agent(client):
+    from smolagents import CodeAgent, OpenAIServerModel, tool
     from sqlalchemy import (
-        create_engine,
-        MetaData,
-        Table,
         Column,
-        String,
-        Integer,
         Float,
+        Integer,
+        MetaData,
+        String,
+        Table,
+        create_engine,
         insert,
         text,
     )
-    from smolagents import tool, CodeAgent, OpenAIServerModel
 
     engine = create_engine("sqlite:///:memory:")
     metadata_obj = MetaData()
@@ -48,8 +45,18 @@ def test_text_to_sql_agent(client):
     rows = [
         {"receipt_id": 1, "customer_name": "Alan Payne", "price": 12.06, "tip": 1.20},
         {"receipt_id": 2, "customer_name": "Alex Mason", "price": 23.86, "tip": 0.24},
-        {"receipt_id": 3, "customer_name": "Woodrow Wilson", "price": 53.43, "tip": 5.43},
-        {"receipt_id": 4, "customer_name": "Margaret James", "price": 21.11, "tip": 1.00},
+        {
+            "receipt_id": 3,
+            "customer_name": "Woodrow Wilson",
+            "price": 53.43,
+            "tip": 5.43,
+        },
+        {
+            "receipt_id": 4,
+            "customer_name": "Margaret James",
+            "price": 21.11,
+            "tip": 1.00,
+        },
     ]
     insert_rows_into_table(rows, receipts)
 
@@ -73,9 +80,11 @@ def test_text_to_sql_agent(client):
             for row in rows:
                 output += "\n" + str(row)
         return output
-    
-    agent = CodeAgent(tools=[sql_engine],model=OpenAIServerModel("gpt-4o-mini"))
-    answer = agent.run("Can you give me the name of the client who got the most expensive receipt?")
+
+    agent = CodeAgent(tools=[sql_engine], model=OpenAIServerModel("gpt-4o-mini"))
+    answer = agent.run(
+        "Can you give me the name of the client who got the most expensive receipt?"
+    )
     assert "woodrow wilson" in answer.lower()
 
     calls = list(client.calls())
@@ -92,7 +101,10 @@ def test_text_to_sql_agent(client):
 
     call = calls[2]
     assert call.started_at < call.ended_at
-    assert op_name_from_ref(call.op_name) == "smolagents.MultiStepAgent.write_memory_to_messages"
+    assert (
+        op_name_from_ref(call.op_name)
+        == "smolagents.MultiStepAgent.write_memory_to_messages"
+    )
 
     call = calls[3]
     assert call.started_at < call.ended_at
@@ -102,4 +114,7 @@ def test_text_to_sql_agent(client):
     call = calls[4]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
-    assert "Thought:" in call.output["choices"][0]["message"]["content"] and "Code:" in call.output["choices"][0]["message"]["content"]
+    assert (
+        "Thought:" in call.output["choices"][0]["message"]["content"]
+        and "Code:" in call.output["choices"][0]["message"]["content"]
+    )
