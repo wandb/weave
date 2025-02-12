@@ -24,7 +24,7 @@ To get started with the Sensitive Data Protection feature in Weave, complete the
     pip install presidio-analyzer presidio-anonymizer
     ```
 
-2. Modify your `weave.init` call to enable redaction. When `redact_pii=True`, [common entities are redacted by default](#fields-redacted-by-default):
+2. Modify your `weave.init` call to enable redaction. When `redact_pii=True`, [common entities are redacted by default](#entities-redacted-by-default):
 
     ```python
     import weave
