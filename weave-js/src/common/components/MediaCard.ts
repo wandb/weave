@@ -37,6 +37,7 @@ export interface AllBoundingBoxControls {
 export interface MaskControl {
   disabled: boolean;
   opacity: number;
+  rgb?: [number, number, number];
 }
 
 export interface AllMaskControls {

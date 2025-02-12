@@ -11,7 +11,7 @@ import {
   useSecrets,
 } from '@wandb/weave/common/hooks/useSecrets';
 import {TargetBlank} from '@wandb/weave/common/util/links';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router';
 import {Link} from 'react-router-dom';
 
@@ -24,18 +24,19 @@ type Mod = {
   secrets: string[];
 };
 
-type ModCategoryType = 'Labeling' | 'Analysis' | 'Demos';
+type ModCategoryType = 'Guardrails' | 'Analysis' | 'Demos';
 
 type ModCategories = {
   [key in ModCategoryType]: Mod[];
 };
 
 const modCats: ModCategories = {
-  Labeling: [
+  Guardrails: [
     {
-      id: 'labeling/html',
-      name: 'HTML Labeler',
-      description: 'Label generated HTML against your own criteria',
+      id: 'guardrails-playground',
+      name: 'Guardrails Playground',
+      description:
+        'Test different types of guardrails for your LLM application',
       secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
     },
   ],
@@ -48,7 +49,7 @@ const modCats: ModCategories = {
       secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY'],
     },
     {
-      id: 'cost-dashboard',
+      id: 'dashboard',
       name: 'Cost Dashboard',
       description: 'A dashboard showing your project LLM costs over time',
       secrets: ['WANDB_API_KEY'],
@@ -56,7 +57,7 @@ const modCats: ModCategories = {
   ],
   Demos: [
     {
-      id: 'welcome',
+      id: 'demo',
       name: 'Welcome',
       description: 'A simple welcome mod',
       secrets: ['WANDB_API_KEY'],
@@ -68,10 +69,10 @@ const modCats: ModCategories = {
       secrets: ['WANDB_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
     },
     {
-      id: 'gist',
-      name: 'Gist',
-      description: 'Load a gist that contains a streamlit app.py file',
-      secrets: ['WANDB_API_KEY'],
+      id: 'together_ft',
+      name: 'Together Fine-Tuning',
+      description: 'Fine-tune a model with together.ai',
+      secrets: ['WANDB_API_KEY', 'TOGETHER_API_KEY'],
     },
   ],
 };
@@ -153,24 +154,82 @@ const ModFrame: React.FC<{entity: string; project: string; modId: string}> = ({
 }) => {
   const searchParams = new URLSearchParams(window.location.search);
   const purl = searchParams.get('purl');
+  const history = useHistory();
+  const modUrl = `${
+    window.WEAVE_CONFIG.WANDB_BASE_URL
+  }/service-redirect/${entity}/${project}/${encodeURIComponent(
+    modId
+  )}/mod?purl=${purl}`;
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const setupIframeAuth = useCallback(
+    (iframe: HTMLIFrameElement) => {
+      let baseUrl = window.WEAVE_CONFIG.WANDB_BASE_URL;
+      if (baseUrl === '') {
+        baseUrl = window.location.origin;
+      }
+      const authListener = (event: MessageEvent) => {
+        if (!event.data.type || !event.data.type.startsWith('MOD_AUTH_')) {
+          return;
+        }
+        // Verify message origin
+        if (event.origin !== baseUrl) {
+          console.warn(
+            'invalid origin (expected %s, got %s)',
+            baseUrl,
+            event.origin
+          );
+          return;
+        }
+        switch (event.data.type) {
+          case 'MOD_AUTH_RESET':
+            history.goBack();
+            break;
+          case 'MOD_AUTH_READY':
+            // Bridge page loaded, trigger auth
+            iframe.contentWindow?.postMessage(
+              {type: 'MOD_AUTH_START'},
+              event.origin
+            );
+            break;
+          case 'MOD_AUTH_COMPLETE':
+            iframe.src = `https://${event.data.modDomain}`;
+            break;
+          case 'MOD_AUTH_ERROR':
+            console.error(event.data.error);
+            break;
+        }
+      };
+
+      window.addEventListener('message', authListener);
+      iframe.src = modUrl;
+      return () => window.removeEventListener('message', authListener);
+    },
+    [modUrl, history]
+  );
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) {
+      return;
+    }
+    return setupIframeAuth(iframe);
+  }, [setupIframeAuth]);
+
   return (
     <iframe
+      ref={iframeRef}
       style={{
         width: '100%',
-        height: '100vh',
+        height: 'calc(100vh - 60px)',
         border: 0,
         borderImage:
           'linear-gradient(90deg, rgb(255, 75, 75), rgb(255, 253, 128)) 1',
         borderTop: '3px solid',
       }}
       title="Weave Mod"
-      allow="accelerometer; ambient-light-sensor; autoplay; battery; camera; clipboard-read; clipboard-write; display-capture; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; sync-xhr; usb; vr; wake-lock; xr-spatial-tracking"
+      allow="window-placement 'self'; downloads 'self'; clipboard-write 'self'; accelerometer 'self'; ambient-light-sensor 'self'; autoplay 'self'; battery 'self'; camera 'self'; clipboard-read 'self'; display-capture 'self'; document-domain 'self'; encrypted-media 'self'; fullscreen 'self'; geolocation 'self'; gyroscope 'self'; layout-animations 'self'; legacy-image-formats 'self'; magnetometer 'self'; microphone 'self'; midi 'self'; oversized-images 'self'; payment 'self'; picture-in-picture 'self'; publickey-credentials-get 'self'; sync-xhr 'self'; usb 'self'; vr 'self'; wake-lock 'self'; xr-spatial-tracking 'self'"
       sandbox="allow-downloads allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-storage-access-by-user-activation"
-      src={`${
-        window.WEAVE_CONFIG.WANDB_BASE_URL
-      }/service-redirect/${entity}/${project}/${encodeURIComponent(
-        modId
-      )}/mod?purl=${purl}`}
     />
   );
 };
@@ -185,6 +244,7 @@ export const SecretSettings: React.FC<{
   const helpText: Record<string, string> = {
     OPENAI_API_KEY: 'https://platform.openai.com/api-keys',
     ANTHROPIC_API_KEY: 'https://console.anthropic.com/keys',
+    TOGETHER_API_KEY: 'https://api.together.ai/settings/api-keys',
   };
   const history = useHistory();
   const [open, setOpen] = useState(true);
@@ -200,6 +260,7 @@ export const SecretSettings: React.FC<{
     // TODO: maybe don't allow this?
     carryOn();
   }, [setOpen, carryOn]);
+  const [error, setError] = useState<string | null>(null);
   const {secrets: existingSecrets, loading} = useSecrets({
     entityName: entity,
   });
@@ -224,6 +285,14 @@ export const SecretSettings: React.FC<{
   };
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const emptySecrets = missingSecrets.filter(name => !secrets[name]?.trim());
+    if (emptySecrets.length > 0) {
+      setError(`Please provide values for: ${emptySecrets.join(', ')}`);
+      return;
+    }
+
+    setError(null);
     await Promise.all(
       Object.entries(secrets).map(([name, value]) =>
         insertSecret({
@@ -273,6 +342,7 @@ export const SecretSettings: React.FC<{
               />
             </Box>
           ))}
+          {error && <Box sx={{color: 'error.main', mb: 2}}>{error}</Box>}
           <Button variant="contained" color="primary" type="submit">
             Run Mod
           </Button>
@@ -320,8 +390,8 @@ export const ModsPage: React.FC<{
               <ModCategory
                 entity={entity}
                 project={project}
-                category="Labeling"
-                mods={modCats.Labeling}
+                category="Guardrails"
+                mods={modCats.Guardrails}
               />
               <ModCategory
                 entity={entity}

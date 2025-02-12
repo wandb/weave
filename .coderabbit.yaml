@@ -1,0 +1,75 @@
+language: en-US
+# CodeRabbit configuration
+reviews:
+  # High-level configuration
+  poem: true
+  review_status: false
+  auto_review:
+    enabled: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+    drafts: true
+
+  # Language-specific instructions
+  path_instructions:
+    - path: "**/*.{js,jsx,ts,tsx}"
+      instructions: |
+        Focus on architectural and logical issues rather than style (assuming ESLint is in place).
+        Flag potential memory leaks and performance bottlenecks.
+        Check for proper error handling and async/await usage.
+        Avoid strict enforcement of try/catch blocks - accept Promise chains, early returns, and other clear error handling patterns. These are acceptable as long as they maintain clarity and predictability.
+        Ensure proper type usage in TypeScript files.
+        Look for security vulnerabilities in data handling.
+        Don't comment on formatting if prettier is configured.
+        Verify proper React hooks usage and component lifecycle.
+        Check for proper state management patterns.
+
+    - path: "**/*.py"
+      instructions: |
+        Focus on pythonic code patterns.
+        Check for proper exception handling.
+        Verify type hints usage where applicable.
+        Look for potential performance improvements.
+        Don't comment on formatting if black/isort is configured.
+        Check for proper dependency injection patterns.
+        Verify proper async handling if applicable.
+
+    - path: "**/*.go"
+      instructions: |
+        Focus on idiomatic Go patterns.
+        Check for proper error handling.
+        Look for concurrent programming issues.
+        Verify interface implementations.
+        Don't comment on formatting (assuming gofmt is used).
+        Check for proper resource cleanup.
+        Verify proper package organization.
+
+    - path: "**/*.{yaml,yml,json,tf}"
+      instructions: |
+        Check for security best practices.
+        Verify environment-specific configurations.
+        Look for hardcoded credentials or sensitive data.
+        Ensure proper resource limits and requests.
+        Verify proper versioning of dependencies.
+        Check for infrastructure best practices.
+
+    - path: "Dockerfile*"
+      instructions: |
+        Check for security best practices.
+        Verify proper base image usage.
+        Look for efficient layer caching.
+        Check for proper cleanup of temporary files.
+        Verify environment variables usage.
+
+    - path: "**/*.{md,mdx}"
+      instructions: |
+        Focus on technical accuracy.
+        Check for broken links.
+        Verify code examples are up-to-date.
+        Look for clarity and completeness.
+        Don't focus on grammar/spelling unless significant.
+
+# General settings
+chat:
+  auto_reply: true
