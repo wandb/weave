@@ -153,7 +153,7 @@ def test_text_to_sql_agent(client):
     assert "woodrow wilson" in answer.lower()
 
     calls = list(client.calls())
-    assert len(calls) >= 9
+    assert len(calls) >= 10
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -177,6 +177,36 @@ def test_text_to_sql_agent(client):
     assert "Thought:" in call.output.content and "Code:" in call.output.content
 
     call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert (
+        "Thought:" in call.output["choices"][0]["message"]["content"]
+        and "Code:" in call.output["choices"][0]["message"]["content"]
+    )
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "smolagents.Tool"
+    assert "woodrow wilson" in call.output.lower()
+
+    call = calls[6]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "smolagents.CodeAgent.step"
+    assert "woodrow wilson" in call.output.lower()
+
+    call = calls[7]
+    assert call.started_at < call.ended_at
+    assert (
+        op_name_from_ref(call.op_name)
+        == "smolagents.MultiStepAgent.write_memory_to_messages"
+    )
+
+    call = calls[8]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "smolagents.OpenAIServerModel"
+    assert "Thought:" in call.output.content and "Code:" in call.output.content
+
+    call = calls[9]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert (
