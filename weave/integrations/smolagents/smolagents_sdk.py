@@ -1,16 +1,26 @@
 import importlib
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.serialize import dictify
 
 _smolagents_patcher: Optional[MultiPatcher] = None
+
+
+def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    if "self" in inputs:
+        inputs["self"] = dictify(inputs["self"])
+    return inputs
 
 
 def smolagents_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
+        if not op_kwargs.get("postprocess_inputs"):
+            op_kwargs["postprocess_inputs"] = smolagents_postprocess_inputs
+
         op = weave.op(fn, **op_kwargs)
         return op
 
