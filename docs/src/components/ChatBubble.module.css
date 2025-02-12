@@ -1,0 +1,144 @@
+.chatContainer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.chatButton {
+  width: 60px;
+  height: 60px;
+  border-radius: 30px;
+  background-color: #3578e5;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  color: white;
+}
+
+.chatButton:hover {
+  transform: scale(1.05);
+}
+
+.chatFrame {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 400px;
+  height: 600px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.chatFrame.dragging {
+  user-select: none;
+  pointer-events: none;
+}
+
+.chatFrame.dragging iframe {
+  pointer-events: none;
+}
+
+.resizeContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 300px;
+  min-height: 400px;
+  resize: both;
+  overflow: hidden;
+}
+
+.iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  z-index: 2;
+  background: linear-gradient(
+    315deg,
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  );
+  border-top-left-radius: 12px;
+}
+
+.resizeRight {
+  cursor: ew-resize;
+  width: 8px;
+  height: calc(100% - 16px);
+  right: 0;
+  top: 8px;
+}
+
+.resizeBottom {
+  cursor: ns-resize;
+  height: 8px;
+  width: calc(100% - 16px);
+  bottom: 0;
+  left: 8px;
+}
+
+.resizeCorner {
+  cursor: nwse-resize;
+  width: 16px;
+  height: 16px;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  border-bottom-right-radius: 12px;
+}
+
+.loadingContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  z-index: 1;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3578e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.loadingText {
+  color: #666;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+} 
