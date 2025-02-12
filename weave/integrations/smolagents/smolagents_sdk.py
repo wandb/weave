@@ -166,6 +166,85 @@ def get_smolagents_patcher(
                 )
             ),
         ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "Tool.__call__",
+            smolagents_wrapper(
+                base.model_copy(update={"name": base.name or "smolagents.Tool"})
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "PythonInterpreterTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.PythonInterpreterTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "FinalAnswerTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.FinalAnswerTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "UserInputTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.UserInputTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "DuckDuckGoSearchTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.DuckDuckGoSearchTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "GoogleSearchTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.GoogleSearchTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "VisitWebpageTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.VisitWebpageTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "SpeechToTextTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.SpeechToTextTool"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "SpeechToTextTool.__call__",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.SpeechToTextTool"}
+                )
+            ),
+        ),
     ]
 
     _smolagents_patcher = MultiPatcher(patchers)
