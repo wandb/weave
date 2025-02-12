@@ -34,15 +34,6 @@ def get_smolagents_patcher(
     patchers = [
         SymbolPatcher(
             lambda: importlib.import_module("smolagents"),
-            "MultiStepAgent.run",
-            smolagents_wrapper(
-                base.model_copy(
-                    update={"name": base.name or "smolagents.MultiStepAgent.run"}
-                )
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("smolagents"),
             "MultiStepAgent.execute_tool_call",
             smolagents_wrapper(
                 base.model_copy(
@@ -78,6 +69,15 @@ def get_smolagents_patcher(
         ),
         SymbolPatcher(
             lambda: importlib.import_module("smolagents"),
+            "MultiStepAgent.run",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.MultiStepAgent.run"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
             "MultiStepAgent",
             smolagents_wrapper(
                 base.model_copy(
@@ -93,6 +93,48 @@ def get_smolagents_patcher(
                     update={
                         "name": base.name
                         or "smolagents.MultiStepAgent.write_memory_to_messages"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "CodeAgent.step",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.CodeAgent.step"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "CodeAgent.initialize_system_prompt",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.CodeAgent.initialize_system_prompt"
+                    }
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "ToolCallingAgent.step",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={"name": base.name or "smolagents.ToolCallingAgent.step"}
+                )
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("smolagents"),
+            "ToolCallingAgent.initialize_system_prompt",
+            smolagents_wrapper(
+                base.model_copy(
+                    update={
+                        "name": base.name
+                        or "smolagents.ToolCallingAgent.initialize_system_prompt"
                     }
                 )
             ),
