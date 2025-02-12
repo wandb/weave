@@ -167,7 +167,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
 
     @weave.op
     def group_analyzer_results_by_entity_type(
-        self, output: str, analyzer_results: list["RecognizerResult"]
+        self, output: str, analyzer_results: list[RecognizerResult]
     ) -> dict[str, list[str]]:
         """Group results by entity type"""
         detected_entities: dict[str, list[str]] = {}
@@ -203,7 +203,7 @@ class PresidioEntityRecognitionGuardrail(Scorer):
     def anonymize_text(
         self,
         output: str,
-        analyzer_results: list["RecognizerResult"],
+        analyzer_results: list[RecognizerResult],
         detected_entities: dict[str, list[str]],
     ) -> Optional[str]:
         anonymized_text = None
