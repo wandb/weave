@@ -91,9 +91,6 @@ def test_print_call_link_env(client):
 
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
-    output = captured.getvalue()
-    assert TRACE_CALL_EMOJI in output
-
 
 def test_should_capture_code_setting(client):
     parse_and_apply_settings(UserSettings(capture_code=False))
