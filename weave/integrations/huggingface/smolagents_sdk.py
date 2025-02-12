@@ -1,10 +1,9 @@
 import importlib
-from typing import Optional, Union, Callable
+from typing import Callable, Optional, Union
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-
 
 _smolagents_patcher: Optional[MultiPatcher] = None
 
@@ -60,8 +59,7 @@ def get_smolagents_patcher(
             smolagents_wrapper(
                 base.model_copy(
                     update={
-                        "name": base.name
-                        or "smolagents.MultiStepAgent.extract_action"
+                        "name": base.name or "smolagents.MultiStepAgent.extract_action"
                     }
                 )
             ),
@@ -83,10 +81,7 @@ def get_smolagents_patcher(
             "MultiStepAgent",
             smolagents_wrapper(
                 base.model_copy(
-                    update={
-                        "name": base.name
-                        or "smolagents.MultiStepAgent.__call__"
-                    }
+                    update={"name": base.name or "smolagents.MultiStepAgent.__call__"}
                 )
             ),
         ),
