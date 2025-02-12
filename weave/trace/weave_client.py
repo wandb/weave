@@ -61,6 +61,7 @@ from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
+    client_parallelism_upload,
     should_capture_client_info,
     should_capture_system_info,
 )
@@ -752,7 +753,14 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
+
+    # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
+    # Fast-lane executor for operations guaranteed to not defer
+    # to child operations, impossible to deadlock
+    # Currently only used for create_file operation
+    # Configurable with client_parallelism_upload
+    future_executor_fastlane: FutureExecutor
 
     """
     A client for interacting with the Weave trace server.
@@ -776,6 +784,9 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self.future_executor = FutureExecutor(max_workers=client_parallelism())
+        self.future_executor_fastlane = FutureExecutor(
+            max_workers=client_parallelism_upload()
+        )
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -1873,6 +1884,9 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        if client_parallelism_upload() is not None:
+            # If we have a separate upload worker pool, use it
+            return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
 
 

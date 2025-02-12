@@ -61,14 +61,18 @@ class FutureExecutor:
                                      Defaults to None. If set to 0, all tasks will be executed
                                      directly in the current thread.
         thread_name_prefix (str): The prefix for thread names. Defaults to "WeaveThreadPool".
+        is_fastlane (bool): Whether the executor is a fastlane executor. Defaults to False.
+                            Fastlane executors cannot defer functions, they must execute directly.
     """
 
     def __init__(
         self,
         max_workers: int | None = None,
         thread_name_prefix: str = THREAD_NAME_PREFIX,
+        is_fastlane: bool = False,
     ):
         self._max_workers = max_workers
+        self._is_fastlane = is_fastlane
         self._executor: ContextAwareThreadPoolExecutor | None = None
         if max_workers != 0:
             self._executor = ContextAwareThreadPoolExecutor(
@@ -218,6 +222,11 @@ class FutureExecutor:
         or if max_workers is 0, execute the function directly in the current thread.
         """
         wrapped = self._make_deadlock_safe(f)
+
+        if self._is_fastlane and self._in_thread_context.get():
+            raise RuntimeError(
+                "Workers in fastlane Executor cannot defer functions, they must execute directly"
+            )
 
         if self._executor is None or self._in_thread_context.get():
             return self._execute_directly(wrapped, *args, **kwargs)

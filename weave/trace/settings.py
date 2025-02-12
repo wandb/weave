@@ -79,6 +79,16 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
+    client_parallelism_upload: Optional[int] = None
+    """
+    EXPERIMENTAL
+
+    Sets the number of workers to use for upload operations.
+    If not set, automatically adjusts based on the number of cores.
+
+    Default is None, disabling separate worker pool for uploads.
+    """
+
     use_server_cache: bool = False
     """
     Toggles caching of server responses, defaults to False
@@ -143,6 +153,10 @@ def should_capture_system_info() -> bool:
 
 def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
+
+
+def client_parallelism_upload() -> Optional[int]:
+    return _optional_int("client_parallelism_upload")
 
 
 def use_server_cache() -> bool:

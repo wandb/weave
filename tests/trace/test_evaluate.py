@@ -324,3 +324,45 @@ def test_sync_eval_parallelism(client):
         "model_latency": {"mean": pytest.approx(1, abs=1)},
     }
     assert time.time() - now < 5
+
+
+@pytest.mark.parametrize("is_fastlane", [False, True])
+def test_eval_dataset_fastlane_executor(client, is_fastlane):
+    # remake fastlane executor with is_fastlane
+    if is_fastlane:
+        from weave.trace.concurrent.futures import FutureExecutor
+
+        client.future_executor_fastlane = FutureExecutor(
+            is_fastlane=is_fastlane, max_workers=2
+        )
+
+    import random
+
+    from PIL import Image
+
+    def random_image():
+        im = Image.new("RGB", (400, 400), "red")
+        for i in range(100):
+            im.putpixel((random.randint(0, 256), random.randint(0, 256)), (0, 0, 0))
+        return im
+
+    class MyModel(weave.Model):
+        @weave.op()
+        async def invoke(self, image: Image.Image) -> dict:
+            return {"success:": True}
+
+    rows = [{"image": random_image()} for i in range(1, 101)]
+    dataset = weave.Dataset(description="dummy_dataset", rows=rows)
+
+    model = MyModel()
+    evaluation = weave.Evaluation(dataset=dataset)
+    result = asyncio.run(evaluation.evaluate(model))
+
+    # assert there are no outstanding background processes
+    assert len(client.future_executor._active_futures) == 0
+    assert len(client.future_executor_fastlane._active_futures) == 0
+
+    assert result == {
+        "output": {"success:": {"true_count": 100, "true_fraction": 1.0}},
+        "model_latency": {"mean": pytest.approx(0, abs=0.1)},
+    }

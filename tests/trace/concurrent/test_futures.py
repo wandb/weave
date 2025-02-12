@@ -47,8 +47,9 @@ def test_then_single_future() -> None:
     assert future_result.result() == 15
 
 
-def test_then_multiple_futures() -> None:
-    executor: FutureExecutor = FutureExecutor()
+@pytest.mark.parametrize("is_fastlane", [False, True])
+def test_then_multiple_futures(is_fastlane: bool) -> None:
+    executor: FutureExecutor = FutureExecutor(is_fastlane=is_fastlane)
 
     def fetch_data1() -> list[int]:
         return [1, 2, 3]
@@ -146,8 +147,9 @@ def test_max_workers() -> None:
     assert 4 <= total_time  # Should take about 4 seconds with 1 worker
 
 
-def test_chained_then_operations() -> None:
-    executor: FutureExecutor = FutureExecutor()
+@pytest.mark.parametrize("is_fastlane", [False, True])
+def test_chained_then_operations(is_fastlane: bool) -> None:
+    executor: FutureExecutor = FutureExecutor(is_fastlane=is_fastlane)
 
     def fetch_data() -> list[int]:
         return [1, 2, 3, 4, 5]
@@ -165,8 +167,9 @@ def test_chained_then_operations() -> None:
     assert future_sum.result() == 30
 
 
-def test_defer_and_then() -> None:
-    executor: FutureExecutor = FutureExecutor()
+@pytest.mark.parametrize("is_fastlane", [False, True])
+def test_defer_and_then(is_fastlane: bool) -> None:
+    executor: FutureExecutor = FutureExecutor(is_fastlane=is_fastlane)
 
     def simple_task() -> int:
         return 42
@@ -190,8 +193,11 @@ def test_empty_futures_list() -> None:
     assert future_result.result() == 0
 
 
-def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
-    executor: FutureExecutor = FutureExecutor(max_workers=1)
+@pytest.mark.parametrize("is_fastlane", [False, True])
+def test_nested_futures_with_1_max_worker_classic_deadlock_case(
+    is_fastlane: bool,
+) -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1, is_fastlane=is_fastlane)
 
     def inner_0() -> list[int]:
         return [0]
@@ -222,3 +228,15 @@ def test_nested_futures_with_0_max_workers_direct() -> None:
     res = executor.defer(inner_2).result()
     assert executor._executor is None
     assert res == [0, 1, 2]
+
+
+def test_fastlane_executor_defer_to_deferred_function() -> None:
+    executor: FutureExecutor = FutureExecutor(is_fastlane=True)
+
+    def deferred_function() -> int:
+        return executor.defer(lambda: 42).result()
+
+    with pytest.raises(
+        RuntimeError, match="Cannot defer to a deferred function in fastlane Executor"
+    ):
+        executor.defer(deferred_function)
