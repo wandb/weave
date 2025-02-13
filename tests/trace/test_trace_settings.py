@@ -215,25 +215,14 @@ def test_get_parallelism_settings() -> None:
     # Test default behavior with 4 CPU cores
     with mock.patch("os.cpu_count", return_value=4):
         main, upload = get_parallelism_settings()
-        assert main == 4  # Default 50/50 split: (4 cores + 4) * 0.5 = 4
-        assert upload == 4  # Equal split by default
+        assert main == 4
+        assert upload == 4
 
     # Test explicit total parallelism override
     with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "10"}):
         main, upload = get_parallelism_settings()
-        assert main == 5  # Default 50/50 split: 10 * 0.5 = 5
-        assert upload == 5  # Equal split by default
-
-    # Test explicit background parallelism mix override
-    with mock.patch.dict(
-        os.environ,
-        {
-            "WEAVE_CLIENT_PARALLELISM": "10",
-        },
-    ):
-        main, upload = get_parallelism_settings()
-        assert main == 3  # 10 * (1 - 0.7) = 3
-        assert upload == 7  # 10 * 0.7 = 7
+        assert main == 5
+        assert upload == 5
 
     # Test disabling parallelism
     with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "0"}):
@@ -244,17 +233,17 @@ def test_get_parallelism_settings() -> None:
     # Test max cap with many cores
     with mock.patch("os.cpu_count", return_value=64):
         main, upload = get_parallelism_settings()
-        assert main == 16  # Default 50/50 split: min(32, 68) * 0.5 = 16
-        assert upload == 16  # Equal split of max 32
+        assert main == 16
+        assert upload == 16
 
     # Test single core system
     with mock.patch("os.cpu_count", return_value=1):
         main, upload = get_parallelism_settings()
-        assert main == 2  # Default 50/50 split: (1 core + 4) * 0.5 = 2
-        assert upload == 3  # Remaining threads (5 - 2)
+        assert main == 2
+        assert upload == 3
 
     # Test when cpu_count returns None
     with mock.patch("os.cpu_count", return_value=None):
         main, upload = get_parallelism_settings()
-        assert main == 2  # Default 50/50 split: (1 core + 4) * 0.5 = 2
-        assert upload == 3  # Remaining threads (5 - 2)s
+        assert main == 2
+        assert upload == 3
