@@ -79,15 +79,6 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    client_background_parallelism_mix: Optional[float] = None
-    """
-    EXPERIMENTAL
-
-    Sets the percentage of workers to use for upload operations.
-    Defaults to 50% of workers set by `client_parallelism`.
-    Higher values means more workers will be used for upload operations.
-    """
-
     use_server_cache: bool = False
     """
     Toggles caching of server responses, defaults to False
@@ -154,10 +145,6 @@ def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
 
-def client_background_parallelism_mix() -> Optional[float]:
-    return _optional_float("client_background_parallelism_mix")
-
-
 def use_server_cache() -> bool:
     return _should("use_server_cache")
 
@@ -202,12 +189,6 @@ def _should(name: str) -> bool:
 def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
-    return _context_vars[name].get()
-
-
-def _optional_float(name: str) -> Optional[float]:
-    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
-        return float(env)
     return _context_vars[name].get()
 
 
