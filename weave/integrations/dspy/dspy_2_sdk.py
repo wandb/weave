@@ -45,7 +45,7 @@ def get_dspy_2_patcher(
 
     base = settings.op_settings
 
-    dspy_patcher = MultiPatcher(
+    _dspy_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("dspy.clients.lm"),
@@ -55,4 +55,4 @@ def get_dspy_2_patcher(
         ]
     )
 
-    return dspy_patcher
+    return _dspy_patcher
