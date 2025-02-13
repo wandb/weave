@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import os
 import platform
 import re
 import sys
@@ -783,10 +784,9 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.future_executor = FutureExecutor(max_workers=client_parallelism())
-        self.future_executor_fastlane = FutureExecutor(
-            max_workers=client_parallelism_upload()
-        )
+        parallelism_main, parallelism_upload = get_parallelism_settings()
+        self.future_executor = FutureExecutor(max_workers=parallelism_main)
+        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -1888,6 +1888,29 @@ class WeaveClient:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
+
+
+def get_parallelism_settings() -> tuple[int | None, int | None]:
+    total_parallelism = client_parallelism()
+    upload_parallelism = client_parallelism_upload()
+
+    # if user has explicitly set 0 for total parallelism, don't use parallelism
+    if total_parallelism == 0:
+        return 0, 0
+
+    # if user has set a specific upload parallelism, use that
+    if upload_parallelism:
+        return total_parallelism, upload_parallelism
+
+    # if total_parallelism is None, we have to calculate it
+    if total_parallelism is None:
+        total_parallelism = min(32, (os.cpu_count() or 1) + 4)
+
+    # use 50/50 split between main and upload
+    parallelism_main = total_parallelism // 2
+    parallelism_upload = total_parallelism - parallelism_main
+
+    return parallelism_main, parallelism_upload
 
 
 def safe_current_wb_run_id() -> str | None:

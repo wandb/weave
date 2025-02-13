@@ -1,10 +1,13 @@
+import os
 import time
 from concurrent.futures import Future
 from typing import Any
+from unittest import mock
 
 import pytest
 
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.weave_client import get_parallelism_settings
 
 
 def test_defer_simple() -> None:
@@ -222,3 +225,50 @@ def test_nested_futures_with_0_max_workers_direct() -> None:
     res = executor.defer(inner_2).result()
     assert executor._executor is None
     assert res == [0, 1, 2]
+
+
+def test_get_parallelism_settings() -> None:
+    # Test default behavior with 4 CPU cores
+    with mock.patch("os.cpu_count", return_value=4):
+        main, upload = get_parallelism_settings()
+        assert main == 4  # (4 cores + 4) // 2 = 4
+        assert upload == 4  # Remaining threads for upload
+
+    # Test explicit total parallelism override
+    with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "10"}):
+        main, upload = get_parallelism_settings()
+        assert main == 5  # 10 // 2 = 5
+        assert upload == 5  # Equal split
+
+    # Test explicit upload parallelism override
+    with mock.patch.dict(
+        os.environ,
+        {"WEAVE_CLIENT_PARALLELISM": "10", "WEAVE_CLIENT_PARALLELISM_UPLOAD": "3"},
+    ):
+        main, upload = get_parallelism_settings()
+        assert main == 10  # Total parallelism unchanged
+        assert upload == 3  # Explicit upload setting
+
+    # Test disabling parallelism
+    with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "0"}):
+        main, upload = get_parallelism_settings()
+        assert main == 0
+        assert upload == 0
+
+    # Test max cap with many cores
+    with mock.patch("os.cpu_count", return_value=64):
+        main, upload = get_parallelism_settings()
+        assert main == 16  # (min(32, 68) // 2)
+        assert upload == 16  # Equal split of max 32
+
+    # Test single core system
+    with mock.patch("os.cpu_count", return_value=1):
+        main, upload = get_parallelism_settings()
+        assert main == 2  # (1 core + 4) // 2 = 2
+        assert upload == 3  # Remaining threads (5 - 2)
+
+    # Test when cpu_count returns None
+    with mock.patch("os.cpu_count", return_value=None):
+        main, upload = get_parallelism_settings()
+        assert main == 2  # (1 core + 4) // 2 = 2
+        assert upload == 3  # Remaining threads (5 - 2)
