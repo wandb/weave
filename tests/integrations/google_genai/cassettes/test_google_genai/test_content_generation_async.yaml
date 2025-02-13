@@ -24,7 +24,7 @@ interactions:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
         [\n          {\n            \"text\": \"The capital of France is Paris.\\n\"\n
         \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.011875460855662823\n    }\n  ],\n  \"usageMetadata\":
+        \"STOP\",\n      \"avgLogprobs\": -0.28169208765029907\n    }\n  ],\n  \"usageMetadata\":
         {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 8,\n    \"totalTokenCount\":
         16,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
         \       \"tokenCount\": 8\n      }\n    ],\n    \"candidatesTokensDetails\":
@@ -38,11 +38,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:09:47 GMT
+      - Thu, 13 Feb 2025 07:18:48 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1545
+      - gfet4t7; dur=1859
       Transfer-Encoding:
       - chunked
       Vary:

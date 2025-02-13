@@ -43,24 +43,20 @@ def test_content_generation_sync(client):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
-def test_content_generation_async(client):
+async def test_content_generation_async(client):
     from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
-    response = asyncio.run(
-        google_client.aio.models.generate_content(
-            model="gemini-2.0-flash",
-            contents="What's the capital of France?",
-        )
+    response = await google_client.aio.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="What's the capital of France?",
     )
-
     assert "paris" in response.text.lower()
-
     call = list(client.calls())[0]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
@@ -114,7 +110,7 @@ def test_content_generation_sync_stream(client):
 
 @pytest.mark.asyncio
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -190,7 +186,7 @@ You are able to generate high-quality code in the Python programming language.""
 
 @pytest.mark.asyncio
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client

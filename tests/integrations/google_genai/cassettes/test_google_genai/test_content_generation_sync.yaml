@@ -317,13 +317,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 13 Feb 2025 07:09:42 GMT
+      - Thu, 13 Feb 2025 07:18:44 GMT
       ETag:
       - W/"e084c0f6160862b5ea95904fcacccc35c9bbcb332240258e06dcf33aef5bee66"
       Expires:
-      - Thu, 13 Feb 2025 07:14:42 GMT
+      - Thu, 13 Feb 2025 07:23:44 GMT
       Source-Age:
-      - '101'
+      - '41'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -333,19 +333,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '6'
+      - '3'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - ca8e8f91516dc351b56af95baace0a781e93026a
+      - 4d3529c1cd0288c4174effa440ad4fccefc0ea3a
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - C35C:3E6C75:1C99B2:1E4A8D:67AD9471
       X-Served-By:
-      - cache-sin-wsss1830035-SIN
+      - cache-sin-wsss1830030-SIN
       X-Timer:
-      - S1739430583.795550,VS0,VE0
+      - S1739431125.719450,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -376,7 +376,7 @@ interactions:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
         [\n          {\n            \"text\": \"The capital of France is Paris.\\n\"\n
         \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.014221512712538242\n    }\n  ],\n  \"usageMetadata\":
+        \"STOP\",\n      \"avgLogprobs\": -0.011875460855662823\n    }\n  ],\n  \"usageMetadata\":
         {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 8,\n    \"totalTokenCount\":
         16,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
         \       \"tokenCount\": 8\n      }\n    ],\n    \"candidatesTokensDetails\":
@@ -390,11 +390,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:09:45 GMT
+      - Thu, 13 Feb 2025 07:18:46 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1567
+      - gfet4t7; dur=917
       Transfer-Encoding:
       - chunked
       Vary:
