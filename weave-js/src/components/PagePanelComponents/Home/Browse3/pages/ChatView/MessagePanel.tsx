@@ -102,9 +102,10 @@ export const MessagePanel = ({
             'py-[16px]': hasContent,
             'pb-[4px] pt-[8px]': !isUser && !isTool && !isSystemPrompt,
           })}>
-          <div className={classNames({
-            'pb-[16px]': hasToolCalls && hasContent
-          })}>
+          <div
+            className={classNames({
+              'pb-[16px]': hasToolCalls && hasContent,
+            })}>
             {isSystemPrompt && (
               <div className="flex justify-between px-[16px]">
                 <div className="text-sm text-moon-500">
@@ -124,8 +125,7 @@ export const MessagePanel = ({
             <div
               ref={contentRef}
               className={classNames('w-full overflow-y-hidden', {
-                'max-h-[400px]':
-                  !isShowingMore && !editorHeight,
+                'max-h-[400px]': !isShowingMore && !editorHeight,
                 'max-h-full': isShowingMore || editorHeight,
               })}>
               {messageHeader}
@@ -158,7 +158,6 @@ export const MessagePanel = ({
                       )}
                     </div>
                   )}
-                  
                 </>
               )}
             </div>

@@ -58,7 +58,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
 
   const copyText = `${name}(${parsedArgs})`;
   return (
-    <div className="bg-moon-100 py-8 rounded-lg">
+    <div className="rounded-lg bg-moon-100 py-8">
       {/* The tool call header has a copy button */}
       <div className="pb-8">
         <div className="flex justify-between px-16">
