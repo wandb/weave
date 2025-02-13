@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, TypedDict, Union, cast
+from typing import Any, Callable, Optional, TypedDict, Union, cast
 
 import boto3
 from azure.core.credentials import TokenCredential as AzureTokenCredential
@@ -27,6 +27,7 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
 
+
 def determine_bucket_uri(
     project_id: str, digest: str, base_storage_bucket_uri: str
 ) -> str:
@@ -38,7 +39,7 @@ class AWSCredentials(TypedDict, total=False):
 
     access_key_id: str
     secret_access_key: str
-    session_token: str  # Optional
+    session_token: Optional[str]  # Optional
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -94,7 +95,6 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
 def get_aws_credentials() -> AWSCredentials:
     """
     Returns AWS credentials needed for S3 access.
-    To be implemented by the client.
 
     Returns:
         Dict containing AWS credentials with keys:
@@ -107,11 +107,14 @@ def get_aws_credentials() -> AWSCredentials:
     session_token = environment.wf_storage_bucket_aws_session_token()
     if access_key_id is None or secret_access_key is None:
         raise ValueError("AWS credentials not set")
-    return AWSCredentials(
-        access_key_id=access_key_id,
-        secret_access_key=secret_access_key,
-        session_token=session_token,
-    )
+
+    creds: AWSCredentials = {
+        "access_key_id": access_key_id,
+        "secret_access_key": secret_access_key,
+    }
+    if session_token is not None:
+        creds["session_token"] = session_token
+    return creds
 
 
 def get_gcp_credentials() -> GCPCredentials:
@@ -159,12 +162,9 @@ def get_azure_credentials() -> (
         return AzureConnectionCredentials(connection_string=connection_string)
     account_url = environment.wf_storage_bucket_azure_account_url()
     credential = environment.wf_storage_bucket_azure_credential()
-    if account_url is None and credential is None:
+    if account_url is None or credential is None:
         raise ValueError("Azure credentials not set")
-    return AzureAccountCredentials(
-        account_url=account_url, credential=credential
-    )
-
+    return AzureAccountCredentials(account_url=account_url, credential=credential)
 
 
 def parse_storage_uri(uri: str) -> tuple[str, str]:
