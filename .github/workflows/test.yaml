@@ -240,7 +240,6 @@ jobs:
             "cerebras",
             "cohere",
             "dspy",
-            "dspy_2",
             "groq",
             "huggingface",
             "google_ai_studio",
