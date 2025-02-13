@@ -220,6 +220,13 @@ def get_dspy_patcher(
                     base.model_copy(update={"name": base.name or "dspy.ReAct.forward"})
                 ),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "ColBERTv2.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.ColBERTv2"})
+                ),
+            ),
         ]
     )
 

@@ -317,13 +317,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 13 Feb 2025 14:04:24 GMT
+      - Thu, 13 Feb 2025 14:06:43 GMT
       ETag:
       - W/"e084c0f6160862b5ea95904fcacccc35c9bbcb332240258e06dcf33aef5bee66"
       Expires:
-      - Thu, 13 Feb 2025 14:09:24 GMT
+      - Thu, 13 Feb 2025 14:11:43 GMT
       Source-Age:
-      - '14'
+      - '152'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -333,26 +333,63 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '1'
+      - '4'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 36ab47c715b9cd5db484eaf2fea94c5ddfe4a1b5
+      - 77721c191659970dfb452d71ca67c766b2bc44bb
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - C35C:3E6C75:1C99B2:1E4A8D:67AD9471
       X-Served-By:
-      - cache-sin-wsss1830054-SIN
+      - cache-sin-wsss1830034-SIN
       X-Timer:
-      - S1739455465.756231,VS0,VE2
+      - S1739455603.362684,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
       code: 200
       message: OK
 - request:
-    body: '{"messages":[{"role":"user","content":"Say this is a test!"}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.7}'
+    body: "{\"messages\":[{\"role\":\"system\",\"content\":\"Your input fields are:\\n1.
+      `context` (str)\\n2. `question` (str)\\n\\nYour output fields are:\\n1. `reasoning`
+      (str)\\n2. `response` (str)\\n\\nAll interactions will be structured in the
+      following way, with the appropriate values filled in.\\n\\n[[ ## context ##
+      ]]\\n{context}\\n\\n[[ ## question ## ]]\\n{question}\\n\\n[[ ## reasoning ##
+      ]]\\n{reasoning}\\n\\n[[ ## response ## ]]\\n{response}\\n\\n[[ ## completed
+      ## ]]\\n\\nIn adhering to this structure, your objective is: \\n        Given
+      the fields `context`, `question`, produce the fields `response`.\"},{\"role\":\"user\",\"content\":\"[[
+      ## context ## ]]\\n[1] \xABDavid Gregory (physician) | David Gregory (20 December
+      1625 \u2013 1720) was a Scottish physician and inventor. His surname is sometimes
+      spelt as Gregorie, the original Scottish spelling. He inherited Kinnairdy Castle
+      in 1664. Three of his twenty-nine children became mathematics professors. He
+      is credited with inventing a military cannon that Isaac Newton described as
+      \\\"being destructive to the human species\\\". Copies and details of the model
+      no longer exist. Gregory's use of a barometer to predict farming-related weather
+      conditions led him to be accused of witchcraft by Presbyterian ministers from
+      Aberdeen, although he was never convicted.\xBB\\n[2] \xABGregory Tarchaneiotes
+      | Gregory Tarchaneiotes (Greek: \u0393\u03C1\u03B7\u03B3\u03CC\u03C1\u03B9\u03BF\u03C2
+      \u03A4\u03B1\u03C1\u03C7\u03B1\u03BD\u03B5\u03B9\u03CE\u03C4\u03B7\u03C2 , Italian:
+      \\\"Gregorio Tracanioto\\\" or \\\"Tracamoto\\\" ) was a \\\"protospatharius\\\"
+      and the long-reigning catepan of Italy from 998 to 1006. In December 999, and
+      again on February 2, 1002, he reinstituted and confirmed the possessions of
+      the abbey and monks of Monte Cassino in Ascoli. In 1004, he fortified and expanded
+      the castle of Dragonara on the Fortore. He gave it three circular towers and
+      one square one. He also strengthened Lucera.\xBB\\n[3] \xABGregory of Gaeta
+      | Gregory was the Duke of Gaeta from 963 until his death. He was the second
+      son of Docibilis II of Gaeta and his wife Orania. He succeeded his brother John
+      II, who had left only daughters. Gregory rapidly depleted the \\\"publicum\\\"
+      (public land) of the Duchy of Gaeta by doling it out to family members as grants.
+      Gregory disappears from the records in 964 and was succeeded by his younger
+      brother Marinus of Fondi over the heads of his three sons. It is possible that
+      there was an internal power struggle between factions of the Docibilan family
+      and that Gregory was forced out. On the other hand, perhaps he died and his
+      sons fought a losing battle for their inheritance to Gaeta.\xBB\\n\\n[[ ## question
+      ## ]]\\nWhat's the name of the castle that David Gregory inherited?\\n\\nRespond
+      with the corresponding output fields, starting with the field `[[ ## reasoning
+      ## ]]`, then `[[ ## response ## ]]`, and then ending with the marker for `[[
+      ## completed ## ]]`.\"}],\"model\":\"gpt-4o-mini\",\"max_tokens\":1000,\"temperature\":0.0}"
     headers:
       accept:
       - application/json
@@ -361,7 +398,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '120'
+      - '2869'
       content-type:
       - application/json
       host:
@@ -393,19 +430,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFLLbtswELzrK7Y8W4UfcpT6UqAwiqQ5BW0RIEUh0ORKYkuRLHfVNgj8
-        7wUlx3JQB8iFh5mdwcxyHzMAYbTYgFCtZNUFm3+Yfy0/Lj6r1fbTDd5e31314W57u72sb37V92KW
-        FH73AxU/qd4q3wWLbLwbaRVRMibXRbl6V6zXxcV6IDqv0SZZEzgvfN4ZZ/LlfFnk8zJfXB7UrTcK
-        SWzgWwYA8Di8KafT+FdsYD57Qjokkg2KzXEIQERvEyIkkSGWjsVsIpV3jG6I/qU1BIZAAiPxG7jy
-        f0BJB9cwKuHB91D3kVuM7089ItY9ydTD9dYe8P0xlPVNiH5HB/6I18YZaquIkrxLAYh9EAO7zwC+
-        D+X7Z31EiL4LXLH/iS4ZLlajnZhWfoZkz9JO+PJidsat0sjSWDpZnlBStagn5bRp2WvjT4jspPP/
-        Yc55j72Na15jPxFKYWDUVYiojXpeeBqLmA7ypbHjjofAgjD+NgorNhjTP2isZW/HMxH0QIxdVRvX
-        YAzRjLdSh6pcoi7lbl0oke2zfwAAAP//AwCLSk3NOQMAAA==
+        H4sIAAAAAAAAAwAAAP//jFNNb+IwEL3nV4zcK0GBBCgc96N7qLZSJXrYBRQZe5J417Et27BlK/57
+        5QRIqrLVXiJn3szzm3njlwiACE4WQFhFPauNjD8lT/Onh/TP4e5xZtOHvz9/fDWPS+P23+/1HRmE
+        Cr39hcyfq4ZM10aiF1q1MLNIPQbW0SydZ5PJNMkaoNYcZSgrjY8zHddCiXicjLM4mcWj21N1pQVD
+        RxawigAAXppv0Kk4PpMFJINzpEbnaIlkcUkCIFbLECHUOeE8VZ4MOpBp5VE10lcruLkBi9RpJVQZ
+        fjabtVpWCE3Ws4caVejKga+ohy90Lzh8s1hqewChKrTCI4d7oRQVlh/gM3VeIggFo+k0G8KyQouF
+        tjgAXyEoWiPoojmzNrXCHpFw77iGa7VWZ6XOaOWwL/QK44dSP77h5CPy9or+3CwWO0eDd2on5Sl+
+        vBghdWms3roTfokXQglX5e2Qw9Cd14Y06DEC2DSG7954SIzVtfG5179RBcJpNm75SLdnPXRyAr32
+        VHbxWTIbXOHLOXoqpOutDGGUVci70m6/6I4L3QOiXtfv1VzjvqzX/9B3AGNoPPLcWOSCve24S7MY
+        nuG/0i5TbgQTh3YvGOZeoA1OcCzoTraPg7iD81jnhVAlWmNF+0IKk2/5bZqO58U0JdExegUAAP//
+        AwCAE0R1LwQAAA==
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 91155e143ad94cad-SIN
+      - 91156177991afe09-SIN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -413,14 +450,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 13 Feb 2025 14:04:26 GMT
+      - Thu, 13 Feb 2025 14:06:46 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=xG144JHTya4TziiRx_WBUnksNRNnGWFZ3zz4V60JSfA-1739455466-1.0.1.1-KI1O4flBpZXi8V.yqjpUdUupo6Yxm4rsWuahwKXeOnNWXim7HTonZzaojGfxi6ZkaIo87cXUfUtu6E034cYmNQ;
-        path=/; expires=Thu, 13-Feb-25 14:34:26 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=Kpn5JzqgmsxwS93yAuIdj07zoEaLz9xsS.msd3gZ.f8-1739455606-1.0.1.1-QejddY6tLIw9Y0aCQiw6m5uxuJDNJfU8YLDirYlzNYVe4eVVsetA_eN.vzIqLhRAVKMzjSZPZRlvqLXl1dH0gA;
+        path=/; expires=Thu, 13-Feb-25 14:36:46 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=OOvPQuulF6CHr7tmQxbZi_zGn4Wjzp0zC7qYwVEnzds-1739455466442-0.0.1.1-604800000;
+      - _cfuvid=pD8wYqjj9aGMfRnCJMua8MTzowrLutgQiV4SlmrSq_0-1739455606352-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -430,10 +467,12 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '486'
+      - '1640'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -445,13 +484,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998994'
+      - '149998323'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_556fc6f4b07cab229218cd54f2bafd3d
+      - req_9aa3c34442b97e168ae6b9c998d5815d
     status:
       code: 200
       message: OK
