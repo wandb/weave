@@ -23,7 +23,7 @@ def test_content_generation_sync(client):
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash",
         contents="What's the capital of France?",
     )
 
@@ -54,7 +54,7 @@ def test_content_generation_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = asyncio.run(
         google_client.aio.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.0-flash",
             contents="What's the capital of France?",
         )
     )
@@ -85,7 +85,7 @@ def test_content_generation_sync_stream(client):
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content_stream(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash",
         contents="What's the capital of France?",
     )
 
@@ -122,7 +122,7 @@ def test_content_generation_async_stream(client):
     async def generate_content():
         response_text = ""
         response = await google_client.aio.models.generate_content_stream(
-            model="gemini-2.0-flash-exp", contents="What's the capital of France?"
+            model="gemini-2.0-flash", contents="What's the capital of France?"
         )
         async for chunk in response:
             response_text += chunk.text
@@ -159,7 +159,7 @@ You are an expert software developer and a helpful coding assistant.
 You are able to generate high-quality code in the Python programming language."""
 
     response = google_client.chats.create(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash",
         config=genai.types.GenerateContentConfig(
             system_instruction=system_instruction,
             temperature=0.5,
@@ -199,7 +199,7 @@ You are able to generate high-quality code in the Python programming language.""
 
     response = asyncio.run(
         google_client.aio.chats.create(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.0-flash",
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.5,
@@ -253,7 +253,7 @@ def test_function_calling(client):
     )
 
     google_client.models.generate_content(
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash",
         contents="I'd like to travel to Paris.",
         config=genai.types.GenerateContentConfig(
             tools=[destination_tool],
