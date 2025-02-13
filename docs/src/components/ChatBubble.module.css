@@ -6,22 +6,23 @@
 }
 
 .chatButton {
-  width: 60px;
-  height: 60px;
-  border-radius: 30px;
-  background-color: #3578e5;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: rgb(34, 139, 230);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease;
+  box-shadow: 0 2px 12px rgba(34, 139, 230, 0.2);
+  transition: all 0.2s ease;
   color: white;
 }
 
 .chatButton:hover {
   transform: scale(1.05);
+  background-color: rgb(28, 126, 214);
 }
 
 .chatFrame {
