@@ -4,6 +4,7 @@ import React from 'react';
 type TailwindProps = {
   style?: React.CSSProperties;
   className?: string;
+  attributes?: Record<string, string>;
 };
 
 // Simple wrapper component that has the tw-style class,
@@ -24,12 +25,14 @@ export const Tailwind: React.FC<TailwindProps> = ({
   style,
   className,
   children,
+  attributes,
 }) => {
   return (
     <div
       className={classNames('tw-style', className)}
       data-testid="tailwind-wrapper"
-      style={style}>
+      style={style}
+      {...attributes}>
       {children}
     </div>
   );
@@ -42,6 +45,7 @@ export const TailwindContents: React.FC<TailwindProps> = ({
   children,
   className,
   style,
+  attributes,
 }) => {
   const styles = React.useMemo(
     () => ({
@@ -52,7 +56,7 @@ export const TailwindContents: React.FC<TailwindProps> = ({
   );
 
   return (
-    <Tailwind style={styles} className={className}>
+    <Tailwind style={styles} className={className} attributes={attributes}>
       {children}
     </Tailwind>
   );
