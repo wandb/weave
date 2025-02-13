@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
+
+if TYPE_CHECKING:
+    from dspy.primitives.prediction import Example
 
 _dspy_patcher: MultiPatcher | None = None
 
@@ -19,11 +22,11 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def dspy_postprocess_outputs(outputs: Any) -> dict[str, Any]:
+def dspy_postprocess_outputs(outputs: Any | Example) -> dict[str, Any]:
     from dspy.primitives.prediction import Example
 
     if isinstance(outputs, Example):
-        return {k: v for k, v in outputs.items()}
+        return outputs.toDict()
 
     return outputs
 
