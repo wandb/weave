@@ -29,6 +29,8 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 | `WEAVE_USE_SERVER_CACHE` | `bool` | `false` | Enables server response caching. When enabled, responses from the server are cached to disk to improve performance for repeated queries. |
 | `WEAVE_SERVER_CACHE_SIZE_LIMIT` | `int` | `1000000000` | Sets the maximum size limit for the server cache in bytes. When the cache reaches this size, older entries are automatically removed to make space for new ones. Important: the underlying implementation uses SQLite which has a Write Ahead Log (WAL) that will grow to 4MB regardless of this setting. This WAL will be removed when the program exits. |
 | `WEAVE_SERVER_CACHE_DIR` | `str` | `None` | Specifies the directory where cache files should be stored. If not set, a temporary directory is used. |
+| `WEAVE_CLIENT_PARALLELISM` | `int` | `<dynamic>` | Controls the number of threads available in the main thread pool for executing background tasks. If not set, automatically adjusts based on the number of cores. Setting this to 0 will effectively execute all background operations immediately in the main thread. This cannot be changed after the client has been initialized. |
+| `WEAVE_CLIENT_PARALLELISM_UPLOAD` | `int` | `None` | Controls the number of threads available in an additional thread pool for uploading data. By default, this is unset; all uploading happens in the main thread pool. When set (recommended for evaluations with large datasets), dataset uploading will happen in a separate thread pool, which reduces the chance of deadlock and improves performance. |
 
 :::note
 All boolean environment variables accept the following values (case-insensitive):
