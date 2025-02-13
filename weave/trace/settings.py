@@ -87,7 +87,7 @@ class UserSettings(BaseModel):
     If not set, automatically adjusts based on the number of cores.
     Generally, this will be the same as `client_parallelism`, consuming half
     of all available cores. For large uploads, higher numbers can improve
-    performance. 
+    performance.
     """
 
     use_server_cache: bool = False
