@@ -15,6 +15,8 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
+        if inputs["self"]["__class__"]["module"] == "__main__":
+            inputs["self"]["__class__"]["module"] = ""
     if model_name is not None:
         inputs["model"] = model_name
     return inputs
