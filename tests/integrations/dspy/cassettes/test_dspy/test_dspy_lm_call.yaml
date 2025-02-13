@@ -317,13 +317,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 13 Feb 2025 14:11:30 GMT
+      - Thu, 13 Feb 2025 14:22:38 GMT
       ETag:
       - W/"e084c0f6160862b5ea95904fcacccc35c9bbcb332240258e06dcf33aef5bee66"
       Expires:
-      - Thu, 13 Feb 2025 14:16:30 GMT
+      - Thu, 13 Feb 2025 14:27:38 GMT
       Source-Age:
-      - '223'
+      - '288'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -333,11 +333,11 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '2'
+      - '7'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - e25ada6507cf64a174cd226ea5cc1e7a658b9ab9
+      - 233c7000f895628311f519eace957343517daf6e
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
@@ -345,7 +345,7 @@ interactions:
       X-Served-By:
       - cache-qpg120097-QPG
       X-Timer:
-      - S1739455890.252945,VS0,VE0
+      - S1739456558.096677,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -393,17 +393,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFJdi9swEHz3r9jqOS5JnFw+XgqFlraUwkEPSksxirS21cpaIa1zF478
-        9yI7F+doDu5FDzM7w8xqHzMAYbTYglCNZNV6m7+f3n1YrW/py497frhrf9r69uuq/YbL/f7wUUyS
-        gnZ/UPGT6q2i1ltkQ26gVUDJmFxnq2KzWC7Xm1lPtKTRJlntOV9Q3hpn8vl0vsinq3y2PqkbMgqj
-        2MKvDADgsX9TTqfxQWxhOnlCWoxR1ii25yEAEcgmRMgYTWTpWExGUpFjdH30742JYCJIYIz8Bj7R
-        PSjp4DMMSjhQB1UXuMHw7tIjYNVFmXq4ztoTfjyHslT7QLt44s94ZZyJTRlQRnIpQGTyomePGcDv
-        vnz3rI/wgVrPJdNfdMlwVgx2Ylz5FZKJpR3x+c3kilupkaWx8WJ5QknVoB6V46Zlpw1dENlF5//D
-        XPMeehtXv8Z+JJRCz6hLH1Ab9bzwOBYwHeRLY+cd94FFxLA3Cks2GNI/aKxkZ4czEfEQGduyMq7G
-        4IMZbqXy5U6vi2K+qW4KkR2zfwAAAP//AwA2qnSUOQMAAA==
+        H4sIAAAAAAAAA4xSQW7bMBC86xVbnq1Cdqw49qVoTm0QoIe2h6IIBIpcSWwpkuCu0hiB/15QciwH
+        cYFeeJjZGcws9zkDEEaLHQjVSVZ9sPlt8f0L3z7dfax9/Vjv1f32hx6o/KoxqEIsksLXv1Dxi+q9
+        8n2wyMa7iVYRJWNyXW6utuvyuiy3I9F7jTbJ2sD52ue9cSZfFat1Xmzy5c1R3XmjkMQOfmYAAM/j
+        m3I6jU9iB8XiBemRSLYodqchABG9TYiQRIZYOhaLmVTeMbox+rfOEBgCCYzE7+CT/wNKOvgMkxL2
+        foBmiNxh/HDuEbEZSKYebrD2iB9OoaxvQ/Q1HfkT3hhnqKsiSvIuBSD2QYzsIQN4GMsPr/qIEH0f
+        uGL/G10yXF5NdmJe+QWSPUs746vrxQW3SiNLY+lseUJJ1aGelfOm5aCNPyOys85vw1zynnob1/6P
+        /UwohYFRVyGiNup14XksYjrIf42ddjwGFoTx0Sis2GBM/6CxkYOdzkTQnhj7qjGuxRiimW6lCdVm
+        hXoj63KtRHbI/gIAAP//AwDbF2lBOQMAAA==
     headers:
       CF-RAY:
-      - 91156877df8b40e2-SIN
+      - 911578c5296dc61e-SIN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -411,14 +411,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 13 Feb 2025 14:11:31 GMT
+      - Thu, 13 Feb 2025 14:22:39 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=8PjLzO1koXA1_y49jtwkTdrTgMzjnwD0Ac2Wbi4psNo-1739455891-1.0.1.1-yM6HO3Ki_hLN1AsaXpE2VyH2dveyMPVGbyFV5gZbuP967zieFDEre1n27qHpyAiEjw_FsUOzT61ArY1k69Dlvg;
-        path=/; expires=Thu, 13-Feb-25 14:41:31 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=5Pxfjum4jUacb6gSgKARKGuC7UuTs7gQRYTHwkFnMFI-1739456559-1.0.1.1-nrEY6PtvFrfTdyFPXD6_VY7ptiqcKt6LMH6u6OSyVkFKE8HRV2LuUCJ32UOjIljdYCMpIPQNImB_Drh.0KAjag;
+        path=/; expires=Thu, 13-Feb-25 14:52:39 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=s18tsk9P46vS9cPyv8wyQ2gyOERDwXC58h6LFHgEZvA-1739455891929-0.0.1.1-604800000;
+      - _cfuvid=XXHvzHQIAmzHtTXIUuv.4dI4w8pLbvcySxPmZ4i65AA-1739456559735-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -433,7 +433,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '453'
+      - '495'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -451,7 +451,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_ebe9b97d8351b50ca4935212876352b2
+      - req_a185536fd4842103dfdde8d72de2c486
     status:
       code: 200
       message: OK

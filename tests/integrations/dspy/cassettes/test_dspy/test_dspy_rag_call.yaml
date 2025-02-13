@@ -78,21 +78,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNb9NAEL3nV4y216TKh+s0uUFBCMGlIhyqtLK2u2N7wJ41u5PSqMp/
-        R2unsasWxMVavzfz5vtpBKDIqjUoU2oxdVNN3k+/f7y6ma385/r6pkh5kX79tllx8u56kS/UOHq4
-        +x9o5Nnr3Li6qVDIcUcbj1owqs6Wi1VycXG5Sluidhar6FY0MkncpCamyXw6TybT5WR2efQuHRkM
-        ag3bEQDAU/uNebLFR7WG6fgZqTEEXaBan4wAlHdVRJQOgYJoFjXuSeNYkNvUt1s4OwOPOjgmLuLP
-        3d0tb0qE1upRIIgWDCClFvigH8jCJ4+F83sgLtGToIUvxKzJ2z1c6SAVAjHM0jQ5h01JAYhz52sd
-        mwOWPBqp9qA5/EYfhRF+7TC0rMdCexsziTDrGsHl7dt0wiX2Yc9v+ZafKwiN44DDAt7w/mcRFF7V
-        MYhwnC/aLsSwnx7zXdBxpryrqiN+OA2ockXj3X048ic8J6ZQZl3z4zCCuEa17GEEcNcuwu7FbFXj
-        Xd1IJu4nchRMk3mnp/r9G7JHUpzoqseX03T8hl5mUTRVYbBKymhTou1d+73TO0tuQIwGVb/O5i3t
-        09r9j3xPGIONoM0aj5bMy4p7M4/xPP9mdupym7AK6B/IYCaEPk7CYq53VXc0KuyDYJ3lxAX6xlN3
-        OXmTLedol/r+IjFqdBj9AQAA//8DAFrWsmFHBAAA
+        H4sIAAAAAAAAAwAAAP//jFNNb9swDL37VxDqNQ6cxHHa3PaBdUAOBYoM25AEhiLRtjpbEiS6aFDk
+        vw+2k9hFs2IXQ+Yjn574yNcAgCnJlsBEwUlUtgw/Rz8eDvHjul5N74v1w/ffT2ZPv35+0t8eVzEb
+        NRVm/4SCzlVjYSpbIimjO1g45IQN62Qxu4vnyTyJW6AyEsumLLcUxiaslFbhNJrGYbQIJ7en6sIo
+        gZ4tYRMAALy230anlvjClhCNzpEKvec5suUlCYA5UzYRxr1XnrgmNupBYTShbqVvNnBzAw65N1rp
+        vPnZ7bZ6XSC0WS8EnjihByo4wVf+rCTcO8yNO4DSBTpFKGGltObKyQN84Z5KBKVhkiTxGNYFOsyM
+        wxFQgaB5hWCy9iy61AIHRMq/4xpv9VafdXprtMehzCuMH0r9+IaTiyi7K4Zdc5jVnjfO6bosT/Hj
+        xYbS5NaZvT/hl3imtPJF2rW4abknY1mLHgOAXWt3/cZBZp2pLKVk/qBuCJN42vGxfsoG6PwEkiFe
+        9vFFtBhd4UslElelHwwME1wUKPvSfrp4LZUZAMHg1e/VXOO+DNf/0PeAEGgJZWodSiXevrhPc9gs
+        4b/SLl1uBTOP7lkJTEmha5yQmPG67FaD+YMnrNJM6Ryddarbj8yme3k7m03vsmTGgmPwFwAA//8D
+        AIceRk0tBAAA
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 91156894c93640e2-SIN
+      - 911578e609c9c61e-SIN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -100,7 +98,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 13 Feb 2025 14:11:37 GMT
+      - Thu, 13 Feb 2025 14:22:47 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -111,10 +109,12 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '970'
+      - '2848'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -132,7 +132,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_96b33dd71d896de9fea570cf3b1b63b3
+      - req_759168406dce5d142d91897d8ea90646
     status:
       code: 200
       message: OK
