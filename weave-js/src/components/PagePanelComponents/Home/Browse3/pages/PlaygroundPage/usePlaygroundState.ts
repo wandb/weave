@@ -138,9 +138,10 @@ export const usePlaygroundState = () => {
         }
         for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
           if (inputs[value.pythonValue]) {
-            newState[key as NumericPlaygroundStateKey] =
-              value.parseFn(inputs[value.pythonValue]) ||
-              DEFAULT_PLAYGROUND_STATE[key as NumericPlaygroundStateKey];
+            const parsedValue = value.parseFn(inputs[value.pythonValue]);
+            newState[key as NumericPlaygroundStateKey] = isNaN(parsedValue)
+              ? DEFAULT_PLAYGROUND_STATE[key as NumericPlaygroundStateKey]
+              : parsedValue;
           }
         }
         if (inputs.model) {
