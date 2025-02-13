@@ -9,7 +9,7 @@ This page explains how to integrate [Hugging Face Hub](https://hf.co/) with W&B 
 :::tip[Try Hugging Face Hub with Weave in Google Colab]
 Do you want to experiment with Hugging Face Hub and Weave without any of the set up? You can try the code samples shown here as a Jupyter Notebook on Google Colab.
 
-<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/docs%2Fweave/weave/docs/quickstart_huggingface.ipynb">
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_huggingface.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 :::
