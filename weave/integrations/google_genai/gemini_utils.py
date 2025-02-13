@@ -34,14 +34,15 @@ def google_genai_gemini_on_finish(
     summary_update = {"usage": usage}
     if output:
         call.output = dictify(output)
-        usage[model_name].update(
-            {
-                "cached_content_token_count": output.usage_metadata.cached_content_token_count,
-                "prompt_token_count": output.usage_metadata.prompt_token_count,
-                "candidates_token_count": output.usage_metadata.candidates_token_count,
-                "total_token_count": output.usage_metadata.total_token_count,
-            }
-        )
+        if hasattr(output, "usage_metadata"):
+            usage[model_name].update(
+                {
+                    "cached_content_token_count": output.usage_metadata.cached_content_token_count,
+                    "prompt_token_count": output.usage_metadata.prompt_token_count,
+                    "candidates_token_count": output.usage_metadata.candidates_token_count,
+                    "total_token_count": output.usage_metadata.total_token_count,
+                }
+            )
     if call.summary is not None:
         call.summary.update(summary_update)
 
@@ -53,7 +54,11 @@ def google_genai_gemini_accumulator(
         return value
 
     for i, value_candidate in enumerate(value.candidates):
+        if i >= len(acc.candidates):
+            break
         for j, value_part in enumerate(value_candidate.content.parts):
+            if j >= len(acc.candidates[i].content.parts):
+                break
             if value_part.text is not None:
                 acc.candidates[i].content.parts[j].text += value_part.text
 
