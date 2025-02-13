@@ -58,7 +58,7 @@ const OneToolCall = ({toolCall}: OneToolCallProps) => {
 
   const copyText = `${name}(${parsedArgs})`;
   return (
-    <div className="bg-moon-100 py-8">
+    <div className="bg-moon-100 py-8 rounded-lg">
       {/* The tool call header has a copy button */}
       <div className="pb-8">
         <div className="flex justify-between px-16">
@@ -111,7 +111,7 @@ type ToolCallsProps = {
 
 export const ToolCalls = ({toolCalls}: ToolCallsProps) => {
   return (
-    <div>
+    <div className="flex flex-col gap-8">
       {toolCalls.map(tc => (
         <OneToolCall key={tc.id} toolCall={tc} />
       ))}

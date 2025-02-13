@@ -93,7 +93,7 @@ export const MessagePanel = ({
           className={classNames('relative w-full overflow-visible', {
             'rounded-lg': !isNested,
             'border-t border-moon-250': isTool,
-            'bg-moon-100': isSystemPrompt || hasToolCalls,
+            'bg-moon-100': isSystemPrompt || isTool,
             'bg-cactus-300/[0.24]': isUser,
             'max-w-full': !isUser,
             'max-w-[768px]': isUser,
@@ -102,7 +102,9 @@ export const MessagePanel = ({
             'py-[16px]': hasContent,
             'pb-[4px] pt-[8px]': !isUser && !isTool && !isSystemPrompt,
           })}>
-          <div>
+          <div className={classNames({
+            'pb-[16px]': hasToolCalls && hasContent
+          })}>
             {isSystemPrompt && (
               <div className="flex justify-between px-[16px]">
                 <div className="text-sm text-moon-500">
@@ -123,8 +125,8 @@ export const MessagePanel = ({
               ref={contentRef}
               className={classNames('w-full overflow-y-hidden', {
                 'max-h-[400px]':
-                  !isShowingMore && !editorHeight && !hasToolCalls,
-                'max-h-full': isShowingMore || editorHeight || hasToolCalls,
+                  !isShowingMore && !editorHeight,
+                'max-h-full': isShowingMore || editorHeight,
               })}>
               {messageHeader}
               {isPlayground && editorHeight ? (
@@ -156,19 +158,12 @@ export const MessagePanel = ({
                       )}
                     </div>
                   )}
-                  {hasToolCalls && (
-                    <div
-                      className={classNames({
-                        'border-t border-moon-250 pt-8': hasContent,
-                      })}>
-                      <ToolCalls toolCalls={message.tool_calls!} />
-                    </div>
-                  )}
+                  
                 </>
               )}
             </div>
 
-            {isOverflowing && !hasToolCalls && !editorHeight && (
+            {isOverflowing && !editorHeight && (
               <ShowMoreButton
                 isUser={isUser}
                 isSystemPrompt={isSystemPrompt}
@@ -178,6 +173,14 @@ export const MessagePanel = ({
               />
             )}
           </div>
+          {hasToolCalls && (
+            <div
+              className={classNames({
+                'border-t border-moon-250 pt-8': hasContent,
+              })}>
+              <ToolCalls toolCalls={message.tool_calls!} />
+            </div>
+          )}
         </div>
       </div>
 
