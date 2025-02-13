@@ -85,8 +85,9 @@ class UserSettings(BaseModel):
 
     Sets the number of workers to use for upload operations.
     If not set, automatically adjusts based on the number of cores.
-
-    Default is None, disabling separate worker pool for uploads.
+    Generally, this will be the same as `client_parallelism`, consuming half
+    of all available cores. For large uploads, higher numbers can improve
+    performance. 
     """
 
     use_server_cache: bool = False
