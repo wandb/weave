@@ -82,19 +82,21 @@ def test_content_generation_async(client):
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_sync_stream(client):
     from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content_stream(
         model="gemini-2.0-flash",
         contents="What's the capital of France?",
     )
-
     response_text = ""
-    for chunk in response:
-        response_text += chunk.text
-
+    try:
+        for chunk in response:
+            if hasattr(chunk, 'text'):
+                response_text += chunk.text
+            else:
+                raise ValueError(f"Unexpected chunk format: {chunk}")
+    except Exception as e:
+        raise AssertionError(f"Error processing stream: {str(e)}")
     assert "paris" in response_text.lower()
-
     call = list(client.calls())[0]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
