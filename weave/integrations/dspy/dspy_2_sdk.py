@@ -48,7 +48,7 @@ def get_dspy_2_patcher(
     _dspy_patcher = MultiPatcher(
         [
             SymbolPatcher(
-                lambda: importlib.import_module("dspy.clients.lm"),
+                lambda: importlib.import_module("dspy"),
                 "LM.__call__",
                 dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.LM"})),
             ),
