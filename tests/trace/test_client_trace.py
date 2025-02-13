@@ -11,7 +11,6 @@ from contextvars import copy_context
 from typing import Any, Callable
 
 import pytest
-import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
@@ -323,11 +322,13 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     num_calls = 5
     run_calls = 0
     if init_wandb:
-        run = wandb.init()
+        pass
+        # run = wandb.init()
     for i in range(num_calls):
         liner(Number(value=i), i, i)
     if init_wandb:
-        run.finish()
+        pass
+        # run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls

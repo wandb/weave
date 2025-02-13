@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
+import os
+
+from weave.trace import autopatch, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import use_server_cache
 from weave.trace_server import sqlite_trace_server
@@ -24,37 +26,40 @@ _current_inited_client: InitializedClient | None = None
 
 
 def get_username() -> str | None:
-    from weave.wandb_interface import wandb_api
+    return os.environ.get("WANDB_USERNAME")
+    # from weave.wandb_interface import wandb_api
 
-    api = wandb_api.get_wandb_api_sync()
-    try:
-        return api.username()
-    except AttributeError:
-        return None
+    # api = wandb_api.get_wandb_api_sync()
+    # try:
+    #     return api.username()
+    # except AttributeError:
+    #     return None
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
+    # from weave.wandb_interface import wandb_api
 
-    fields = project_name.split("/")
-    if len(fields) == 1:
-        api = wandb_api.get_wandb_api_sync()
-        entity_name = api.default_entity_name()
-        if entity_name is None:
-            raise errors.WeaveWandbAuthenticationException(
-                'weave init requires wandb. Run "wandb login"'
-            )
-        project_name = fields[0]
-    elif len(fields) == 2:
-        entity_name, project_name = fields
-    else:
-        raise ValueError(
-            'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
-        )
-    if not entity_name:
-        raise ValueError("entity_name must be non-empty")
+    # fields = project_name.split("/")
+    # if len(fields) == 1:
+    #     api = wandb_api.get_wandb_api_sync()
+    #     entity_name = api.default_entity_name()
+    #     if entity_name is None:
+    #         raise errors.WeaveWandbAuthenticationException(
+    #             'weave init requires wandb. Run "wandb login"'
+    #         )
+    #     project_name = fields[0]
+    # elif len(fields) == 2:
+    #     entity_name, project_name = fields
+    # else:
+    #     raise ValueError(
+    #         'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+    #     )
+    # if not entity_name:
+    #     raise ValueError("entity_name must be non-empty")
 
-    return entity_name, project_name
+    return project_name.split("/")
+
+    # return entity_name, project_name
 
 
 """
@@ -84,29 +89,30 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from weave.wandb_interface import wandb_api  # type: ignore
+    # from weave.wandb_interface import wandb_api  # type: ignore
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
-    if wandb_context is None:
-        import wandb
+    # wandb_api.init()
+    # wandb_context = wandb_api.get_wandb_api_context()
+    # if wandb_context is None:
+    #     import wandb
 
-        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
-        wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
+    #     print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+    #     wandb.login(anonymous="never", force=True)  # type: ignore
+    #     wandb_api.init()
+    #     wandb_context = wandb_api.get_wandb_api_context()
 
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    api_key = None
-    if wandb_context is not None and wandb_context.api_key is not None:
-        api_key = wandb_context.api_key
+    # api_key = None
+    # if wandb_context is not None and wandb_context.api_key is not None:
+    #     api_key = wandb_context.api_key
 
-    remote_server = init_weave_get_server(api_key)
+    api_key = os.environ.get("WANDB_API_KEY")
+    remote_server = init_weave_get_server()
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)

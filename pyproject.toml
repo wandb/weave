@@ -1,5 +1,5 @@
 [project]
-name = "weave"
+name = "andrew-test-weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -35,17 +35,18 @@ requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
   "pydantic>=2.0.0",
-  "wandb>=0.17.1",
+  # "wandb>=0.17.1",
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback
-  "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
-  "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
-  "rich",                    # Used for special formatting of tables (should be made optional)
-  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
-  "jsonschema>=4.23.0",      # Used by scorers for field validation
-  "diskcache==5.6.3",        # Used for data caching
+  # "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
+  "numpy>1.21.0",          # Used in box.py and scorer.py (should be made optional)
+  "rich",                  # Used for special formatting of tables (should be made optional)
+  "gql[aiohttp,requests]", # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",    # Used by scorers for field validation
+  "diskcache==5.6.3",      # Used for data caching
 ]
+version = "0.51.34.dev6"
 
 [project.optional-dependencies]
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
@@ -76,7 +77,7 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
-scorers = ["Levenshtein>=0.26.0","litellm>=1.58"]
+scorers = ["Levenshtein>=0.26.0", "litellm>=1.58"]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
@@ -124,6 +125,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "weave/version.py"
+pattern = "VERSION = \"(?P<version>[^\"]+)\""
 
 [tool.hatch.build]
 include = ["weave"]
@@ -136,6 +138,13 @@ exclude = [
   "dev_docs",
   "weave/clear_cache.py",
 ]
+force-include-editable = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["weave"]
+only-include = ["weave"]
+artifacts = ["weave/**/*.py"]
+wheel-tags = ["py3-none-any"] # This forces a pure Python wheel
 
 [tool.pytest.ini_options]
 filterwarnings = [
@@ -224,19 +233,19 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.34-dev0"
+current_version = "0.51.34.dev6"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
     (?P<patch>0|[1-9]\\d*)
     (?:
-        -                             # dash separator for pre-release section
-        (?P<pre_l>[a-zA-Z-]+)         # pre-release label
-        (?P<pre_n>0|[1-9]\\d*)        # pre-release version number
-    )?                                # pre-release section is optional
+        \\.                             # dot separator for pre-release section (changed from hyphen)
+        (?P<pre_l>[a-zA-Z-]+)         
+        (?P<pre_n>0|[1-9]\\d*)        
+    )?                                
 """
 serialize = [
-  "{major}.{minor}.{patch}-{pre_l}{pre_n}",
+  "{major}.{minor}.{patch}.{pre_l}{pre_n}", # Changed format to use dot
   "{major}.{minor}.{patch}",
 ]
 search = "{current_version}"
@@ -256,3 +265,6 @@ commit_args = ""
 [tool.bumpversion.parts.pre_l]
 values = ["dev", "final"]
 optional_value = "final"
+
+[tool.hatch.metadata]
+allow-direct-references = true

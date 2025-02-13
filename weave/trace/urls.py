@@ -1,17 +1,16 @@
 from urllib.parse import quote
 
-from wandb import util as wb_util
-
-from weave.trace import env
+# from wandb import util as wb_util
 
 BROWSE3_PATH = "browse3"
 WEAVE_SLUG = "weave"
 
 
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return (
-        f"{wb_util.app_url(env.wandb_base_url())}/{entity_name}/{quote(project_name)}"
-    )
+    return "UNKNOWN"
+    # return (
+    #     f"{wb_util.app_url(env.wandb_base_url())}/{entity_name}/{quote(project_name)}"
+    # )
 
 
 def remote_project_weave_root_url(entity_name: str, project_name: str) -> str:

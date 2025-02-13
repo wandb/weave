@@ -1877,16 +1877,17 @@ class WeaveClient:
 
 
 def safe_current_wb_run_id() -> str | None:
-    try:
-        import wandb
+    pass
+    # try:
+    #     import wandb
 
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
-        return None
-    else:
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+    #     wandb_run = wandb.run
+    #     if wandb_run is None:
+    #         return None
+    # except ImportError:
+    #     return None
+    # else:
+    #     return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def check_wandb_run_matches(

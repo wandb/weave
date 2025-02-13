@@ -16,8 +16,8 @@ import graphql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
 
+# from wandb.sdk.internal.internal_api import _thread_local_api_settings
 from weave.trace import env
 
 
@@ -51,15 +51,17 @@ def set_wandb_thread_local_api_settings(
     cookies: Optional[dict],
     headers: Optional[dict],
 ) -> None:
-    _thread_local_api_settings.api_key = api_key
-    _thread_local_api_settings.cookies = cookies
-    _thread_local_api_settings.headers = headers
+    # _thread_local_api_settings.api_key = api_key
+    # _thread_local_api_settings.cookies = cookies
+    # _thread_local_api_settings.headers = headers
+    pass
 
 
 def reset_wandb_thread_local_api_settings() -> None:
-    _thread_local_api_settings.api_key = None
-    _thread_local_api_settings.cookies = None
-    _thread_local_api_settings.headers = None
+    # _thread_local_api_settings.api_key = None
+    # _thread_local_api_settings.cookies = None
+    # _thread_local_api_settings.headers = None
+    pass
 
 
 def set_wandb_api_context(

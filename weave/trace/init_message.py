@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from weave.trace import urls
-from weave.trace.pypi_version_check import check_available
 
 if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
@@ -27,35 +26,36 @@ def _parse_version(version: str) -> packaging.version.Version:
 
 
 def _print_version_check() -> None:
-    import wandb
+    pass
+    # import wandb
 
-    import weave
+    # import weave
 
-    if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
-        message = (
-            "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
-            " $ pip install wandb --upgrade"
-        )
-        print(message)
-    else:
-        wandb_messages = check_available(wandb.__version__, "wandb")
-        if wandb_messages:
-            # Don't print the upgrade message, only the delete or yank message
-            use_message = wandb_messages.get("delete_message") or wandb_messages.get(
-                "yank_message"
-            )  #  or wandb_messages.get("upgrade_message")
-            if use_message:
-                print(use_message)
+    # if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
+    #     message = (
+    #         "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
+    #         " $ pip install wandb --upgrade"
+    #     )
+    #     print(message)
+    # else:
+    #     wandb_messages = check_available(wandb.__version__, "wandb")
+    #     if wandb_messages:
+    #         # Don't print the upgrade message, only the delete or yank message
+    #         use_message = wandb_messages.get("delete_message") or wandb_messages.get(
+    #             "yank_message"
+    #         )  #  or wandb_messages.get("upgrade_message")
+    #         if use_message:
+    #             print(use_message)
 
-    weave_messages = check_available(weave.__version__, "weave")
-    if weave_messages:
-        use_message = (
-            weave_messages.get("delete_message")
-            or weave_messages.get("yank_message")
-            or weave_messages.get("upgrade_message")
-        )
-        if use_message:
-            print(use_message)
+    # weave_messages = check_available(weave.__version__, "weave")
+    # if weave_messages:
+    #     use_message = (
+    #         weave_messages.get("delete_message")
+    #         or weave_messages.get("yank_message")
+    #         or weave_messages.get("upgrade_message")
+    #     )
+    #     if use_message:
+    #         print(use_message)
 
 
 def assert_min_weave_version(
