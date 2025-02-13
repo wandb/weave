@@ -14,6 +14,8 @@ import {ResponseFormatEditor} from './ResponseFormatEditor';
 import {StopSequenceEditor} from './StopSequenceEditor';
 
 export type PlaygroundSettingsProps = {
+  entity: string;
+  project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
@@ -21,6 +23,8 @@ export type PlaygroundSettingsProps = {
 };
 
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
+  entity,
+  project,
   playgroundStates,
   setPlaygroundStateField,
   settingsTab,
@@ -69,6 +73,8 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 }
               />
               <FunctionEditor
+                entity={entity}
+                project={project}
                 playgroundState={playgroundState}
                 functions={playgroundState.functions}
                 setFunctions={value =>

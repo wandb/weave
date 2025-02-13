@@ -13,6 +13,7 @@ const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   ActionSpec: 'sienna',
   AnnotationSpec: 'magenta',
   SavedView: 'magenta',
+  FunctionSpec: 'teal',
 };
 
 export const TypeVersionCategoryChip: React.FC<{

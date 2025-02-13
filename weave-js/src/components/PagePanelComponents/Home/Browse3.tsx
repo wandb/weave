@@ -410,7 +410,7 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(prompts|datasets|models|objects)`,
+            `${projectRoot}/:tab(prompts|datasets|models|objects|functions)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
@@ -789,6 +789,8 @@ const ObjectVersionsPageBinding = () => {
       queryFilter.baseObjectClass = 'Model';
     } else if (tab === 'datasets') {
       queryFilter.baseObjectClass = 'Dataset';
+    } else if (tab === 'functions') {
+      queryFilter.baseObjectClass = 'FunctionSpec';
     }
     return queryFilter;
   }, [query.filter, tab]);

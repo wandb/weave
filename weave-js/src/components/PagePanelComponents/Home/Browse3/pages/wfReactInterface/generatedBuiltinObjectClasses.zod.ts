@@ -71,12 +71,21 @@ export const TestOnlyExampleSchema = z.object({
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
 
+export const FunctionSpecSchema = z.object({
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+  parameters: z.record(z.string(), z.any()).optional(),
+  returns: z.record(z.string(), z.any()).optional(),
+});
+export type FunctionSpec = z.infer<typeof FunctionSpecSchema>;
+
 export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
   TestOnlyExample: TestOnlyExampleSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
+  FunctionSpec: FunctionSpecSchema,
 };
 
 export const GeneratedBuiltinObjectClassesZodSchema = z.object(

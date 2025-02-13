@@ -222,3 +222,10 @@ export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_FUNCTIONS: EmptyProps = {
+  icon: 'job-calculator' as const,
+  heading: 'No functions yet',
+  description: 'Create functions in the UI or python.',
+  moreInformation: <></>,
+};

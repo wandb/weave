@@ -40,6 +40,7 @@ export const useProjectSidebar = (
       'weave/operations',
       'weave/objects',
       'weave/agentdome',
+      'weave/functions',
     ];
     if (isWandbAdmin) {
       weaveOnlyMenu.push('weave/mods');
@@ -183,6 +184,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Functions',
+            slug: 'weave/functions',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.JobCalculator,
+          },
+          {
+            type: 'button' as const,
             name: 'Agentdome',
             slug: 'weave/agentdome',
             isShown: showWeaveSidebarItems || isShowAll,
@@ -240,6 +248,7 @@ export const useProjectSidebar = (
               'weave/prompts',
               'weave/models',
               'weave/datasets',
+              'weave/functions',
               'weave/scorers',
             ].concat(weaveOnlyMenu),
           },

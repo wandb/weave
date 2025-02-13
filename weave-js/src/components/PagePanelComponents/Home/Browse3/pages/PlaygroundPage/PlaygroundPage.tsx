@@ -3,6 +3,7 @@ import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Pill} from '@wandb/weave/components/Tag/Pill';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {useFunctionSpecs} from '../AgentdomePage/tsFunctionSpecs';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
@@ -90,14 +91,20 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     }
   );
 
+  const {functionSpecs, specsLoading} = useFunctionSpecs(
+    props.entity,
+    props.project
+  );
+
   useEffect(() => {
-    if (!call.loading && call.result) {
+    if (!call.loading && call.result && !specsLoading) {
       if (call.result.traceCall?.inputs) {
         setPlaygroundStateFromTraceCall(call.result.traceCall);
       }
     } else if (
       playgroundStates.length === 1 &&
-      !playgroundStates[0].traceCall.project_id
+      !playgroundStates[0].traceCall.project_id &&
+      !specsLoading
     ) {
       if (props.agentdome) {
         const initialState = {
@@ -110,6 +117,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           Array(4).fill({
             ...playgroundStates[0],
             traceCall: initialState,
+            functions: functionSpecs || [],
           })
         );
       } else {
@@ -122,7 +130,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call.loading]);
+  }, [call.loading, functionSpecs, specsLoading]);
 
   useEffect(() => {
     if (!callWithCosts.loading && callWithCosts.result) {
@@ -182,6 +190,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       )}
       {settingsTab !== null && (
         <PlaygroundSettings
+          entity={props.entity}
+          project={props.project}
           playgroundStates={playgroundStates}
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}

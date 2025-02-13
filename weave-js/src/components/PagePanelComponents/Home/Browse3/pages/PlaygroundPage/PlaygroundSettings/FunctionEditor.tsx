@@ -4,6 +4,8 @@ import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import React, {useState} from 'react';
 
+import {useMakeFunctionSpec} from '../../AgentdomePage/tsFunctionSpecs';
+import {projectIdFromParts} from '../../wfReactInterface/tsDataModelHooks';
 import {LLM_MAX_TOKENS} from '../llmMaxTokens';
 import {PlaygroundState} from '../types';
 import {FunctionDrawer} from './FunctionDrawer';
@@ -25,6 +27,8 @@ const StyledChip = styled(Chip)(({theme}) => ({
 }));
 
 type FunctionEditorProps = {
+  entity: string;
+  project: string;
   playgroundState: PlaygroundState;
   functions: Array<{name: string; [key: string]: any}>;
   setFunctions: React.Dispatch<
@@ -33,6 +37,8 @@ type FunctionEditorProps = {
 };
 
 export const FunctionEditor: React.FC<FunctionEditorProps> = ({
+  entity,
+  project,
   playgroundState,
   functions,
   setFunctions,
@@ -41,6 +47,7 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
   const [drawerFunctionIndex, setDrawerFunctionIndex] = useState<number | null>(
     null
   );
+  const createFunctionSpec = useMakeFunctionSpec();
 
   const handleAddFunction = (functionJSON: string, index: number) => {
     try {
@@ -57,6 +64,17 @@ export const FunctionEditor: React.FC<FunctionEditorProps> = ({
             return newFunctions;
           }
         );
+        const name = json?.name;
+        if (!name) {
+          throw new Error('Function name is required');
+        }
+        createFunctionSpec({
+          obj: {
+            project_id: projectIdFromParts({entity, project}),
+            object_id: name,
+            val: json,
+          },
+        });
       }
     } catch (err) {
       console.error('Error parsing function json', err);

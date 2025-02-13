@@ -2,6 +2,9 @@
 
 from weave import version
 from weave.trace.api import *
+from weave.trace_server.interface.builtin_object_classes.function_spec import (
+    FunctionSpec,
+)
 
 __version__ = version.VERSION
 
@@ -44,4 +47,5 @@ __docspec__ = [
     Evaluation,
     Scorer,
     AnnotationSpec,
+    FunctionSpec,
 ]

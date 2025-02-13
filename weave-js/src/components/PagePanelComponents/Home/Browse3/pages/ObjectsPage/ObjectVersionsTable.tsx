@@ -22,6 +22,7 @@ import {
   EMPTY_PROPS_ACTION_SPECS,
   EMPTY_PROPS_ANNOTATIONS,
   EMPTY_PROPS_DATASETS,
+  EMPTY_PROPS_FUNCTIONS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
   EMPTY_PROPS_OBJECTS,
@@ -447,6 +448,8 @@ export const FilterableObjectVersionsTable: React.FC<{
       propsEmpty = EMPTY_PROPS_ACTION_SPECS;
     } else if (base === 'AnnotationSpec') {
       propsEmpty = EMPTY_PROPS_ANNOTATIONS;
+    } else if (base === 'FunctionSpec') {
+      propsEmpty = EMPTY_PROPS_FUNCTIONS;
     }
     return <Empty {...propsEmpty} />;
   }
