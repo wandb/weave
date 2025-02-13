@@ -39,6 +39,7 @@ def lint(session):
         "cerebras",
         "cohere",
         "dspy",
+        "dspy_2",
         "google_ai_studio",
         "groq",
         "instructor",
