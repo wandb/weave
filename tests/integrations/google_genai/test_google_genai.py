@@ -14,7 +14,7 @@ class Recipe(BaseModel):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -44,7 +44,7 @@ def test_content_generation_sync(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -76,7 +76,7 @@ def test_content_generation_async(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -113,7 +113,7 @@ def test_content_generation_sync_stream(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -149,7 +149,7 @@ def test_content_generation_async_stream(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -188,7 +188,7 @@ You are able to generate high-quality code in the Python programming language.""
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -229,7 +229,7 @@ You are able to generate high-quality code in the Python programming language.""
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -286,7 +286,7 @@ def test_function_calling(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -311,7 +311,7 @@ def test_image_generation_sync(client):
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
