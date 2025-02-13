@@ -78,7 +78,11 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.file_management import read_from_bucket, store_in_bucket
+from weave.trace_server.file_management import (
+    determine_bucket_uri,
+    read_from_bucket,
+    store_in_bucket,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
@@ -187,6 +191,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        storage_bucket_uri: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -199,6 +204,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._storage_bucket_uri = storage_bucket_uri
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -211,6 +217,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
+            storage_bucket_uri=wf_env.wf_storage_bucket_uri(),
         )
 
     @contextmanager
@@ -1233,19 +1240,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
 
-        def get_base_storage_bucket_uri() -> Optional[str]:
-            # TODO: Implement this
-            return "azure://bucket"
-
-        # TODO: Refactor this into a common module
-        def determine_bucket_uri(
-            project_id: str, digest: str, base_storage_bucket_uri: str
-        ) -> str:
-            return f"{base_storage_bucket_uri}/projects/{project_id}/files/{digest}"
-
-        if base_storage_bucket_uri := get_base_storage_bucket_uri():
+        if self._storage_bucket_uri is not None:
             bucket_uri = determine_bucket_uri(
-                base_storage_bucket_uri, req.project, req.digest
+                self._storage_bucket_uri, req.project_id, req.digest
             )
             store_in_bucket(bucket_uri, req.content)
             self._insert(
@@ -1319,6 +1316,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         file_storage_uri = query_result.result_rows[0][2]
         if file_storage_uri:
+            # Verify storage URI is what we expect. This is an extra check to ensure
+            # that the storage bucket URI is set correctly.
+            if self._storage_bucket_uri is None:
+                raise ValueError("Storage bucket URI is not set")
+            expected_file_storage_uri = determine_bucket_uri(
+                self._storage_bucket_uri, req.project_id, req.digest
+            )
+            if file_storage_uri != expected_file_storage_uri:
+                raise ValueError("File storage URI does not match expected URI")
             bytes = read_from_bucket(file_storage_uri)
         else:
             bytes = b"".join(chunks)

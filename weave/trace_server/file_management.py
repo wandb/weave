@@ -15,6 +15,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from weave.trace_server import environment
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,11 @@ DEFAULT_READ_TIMEOUT = 30
 RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
+
+def determine_bucket_uri(
+    project_id: str, digest: str, base_storage_bucket_uri: str
+) -> str:
+    return f"{base_storage_bucket_uri}/weave/projects/{project_id}/files/{digest}"
 
 
 class AWSCredentials(TypedDict, total=False):
@@ -95,18 +102,44 @@ def get_aws_credentials() -> AWSCredentials:
         - secret_access_key: AWS secret access key
         - session_token: Optional session token
     """
-    raise NotImplementedError("AWS credentials retrieval not implemented")
+    access_key_id = environment.wf_storage_bucket_aws_access_key_id()
+    secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
+    session_token = environment.wf_storage_bucket_aws_session_token()
+    if access_key_id is None or secret_access_key is None:
+        raise ValueError("AWS credentials not set")
+    return AWSCredentials(
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+        session_token=session_token,
+    )
 
 
 def get_gcp_credentials() -> GCPCredentials:
     """
     Returns GCP credentials needed for GCS access.
-    To be implemented by the client.
+    Uses a JSON string containing service account credentials.
 
     Returns:
         Google Cloud credentials object that can be used with storage client
+
+    Raises:
+        ValueError: If no valid GCP credentials are found
     """
-    raise NotImplementedError("GCP credentials retrieval not implemented")
+    import json
+
+    from google.oauth2 import service_account
+
+    creds_json = environment.wf_storage_bucket_gcp_credentials_json()
+    if not creds_json:
+        raise ValueError(
+            "No GCP credentials found. Set WF_STORAGE_BUCKET_GCP_CREDENTIALS_JSON environment variable."
+        )
+
+    try:
+        creds_dict = json.loads(creds_json)
+        return service_account.Credentials.from_service_account_info(creds_dict)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid GCP credentials JSON: {e}")
 
 
 def get_azure_credentials() -> (
@@ -121,7 +154,17 @@ def get_azure_credentials() -> (
         - Dict with connection_string for connection string auth
         - Dict with account_url and credential for account-based auth
     """
-    raise NotImplementedError("Azure credentials retrieval not implemented")
+    connection_string = environment.wf_storage_bucket_azure_connection_string()
+    if connection_string is not None:
+        return AzureConnectionCredentials(connection_string=connection_string)
+    account_url = environment.wf_storage_bucket_azure_account_url()
+    credential = environment.wf_storage_bucket_azure_credential()
+    if account_url is None and credential is None:
+        raise ValueError("Azure credentials not set")
+    return AzureAccountCredentials(
+        account_url=account_url, credential=credential
+    )
+
 
 
 def parse_storage_uri(uri: str) -> tuple[str, str]:
