@@ -317,13 +317,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 13 Feb 2025 14:06:43 GMT
+      - Thu, 13 Feb 2025 14:10:22 GMT
       ETag:
       - W/"e084c0f6160862b5ea95904fcacccc35c9bbcb332240258e06dcf33aef5bee66"
       Expires:
-      - Thu, 13 Feb 2025 14:11:43 GMT
+      - Thu, 13 Feb 2025 14:15:22 GMT
       Source-Age:
-      - '152'
+      - '155'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -333,19 +333,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '4'
+      - '2'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 77721c191659970dfb452d71ca67c766b2bc44bb
+      - cc2d0b00f624af680b581bf2b71dcc66f45e0845
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - C35C:3E6C75:1C99B2:1E4A8D:67AD9471
+      - 347A:141A9A:1624F0:2165F2:67AD93C7
       X-Served-By:
-      - cache-sin-wsss1830034-SIN
+      - cache-qpg120112-QPG
       X-Timer:
-      - S1739455603.362684,VS0,VE0
+      - S1739455823.824124,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -430,19 +430,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNb+IwEL3nV4zcK0GBBCgc96N7qLZSJXrYBRQZe5J417Et27BlK/57
-        5QRIqrLVXiJn3szzm3njlwiACE4WQFhFPauNjD8lT/Onh/TP4e5xZtOHvz9/fDWPS+P23+/1HRmE
-        Cr39hcyfq4ZM10aiF1q1MLNIPQbW0SydZ5PJNMkaoNYcZSgrjY8zHddCiXicjLM4mcWj21N1pQVD
-        RxawigAAXppv0Kk4PpMFJINzpEbnaIlkcUkCIFbLECHUOeE8VZ4MOpBp5VE10lcruLkBi9RpJVQZ
-        fjabtVpWCE3Ws4caVejKga+ohy90Lzh8s1hqewChKrTCI4d7oRQVlh/gM3VeIggFo+k0G8KyQouF
-        tjgAXyEoWiPoojmzNrXCHpFw77iGa7VWZ6XOaOWwL/QK44dSP77h5CPy9or+3CwWO0eDd2on5Sl+
-        vBghdWms3roTfokXQglX5e2Qw9Cd14Y06DEC2DSG7954SIzVtfG5179RBcJpNm75SLdnPXRyAr32
-        VHbxWTIbXOHLOXoqpOutDGGUVci70m6/6I4L3QOiXtfv1VzjvqzX/9B3AGNoPPLcWOSCve24S7MY
-        nuG/0i5TbgQTh3YvGOZeoA1OcCzoTraPg7iD81jnhVAlWmNF+0IKk2/5bZqO58U0JdExegUAAP//
-        AwCAE0R1LwQAAA==
+        H4sIAAAAAAAAAwAAAP//jFNNb9swDL37VxDqNSkSx/lojluHYugGDFiGHpLAUCTa1iZLgkSnDYr8
+        98F2ErtoVuxiyHzk0xMf+RoBMCXZEpgoOInS6eGn0a/7+MtkftDF9+ef8nFf/eDP3x7c6mn8VbJB
+        XWF3v1HQuepW2NJpJGVNCwuPnLBmHc8nd8l0uoiTBiitRF2X5Y6GiR2WyqhhPIqT4Wg+HC9O1YVV
+        AgNbwjoCAHhtvrVOI/GFLWE0OEdKDIHnyJaXJADmra4jjIegAnFDbNCBwhpC00hfr+HmBjzyYI0y
+        ef2z3W7MqkBosl4IAnHCAFRwgnu+VxIePObWH0CZAr0ilPCojOHKywN85oE0gjIwns2SW1gV6DGz
+        HgdABYLhJYLNmrNoUwvsEanwjut2YzbmrDM4awL2ZV5h/FDqxzecXETZXtHvmsesCrx2zlRan+LH
+        iw3a5s7bXTjhl3imjApF2ra4bnkg61iDHiOAbWN39cZB5rwtHaVk/6CpCWdJ3PKxbsp66PQEkiWu
+        u/h8NB9c4UslElc69AaGCS4KlF1pN128ksr2gKj36vdqrnFfhut/6DtACHSEMnUepRJvX9yleayX
+        8F9ply43gllAv1cCU1LoayckZrzS7WqwcAiEZZopk6N3XrX7kbl0JxeTSXyXzSYsOkZ/AQAA//8D
+        AA+y9FgtBAAA
     headers:
       CF-RAY:
-      - 91156177991afe09-SIN
+      - 911566d33ea9fd38-SIN
       Connection:
       - keep-alive
       Content-Encoding:
@@ -450,14 +450,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 13 Feb 2025 14:06:46 GMT
+      - Thu, 13 Feb 2025 14:10:26 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=Kpn5JzqgmsxwS93yAuIdj07zoEaLz9xsS.msd3gZ.f8-1739455606-1.0.1.1-QejddY6tLIw9Y0aCQiw6m5uxuJDNJfU8YLDirYlzNYVe4eVVsetA_eN.vzIqLhRAVKMzjSZPZRlvqLXl1dH0gA;
-        path=/; expires=Thu, 13-Feb-25 14:36:46 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=Mn7QhcjBI_5wj5_fXA0ryceDeRLxpqhtLy5c4dozNDM-1739455826-1.0.1.1-9q.GBky_pcC4fUpPGauOJEouuUsS_BuE7VjmeUk6UhYbeksdluRgUYBqrp9JlJGo4c7Xn4d3eGKYMUBhCuBr1w;
+        path=/; expires=Thu, 13-Feb-25 14:40:26 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=pD8wYqjj9aGMfRnCJMua8MTzowrLutgQiV4SlmrSq_0-1739455606352-0.0.1.1-604800000;
+      - _cfuvid=Hr8K5NmnS0pV2Kt8Ga9vH.oTNU7u.f15BwF4KLIF8WM-1739455826763-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -472,7 +472,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1640'
+      - '2603'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -490,7 +490,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_9aa3c34442b97e168ae6b9c998d5815d
+      - req_3e1b7eccf7b811b192fd060bd04d9394
     status:
       code: 200
       message: OK
