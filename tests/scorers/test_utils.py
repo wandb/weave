@@ -18,7 +18,6 @@ TINY_MODEL_PATHS = {
     "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest",
 }
 
-
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     input_ids: Union[list[int], Tensor]
@@ -40,14 +39,16 @@ class RandomTokenizer:
         return TokenizedText(input_ids=tokenized_text, attention_mask=attention_mask)
 
 
-def generate_large_text(tokens: int = 100_000, pattern: Optional[str] = None) -> str:
-    if pattern is None:
-        pattern = (
-            "The quick brown fox jumps over the lazy dog. "
-            "A wizard's job is to vex chumps quickly in fog. "
-            "Pack my box with five dozen liquor jugs. "
-        )
+_default_pattern = (
+    "The quick brown fox jumps over the lazy dog. "
+    "A wizard's job is to vex chumps quickly in fog. "
+    "Pack my box with five dozen liquor jugs. "
+)
 
+
+def generate_large_text(
+    tokens: int = 100_000, pattern: Optional[str] = _default_pattern
+) -> str:
     words_per_pattern = len(pattern.split())
     tokens_per_pattern = words_per_pattern * 1.5
     multiplier = int(tokens / tokens_per_pattern)

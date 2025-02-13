@@ -19,9 +19,6 @@ class WeaveScorerResult(BaseModel):
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
 
-    class Config:
-        extra = "allow"
-
 
 def set_device(device: str = "auto") -> "device":
     """Set the device to use for the model.
@@ -102,7 +99,7 @@ def ensure_hf_imports() -> None:
     """Ensure that the required packages for Hugging Face models are installed."""
     if find_spec("torch") is None or find_spec("transformers") is None:
         raise ImportError(
-            "The 'transformers' and 'torch' packages are required for HF models. Please install them using 'pip install transformers torch'."
+            "The 'transformers' and 'torch' packages are required for Weave Scorers. Please install them using 'pip install transformers torch'."
         )
 
 
