@@ -123,9 +123,8 @@ export const MessagePanel = ({
               ref={contentRef}
               className={classNames('w-full overflow-y-hidden', {
                 'max-h-[400px]':
-                  !isShowingMore && !editorHeight && !isNested && !hasToolCalls,
-                'max-h-full':
-                  isShowingMore || editorHeight || isNested || hasToolCalls,
+                  !isShowingMore && !editorHeight && !hasToolCalls,
+                'max-h-full': isShowingMore || editorHeight || hasToolCalls,
               })}>
               {messageHeader}
               {isPlayground && editorHeight ? (
@@ -173,6 +172,7 @@ export const MessagePanel = ({
               <ShowMoreButton
                 isUser={isUser}
                 isSystemPrompt={isSystemPrompt}
+                isNested={isNested}
                 isShowingMore={isShowingMore}
                 setIsShowingMore={setIsShowingMore}
               />
