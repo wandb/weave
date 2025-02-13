@@ -2,7 +2,6 @@ import os
 
 import pytest
 
-import weave
 from weave.integrations.integration_utilities import op_name_from_ref
 
 
