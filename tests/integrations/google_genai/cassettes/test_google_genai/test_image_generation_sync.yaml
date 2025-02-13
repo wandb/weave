@@ -18,7 +18,7 @@ interactions:
       x-goog-api-client:
       - google-genai-sdk/1.0.0 gl-python/3.12.8
       x-goog-api-key:
-      - AIzaSyBiYf-E95RSI7bUeZL-3JyPd16N2Fd1YF8
+      - GOOGLE_API_KEY
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict
   response:
