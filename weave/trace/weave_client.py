@@ -751,6 +751,9 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+BACKGROUND_PARALLELISM_MIX = 0.5
+
+
 class WeaveClient:
     server: TraceServerInterface
 
@@ -759,6 +762,7 @@ class WeaveClient:
     # Fast-lane executor for operations guaranteed to not defer
     # to child operations, impossible to deadlock
     # Currently only used for create_file operation
+    # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
     future_executor_fastlane: FutureExecutor | None
 
     """
@@ -1891,9 +1895,6 @@ class WeaveClient:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
-
-
-BACKGROUND_PARALLELISM_MIX = 0.5
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
