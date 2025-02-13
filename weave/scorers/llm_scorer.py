@@ -1,12 +1,12 @@
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, field_validator
 
 import weave
 from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
-    from torch import Tensor
+    import torch
     from transformers.modeling_utils import PreTrainedModel
     from transformers.pipelines.base import Pipeline
     from transformers.tokenization_utils import PreTrainedTokenizer
@@ -75,15 +75,20 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _pipeline: "Pipeline" = PrivateAttr(default=None)
+    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
+
+    @field_validator("device", mode="before")
+    def validate_device(cls, v):  # type: ignore
+        if isinstance(v, "torch.device"):
+            return v
+        else:
+            return set_device(v)
 
     def model_post_init(self, __context: Any) -> None:
-        self.device = set_device(self.device)
-
         if self._pipeline is None:
-            self._load_pipeline()
+            self.load_pipeline()
 
-    def _load_pipeline(self) -> None:
+    def load_pipeline(self) -> None:
         raise NotImplementedError(
             "Subclasses must implement the `_load_pipeline` method."
         )
@@ -98,26 +103,37 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(default="auto", description="The device to use for the model")
-    _model: "PreTrainedModel" = PrivateAttr(default=None)
-    _tokenizer: "PreTrainedTokenizer" = PrivateAttr(default=None)
+    _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
+    _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
+
+    @field_validator("device", mode="before")
+    def validate_device(cls, v):  # type: ignore
+        if isinstance(v, "torch.device"):
+            return v
+        else:
+            return set_device(v)
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
-        self.device = set_device(self.device)
         if self._model is None:
-            self._load_model()
+            self.load_model()
         else:
             print("Using user-provided model.")
 
         if self._tokenizer is None:
-            self._load_tokenizer()
+            self.load_tokenizer()
         else:
             print("Using user-provided tokenizer.")
 
-    def _load_model(self) -> None:
+        assert self._model is not None, "Model must be loaded, implement `load_model`"
+        assert (
+            self._tokenizer is not None
+        ), "Tokenizer must be loaded, implement `load_tokenizer`"
+
+    def load_model(self) -> None:
         raise NotImplementedError("Subclasses must implement the `_load_model` method.")
 
-    def _load_tokenizer(self) -> None:
+    def load_tokenizer(self) -> None:
         raise NotImplementedError(
             "Subclasses must implement the `_load_tokenizer` method."
         )
@@ -148,7 +164,10 @@ class RollingWindowScorer(HuggingFaceScorer):
         description="The method to aggregate predictions",
     )
 
-    def _tokenize_input(self, prompt: str) -> "Tensor":
+    def predict_chunk(self, input_ids: "torch.Tensor") -> list[Union[int, float]]:
+        raise NotImplementedError("Subclasses must implement predict_chunk method.")
+
+    def _tokenize_input(self, prompt: str) -> "torch.Tensor":
         """
         Tokenize the input prompt without truncation.
 
@@ -162,9 +181,6 @@ class RollingWindowScorer(HuggingFaceScorer):
         return self._tokenizer(
             prompt, return_tensors="pt", truncation=False
         ).input_ids.to(self.device)
-
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
-        raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
     def _aggregate_predictions(
         self, all_predictions: list[list[Union[int, float]]]
@@ -197,7 +213,7 @@ class RollingWindowScorer(HuggingFaceScorer):
 
         return aggregated
 
-    def _predict_long(self, input_ids: "Tensor") -> list[float]:
+    def _predict_long(self, input_ids: "torch.Tensor") -> list[float]:
         """
         Handle prediction for long inputs by processing in overlapping windows.
 
@@ -240,5 +256,5 @@ class RollingWindowScorer(HuggingFaceScorer):
             >>> print(predictions)
             [0.5, 0.3, 0.0, 0.2, 0.7]
         """
-        input_ids: Tensor = self._tokenize_input(prompt)
+        input_ids: torch.Tensor = self._tokenize_input(prompt)
         return self._predict_long(input_ids)

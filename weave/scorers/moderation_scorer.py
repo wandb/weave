@@ -118,7 +118,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         ]
     )
 
-    def _load_model(self) -> None:
+    def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
 
@@ -130,7 +130,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
         )
         self._model.eval()
 
-    def _load_tokenizer(self) -> None:
+    def load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
@@ -150,7 +150,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
 
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)  # type: ignore
             predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
         if isinstance(predictions, int):
             return [predictions]
@@ -215,7 +215,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         ]
     )
 
-    def _load_model(self) -> None:
+    def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
 
@@ -227,7 +227,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         )
         self._model.eval()
 
-    def _load_tokenizer(self) -> None:
+    def load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
@@ -238,7 +238,7 @@ class WeaveBiasScorer(RollingWindowScorer):
 
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)  # type: ignore
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
