@@ -82,6 +82,7 @@ def test_content_generation_async(client):
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_sync_stream(client):
     from google import genai
+
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content_stream(
         model="gemini-2.0-flash",
@@ -90,7 +91,7 @@ def test_content_generation_sync_stream(client):
     response_text = ""
     try:
         for chunk in response:
-            if hasattr(chunk, 'text'):
+            if hasattr(chunk, "text"):
                 response_text += chunk.text
             else:
                 raise ValueError(f"Unexpected chunk format: {chunk}")
