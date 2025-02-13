@@ -17,6 +17,7 @@ export const useFunctionSpecs = (
 ): {functionSpecs: FunctionSpec[]; specsLoading: boolean} => {
   const req: TraceObjQueryReq = {
     project_id: projectIdFromParts({entity, project}),
+    filter: {latest_only: true},
   };
   const res = useBaseObjectInstances('FunctionSpec', req);
   const [cols, setCols] = useState<TraceObjSchema[] | null>(null);

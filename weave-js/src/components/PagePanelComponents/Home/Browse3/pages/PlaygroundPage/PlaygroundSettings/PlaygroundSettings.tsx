@@ -20,6 +20,7 @@ export type PlaygroundSettingsProps = {
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
   settingsTab: number;
   setSettingsTab: (tab: number) => void;
+  agentdome?: boolean;
 };
 
 export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
@@ -29,7 +30,33 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
   setPlaygroundStateField,
   settingsTab,
   setSettingsTab,
+  agentdome,
 }) => {
+  // Add handler for function updates in agentdome mode
+  const handleFunctionUpdate = React.useCallback(
+    (
+      idx: number,
+      value:
+        | Array<{name: string; [key: string]: any}>
+        | ((
+            prev: Array<{name: string; [key: string]: any}>
+          ) => Array<{name: string; [key: string]: any}>)
+    ) => {
+      const resolvedValue =
+        typeof value === 'function'
+          ? value(playgroundStates[idx].functions)
+          : value;
+      if (agentdome) {
+        playgroundStates.forEach((_, stateIdx) => {
+          setPlaygroundStateField(stateIdx, 'functions', resolvedValue);
+        });
+      } else {
+        setPlaygroundStateField(idx, 'functions', resolvedValue);
+      }
+    },
+    [agentdome, playgroundStates, setPlaygroundStateField]
+  );
+
   return (
     <Box
       sx={{
@@ -43,20 +70,22 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
         flexShrink: 0,
       }}>
       <Tabs.Root value={settingsTab.toString()}>
-        <Tabs.List>
-          {playgroundStates.map((state, idx) => (
-            <Tabs.Trigger
-              key={idx}
-              value={idx.toString()}
-              onClick={() => setSettingsTab(idx)}
-              className="max-w-[120px]">
-              {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
-              <Tooltip title={state.model}>
-                <span className="truncate">{state.model}</span>
-              </Tooltip>
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
+        {!agentdome && (
+          <Tabs.List>
+            {playgroundStates.map((state, idx) => (
+              <Tabs.Trigger
+                key={idx}
+                value={idx.toString()}
+                onClick={() => setSettingsTab(idx)}
+                className="max-w-[120px]">
+                {playgroundStates.length > 1 && <Tag label={`${idx + 1}`} />}
+                <Tooltip title={state.model}>
+                  <span className="truncate">{state.model}</span>
+                </Tooltip>
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        )}
         {playgroundStates.map((playgroundState, idx) => (
           <Tabs.Content key={idx} value={idx.toString()}>
             <Box
@@ -77,13 +106,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                 project={project}
                 playgroundState={playgroundState}
                 functions={playgroundState.functions}
-                setFunctions={value =>
-                  setPlaygroundStateField(
-                    idx,
-                    'functions',
-                    value as Array<{name: string; [key: string]: any}>
-                  )
-                }
+                setFunctions={value => handleFunctionUpdate(idx, value)}
               />
 
               <StopSequenceEditor

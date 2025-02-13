@@ -196,6 +196,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          agentdome={props.agentdome}
         />
       )}
     </Box>

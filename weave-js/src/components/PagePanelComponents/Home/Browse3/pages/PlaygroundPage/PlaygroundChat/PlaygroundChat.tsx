@@ -110,6 +110,7 @@ export const PlaygroundChat: React.FC<PlaygroundChatProps> = ({
               idx={idx}
               entity={entity}
               project={project}
+              handleSend={handleSend}
             />
             <PlaygroundChatInput
               playgroundState={playgroundState}
