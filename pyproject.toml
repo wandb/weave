@@ -46,7 +46,6 @@ dependencies = [
   "jsonschema>=4.23.0",    # Used by scorers for field validation
   "diskcache==5.6.3",      # Used for data caching
 ]
-version = "0.51.34.dev6"
 
 [project.optional-dependencies]
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
@@ -125,7 +124,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "weave/version.py"
-pattern = "VERSION = \"(?P<version>[^\"]+)\""
 
 [tool.hatch.build]
 include = ["weave"]
@@ -233,19 +231,19 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.34.dev6"
+current_version = "0.51.34.dev3"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
     (?P<patch>0|[1-9]\\d*)
     (?:
-        \\.                             # dot separator for pre-release section (changed from hyphen)
-        (?P<pre_l>[a-zA-Z-]+)         
-        (?P<pre_n>0|[1-9]\\d*)        
-    )?                                
+        -                             # dash separator for pre-release section
+        (?P<pre_l>[a-zA-Z-]+)         # pre-release label
+        (?P<pre_n>0|[1-9]\\d*)        # pre-release version number
+    )?                                # pre-release section is optional
 """
 serialize = [
-  "{major}.{minor}.{patch}.{pre_l}{pre_n}", # Changed format to use dot
+  "{major}.{minor}.{patch}-{pre_l}{pre_n}",
   "{major}.{minor}.{patch}",
 ]
 search = "{current_version}"
@@ -265,6 +263,3 @@ commit_args = ""
 [tool.bumpversion.parts.pre_l]
 values = ["dev", "final"]
 optional_value = "final"
-
-[tool.hatch.metadata]
-allow-direct-references = true
