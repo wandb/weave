@@ -761,7 +761,7 @@ class WeaveClient:
     # to child operations, impossible to deadlock
     # Currently only used for create_file operation
     # Configurable with client_parallelism_upload
-    future_executor_fastlane: FutureExecutor
+    future_executor_fastlane: FutureExecutor | None
 
     """
     A client for interacting with the Weave trace server.
@@ -786,7 +786,10 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
-        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
+        if parallelism_upload:
+            self.future_executor_fastlane = FutureExecutor(
+                max_workers=parallelism_upload
+            )
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -1875,6 +1878,8 @@ class WeaveClient:
         # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
+        if self.future_executor_fastlane:
+            self.future_executor_fastlane.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
@@ -1884,7 +1889,7 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        if client_parallelism_upload() is not None:
+        if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
