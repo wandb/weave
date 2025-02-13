@@ -18,6 +18,7 @@ TINY_MODEL_PATHS = {
     "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest",
 }
 
+
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     input_ids: Union[list[int], Tensor]

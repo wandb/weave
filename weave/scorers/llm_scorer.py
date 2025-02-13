@@ -74,12 +74,16 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The task to use for the pipeline, for example 'text-classification'"
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: str = Field(default="auto", description="The device to use for the model")
+    device: Union[str, Any] = Field(
+        default="auto", description="The device to use for the model"
+    )
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
-    def validate_device(cls, v):  # type: ignore
-        if isinstance(v, "torch.device"):
+    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
+        import torch
+
+        if isinstance(v, torch.device):
             return v
         else:
             return set_device(v)
@@ -102,13 +106,17 @@ class HuggingFaceScorer(weave.Scorer):
     """Score model outputs using a Hugging Face model."""
 
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: str = Field(default="auto", description="The device to use for the model")
+    device: Union[str, Any] = Field(
+        default="auto", description="The device to use for the model"
+    )
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
-    def validate_device(cls, v):  # type: ignore
-        if isinstance(v, "torch.device"):
+    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
+        import torch
+
+        if isinstance(v, torch.device):
             return v
         else:
             return set_device(v)
