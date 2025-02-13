@@ -1,4 +1,3 @@
-// Test for MyComponent
 import {render, screen} from '@testing-library/react';
 import React from 'react';
 
@@ -8,7 +7,6 @@ describe('Tailwind wrapper', () => {
   test('empty wrapper includes defaults', () => {
     render(<Tailwind />);
 
-    // Assertions
     const wrapper = screen.getByTestId('tailwind-wrapper');
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
@@ -17,7 +15,6 @@ describe('Tailwind wrapper', () => {
   test('wrapper includes defined props', () => {
     render(<Tailwind style={{minHeight: '500px'}} className="myClass" />);
 
-    // Assertions
     const wrapper = screen.getByTestId('tailwind-wrapper');
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
@@ -28,9 +25,7 @@ describe('Tailwind wrapper', () => {
   test('wrapper includes extended props', () => {
     render(<Tailwind data-test="mytest" />);
 
-    // Assertions
     const wrapper = screen.getByTestId('tailwind-wrapper');
-    console.log(wrapper);
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
     expect(wrapper).toHaveAttribute('data-test', 'mytest');
@@ -39,9 +34,7 @@ describe('Tailwind wrapper', () => {
   test('wrapper includes override props', () => {
     render(<Tailwind data-test="mytest" data-testid="mytestid" />);
 
-    // Assertions
     const wrapper = screen.getByTestId('mytestid');
-    console.log(wrapper);
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
     expect(wrapper).toHaveAttribute('data-test', 'mytest');
@@ -52,7 +45,6 @@ describe('Tailwind wrapper', () => {
   test('contents wrapper includes defaults', () => {
     render(<TailwindContents />);
 
-    // Assertions
     const wrapper = screen.getByTestId('tailwind-wrapper');
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
@@ -64,7 +56,6 @@ describe('Tailwind wrapper', () => {
       <TailwindContents style={{minHeight: '500px'}} className="myClass" />
     );
 
-    // Assertions
     const wrapper = screen.getByTestId('tailwind-wrapper');
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
@@ -87,7 +78,6 @@ describe('Tailwind wrapper', () => {
   test('contents wrapper includes override props', () => {
     render(<TailwindContents data-test="mytest" data-testid="mytestid" />);
 
-    // Assertions
     const wrapper = screen.getByTestId('mytestid');
     expect(wrapper).toBeInTheDocument();
     expect(wrapper).toHaveClass('tw-style');
