@@ -39,6 +39,7 @@ export const useProjectSidebar = (
       'weave/leaderboards',
       'weave/operations',
       'weave/objects',
+      'weave/agentdome',
     ];
     if (isWandbAdmin) {
       weaveOnlyMenu.push('weave/mods');
@@ -179,6 +180,13 @@ export const useProjectSidebar = (
             slug: 'weave/datasets',
             isShown: isWeaveOnly,
             iconName: IconNames.Table,
+          },
+          {
+            type: 'button' as const,
+            name: 'Agentdome',
+            slug: 'weave/agentdome',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.RocketLaunch,
           },
           {
             type: 'button' as const,

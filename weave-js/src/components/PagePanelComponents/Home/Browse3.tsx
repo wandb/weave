@@ -53,6 +53,7 @@ import {
 } from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
+import {AgentdomePage} from './Browse3/pages/AgentdomePage/AgentdomePage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
@@ -470,6 +471,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/compare`}>
           <ComparePageBinding />
+        </Route>
+        <Route path={`${projectRoot}/agentdome`}>
+          <AgentdomePageBinding />
         </Route>
       </Switch>
     </Box>
@@ -980,4 +984,9 @@ const PlaygroundPageBinding = () => {
       callId={params.itemName}
     />
   );
+};
+
+const AgentdomePageBinding = () => {
+  const params = useParamsDecoded<Browse3TabParams>();
+  return <AgentdomePage entity={params.entity} project={params.project} />;
 };

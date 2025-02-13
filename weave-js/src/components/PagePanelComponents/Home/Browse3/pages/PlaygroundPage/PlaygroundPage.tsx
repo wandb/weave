@@ -16,17 +16,25 @@ import {
 export type PlaygroundPageProps = {
   entity: string;
   project: string;
-  callId: string;
+  callId?: string;
+  agentdome?: boolean;
 };
 
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   return (
     <SimplePageLayoutWithHeader
       title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-          <Pill label="Preview" color="moon" />
-        </Box>
+        !props.agentdome ? (
+          <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
+            Playground
+            <Pill label="Preview" color="moon" />
+          </Box>
+        ) : (
+          <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
+            Agentdome
+            <Pill label="Experimental" color="moon" />
+          </Box>
+        )
       }
       hideTabsIfSingle
       headerContent={null}
@@ -49,7 +57,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   } = usePlaygroundState();
 
   const {useCall, useCalls} = useWFHooks();
-  const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
   const callKey = useMemo(() => {
     return props.callId
       ? {
@@ -91,14 +99,28 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
       playgroundStates.length === 1 &&
       !playgroundStates[0].traceCall.project_id
     ) {
-      setPlaygroundStateField(0, 'traceCall', {
-        inputs: {
-          messages: [DEFAULT_SYSTEM_MESSAGE],
-        },
-        project_id: `${props.entity}/${props.project}`,
-      });
+      if (props.agentdome) {
+        const initialState = {
+          inputs: {
+            messages: [DEFAULT_SYSTEM_MESSAGE],
+          },
+          project_id: `${props.entity}/${props.project}`,
+        };
+        setPlaygroundStates(
+          Array(4).fill({
+            ...playgroundStates[0],
+            traceCall: initialState,
+          })
+        );
+      } else {
+        setPlaygroundStateField(0, 'traceCall', {
+          inputs: {
+            messages: [DEFAULT_SYSTEM_MESSAGE],
+          },
+          project_id: `${props.entity}/${props.project}`,
+        });
+      }
     }
-    // Only set the call the first time the page loads, and we get the call
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.loading]);
 
@@ -155,6 +177,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           project={props.project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
+          agentdome={props.agentdome}
         />
       )}
       {settingsTab !== null && (

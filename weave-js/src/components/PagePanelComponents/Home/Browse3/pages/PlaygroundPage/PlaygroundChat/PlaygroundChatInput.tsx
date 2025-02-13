@@ -5,15 +5,28 @@ import React, {useState} from 'react';
 
 import {StyledTextArea} from '../../../StyledTextarea';
 import {PlaygroundMessageRole} from '../types';
+import {PlaygroundState} from '../types';
+import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
-type PlaygroundChatInputProps = {
+interface PlaygroundChatInputProps {
+  playgroundState: PlaygroundState;
+  setPlaygroundStateField: SetPlaygroundStateFieldFunctionType;
+  idx: number;
+  entity: string;
+  project: string;
   chatText: string;
   setChatText: (text: string) => void;
   isLoading: boolean;
-  onSend: (role: PlaygroundMessageRole, chatText: string) => void;
-  onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
+  handleSend: (
+    role: PlaygroundMessageRole,
+    chatText: string,
+    callIndex?: number,
+    content?: string,
+    toolCallId?: string
+  ) => Promise<void>;
+  handleAddMessage: (role: PlaygroundMessageRole, text: string) => void;
   settingsTab: number | null;
-};
+}
 
 const isMac = () => {
   const platform = navigator.platform || '';
@@ -26,11 +39,16 @@ const isMac = () => {
 };
 
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
+  playgroundState,
+  setPlaygroundStateField,
+  idx,
+  entity,
+  project,
   chatText,
   setChatText,
   isLoading,
-  onSend,
-  onAdd,
+  handleSend,
+  handleAddMessage,
   settingsTab,
 }) => {
   const [addMessageRole, setAddMessageRole] =
@@ -42,20 +60,20 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
     setTimeout(() => setShouldReset(false), 0);
   };
 
-  const handleSend = (role: PlaygroundMessageRole) => {
-    onSend(role, chatText);
+  const handleSendMessage = async (role: PlaygroundMessageRole) => {
+    await handleSend(role, chatText);
     handleReset();
   };
 
-  const handleAdd = (role: PlaygroundMessageRole, text: string) => {
-    onAdd(role, text);
+  const handleAddMessageRole = (role: PlaygroundMessageRole, text: string) => {
+    handleAddMessage(role, text);
     handleReset();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      handleSend(addMessageRole);
+      handleSendMessage(addMessageRole);
     }
   };
 
@@ -140,13 +158,13 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               variant="secondary"
               size="medium"
               startIcon="add-new"
-              onClick={() => handleAdd(addMessageRole, chatText)}>
+              onClick={() => handleAddMessageRole(addMessageRole, chatText)}>
               Add
             </Button>
             <Divider orientation="vertical" flexItem sx={{bgcolor: MOON_250}} />
             <Button
               size="medium"
-              onClick={() => handleSend(addMessageRole)}
+              onClick={() => handleSendMessage(addMessageRole)}
               disabled={isLoading || chatText.trim() === ''}
               startIcon={isLoading ? 'loading' : undefined}>
               {isLoading ? 'Sending...' : 'Send'}

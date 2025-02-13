@@ -27,6 +27,7 @@ type PlaygroundChatTopBarProps = {
   project: string;
   playgroundStates: PlaygroundState[];
   setPlaygroundStates: (playgroundStates: PlaygroundState[]) => void;
+  agentdome?: boolean;
 };
 
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
@@ -45,6 +46,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
   project,
   playgroundStates,
   setPlaygroundStates,
+  agentdome,
 }) => {
   const history = useHistory();
   const isLastChat = idx === playgroundStates.length - 1;
@@ -118,7 +120,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           alignItems: 'center',
           backgroundColor: 'transparent',
         }}>
-        {!onlyOneChat && <Tag label={`${idx + 1}`} />}
+        {(!onlyOneChat || agentdome) && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
@@ -143,32 +145,31 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           variant="ghost"
           onClick={() => setConfirmClear(true)}
         />
-        {onlyOneChat ? (
-          <Button
-            tooltip={'Add chat'}
-            endIcon="swap"
-            size="medium"
-            variant="ghost"
-            onClick={handleCompare}>
-            Compare
-          </Button>
-        ) : (
-          <Button
-            tooltip={'Remove chat'}
-            endIcon="close"
-            size="medium"
-            variant="ghost"
-            onClick={() => {
-              if (settingsTab === idx) {
-                setSettingsTab(0);
-              }
-              setPlaygroundStates(
-                playgroundStates.filter((_, index) => index !== idx)
-              );
-            }}>
-            Remove
-          </Button>
-        )}
+        {!agentdome &&
+          (onlyOneChat ? (
+            <Button
+              tooltip={'Add chat'}
+              endIcon="swap"
+              size="medium"
+              variant="ghost"
+              onClick={handleCompare}>
+              Compare
+            </Button>
+          ) : (
+            <Button
+              tooltip={'Remove chat'}
+              endIcon="close"
+              size="medium"
+              variant="ghost"
+              onClick={() => {
+                if (settingsTab === idx) {
+                  setSettingsTab(0);
+                }
+                setPlaygroundStates(
+                  playgroundStates.filter((_, index) => index !== idx)
+                );
+              }}></Button>
+          ))}
         {isLastChat && (
           <Button
             tooltip={'Chat settings'}
