@@ -215,29 +215,35 @@ def test_get_parallelism_settings() -> None:
     # Test default behavior with 4 CPU cores
     with mock.patch("os.cpu_count", return_value=4):
         main, upload = get_parallelism_settings()
-        assert main == 4  # (4 cores + 4) // 2 = 4
-        assert upload == 4  # Remaining threads for upload
+        assert main == 4  # Default 50/50 split: (4 cores + 4) * 0.5 = 4
+        assert upload == 4  # Equal split by default
 
     # Test explicit total parallelism override
     with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "10"}):
         main, upload = get_parallelism_settings()
-        assert main == 5  # 10 // 2 = 5
-        assert upload == 5  # Equal split
+        assert main == 5  # Default 50/50 split: 10 * 0.5 = 5
+        assert upload == 5  # Equal split by default
 
-    # Test explicit upload parallelism override
+    # Test explicit background parallelism mix override
     with mock.patch.dict(
         os.environ,
-        {"WEAVE_CLIENT_PARALLELISM": "10", "WEAVE_CLIENT_PARALLELISM_UPLOAD": "3"},
+        {
+            "WEAVE_CLIENT_PARALLELISM": "10",
+            "WEAVE_CLIENT_BACKGROUND_PARALLELISM_MIX": "0.7",
+        },
     ):
         main, upload = get_parallelism_settings()
-        assert main == 10  # Total parallelism unchanged
-        assert upload == 3  # Explicit upload setting
+        assert main == 3  # 10 * (1 - 0.7) = 3
+        assert upload == 7  # 10 * 0.7 = 7
 
-    # Test just upload parallelism override, 16 core machine
-    with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM_UPLOAD": "3"}):
-        main, upload = get_parallelism_settings()
-        assert main is None  # will get set on thread pool init
-        assert upload == 3  # Explicit upload setting
+    # Test just background parallelism mix override, 16 core machine
+    with mock.patch.dict(
+        os.environ, {"WEAVE_CLIENT_BACKGROUND_PARALLELISM_MIX": "0.25"}
+    ):
+        with mock.patch("os.cpu_count", return_value=16):
+            main, upload = get_parallelism_settings()
+            assert main == 15  # (16 + 4) * 0.75 = 15
+            assert upload == 5  # (16 + 4) * 0.25 = 5
 
     # Test disabling parallelism
     with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "0"}):
@@ -248,17 +254,17 @@ def test_get_parallelism_settings() -> None:
     # Test max cap with many cores
     with mock.patch("os.cpu_count", return_value=64):
         main, upload = get_parallelism_settings()
-        assert main == 16  # (min(32, 68) // 2)
+        assert main == 16  # Default 50/50 split: min(32, 68) * 0.5 = 16
         assert upload == 16  # Equal split of max 32
 
     # Test single core system
     with mock.patch("os.cpu_count", return_value=1):
         main, upload = get_parallelism_settings()
-        assert main == 2  # (1 core + 4) // 2 = 2
+        assert main == 2  # Default 50/50 split: (1 core + 4) * 0.5 = 2
         assert upload == 3  # Remaining threads (5 - 2)
 
     # Test when cpu_count returns None
     with mock.patch("os.cpu_count", return_value=None):
         main, upload = get_parallelism_settings()
-        assert main == 2  # (1 core + 4) // 2 = 2
+        assert main == 2  # Default 50/50 split: (1 core + 4) * 0.5 = 2
         assert upload == 3  # Remaining threads (5 - 2)

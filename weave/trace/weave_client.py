@@ -61,8 +61,8 @@ from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.settings import (
+    client_background_parallelism_mix,
     client_parallelism,
-    client_parallelism_upload,
     should_capture_client_info,
     should_capture_system_info,
 )
@@ -760,7 +760,7 @@ class WeaveClient:
     # Fast-lane executor for operations guaranteed to not defer
     # to child operations, impossible to deadlock
     # Currently only used for create_file operation
-    # Configurable with client_parallelism_upload
+    # Configurable with client_background_parallelism_mix
     future_executor_fastlane: FutureExecutor | None
 
     """
@@ -1897,23 +1897,21 @@ class WeaveClient:
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
     total_parallelism = client_parallelism()
-    upload_parallelism = client_parallelism_upload()
+    background_parallelism_mix = client_background_parallelism_mix()
 
     # if user has explicitly set 0 or 1 for total parallelism,
     # don't use fastlane executor
     if total_parallelism is not None and total_parallelism <= 1:
         return total_parallelism, 0
 
-    # if user has set a specific upload parallelism, use that
-    if upload_parallelism:
-        return total_parallelism, upload_parallelism
-
     # if total_parallelism is None, we have to calculate it
     if total_parallelism is None:
         total_parallelism = min(32, (os.cpu_count() or 1) + 4)
 
+    background_parallelism_mix = background_parallelism_mix or 0.5
+
     # use 50/50 split between main and upload
-    parallelism_main = total_parallelism // 2
+    parallelism_main = int(total_parallelism * (1 - background_parallelism_mix))
     parallelism_upload = total_parallelism - parallelism_main
 
     return parallelism_main, parallelism_upload
