@@ -97,13 +97,12 @@ client.flush()
 
 ### Increasing client parallelism
 
-There are two environment variables that can be set to increase the number of background threads available to the client.
+Client parallelism is automatically determined based on the environment, but can be set manually using the following environment variable:
 
-- `WEAVE_CLIENT_PARALLELISM`: The number of threads available for parallel processing. By default, this is set to 100.
-- `WEAVE_CLIENT_PARALLELISM_UPLOAD`: The number of threads available for specifically uploading data in the background. By default this is unset; all uploading happens in the main thread pool. When set (recommended for evaluations with large datasets), dataset uploading will happen in a separate thread pool, which reduces the chance of deadlock and improves performance.
+- `WEAVE_CLIENT_PARALLELISM`: The number of threads available for parallel processing. Increasing this number will increase the number of threads available for parallel processing, potentially improving the performance of background tasks like dataset uploads.
 
 This can also be set programmatically using the `settings` argument to `weave.init()`:
 
 ```python
-client = weave.init("fast-upload", settings={"client_parallelism": 100, "client_parallelism_upload": 100})
+client = weave.init("fast-upload", settings={"client_parallelism": 100})
 ```
