@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import importlib
-from typing import Callable, Any
+from typing import Any, Callable
 
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
-
 
 _dspy_patcher: MultiPatcher | None = None
 
