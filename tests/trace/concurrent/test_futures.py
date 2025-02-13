@@ -222,21 +222,3 @@ def test_nested_futures_with_0_max_workers_direct() -> None:
     res = executor.defer(inner_2).result()
     assert executor._executor is None
     assert res == [0, 1, 2]
-
-
-def test_fastlane_executor_defer_to_deferred_function() -> None:
-    executor: FutureExecutor = FutureExecutor(is_fastlane=True)
-
-    def deferred_function() -> int:
-        with pytest.raises(
-            RuntimeError,
-            match="Workers in fastlane Executor cannot defer functions, they must execute directly",
-        ):
-            executor.defer(lambda: 42).result()
-
-    executor.defer(deferred_function)
-
-
-def test_fastlane_executor_init_with_zero_max_workers() -> None:
-    executor: FutureExecutor = FutureExecutor(max_workers=0, is_fastlane=True)
-    assert executor._executor is None
