@@ -249,6 +249,12 @@ def test_get_parallelism_settings() -> None:
         assert main == 10  # Total parallelism unchanged
         assert upload == 3  # Explicit upload setting
 
+    # Test just upload parallelism override, 16 core machine
+    with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM_UPLOAD": "3"}):
+        main, upload = get_parallelism_settings()
+        assert main is None  # will get set on thread pool init
+        assert upload == 3  # Explicit upload setting
+
     # Test disabling parallelism
     with mock.patch.dict(os.environ, {"WEAVE_CLIENT_PARALLELISM": "0"}):
         main, upload = get_parallelism_settings()
