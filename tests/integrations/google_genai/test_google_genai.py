@@ -51,6 +51,7 @@ def test_content_generation_sync(client):
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
     from google import genai
+
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = await google_client.aio.models.generate_content(
         model="gemini-2.0-flash",
