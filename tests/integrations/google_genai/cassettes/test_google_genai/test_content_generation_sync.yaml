@@ -1,4 +1,5 @@
 interactions:
+- request:
     body: ''
     headers:
       accept:
@@ -316,13 +317,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 13 Feb 2025 06:59:59 GMT
+      - Thu, 13 Feb 2025 07:09:42 GMT
       ETag:
       - W/"e084c0f6160862b5ea95904fcacccc35c9bbcb332240258e06dcf33aef5bee66"
       Expires:
-      - Thu, 13 Feb 2025 07:04:59 GMT
+      - Thu, 13 Feb 2025 07:14:42 GMT
       Source-Age:
-      - '120'
+      - '101'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -332,19 +333,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '12'
+      - '6'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 3af43b3109545c2e738b1b3580b007590b64989c
+      - ca8e8f91516dc351b56af95baace0a781e93026a
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - C35C:3E6C75:1C99B2:1E4A8D:67AD9471
       X-Served-By:
-      - cache-sin-wsss1830032-SIN
+      - cache-sin-wsss1830035-SIN
       X-Timer:
-      - S1739430000.625739,VS0,VE0
+      - S1739430583.795550,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -368,8 +369,6 @@ interactions:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
       x-goog-api-client:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
-      x-goog-api-key:
-      - <MASKED>
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
   response:
@@ -391,11 +390,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:00:02 GMT
+      - Thu, 13 Feb 2025 07:09:45 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1564
+      - gfet4t7; dur=1567
       Transfer-Encoding:
       - chunked
       Vary:

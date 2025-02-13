@@ -20,8 +20,6 @@ interactions:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
       x-goog-api-client:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
-      x-goog-api-key:
-      - <MASKED>
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
   response:
@@ -32,17 +30,19 @@ interactions:
         calendar rules.\\n\\n  Args:\\n    year: An integer representing the year.\\n\\n
         \ Returns:\\n    True if the year is a leap year, False otherwise.\\n  \\\"\\\"\\\"\\n
         \ if not isinstance(year, int):\\n    raise TypeError(\\\"Year must be an
-        integer.\\\")\\n  if year \\u003c 0:\\n    raise ValueError(\\\"Year must
-        be a non-negative integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100
-        == 0:\\n      if year % 400 == 0:\\n        return True\\n      else:\\n        return
-        False\\n    else:\\n      return True\\n  else:\\n    return False\\n```\"\n
-        \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.021814502565200719\n    }\n  ],\n  \"usageMetadata\":
-        {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\": 177,\n    \"totalTokenCount\":
-        228,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
-        \       \"tokenCount\": 51\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 177\n
-        \     }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash\"\n}\n"
+        integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100 == 0:\\n      if
+        year % 400 == 0:\\n        return True\\n      else:\\n        return False\\n
+        \   else:\\n      return True\\n  else:\\n    return False\\n```\"\n          }\n
+        \       ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
+        \"STOP\",\n      \"citationMetadata\": {\n        \"citationSources\": [\n
+        \         {\n            \"startIndex\": 300,\n            \"endIndex\": 495,\n
+        \           \"uri\": \"https://github.com/Multifaceted/Prog_Class\"\n          }\n
+        \       ]\n      },\n      \"avgLogprobs\": -0.020429892693796466\n    }\n
+        \ ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\":
+        155,\n    \"totalTokenCount\": 206,\n    \"promptTokensDetails\": [\n      {\n
+        \       \"modality\": \"TEXT\",\n        \"tokenCount\": 51\n      }\n    ],\n
+        \   \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \       \"tokenCount\": 155\n      }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash\"\n}\n"
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -51,11 +51,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:00:09 GMT
+      - Thu, 13 Feb 2025 07:09:53 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=2717
+      - gfet4t7; dur=2398
       Transfer-Encoding:
       - chunked
       Vary:

@@ -20,8 +20,6 @@ interactions:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
       x-goog-api-client:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
-      x-goog-api-key:
-      - <MASKED>
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
   response:
@@ -44,11 +42,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:00:13 GMT
+      - Thu, 13 Feb 2025 07:09:58 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=590
+      - gfet4t7; dur=1618
       Transfer-Encoding:
       - chunked
       Vary:

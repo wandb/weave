@@ -17,20 +17,18 @@ interactions:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
       x-goog-api-client:
       - google-genai-sdk/1.1.0 gl-python/3.12.8
-      x-goog-api-key:
-      - <MASKED>
     method: POST
     uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
   response:
     body:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
-        [\n          {\n            \"text\": \"The capital of France is **Paris**.\\n\"\n
+        [\n          {\n            \"text\": \"The capital of France is Paris.\\n\"\n
         \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.012641049921512604\n    }\n  ],\n  \"usageMetadata\":
-        {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 9,\n    \"totalTokenCount\":
-        17,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \"STOP\",\n      \"avgLogprobs\": -0.011875460855662823\n    }\n  ],\n  \"usageMetadata\":
+        {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 8,\n    \"totalTokenCount\":
+        16,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
         \       \"tokenCount\": 8\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      }\n
+        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 8\n      }\n
         \   ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash\"\n}\n"
     headers:
       Alt-Svc:
@@ -40,11 +38,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 13 Feb 2025 07:00:04 GMT
+      - Thu, 13 Feb 2025 07:09:47 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1618
+      - gfet4t7; dur=1545
       Transfer-Encoding:
       - chunked
       Vary:
