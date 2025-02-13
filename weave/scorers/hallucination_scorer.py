@@ -188,7 +188,7 @@ class HallucinationFreeScorer(LLMScorer):
 HALLUCINATION_SCORER_THRESHOLD = 0.35
 
 
-class WeaveHallucinationScorer(HuggingFacePipelineScorer):
+class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     """
     A scorer that detects hallucinations in the output, given an query and context. This scorer
     uses the HHEM 2.1 model from Vectara, https://huggingface.co/vectara/hallucination_evaluation_model

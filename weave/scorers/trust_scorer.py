@@ -13,11 +13,11 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers import (
-    WeaveCoherenceScorer,
-    WeaveContextRelevanceScorer,
-    WeaveFluencyScorer,
-    WeaveHallucinationScorer,
-    WeaveToxicityScorer,
+    WeaveCoherenceScorerV1,
+    WeaveContextRelevanceScorerV1,
+    WeaveFluencyScorerV1,
+    WeaveHallucinationScorerV1,
+    WeaveToxicityScorerV1,
 )
 from weave.scorers.context_relevance_scorer import CONTEXT_RELEVANCE_SCORER_THRESHOLD
 from weave.scorers.fluency_scorer import FLUENCY_SCORER_THRESHOLD
@@ -30,14 +30,14 @@ from weave.scorers.utils import WeaveScorerResult, check_score_param_type
 
 
 class WeaveTrustScorerError(Exception):
-    """Error raised by the WeaveTrustScorer."""
+    """Error raised by the WeaveTrustScorerV1."""
 
     def __init__(self, message: str, errors: Optional[Exception] = None):
         super().__init__(message)
         self.errors = errors
 
 
-class WeaveTrustScorer(weave.Scorer):
+class WeaveTrustScorerV1(weave.Scorer):
     """A comprehensive trust evaluation scorer that combines multiple specialized scorers.
 
     For best performance run this Scorer on a GPU. The model weights for 5 small language models
@@ -49,13 +49,13 @@ class WeaveTrustScorer(weave.Scorer):
     Note: This scorer is suited for RAG pipelines. It requires query, context and output keys to score correctly.
 
     1. Critical Scorers (automatic failure if pass is False):
-        - WeaveToxicityScorer: Detects harmful, offensive, or inappropriate content
-        - WeaveHallucinationScorer: Identifies fabricated or unsupported information
-        - WeaveContextRelevanceScorer: Ensures output relevance to provided context
+        - WeaveToxicityScorerV1: Detects harmful, offensive, or inappropriate content
+        - WeaveHallucinationScorerV1: Identifies fabricated or unsupported information
+        - WeaveContextRelevanceScorerV1: Ensures output relevance to provided context
 
     2. Advisory Scorers (warnings that may affect trust):
-        - WeaveFluencyScorer: Evaluates language quality and coherence
-        - WeaveCoherenceScorer: Checks for logical consistency and flow
+        - WeaveFluencyScorerV1: Evaluates language quality and coherence
+        - WeaveCoherenceScorerV1: Checks for logical consistency and flow
 
     Trust Levels:
         - "high": No issues detected
@@ -92,18 +92,18 @@ class WeaveTrustScorer(weave.Scorer):
                 "critical_issues": [],
                 "advisory_issues": [],
                 "raw_outputs": {
-                    "WeaveToxicityScorer": {"passed": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
-                    "WeaveHallucinationScorer": {"passed": True, "extras": {"score": 0.1}},
-                    "WeaveContextRelevanceScorer": {"passed": True, "extras": {"score": 0.85}},
-                    "WeaveFluencyScorer": {"passed": True, "extras": {"score": 0.95}},
-                    "WeaveCoherenceScorer": {"passed": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
+                    "WeaveToxicityScorerV1": {"passed": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
+                    "WeaveHallucinationScorerV1": {"passed": True, "extras": {"score": 0.1}},
+                    "WeaveContextRelevanceScorerV1": {"passed": True, "extras": {"score": 0.85}},
+                    "WeaveFluencyScorerV1": {"passed": True, "extras": {"score": 0.95}},
+                    "WeaveCoherenceScorerV1": {"passed": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
                 },
                 "scores": {
-                    "WeaveToxicityScorer": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0},
-                    "WeaveHallucinationScorer": 0.1,
-                    "WeaveContextRelevanceScorer": 0.85,
-                    "WeaveFluencyScorer": 0.95,
-                    "WeaveCoherenceScorer": 0.9
+                    "WeaveToxicityScorerV1": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0},
+                    "WeaveHallucinationScorerV1": 0.1,
+                    "WeaveContextRelevanceScorerV1": 0.85,
+                    "WeaveFluencyScorerV1": 0.95,
+                    "WeaveCoherenceScorerV1": 0.9
                 }
             }
         }
@@ -148,13 +148,13 @@ class WeaveTrustScorer(weave.Scorer):
 
     # Define scorer categories
     _critical_scorers: set[type[weave.Scorer]] = {
-        WeaveToxicityScorer,
-        WeaveHallucinationScorer,
-        WeaveContextRelevanceScorer,
+        WeaveToxicityScorerV1,
+        WeaveHallucinationScorerV1,
+        WeaveContextRelevanceScorerV1,
     }
     _advisory_scorers: set[type[weave.Scorer]] = {
-        WeaveFluencyScorer,
-        WeaveCoherenceScorer,
+        WeaveFluencyScorerV1,
+        WeaveCoherenceScorerV1,
     }
 
     # Private attributes
@@ -192,24 +192,24 @@ class WeaveTrustScorer(weave.Scorer):
             scorer_params = base_params.copy()
 
             # Add specific threshold parameters based on scorer type
-            if scorer_cls == WeaveContextRelevanceScorer:
+            if scorer_cls == WeaveContextRelevanceScorerV1:
                 scorer_params["threshold"] = CONTEXT_RELEVANCE_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = (
                     self.context_relevance_model_name_or_path
                 )
-            elif scorer_cls == WeaveHallucinationScorer:
+            elif scorer_cls == WeaveHallucinationScorerV1:
                 scorer_params["threshold"] = HALLUCINATION_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = (
                     self.hallucination_model_name_or_path
                 )
-            elif scorer_cls == WeaveToxicityScorer:
+            elif scorer_cls == WeaveToxicityScorerV1:
                 scorer_params["total_threshold"] = TOXICITY_TOTAL_THRESHOLD
                 scorer_params["category_threshold"] = TOXICITY_CATEGORY_THRESHOLD
                 scorer_params["model_name_or_path"] = self.toxicity_model_name_or_path
-            elif scorer_cls == WeaveFluencyScorer:
+            elif scorer_cls == WeaveFluencyScorerV1:
                 scorer_params["threshold"] = FLUENCY_SCORER_THRESHOLD
                 scorer_params["model_name_or_path"] = self.fluency_model_name_or_path
-            elif scorer_cls == WeaveCoherenceScorer:
+            elif scorer_cls == WeaveCoherenceScorerV1:
                 scorer_params["model_name_or_path"] = self.coherence_model_name_or_path
 
             # Initialize and store scorer
@@ -333,7 +333,7 @@ class WeaveTrustScorer(weave.Scorer):
         # Extract scores where available
         scores = {}
         for name, result in raw_results.items():
-            if name == "WeaveToxicityScorer":
+            if name == "WeaveToxicityScorerV1":
                 scores[name] = result.extras  # Toxicity returns category scores
             elif hasattr(result, "extras") and "score" in result.extras:
                 scores[name] = result.extras["score"]

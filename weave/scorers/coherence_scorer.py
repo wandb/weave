@@ -11,7 +11,7 @@ from weave.scorers.utils import (
 )
 
 
-class WeaveCoherenceScorer(HuggingFacePipelineScorer):
+class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     """
     The scorer that assesses if the model output is coherent using a fine-tuned
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli

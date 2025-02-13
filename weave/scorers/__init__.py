@@ -9,21 +9,21 @@ from weave.scorers.bleu_scorer import BLEUScorer
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
-from weave.scorers.coherence_scorer import WeaveCoherenceScorer
-from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorer
-from weave.scorers.faithfulness_scorer import WeaveFaithfulnessScorer
-from weave.scorers.fluency_scorer import WeaveFluencyScorer
+from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
+from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
+from weave.scorers.faithfulness_scorer import WeaveFaithfulnessScorerV1
+from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
 from weave.scorers.hallucination_scorer import (
     HallucinationFreeScorer,
-    WeaveHallucinationScorer,
+    WeaveHallucinationScorerV1,
 )
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llamaguard_scorer import LlamaGuardScorer
 from weave.scorers.llm_scorer import LLMScorer
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
-    WeaveBiasScorer,
-    WeaveToxicityScorer,
+    WeaveBiasScorerV1,
+    WeaveToxicityScorerV1,
 )
 from weave.scorers.perplexity_scorer import (
     HuggingFacePerplexityScorer,
@@ -36,7 +36,7 @@ from weave.scorers.ragas_scorer import (
     ContextRelevancyScorer,
 )
 from weave.scorers.robustness_scorer import (
-    WeaveRobustnessScorer,
+    WeaveRobustnessScorerV1,
     create_perturbed_dataset,
 )
 from weave.scorers.rouge_scorer import RougeScorer
@@ -46,31 +46,31 @@ from weave.scorers.string_scorer import (
     StringMatchScorer,
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
-from weave.scorers.trust_scorer import WeaveTrustScorer
+from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
     "AccuracyScorer",
     "BLEUScorer",
     "MultiTaskBinaryClassificationF1",
-    "WeaveCoherenceScorer",
-    "WeaveContextRelevanceScorer",
-    "WeaveFaithfulnessScorer",
-    "WeaveFluencyScorer",
+    "WeaveCoherenceScorerV1",
+    "WeaveContextRelevanceScorerV1",
+    "WeaveFaithfulnessScorerV1",
+    "WeaveFluencyScorerV1",
     "HallucinationFreeScorer",
-    "WeaveHallucinationScorer",
+    "WeaveHallucinationScorerV1",
     "ValidJSONScorer",
     "LlamaGuardScorer",
     "LLMScorer",
-    "WeaveBiasScorer",
+    "WeaveBiasScorerV1",
     "OpenAIModerationScorer",
-    "WeaveToxicityScorer",
+    "WeaveToxicityScorerV1",
     "HuggingFacePerplexityScorer",
     "OpenAIPerplexityScorer",
     "PydanticScorer",
     "ContextEntityRecallScorer",
     "ContextRelevancyScorer",
-    "WeaveRobustnessScorer",
+    "WeaveRobustnessScorerV1",
     "create_perturbed_dataset",
     "RougeScorer",
     "EmbeddingSimilarityScorer",
@@ -78,6 +78,6 @@ __all__ = [
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
-    "WeaveTrustScorer",
+    "WeaveTrustScorerV1",
     "Scorer",
 ]

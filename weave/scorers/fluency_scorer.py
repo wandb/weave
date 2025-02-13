@@ -12,7 +12,7 @@ from weave.scorers.utils import (
 FLUENCY_SCORER_THRESHOLD = 0.5
 
 
-class WeaveFluencyScorer(HuggingFacePipelineScorer):
+class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     """
     The scorer uses an fine-tuned ModernBert model to score a given text's fluency,
     https://github.com/AnswerDotAI/ModernBERT
@@ -24,8 +24,8 @@ class WeaveFluencyScorer(HuggingFacePipelineScorer):
     Note: This Scorer's `score` method expects the text to be passed as a string to its `output` parameter.
 
     Example:
-        >>> from weave.scorers.fluency_scorer import WeaveFluencyScorer
-        >>> scorer = WeaveFluencyScorer()
+        >>> from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
+        >>> scorer = WeaveFluencyScorerV1()
         >>> result = scorer.score("This text is fluent.")
         >>> print(result)
         {

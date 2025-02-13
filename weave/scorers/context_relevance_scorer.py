@@ -15,7 +15,7 @@ from weave.scorers.utils import (
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
 
-class WeaveContextRelevanceScorer(HuggingFaceScorer):
+class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     """
     A scorer that evaluates the relevance of model outputs relative to input queries and context.
     The scorer uses a fine-tuned deberta-small-long-nli model from tasksource;
