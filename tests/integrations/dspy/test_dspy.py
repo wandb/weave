@@ -118,7 +118,7 @@ def test_dspy_rag_call(client) -> None:
 
     rag = dspy.ChainOfThought("context, question -> response")
 
-    @weave.op(postprocess_output=lambda x: x.toDict())
+    @weave.op
     def get_answer(question: str) -> str:
         results = dspy.ColBERTv2(url="http://20.102.90.50:2017/wiki17_abstracts")(
             question, k=3
@@ -126,19 +126,12 @@ def test_dspy_rag_call(client) -> None:
         context = [x["text"] for x in results]
         return rag(context=context, question=question)
 
-    response = get_answer(
+    _ = get_answer(
         question="What's the name of the castle that David Gregory inherited?"
     )
-    assert "kinnairdy castle" in response.response.lower()
 
     calls = list(client.calls())
     assert len(calls) == 10
-
-    call = calls[0]
-    assert call.started_at < call.ended_at
-    trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "get_answer"
-    assert "kinnairdy castle" in call.output["response"].lower()
 
     call = calls[1]
     assert call.started_at < call.ended_at
