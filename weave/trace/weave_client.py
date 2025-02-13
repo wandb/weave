@@ -1899,9 +1899,10 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     total_parallelism = client_parallelism()
     upload_parallelism = client_parallelism_upload()
 
-    # if user has explicitly set 0 for total parallelism, don't use parallelism
-    if total_parallelism == 0:
-        return 0, 0
+    # if user has explicitly set 0 or 1 for total parallelism,
+    # don't use fastlane executor
+    if total_parallelism is not None and total_parallelism <= 1:
+        return total_parallelism, 0
 
     # if user has set a specific upload parallelism, use that
     if upload_parallelism:
