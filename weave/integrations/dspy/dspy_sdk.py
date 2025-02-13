@@ -19,11 +19,22 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
+def dspy_postprocess_outputs(outputs: Any) -> dict[str, Any]:
+    from dspy.primitives.prediction import Example
+
+    if isinstance(outputs, Example):
+        return {k: v for k, v in outputs.items()}
+
+    return outputs
+
+
 def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = dspy_postprocess_inputs
+        if not op_kwargs.get("postprocess_output"):
+            op_kwargs["postprocess_output"] = dspy_postprocess_outputs
         op = weave.op(fn, **op_kwargs)
         return op
 
@@ -55,17 +66,41 @@ def get_dspy_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
                 "Module.__call__",
-                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.Module"})),
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.Module"})
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
                 "Predict.__call__",
-                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.Predict"})),
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.Predict"})
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
                 "Predict.forward",
-                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.Predict.forward"})),
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.Predict.forward"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "ChainOfThought.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.ChainOfThought"})
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "ChainOfThought.forward",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.ChainOfThought.forward"}
+                    )
+                ),
             ),
         ]
     )
