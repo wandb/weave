@@ -807,9 +807,10 @@ def process_query_to_conditions(
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedAggField) and raw:
                 structured_field.use_agg_fn = False
-            field = structured_field.as_sql(param_builder, table_alias)
-            if isinstance(structured_field, CallsMergedAggField) and raw:
-                structured_field.use_agg_fn = True
+                field = structured_field.as_sql(param_builder, table_alias)
+                structured_field.use_agg_fn = True  # reset to default
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
