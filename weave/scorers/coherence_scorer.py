@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from pydantic import validate_call, PrivateAttr, Field
+from pydantic import Field, PrivateAttr, validate_call
 
 import weave
 from weave.scorers.default_models import MODEL_PATHS
@@ -24,14 +24,17 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     """
 
     task: str = "sentiment-analysis"
-    model_max_length: int = Field(default=1024, description="The maximum length of the model output.")
-    _label2id: dict[str, int] = PrivateAttr(default_factory=lambda: {
-        "Completely Incoherent": 0,
-        "Mostly Incoherent": 1,
-        "A Little Incoherent": 2,
-        "Mostly Coherent": 3,
-        "Perfectly Coherent": 4,
-    }
+    model_max_length: int = Field(
+        default=1024, description="The maximum length of the model output."
+    )
+    _label2id: dict[str, int] = PrivateAttr(
+        default_factory=lambda: {
+            "Completely Incoherent": 0,
+            "Mostly Incoherent": 1,
+            "A Little Incoherent": 2,
+            "Mostly Coherent": 3,
+            "Perfectly Coherent": 4,
+        }
     )
 
     def load_pipeline(self) -> None:
