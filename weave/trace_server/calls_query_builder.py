@@ -261,12 +261,14 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str, raw: bool = False) -> str:
+    def as_sql(
+        self, pb: ParamBuilder, table_alias: str, ignore_agg_fn: bool = False
+    ) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
-            raw=raw,
+            ignore_agg_fn=ignore_agg_fn,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -620,7 +622,12 @@ class CallsQuery(BaseModel):
         for condition in self.query_conditions:
             if not condition.is_heavy() or condition.is_feedback():
                 continue
-            heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
+            heavy_filter_sql += "AND " + condition.as_sql(
+                pb, table_alias, ignore_agg_fn=True
+            )
+            heavy_filter_sql += "AND " + condition.as_simple_where_sql(
+                pb, table_alias, ignore_agg_fn=True
+            )
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -665,12 +672,9 @@ class CallsQuery(BaseModel):
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
             """
 
-        # Force merge before query if pushing heavy filters before aggregation
-        table_sql = "calls_merged FINAL" if heavy_filter_sql else "calls_merged"
-
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM {table_sql}
+        FROM calls_merged
         {feedback_join_sql}
         WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
         {feedback_where_sql}
@@ -736,7 +740,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
-    raw: bool = False,
+    ignore_agg_fn: bool = False,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -805,7 +809,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            if isinstance(structured_field, CallsMergedAggField) and raw:
+            if isinstance(structured_field, CallsMergedAggField) and ignore_agg_fn:
                 structured_field.use_agg_fn = False
                 field = structured_field.as_sql(param_builder, table_alias)
                 structured_field.use_agg_fn = True  # reset to default
