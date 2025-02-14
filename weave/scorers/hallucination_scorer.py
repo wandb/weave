@@ -217,19 +217,20 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     """
 
     threshold: float = HALLUCINATION_SCORER_THRESHOLD
-    model_max_length: int = PrivateAttr(default=8192)
+    _model_max_length: int = PrivateAttr(default=8192)
+    task: str = "pair-classification"
 
-    def load_pipeline(self) -> Pipeline:
+    def load_pipeline(self) -> "Pipeline":
         ensure_hf_imports()
         from transformers import pipeline
 
         self.device = set_device(self.device)
         self._local_model_path = load_hf_model_weights(
-            self.model_name_or_path, MODEL_PATHS["hallucination_hhem_scorer"]
+            self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]
         )
         # HuggingFacePipelineScorer's model_post_init will cache the pipeline at self._pipeline
         return pipeline(
-            task="pair-classification",
+            task=self.task,
             model=self._local_model_path,
             device=self.device,
             trust_remote_code=True,
@@ -248,19 +249,19 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         len_outs = len(outs_toks.input_ids)
 
         # Handle large inputs
-        if len_inps + len_outs > self.model_max_length:
+        if len_inps + len_outs > self._model_max_length:
             logger.warning(
-                f"sum of query, key and output tokens ({len_inps + len_outs}) > model_max_length ({self.model_max_length}), curtailing input query and context.."
+                f"sum of query, key and output tokens ({len_inps + len_outs}) > model_max_length ({self._model_max_length}), curtailing input query and context.."
             )
             # If the output is less than 1000 tokens, curtail the input query and context only
-            if len_outs < self.model_max_length - 1000:
-                inp_remaining = self.model_max_length - (len_outs + 975)
+            if len_outs < self._model_max_length - 1000:
+                inp_remaining = self._model_max_length - (len_outs + 975)
                 inps_input_ids = inps_toks.input_ids[:inp_remaining]
                 out_input_ids = outs_toks.input_ids
             else:
                 # If the output is greater than 1000 tokens, curtail all 3,  query, context and output
                 inps_input_ids = inps_toks.input_ids[:975]
-                out_input_ids = outs_toks.input_ids[: self.model_max_length - 1025]
+                out_input_ids = outs_toks.input_ids[: self._model_max_length - 1025]
 
             inps = tokenizer.decode(inps_input_ids)
             outs = tokenizer.decode(out_input_ids)
