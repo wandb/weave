@@ -123,6 +123,7 @@ async function main() {
             outputDir, 
             file.replace('.ts', '.md')
         );
+        
         // Convert the file from .ts to .md
         const blocks = await processTypeScriptFile(inputPath);
         const markdown = await generateMarkdown(blocks);
