@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
@@ -97,33 +96,32 @@ def cohere_wrapper(settings: OpSettings) -> Callable:
 
 def cohere_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        def _post_process_response(fn: Callable) -> Any:
-            @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                response = fn(*args, **kwargs)
-
-                try:
-                    from cohere.v2.types.non_streamed_chat_response2 import (
-                        NonStreamedChatResponse2,
-                    )
-                    from cohere.v2.types.usage import Usage
-
-                    # Create a new instance with modified `usage`
-                    response_dict = response.dict()
-                    response_dict["usage"] = Usage(
-                        billed_units=response.model_extra["meta"]["billed_units"],
-                        tokens=response.model_extra["meta"]["tokens"],
-                    )
-                    response = NonStreamedChatResponse2(**response_dict)
-                except:
-                    pass  # prompt to upgrade cohere sdk
-
-                return response
-
-            return _wrapper
-
         op_kwargs = settings.model_dump()
-        op = weave.op(_post_process_response(fn), **op_kwargs)
+        user_provided_postprocess_output = op_kwargs.pop("postprocess_output", None)
+
+        def postprocess_output(response: Any) -> Any:
+            try:
+                from cohere.v2.types.non_streamed_chat_response2 import (
+                    NonStreamedChatResponse2,
+                )
+                from cohere.v2.types.usage import Usage
+
+                # Create a new instance with modified `usage`
+                response_dict = response.dict()
+                response_dict["usage"] = Usage(
+                    billed_units=response.model_extra["meta"]["billed_units"],
+                    tokens=response.model_extra["meta"]["tokens"],
+                )
+                response = NonStreamedChatResponse2(**response_dict)
+            except:
+                pass  # prompt to upgrade cohere sdk
+            if user_provided_postprocess_output:
+                return user_provided_postprocess_output(response)
+            return response
+
+        op_kwargs["postprocess_output"] = postprocess_output
+
+        op = weave.op(fn, **op_kwargs)
         return op
 
     return wrapper
@@ -131,33 +129,32 @@ def cohere_wrapper_v2(settings: OpSettings) -> Callable:
 
 def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
-        def _post_process_response(fn: Callable) -> Any:
-            @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
-                response = await fn(*args, **kwargs)
-
-                try:
-                    from cohere.v2.types.non_streamed_chat_response2 import (
-                        NonStreamedChatResponse2,
-                    )
-                    from cohere.v2.types.usage import Usage
-
-                    # Create a new instance with modified `usage`
-                    response_dict = response.dict()
-                    response_dict["usage"] = Usage(
-                        billed_units=response.model_extra["meta"]["billed_units"],
-                        tokens=response.model_extra["meta"]["tokens"],
-                    )
-                    response = NonStreamedChatResponse2(**response_dict)
-                except:
-                    pass  # prompt to upgrade cohere sdk
-
-                return response
-
-            return _wrapper
-
         op_kwargs = settings.model_dump()
-        op = weave.op(_post_process_response(fn), **op_kwargs)
+        user_provided_postprocess_output = op_kwargs.pop("postprocess_output", None)
+
+        def postprocess_output(response: Any) -> Any:
+            try:
+                from cohere.v2.types.non_streamed_chat_response2 import (
+                    NonStreamedChatResponse2,
+                )
+                from cohere.v2.types.usage import Usage
+
+                # Create a new instance with modified `usage`
+                response_dict = response.dict()
+                response_dict["usage"] = Usage(
+                    billed_units=response.model_extra["meta"]["billed_units"],
+                    tokens=response.model_extra["meta"]["tokens"],
+                )
+                response = NonStreamedChatResponse2(**response_dict)
+            except:
+                pass  # prompt to upgrade cohere sdk
+            if user_provided_postprocess_output:
+                response = user_provided_postprocess_output(response)
+            return response
+
+        op_kwargs["postprocess_output"] = postprocess_output
+
+        op = weave.op(fn, **op_kwargs)
         return op
 
     return wrapper
