@@ -68,10 +68,7 @@ def download_model(artifact_path: Union[str, Path]) -> Path:
 
 def get_model_path(model_name: str) -> str:
     """Get the full model path for a scorer."""
-    if model_name in MODEL_PATHS:
-        return MODEL_PATHS[model_name]
-    return model_name
-
+    return MODEL_PATHS.get(model_name, model_name)
 
 def stringify(output: Any) -> str:
     """
