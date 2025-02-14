@@ -67,10 +67,10 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     Celadon is a DeBERTa-v3-small fine-tuned model with five classification heads, trained on 600k samples from the Toxic Commons dataset.
 
     It classifies toxicity along five dimensions:
-    - **Race and Origin-based Bias**: Includes racism and bias against someone’s country, region of origin, or immigration status.
+    - **Race and Origin-based Bias**: Includes racism and bias against someone's country, region of origin, or immigration status.
     - **Gender and Sexuality-based Bias**: Includes sexism, misogyny, homophobia, transphobia, and sexual harassment.
-    - **Religious Bias**: Any bias or stereotype based on someone’s religion.
-    - **Ability Bias**: Bias according to someone’s physical, mental, or intellectual ability or disability.
+    - **Religious Bias**: Any bias or stereotype based on someone's religion.
+    - **Ability Bias**: Bias according to someone's physical, mental, or intellectual ability or disability.
     - **Violence and Abuse**: Overly graphic descriptions of violence, threats of violence, or incitement of violence.
 
     Args:
@@ -105,15 +105,13 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     category_threshold: int = Field(description="The threshold for individual category scores to flag the input.", default=TOXICITY_CATEGORY_THRESHOLD)
     max_tokens: int = 512
     overlap: int = 50
-    _categories: list[str] = PrivateAttr(
-        default=[
-            "Race/Origin",
-            "Gender/Sex",
-            "Religion",
-            "Ability",
-            "Violence",
-        ]
-    )
+    _categories: list[str] = PrivateAttr(default_factory=lambda: [
+        "Race/Origin",
+        "Gender/Sex", 
+        "Religion",
+        "Ability",
+        "Violence",
+    ])
 
     def load_model(self) -> None:
         ensure_hf_imports()
@@ -205,12 +203,10 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     """
 
     threshold: float = Field(description="The threshold for the bias score to flag the input.", default=BIAS_SCORER_THRESHOLD)
-    _categories: list[str] = PrivateAttr(
-        default=[
-            "gender_bias",
-            "racial_bias",
-        ]
-    )
+    _categories: list[str] = PrivateAttr(default_factory=lambda: [
+        "gender_bias",
+        "racial_bias",
+    ])
 
     def load_model(self) -> None:
         ensure_hf_imports()
