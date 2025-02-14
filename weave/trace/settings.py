@@ -167,7 +167,7 @@ def server_cache_dir() -> Optional[str]:
 
 
 def scorers_dir() -> str:
-    return _optional_str("scorers_dir")
+    return _optional_str("scorers_dir")  # type: ignore
 
 
 def parse_and_apply_settings(
