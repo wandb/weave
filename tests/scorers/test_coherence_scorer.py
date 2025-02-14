@@ -18,7 +18,7 @@ def test_score_messages(weave_coherence_scorer):
     """Test score_messages with a coherent response."""
     query = "This is a test prompt."
     output = "This is a coherent response."
-    result = weave_coherence_scorer.score_messages(query, output)
+    result = weave_coherence_scorer._score_messages(query, output)
     # Check that the pydantic model has the expected attributes.
     assert hasattr(result, "passed")
     assert hasattr(result, "extras")
