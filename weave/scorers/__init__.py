@@ -9,9 +9,6 @@ from weave.scorers.classification_scorer import (
 from weave.scorers.guardrails import PromptInjectionLLMGuardrail
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
-from weave.scorers.scorer_types import (
-    LLMScorer,
-)
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
     WeaveBiasScorer,
@@ -21,6 +18,9 @@ from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
+)
+from weave.scorers.scorer_types import (
+    LLMScorer,
 )
 from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.scorers.string_scorer import (

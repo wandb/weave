@@ -1,8 +1,5 @@
 """Default model configurations for different LLM providers."""
 
-import os
-from pathlib import Path
-
 OPENAI_DEFAULT_MODEL = "gpt-4o"
 OPENAI_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_DEFAULT_MODERATION_MODEL = "omni-moderation-latest"

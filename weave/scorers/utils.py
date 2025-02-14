@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from weave.trace.settings import scorers_dir
 from weave.scorers.default_models import MODEL_PATHS
+from weave.trace.settings import scorers_dir
 
 if TYPE_CHECKING:
     from torch import device
@@ -31,6 +31,7 @@ def set_device(device: str = "auto") -> "device":
         The device to use for the model.
     """
     import torch
+
     try:
         cuda_available = torch.cuda.is_available()
         if not cuda_available and "cuda" in str(device):
@@ -70,6 +71,7 @@ def download_model(artifact_path: Union[str, Path]) -> Path:
 def get_model_path(model_name: str) -> str:
     """Get the full model path for a scorer."""
     return MODEL_PATHS.get(model_name, model_name)
+
 
 def stringify(output: Any) -> str:
     """

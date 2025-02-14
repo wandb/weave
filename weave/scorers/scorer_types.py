@@ -75,7 +75,9 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: Union[str, Any] = Field(
-        default="auto", description="The device to use for the model", validate_default=True
+        default="auto",
+        description="The device to use for the model",
+        validate_default=True,
     )
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
@@ -108,7 +110,9 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: Union[str, Any] = Field(
-        default="auto", description="The device to use for the model", validate_default=True
+        default="auto",
+        description="The device to use for the model",
+        validate_default=True,
     )
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
