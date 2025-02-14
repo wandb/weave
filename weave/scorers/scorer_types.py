@@ -80,6 +80,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
+    @classmethod
     def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
         import torch
 
@@ -113,6 +114,7 @@ class HuggingFaceScorer(weave.Scorer):
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
+    @classmethod
     def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
         import torch
 
