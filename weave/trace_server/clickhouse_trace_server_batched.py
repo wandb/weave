@@ -1242,7 +1242,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if self._storage_bucket_uri is not None:
             bucket_uri = determine_bucket_uri(
-                self._storage_bucket_uri, req.project_id, req.digest
+                self._storage_bucket_uri, req.project_id, digest
             )
             store_in_bucket(bucket_uri, req.content)
             self._insert(

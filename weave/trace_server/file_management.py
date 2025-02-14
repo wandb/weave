@@ -27,11 +27,13 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
 
+def key_for_project_digest(project_id: str, digest: str) -> str:
+    return f"weave/projects/{project_id}/files/{digest}"
 
 def determine_bucket_uri(
     project_id: str, digest: str, base_storage_bucket_uri: str
 ) -> str:
-    return f"{base_storage_bucket_uri}/weave/projects/{project_id}/files/{digest}"
+    return f"{base_storage_bucket_uri}/{key_for_project_digest(project_id, digest)}"
 
 
 class AWSCredentials(TypedDict, total=False):
