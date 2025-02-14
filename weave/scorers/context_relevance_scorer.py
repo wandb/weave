@@ -1,7 +1,7 @@
 from typing import Any, Union
 
 import numpy as np
-from pydantic import validate_call
+from pydantic import Field, validate_call
 
 import weave
 from weave.scorers.scorer_types import HuggingFaceScorer
@@ -63,10 +63,15 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         }
     """
 
-    threshold: float = CONTEXT_RELEVANCE_SCORER_THRESHOLD
+    threshold: float = Field(
+        default=CONTEXT_RELEVANCE_SCORER_THRESHOLD,
+        description="The threshold for relevance classification.",
+    )
+    return_all_spans: bool = Field(
+        default=False,
+        description="Whether to return all spans.",
+    )
     model_max_length: int = 1280
-    return_all_spans: bool = False
-
     def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForTokenClassification
