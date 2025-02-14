@@ -2,6 +2,7 @@ import {
   constFunction,
   isAssignableTo,
   isListLike,
+  isOutputNode,
   isVoidNode,
   listObjectTypePassTags,
   Node,
@@ -36,6 +37,18 @@ export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
     ) {
       return voidNode();
     }
+
+    // Don't add a runColor onto an input node from the op tag-joinObj
+    // because it comes from a joinAll + groupby operation.
+    // This causes a panel crash because it attempts to map a run color
+    // from a type that does not have the run tag.
+    //
+    // There is a difference in the output type of tag-joinObj on the client (this)
+    // and the query engine service.
+    if (isOutputNode(inputNode) && inputNode.fromOp.name === 'tag-joinObj') {
+      return voidNode();
+    }
+
     return opMapEach({
       obj: inputNode,
       mapFn: constFunction({row: withNamedTag('run', 'run', 'any')}, ({row}) =>

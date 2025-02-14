@@ -1311,16 +1311,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     ):
         if index == None:
             return None
+
         indexes: pa.Array
+        
+        arr = self._arrow_data
+        length = len(arr)
+
         if isinstance(index, int):
+            if index >= length or index < -length:
+                return None
             indexes = [index]
         elif isinstance(index, ArrowWeaveList):
             indexes = index._arrow_data
         else:
             indexes = index
 
-        arr = self._arrow_data
-        length = len(arr)
         neg_cond = pc.less(indexes, 0)
         indexes_neg = pc.add(indexes, length)
         indexes = pc.choose(neg_cond, indexes, indexes_neg)
