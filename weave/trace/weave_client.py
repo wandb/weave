@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import os
 import platform
 import re
 import sys
@@ -292,7 +293,7 @@ def _make_calls_iterator(
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(project_id=project_id, filter=filter)
+            CallsQueryStatsReq(project_id=project_id, filter=filter, query=query)
         )
         if limit_override is not None:
             offset = offset_override or 0
@@ -308,6 +309,40 @@ def _make_calls_iterator(
         limit=limit_override,
         offset=offset_override,
     )
+
+
+def _add_scored_by_to_calls_query(
+    scored_by: list[str] | str | None, query: Query | None
+) -> Query | None:
+    # This logic might be pushed down to the server soon, but for now it lives here:
+    if not scored_by:
+        return query
+
+    if isinstance(scored_by, str):
+        scored_by = [scored_by]
+    exprs = []
+    if query is not None:
+        exprs.append(query["$expr"])
+    for name in scored_by:
+        ref = maybe_parse_uri(name)
+        if ref and isinstance(ref, ObjectRef):
+            uri = name
+            scorer_name = ref.name
+            exprs.append(
+                {
+                    "$eq": (
+                        get_field_expr(
+                            runnable_feedback_runnable_ref_selector(scorer_name)
+                        ),
+                        literal_expr(uri),
+                    )
+                }
+            )
+        else:
+            exprs.append(
+                exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
+            )
+    return Query.model_validate({"$expr": {"$and": exprs}})
 
 
 class OpNameError(ValueError):
@@ -716,9 +751,19 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+BACKGROUND_PARALLELISM_MIX = 0.5
+
+
 class WeaveClient:
     server: TraceServerInterface
+
+    # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
+    # Fast-lane executor for operations guaranteed to not defer
+    # to child operations, impossible to deadlock
+    # Currently only used for create_file operation
+    # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
+    future_executor_fastlane: FutureExecutor | None
 
     """
     A client for interacting with the Weave trace server.
@@ -741,7 +786,12 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.future_executor = FutureExecutor(max_workers=client_parallelism())
+        parallelism_main, parallelism_upload = get_parallelism_settings()
+        self.future_executor = FutureExecutor(max_workers=parallelism_main)
+        if parallelism_upload:
+            self.future_executor_fastlane = FutureExecutor(
+                max_workers=parallelism_upload
+            )
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -881,35 +931,7 @@ class WeaveClient:
         if filter is None:
             filter = CallsFilter()
 
-        # This logic might be pushed down to the server soon, but for now it lives here:
-        if scored_by:
-            if isinstance(scored_by, str):
-                scored_by = [scored_by]
-            exprs = []
-            if query is not None:
-                exprs.append(query["$expr"])
-            for name in scored_by:
-                ref = maybe_parse_uri(name)
-                if ref and isinstance(ref, ObjectRef):
-                    uri = name
-                    scorer_name = ref.name
-                    exprs.append(
-                        {
-                            "$eq": (
-                                get_field_expr(
-                                    runnable_feedback_runnable_ref_selector(scorer_name)
-                                ),
-                                literal_expr(uri),
-                            )
-                        }
-                    )
-                else:
-                    exprs.append(
-                        exists_expr(
-                            get_field_expr(runnable_feedback_output_selector(name))
-                        )
-                    )
-            query = Query.model_validate({"$expr": {"$and": exprs}})
+        query = _add_scored_by_to_calls_query(scored_by, query)
 
         return _make_calls_iterator(
             self.server,
@@ -1854,10 +1876,21 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def flush(self) -> None:
+        """
+        An optional flushing method for the client.
+        Forces all background tasks to be processed, which ensures parallel processing
+        during main thread execution. Can improve performance when user code completes
+        before data has been uploaded to the server.
+        """
+        self._flush()
+
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
+        if self.future_executor_fastlane:
+            self.future_executor_fastlane.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
@@ -1867,7 +1900,29 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
+
+
+def get_parallelism_settings() -> tuple[int | None, int | None]:
+    total_parallelism = client_parallelism()
+
+    # if user has explicitly set 0 or 1 for total parallelism,
+    # don't use fastlane executor
+    if total_parallelism is not None and total_parallelism <= 1:
+        return total_parallelism, 0
+
+    # if total_parallelism is None, calculate it
+    if total_parallelism is None:
+        total_parallelism = min(32, (os.cpu_count() or 1) + 4)
+
+    # use 50/50 split between main and fastlane
+    parallelism_main = int(total_parallelism * (1 - BACKGROUND_PARALLELISM_MIX))
+    parallelism_fastlane = total_parallelism - parallelism_main
+
+    return parallelism_main, parallelism_fastlane
 
 
 def safe_current_wb_run_id() -> str | None:
