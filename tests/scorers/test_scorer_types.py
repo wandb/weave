@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 
 from tests.scorers.test_utils import RandomTokenizer
-from weave.scorers.llm_scorer import RollingWindowScorer
+from weave.scorers.scorer_types import RollingWindowScorer
 
 torch.manual_seed(42)
 
