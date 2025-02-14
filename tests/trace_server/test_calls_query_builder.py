@@ -698,12 +698,21 @@ def test_calls_query_multiple_select_columns() -> None:
     cq.add_field("inputs")
     cq.add_field("inputs")
     cq.add_field("inputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
+    cq.add_field("outputs")
     assert_sql(
         cq,
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.outputs_dump) AS outputs_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
