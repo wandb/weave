@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Any, Callable, Optional, TypedDict, Union, cast
 
@@ -31,9 +32,11 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
 
 def determine_bucket_uri(
-    project_id: str, digest: str, base_storage_bucket_uri: str
+    base_storage_bucket_uri: str, project_id: str, digest: str
 ) -> str:
-    return f"{base_storage_bucket_uri}/{key_for_project_digest(project_id, digest)}"
+    # BBBAAADDD
+    assert base_storage_bucket_uri.endswith("/")
+    return f"{base_storage_bucket_uri}{key_for_project_digest(project_id, digest)}"
 
 
 class AWSCredentials(TypedDict, total=False):
@@ -163,9 +166,10 @@ def get_azure_credentials() -> (
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
     account_url = environment.wf_storage_bucket_azure_account_url()
-    credential = environment.wf_storage_bucket_azure_credential()
-    if account_url is None or credential is None:
+    b64_credential = environment.wf_storage_bucket_azure_credential()
+    if account_url is None or b64_credential is None:
         raise ValueError("Azure credentials not set")
+    credential = base64.b64decode(b64_credential).decode('utf-8')
     return AzureAccountCredentials(account_url=account_url, credential=credential)
 
 
@@ -193,6 +197,8 @@ def parse_storage_uri(uri: str) -> tuple[str, str]:
     if provider not in ["s3", "gs", "azure", "file"]:
         raise ValueError(f"Unsupported storage provider: {provider}")
 
+    # BBBAAADDD
+    name, path = path.split("/", 1)
     return provider, path
 
 

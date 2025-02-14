@@ -1311,10 +1311,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
-        if len(chunks) != n_chunks:
+        bucket_storage_uri = query_result.result_rows[0][2]
+        if n_chunks == 0:
+            if not bucket_storage_uri:
+                raise ValueError("File not found")
+        elif len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
 
-        bucket_storage_uri = query_result.result_rows[0][2]
         if bucket_storage_uri:
             # Verify storage URI is what we expect. This is an extra check to ensure
             # that the storage bucket URI is set correctly.
