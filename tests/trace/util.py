@@ -70,13 +70,21 @@ class DummyTestException(Exception):
     pass
 
 
-def get_clickhouse_loglines(
-    caplog, match_string: Optional[str] = None, getattrs: list[str] = []
+def get_info_loglines(
+    caplog, match_string: Optional[str] = None, getattrs: list[str] = ["msg"]
 ):
     """
     Get all log lines from caplog that match the given string.
 
     Match string is compared to the message, and getattrs is a list of attributes to get from the record.
+
+    Example:
+    ```python
+    logger.info("my query", query="SELECT * FROM my_table")
+    ```
+
+    >>> get_info_loglines(caplog, "my query", ["msg", "query"])
+    >>> [{"msg": "my query", "query": "SELECT * FROM my_table"}]
     """
     lines = []
     for record in caplog.records:
