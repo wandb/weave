@@ -236,7 +236,9 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
             trust_remote_code=True,
         )
 
-    def _predict(self, query: str, context: Union[str, list[str]], output: str) -> float:
+    def _predict(
+        self, query: str, context: Union[str, list[str]], output: str
+    ) -> float:
         tokenizer = self._pipeline.tokenizer
         context_str = "\n\n".join(context) if isinstance(context, list) else context
         inps = query + "\n\n" + context_str
