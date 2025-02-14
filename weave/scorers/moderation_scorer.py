@@ -156,8 +156,8 @@ class WeaveToxicityScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
+    @validate_call
     def score(self, output: str) -> WeaveScorerResult:
-        # local scoring
         passed: bool = True
         predictions: list[float] = self._predict(output)
         if (sum(predictions) >= self.total_threshold) or any(
