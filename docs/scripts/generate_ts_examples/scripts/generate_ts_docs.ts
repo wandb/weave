@@ -123,19 +123,12 @@ async function main() {
             outputDir, 
             file.replace('.ts', '.md')
         );
-        
-        // Skip if output file already exists
-        try {
-            await fs.access(outputPath);
-            console.log(`Skipping ${file} - output already exists`);
-            continue;
-        } catch {
-            // File doesn't exist, proceed with generation
-            const blocks = await processTypeScriptFile(inputPath);
-            const markdown = await generateMarkdown(blocks);
-            await fs.writeFile(outputPath, markdown);
-            console.log(`Generated documentation for ${file}`);
-        }
+
+        // Convert the file from .ts to .md
+        const blocks = await processTypeScriptFile(inputPath);
+        const markdown = await generateMarkdown(blocks);
+        await fs.writeFile(outputPath, markdown);
+        console.log(`Generated documentation for ${file}`);
     }
 }
 
