@@ -8,7 +8,7 @@ from weave.scorers.hallucination_scorer import WeaveHallucinationScorerV1
 def weave_hallucination_scorer():
     """Fixture that returns a WeaveHallucinationScorerV1 instance using a tiny downloaded model."""
     return WeaveHallucinationScorerV1(
-        model_name_or_path=TINY_MODEL_PATHS["hallucination_hhem_scorer"],
+        model_name_or_path=TINY_MODEL_PATHS["hallucination_scorer"],
         device="cpu",  # Use CPU for testing
         threshold=0.35,  # Default threshold from the class
     )
@@ -18,9 +18,9 @@ def test_weave_hallucination_scorer_simple(weave_hallucination_scorer):
     """Tests that the scorer can handle a basic string."""
     query = "What is the capital of France?"
     context = "Paris is the capital of France."
-    output = "Paris is the capital of France."
+    output = "Paris croissants are the best croissants"
     result = weave_hallucination_scorer.score(query=query, context=context, output=output)
-    assert result.passed  # Should pass since output matches context exactly
+    assert not result.passed  # Should not pass since output is a hallucination
 
 
 def test_weave_hallucination_scorer_large_input(weave_hallucination_scorer):
