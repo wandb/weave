@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, validate_call
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
@@ -9,7 +9,6 @@ from weave.scorers.llm_scorer import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
-    check_score_param_type,
     ensure_hf_imports,
     load_hf_model_weights,
 )
@@ -34,6 +33,7 @@ class OpenAIModerationScorer(weave.Scorer):
     model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
 
     @weave.op
+    @validate_call
     async def score(self, output: str) -> dict:
         """
         Score the given text against the OpenAI moderation API.
@@ -41,7 +41,6 @@ class OpenAIModerationScorer(weave.Scorer):
         Args:
             output: text to check for moderation, must be a string
         """
-        check_score_param_type(output, str, "output", self)
         response = await amoderation(
             model=self.model_id,
             input=output,
@@ -243,6 +242,7 @@ class WeaveBiasScorer(RollingWindowScorer):
         return predictions
 
     @weave.op
+    @validate_call
     def score(self, output: str) -> WeaveScorerResult:
         """
         Score the output.
@@ -252,7 +252,6 @@ class WeaveBiasScorer(RollingWindowScorer):
 
         Returns:
         """
-        check_score_param_type(output, str, "output", self)
         predictions = self._predict(output)
         scores = [o >= self.threshold for o in predictions]
         categories = {}
