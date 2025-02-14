@@ -274,14 +274,14 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     @validate_call
     @weave.op
     def score(
-        self, query: str, context: str | list[str], output: str
+        self, query: str, context: Union[str, list[str]], output: str
     ) -> WeaveScorerResult:
         """
         Score the hallucination of the query and context.
 
         Args:
             query: str, The query to score, must be a string
-            context: str | list[str], The context to score, must be a string or list of strings
+            context: Union[str, list[str]], The context to score, must be a string or list of strings
             output: str, The output string to score for hallucination given the query and context, must be a string
         """
         score = self._predict(query, context, output)
