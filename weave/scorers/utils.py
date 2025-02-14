@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from weave.scorers.default_models import MODEL_PATHS, WEAVE_SCORERS_DIR
+from weave.trace.settings import scorers_dir
+from weave.scorers.default_models import MODEL_PATHS
 
 if TYPE_CHECKING:
     from torch import device
@@ -61,7 +62,7 @@ def download_model(artifact_path: Union[str, Path]) -> Path:
         name=str(artifact_path),
     )
     model_name = str(artifact_path).split("/")[-1].replace(":", "_")
-    local_model_path = WEAVE_SCORERS_DIR / model_name
+    local_model_path = Path(scorers_dir()) / model_name
     art.download(local_model_path)
     return Path(local_model_path)
 
