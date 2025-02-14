@@ -3,8 +3,8 @@ from typing import Optional, Union
 from pydantic import validate_call
 
 import weave
-from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.default_models import MODEL_PATHS
+from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
     ensure_hf_imports,
@@ -74,7 +74,7 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
             else:
                 formatted_chat_history += f"{turn['content']}\n<extra_id_1>User\n"
         return formatted_chat_history
-    
+
     @validate_call
     @weave.op
     def score(
