@@ -49,17 +49,19 @@ export const useDatasetEditContext = () => {
 
 interface DatasetEditProviderProps {
   children: React.ReactNode;
+  initialAddedRows?: Map<string, DatasetRow>;
 }
 
 export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
   children,
+  initialAddedRows,
 }) => {
   const [editedRows, setEditedRows] = useState<Map<number, DatasetRow>>(
     new Map()
   );
   const [deletedRows, setDeletedRows] = useState<number[]>([]);
   const [addedRows, setAddedRows] = useState<Map<string, DatasetRow>>(
-    new Map()
+    initialAddedRows || new Map()
   );
 
   const getEditedFields = useCallback(
@@ -152,8 +154,6 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
 
     return updates;
   }, [editedRows, deletedRows, addedRows, cleanRow]);
-
-  // Use an effect to always remove d
 
   return (
     <DatasetEditContext.Provider
