@@ -3257,9 +3257,7 @@ def test_calls_len(client):
     assert len(client.get_calls()) == 2
 
 
-def test_calls_query_multiple_dupe_select_columns(
-    client, capsys
-):  # Change caplog to capsys
+def test_calls_query_multiple_dupe_select_columns(client, capsys):
     @weave.op
     def test():
         return {"a": {"b": {"c": {"d": 1}}}}

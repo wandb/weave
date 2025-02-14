@@ -711,7 +711,7 @@ def test_calls_query_multiple_select_columns() -> None:
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump,
-            any(calls_merged.outputs_dump) AS outputs_dump
+            any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
