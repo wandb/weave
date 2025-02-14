@@ -94,7 +94,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
 
     def load_pipeline(self) -> None:
         raise NotImplementedError(
-            "Subclasses must implement the `_load_pipeline` method."
+            "Subclasses must implement the `load_pipeline` method."
         )
 
     @weave.op
@@ -139,11 +139,11 @@ class HuggingFaceScorer(weave.Scorer):
         ), "Tokenizer must be loaded, implement `load_tokenizer`"
 
     def load_model(self) -> None:
-        raise NotImplementedError("Subclasses must implement the `_load_model` method.")
+        raise NotImplementedError("Subclasses must implement the `load_model` method.")
 
     def load_tokenizer(self) -> None:
         raise NotImplementedError(
-            "Subclasses must implement the `_load_tokenizer` method."
+            "Subclasses must implement the `load_tokenizer` method."
         )
 
     @weave.op
