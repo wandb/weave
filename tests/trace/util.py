@@ -67,3 +67,22 @@ class DatetimeMatcher:
 
 class DummyTestException(Exception):
     pass
+
+
+def get_clickhouse_loglines(
+    caplog, match_string: str | None = None, getattrs: list[str] = []
+):
+    """
+    Get all log lines from caplog that match the given string.
+
+    Match string is compared to the message, and getattrs is a list of attributes to get from the record.
+    """
+    lines = []
+    for record in caplog.records:
+        if match_string and record.msg != match_string:
+            continue
+        line = {}
+        for attr in getattrs:
+            line[attr] = getattr(record, attr)
+        lines.append(line)
+    return lines
