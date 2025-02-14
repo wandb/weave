@@ -11,8 +11,8 @@ from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
-    WeaveBiasScorer,
-    WeaveToxicityScorer,
+    WeaveBiasScorerV1,
+    WeaveToxicityScorerV1,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
@@ -50,7 +50,7 @@ __all__ = [
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
-    "WeaveBiasScorer",
-    "WeaveToxicityScorer",
+    "WeaveBiasScorerV1",
+    "WeaveToxicityScorerV1",
     "_validate_scorer_signature",
 ]

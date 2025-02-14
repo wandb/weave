@@ -60,7 +60,7 @@ TOXICITY_CATEGORY_THRESHOLD = 2
 TOXICITY_TOTAL_THRESHOLD = 5
 
 
-class WeaveToxicityScorer(RollingWindowScorer):
+class WeaveToxicityScorerV1(RollingWindowScorer):
     """
     A moderation scorer using the Celadon model from PleIAs, https://huggingface.co/PleIAs/celadon
 
@@ -174,7 +174,7 @@ class WeaveToxicityScorer(RollingWindowScorer):
 BIAS_SCORER_THRESHOLD = 0.60
 
 
-class WeaveBiasScorer(RollingWindowScorer):
+class WeaveBiasScorerV1(RollingWindowScorer):
     """
     The scorer that assesses gender and race/origin bias using a fine-tuned
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
