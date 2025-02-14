@@ -1,5 +1,9 @@
 # Groq
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_groq.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 :::note
 Do you want to experiment with Groq models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
 :::
