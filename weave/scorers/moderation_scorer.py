@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
-from pydantic import PrivateAttr, Field, validate_call
+from pydantic import Field, PrivateAttr, validate_call
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
@@ -30,7 +30,10 @@ class OpenAIModerationScorer(weave.Scorer):
         model_id (str): The OpenAI moderation model identifier to be used. Defaults to `OPENAI_DEFAULT_MODERATION_MODEL`.
     """
 
-    model_id: str = Field(description="The OpenAI moderation model identifier to be used.", default=OPENAI_DEFAULT_MODERATION_MODEL)
+    model_id: str = Field(
+        description="The OpenAI moderation model identifier to be used.",
+        default=OPENAI_DEFAULT_MODERATION_MODEL,
+    )
 
     @weave.op
     @validate_call
@@ -101,17 +104,25 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         }
     """
 
-    total_threshold: int = Field(description="The threshold for the total moderation score to flag the input.", default=TOXICITY_TOTAL_THRESHOLD)
-    category_threshold: int = Field(description="The threshold for individual category scores to flag the input.", default=TOXICITY_CATEGORY_THRESHOLD)
+    total_threshold: int = Field(
+        description="The threshold for the total moderation score to flag the input.",
+        default=TOXICITY_TOTAL_THRESHOLD,
+    )
+    category_threshold: int = Field(
+        description="The threshold for individual category scores to flag the input.",
+        default=TOXICITY_CATEGORY_THRESHOLD,
+    )
     max_tokens: int = 512
     overlap: int = 50
-    _categories: list[str] = PrivateAttr(default_factory=lambda: [
-        "Race/Origin",
-        "Gender/Sex", 
-        "Religion",
-        "Ability",
-        "Violence",
-    ])
+    _categories: list[str] = PrivateAttr(
+        default_factory=lambda: [
+            "Race/Origin",
+            "Gender/Sex",
+            "Religion",
+            "Ability",
+            "Violence",
+        ]
+    )
 
     def load_model(self) -> None:
         ensure_hf_imports()
@@ -202,11 +213,16 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         }
     """
 
-    threshold: float = Field(description="The threshold for the bias score to flag the input.", default=BIAS_SCORER_THRESHOLD)
-    _categories: list[str] = PrivateAttr(default_factory=lambda: [
-        "gender_bias",
-        "racial_bias",
-    ])
+    threshold: float = Field(
+        description="The threshold for the bias score to flag the input.",
+        default=BIAS_SCORER_THRESHOLD,
+    )
+    _categories: list[str] = PrivateAttr(
+        default_factory=lambda: [
+            "gender_bias",
+            "racial_bias",
+        ]
+    )
 
     def load_model(self) -> None:
         ensure_hf_imports()
@@ -228,6 +244,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
+
         assert self._model is not None
         assert self._tokenizer is not None
         with torch.inference_mode():
