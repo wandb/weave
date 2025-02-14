@@ -1,5 +1,6 @@
 import datetime
 import re
+from typing import Optional
 
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -70,7 +71,7 @@ class DummyTestException(Exception):
 
 
 def get_clickhouse_loglines(
-    caplog, match_string: str | None = None, getattrs: list[str] = []
+    caplog, match_string: Optional[str] = None, getattrs: list[str] = []
 ):
     """
     Get all log lines from caplog that match the given string.

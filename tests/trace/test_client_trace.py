@@ -3285,7 +3285,6 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
 
     # now make sure we don't make duplicate selects
     if client_is_sqlite(client):
-        captured = capsys.readouterr()
         select_queries = [
             line
             for line in capsys.readouterr().out.split("\n")
