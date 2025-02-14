@@ -1,2 +1,2 @@
 ALTER TABLE files
-    DROP COLUMN file_storage_uri;
+    DROP COLUMN bucket_storage_uri;

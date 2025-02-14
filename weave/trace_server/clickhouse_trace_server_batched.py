@@ -1255,7 +1255,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "n_chunks",
                     "name",
                     "val_bytes",
-                    "file_storage_uri",
+                    "bucket_storage_uri",
                 ],
             )
         else:
@@ -1284,7 +1284,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "n_chunks",
                     "name",
                     "val_bytes",
-                    "file_storage_uri",
+                    "bucket_storage_uri",
                 ],
             )
         return tsi.FileCreateRes(digest=digest)
@@ -1293,7 +1293,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
-            SELECT n_chunks, val_bytes, file_storage_uri
+            SELECT n_chunks, val_bytes, bucket_storage_uri
             FROM (
                 SELECT *
                 FROM (
@@ -1314,18 +1314,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
 
-        file_storage_uri = query_result.result_rows[0][2]
-        if file_storage_uri:
+        bucket_storage_uri = query_result.result_rows[0][2]
+        if bucket_storage_uri:
             # Verify storage URI is what we expect. This is an extra check to ensure
             # that the storage bucket URI is set correctly.
             if self._storage_bucket_uri is None:
                 raise ValueError("Storage bucket URI is not set")
-            expected_file_storage_uri = determine_bucket_uri(
+            expected_bucket_storage_uri = determine_bucket_uri(
                 self._storage_bucket_uri, req.project_id, req.digest
             )
-            if file_storage_uri != expected_file_storage_uri:
+            if bucket_storage_uri != expected_bucket_storage_uri:
                 raise ValueError("File storage URI does not match expected URI")
-            bytes = read_from_bucket(file_storage_uri)
+            bytes = read_from_bucket(bucket_storage_uri)
         else:
             bytes = b"".join(chunks)
 

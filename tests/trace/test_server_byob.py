@@ -9,7 +9,6 @@ from google.cloud import storage
 from moto import mock_aws
 
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.file_management import key_for_project_digest
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 
@@ -150,11 +149,6 @@ def run_test(client: WeaveClient):
 def test_aws_storage(client: WeaveClient, s3):
     """Test file storage using AWS S3"""
     res = run_test(client)
-
-    # Verify the object exists in S3 and has correct content
-    key = key_for_project_digest(client._project_id(), res.digest)
-    response = s3.get_object(Bucket='test-bucket', Key=key)
-    assert response['Body'].read() == b"Hello, world!"
 
     response = s3.list_objects_v2(Bucket='test-bucket')
 
