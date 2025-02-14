@@ -1,8 +1,8 @@
-from pydantic import validate_call, Field
+from pydantic import Field, validate_call
 
 import weave
-from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.default_models import MODEL_PATHS
+from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
     ensure_hf_imports,
@@ -39,7 +39,10 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     task: str = "text-classification"
     model_name_or_path: str = ""
     device: str = "auto"
-    threshold: float = Field(default=FLUENCY_SCORER_THRESHOLD, description="The threshold for the non-fluent score.")
+    threshold: float = Field(
+        default=FLUENCY_SCORER_THRESHOLD,
+        description="The threshold for the non-fluent score.",
+    )
 
     def load_pipeline(self) -> None:
         """Loads the _pipeline attribute using HF utilities"""
@@ -55,7 +58,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
             device=self.device,
             top_k=2,
         )
-    
+
     @validate_call
     @weave.op
     def score(self, output: str) -> WeaveScorerResult:
