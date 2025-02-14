@@ -7,6 +7,7 @@ from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
+from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
 from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
 from weave.scorers.guardrails import PromptInjectionLLMGuardrail
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
@@ -55,4 +56,5 @@ __all__ = [
     "WeaveToxicityScorerV1",
     "WeaveCoherenceScorerV1",
     "WeaveFluencyScorerV1",
+    "WeaveContextRelevanceScorerV1",
 ]
