@@ -3255,3 +3255,45 @@ def test_calls_len(client):
 
     assert len(test.calls()) == 2
     assert len(client.get_calls()) == 2
+
+
+def test_calls_query_multiple_dupe_select_columns(
+    client, capsys
+):  # Change caplog to capsys
+    @weave.op
+    def test():
+        return {"a": {"b": {"c": {"d": 1}}}}
+
+    test()
+    test()
+
+    calls = client.get_calls(
+        columns=[
+            "output",
+            "output.a",
+            "output.a.b",
+            "output.a.b.c",
+            "output.a.b.c.d",
+        ]
+    )
+
+    assert len(calls) == 2
+    assert calls[0].output == {"a": {"b": {"c": {"d": 1}}}}
+    assert calls[0].output["a"] == {"b": {"c": {"d": 1}}}
+    assert calls[0].output["a"]["b"] == {"c": {"d": 1}}
+    assert calls[0].output["a"]["b"]["c"] == {"d": 1}
+    assert calls[0].output["a"]["b"]["c"]["d"] == 1
+
+    # now make sure we don't make duplicate selects
+    captured = capsys.readouterr()
+    select_queries = [
+        line for line in captured.out.split("\n") if line.startswith("QUERY SELECT")
+    ]
+
+    assert len(select_queries) == 2
+
+    for query in select_queries:
+        if client_is_sqlite(client):
+            assert query.count("output") == 1
+        else:
+            assert query.count("output_dump") == 1
