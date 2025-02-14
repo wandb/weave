@@ -690,3 +690,34 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             "pb_6": "project",
         },
     )
+
+
+def test_calls_query_multiple_select_columns() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("inputs")
+    cq.add_field("inputs")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        """,
+        {"pb_0": "project"},
+    )
