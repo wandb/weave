@@ -922,6 +922,7 @@ def flatten(arr):
     #   - handle N levels instead of 1
 
     arrow_data = arr._arrow_data
+    arr_was_flattened = False
     if is_list_arrowweavelist(arr) or (
         is_taggedvalue_arrowweavelist(arr)
         and is_list_arrowweavelist(arr.tagged_value_value())
@@ -943,6 +944,7 @@ def flatten(arr):
 
         assert isinstance(values, pa.ListArray)
         flattened_values = values.flatten()
+        arr_was_flattened = True
 
         if tags is not None:
             list_parent_indices = pc.list_parent_indices(values)
@@ -955,7 +957,7 @@ def flatten(arr):
 
     return ArrowWeaveList(
         arrow_data,
-        flatten_return_object_type(arr.object_type),
+        flatten_return_object_type(arr.object_type) if arr_was_flattened else arr.object_type,
         arr._artifact,
     )
 

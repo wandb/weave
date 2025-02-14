@@ -1792,6 +1792,13 @@ def test_flatten_handles_tagged_lists():
         for i in expected
     ]
 
+def test_flatten_handles_union_return_type():
+    data = [None, [{"a": 1}, {"b": 2}, {"c": 3}]]
+    awl = arrow.to_arrow(data)
+    node = weave.save(awl)
+    flattened = node.flatten()
+    assert weave.use(flattened).object_type == awl.object_type
+
 
 def test_keys_ops():
     awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
