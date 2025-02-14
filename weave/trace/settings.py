@@ -106,8 +106,8 @@ class UserSettings(BaseModel):
 
     scorers_dir: str = str(Path.home() / ".cache" / "wandb" / "weave-scorers")
     """
-    Sets the directory for the scorers, defaults to None (temporary cache)
-    Ignored if `use_server_cache` is False.
+    Sets the directory for the scorers model checkpoints. Defaults to
+    ~/.cache/wandb/weave-scorers.
 
     Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
     """
