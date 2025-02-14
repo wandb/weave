@@ -73,6 +73,7 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
+    use_agg_fn: bool = True
 
     def as_sql(
         self,
@@ -81,6 +82,8 @@ class CallsMergedAggField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if not self.use_agg_fn:
+            return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
@@ -258,11 +261,12 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str, raw: bool = False) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            raw=raw,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -280,6 +284,12 @@ class Condition(BaseModel):
     def is_heavy(self) -> bool:
         for field in self._get_consumed_fields():
             if field.is_heavy():
+                return True
+        return False
+
+    def is_feedback(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
 
@@ -445,8 +455,10 @@ class CallsQuery(BaseModel):
         )
         SELECT {SELECT_FIELDS}
         FROM calls_merged
+        FINAL                                   -- optional, if heavy filter conditions
         WHERE project_id = {PROJECT_ID}
         AND id IN filtered_calls
+        AND {HEAVY_FILTER_CONDITIONS}           -- optional heavy filter conditions
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
@@ -583,22 +595,32 @@ class CallsQuery(BaseModel):
         )
 
         having_filter_sql = ""
-        having_conditions_sql: list[str] = []
+        having_light_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
-            having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
+            having_light_conditions_sql.extend(
+                c.as_sql(pb, table_alias)
+                for c in self.query_conditions
+                if not c.is_heavy() or c.is_feedback()
             )
             for query_condition in self.query_conditions:
                 for field in query_condition._get_consumed_fields():
                     if isinstance(field, CallsMergedFeedbackPayloadField):
                         needs_feedback = True
         if self.hardcoded_filter is not None:
-            having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
-
-        if len(having_conditions_sql) > 0:
-            having_filter_sql = "HAVING " + combine_conditions(
-                having_conditions_sql, "AND"
+            having_light_conditions_sql.append(
+                self.hardcoded_filter.as_sql(pb, table_alias)
             )
+
+        if len(having_light_conditions_sql) > 0:
+            having_filter_sql = "HAVING " + combine_conditions(
+                having_light_conditions_sql, "AND"
+            )
+
+        heavy_filter_sql = ""
+        for condition in self.query_conditions:
+            if not condition.is_heavy() or condition.is_feedback():
+                continue
+            heavy_filter_sql += "AND " + condition.as_sql(pb, table_alias, raw=True)
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -643,14 +665,18 @@ class CallsQuery(BaseModel):
             ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
             """
 
+        # Force merge before query if pushing heavy filters before aggregation
+        table_sql = "calls_merged FINAL" if heavy_filter_sql else "calls_merged"
+
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
+        FROM {table_sql}
         {feedback_join_sql}
         WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {heavy_filter_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -710,6 +736,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    raw: bool = False,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -778,7 +805,12 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            if isinstance(structured_field, CallsMergedAggField) and raw:
+                structured_field.use_agg_fn = False
+                field = structured_field.as_sql(param_builder, table_alias)
+                structured_field.use_agg_fn = True  # reset to default
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
