@@ -1,6 +1,4 @@
-import io
 import os
-import sys
 import time
 import timeit
 from unittest import mock
@@ -8,6 +6,7 @@ from unittest import mock
 import pytest
 
 import weave
+from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
@@ -64,37 +63,35 @@ def test_disabled_env_client():
 
 
 def test_print_call_link_setting(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        parse_and_apply_settings(UserSettings(print_call_link=False))
+        func()
 
-    parse_and_apply_settings(UserSettings(print_call_link=False))
-    func()
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        parse_and_apply_settings(UserSettings(print_call_link=True))
+        func()
 
-    parse_and_apply_settings(UserSettings(print_call_link=True))
-    func()
-
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
 def test_print_call_link_env(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
+        func()
 
-    os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
-    func()
+    assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI not in output
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
+        func()
 
-    os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
-    func()
-
-    output = captured_stdout.getvalue()
-    assert TRACE_CALL_EMOJI in output
+    assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
 def test_should_capture_code_setting(client):
