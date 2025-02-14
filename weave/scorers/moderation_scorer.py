@@ -5,7 +5,7 @@ from pydantic import PrivateAttr, validate_call
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-from weave.scorers.llm_scorer import RollingWindowScorer
+from weave.scorers.scorer_types import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
