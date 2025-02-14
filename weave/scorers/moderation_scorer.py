@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
-from pydantic import PrivateAttr, validate_call
+from pydantic import PrivateAttr, Field, validate_call
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
@@ -30,7 +30,7 @@ class OpenAIModerationScorer(weave.Scorer):
         model_id (str): The OpenAI moderation model identifier to be used. Defaults to `OPENAI_DEFAULT_MODERATION_MODEL`.
     """
 
-    model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
+    model_id: str = Field(description="The OpenAI moderation model identifier to be used.", default=OPENAI_DEFAULT_MODERATION_MODEL)
 
     @weave.op
     @validate_call
@@ -78,8 +78,6 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         total_threshold (int): The threshold for the total moderation score to flag the input. Defaults to `5`.
         category_threshold (int): The threshold for individual category scores to flag the input. Defaults to `2`.
         device (str): The device to use for inference. Defaults to `"cuda"` if available, otherwise `"cpu"`.
-        max_tokens (int): Maximum number of tokens per window. Defaults to `512`.
-        overlap (int): Number of overlapping tokens between windows. Defaults to `50`.
 
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
@@ -103,8 +101,8 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         }
     """
 
-    total_threshold: int = TOXICITY_TOTAL_THRESHOLD
-    category_threshold: int = TOXICITY_CATEGORY_THRESHOLD
+    total_threshold: int = Field(description="The threshold for the total moderation score to flag the input.", default=TOXICITY_TOTAL_THRESHOLD)
+    category_threshold: int = Field(description="The threshold for individual category scores to flag the input.", default=TOXICITY_CATEGORY_THRESHOLD)
     max_tokens: int = 512
     overlap: int = 50
     _categories: list[str] = PrivateAttr(
@@ -206,7 +204,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         }
     """
 
-    threshold: float = BIAS_SCORER_THRESHOLD
+    threshold: float = Field(description="The threshold for the bias score to flag the input.", default=BIAS_SCORER_THRESHOLD)
     _categories: list[str] = PrivateAttr(
         default=[
             "gender_bias",
@@ -234,10 +232,11 @@ class WeaveBiasScorerV1(RollingWindowScorer):
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
-
+        assert self._model is not None
+        assert self._tokenizer is not None
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)  # type: ignore
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
