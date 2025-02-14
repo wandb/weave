@@ -1238,7 +1238,16 @@ def test_attributes_on_ops(client):
     def op_with_attrs(a: int, b: int) -> int:
         return a + b
 
-    with weave.attributes({"custom": "attribute"}):
+    class ComplexAttribute:
+        a: int
+        b: dict[str, Any]
+
+    with weave.attributes(
+        {
+            "custom": "attribute",
+            "complex": ComplexAttribute(a=1, b={"c": 2}),
+        }
+    ):
         op_with_attrs(1, 2)
 
     res = get_client_trace_server(client).calls_query(
@@ -1251,6 +1260,10 @@ def test_attributes_on_ops(client):
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
         "custom": "attribute",
+        "complex": {
+            "a": 1,
+            "b": {"c": 2},
+        },
         "weave": {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
