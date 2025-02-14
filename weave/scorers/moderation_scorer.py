@@ -155,8 +155,8 @@ class WeaveToxicityScorer(RollingWindowScorer):
             return [predictions]
         return predictions
 
-    @weave.op
     @validate_call
+    @weave.op
     def score(self, output: str) -> WeaveScorerResult:
         passed: bool = True
         predictions: list[float] = self._predict(output)
@@ -241,8 +241,8 @@ class WeaveBiasScorer(RollingWindowScorer):
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
-    @weave.op
     @validate_call
+    @weave.op
     def score(self, output: str) -> WeaveScorerResult:
         """
         Score the output.
