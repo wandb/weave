@@ -30,19 +30,21 @@ def set_device(device: str = "auto") -> "device":
         The device to use for the model.
     """
     import torch
-
-    cuda_available = torch.cuda.is_available()
-    if not cuda_available and "cuda" in str(device):
-        # could be `cuda:0`, `cuda:1`, etc.
-        raise ValueError("CUDA is not available")
-    if device == "auto":
-        if cuda_available:
-            device = "cuda"
-        elif torch.backends.mps.is_available():
-            device = "mps"
-        else:
-            device = "cpu"
-    return torch.device(device)
+    try:
+        cuda_available = torch.cuda.is_available()
+        if not cuda_available and "cuda" in str(device):
+            # could be `cuda:0`, `cuda:1`, etc.
+            raise ValueError("CUDA is not available")
+        if device == "auto":
+            if cuda_available:
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
+        return torch.device(device)
+    except:
+        return torch.device("cpu")
 
 
 def download_model(artifact_path: Union[str, Path]) -> Path:
