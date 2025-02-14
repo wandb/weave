@@ -698,14 +698,13 @@ def test_calls_query_multiple_select_columns() -> None:
     cq.add_field("inputs")
     cq.add_field("inputs")
     cq.add_field("inputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
-    cq.add_field("outputs")
+    cq.add_field("output")
+    cq.add_field("output")
+    cq.add_field("output")
+    cq.add_field("output")
+    cq.add_field("output")
+    cq.add_field("output")
+    cq.add_field("output")
     assert_sql(
         cq,
         """
