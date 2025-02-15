@@ -21,6 +21,7 @@ If True, prints a link to the Weave UI when calling a weave op.
 
 import os
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
@@ -103,6 +104,14 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
     """
 
+    scorers_dir: str = str(Path.home() / ".cache" / "wandb" / "weave-scorers")
+    """
+    Sets the directory for the scorers model checkpoints. Defaults to
+    ~/.cache/wandb/weave-scorers.
+
+    Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -155,6 +164,10 @@ def server_cache_size_limit() -> int:
 
 def server_cache_dir() -> Optional[str]:
     return _optional_str("server_cache_dir")
+
+
+def scorers_dir() -> str:
+    return _optional_str("scorers_dir")  # type: ignore
 
 
 def parse_and_apply_settings(
