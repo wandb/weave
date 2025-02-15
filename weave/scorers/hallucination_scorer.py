@@ -197,7 +197,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         dict: A dictionary containing:
             - pass (bool): True if no hallucinations detected (score <= threshold)
             - extras (dict): Contains:
-                - score (float): Hallucination score between 0 and 1, where lower is better
+                - score (float): Hallucination score between 0 and 1, where higher is more hallucination
                 - error (str, optional): Error message if something went wrong
 
     Example:
@@ -216,9 +216,15 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         }
     """
 
-    threshold: float = HALLUCINATION_SCORER_THRESHOLD
+    threshold: float = Field(
+        default=HALLUCINATION_SCORER_THRESHOLD,
+        description="The threshold for the hallucination scorer.",
+    )
+    task: str = Field(
+        default="pair-classification",
+        description="The HF task name to use for the hallucination scorer pipeline.",
+    )
     _model_max_length: int = PrivateAttr(default=8192)
-    task: str = "pair-classification"
 
     def load_pipeline(self) -> "Pipeline":
         ensure_hf_imports()
@@ -252,7 +258,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
 
         # Handle large inputs
         if len_inps + len_outs > self._model_max_length:
-            logger.warning(
+            logger.info(
                 f"sum of query, key and output tokens ({len_inps + len_outs}) > model_max_length ({self._model_max_length}), curtailing input query and context.."
             )
             # If the output is less than 1000 tokens, curtail the input query and context only
@@ -287,9 +293,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
             output: str, The output string to score for hallucination given the query and context, must be a string
         """
         score = self._predict(query, context, output)
-        passed: bool = True
-        if score > self.threshold:
-            passed = False
+        passed = score < self.threshold
         return WeaveScorerResult(
             passed=passed,
             extras={"score": score},

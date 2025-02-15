@@ -79,7 +79,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The device to use for the model",
         validate_default=True,
     )
-    _pipeline: "Pipeline" = PrivateAttr()
+    _pipeline: "Pipeline" = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
     @classmethod
@@ -92,7 +92,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
             return set_device(v)
 
     def model_post_init(self, __context: Any) -> None:
-        if not hasattr(self, "_pipeline"):
+        if self._pipeline is None:
             self._pipeline = self.load_pipeline()
 
     def load_pipeline(self) -> "Pipeline":

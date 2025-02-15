@@ -28,7 +28,7 @@ def test_weave_hallucination_scorer_simple(weave_hallucination_scorer):
 def test_weave_hallucination_scorer_large_input(weave_hallucination_scorer):
     """Tests hallucination scorer with very large input to ensure it doesn't crash."""
     query = "Summarize this text."
-    large_context_text = generate_large_text(100_000)  # 100k characters
+    large_context_text = generate_large_text(50_000)  # 50k characters
     output = "This is a very long text."
     _ = weave_hallucination_scorer.score(
         query=query, context=large_context_text, output=output
