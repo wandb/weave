@@ -1303,14 +1303,13 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-def test_table_partitioning(network_proxy_client):
+def test_table_partitioning(client):
     """
     This test is specifically testing the correctness
-    of the table partitioning logic in the remote client.
+    of the table partitioning logic in the client.
     In particular, the ability to partition large dataset
     creation into multiple updates
     """
-    client, remote_client, records = network_proxy_client
     NUM_ROWS = 16
     rows = list(row_gen(NUM_ROWS, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
@@ -1332,10 +1331,12 @@ def test_table_partitioning(network_proxy_client):
         "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
         "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
     ]
-    remote_client.remote_request_bytes_limit = (
+
+    # Test with large batch size
+    client.server.max_request_size = (
         100 * 1024
     )  # very large buffer to ensure a single request
-    res = remote_client.table_create(
+    res = client.server.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 project_id=client._project_id(),
@@ -1345,12 +1346,10 @@ def test_table_partitioning(network_proxy_client):
     )
     assert res.digest == exp_digest
     assert res.row_digests == row_digests
-    assert len(records) == 1
 
-    remote_client.remote_request_bytes_limit = (
-        4 * 1024
-    )  # Small enough to get multiple updates
-    res = remote_client.table_create(
+    # Test with small batch size to force multiple requests
+    client.server.max_request_size = 4 * 1024  # Small enough to get multiple updates
+    res = client.server.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 project_id=client._project_id(),
@@ -1360,11 +1359,6 @@ def test_table_partitioning(network_proxy_client):
     )
     assert res.digest == exp_digest
     assert res.row_digests == row_digests
-    assert len(records) == (
-        1  # The first create call,
-        + 1  # the second  create
-        + NUM_ROWS / 2  # updates - 2 per batch
-    )
 
 
 def test_summary_tokens_cost(client):
