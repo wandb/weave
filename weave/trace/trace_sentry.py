@@ -21,7 +21,7 @@ import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import ExcInfo
+    from sentry_sdk._types import Event, ExcInfo
 
 
 import sentry_sdk  # type: ignore
@@ -209,6 +209,27 @@ class Sentry:
             return wrapper
 
         return watch_dec
+
+    # Not in the original WandB Sentry module
+    def track_event(
+        self,
+        event_name: str,
+        tags: dict[str, Any] | None = None,
+        username: str | None = None,
+    ) -> None:
+        """Track an event to Sentry."""
+        assert self.hub is not None
+
+        event_data: Event = {
+            "message": event_name,
+            "level": "info",
+            "tags": tags or {},
+            "user": {
+                "username": username,
+            },
+        }
+
+        self.hub.capture_event(event_data)
 
 
 def _is_local_dev_install(module: Any) -> bool:
