@@ -2,7 +2,7 @@
 
 > **The LLM Playground is currently in preview.**
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports OpenAI, Anthropic, Google Gemini, Groq, and Amazon Bedrock models.
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure.
 
 ## Features
 
@@ -32,12 +32,11 @@ Before you can use Playground, you must [add provider credentials](#add-provider
 
 ### Add provider credentials and information
 
-Playground currently supports OpenAI, Anthropic, Gemini, Groq, Amazon Bedrock, and Azure models.
-To use one of the available models, add the appropriate information to your team secrets in W&B settings.
+Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure. To use one of the available models, add the appropriate information to your team secrets in W&B settings.
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
-- Google Gemini: `GOOGLE_API_KEY`
+- Google: `GOOGLE_API_KEY`
 - Groq: `GEMMA_API_KEY`
 - Amazon Bedrock:
   - `AWS_ACCESS_KEY_ID`
@@ -67,7 +66,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - [Amazon Bedrock](#amazon-bedrock)
 - [Anthropic](#anthropic)
 - [Azure](#azure)
-- [Google Gemini](#gemini)
+- [Google](#google)
 - [Groq](#groq)
 - [OpenAI](#openai)
 - [X.AI](#xai)
@@ -126,7 +125,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - azure/gpt-4o-mini
 - azure/gpt-4o-mini-2024-07-18
 
-### [Google Gemini](../integrations/google-gemini.md)
+### [Google](../integrations/google.md)
 
 - gemini/gemini-1.5-flash-001
 - gemini/gemini-1.5-flash-002
