@@ -1,4 +1,5 @@
 import dataclasses
+from datetime import datetime
 import inspect
 import logging
 import operator
@@ -26,6 +27,7 @@ from weave.trace.refs import (
     ObjectRef,
     RefWithExtra,
     TableRef,
+    make_deleted_ref_with_error,
 )
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
