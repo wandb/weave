@@ -18,4 +18,5 @@ MODEL_PATHS = {
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
     "fluency_scorer": "c-metrics/weave-scorers/fluency_scorer:v0",
+    "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer:v0",
 }
