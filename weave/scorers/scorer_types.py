@@ -79,7 +79,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The device to use for the model",
         validate_default=True,
     )
-    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
+    _pipeline: "Pipeline" = PrivateAttr(default=None)
 
     @field_validator("device", mode="before")
     @classmethod
@@ -93,9 +93,9 @@ class HuggingFacePipelineScorer(weave.Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         if self._pipeline is None:
-            self.load_pipeline()
+            self._pipeline = self.load_pipeline()
 
-    def load_pipeline(self) -> None:
+    def load_pipeline(self) -> "Pipeline":
         raise NotImplementedError(
             "Subclasses must implement the `load_pipeline` method."
         )
