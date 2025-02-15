@@ -37,10 +37,6 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     """
 
     task: str = "text-classification"
-    device: str = Field(
-        default="auto",
-        description="The device to use for inference.",
-    )
     threshold: float = Field(
         default=FLUENCY_SCORER_THRESHOLD,
         description="The threshold for the non-fluent score.",
