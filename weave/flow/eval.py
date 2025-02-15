@@ -118,16 +118,12 @@ class Evaluation(Object):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        return cls(
-            name=obj.name,
-            description=obj.description,
-            ref=obj.ref,
-            dataset=obj.dataset,
-            scorers=obj.scorers,
-            preprocess_model_input=obj.preprocess_model_input,
-            trials=obj.trials,
-            evaluation_name=obj.evaluation_name,
-        )
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
 
     @model_validator(mode="after")
     def _update_display_name(self) -> "Evaluation":
