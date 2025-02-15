@@ -105,6 +105,13 @@ test = [
   "pillow",
   "filelock",
   "httpx",
+
+  # BYOB
+  "boto3",
+  "azure-storage-blob",
+  "google-cloud-storage",
+  "moto[s3]",
+  "azure-storage-blob",
 ]
 
 [project.scripts]

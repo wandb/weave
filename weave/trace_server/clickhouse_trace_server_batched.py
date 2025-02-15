@@ -78,6 +78,11 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.file_management import (
+    determine_bucket_uri,
+    read_from_bucket,
+    store_in_bucket,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
@@ -186,6 +191,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        storage_bucket_uri: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -198,6 +204,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._storage_bucket_uri = storage_bucket_uri
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -210,6 +217,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
+            storage_bucket_uri=wf_env.wf_storage_bucket_uri(),
         )
 
     @contextmanager
@@ -1231,39 +1239,61 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        chunks = [
-            req.content[i : i + FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), FILE_CHUNK_SIZE)
-        ]
-        self._insert(
-            "files",
-            data=[
-                (
-                    req.project_id,
-                    digest,
-                    i,
-                    len(chunks),
-                    req.name,
-                    chunk,
-                )
-                for i, chunk in enumerate(chunks)
-            ],
-            column_names=[
-                "project_id",
-                "digest",
-                "chunk_index",
-                "n_chunks",
-                "name",
-                "val_bytes",
-            ],
-        )
+
+        if self._storage_bucket_uri is not None:
+            bucket_uri = determine_bucket_uri(
+                self._storage_bucket_uri, req.project_id, digest
+            )
+            store_in_bucket(bucket_uri, req.content)
+            self._insert(
+                "files",
+                data=[(req.project_id, digest, 0, 0, req.name, b"", bucket_uri)],
+                column_names=[
+                    "project_id",
+                    "digest",
+                    "chunk_index",
+                    "n_chunks",
+                    "name",
+                    "val_bytes",
+                    "bucket_storage_uri",
+                ],
+            )
+        else:
+            chunks = [
+                req.content[i : i + FILE_CHUNK_SIZE]
+                for i in range(0, len(req.content), FILE_CHUNK_SIZE)
+            ]
+            self._insert(
+                "files",
+                data=[
+                    (
+                        req.project_id,
+                        digest,
+                        i,
+                        len(chunks),
+                        req.name,
+                        chunk,
+                        None,
+                    )
+                    for i, chunk in enumerate(chunks)
+                ],
+                column_names=[
+                    "project_id",
+                    "digest",
+                    "chunk_index",
+                    "n_chunks",
+                    "name",
+                    "val_bytes",
+                    "bucket_storage_uri",
+                ],
+            )
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
-            SELECT n_chunks, val_bytes
+            SELECT n_chunks, val_bytes, bucket_storage_uri
             FROM (
                 SELECT *
                 FROM (
@@ -1281,9 +1311,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
-        if len(chunks) != n_chunks:
+        bucket_storage_uri = query_result.result_rows[0][2]
+        if n_chunks == 0:
+            if not bucket_storage_uri:
+                raise ValueError("File not found")
+        elif len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
-        return tsi.FileContentReadRes(content=b"".join(chunks))
+
+        if bucket_storage_uri:
+            # Verify storage URI is what we expect. This is an extra check to ensure
+            # that the storage bucket URI is set correctly.
+            if self._storage_bucket_uri is None:
+                raise ValueError("Storage bucket URI is not set")
+            expected_bucket_storage_uri = determine_bucket_uri(
+                self._storage_bucket_uri, req.project_id, req.digest
+            )
+            if bucket_storage_uri != expected_bucket_storage_uri:
+                raise ValueError("File storage URI does not match expected URI")
+            bytes = read_from_bucket(bucket_storage_uri)
+        else:
+            bytes = b"".join(chunks)
+
+        return tsi.FileContentReadRes(content=bytes)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)
