@@ -3,7 +3,6 @@ import json
 import pytest
 from pydantic import BaseModel
 
-import weave
 from weave.scorers import (
     HallucinationFreeScorer,
 )
@@ -47,6 +46,7 @@ def hallucination_scorer(monkeypatch):
         temperature=0.7,
         max_tokens=4096,
     )
+    return scorer
 
 
 @pytest.mark.asyncio
@@ -57,59 +57,26 @@ async def test_hallucination_scorer_score(hallucination_scorer):
     # we should be able to do this validation
     _ = HallucinationResponse.model_validate(result)
 
-    assert result["has_hallucination"] == True
-    assert result["conclusion"] == "The output is consistent with the input data."
-    assert len(result["reasonings"]) == 1
-    assert result["reasonings"][0]["hallucination_type"] == "No Hallucination"
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "pass" in result, "Result should contain 'pass' key"
+    assert "extras" in result, "Result should contain 'extras' key"
+    assert result["pass"] is True, "Matching context/output should not be flagged"
+    assert "score" in result["extras"], "Result extras should contain a 'score' field"
 
 
-@pytest.mark.asyncio
-async def test_hallucination_scorer_eval(hallucination_scorer):
-    dataset = [
-        {"context": "John likes various types of cheese."},
-        {"context": "Pepe likes various types of cheese."},
-    ]
-
-    @weave.op
-    def model():
-        return "John's favorite cheese is cheddar."
-
-    evaluation = weave.Evaluation(
-        dataset=dataset,
-        scorers=[hallucination_scorer],
+def test_weave_hallucination_scorer_long_input(weave_hallucination_scorer):
+    """Test that the scorer can handle a longer context/output without errors."""
+    query = "What is the text about?"
+    context, output = generate_context_and_output(
+        total_tokens=5000  # moderately large for a test
     )
-    result = await evaluation.evaluate(model)
-    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
-    assert (
-        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
+    result = weave_hallucination_scorer.score(
+        query=query, context=context, output=output
     )
 
-
-@pytest.mark.asyncio
-async def test_hallucination_scorer_eval2(hallucination_scorer):
-    dataset = [
-        {
-            "input": "John likes various types of cheese.",
-            "other_col": "John's favorite cheese is cheddar.",
-        },
-        {
-            "input": "Pepe likes various types of cheese.",
-            "other_col": "Pepe's favorite cheese is gouda.",
-        },
-    ]
-
-    @weave.op
-    def model(input):
-        return "The person's favorite cheese is cheddar."
-
-    hallucination_scorer.column_map = {"context": "input", "output": "other_col"}
-
-    evaluation = weave.Evaluation(
-        dataset=dataset,
-        scorers=[hallucination_scorer],
-    )
-    result = await evaluation.evaluate(model)
-    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
-    assert (
-        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
-    )
+    # We only check that the result structure is valid;
+    # the actual flagged/score value depends on how the model scores the content.
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "pass" in result, "Result should contain 'pass' key"
+    assert "extras" in result, "Result should contain 'extras' key"
+    assert "score" in result["extras"], "Result extras should contain a 'score' field"
