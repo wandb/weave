@@ -14,6 +14,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {Icon} from '../../../../../Icon';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -22,6 +23,24 @@ import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
+
+type Mode = 'collapsed' | 'expanded' | 'json';
+
+function isModeCollapsed(mode: Mode): boolean {
+  return mode === 'collapsed';
+}
+
+function isModeExpanded(mode: Mode): boolean {
+  return mode === 'expanded';
+}
+
+function isModeJson(mode: Mode): boolean {
+  return mode === 'json';
+}
+
+function isModeCollapsedOrExpanded(mode: Mode): boolean {
+  return isModeCollapsed(mode) || isModeExpanded(mode);
+}
 
 const EXPANDED_IDS_LENGTH = 200;
 
@@ -44,11 +63,18 @@ TitleRow.displayName = 'S.TitleRow';
 const Title = styled.div`
   flex: 1 1 auto;
   font-family: Source Sans Pro;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 32px;
   letter-spacing: 0px;
   text-align: left;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.8;
+  }
 `;
 Title.displayName = 'S.Title';
 
@@ -96,22 +122,26 @@ const ObjectViewerSectionNonEmpty = ({
   isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const [mode, setMode] = useState('collapsed');
+  const [mode, setMode] = useState<Mode>('collapsed');
+  const [isViewerHidden, setIsViewerHidden] = useState(false);
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
-    if (mode === 'collapsed' || mode === 'expanded') {
+    if (isViewerHidden) {
+      return null;
+    }
+    if (isModeCollapsedOrExpanded(mode)) {
       return (
         <ObjectViewer
           apiRef={apiRef}
           data={data}
-          isExpanded={mode === 'expanded'}
+          isExpanded={isModeExpanded(mode)}
           expandedIds={expandedIds}
           setExpandedIds={setExpandedIds}
         />
       );
     }
-    if (mode === 'json') {
+    if (isModeJson(mode)) {
       return (
         <CodeEditor
           value={JSON.stringify(data, null, 2)}
@@ -123,7 +153,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [mode, apiRef, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds, isViewerHidden]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -147,7 +177,7 @@ const ObjectViewerSectionNonEmpty = ({
 
   // Re-clicking the button will reapply collapse/expand
   const onClickCollapsed = () => {
-    if (mode === 'collapsed') {
+    if (isModeCollapsed(mode)) {
       setTreeExpanded(false);
     }
     setMode('collapsed');
@@ -159,7 +189,7 @@ const ObjectViewerSectionNonEmpty = ({
     getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
 
   const onClickExpanded = () => {
-    if (mode === 'expanded') {
+    if (isModeExpanded(mode)) {
       setTreeExpanded(true);
     }
     setMode('expanded');
@@ -174,7 +204,7 @@ const ObjectViewerSectionNonEmpty = ({
 
   // On first render and when data changes, recompute expansion state
   useEffect(() => {
-    if (mode === 'hidden' || mode === 'json') {
+    if (isViewerHidden || isModeJson(mode)) {
       return;
     }
     const isSimple = isSimpleData(data);
@@ -190,40 +220,43 @@ const ObjectViewerSectionNonEmpty = ({
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
-        <Title>{title}</Title>
-        <Button
-          variant="ghost"
-          icon="row-height-small"
-          active={mode === 'collapsed'}
-          onClick={onClickCollapsed}
-          tooltip="View collapsed"
-        />
-        <Button
-          variant="ghost"
-          icon="expand-uncollapse"
-          active={mode === 'expanded'}
-          onClick={onClickExpanded}
-          tooltip={
-            isExpandAllSmall
-              ? 'Expand all'
-              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
-          }
-        />
-        <Button
-          variant="ghost"
-          icon="code-alt"
-          active={mode === 'json'}
-          onClick={() => setMode('json')}
-          tooltip="View as JSON"
-        />
-        {!noHide && (
-          <Button
-            variant="ghost"
-            icon="hide-hidden"
-            active={mode === 'hidden'}
-            onClick={() => setMode('hidden')}
-            tooltip="Hide"
+        <Title onClick={() => setIsViewerHidden(!isViewerHidden)}>
+          <Icon
+            name={isViewerHidden ? 'chevron-next' : 'chevron-down'}
+            width={16}
+            height={16}
+            style={{marginRight: '8px'}}
           />
+          {title}
+        </Title>
+        {!isViewerHidden && (
+          <>
+            <Button
+              variant="ghost"
+              icon="collapse"
+              onClick={onClickCollapsed}
+              tooltip="Collapse all"
+              active={isModeCollapsed(mode)}
+            />
+            <Button
+              variant="ghost"
+              icon="expand-uncollapse"
+              onClick={onClickExpanded}
+              tooltip={
+                isExpandAllSmall
+                  ? 'Expand all'
+                  : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+              }
+              active={isModeExpanded(mode)}
+            />
+            <Button
+              variant="ghost"
+              icon="code-alt"
+              active={isModeJson(mode)}
+              onClick={() => setMode('json')}
+              tooltip="View as JSON"
+            />
+          </>
         )}
       </TitleRow>
       {body}
