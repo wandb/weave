@@ -1,0 +1,78 @@
+interactions:
+- request:
+    body: '{"contents": [{"parts": [{"text": "Write a python function named `is_leap_year`
+      that checks if a year is a leap year."}], "role": "user"}], "systemInstruction":
+      {"parts": [{"text": "\nYou are an expert software developer and a helpful coding
+      assistant.\nYou are able to generate high-quality code in the Python programming
+      language."}], "role": "user"}, "generationConfig": {"temperature": 0.5}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '395'
+      Content-Type:
+      - application/json
+      user-agent:
+      - google-genai-sdk/1.1.0 gl-python/3.12.8
+      x-goog-api-client:
+      - google-genai-sdk/1.1.0 gl-python/3.12.8
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+  response:
+    body:
+      string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
+        [\n          {\n            \"text\": \"```python\\ndef is_leap_year(year):\\n
+        \ \\\"\\\"\\\"\\n  Checks if a year is a leap year according to the Gregorian
+        calendar rules.\\n\\n  Args:\\n    year: An integer representing the year.\\n\\n
+        \ Returns:\\n    True if the year is a leap year, False otherwise.\\n  \\\"\\\"\\\"\\n\\n
+        \ if not isinstance(year, int):\\n    raise TypeError(\\\"Year must be an
+        integer.\\\")\\n\\n  if year % 4 == 0:\\n    if year % 100 == 0:\\n      if
+        year % 400 == 0:\\n        return True  # Divisible by 400, so it's a leap
+        year\\n      else:\\n        return False # Divisible by 100 but not by 400,
+        so it's not a leap year\\n    else:\\n      return True  # Divisible by 4
+        but not by 100, so it's a leap year\\n  else:\\n    return False # Not divisible
+        by 4, so it's not a leap year\\n```\"\n          }\n        ],\n        \"role\":
+        \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"citationMetadata\":
+        {\n        \"citationSources\": [\n          {\n            \"startIndex\":
+        326,\n            \"endIndex\": 518,\n            \"uri\": \"https://github.com/Ashu-sketch/PracticeProjects\"\n
+        \         },\n          {\n            \"startIndex\": 535,\n            \"endIndex\":
+        697,\n            \"uri\": \"https://github.com/bownejp20/codeWarsTwo\"\n
+        \         }\n        ]\n      },\n      \"avgLogprobs\": -0.027494768216374605\n
+        \   }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\":
+        233,\n    \"totalTokenCount\": 284,\n    \"promptTokensDetails\": [\n      {\n
+        \       \"modality\": \"TEXT\",\n        \"tokenCount\": 51\n      }\n    ],\n
+        \   \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \       \"tokenCount\": 233\n      }\n    ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash\"\n}\n"
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 13 Feb 2025 07:18:54 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=2107
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
