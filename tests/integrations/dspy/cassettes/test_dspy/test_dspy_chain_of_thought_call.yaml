@@ -1,0 +1,115 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `reasoning` (str)\n2. `answer` (float)\n\nAll
+      interactions will be structured in the following way, with the appropriate values
+      filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[
+      ## answer ## ]]\n{answer}        # note: the value you produce must be a single
+      float value\n\n[[ ## completed ## ]]\n\nIn adhering to this structure, your
+      objective is: \n        Given the fields `question`, produce the fields `answer`."},{"role":"user","content":"[[
+      ## question ## ]]\nTwo dice are tossed. What is the probability that the sum
+      equals two?\n\nRespond with the corresponding output fields, starting with the
+      field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]` (must be formatted
+      as a valid Python float), and then ending with the marker for `[[ ## completed
+      ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '984'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.62.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.62.0
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFRLb9swDL7nVxDqZRucLLZTtw2wyx7YZcOwYcMObRHIEh2xtUVXkpMF
+        Rf/7IDuNU7QD5oMB83uQlEjfTwAEabEEoYwMqmnr6fv5r2/d5/JDd3fbfMT1enPz/esnkrrd/fjC
+        IokKLm9QhUfVTHHT1hiI7QArhzJgdE3P8ovFaXFazHugYY11lK3bMF3wtCFL02yeLabzs2l6vlcb
+        JoVeLOFyAgBw379jnVbjH7GE3quPNOi9XKNYHkgAwnEdI0J6Tz5IG0QygoptQNuXfnkJJyfgUHq2
+        ZNfx4/r6yv42aCFsGTQpBOkQAnuPOgGUyoAmBCM9FFBJhT4Bh76rQzQgCxICB1kDV1DAGyjgHeQF
+        tOw9lTUCd0Fxg34GPw0C23oHW7mDwCCVIdwgSPBdE+UZkAeqoORghlK84S1ISOFVmkD6uvdwGGm9
+        UQqV3LCTR3mgYgfBkAfcoA17RcUOEwgGoXVcypJqCruYMoZidrzrZB0b6muIUds1JbrIeZbDg6YN
+        adRQ7nrucACj4pGXwNaQMtEyfZsXsyt7ZYcrkNZv0T2e/3w2z86ePsXI3Y8a6oF+fLUOq87LOF62
+        q+t9/OEwKzWvY79+jx/iFVnyZjXMQZwLH7gVPfowAbjuZ7J7Mmaiddy0YRX4Fm00zOb54CfGVRjR
+        NEv3aH82I5Bni+QFw5XGIKn2R2MtlFQG9Sgdd0B2mvgImBy1/bycl7wPK/A/9iOgFLYB9ap1qEk9
+        bXmkOYy/in/RDsfcFyw8ug0pXAVCF69CYyW7elhg4Xc+YLOqyK7RtY6GLa7aVanP8zy7qIpcTB4m
+        fwEAAP//AwAYZzcg0wQAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 911578cb6a2ac61e-SIN
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 13 Feb 2025 14:22:43 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '3778'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998790'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_0a0dafb916fcd4712d6477024555224b
+    status:
+      code: 200
+      message: OK
+version: 1
