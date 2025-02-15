@@ -91,7 +91,6 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             self._local_model_path,
             model_max_length=self.model_max_length,
         )
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def _score_document(
         self, query: str, document: str, threshold: float
