@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from pydantic import (
     BaseModel,
@@ -12,6 +12,7 @@ from pydantic import (
 from typing_extensions import Self
 
 from weave.trace import api
+from weave.trace.api import publish as weave_publish
 from weave.trace.objectify import Objectifyable
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
@@ -63,6 +64,19 @@ class Object(BaseModel):
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
             )
         return api.ref(uri).get(objectify=objectify)
+
+    def publish(self, name: Union[str, None] = None) -> ObjectRef:
+        # I'm using the `publish` term here for now, but ideally we call this `save`.
+        return weave_publish(self, name)
+
+    def delete(self) -> None:
+        if self.ref is None:
+            raise ValueError(
+                "Can't delete an object without a ref -- has this object been saved?"
+            )
+
+        self.ref.delete()
+        self.name = f"DELETED OBJECT: {self.name}"
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
