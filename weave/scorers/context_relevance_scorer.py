@@ -4,8 +4,8 @@ import numpy as np
 from pydantic import Field, validate_call
 
 import weave
-from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.default_models import MODEL_PATHS
+from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
     ensure_hf_imports,
@@ -72,6 +72,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         description="Whether to return all spans.",
     )
     model_max_length: int = 1280
+
     def load_model(self) -> None:
         ensure_hf_imports()
         from transformers import AutoModelForTokenClassification
@@ -97,9 +98,9 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     ) -> tuple[list[dict[str, Any]], int, int]:
         """Score a single document."""
         import torch
-        
-        assert self._tokenizer is not None # keep mypy happy
-        assert self._model is not None # keep mypy happy
+
+        assert self._tokenizer is not None  # keep mypy happy
+        assert self._model is not None  # keep mypy happy
 
         input_text = query + f" {self._tokenizer.sep_token} " + document
         model_inputs = self._tokenizer(
@@ -160,7 +161,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         query: str,
         output: Union[str, list[str]],  # Pass the context to the `output` parameter
     ) -> WeaveScorerResult:
-        all_spans = []
+        all_spans: list[dict[str, Any]] = []
         total_weighted_score = 0.0
         total_length = 0
 
@@ -180,9 +181,9 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        extras = {"score": final_score}
+        extras: dict[str, Any] = {"score": final_score}
         if self.return_all_spans:
-            extras["all_spans"] = all_spans  # type: ignore
+            extras["all_spans"] = all_spans
         return WeaveScorerResult(
             passed=final_score >= self.threshold,
             extras=extras,
