@@ -685,6 +685,31 @@ export const opNumberToTimestamp = OpKinds.makeStandardOp({
   },
 });
 
+export const opNumberToTimestampFloored = OpKinds.makeStandardOp({
+  name: 'number-toTimestampFloored',
+  argTypes: {val: 'number'},
+  description: `Converts a ${docType('number')} to a ${docType('timestamp')}.`,
+  argDescriptions: {
+    val: 'Number (unix time in miliseconds, microseconds, or nanoseconds) to convert to a timestamp',
+  },
+  returnValueDescription: `Timestamp`,
+  returnType: inputTypes => ({
+    type: 'timestamp',
+    unit: 'ms',
+  }),
+  resolver: ({val}) => {
+    while (
+      Math.abs(val) > PY_DATETIME_MAX_MS ||
+      Math.abs(val) < PY_DATETIME_MIN_MS
+    ) {
+      val = val / 1000;
+    }
+    const date = new Date(val);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  },
+});
+
 export const opNumberNegate = OpKinds.makeStandardOp({
   name: 'number-negate',
   argTypes: {
