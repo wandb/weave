@@ -6,7 +6,10 @@ check_litellm_installation()
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
-from weave.scorers.guardrails import PromptInjectionLLMGuardrail
+from weave.scorers.guardrails import (
+    PrivilegeEscalationLLMGuardrail,
+    PromptInjectionLLMGuardrail,
+)
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llm_scorer import (
@@ -40,6 +43,7 @@ __all__ = [
     "LLMScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
+    "PrivilegeEscalationLLMGuardrail",
     "PromptInjectionLLMGuardrail",
     "PydanticScorer",
     "Scorer",
