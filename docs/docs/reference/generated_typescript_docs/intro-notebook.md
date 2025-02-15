@@ -6,6 +6,10 @@ You can use W&B Weave with Typescript to:
 - Build rigorous, apples-to-apples evaluations for language model use cases
 - Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
+:::note
+Weave with TypeScript depends on NodeJS.
+:::
+
 For more information, see the [Weave documentation](/). 
 
 ## Function tracking
