@@ -99,6 +99,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/cohere",
             "guides/integrations/google-gemini",
             "guides/integrations/groq",
+            "guides/integrations/huggingface",
             "guides/integrations/litellm",
             "guides/integrations/azure",
             "guides/integrations/mistral",
