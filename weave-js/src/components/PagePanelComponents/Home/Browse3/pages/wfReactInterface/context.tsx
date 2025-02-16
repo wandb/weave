@@ -82,3 +82,13 @@ export const useProjectHasTraceServerData = (
     [loading, objs.result, calls.result]
   );
 };
+
+export const usePermanentlyDeleteAllDataInProject = (
+  entity: string,
+  project: string
+) => {
+  return tsWFDataModelHooks.usePermanentlyDeleteAllDataInProject(
+    entity,
+    project
+  );
+};
