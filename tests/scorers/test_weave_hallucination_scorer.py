@@ -50,6 +50,6 @@ def test_weave_hallucination_scorer_threshold(weave_hallucination_scorer):
     # The scorer's logic sets:
     #   passed = score <= threshold
     # Thus, if the score is above the threshold, overall passed should be False
-    score = result.extras["score"]
+    score = result.metadata["score"]
     should_pass = score <= weave_hallucination_scorer.threshold
     assert result.passed == should_pass, "Threshold logic did not work as expected."
