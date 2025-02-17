@@ -408,6 +408,44 @@ def get_dspy_patcher(
                     base.model_copy(update={"name": base.name or "dspy.Evaluate"})
                 ),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.retrievers"),
+                "Embeddings.__call__",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.retrievers.Embeddings"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.retrievers"),
+                "Embeddings.forward",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={
+                            "name": base.name or "dspy.retrievers.Embeddings.forward"
+                        }
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "PythonInterpreter.__call__",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.PythonInterpreter"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "PythonInterpreter.execute",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.PythonInterpreter.execute"}
+                    )
+                ),
+            ),
         ]
     )
 
