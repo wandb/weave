@@ -1,11 +1,8 @@
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 import weave
 from weave.trace.autopatch import OpSettings
 from weave.trace.serialize import dictify
-
-if TYPE_CHECKING:
-    from dspy.primitives.prediction import Example
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -29,9 +26,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def dspy_postprocess_outputs(
-    outputs: Any | "Example",
-) -> list[Any] | dict[str, Any] | Any:
+def dspy_postprocess_outputs(outputs: Any) -> list[Any] | dict[str, Any] | Any:
     import numpy as np
     from dspy import Example, Module
 
