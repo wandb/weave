@@ -36,7 +36,7 @@ print(output)
 
 ## Tracking Call Attributes
 
-To track attributes for your langchain calls, you can use the `weave.attributes`[] context manager. This context manager allows you to set attributes for a specific block of code, such as a chain or a single request.
+To track attributes for your langchain calls, you can use the [`weave.attributes`](https://weave-docs.wandb.ai/reference/python-sdk/weave/#function-attributes) context manager. This context manager allows you to set attributes for a specific block of code, such as a chain or a single request.
 
 ```python
 import weave
