@@ -109,3 +109,40 @@ def test_dspy_chain_of_thought_call(client) -> None:
     assert (
         0.025 <= call.output["answer"] <= 0.03
     ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "cookie", "set-cookie"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_rag(client) -> None:
+    import dspy
+
+    def search_wikipedia(query: str) -> list[str]:
+        results = dspy.ColBERTv2(url="http://20.102.90.50:2017/wiki17_abstracts")(
+            query, k=3
+        )
+        return [x["text"] for x in results]
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        )
+    )
+
+    rag = dspy.ChainOfThought("context, question -> response")
+    question = "What's the name of the city Mahatma Gandhi was born in?"
+    response = rag(context=search_wikipedia(question), question=question)
+    assert "porbandar" in response.response.lower()
+
+    calls = list(client.calls())
+    assert len(calls) == 9
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.ChainOfThought"
+    assert "porbandar" in call.output["response"].lower()
