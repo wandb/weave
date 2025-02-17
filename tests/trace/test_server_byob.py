@@ -98,12 +98,12 @@ def gcp_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": '''{
+            "WF_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": """{
                 "type": "authorized_user",
                 "client_id": "",
                 "client_secret": "",
                 "refresh_token": ""
-            }''',
+            }""",
             "WF_STORAGE_BUCKET_URI": "gs://test-bucket",
         },
     ):
@@ -126,44 +126,46 @@ def azure_storage_env():
     ):
         yield
 
+
 def run_test(client: WeaveClient):
     """Run the basic file storage test"""
     # Create a new trace
-    res = client.server.file_create(FileCreateReq(
-        project_id=client._project_id(),
-        name="test.txt",
-        content=b"Hello, world!",
-    ))
+    res = client.server.file_create(
+        FileCreateReq(
+            project_id=client._project_id(),
+            name="test.txt",
+            content=b"Hello, world!",
+        )
+    )
     assert res.digest is not None
     assert res.digest != ""
 
     # Get the file
-    file = client.server.file_content_read(FileContentReadReq(
-        project_id=client._project_id(),
-        digest=res.digest))
+    file = client.server.file_content_read(
+        FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+    )
     assert file.content == b"Hello, world!"
 
     return res
+
 
 @pytest.mark.usefixtures("aws_storage_env")
 def test_aws_storage(client: WeaveClient, s3):
     """Test file storage using AWS S3"""
     res = run_test(client)
 
-    response = s3.list_objects_v2(Bucket='test-bucket')
+    response = s3.list_objects_v2(Bucket="test-bucket")
 
     # Verify we can see all the objects
-    assert 'Contents' in response
-    assert len(response['Contents']) == 1
+    assert "Contents" in response
+    assert len(response["Contents"]) == 1
 
     # Verify each object exists and has correct size
-    obj = response['Contents'][0]
+    obj = response["Contents"][0]
     # Get the specific object
-    obj_response = s3.get_object(Bucket='test-bucket', Key=obj['Key'])
-    content = obj_response['Body'].read()
+    obj_response = s3.get_object(Bucket="test-bucket", Key=obj["Key"])
+    content = obj_response["Body"].read()
     assert content == b"Hello, world!"
-
-
 
 
 @pytest.mark.usefixtures("gcp_storage_env")

@@ -28,8 +28,10 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
 
+
 def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
+
 
 def determine_bucket_uri(
     base_storage_bucket_uri: str, project_id: str, digest: str
@@ -169,7 +171,7 @@ def get_azure_credentials() -> (
     b64_credential = environment.wf_storage_bucket_azure_credential()
     if account_url is None or b64_credential is None:
         raise ValueError("Azure credentials not set")
-    credential = base64.b64decode(b64_credential).decode('utf-8')
+    credential = base64.b64decode(b64_credential).decode("utf-8")
     return AzureAccountCredentials(account_url=account_url, credential=credential)
 
 

@@ -1,2 +1,2 @@
 ALTER TABLE files
-    ADD COLUMN bucket_storage_uri Nullable(String);
+    ADD COLUMN file_storage_uri Nullable(String);

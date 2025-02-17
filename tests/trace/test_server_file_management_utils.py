@@ -32,8 +32,14 @@ def test_parse_storage_uri():
 def test_split_bucket_and_path():
     # Test valid paths
     assert split_bucket_and_path("bucket/path", "s3") == ("bucket", "path")
-    assert split_bucket_and_path("bucket/path/nested", "gs") == ("bucket", "path/nested")
-    assert split_bucket_and_path("container/blob/path", "azure") == ("container", "blob/path")
+    assert split_bucket_and_path("bucket/path/nested", "gs") == (
+        "bucket",
+        "path/nested",
+    )
+    assert split_bucket_and_path("container/blob/path", "azure") == (
+        "container",
+        "blob/path",
+    )
 
     # Test invalid paths
     with pytest.raises(ValueError, match="Invalid path format"):
@@ -115,7 +121,7 @@ def test_get_azure_credentials():
 
 
 def test_get_gcp_credentials():
-    test_creds_json = '''
+    test_creds_json = """
     {
         "type": "service_account",
         "project_id": "test-project",
@@ -124,7 +130,7 @@ def test_get_gcp_credentials():
         "client_email": "test@test.com",
         "client_id": "test-client-id"
     }
-    '''
+    """
 
     # Test with valid JSON
     with mock.patch.dict(
