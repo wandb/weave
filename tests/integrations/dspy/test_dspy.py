@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 
 import pytest
 
@@ -146,3 +147,73 @@ def test_dspy_rag(client) -> None:
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.ChainOfThought"
     assert "porbandar" in call.output["response"].lower()
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "cookie", "set-cookie"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_classification(client) -> None:
+    import dspy
+
+    def search_wikipedia(query: str) -> list[str]:
+        results = dspy.ColBERTv2(url="http://20.102.90.50:2017/wiki17_abstracts")(
+            query, k=3
+        )
+        return [x["text"] for x in results]
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        )
+    )
+
+    class Classify(dspy.Signature):
+        """Classify sentiment of a given sentence."""
+
+        sentence: str = dspy.InputField()
+        sentiment: Literal["positive", "negative", "neutral"] = dspy.OutputField()
+        confidence: float = dspy.OutputField()
+
+    classify = dspy.Predict(Classify)
+    response = classify(
+        sentence="This book was super fun to read, though not the last chapter."
+    )
+
+    assert response.sentiment == "positive"
+    assert response.confidence > 0.5
+
+    calls = list(client.calls())
+    assert len(calls) == 5
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict"
+    assert response.sentiment == call.output["sentiment"]
+    assert response.confidence == call.output["confidence"]
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict.forward"
+    assert response.sentiment == call.output["sentiment"]
+    assert response.confidence == call.output["confidence"]
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "openai.chat.completions.create"

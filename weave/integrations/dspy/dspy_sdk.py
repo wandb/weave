@@ -15,10 +15,20 @@ _dspy_patcher: MultiPatcher | None = None
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    from dspy import Predict
+
     if "self" in inputs:
-        inputs["self"] = dictify(inputs["self"])
-        if inputs["self"]["__class__"]["module"] == "__main__":
-            inputs["self"]["__class__"]["module"] = ""
+        dictified_inputs_self = dictify(inputs["self"])
+        if dictified_inputs_self["__class__"]["module"] == "__main__":
+            dictified_inputs_self["__class__"]["module"] = ""
+
+        if isinstance(inputs["self"], Predict):
+            if hasattr(inputs["self"], "signature"):
+                dictified_inputs_self["signature"] = inputs[
+                    "self"
+                ].signature.model_json_schema()
+
+        inputs["self"] = dictified_inputs_self
     return inputs
 
 
