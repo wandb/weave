@@ -16,7 +16,7 @@ class WeaveScorerResult(BaseModel):
     """The result of a weave.Scorer.score method."""
 
     passed: bool = Field(description="Whether the scorer passed or not")
-    extras: dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
 
