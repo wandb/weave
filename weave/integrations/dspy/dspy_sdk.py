@@ -340,6 +340,74 @@ def get_dspy_patcher(
                     )
                 ),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "answer_passage_match",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={
+                            "name": base.name or "dspy.evaluate.answer_passage_match"
+                        }
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "answer_exact_match",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.evaluate.answer_exact_match"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "SemanticF1.__call__",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.evaluate.SemanticF1"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "SemanticF1.forward",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.evaluate.SemanticF1.forward"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "CompleteAndGrounded.__call__",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={
+                            "name": base.name or "dspy.evaluate.CompleteAndGrounded"
+                        }
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy.evaluate"),
+                "CompleteAndGrounded.forward",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={
+                            "name": base.name
+                            or "dspy.evaluate.CompleteAndGrounded.forward"
+                        }
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "Evaluate.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.Evaluate"})
+                ),
+            ),
         ]
     )
 
