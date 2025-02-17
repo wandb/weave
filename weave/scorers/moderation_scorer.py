@@ -171,7 +171,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             passed = False
 
         return WeaveScorerResult(
-            extras=dict(zip(self._categories, predictions)),
+            metadata=dict(zip(self._categories, predictions)),
             passed=passed,
         )
 
@@ -269,6 +269,6 @@ class WeaveBiasScorerV1(RollingWindowScorer):
             categories[f"{base_name}_score"] = float(pred)
             categories[base_name] = score
         return WeaveScorerResult(
-            extras=categories,
+            metadata=categories,
             passed=not any(scores),
         )
