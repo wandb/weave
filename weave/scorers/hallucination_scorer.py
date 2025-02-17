@@ -295,5 +295,5 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         passed = score < self.threshold
         return WeaveScorerResult(
             passed=passed,
-            extras={"score": score},
+            metadata={"score": score},
         )
