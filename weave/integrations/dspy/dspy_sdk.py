@@ -24,9 +24,12 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         if isinstance(inputs["self"], Predict):
             if hasattr(inputs["self"], "signature"):
-                dictified_inputs_self["signature"] = inputs[
-                    "self"
-                ].signature.model_json_schema()
+                try:
+                    dictified_inputs_self["signature"] = inputs[
+                        "self"
+                    ].signature.model_json_schema()
+                except Exception as e:
+                    dictified_inputs_self["signature"] = inputs["self"].signature
 
         inputs["self"] = dictified_inputs_self
     return inputs
@@ -248,6 +251,93 @@ def get_dspy_patcher(
                 "ColBERTv2.__call__",
                 dspy_wrapper(
                     base.model_copy(update={"name": base.name or "dspy.ColBERTv2"})
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "BootstrapFinetune.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.BootstrapFinetune.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "MIPROv2.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.MIPROv2.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "LabeledFewShot.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.LabeledFewShot.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "KNNFewShot.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.KNNFewShot.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "KNN.__call__",
+                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.KNN"})),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "Ensemble.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.Ensemble.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "COPRO.compile",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.COPRO.compile"})
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "BootstrapFewShotWithRandomSearch.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={
+                            "name": base.name
+                            or "dspy.BootstrapFewShotWithRandomSearch.compile"
+                        }
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "BootstrapFewShot.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.BootstrapFewShot.compile"}
+                    )
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "BetterTogether.compile",
+                dspy_wrapper(
+                    base.model_copy(
+                        update={"name": base.name or "dspy.BetterTogether.compile"}
+                    )
                 ),
             ),
         ]
