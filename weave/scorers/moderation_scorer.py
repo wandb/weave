@@ -85,23 +85,22 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
-        dict[str, Any]: A dictionary containing the `categories` with their respective scores and a `flagged` boolean.
+        WeaveScorerResult: An object containing:
+            - extras (dict[str, Any]): A dictionary mapping toxicity categories, such as "Race/Origin", "Gender/Sex", "Religion", "Ability", and "Violence", to their respective scores.
+            - passed (bool): A flag indicating whether the text passed the toxicity thresholds (True if none of the thresholds were exceeded, False otherwise).
 
     Example:
         >>> from weave.scorers import ToxicityScorer
         >>> scorer = ToxicityScorer()
         >>> result = scorer.score("This is a hateful message.")
         >>> print(result)
-        {
-            'categories': {
-                'Race/Origin': 3,
-                'Gender/Sex': 0,
-                'Religion': 0,
-                'Ability': 0,
-                'Violence': 1
-            },
-            'pass': False
-        }
+        WeaveScorerResult(extras={
+            'Race/Origin': 3,
+            'Gender/Sex': 0,
+            'Religion': 0,
+            'Ability': 0,
+            'Violence': 1
+        }, passed=False)
     """
 
     total_threshold: int = Field(
