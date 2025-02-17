@@ -63,7 +63,9 @@ def test_dspy_chain_of_thought_call(client) -> None:
     response = math(
         question="Two dice are tossed. What is the probability that the sum equals two?"
     )
-    assert response.answer >= 0.027
+    assert (
+        0.025 <= response.answer <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {response.answer}"
 
     calls = list(client.calls())
     assert len(calls) == 8
@@ -72,28 +74,38 @@ def test_dspy_chain_of_thought_call(client) -> None:
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.ChainOfThought"
-    assert call.output["answer"] >= 0.027
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
 
     call = calls[1]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.Module"
-    assert call.output["answer"] >= 0.027
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
 
     call = calls[2]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.ChainOfThought.forward"
-    assert call.output["answer"] >= 0.027
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
 
     call = calls[3]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.Predict"
-    assert call.output["answer"] >= 0.027
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
 
     call = calls[4]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.Predict.forward"
-    assert call.output["answer"] >= 0.027
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
