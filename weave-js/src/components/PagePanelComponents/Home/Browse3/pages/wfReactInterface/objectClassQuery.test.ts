@@ -1,8 +1,8 @@
 import {expectType} from 'tsd';
 
 import {
-  TestOnlyExample,
-  TestOnlyExampleSchema,
+  ExampleForTesting,
+  ExampleForTestingSchema,
 } from './generatedBuiltinObjectClasses.zod';
 import {
   useBaseObjectInstances,
@@ -24,12 +24,12 @@ type TypesAreEqual<T, U> = [T] extends [U]
 describe('Type Tests', () => {
   it('useCollectionObjects return type matches expected structure', () => {
     type CollectionObjectsReturn = ReturnType<
-      typeof useBaseObjectInstances<'TestOnlyExample'>
+      typeof useBaseObjectInstances<'ExampleForTesting'>
     >;
 
     // Define the expected type structure
     type ExpectedType = LoadableWithError<
-      Array<TraceObjSchema<TestOnlyExample, 'TestOnlyExample'>>
+      Array<TraceObjSchema<ExampleForTesting, 'ExampleForTesting'>>
     > & {
       refetch: () => void;
     };
@@ -59,8 +59,8 @@ describe('Type Tests', () => {
           version_index: 0,
           is_latest: 0,
           kind: 'object',
-          base_object_class: 'TestOnlyExample',
-          val: TestOnlyExampleSchema.parse({
+          base_object_class: 'ExampleForTesting',
+          val: ExampleForTestingSchema.parse({
             name: '',
             description: '',
             nested_base_model: {
@@ -79,12 +79,12 @@ describe('Type Tests', () => {
 
   it('useCreateCollectionObject return type matches expected structure', () => {
     type CreateCollectionObjectReturn = ReturnType<
-      typeof useCreateBuiltinObjectInstance<'TestOnlyExample'>
+      typeof useCreateBuiltinObjectInstance<'ExampleForTesting'>
     >;
 
     // Define the expected type structure
     type ExpectedType = (
-      req: TraceObjCreateReq<TestOnlyExample>
+      req: TraceObjCreateReq<ExampleForTesting>
     ) => Promise<TraceObjCreateRes>;
 
     // Type assertion tests
