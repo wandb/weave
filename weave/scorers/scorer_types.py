@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
-from pydantic import Field, PrivateAttr, field_validator
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import set_device
@@ -79,19 +79,11 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The device to use for the model",
         validate_default=True,
     )
+    _device: Optional["torch.device"] = PrivateAttr(default=None)
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
-        import torch
-
-        if isinstance(v, torch.device):
-            return v
-        else:
-            return set_device(v)
-
     def model_post_init(self, __context: Any) -> None:
+        self._device = set_device(self.device)
         if self._pipeline is None:
             self.load_pipeline()
 
@@ -109,26 +101,19 @@ class HuggingFaceScorer(weave.Scorer):
     """Score model outputs using a Hugging Face model."""
 
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: Union[str, Any] = Field(
+    device: str = Field(
         default="auto",
         description="The device to use for the model",
-        validate_default=True,
     )
+    _device: Optional["torch.device"] = PrivateAttr(default=None)
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
-        import torch
-
-        if isinstance(v, torch.device):
-            return v
-        else:
-            return set_device(v)
-
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
+        # Set device before loading model
+        self._device = set_device(self.device)
+
         if self._model is None:
             self.load_model()
         else:
