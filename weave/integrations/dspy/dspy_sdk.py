@@ -22,11 +22,17 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def dspy_postprocess_outputs(outputs: Any | Example) -> dict[str, Any]:
+def dspy_postprocess_outputs(
+    outputs: Any | Example,
+) -> list[Any] | dict[str, Any] | Any:
+    import numpy as np
     from dspy.primitives.prediction import Example
 
     if isinstance(outputs, Example):
         return outputs.toDict()
+
+    if isinstance(outputs, np.ndarray):
+        return outputs.tolist()
 
     return outputs
 
@@ -65,6 +71,13 @@ def get_dspy_patcher(
                 lambda: importlib.import_module("dspy"),
                 "LM.__call__",
                 dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.LM"})),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "Embedder.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.Embedder"})
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
