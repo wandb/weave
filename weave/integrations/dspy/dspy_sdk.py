@@ -472,6 +472,27 @@ def get_dspy_patcher(
                     )
                 ),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "Adapter.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.Adapter"})
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "ChatAdapter.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.ChatAdapter"})
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("dspy"),
+                "JSONAdapter.__call__",
+                dspy_wrapper(
+                    base.model_copy(update={"name": base.name or "dspy.JSONAdapter"})
+                ),
+            ),
         ]
     )
 
