@@ -132,7 +132,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self.device, trust_remote_code=True
+            self._local_model_path, device_map=self._device, trust_remote_code=True
         )
         self._model.eval()
 
@@ -140,7 +140,6 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         """
@@ -231,7 +230,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self.device, trust_remote_code=True
+            self._local_model_path, device_map=self._device, trust_remote_code=True
         )
         self._model.eval()
 
@@ -239,7 +238,6 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
