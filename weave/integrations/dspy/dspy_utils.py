@@ -30,7 +30,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def dspy_postprocess_outputs(
-    outputs: Any | Example,
+    outputs: Any | "Example",
 ) -> list[Any] | dict[str, Any] | Any:
     import numpy as np
     from dspy import Example, Module
