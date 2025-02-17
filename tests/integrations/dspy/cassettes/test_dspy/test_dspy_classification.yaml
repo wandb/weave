@@ -55,17 +55,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFLBbtswDL37KwT1GheO58JujttOuwxYgQFbEhiKRNvsZEmT6KZFkX8f
-        ZCexi3XALgbMx/f0HsnXhDGOim8Yl50g2TudflyH39nd54dShS/YfdNfX47HHw/ffx7z58dPfBUZ
-        9vAIki6sW2l7p4HQmgmWHgRBVF2XH+7LqqryYgR6q0BHWusoLWzao8E0z/Iizcp0XZ3ZnUUJgW/Y
-        NmGMsdfxG30aBc98w7LVpdJDCKIFvrk2Mca91bHCRQgYSBjiqxmU1hCY0fp2y25uWABD2IOh+LPf
-        74yzAQmfYGd2ZmqR1jSowEi49GS31d0SH+ODmuDlcx6aIYgY2Qxan+unq39tW+ftIZzxa71Bg6Gr
-        PYhgTfQayDo+oqeEsf04p+FNdO687R3VZH+BiYJ5cT/p8Xk9CzQ/g2RJ6EW9XK/e0asVkEAdFpPm
-        UsgO1Eyd1yIGhXYBJIvUf7t5T3tKjqb9H/kZkBIcgaqdB4XybeK5zUO83n+1Xac8GuYB/BNKqAnB
-        x00oaMSgp5vi4SUQ9HWDpgXvPE6H1bg6y4q8OpRVLnhySv4AAAD//wMAlr/GKGYDAAA=
+        H4sIAAAAAAAAAwAAAP//jFJNj5swEL3zKyzvNayAEOXjtl2t2mMPVas2iZBjD+DWjC17WLVd5b9X
+        hiSw6lbqBYl5857fm5mXhDGuFd8xLltBsnMmfZfTU/7hqfz8u3hA8bD68rFdvX88fS2+wadHvogM
+        e/oOkq6se2k7Z4C0xRGWHgRBVM3Xy+16my3z5QB0VoGJtMZRWtq006jTIivKNFun+ebCbq2WEPiO
+        7RPGGHsZvtEnKvjJdyxbXCsdhCAa4LtbE2PcWxMrXISgAwkkvphAaZEAB+v7Pbu7YwGQdAdI8ed4
+        PKCzQZN+hgMecGyRFmutACVce7L7zWqOD/FBjfD8OQ91H0SMjL0xl/r55t/Yxnl7Chf8Vq816tBW
+        HkSwGL0Gso4P6Dlh7DjMqX8VnTtvO0cV2R+AUbAot6Men9YzQ4sLSJaEmdXX+eINvUoBCW3CbNJc
+        CtmCmqjTWkSvtJ0BySz1327e0h6Ta2z+R34CpARHoCrnQWn5OvHU5iFe77/ablMeDPMA/llLqEiD
+        j5tQUIvejDfFw69A0FW1xga883o8rNpVWVYWm9N6UwienJM/AAAA//8DAPVmkblmAwAA
     headers:
       CF-RAY:
-      - 913528b97e524719-BOM
+      - 91354d114fb2f4b4-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -73,7 +73,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 17 Feb 2025 10:40:25 GMT
+      - Mon, 17 Feb 2025 11:05:13 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -89,7 +89,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '501'
+      - '585'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -101,13 +101,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998734'
+      - '149998735'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_f91e93f061ec39e59570ec83be2c151c
+      - req_4828301c38159df02084bbc68ebd1f27
     status:
       code: 200
       message: OK

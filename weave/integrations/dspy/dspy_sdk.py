@@ -14,6 +14,28 @@ if TYPE_CHECKING:
 _dspy_patcher: MultiPatcher | None = None
 
 
+def serialize_dspy_objects(data: Any) -> Any:
+    import numpy as np
+    from dspy import Example, Module
+
+    if isinstance(data, Example):
+        return data.toDict()
+
+    elif isinstance(data, Module):
+        return data.dump_state()
+
+    elif isinstance(data, np.ndarray):
+        return data.tolist()
+
+    elif isinstance(data, dict):
+        return {key: serialize_dspy_objects(value) for key, value in data.items()}
+
+    elif isinstance(data, list):
+        return [serialize_dspy_objects(item) for item in data]
+
+    return data
+
+
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     from dspy import Predict
 
@@ -31,8 +53,9 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                 except Exception as e:
                     dictified_inputs_self["signature"] = inputs["self"].signature
 
+        dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
         inputs["self"] = dictified_inputs_self
-    return inputs
+    return serialize_dspy_objects(inputs)
 
 
 def dspy_postprocess_outputs(
@@ -42,15 +65,15 @@ def dspy_postprocess_outputs(
     from dspy import Example, Module
 
     if isinstance(outputs, Module):
-        return outputs.dump_state()
+        outputs = outputs.dump_state()
 
     if isinstance(outputs, Example):
-        return outputs.toDict()
+        outputs = outputs.toDict()
 
     if isinstance(outputs, np.ndarray):
-        return outputs.tolist()
+        outputs = outputs.tolist()
 
-    return outputs
+    return serialize_dspy_objects(outputs)
 
 
 def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
