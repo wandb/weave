@@ -73,7 +73,6 @@ def test_print_call_link_setting(client_creator):
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
-
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     parse_and_apply_settings(UserSettings(print_call_link=True))
@@ -81,7 +80,6 @@ def test_print_call_link_setting(client_creator):
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
-
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
