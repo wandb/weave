@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 from pydantic import Field, PrivateAttr
 
 import weave
-from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     import torch
@@ -74,16 +73,14 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The task to use for the pipeline, for example 'text-classification'"
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: Union[str, Any] = Field(
-        default="auto",
-        description="The device to use for the model",
-        validate_default=True,
+    device: str = Field(
+        default="cpu",
+        description="The device to use for the model, default to cpu.",
+        frozen=True,
     )
-    _device: Optional["torch.device"] = PrivateAttr(default=None)
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
-        self._device = set_device(self.device)
         if self._pipeline is None:
             self.load_pipeline()
 
@@ -102,19 +99,15 @@ class HuggingFaceScorer(weave.Scorer):
 
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(
-        default="auto",
-        description="The device to use for the model",
+        default="cpu",
         frozen=True,
+        description="The device to use model, default to cpu.",
     )
-    _device: Optional["torch.device"] = PrivateAttr(default=None)
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
-        # Set device before loading model
-        self._device = set_device(self.device)
-
         if self._model is None:
             self.load_model()
         else:

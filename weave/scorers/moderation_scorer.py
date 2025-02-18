@@ -131,8 +131,8 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self._device, trust_remote_code=True
-        )
+            self._local_model_path, trust_remote_code=True
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
@@ -230,8 +230,8 @@ class WeaveBiasScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self._device, trust_remote_code=True
-        )
+            self._local_model_path, trust_remote_code=True
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
