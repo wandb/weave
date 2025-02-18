@@ -1,5 +1,11 @@
 # Guardrails
 
+:::note Prerequisites
+Before implementing guardrails, make sure you understand:
+- [Scorer basics and implementation](./scorers.md)
+- [Real-time evaluation concepts](./guardrails_and_monitors.md)
+:::
+
 Guardrails act as safety checks that run before allowing LLM output to reach users. They provide active intervention to prevent issues in real-time, ensuring your application maintains quality and safety standards.
 
 ## Using Scorers as Guardrails
@@ -202,3 +208,9 @@ This example demonstrates:
 - Production-ready implementation
 
 For more information about the core concepts of scorers and evaluation in Weave, see our [Guardrails and Monitors Overview](./guardrails_and_monitors.md). 
+
+:::tip See Also
+- [Monitors Guide](./monitors.md) - Learn about passive quality monitoring
+- [Builtin Scorers](./builtin_scorers.mdx) - Ready-to-use guardrail scorers
+- [Batch Evaluation](../core-types/evaluations.md) - For offline evaluation needs
+::: 

@@ -21,6 +21,21 @@ The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - 
 Throughout this guide, we'll refer to functions decorated with `@weave.op` as "ops". These are regular Python functions that have been enhanced with Weave's tracking capabilities.
 :::
 
+### Scoring and Real-time Evaluation
+
+The relationship between scoring and real-time evaluation is fundamental:
+
+1. **Scorers are the Building Blocks**
+   - Scorers define *what* to evaluate (toxicity, quality, etc.)
+   - Real-time evaluation defines *how* to use the scores (block, monitor, etc.)
+
+2. **Common Implementation Patterns**
+   - Initialize scorers at module level for better performance
+   - Handle errors gracefully with clear fallback behaviors
+   - Use async/await for efficient execution
+   - Implement clear scoring criteria and normalized ranges
+
+
 ### Ready-to-Use Scorers
 While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) that you can use right away, including:
 - [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)

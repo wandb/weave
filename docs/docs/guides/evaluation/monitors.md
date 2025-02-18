@@ -1,5 +1,11 @@
 # Monitors
 
+:::note Prerequisites
+Before implementing monitors, make sure you understand:
+- [Scorer basics and implementation](./scorers.md)
+- [Real-time evaluation concepts](./guardrails_and_monitors.md)
+:::
+
 Monitors help track quality metrics over time without blocking operations. They provide passive observation for analysis, helping you identify trends, detect model drift, and gather data for improvements.
 
 ## Using Scorers as Monitors
@@ -241,3 +247,13 @@ This example demonstrates:
 - Production-ready implementation
 
 For more information about the core concepts of scorers and evaluation in Weave, see our [Guardrails and Monitors Overview](./guardrails_and_monitors.md). 
+
+:::tip See Also
+- [Guardrails Guide](./guardrails.md) - Learn about active safety controls
+- [Builtin Scorers](./builtin_scorers.mdx) - Ready-to-use monitoring scorers
+- [Batch Evaluation](../core-types/evaluations.md) - For offline evaluation needs
+:::
+
+:::info Relationship with Guardrails
+Remember that every scorer result is automatically stored in Weave's database. This means your guardrails automatically double as monitors! You can analyze historical scorer results from both guardrails and monitors in the same way.
+::: 
