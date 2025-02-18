@@ -38,6 +38,7 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
+    _process_query_to_conditions,
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
@@ -622,10 +623,12 @@ class CallsQuery(BaseModel):
         for condition in self.query_conditions:
             if not condition.is_heavy() or condition.is_feedback():
                 continue
+
+            # heavy condition, we want to add a simple LIKE condition first if possible,
+            # to narrow down the number JSON operations we have to do.
+            heavy_filter_sql += make_simple_like_condition(pb, condition, table_alias)
+            print(">>>>>>heavy_filter_sql>>>>> ", heavy_filter_sql)
             heavy_filter_sql += "AND " + condition.as_sql(
-                pb, table_alias, ignore_agg_fn=True
-            )
-            heavy_filter_sql += "AND " + condition.as_simple_where_sql(
                 pb, table_alias, ignore_agg_fn=True
             )
 
@@ -689,6 +692,47 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
+
+
+def make_simple_like_condition(
+    pb: ParamBuilder, condition: Condition, table_alias: str = "calls_merged"
+) -> str:
+    # processed = process_query_to_conditions(
+    #     tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
+    #     pb,
+    #     table_alias,
+    #     ignore_agg_fn=True,
+    # )
+    # print(">>>>>>processed>>>>> ", processed)
+
+    print(">>>>>>condition>>>>> ", condition)
+    as_sql = condition.as_sql(pb, table_alias, ignore_agg_fn=True)
+    print(">>>>>>as_sql>>>>> ", as_sql)
+
+    if isinstance(condition.operand, tsi_query.EqOperation):
+        field_name = get_field_by_name(condition.operand.eq_[0].get_field_).field
+        field_value = condition.operand.eq_[1].literal_
+    elif isinstance(condition.operand, tsi_query.ContainsOperation):
+        field_name = get_field_by_name(
+            condition.operand.contains_.input.get_field_
+        ).field
+        field_value = condition.operand.contains_.substr.literal_
+    elif isinstance(condition.operand, tsi_query.InOperation):
+        field_name = get_field_by_name(condition.operand.in_[0].get_field_).field
+        sql = "AND ("
+        for op in condition.operand.in_[1]:
+            sql += f"{table_alias}.{field_name} LIKE '%{op.literal_}%' OR "
+        sql = sql[:-4]
+        sql += ")"
+        return sql
+    else:
+        return ""
+
+    return f"AND {table_alias}.{field_name} LIKE '%{field_value}%'"
+
+    # if isinstance(condition.operand, tsi_query.EqOperation):
+    #     return f"calls_merged.display_name LIKE '%{condition.operand.eq_[1].literal_}%'"
+    return ""
 
 
 ALLOWED_CALL_FIELDS = {
