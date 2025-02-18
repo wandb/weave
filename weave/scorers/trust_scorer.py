@@ -181,7 +181,7 @@ class WeaveTrustScorerV1(weave.Scorer):
 
     def _load_scorers(self) -> None:
         """Load all scorers with appropriate configurations."""
-        base_params = {
+        base_params: dict[str, Any] = {
             "column_map": self.column_map,
             "device": self.device,
         }
@@ -258,7 +258,7 @@ class WeaveTrustScorerV1(weave.Scorer):
         )
         processed_query = self._preprocess_text(query) if query else None
 
-        inputs = {"output": processed_output}
+        inputs: dict[str, Any] = {"output": processed_output}
         if processed_context is not None:
             inputs["context"] = processed_context
         if processed_query is not None:
@@ -346,6 +346,7 @@ class WeaveTrustScorerV1(weave.Scorer):
             "advisory_issues": advisory_issues,
             "extras": {"raw_outputs": raw_results, "scores": scores},
         }
+
     @validate_call
     @weave.op
     def score(

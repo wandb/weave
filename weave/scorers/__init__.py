@@ -38,8 +38,8 @@ from weave.scorers.string_scorer import (
     LevenshteinScorer,
     StringMatchScorer,
 )
-from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.summarization_scorer import SummarizationScorer
+from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
