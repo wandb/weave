@@ -80,7 +80,6 @@ class HuggingFacePipelineScorer(weave.Scorer):
     )
     _pipeline: "Pipeline" = PrivateAttr(default=None)
 
-
     def model_post_init(self, __context: Any) -> None:
         if self._pipeline is None:
             self._pipeline = self.load_pipeline()

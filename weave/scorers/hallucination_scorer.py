@@ -12,7 +12,6 @@ from weave.scorers.utils import (
     WeaveScorerResult,
     ensure_hf_imports,
     load_hf_model_weights,
-    set_device,
     stringify,
 )
 
@@ -229,7 +228,6 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         ensure_hf_imports()
         from transformers import pipeline
 
-        self.device = set_device(self.device)
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]
         )
