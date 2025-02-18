@@ -318,13 +318,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 18 Feb 2025 06:46:15 GMT
+      - Tue, 18 Feb 2025 07:01:38 GMT
       ETag:
       - W/"05ebff67c6850ad022cd0cb87af139f630549dac93b850103d0f0d274d732d9c"
       Expires:
-      - Tue, 18 Feb 2025 06:51:15 GMT
+      - Tue, 18 Feb 2025 07:06:38 GMT
       Source-Age:
-      - '210'
+      - '231'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -334,19 +334,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '18'
+      - '15'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 919bccac54940c53d57258e04c18d08b90837614
+      - 6630125d1e104aebb06262a1dd1162d6ba0512c1
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - CC19:207E4A:21626C:2FA71B:67B3A7D2
       X-Served-By:
-      - cache-bom4747-BOM
+      - cache-bom4727-BOM
       X-Timer:
-      - S1739861176.698045,VS0,VE0
+      - S1739862099.553533,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -411,19 +411,21 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNb9pAEL3zK0abK0QYaCDcEtqoVaMSqb1hZC27Y7OJPbvaHbehEf89
-        8gcYSiv1Ylnz5r198/XWAxBGizkItZWsCpcP7kf3uHt80J+Hz6+LD/qrfrwt9Mb5j8vljEW/YtjN
-        Myo+sK6VLVyObCw1sPIoGSvVaDq+nd1E0fSmBgqrMa9omePBxA4KQ2YwGo4mg+F0EM1a9tYahUHM
-        YdUDAHirv5VP0vgq5jDsHyIFhiAzFPNjEoDwNq8iQoZgAktqPLegssRItfXVCq6ugA3nWP2s1zHd
-        OZcjfCF1DXdEtiSFAczT1hJCNIkppoa0RakNZeHAW8XikF8gcSz6EIvFpyV8Z8knoW/4Cx5Qcukx
-        xGLdCSKxYYOd4FssSBYYiznEorPVyPDOtcjSZ5LMb1n1Phb7PpzxOud/0J681aXiS8YPU8DC2pcL
-        AvpQv3DiuZ066sb0aZc9pmWQ1aSpzPM2vj+OLbeZ83YTWvwYTw2ZsE08ymCpGlFg60SN7nsA63o9
-        yrOJC+dt4Thh+4JUCY7H7XqIbis7dDZpQbYs8y4+iQ7AmV6ikaXJw8mCCSXVFnVH7bZRltrYE6B3
-        UvWlm79pN5Ubyv5HvgOUQseoE+dRG3VecZfmsTraf6Udu1wbFgH9T6MwYYO+moTGVJZ5e/5hFxiL
-        JDWUoXfeNPeUuiQaI+pJqjASvX3vHQAA//8DAO1PMgVdBAAA
+        H4sIAAAAAAAAAwAAAP//jFPbbhoxEH3nK0bOK0Tc1BDekiiV2ocm6UWVwqKVYw/LgNd27dk2BPHv
+        1V5gobRSX1arOXOOz9y2HQBBWkxBqKVklXvTux3ecqDVZrJ+/vz9Ob//odev5tv9E318Wq1Et2S4
+        lxUq3rMulcu9QSZna1gFlIyl6uBqdD15N+xfX1dA7jSakpZ57o1dLydLvWF/OO71r3qDScNeOlIY
+        xRRmHQCAbfUtfVqNr2IK/e4+kmOMMkMxPSQBiOBMGREyRoosLYtuCypnGW1lfTaDiwtgYoPlz3ye
+        2BvvDcIHqy7hxlpXWIUR6HHpLMJgnNjE1qQlSk02i3veLBH7/BwtJ6ILibi7f4AvLPko9Al/wXuU
+        XASMiZi3gmiZmLAV3CbCyhwTMYVEtLZqGd74BnkImbT0JsveJ2LXhRNe6/wP2mNwulB8zvhKOdw5
+        tz4jYIjVC0eem6mjrk0fdzngooiynLQtjGniu8PYjMt8cC+xwQ/xBVmKyzSgjM6WI4rsvKjQXQdg
+        Xq1HcTJx4YPLPafs1mhLwdGoWQ/RbmWLTsYNyI6laePjwR440Us1siQTjxZMKKmWqFtqu42y0OSO
+        gM5R1edu/qZdV042+x/5FlAKPaNOfUBN6rTiNi1gebT/Sjt0uTIsIoafpDBlwlBOQuNCFqY+JRE3
+        kTFPF2QzDD5QfU8Lnw5GiHq8UDgQnV3nNwAAAP//AwABTY4vXQQAAA==
     headers:
+      CF-Cache-Status:
+      - DYNAMIC
       CF-RAY:
-      - 913c0f20df943b0a-BOM
+      - 913c25a84958441f-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -431,14 +433,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 18 Feb 2025 06:46:18 GMT
+      - Tue, 18 Feb 2025 07:01:41 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=Qiq73bI5khZK4OA4mlLXFCJ7IVfbE.7W3UM5XFOz368-1739861178-1.0.1.1-QRbhgaFlL7kRYvB0uLCiKfDL7Z_D8_JNjjyj1xhP9wDv_H30j3JOr.t6Vwq13vGo0SCKg0GLxz141wF0LuM52w;
-        path=/; expires=Tue, 18-Feb-25 07:16:18 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=z8Bpyo7gCGvEqIgcjB8bzRlpXOQlrSwK4NBbUBR8NlI-1739862101-1.0.1.1-v628TamHF5xWBLAnErmWYh0RH6Tj0f2eRP8p7xpNnxBSr.zJzV8AqlnQ0UT2RIq9tmPH0Jn4y3A07rhmVgkEkA;
+        path=/; expires=Tue, 18-Feb-25 07:31:41 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=AkNz1VKdpujtFcLWZCPTy0EQ.YwW8ybkbSn4pGFPDcs-1739861178405-0.0.1.1-604800000;
+      - _cfuvid=IXeaJkVl_q4eQx34NXPvASnnH5FarkW1wv2pI63nVcQ-1739862101527-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -448,12 +450,10 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1643'
+      - '1994'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -471,7 +471,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_9d174b27a68c782c9f849b37b5a0e02c
+      - req_2c2f289b750f3a0b615324486955e425
     status:
       code: 200
       message: OK
