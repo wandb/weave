@@ -10,7 +10,6 @@ from weave.scorers.scorer_types import HuggingFacePipelineScorer, LLMScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
     stringify,
 )
@@ -226,7 +225,6 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     _model_max_length: int = PrivateAttr(default=8192)
 
     def load_pipeline(self) -> None:
-        ensure_hf_imports()
         from transformers import pipeline
 
         self._local_model_path = load_hf_model_weights(
