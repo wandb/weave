@@ -1,8 +1,6 @@
 import pytest
 
-from weave.scorers.guardrails.presidio_entity_recognition_guardrail import (
-    PresidioEntityRecognitionGuardrail,
-)
+from weave.scorers import PresidioEntityRecognitionGuardrail
 
 
 @pytest.fixture
