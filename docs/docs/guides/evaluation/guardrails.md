@@ -1,5 +1,7 @@
 # Guardrails
 
+![Guardrails](./../../../static/img/guardrails_scorers.png)
+
 :::note Prerequisites
 Before implementing guardrails, make sure you understand:
 - [Scorer basics and implementation](./scorers.md)

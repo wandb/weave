@@ -100,32 +100,13 @@ async def monitor_comprehensively(call):
     )
 ```
 
-### 3. Trend Analysis
-Implement systems to analyze monitoring data over time:
+### 3. Analyze and Improve
+Since all scorer results are automatically stored in Weave's database, you can:
+- Review trends in the Weave Dashboard
+- Query historical data through the API
+- Export data for external analysis
+- Set up alerts for concerning patterns (coming soon)
 
-```python
-class TrendingTopicsMonitor(Scorer):
-    def __init__(self):
-        self.topic_counts = defaultdict(int)
-        self.total_calls = 0
-    
-    @weave.op
-    def score(self, output: str) -> dict:
-        topics = self._extract_topics(output)
-        self.total_calls += 1
-        
-        for topic in topics:
-            self.topic_counts[topic] += 1
-        
-        return {
-            "topics": topics,
-            "trending_topics": self._get_trending(),
-            "topic_distribution": {
-                topic: count/self.total_calls 
-                for topic, count in self.topic_counts.items()
-            }
-        }
-```
 
 :::caution Performance Tips
 For optimal monitoring:
