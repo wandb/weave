@@ -36,9 +36,9 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     a string or list of strings.
 
     Returns:
-        dict: A dictionary containing:
-            - pass (bool): Whether the output was flagged as relevant (score >= threshold)
-            - extras (dict): Contains:
+        WeaveScorerResult: An object containing:
+            - passed (bool): Whether the output was flagged as relevant (score >= threshold)
+            - metadata (dict): Contains:
                 - score (float): Overall relevance score between 0 and 1
                 - all_spans (list[dict], optional): If `return_all_spans` is True, includes list of all relevant
                   text spans with their scores, where each dict has:
