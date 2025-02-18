@@ -96,7 +96,7 @@ def test_failed_publish_maintains_old_object_ref(client, custom_object, monkeypa
             def fail_publish(*args, **kwargs):
                 raise RuntimeError("Publish failed")
 
-            m.setattr("weave._publish", fail_publish)
+            m.setattr("weave.trace.api._publish", fail_publish)
             custom_object.publish()
 
     assert custom_object.ref == old_ref

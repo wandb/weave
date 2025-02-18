@@ -1593,6 +1593,14 @@ class WeaveClient:
         Returns:
             An ObjectRef to the saved object.
         """
+        # Must defer import here to avoid circular import
+        from weave.flow.obj import Object
+        from weave.trace.objectify import _registry
+
+        # Check if object is a weave.Object but not registered
+        if isinstance(val, Object) and val.__class__.__name__ not in _registry:
+            raise NotImplementedError("Cannot save unregistered object")
+
         if isinstance(val, WeaveTable):
             # TODO: Probably should error here
             pass
