@@ -10,6 +10,9 @@ def presidio_entity_recognition_guardrail():
     return PresidioEntityRecognitionGuardrail()
 
 
+@pytest.mark.skip(
+    reason="This test depends on the spacy model `en-core-web-lg` which takes a long time to download"
+)
 def test_presidio_entity_recognition_guardrail_score(
     presidio_entity_recognition_guardrail,
 ):
