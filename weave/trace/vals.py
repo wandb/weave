@@ -386,6 +386,15 @@ class WeaveTable(Traceable):
         if self.table_ref is None:
             return
 
+        # If we have prefetched rows, use them directly
+        if self._prefetched_rows is not None:
+            for i, row in enumerate(self._prefetched_rows):
+                new_ref = self.ref.with_item(row.digest) if self.ref else None
+                res = from_json(row, self.table_ref.project_id, self.server)
+                res = make_trace_obj(res, new_ref, self.server, self.root)
+                yield res
+            return
+
         page_index = 0
         page_size = 100
         while True:
@@ -399,29 +408,9 @@ class WeaveTable(Traceable):
                 )
             )
 
-            if self._prefetched_rows is not None and len(response.rows) != len(
-                self._prefetched_rows
-            ):
-                if get_raise_on_captured_errors():
-                    raise
-                logger.error(
-                    f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
-                )
-                self._prefetched_rows = None
-
             for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
-                # Here, we use the raw rows if they exist, otherwise we use the
-                # rows from the server. This is a temporary trick to ensure
-                # we don't re-deserialize the rows on every access. Once all servers
-                # return digests, this branch can be removed because anytime we have prefetched
-                # rows we should also have the digests - and we should be in the
-                #  _local_iter_with_remote_fallback case.
-                val = (
-                    item.val
-                    if self._prefetched_rows is None
-                    else self._prefetched_rows[i]
-                )
+                val = item.val
                 res = from_json(val, self.table_ref.project_id, self.server)
                 res = make_trace_obj(res, new_ref, self.server, self.root)
                 yield res

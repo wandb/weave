@@ -54,3 +54,14 @@ def test_dataset_from_calls(client):
     assert rows[1]["inputs"]["name"] == "Bob"
     assert rows[1]["inputs"]["age"] == 25
     assert rows[1]["output"] == "Hello Bob, you are 25!"
+
+
+def test_dataset_from_specific_uri(client):
+    data = [{'a': i, 'b': i+1} for i in range(200)]
+    ds = weave.Dataset(rows=data)
+
+    ref = weave.publish(ds)
+    uri = ref.uri()
+
+    ds2 = weave.ref(uri).get()
+    assert list(ds2.rows) == data
