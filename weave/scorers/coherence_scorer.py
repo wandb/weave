@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from pydantic import Field, PrivateAttr, validate_call
+from pydantic import Field, validate_call
 
 import weave
 from weave.scorers.default_models import MODEL_PATHS
@@ -20,6 +20,17 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     Args:
         model_name: The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
         model_max_length: The maximum length of the model output. Defaults to 1024.
+
+    Example:
+    >>> scorer = WeaveCoherenceScorerV1()
+    >>> result = scorer.score(output="I am feeling sad", query="Hey how are you")
+    >>> print(result)
+    WeaveScorerResult(
+      passed=True,
+      metadata={
+        'coherence_label': 'Perfectly Coherent',
+        'coherence_id': 4, 'score': 0.8576799035072327}
+    )
     """
 
     task: str = "sentiment-analysis"
