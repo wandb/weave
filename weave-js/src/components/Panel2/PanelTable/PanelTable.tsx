@@ -1,6 +1,7 @@
 import 'react-base-table/lib/TableRow';
 
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {useRunName} from '@wandb/weave/common/hooks/useRunName';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
   callOpVeryUnsafe,
@@ -27,12 +28,8 @@ import {
   opMap,
   opPick,
   opRunId,
-  opRunName,
   Stack,
-  taggedValue,
   Type,
-  typedDict,
-  union,
   varNode,
   voidNode,
   WeaveInterface,
@@ -1227,17 +1224,9 @@ const IndexCell: React.FC<{
           }),
         })
       : constString('inherit');
-  const runNameNode =
-    props.runNode != null
-      ? opRunName({
-          run: weave.callFunction(props.runNode, {
-            row: props.rowNode as any,
-          }),
-        })
-      : constString('');
 
   const colorNodeValue = LLReact.useNodeValue(colorNode);
-  const runNameNodeValue = LLReact.useNodeValue(runNameNode);
+  const runNameNodeValue = useRunName(props.runNode);
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
