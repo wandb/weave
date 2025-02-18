@@ -28,12 +28,12 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         >>> scorer = WeaveFluencyScorerV1()
         >>> result = scorer.score("This text is fluent.")
         >>> print(result)
-        {
-            'pass': True,
-            'extras': {
+        WeaveScorerResult(
+            passed=True,
+            metadata={
                 'score': 0.95
             }
-        }
+        )
     """
 
     task: str = "text-classification"
@@ -68,5 +68,5 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         passed = fluency_score >= self.threshold
         return WeaveScorerResult(
             passed=passed,
-            extras={"score": fluency_score},
+            metadata={"score": fluency_score},
         )
