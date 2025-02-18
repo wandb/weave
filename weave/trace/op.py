@@ -291,8 +291,6 @@ def _execute_op(
             exception,
             op=__op,
         )
-        if not call_context.get_current_call() and __call.id:
-            print_call_link(__call)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):

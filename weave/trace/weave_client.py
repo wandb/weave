@@ -45,7 +45,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -64,6 +64,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -1137,6 +1138,9 @@ class WeaveClient:
     ) -> None:
         from weave.trace.api import _global_postprocess_output
 
+        # Capture the setting value in the current context
+        should_print = should_print_call_link()
+
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
@@ -1205,7 +1209,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_end_call() -> bool:
             output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
@@ -1219,8 +1223,20 @@ class WeaveClient:
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_end_call)
+        fut = self.future_executor.defer(send_end_call)
+
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    # Use the captured setting value
+                    if should_print:
+                        print_call_link(call)
+            except Exception:
+                pass
+
+        fut.add_done_callback(on_complete)
 
         call_context.pop_call(call.id)
 
