@@ -389,7 +389,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         select_columns = list(tsi.CallSchema.model_fields.keys())
         if req.columns:
             # TODO(gst): allow json fields to be selected
-            simple_columns = [x.split(".")[0] for x in req.columns]
+            simple_columns = list({x.split(".")[0] for x in req.columns})
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
             select_columns += [

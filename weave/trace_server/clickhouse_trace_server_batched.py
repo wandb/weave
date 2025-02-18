@@ -305,13 +305,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         columns = all_call_select_columns
         if req.columns:
+            # TODO: add support for json extract fields
+            # Split out any nested column requests
+            columns = [col.split(".")[0] for col in req.columns]
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
-            columns = list(set(required_call_columns + req.columns))
-            # TODO: add support for json extract fields
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in columns]
+            columns = list(set(required_call_columns + columns))
 
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
