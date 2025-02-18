@@ -30,7 +30,7 @@ Weave will automatically capture traces for [`InferenceClient`](https://huggingf
     pip install -U huggingface_hub weave -qqq
     ```
 
-2. To use inference with a model on the Hugging Face Hub, set your [User Access Token](https://huggingface.co/docs/hub/security-tokens). You can either set the token from your [Hugging Face Hub Settings page](https://huggingface.co/settings/tokens) or programmtically. The following code sample prompts the user to enter their `HUGGINGFACE_TOKEN` and sets the token as an environment variable.
+2. To use inference with a model on the Hugging Face Hub, set your [User Access Token](https://huggingface.co/docs/hub/security-tokens). You can either set the token from your [Hugging Face Hub Settings page](https://huggingface.co/settings/tokens) or programmatically. The following code sample prompts the user to enter their `HUGGINGFACE_TOKEN` and sets the token as an environment variable.
 
     ```python
     import os
