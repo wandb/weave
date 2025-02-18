@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Union
 
 from litellm import amoderation
-from pydantic import PrivateAttr, validate_call
+from pydantic import Field, PrivateAttr, validate_call
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
@@ -30,7 +30,10 @@ class OpenAIModerationScorer(weave.Scorer):
         model_id (str): The OpenAI moderation model identifier to be used. Defaults to `OPENAI_DEFAULT_MODERATION_MODEL`.
     """
 
-    model_id: str = OPENAI_DEFAULT_MODERATION_MODEL
+    model_id: str = Field(
+        description="The OpenAI moderation model identifier to be used.",
+        default=OPENAI_DEFAULT_MODERATION_MODEL,
+    )
 
     @weave.op
     @validate_call
@@ -67,10 +70,10 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     Celadon is a DeBERTa-v3-small fine-tuned model with five classification heads, trained on 600k samples from the Toxic Commons dataset.
 
     It classifies toxicity along five dimensions:
-    - **Race and Origin-based Bias**: Includes racism and bias against someone’s country, region of origin, or immigration status.
+    - **Race and Origin-based Bias**: Includes racism and bias against someone's country, region of origin, or immigration status.
     - **Gender and Sexuality-based Bias**: Includes sexism, misogyny, homophobia, transphobia, and sexual harassment.
-    - **Religious Bias**: Any bias or stereotype based on someone’s religion.
-    - **Ability Bias**: Bias according to someone’s physical, mental, or intellectual ability or disability.
+    - **Religious Bias**: Any bias or stereotype based on someone's religion.
+    - **Ability Bias**: Bias according to someone's physical, mental, or intellectual ability or disability.
     - **Violence and Abuse**: Overly graphic descriptions of violence, threats of violence, or incitement of violence.
 
     Args:
@@ -78,37 +81,40 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         total_threshold (int): The threshold for the total moderation score to flag the input. Defaults to `5`.
         category_threshold (int): The threshold for individual category scores to flag the input. Defaults to `2`.
         device (str): The device to use for inference. Defaults to `"cuda"` if available, otherwise `"cpu"`.
-        max_tokens (int): Maximum number of tokens per window. Defaults to `512`.
-        overlap (int): Number of overlapping tokens between windows. Defaults to `50`.
 
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
-        dict[str, Any]: A dictionary containing the `categories` with their respective scores and a `flagged` boolean.
+        WeaveScorerResult: An object containing:
+            - extras (dict[str, Any]): A dictionary mapping toxicity categories, such as "Race/Origin", "Gender/Sex", "Religion", "Ability", and "Violence", to their respective scores.
+            - passed (bool): A flag indicating whether the text passed the toxicity thresholds (True if none of the thresholds were exceeded, False otherwise).
 
     Example:
         >>> from weave.scorers import ToxicityScorer
         >>> scorer = ToxicityScorer()
         >>> result = scorer.score("This is a hateful message.")
         >>> print(result)
-        {
-            'categories': {
-                'Race/Origin': 3,
-                'Gender/Sex': 0,
-                'Religion': 0,
-                'Ability': 0,
-                'Violence': 1
-            },
-            'pass': False
-        }
+        WeaveScorerResult(extras={
+            'Race/Origin': 3,
+            'Gender/Sex': 0,
+            'Religion': 0,
+            'Ability': 0,
+            'Violence': 1
+        }, passed=False)
     """
 
-    total_threshold: int = TOXICITY_TOTAL_THRESHOLD
-    category_threshold: int = TOXICITY_CATEGORY_THRESHOLD
+    total_threshold: int = Field(
+        description="The threshold for the total moderation score to flag the input.",
+        default=TOXICITY_TOTAL_THRESHOLD,
+    )
+    category_threshold: int = Field(
+        description="The threshold for individual category scores to flag the input.",
+        default=TOXICITY_CATEGORY_THRESHOLD,
+    )
     max_tokens: int = 512
     overlap: int = 50
     _categories: list[str] = PrivateAttr(
-        default=[
+        default_factory=lambda: [
             "Race/Origin",
             "Gender/Sex",
             "Religion",
@@ -125,15 +131,14 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self.device, trust_remote_code=True
-        )
+            self._local_model_path, trust_remote_code=True
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
         """
@@ -166,7 +171,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             passed = False
 
         return WeaveScorerResult(
-            extras=dict(zip(self._categories, predictions)),
+            metadata=dict(zip(self._categories, predictions)),
             passed=passed,
         )
 
@@ -193,22 +198,27 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
-        dict[str, Any]: A dictionary indicating whether each bias category is detected.
+        WeaveScorerResult: An object containing:
+            - extras (dict[str, Any]): A dictionary mapping bias categories, such as "gender_bias" and "racial_bias", to their respective scores.
+            - passed (bool): A flag indicating whether the text passed the bias thresholds (True if none of the thresholds were exceeded, False otherwise).
 
     Example:
         >>> from weave.scorers.moderation_scorer import CustomBiasScorer
         >>> scorer = CustomBiasScorer()
         >>> result = scorer.score("This text contains gender bias.")
         >>> print(result)
-        {
-            'gender_bias': True,
-            'racial_bias': False
-        }
+        WeaveScorerResult(extras={
+            'gender_bias_score': 0.7,
+            'racial_bias_score': 0.3
+        }, passed=False)
     """
 
-    threshold: float = BIAS_SCORER_THRESHOLD
+    threshold: float = Field(
+        description="The threshold for the bias score to flag the input.",
+        default=BIAS_SCORER_THRESHOLD,
+    )
     _categories: list[str] = PrivateAttr(
-        default=[
+        default_factory=lambda: [
             "gender_bias",
             "racial_bias",
         ]
@@ -222,22 +232,23 @@ class WeaveBiasScorerV1(RollingWindowScorer):
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
-            self._local_model_path, device_map=self.device, trust_remote_code=True
-        )
+            self._local_model_path, trust_remote_code=True
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
         from transformers import AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
         import torch
 
+        assert self._model is not None
+        assert self._tokenizer is not None
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
-            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)  # type: ignore
+            outputs = self._model(input_ids=input_ids, attention_mask=attention_mask)
             predictions = outputs.logits.sigmoid().tolist()[0]
         return predictions
 
@@ -260,6 +271,6 @@ class WeaveBiasScorerV1(RollingWindowScorer):
             categories[f"{base_name}_score"] = float(pred)
             categories[base_name] = score
         return WeaveScorerResult(
-            extras=categories,
+            metadata=categories,
             passed=not any(scores),
         )
