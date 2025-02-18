@@ -46,21 +46,21 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
                     - score (float): The relevance score for this span
 
     Example:
-        >>> scorer = ContextRelevanceScorer(return_all_spans=True)
+        >>> scorer = WeaveContextRelevanceScorerV1(return_all_spans=True)
         >>> result = scorer.score(
         ...     query="What is the capital of France?",
         ...     output=["Paris is the capital of France."], # the context to score
         ... )
         >>> print(result)
-        {
-            'pass': True,
-            'extras': {
+        WeaveScorerResult(
+            passed=True,
+            metadata={
                 'score': 0.92,
                 'all_spans': [
                     {'text': 'Paris is the capital of France', 'score': 0.92}
                 ]
             }
-        }
+        )
     """
 
     threshold: float = Field(
@@ -181,10 +181,10 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        extras: dict[str, Any] = {"score": final_score}
+        metadata: dict[str, Any] = {"score": final_score}
         if self.return_all_spans:
-            extras["all_spans"] = all_spans
+            metadata["all_spans"] = all_spans
         return WeaveScorerResult(
             passed=final_score >= self.threshold,
-            extras=extras,
+            metadata=metadata,
         )
