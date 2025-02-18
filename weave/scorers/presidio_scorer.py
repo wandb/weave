@@ -28,7 +28,7 @@ def get_available_entities() -> list[str]:
     ]
 
 
-class PresidioEntityRecognitionGuardrail(weave.Scorer):
+class PresidioScorer(weave.Scorer):
     """
     The `PresidioEntityRecognitionGuardrail` class is a guardrail for entity recognition and anonymization
     by leveraging Presidio's AnalyzerEngine and AnonymizerEngine to perform these tasks.
