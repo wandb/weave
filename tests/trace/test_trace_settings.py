@@ -68,6 +68,7 @@ def test_disabled_env_client():
 
 
 def test_print_call_link_setting(client_creator):
+    # Test with link printing disabled
     parse_and_apply_settings(UserSettings(print_call_link=False))
     with client_creator() as client:
         callbacks = [flushing_callback(client)]
@@ -76,6 +77,7 @@ def test_print_call_link_setting(client_creator):
 
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
+    # Test with link printing enabled
     parse_and_apply_settings(UserSettings(print_call_link=True))
     with client_creator() as client:
         callbacks = [flushing_callback(client)]
