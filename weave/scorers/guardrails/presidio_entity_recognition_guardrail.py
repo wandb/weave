@@ -68,15 +68,11 @@ class PresidioEntityRecognitionGuardrail(weave.Scorer):
         # Get available entities dynamically
         available_entities = self.available_entities
 
-        # Initialize default values to all available entities
-        if not self.selected_entities:
-            self.selected_entities = available_entities
-
         # Filter out invalid entities and warn user
-        invalid_entities = [
-            e for e in self.selected_entities if e not in available_entities
-        ]
-        valid_entities = [e for e in self.selected_entities if e in available_entities]
+        invalid_entities = list(set(self.selected_entities) - set(available_entities))
+        valid_entities = list(
+            set(self.selected_entities).intersection(available_entities)
+        )
 
         if invalid_entities:
             print(
