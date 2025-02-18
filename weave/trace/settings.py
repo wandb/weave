@@ -112,6 +112,22 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
     """
 
+    redact_keys: tuple[str, ...] = ("api_key", "auth_headers", "authorization")
+    """
+    Sets the keys that should be redacted in traces. Values are case-insensitive.
+    Defaults to ("api_key", "auth_headers", "authorization").
+
+    Can be overridden with the environment variable `WEAVE_REDACT_KEYS` as a comma-separated list.
+    """
+
+    redacted_value: str = "REDACTED"
+    """
+    Sets the value to use when redacting sensitive information.
+    Defaults to "REDACTED".
+
+    Can be overridden with the environment variable `WEAVE_REDACTED_VALUE`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -168,6 +184,16 @@ def server_cache_dir() -> Optional[str]:
 
 def scorers_dir() -> str:
     return _optional_str("scorers_dir")  # type: ignore
+
+
+def redact_keys() -> tuple[str, ...]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}REDACT_KEYS"):
+        return tuple(k.strip() for k in env.split(","))
+    return _context_vars["redact_keys"].get()
+
+
+def redacted_value() -> str:
+    return _optional_str("redacted_value") or "REDACTED"  # type: ignore
 
 
 def parse_and_apply_settings(
