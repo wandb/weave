@@ -1057,8 +1057,11 @@ class WeaveClient:
         if not attributes:
             attributes = {}
 
-        # First create an AttributesDict with global attributes
-        attributes_dict = AttributesDict(**_global_attributes, **attributes)
+        # First create an AttributesDict with global attributes, then update with local attributes
+        # Local attributes take precedence over global ones
+        attributes_dict = AttributesDict()
+        attributes_dict.update(_global_attributes)
+        attributes_dict.update(attributes)
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
