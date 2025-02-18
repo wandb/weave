@@ -20,6 +20,7 @@ from weave.flow.model import (
 )
 from weave.flow.obj import Object
 from weave.flow.scorer import (
+    PairwiseScorer,
     Scorer,
     _has_oldstyle_scorers,
     _validate_scorer_signature,
@@ -222,7 +223,27 @@ class Evaluation(Object):
         scorers = self._post_init_scorers
 
         for scorer in scorers:
-            apply_scorer_result = await model_call.apply_scorer(scorer, example)
+            if isinstance(scorer, PairwiseScorer):
+                # For pairwise scorers, we need to run the other model too
+                other_model_result = await apply_model_async(
+                    scorer.other_model, example, self.preprocess_model_input
+                )
+
+                if isinstance(other_model_result, ApplyModelError):
+                    # If other model fails, skip this scorer
+                    continue
+
+                # Add other model's output to the scorer kwargs
+                example_with_outputs = {
+                    **example,
+                    "other_output": other_model_result.model_output,
+                }
+                apply_scorer_result = await model_call.apply_scorer(
+                    scorer, example_with_outputs
+                )
+            else:
+                apply_scorer_result = await model_call.apply_scorer(scorer, example)
+
             result = apply_scorer_result.result
             scorer_attributes = get_scorer_attributes(scorer)
             scorer_name = scorer_attributes.scorer_name

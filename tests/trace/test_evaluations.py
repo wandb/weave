@@ -5,10 +5,12 @@ from typing import Any, Optional
 import pydantic
 import pytest
 from PIL import Image
+from pydantic_core import ValidationError
 
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
-from weave import Evaluation, Model
+from weave import Dataset, Evaluation, Model
+from weave.flow.scorer import PairwiseScorer
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
@@ -1052,3 +1054,167 @@ async def test_evaluation_with_custom_name(client):
 
     call = calls[0]
     assert call.display_name == "wow-custom!"
+
+
+@pytest.mark.asyncio
+async def test_pairwise_scorer_basic(client):
+    class ModelA(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            if "Prefer model A" in input_text:
+                return {"response": "This is a great answer from Model A"}
+            return {"response": "Meh, whatever"}
+
+    class ModelB(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            if "Prefer model B" in input_text:
+                return {"response": "This is a thoughtful answer from Model B"}
+            return {"response": "I don't know"}
+
+    class PreferenceScorer(PairwiseScorer):
+        @weave.op
+        async def score(
+            self, output: dict, other_output: dict, input_text: str
+        ) -> dict:
+            if "Prefer model A" in input_text:  # Model A wins
+                primary_is_better = True
+                reason = "Model A gave a great answer"
+            else:  # Model B wins
+                primary_is_better = False
+                reason = "Model B is preferred for this type of question"
+
+            return {"primary_is_better": primary_is_better, "reason": reason}
+
+    dataset = Dataset(
+        rows=[
+            {"input_text": "Prefer model A: Question 1"},  # Model A wins
+            {"input_text": "Prefer model A: Question 2"},  # Model A wins
+            {"input_text": "Prefer model B: Question 3"},  # Model B wins
+            {"input_text": "Prefer model B: Question 4"},  # Model B wins
+        ]
+    )
+
+    model_a = ModelA()
+    model_b = ModelB()
+    scorer = PreferenceScorer(other_model=model_b)
+    evaluation = Evaluation(dataset=dataset, scorers=[scorer])
+
+    result = await evaluation.evaluate(model_a)
+
+    # Assert exact shape of results
+    expected_result = {
+        "PreferenceScorer": {
+            "primary_is_better": {"true_count": 2, "true_fraction": 0.5}
+        },
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }
+    assert result == expected_result
+
+
+@pytest.mark.asyncio
+async def test_pairwise_scorer_multiple_scorers(client):
+    """Test multiple different types of pairwise scorers working together."""
+
+    class ModelA(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            return {"response": "Response from A", "metadata": {"model": "A"}}
+
+    class ModelB(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            return {"response": "Response from B", "metadata": {"model": "B"}}
+
+    class ResponseLengthScorer(PairwiseScorer):
+        @weave.op
+        async def score(self, output: dict, other_output: dict) -> dict:
+            return {
+                "primary_longer": len(output["response"])
+                > len(other_output["response"]),
+                "length_diff": len(output["response"]) - len(other_output["response"]),
+            }
+
+    class MetadataComparisonScorer(PairwiseScorer):
+        @weave.op
+        async def score(self, output: dict, other_output: dict) -> dict:
+            return {
+                "models_match": output["metadata"]["model"]
+                == other_output["metadata"]["model"],
+                "model_names": f"{output['metadata']['model']} vs {other_output['metadata']['model']}",
+            }
+
+    dataset = Dataset(rows=[{"input_text": "Test input"}])
+    model_a = ModelA()
+    model_b = ModelB()
+    scorers = [
+        ResponseLengthScorer(other_model=model_b),
+        MetadataComparisonScorer(other_model=model_b),
+    ]
+
+    evaluation = Evaluation(dataset=dataset, scorers=scorers)
+    result = await evaluation.evaluate(model_a)
+
+    # Assert exact shape of results
+    expected_result = {
+        "ResponseLengthScorer": {
+            "primary_longer": {"true_count": 0, "true_fraction": 0.0},
+            "length_diff": {"mean": 0.0},
+        },
+        "MetadataComparisonScorer": {
+            "models_match": {"true_count": 0, "true_fraction": 0.0}
+        },
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }
+    assert result == expected_result
+
+
+@pytest.mark.asyncio
+async def test_pairwise_scorer_invalid_model(client):
+    """Test error handling when an invalid model is provided."""
+
+    class InvalidModel:
+        def predict(self, input_text: str):
+            return "invalid"
+
+    class PreferenceScorer(PairwiseScorer):
+        @weave.op
+        async def score(self, output: dict, other_output: dict) -> dict:
+            return {"compared": True}
+
+    with pytest.raises(ValidationError, match="Input should be an instance of Op"):
+        PreferenceScorer(other_model=InvalidModel())
+
+
+@pytest.mark.asyncio
+async def test_pairwise_scorer_failing_model(client):
+    """Test behavior when the comparison model fails."""
+
+    class MainModel(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            return {"response": "Success", "confidence": 0.9}
+
+    class FailingModel(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            raise RuntimeError("Simulated failure")
+
+    class SimpleScorer(PairwiseScorer):
+        @weave.op
+        async def score(self, output: dict, other_output: dict) -> dict:
+            raise RuntimeError("Simulated failure")
+
+    dataset = Dataset(rows=[{"input_text": "Test input"}])
+    failing_scorer = SimpleScorer(other_model=FailingModel())
+    evaluation = Evaluation(dataset=dataset, scorers=[failing_scorer])
+
+    result = await evaluation.evaluate(MainModel())
+
+    # Assert exact shape of results
+    expected_result = {
+        "SimpleScorer": None,
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "output": {"confidence": {"mean": 0.9}},
+    }
+    assert result == expected_result

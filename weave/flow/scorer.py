@@ -9,6 +9,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 import weave
+from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
@@ -365,3 +366,53 @@ async def apply_scorer_async(
         raise OpCallError(message)
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
+
+
+class PairwiseScorer(Scorer):
+    """Base class for scorers that compare outputs from two models.
+
+    This scorer type is used when you need to compare outputs from two different models
+    on the same input, for example to determine which model performs better in a head-to-head
+    comparison.
+
+    Attributes:
+        other_model: The second model to compare against
+        column_map: Optional mapping from dataset column names to scorer parameter names
+
+    Example:
+        ```python
+        class PreferenceScorer(PairwiseScorer):
+            @weave.op
+            async def score(self, output: Any, other_output: Any, **kwargs) -> dict:
+                # Compare the two outputs and return preference scores
+                return {
+                    "model_a_better": 0.8,
+                    "model_b_better": 0.2,
+                    "reasoning": "Model A's response was more detailed..."
+                }
+        ```
+    """
+
+    other_model: Union[Op, Model]
+
+    def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
+
+        from weave.flow.eval import is_valid_model
+
+        if not is_valid_model(self.other_model):
+            raise ValueError("other_model must be a valid Model or Op instance")
+
+    @weave.op
+    async def score(self, output: Any, other_output: Any, **kwargs: Any) -> dict:
+        """Score the outputs from both models.
+
+        Args:
+            output: Output from the primary model being evaluated
+            other_output: Output from the comparison model
+            **kwargs: Additional arguments from the dataset row
+
+        Returns:
+            A dictionary containing the comparison metrics
+        """
+        raise NotImplementedError
