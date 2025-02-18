@@ -7,7 +7,6 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
 )
 
@@ -39,7 +38,6 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     )
 
     def load_pipeline(self) -> None:
-        ensure_hf_imports()
         from transformers import pipeline
 
         self._local_model_path = load_hf_model_weights(
