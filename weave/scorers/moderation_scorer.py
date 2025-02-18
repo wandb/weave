@@ -198,17 +198,19 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
-        dict[str, Any]: A dictionary indicating whether each bias category is detected.
+        WeaveScorerResult: An object containing:
+            - extras (dict[str, Any]): A dictionary mapping bias categories, such as "gender_bias" and "racial_bias", to their respective scores.
+            - passed (bool): A flag indicating whether the text passed the bias thresholds (True if none of the thresholds were exceeded, False otherwise).
 
     Example:
         >>> from weave.scorers.moderation_scorer import CustomBiasScorer
         >>> scorer = CustomBiasScorer()
         >>> result = scorer.score("This text contains gender bias.")
         >>> print(result)
-        {
-            'gender_bias': True,
-            'racial_bias': False
-        }
+        WeaveScorerResult(extras={
+            'gender_bias_score': 0.7,
+            'racial_bias_score': 0.3
+        }, passed=False)
     """
 
     threshold: float = Field(
