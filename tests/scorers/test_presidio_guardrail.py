@@ -1,11 +1,11 @@
 import pytest
 
-from weave.scorers import PresidioEntityRecognitionGuardrail
+from weave.scorers import PresidioScorer
 
 
 @pytest.fixture
 def presidio_entity_recognition_guardrail():
-    return PresidioEntityRecognitionGuardrail()
+    return PresidioScorer()
 
 
 @pytest.mark.skip(

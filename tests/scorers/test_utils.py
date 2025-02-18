@@ -10,6 +10,7 @@ from weave.scorers.utils import download_model, stringify
 
 # Model paths for various scorers
 TINY_MODEL_PATHS = {
+    "fluency_scorer": "c-metrics/weave-scorers/fluency_scorer_tiny:latest",
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer_tiny:latest",
     "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer_tiny:latest",
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:latest",
