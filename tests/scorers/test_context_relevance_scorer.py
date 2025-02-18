@@ -29,12 +29,8 @@ def test_context_relevance_scorer_basic(weave_context_relevance_scorer):
         output=output,
     )
     # Using attributes from the pydantic model
-    assert (
-        result.passed is False
-    )  # The actual implementation returns False for this case
-    # Ensure that the score is present and truthy
-    assert "score" in result.metadata
-    assert result.extras["score"] > 0
+    assert not result.passed
+    assert result.metadata["score"] > 0
 
 
 def test_long_context(weave_context_relevance_scorer):
@@ -45,7 +41,5 @@ def test_long_context(weave_context_relevance_scorer):
         query=query,
         output=output,
     )
-    assert (
-        result.passed is False
-    )  # The actual implementation returns False for this case
+    assert not result.passed
     assert result.metadata["score"] < 1.0

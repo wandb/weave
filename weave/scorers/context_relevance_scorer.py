@@ -81,8 +81,8 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
         )
         self._model = AutoModelForTokenClassification.from_pretrained(
-            self._local_model_path, device_map=self.device
-        )
+            self._local_model_path
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
