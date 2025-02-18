@@ -14,8 +14,8 @@ from weave.scorers.moderation_scorer import (
     WeaveBiasScorerV1,
     WeaveToxicityScorerV1,
 )
-from weave.scorers.presidio_entity_recognition_guardrail import (
-    PresidioEntityRecognitionGuardrail,
+from weave.scorers.presidio_guardrail import (
+    PresidioScorer,
 )
 from weave.scorers.prompt_injection_guardrail import (
     PromptInjectionLLMGuardrail,
@@ -51,7 +51,7 @@ __all__ = [
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "PromptInjectionLLMGuardrail",
-    "PresidioEntityRecognitionGuardrail",
+    "PresidioScorer",
     "PydanticScorer",
     "Scorer",
     "StringMatchScorer",
