@@ -193,7 +193,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias_scorer"`.
         task (str): The pipeline task type. Defaults to `"text-classification"`.
         device (str): The device to use for inference. Defaults to `cpu`, set to `cuda` if GPU is available.
-        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.5`.
+        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.6`.
 
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 

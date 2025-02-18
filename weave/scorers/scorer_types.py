@@ -78,6 +78,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The device to use for the model, default to cpu.",
         frozen=True,
     )
+
     _pipeline: "Pipeline" = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
