@@ -104,6 +104,7 @@ class HuggingFaceScorer(weave.Scorer):
     device: str = Field(
         default="auto",
         description="The device to use for the model",
+        frozen=True,
     )
     _device: Optional["torch.device"] = PrivateAttr(default=None)
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
