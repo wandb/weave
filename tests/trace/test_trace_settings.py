@@ -50,7 +50,6 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
-
 def test_print_call_link_setting(client):
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
