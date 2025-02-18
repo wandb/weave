@@ -85,7 +85,7 @@ def test_dspy_chain_of_thought_call(client) -> None:
     ), f"Expected probability around 0.0277 (1/36), got {response.answer}"
 
     calls = list(client.calls())
-    assert len(calls) == 8
+    assert len(calls) == 10
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -168,7 +168,7 @@ def test_dspy_classification(client) -> None:
     assert response.confidence > 0.5
 
     calls = list(client.calls())
-    assert len(calls) == 5
+    assert len(calls) == 7
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -187,14 +187,24 @@ def test_dspy_classification(client) -> None:
     call = calls[2]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "dspy.LM"
+    assert trace_name == "dspy.ChatAdapter"
 
     call = calls[3]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "litellm.completion"
+    assert trace_name == "dspy.Adapter"
 
     call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+
+    call = calls[6]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "openai.chat.completions.create"
@@ -245,7 +255,7 @@ def test_dspy_information_extraction(client) -> None:
     assert "iphone" in response.title.lower()
 
     calls = list(client.calls())
-    assert len(calls) == 5
+    assert len(calls) == 7
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -266,14 +276,24 @@ def test_dspy_information_extraction(client) -> None:
     call = calls[2]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "dspy.LM"
+    assert trace_name == "dspy.ChatAdapter"
 
     call = calls[3]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "litellm.completion"
+    assert trace_name == "dspy.Adapter"
 
     call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+
+    call = calls[6]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "openai.chat.completions.create"
