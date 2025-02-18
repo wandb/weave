@@ -325,9 +325,19 @@ def test_sync_eval_parallelism(client):
     }
     assert time.time() - now < 5
 def test_evaluation_from_weaveobject_missing_evaluation_name(client):
-    # Setup
-    weave.publish(score)
-    weave.publish(dataset)
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+    dataset = Dataset(rows=dataset_rows)
+
+    class EvalModel(Model):
+        @weave.op()
+        async def predict(self, input) -> str:
+            return eval(input)
+
+
+    @weave.op()
+    def score(target, output):
+        return target == output
+
 
     # Create and save an Evaluation object
     evaluation = Evaluation(
