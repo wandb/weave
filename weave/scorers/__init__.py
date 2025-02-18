@@ -60,4 +60,6 @@ __all__ = [
     "WeaveToxicityScorerV1",
     "WeaveCoherenceScorerV1",
     "WeaveFluencyScorerV1",
+    "WeaveHallucinationScorerV1",
+    "WeaveContextRelevanceScorerV1",
 ]
