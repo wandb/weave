@@ -1,12 +1,14 @@
 import pytest
 
+import weave
 from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.utils import WeaveScorerResult
 
 
 # Dummy scorer to test _filter_inputs_for_scorer functionality.
-class DummyScorer:
+class DummyScorer(weave.Scorer):
+    @weave.op
     def score(self, output: str, query: str):
         return WeaveScorerResult(
             passed=True, metadata={"dummy": True}, extras={"score": 1}
