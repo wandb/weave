@@ -26,15 +26,6 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     model_max_length: int = Field(
         default=1024, description="The maximum length of the model output."
     )
-    _label2id: dict[str, int] = PrivateAttr(
-        default_factory=lambda: {
-            "Completely Incoherent": 0,
-            "Mostly Incoherent": 1,
-            "A Little Incoherent": 2,
-            "Mostly Coherent": 3,
-            "Perfectly Coherent": 4,
-        }
-    )
 
     def load_pipeline(self) -> None:
         ensure_hf_imports()
@@ -58,12 +49,14 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
         passed = True
         if "incoherent" in coherence_output["label"].lower():
             passed = False
+        label = coherence_output["label"]
+        id = self._pipeline.model.config.label2id[label]
 
         return WeaveScorerResult(
             passed=passed,
             metadata={
-                "coherence_label": coherence_output["label"],
-                "coherence_id": self._label2id[coherence_output["label"]],
+                "coherence_label": label,
+                "coherence_id": id,
                 "score": coherence_output["score"],
             },
         )
