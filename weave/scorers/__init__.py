@@ -13,10 +13,11 @@ from weave.scorers.moderation_scorer import (
     WeaveBiasScorerV1,
     WeaveToxicityScorerV1,
 )
-from weave.scorers.prompt_injection_guardrail import (
-    PromptInjectionLLMGuardrail,
 from weave.scorers.presidio_entity_recognition_guardrail import (
     PresidioEntityRecognitionGuardrail,
+)
+from weave.scorers.prompt_injection_guardrail import (
+    PromptInjectionLLMGuardrail,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
