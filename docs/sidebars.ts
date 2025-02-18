@@ -59,8 +59,25 @@ const sidebars: SidebarsConfig = {
           collapsible: true,
           collapsed: false,
           label: "Evaluation",
-          link: { type: "doc", id: "guides/core-types/evaluations" },
-          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors", "guides/evaluation/builtin_scorers"],
+          // link: { type: "doc", id: "guides/core-types/evaluations" },
+          items: [
+            "guides/core-types/evaluations",
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Real-time Evaluation",
+              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
+              items: ["guides/evaluation/guardrails", "guides/evaluation/monitors"],
+            },
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Scoring",
+              items: ["guides/evaluation/scorers",  "guides/evaluation/builtin_scorers"],
+            }
+            ],
         },
         "guides/core-types/prompts",
         "guides/core-types/models",
