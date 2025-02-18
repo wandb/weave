@@ -71,6 +71,34 @@ For more details about Call objects, see our [Calls guide section on Call object
 
 ## Implementation Guides
 
+### Basic Example
+
+Here's a simple example showing how to use `.call()` with a scorer:
+
+```python
+import weave
+from weave import Scorer
+
+class LengthScorer(Scorer):
+    @weave.op
+    def score(self, output: str) -> dict:
+        """A simple scorer that checks output length."""
+        return {
+            "length": len(output),
+            "is_short": len(output) < 100
+        }
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    return "Hello, world!"
+
+# Get both result and Call object
+result, call = generate_text.call("Say hello")
+
+# Now you can apply scorers
+await call.apply_scorer(LengthScorer())
+```
+
 Now that you understand the core concepts, dive into our detailed implementation guides:
 
 1. [**Guardrails Guide**](./guardrails.md)
