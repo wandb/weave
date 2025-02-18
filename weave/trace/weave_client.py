@@ -1101,7 +1101,7 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
+        def send_start_call() -> bool:
             inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
                 CallStartReq(
@@ -1119,8 +1119,19 @@ class WeaveClient:
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        fut = self.future_executor.defer(send_start_call)
+
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    if should_print_call_link():
+                        print_call_link(call)
+            except Exception:
+                pass
+
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -1137,9 +1148,6 @@ class WeaveClient:
         op: Op | None = None,
     ) -> None:
         from weave.trace.api import _global_postprocess_output
-
-        # Capture the setting value in the current context
-        should_print = should_print_call_link()
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
@@ -1226,17 +1234,6 @@ class WeaveClient:
             return True
 
         fut = self.future_executor.defer(send_end_call)
-
-        def on_complete(f: Future) -> None:
-            try:
-                if f.result() and not call_context.get_current_call():
-                    # Use the captured setting value
-                    if should_print:
-                        print_call_link(call)
-            except Exception:
-                pass
-
-        fut.add_done_callback(on_complete)
 
         call_context.pop_call(call.id)
 
