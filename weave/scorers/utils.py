@@ -1,15 +1,12 @@
 import json
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
-
-if TYPE_CHECKING:
-    from torch import device
 
 
 class WeaveScorerResult(BaseModel):
