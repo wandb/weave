@@ -7,7 +7,7 @@ import logging
 import random
 import sys
 import traceback
-from collections.abc import Coroutine, Mapping
+from collections.abc import Coroutine, Mapping, Iterable, AsyncIterable
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
@@ -21,6 +21,9 @@ from typing import (
     cast,
     overload,
     runtime_checkable,
+    TypeVar,
+    Dict,
+    Generic,
 )
 
 from weave.trace import box, settings
@@ -128,58 +131,167 @@ class WeaveKwargs(TypedDict):
     display_name: str | None
 
 
+# Type variables for generic hooks
+Input = TypeVar("Input")  # Input type
+Output = TypeVar("Output")  # Output type 
+State = TypeVar("State")  # State type
+
+class OpLifecycle(Protocol[Input, Output, State]):
+    """Protocol defining the lifecycle hooks for an Op.
+    
+    The lifecycle is:
+    1. before_call - Called before the function is executed
+    2. process_inputs_for_logging - Process inputs for logging purposes only
+    3. on_yield - Called for each value yielded (for iterators)
+    4. process_output - Process output after function execution
+    5. on_error - Called when an error occurs
+    6. on_finish - Called when execution finishes (success or error)
+    7. after_call - Called after everything is done
+    """
+    
+    def before_call(self, args: tuple, kwargs: dict) -> None:
+        """Called before function execution."""
+        ...
+        
+    def process_inputs_for_logging(self, args: tuple, kwargs: dict) -> dict[str, Any]:
+        """Process inputs for logging purposes only. Does not affect function execution.
+        
+        This hook allows you to modify how inputs are logged to Weave without affecting
+        the actual function execution. The original args/kwargs are passed to the function.
+        
+        Returns:
+            A dictionary of inputs to log to Weave
+        """
+        ...
+        
+    def on_yield(self, value: Any) -> Any:
+        """Called for each value yielded by an iterator."""
+        ...
+        
+    def process_output(self, output: Any) -> Any:
+        """Process output after function execution."""
+        ...
+        
+    def on_error(self, error: Exception) -> None:
+        """Called when an error occurs."""
+        ...
+        
+    def on_finish(self, output: Any, error: Exception | None = None) -> None:
+        """Called when execution finishes."""
+        ...
+        
+    def after_call(self, call: "Call") -> None:
+        """Called after everything is done."""
+        ...
+
+class DefaultOpLifecycle:
+    """Default lifecycle implementation that maintains compatibility."""
+
+    def before_call(self, call: Call) -> None:
+        """Default no-op before call."""
+        pass
+
+    def process_inputs_for_logging(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Default input processing that returns inputs as is."""
+        return inputs
+
+    def on_yield(self, value: Any) -> Any:
+        """Default yield processing that returns value as is."""
+        return value
+
+    def process_output(self, output: Any) -> Any:
+        """Default output processing that returns output as is."""
+        return output
+
+    def on_error(self, error: Exception) -> None:
+        """Default no-op error handler."""
+        pass
+
+    def on_finish(self, error: Optional[Exception]) -> None:
+        """Default no-op finish handler."""
+        pass
+
+    def after_call(self, call: Call) -> None:
+        """Default no-op after call."""
+        pass
+
+class IteratorLifecycle(Generic[State]):
+    """Lifecycle implementation for iterators that supports accumulation."""
+
+    def __init__(self):
+        self._accumulator = None
+        self._state = None
+        self._on_finish = None
+        self._has_finished = False
+
+    def before_call(self, call: Call) -> None:
+        """Initialize state before call."""
+        self._state = None
+        self._has_finished = False
+
+    def process_inputs_for_logging(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Process inputs for logging."""
+        return inputs
+
+    def on_yield(self, value: Any) -> Any:
+        """Process yielded value and update state."""
+        if self._accumulator is not None:
+            self._state = self._accumulator(self._state, value)
+        return value
+
+    def process_output(self, output: Any) -> Any:
+        """Process final output."""
+        return output
+
+    def on_error(self, error: Exception) -> None:
+        """Handle error."""
+        pass
+
+    def on_finish(self, error: Optional[Exception]) -> None:
+        """Handle finish with optional error."""
+        if not self._has_finished and self._on_finish is not None:
+            self._on_finish(self._state, error)
+        self._has_finished = True
+
+    def after_call(self, call: Call) -> None:
+        """Ensure finish is called."""
+        if not self._has_finished and self._on_finish is not None:
+            self._on_finish(self._state, None)
+            self._has_finished = True
+
+    def add_accumulator(
+        self,
+        accumulator: Callable[[Optional[State], Any], State],
+        on_finish: Optional[Callable[[Optional[State], Optional[Exception]], None]] = None,
+    ) -> None:
+        """Add accumulator function to lifecycle.
+
+        Args:
+            accumulator: Function that takes current state and yielded value and returns new state
+            on_finish: Optional callback when iteration finishes
+        """
+        self._accumulator = accumulator
+        self._on_finish = on_finish
+
 @runtime_checkable
 class Op(Protocol):
-    """
-    The interface for Op-ified functions and methods.
-
-    Op was previously a class, and has been converted to a Protocol to allow
-    functions to pass for Op.  This is needed because many popular packages are
-    using the `inspect` module for control flow, and Op instances don't always
-    pass those checks.  In particular, `inspect.iscoroutinefunction` always
-    fails for classes, even ones that implement async methods or protocols.
-
-    Some of the attributes are carry-overs from when Op was a class.  We should
-    consider removing the unnecessary ones where possible.
-    - resolve_fn (I think you can just use the func itself?)
-    - _set_on_output_handler (does this have to be on the op?)
-    - _on_output_handler (does this have to be on the op?)
-    """
-
+    """Protocol for Op-ified functions and methods."""
     name: str
     call_display_name: str | Callable[[Call], str]
     ref: ObjectRef | None
     resolve_fn: Callable
-
+    lifecycle: OpLifecycle
+    
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None
     postprocess_output: Callable[..., Any] | None
 
-    call: Callable[..., Any]
-    calls: Callable[..., CallsIter]
+    call: Callable[..., CallsIter]
 
-    _set_on_input_handler: Callable[[OnInputHandlerType], None]
-    _on_input_handler: OnInputHandlerType | None
-
-    # not sure if this is the best place for this, but kept for compat
-    _set_on_output_handler: Callable[[OnOutputHandlerType], None]
-    _on_output_handler: OnOutputHandlerType | None
-
-    _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
-    _on_finish_handler: OnFinishHandlerType | None
+    _tracing_enabled: bool
+    tracing_sample_rate: float
 
     __call__: Callable[..., Any]
     __self__: Any
-
-    # `_tracing_enabled` is a runtime-only flag that can be used to disable
-    # call tracing for an op. It is not persisted as a property of the op, but is
-    # respected by the current execution context. It is an underscore property
-    # because it is not intended to be used by users directly, but rather assists
-    # with internal Weave behavior. If we find a need to expose this to users, we
-    # should consider a more user-friendly API (perhaps a setter/getter) & whether
-    # it disables child ops as well.
-    _tracing_enabled: bool
-
-    tracing_sample_rate: float
 
 
 def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
@@ -269,82 +381,180 @@ def _create_call(
     )
 
 
-def _execute_op(
-    __op: Op,
-    __call: Call,
-    *args: Any,
-    __should_raise: bool = True,
-    **kwargs: Any,
+def execute_op(
+    op: Op,
+    call: Call,
+    args: tuple,
+    kwargs: dict,
+    should_raise: bool = True,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    func = __op.resolve_fn
+    """Execute an op with full lifecycle hooks.
+
+    This is the main entry point for op execution. It handles both sync and async
+    functions, and manages the entire lifecycle of the op execution including:
+    - Input processing for logging
+    - Function execution
+    - Output processing
+    - Error handling
+    - Iterator wrapping
+    - Cleanup
+
+    Args:
+        op: The op to execute
+        call: The call object representing this execution
+        args: Positional arguments to pass to the function
+        kwargs: Keyword arguments to pass to the function
+        should_raise: Whether to raise exceptions or return them
+
+    Returns:
+        A tuple of (result, call) or a coroutine that will return that tuple
+    """
     client = weave_client_context.require_weave_client()
-    has_finished = False
 
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        nonlocal has_finished
-        if has_finished:
-            raise ValueError("Should not call finish more than once")
+    # Step 1: Before call hook
+    op.lifecycle.before_call(call)
 
-        client.finish_call(
-            __call,
-            output,
-            exception,
-            op=__op,
-        )
-        if not call_context.get_current_call():
-            print_call_link(__call)
-
-    def on_output(output: Any) -> Any:
-        if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, __call.inputs)
-        finish(output)
-        return output
-
-    def process(res: Any) -> tuple[Any, Call]:
-        res = box.box(res)
-        try:
-            # Here we do a try/catch because we don't want to
-            # break the user process if we trip up on processing
-            # the output
-            res = on_output(res)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-        finally:
-            # Is there a better place for this? We want to ensure that even
-            # if the final output fails to be captured, we still pop the call
-            # so we don't put future calls under the old call.
-            call_context.pop_call(__call.id)
-
-        return res, __call
-
-    def handle_exception(e: Exception) -> tuple[Any, Call]:
-        finish(exception=e)
-        if __should_raise:
-            raise
-        return None, __call
-
-    if inspect.iscoroutinefunction(func):
-
-        async def _call_async() -> tuple[Any, Call]:
-            try:
-                res = await func(*args, **kwargs)
-            except Exception as e:
-                return handle_exception(e)
-            else:
-                return process(res)
-
-        return _call_async()
-
+    # Step 2: Process inputs for logging
     try:
-        res = func(*args, **kwargs)
+        inputs_dict = {
+            f"arg{i}": arg for i, arg in enumerate(args)
+        }
+        inputs_dict.update(kwargs)
+        processed_inputs = op.lifecycle.process_inputs_for_logging(inputs_dict)
+        call.update_inputs(processed_inputs)
     except Exception as e:
-        handle_exception(e)
-    else:
-        return process(res)
+        # Log error but continue execution
+        logger.error(f"Error processing inputs for logging: {e}")
 
-    return None, __call
+    async def _execute_async() -> tuple[Any, Call]:
+        try:
+            # Step 3: Execute function with original args
+            if inspect.isasyncgenfunction(op.resolve_fn):
+                # Handle async generator functions
+                result = op.resolve_fn(*args, **kwargs)
+                values = []
+                try:
+                    async for value in result:
+                        processed = op.lifecycle.on_yield(value)
+                        values.append(processed)
+                except Exception as e:
+                    op.lifecycle.on_error(e)
+                    if should_raise:
+                        raise
+                finally:
+                    op.lifecycle.on_finish(None)
+
+                async def yield_from_list():
+                    for value in values:
+                        yield value
+
+                result = yield_from_list()
+            else:
+                # Handle regular async functions
+                result = await op.resolve_fn(*args, **kwargs)
+                if isinstance(result, AsyncIterable):
+                    # Handle async iterables
+                    values = []
+                    try:
+                        async for value in result:
+                            processed = op.lifecycle.on_yield(value)
+                            values.append(processed)
+                    except Exception as e:
+                        op.lifecycle.on_error(e)
+                        if should_raise:
+                            raise
+                    finally:
+                        op.lifecycle.on_finish(None)
+
+                    async def yield_from_list():
+                        for value in values:
+                            yield value
+
+                    result = yield_from_list()
+                else:
+                    result = op.lifecycle.process_output(result)
+                    op.lifecycle.on_finish(None)
+
+            # Update call output
+            call.update_output(result)
+            op.lifecycle.after_call(call)
+            return result, call
+
+        except Exception as e:
+            # Step 5: Finish with error
+            op.lifecycle.on_error(e)
+            op.lifecycle.on_finish(e)
+            op.lifecycle.after_call(call)
+            if should_raise:
+                raise
+            return e, call
+
+    def _execute_sync() -> tuple[Any, Call]:
+        try:
+            # Step 3: Execute function with original args
+            result = op.resolve_fn(*args, **kwargs)
+
+            # Step 4: Process output
+            if inspect.isgenerator(result):
+                # Handle sync iterators
+                values = []
+                try:
+                    for value in result:
+                        processed = op.lifecycle.on_yield(value)
+                        values.append(processed)
+                except Exception as e:
+                    op.lifecycle.on_error(e)
+                    if should_raise:
+                        raise
+                finally:
+                    op.lifecycle.on_finish(None)
+
+                def yield_from_list():
+                    for value in values:
+                        yield value
+
+                result = yield_from_list()
+            elif isinstance(result, Iterable) and not isinstance(result, (str, bytes)):
+                # Handle other iterables
+                values = []
+                try:
+                    for value in result:
+                        processed = op.lifecycle.on_yield(value)
+                        values.append(processed)
+                except Exception as e:
+                    op.lifecycle.on_error(e)
+                    if should_raise:
+                        raise
+                finally:
+                    op.lifecycle.on_finish(None)
+
+                def yield_from_list():
+                    for value in values:
+                        yield value
+
+                result = yield_from_list()
+            else:
+                result = op.lifecycle.process_output(result)
+                op.lifecycle.on_finish(None)
+
+            # Update call output
+            call.update_output(result)
+            op.lifecycle.after_call(call)
+            return result, call
+
+        except Exception as e:
+            # Step 5: Finish with error
+            op.lifecycle.on_error(e)
+            op.lifecycle.on_finish(e)
+            op.lifecycle.after_call(call)
+            if should_raise:
+                raise
+            return e, call
+
+    if inspect.iscoroutinefunction(op.resolve_fn) or inspect.isasyncgenfunction(op.resolve_fn):
+        return _execute_async()
+    else:
+        return _execute_sync()
 
 
 def call(
@@ -461,12 +671,12 @@ def _do_call(
         )
         res = func(*pargs.args, **pargs.kwargs)
     else:
-        execute_result = _execute_op(
+        execute_result = execute_op(
             op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
         )
         if inspect.iscoroutine(execute_result):
             raise TypeError(
-                "Internal error: Expected `_execute_call` to return a sync result"
+                "Internal error: Expected `execute_op` to return a sync result"
             )
         execute_result = cast(tuple[Any, "Call"], execute_result)
         res, call = execute_result
@@ -525,12 +735,12 @@ async def _do_call_async(
         )
         res = await func(*args, **kwargs)
     else:
-        execute_result = _execute_op(
+        execute_result = execute_op(
             op, call, *args, __should_raise=__should_raise, **kwargs
         )
         if not inspect.iscoroutine(execute_result):
             raise TypeError(
-                "Internal error: Expected `_execute_call` to return a coroutine"
+                "Internal error: Expected `execute_op` to return a coroutine"
             )
         res, call = await execute_result
     return res, call
@@ -601,49 +811,22 @@ def op(
     If you don't call `weave.init` then the function will behave as if it were
     not decorated.
 
-
     Args:
         func (Optional[Callable]): The function to be decorated. If None, the decorator
             is being called with parameters.
         name (Optional[str]): Custom name for the op. If None, the function's name is used.
         call_display_name (Optional[Union[str, Callable[["Call"], str]]]): Custom display name
             for the call in the Weave UI. Can be a string or a function that takes a Call
-            object and returns a string.  When a function is passed, it can use any attributes
-            of the Call object (e.g. `op_name`, `trace_id`, etc.) to generate a custom display name.
+            object and returns a string.
         postprocess_inputs (Optional[Callable[[dict[str, Any]], dict[str, Any]]]): A function
-            to process the inputs after they've been captured but before they're logged.  This
-            does not affect the actual inputs passed to the function, only the displayed inputs.
+            to process the inputs after they've been captured but before they're logged.
         postprocess_output (Optional[Callable[..., Any]]): A function to process the output
-            after it's been returned from the function but before it's logged.  This does not
-            affect the actual output of the function, only the displayed output.
-        tracing_sample_rate (float): The sampling rate for tracing this function. Defaults to 1.0 (always trace).
+            after it's been returned from the function but before it's logged.
+        tracing_sample_rate (float): The sampling rate for tracing this function. Defaults to 1.0.
 
     Returns:
         Union[Callable[[Any], Op], Op]: If called without arguments, returns a decorator.
         If called with a function, returns the decorated function as an Op.
-
-    Raises:
-        ValueError: If the decorated object is not a function or method.
-
-
-    Example usage:
-
-    ```python
-    import weave
-    weave.init("my-project")
-
-    @weave.op
-    async def extract():
-        return await client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "user", "content": "Create a user as JSON"},
-            ],
-        )
-
-    await extract()  # calls the function and tracks the call in the Weave UI
-    ```
-
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
@@ -657,57 +840,41 @@ def op(
 
         def create_wrapper(func: Callable) -> Op:
             if is_async:
-
                 @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _do_call_async(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    res, _ = await execute_op(
+                        cast(Op, wrapper),
+                        _placeholder_call(),
+                        args,
+                        kwargs,
+                        should_raise=True,
                     )
                     return res
             else:
-
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = _do_call(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
+                    res, _ = execute_op(
+                        cast(Op, wrapper),
+                        _placeholder_call(),
+                        args,
+                        kwargs,
+                        should_raise=True,
                     )
                     return res
 
-            # Tack these helpers on to our wrapper
-            wrapper.resolve_fn = func  # type: ignore
-
-            inferred_name = func.__qualname__ if is_method else func.__name__
-
-            # funcs and methods defined inside another func will have the
-            # name prefixed with {outer}.<locals>.{func_name}
-            # this is noisy for us, so we strip it out
-            inferred_name = inferred_name.split(".<locals>.")[-1]
-
-            wrapper.name = name or inferred_name  # type: ignore
-            wrapper.ref = None  # type: ignore
-
-            wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
-            wrapper.postprocess_output = postprocess_output  # type: ignore
-
-            wrapper.call = partial(call, wrapper)  # type: ignore
-            wrapper.calls = partial(calls, wrapper)  # type: ignore
-
-            wrapper.__call__ = wrapper  # type: ignore
-            wrapper.__self__ = wrapper  # type: ignore
-
-            wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
-            wrapper._on_input_handler = None  # type: ignore
-
-            wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
-            wrapper._on_output_handler = None  # type: ignore
-
-            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
-            wrapper._on_finish_handler = None  # type: ignore
-
-            wrapper._tracing_enabled = True  # type: ignore
-            wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
-
-            wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+            # Initialize the wrapper with required Op attributes
+            wrapper.resolve_fn = func
+            wrapper.name = name or (func.__qualname__ if is_method else func.__name__)
+            wrapper.ref = None
+            wrapper.lifecycle = DefaultOpLifecycle()
+            wrapper.postprocess_inputs = postprocess_inputs
+            wrapper.postprocess_output = postprocess_output
+            wrapper.call = partial(call, wrapper)
+            wrapper.calls = partial(calls, wrapper)
+            wrapper.__call__ = wrapper
+            wrapper.__self__ = wrapper
+            wrapper._tracing_enabled = True
+            wrapper.tracing_sample_rate = tracing_sample_rate
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
@@ -715,7 +882,7 @@ def op(
                     raise DisplayNameFuncError(
                         "`call_display_name` function must take exactly 1 argument (the Call object)"
                     )
-            wrapper.call_display_name = call_display_name  # type: ignore
+            wrapper.call_display_name = call_display_name
 
             return cast(Op, wrapper)
 
@@ -798,6 +965,46 @@ def as_op(fn: Callable) -> Op:
     # The unbinding is necessary for methods because `MethodType` is applied after the
     # func is decorated into an Op.
     return maybe_unbind_method(cast(Op, fn))
+
+
+def add_accumulator(
+    op: Op,
+    make_accumulator: Callable[[dict], Callable[[S, V], S]],
+    *,
+    should_accumulate: Callable[[dict], bool] | None = None,
+    on_finish_post_processor: Callable[[Any], Any] | None = None,
+) -> Op:
+    """Add accumulator functionality to an op.
+    
+    This replaces the old accumulator implementation with one that uses the lifecycle hooks.
+    The accumulator will be called with each yielded value and can maintain state.
+    
+    Args:
+        op: The op to add accumulator to
+        make_accumulator: Function that creates an accumulator function
+        should_accumulate: Optional function to determine if accumulation should happen
+        on_finish_post_processor: Optional function to process final state
+        
+    Returns:
+        The op with accumulator functionality added
+    """
+    def wrapped_on_finish(value: Any, error: BaseException | None = None) -> None:
+        if on_finish_post_processor is not None:
+            value = on_finish_post_processor(value)
+        if hasattr(op.lifecycle, "_on_finish"):
+            op.lifecycle._on_finish(value, error)
+            
+    # Create iterator lifecycle
+    iterator_lifecycle = IteratorLifecycle()
+    iterator_lifecycle._on_finish = wrapped_on_finish
+    
+    # Only set accumulator if should_accumulate passes
+    if should_accumulate is None or should_accumulate({}):
+        iterator_lifecycle._accumulator = make_accumulator({})
+        
+    # Replace existing lifecycle
+    op.lifecycle = iterator_lifecycle
+    return op
 
 
 __docspec__ = [call, calls]

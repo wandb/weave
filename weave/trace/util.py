@@ -176,3 +176,25 @@ ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
 
 __docspec__ = [ThreadPoolExecutor, Thread]
+
+def process_inputs_for_logging(inputs: dict) -> dict:
+    """Process inputs for logging purposes.
+    
+    This function attempts to convert inputs into a loggable format.
+    If conversion fails, it returns a simplified representation rather than raising an error.
+    
+    Args:
+        inputs: Dictionary of input values
+        
+    Returns:
+        Dictionary of processed inputs for logging
+    """
+    try:
+        return {k: str(v) for k, v in inputs.items()}
+    except Exception as e:
+        # If we can't process inputs, return a simplified representation
+        return {
+            "warning": "Failed to process inputs for logging",
+            "error": str(e),
+            "input_keys": list(inputs.keys())
+        }
