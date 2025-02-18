@@ -1275,9 +1275,9 @@ def test_summary_descendents(client):
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
-        (ObjectRefStrMatcher(name="model_b"), {"successes": 1, "errors": 0}),
-        (ObjectRefStrMatcher(name="model_error"), {"successes": 0, "errors": 1}),
-        (ObjectRefStrMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
+        (ObjectRefMatcher(name="model_b"), {"successes": 1, "errors": 0}),
+        (ObjectRefMatcher(name="model_error"), {"successes": 0, "errors": 1}),
+        (ObjectRefMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
     ]
 
 
@@ -1843,3 +1843,42 @@ def test_delete_op_version(client):
     # but the ref is still deleted
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         op_ref.get()
+
+
+def test_global_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(global_attributes={"env": "test", "version": "1.0"}) as client:
+        my_op(1)
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Check global attributes are present
+        assert call.attributes["env"] == "test"
+        assert call.attributes["version"] == "1.0"
+
+
+def test_global_attributes_with_call_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(global_attributes={"global_attr": "global"}) as client:
+        with weave.attributes({"local_attr": "local", "env": "override"}):
+            my_op(1)
+
+        # Get the calls and verify attributes
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Both global and local attributes are present
+        assert call.attributes["global_attr"] == "global"
+        assert call.attributes["local_attr"] == "local"
+
+        # Local attributes override global ones
+        assert call.attributes["env"] == "override"

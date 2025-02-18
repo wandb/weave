@@ -74,7 +74,7 @@ def init(
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output
-    _global_attributes = global_attributes
+    _global_attributes = global_attributes or {}
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
