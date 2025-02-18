@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import Field, PrivateAttr
@@ -11,6 +12,9 @@ if TYPE_CHECKING:
         RecognizerResult,
     )
     from presidio_anonymizer import AnonymizerEngine
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_available_entities() -> list[str]:
@@ -75,10 +79,9 @@ class PresidioEntityRecognitionGuardrail(weave.Scorer):
         )
 
         if invalid_entities:
-            print(
-                f"\nWarning: The following entities are not available and will be ignored: {invalid_entities}"
+            logger.warning(
+                f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
             )
-            print(f"Continuing with valid entities: {valid_entities}")
             self.selected_entities = valid_entities
 
         # Add custom recognizers if provided
