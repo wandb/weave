@@ -30,6 +30,7 @@ from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
+_global_attributes: dict[str, Any] = {}
 
 
 def init(
@@ -39,6 +40,7 @@ def init(
     autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -54,6 +56,7 @@ def init(
         autopatch_settings: Configuration for autopatch integrations, e.g. openai
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
+        global_attributes: A dictionary of attributes that will be applied to all traces.
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -67,9 +70,11 @@ def init(
 
     global _global_postprocess_inputs
     global _global_postprocess_output
+    global _global_attributes
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output
+    _global_attributes = global_attributes
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
