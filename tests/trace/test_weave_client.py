@@ -1275,9 +1275,9 @@ def test_summary_descendents(client):
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
-        (ObjectRefMatcher(name="model_b"), {"successes": 1, "errors": 0}),
-        (ObjectRefMatcher(name="model_error"), {"successes": 0, "errors": 1}),
-        (ObjectRefMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
+        (ObjectRefStrMatcher(name="model_b"), {"successes": 1, "errors": 0}),
+        (ObjectRefStrMatcher(name="model_error"), {"successes": 0, "errors": 1}),
+        (ObjectRefStrMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
     ]
 
 
@@ -1867,11 +1867,10 @@ def test_global_attributes_with_call_attributes(client_creator):
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(global_attributes={"global_attr": "global"}) as client:
+    with client_creator(global_attributes={"global_attr": "global", "env": "test"}) as client:
         with weave.attributes({"local_attr": "local", "env": "override"}):
             my_op(1)
 
-        # Get the calls and verify attributes
         calls = list(client.get_calls())
         assert len(calls) == 1
         call = calls[0]
