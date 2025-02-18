@@ -8,11 +8,9 @@ Before implementing guardrails, make sure you understand:
 - [Real-time evaluation concepts](./guardrails_and_monitors.md)
 :::
 
-Guardrails act as safety checks that run before allowing LLM output to reach users. They provide active intervention to prevent issues in real-time, ensuring your application maintains quality and safety standards.
-
 ## Using Scorers as Guardrails
 
-Here's a practical example of implementing a guardrail:
+Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
 
 ```python
 import weave
@@ -49,170 +47,107 @@ async def generate_safe_response(prompt: str) -> str:
 ```
 
 :::note Scorer Timing
-When applying guardrails:
-- The main operation (`generate_text`) completes first
-- Guardrail checks run immediately after
-- The response is only returned if it passes all checks
-- Failed checks can trigger alternative responses or error messages
+When applying scorers:
+- The main operation (`generate_text`) completes and is marked as finished in the UI
+- Scorers run asynchronously after the main operation
+- Scorer results are attached to the call once they complete
+- You can view scorer results in the UI or query them via the API
 :::
 
-## Guardrail Best Practices
+## Performance Best Practices
 
-### 1. Performance Optimization
-Since guardrails run in real-time and block the response, performance is critical:
-
-```python
-# Initialize guards at module level for better performance
-toxicity_guard = ToxicityScorer()
-quality_guard = QualityScorer()
-
-async def generate_safe_response(prompt: str) -> str:
-    result, call = generate_text.call(prompt)
-    
-    # Use pre-initialized guards
-    safety = await call.apply_scorer(toxicity_guard)
-    if safety.result["flagged"]:
-        return f"I cannot generate that content: {safety.result['reason']}"
-    
-    return result
-```
-
-### 2. Error Handling
-Implement robust error handling to ensure your application remains functional even if a guardrail check fails:
-
-```python
-class SafetyScorer(Scorer):
-    @weave.op
-    async def score(self, output: str) -> dict:
-        try:
-            result = await self.evaluate_safety(output)
-            return {
-                "flagged": result.is_unsafe,
-                "reason": result.explanation
-            }
-        except Exception as e:
-            # Log error and default to conservative behavior
-            print(f"Safety check failed: {e}")
-            return {
-                "flagged": True,
-                "reason": "Safety check unavailable - defaulting to conservative behavior"
-            }
-```
-
-### 3. Cascading Guardrails
-Apply multiple guardrails in a logical sequence, from fastest to most comprehensive:
-
-```python
-async def generate_safe_response(prompt: str) -> str:
-    result, call = generate_text.call(prompt)
-    
-    # Quick checks first
-    length = await call.apply_scorer(LengthScorer())
-    if length.result["too_long"]:
-        return "Response exceeds maximum length"
-    
-    # More intensive checks next
-    safety = await call.apply_scorer(toxicity_guard)
-    if safety.result["flagged"]:
-        return f"Content flagged: {safety.result['reason']}"
-    
-    # Most comprehensive checks last
-    quality = await call.apply_scorer(quality_guard)
-    if quality.result["score"] < 0.5:
-        return "Response does not meet quality standards"
-    
-    return result
-```
-
-:::caution Performance Tips
-For optimal guardrail performance:
+For optimal performance with guardrails:
 - Keep logic simple and fast
-- Initialize expensive resources (like ML models) once
 - Consider caching common results
-- Avoid unnecessary network calls
-- Run checks in parallel when order doesn't matter
-:::
+- Avoid heavy external API calls
+- Initialize guards outside of your main functions to avoid repeated initialization costs
 
-## Complete Guardrail Example
+### Initialize Guards Efficiently
 
-Here's a comprehensive example showing a production-ready guardrail implementation:
+For optimal performance, especially with locally-run models, initialize your guards outside of the main function. This pattern is particularly important when:
+- Your scorers load ML models
+- You're using local LLMs where latency is critical
+- Your scorers maintain network connections
+- You have high-traffic applications
+
+## Complete Example
+
+Here's a comprehensive example that demonstrates guardrail implementation:
 
 ```python
 import weave
 from weave import Scorer
-import asyncio
 from typing import Optional
 
-class ContentGuard:
+class ToxicityScorer(Scorer):
     def __init__(self):
-        # Initialize all guardrails once
-        self.toxicity_guard = ToxicityScorer()
-        self.quality_guard = QualityScorer()
-        self.length_guard = LengthScorer()
+        # Initialize any expensive resources here
+        self.model = load_toxicity_model()
     
-    async def check_content(self, call) -> tuple[bool, Optional[str]]:
-        """Run all guardrail checks in parallel."""
+    @weave.op
+    async def score(self, output: str) -> dict:
+        """Check content for toxic language."""
         try:
-            # Run all checks in parallel
-            safety, quality, length = await asyncio.gather(
-                call.apply_scorer(self.toxicity_guard),
-                call.apply_scorer(self.quality_guard),
-                call.apply_scorer(self.length_guard)
-            )
-            
-            # Check results in order of importance
-            if safety.result["flagged"]:
-                return False, f"Content safety: {safety.result['reason']}"
-            
-            if length.result["too_long"]:
-                return False, "Content length exceeds limits"
-            
-            if quality.result["score"] < 0.5:
-                return False, "Content quality below threshold"
-            
-            return True, None
-            
+            result = await self.model.evaluate(output)
+            return {
+                "flagged": result.is_toxic,
+                "reason": result.explanation if result.is_toxic else None
+            }
         except Exception as e:
-            print(f"Guard check failed: {e}")
-            return False, "Guard check failed - defaulting to conservative behavior"
+            # Log error and default to conservative behavior
+            print(f"Toxicity check failed: {e}")
+            return {"flagged": True, "reason": "Safety check unavailable"}
+
+# Initialize scorer at module level (optimization)
+toxicity_guard = ToxicityScorer()
 
 @weave.op
-def generate_text(prompt: str) -> str:
-    """Generate text using an LLM."""
+def generate_text(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate an LLM response."""
+    # Your LLM generation logic here
     return "Generated response..."
 
-# Initialize guard system once
-content_guard = ContentGuard()
-
-async def generate_safe_response(prompt: str) -> str:
-    """Generate a response with comprehensive guardrails."""
+async def generate_safe_response(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate a response with safety checks."""
     try:
         # Generate initial response
-        result, call = generate_text.call(prompt)
-        
-        # Apply guardrails
-        is_safe, reason = await content_guard.check_content(call)
-        if not is_safe:
-            return f"Cannot provide response: {reason}"
+        result, call = generate_text.call(
+            prompt=prompt,
+            style=style,
+            temperature=temperature
+        )
+
+        # Apply safety check (guardrail)
+        safety = await call.apply_scorer(toxicity_guard)
+        if safety.result["flagged"]:
+            return f"I cannot generate that content: {safety.result['reason']}"
         
         return result
-        
+
     except Exception as e:
+        # Log error and return user-friendly message
         print(f"Generation failed: {e}")
-        return "An error occurred during content generation"
+        return "I'm sorry, I encountered an error. Please try again."
+
+# Example usage
+async def main():
+    response = await generate_safe_response(
+        prompt="Tell me a story",
+        style="noir",
+        temperature=0.8
+    )
+    print(f"Response: {response}")
 ```
 
 This example demonstrates:
-- Efficient guard initialization
-- Parallel guard execution
-- Comprehensive error handling
-- Clear failure messaging
-- Production-ready implementation
-
-For more information about the core concepts of scorers and evaluation in Weave, see our [Guardrails and Monitors Overview](./guardrails_and_monitors.md). 
-
-:::tip See Also
-- [Monitors Guide](./monitors.md) - Learn about passive quality monitoring
-- [Builtin Scorers](./builtin_scorers.mdx) - Ready-to-use guardrail scorers
-- [Batch Evaluation](../core-types/evaluations.md) - For offline evaluation needs
-::: 
+- Proper scorer initialization and error handling
+- Efficient guardrail implementation
+- Production-ready error handling and logging

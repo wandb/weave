@@ -1,36 +1,32 @@
 # Monitors
 
+![Monitors](./../../../static/img/guardrails_scorers.png)
+
 :::note Prerequisites
 Before implementing monitors, make sure you understand:
 - [Scorer basics and implementation](./scorers.md)
 - [Real-time evaluation concepts](./guardrails_and_monitors.md)
 :::
 
-Monitors help track quality metrics over time without blocking operations. They provide passive observation for analysis, helping you identify trends, detect model drift, and gather data for improvements.
-
 ## Using Scorers as Monitors
 
-Here's a practical example of implementing monitoring:
+Monitors help track quality metrics over time without blocking operations. This is useful for:
+- Identifying quality trends
+- Detecting model drift
+- Gathering data for model improvements
+
+Here's a basic example of implementing monitors:
 
 ```python
 import weave
 from weave import Scorer
+from weave.scorers import ValidJSONScorer, ValidXMLScorer
 import random
 
 @weave.op
 def generate_text(prompt: str) -> str:
     """Generate text using an LLM."""
     return "Generated response..."
-
-class QualityScorer(Scorer):
-    @weave.op
-    def score(self, output: str, prompt: str) -> dict:
-        """Evaluate response quality."""
-        return {
-            "coherence": evaluate_coherence(output),
-            "relevance": evaluate_relevance(output, prompt),
-            "grammar": evaluate_grammar(output)
-        }
 
 async def generate_with_monitoring(prompt: str) -> str:
     # Get both the result and tracking information
@@ -39,202 +35,133 @@ async def generate_with_monitoring(prompt: str) -> str:
     # Sample monitoring (only monitor 10% of calls)
     if random.random() < 0.1:
         # Monitor multiple aspects asynchronously
+        await call.apply_scorer(ValidJSONScorer())
+        await call.apply_scorer(ValidXMLScorer())
+    
+    return result
+```
+
+## Best Practices
+
+### 1. Set Appropriate Sampling Rates
+```python
+@weave.op
+def generate_text(prompt: str) -> str:
+    return generate_response(prompt)
+
+async def generate_with_sampling(prompt: str) -> str:
+    result, call = generate_text.call(prompt)
+    
+    # Only monitor 10% of calls
+    if random.random() < 0.1:
+        await call.apply_scorer(ToxicityScorer())
         await call.apply_scorer(QualityScorer())
     
     return result
 ```
 
-:::note Scorer Timing
-When using monitors:
-- The main operation completes and returns results immediately
-- Monitors run asynchronously in the background
-- Monitor results are stored for later analysis
-- No impact on response time or application flow
-:::
-
-## Monitor Best Practices
-
-### 1. Sampling Strategies
-Since monitors don't block responses, you can be more flexible with sampling:
-
+### 2. Monitor Multiple Aspects
 ```python
-class AdaptiveSampling:
-    def __init__(self, base_rate: float = 0.1):
-        self.base_rate = base_rate
-        self.recent_scores = []
-    
-    def should_sample(self, prompt: str) -> bool:
-        # Sample more if recent scores are concerning
-        if len(self.recent_scores) > 0:
-            avg_score = sum(self.recent_scores) / len(self.recent_scores)
-            return random.random() < (self.base_rate * (2.0 - avg_score))
-        return random.random() < self.base_rate
-    
-    def update(self, score: float):
-        self.recent_scores = (self.recent_scores[-9:] + [score])
-
-# Initialize sampling strategy
-sampler = AdaptiveSampling()
-
-async def generate_with_adaptive_monitoring(prompt: str) -> str:
-    result, call = generate_text.call(prompt)
-    
-    if sampler.should_sample(prompt):
-        score = await call.apply_scorer(QualityScorer())
-        sampler.update(score.result["quality"])
-    
-    return result
-```
-
-### 2. Comprehensive Monitoring
-Monitor multiple aspects of your system's performance:
-
-```python
-async def monitor_comprehensively(call):
-    """Monitor various aspects of the response."""
-    await asyncio.gather(
-        call.apply_scorer(QualityScorer()),
-        call.apply_scorer(LatencyScorer()),
-        call.apply_scorer(TokenUsageScorer()),
-        call.apply_scorer(PromptRelevanceScorer())
-    )
+async def evaluate_comprehensively(call):
+    await call.apply_scorer(ToxicityScorer())
+    await call.apply_scorer(QualityScorer())
+    await call.apply_scorer(LatencyScorer())
 ```
 
 ### 3. Analyze and Improve
-Since all scorer results are automatically stored in Weave's database, you can:
 - Review trends in the Weave Dashboard
-- Query historical data through the API
-- Export data for external analysis
+- Look for patterns in low-scoring outputs
+- Use insights to improve your LLM system
 - Set up alerts for concerning patterns (coming soon)
 
+### 4. Access Historical Data
+Scorer results are stored with their associated calls and can be accessed through:
+- The Call object's `feedback` field
+- The Weave Dashboard
+- Our query APIs
 
-:::caution Performance Tips
-For optimal monitoring:
-- Use appropriate sampling rates
-- Run intensive checks asynchronously
-- Batch operations when possible
-- Consider storage and analysis requirements
-- Monitor resource usage of the monitors themselves
-:::
+### Performance Considerations
+For monitors:
+- Use sampling to reduce load
+- Can use more complex logic
+- Can make external API calls
 
-## Complete Monitor Example
+## Complete Example
 
-Here's a comprehensive example showing a production-ready monitoring implementation:
+Here's a comprehensive example that demonstrates monitor implementation:
 
 ```python
 import weave
 from weave import Scorer
 import asyncio
+import random
 from typing import Optional
-from datetime import datetime
 
-class MonitoringSystem:
-    def __init__(self, base_sample_rate: float = 0.1):
-        # Initialize monitors
-        self.quality_monitor = QualityScorer()
-        self.latency_monitor = LatencyScorer()
-        self.usage_monitor = TokenUsageScorer()
-        
-        # Initialize sampling
-        self.sampler = AdaptiveSampling(base_rate=base_sample_rate)
-        
-        # Track monitoring stats
-        self.total_calls = 0
-        self.monitored_calls = 0
-    
-    async def monitor_call(self, call, force_monitor: bool = False) -> None:
-        """Apply monitoring to a call if sampled or forced."""
-        self.total_calls += 1
-        
-        try:
-            if force_monitor or self.sampler.should_sample():
-                self.monitored_calls += 1
-                
-                # Run all monitors in parallel
-                results = await asyncio.gather(
-                    call.apply_scorer(self.quality_monitor),
-                    call.apply_scorer(self.latency_monitor),
-                    call.apply_scorer(self.usage_monitor),
-                    return_exceptions=True
-                )
-                
-                # Update sampling strategy based on quality score
-                if not isinstance(results[0], Exception):
-                    self.sampler.update(results[0].result["quality"])
-                
-                # Log any monitoring errors
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        print(f"Monitor {i} failed: {result}")
-                        
-        except Exception as e:
-            print(f"Monitoring failed: {e}")
-    
-    def get_stats(self) -> dict:
-        """Get current monitoring statistics."""
+class QualityScorer(Scorer):
+    @weave.op
+    async def score(self, output: str, prompt: str) -> dict:
+        """Evaluate response quality and relevance."""
         return {
-            "total_calls": self.total_calls,
-            "monitored_calls": self.monitored_calls,
-            "monitoring_rate": self.monitored_calls / max(1, self.total_calls),
-            "current_sample_rate": self.sampler.get_current_rate()
+            "coherence": evaluate_coherence(output),
+            "relevance": evaluate_relevance(output, prompt),
+            "grammar": evaluate_grammar(output)
         }
 
-# Initialize monitoring system
-monitor = MonitoringSystem()
+# Initialize monitors at module level
+quality_monitor = QualityScorer()
+relevance_monitor = RelevanceScorer()
 
 @weave.op
-def generate_text(prompt: str) -> str:
-    """Generate text using an LLM."""
+def generate_text(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate an LLM response."""
+    # Your LLM generation logic here
     return "Generated response..."
 
 async def generate_with_monitoring(
     prompt: str,
-    force_monitor: bool = False
+    style: Optional[str] = None,
+    temperature: float = 0.7
 ) -> str:
-    """Generate a response with comprehensive monitoring."""
+    """Generate a response with quality monitoring."""
     try:
-        # Generate response
-        result, call = generate_text.call(prompt)
-        
-        # Apply monitoring asynchronously
-        asyncio.create_task(monitor.monitor_call(call, force_monitor))
+        # Generate initial response
+        result, call = generate_text.call(
+            prompt=prompt,
+            style=style,
+            temperature=temperature
+        )
+
+        # Sample quality monitoring (10% of requests)
+        if random.random() < 0.1:
+            # Run quality checks in parallel
+            await asyncio.gather(
+                call.apply_scorer(quality_monitor),
+                call.apply_scorer(relevance_monitor)
+            )
         
         return result
-        
+
     except Exception as e:
+        # Log error and return user-friendly message
         print(f"Generation failed: {e}")
-        return "An error occurred during content generation"
+        return "I'm sorry, I encountered an error. Please try again."
 
 # Example usage
 async def main():
-    # Generate with normal sampling
-    response = await generate_with_monitoring("Tell me a story")
-    
-    # Generate with forced monitoring
     response = await generate_with_monitoring(
-        "Tell me another story",
-        force_monitor=True
+        prompt="Tell me a story",
+        style="noir",
+        temperature=0.8
     )
-    
-    # Check monitoring stats
-    print(monitor.get_stats())
+    print(f"Response: {response}")
 ```
 
 This example demonstrates:
-- Adaptive sampling strategy
-- Parallel monitor execution
-- Error handling and logging
-- Monitoring statistics tracking
-- Production-ready implementation
-
-For more information about the core concepts of scorers and evaluation in Weave, see our [Guardrails and Monitors Overview](./guardrails_and_monitors.md). 
-
-:::tip See Also
-- [Guardrails Guide](./guardrails.md) - Learn about active safety controls
-- [Builtin Scorers](./builtin_scorers.mdx) - Ready-to-use monitoring scorers
-- [Batch Evaluation](../core-types/evaluations.md) - For offline evaluation needs
-:::
-
-:::info Relationship with Guardrails
-Remember that every scorer result is automatically stored in Weave's database. This means your guardrails automatically double as monitors! You can analyze historical scorer results from both guardrails and monitors in the same way.
-::: 
+- Proper monitor initialization
+- Efficient sampling implementation
+- Parallel scoring for better performance
+- Production-ready error handling

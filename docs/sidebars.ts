@@ -65,7 +65,7 @@ const sidebars: SidebarsConfig = {
               type: "category",
               collapsible: true,
               collapsed: false,
-              label: "Real-time Evaluation",
+              label: "Online Evaluation",
               link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
               items: ["guides/evaluation/guardrails", "guides/evaluation/monitors"],
             },
