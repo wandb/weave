@@ -19,7 +19,6 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     Use wandb/coherence_scorer to check if the model output is coherent.
     Args:
         model_name: The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
-        device: The device to use for inference. Defaults to `auto`, which will use `cuda` if available.
         model_max_length: The maximum length of the model output. Defaults to 1024.
     """
 
