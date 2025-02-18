@@ -324,6 +324,8 @@ def test_sync_eval_parallelism(client):
         "model_latency": {"mean": pytest.approx(1, abs=1)},
     }
     assert time.time() - now < 5
+
+
 def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
     dataset = Dataset(rows=dataset_rows)
