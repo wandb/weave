@@ -94,7 +94,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         >>> scorer = ToxicityScorer()
         >>> result = scorer.score("This is a hateful message.")
         >>> print(result)
-        
+
         WeaveScorerResult(extras={
             'Race/Origin': 3,
             'Gender/Sex': 0,

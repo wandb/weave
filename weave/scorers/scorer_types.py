@@ -80,7 +80,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         validate_default=True,
     )
     _device: Optional["torch.device"] = PrivateAttr(default=None)
-    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
+    _pipeline: "Pipeline" = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
         self._device = set_device(self.device)
