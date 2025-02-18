@@ -96,6 +96,8 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
             context: [optional] context to score, must be a string
         """
         prompt = query
+        if chat_history is not None and context is not None:
+            raise ValueError("Cannot provide both `chat_history` and `context`")
         if chat_history:
             history = self._format_chat_history(chat_history)
             prompt = f"{history}{query}"
