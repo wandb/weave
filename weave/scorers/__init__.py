@@ -9,7 +9,10 @@ from weave.scorers.classification_scorer import (
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
 from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
 from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
-from weave.scorers.hallucination_scorer import WeaveHallucinationScorerV1
+from weave.scorers.hallucination_scorer import (
+    HallucinationFreeScorer,
+    WeaveHallucinationScorerV1,
+)
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
