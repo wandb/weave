@@ -1,16 +1,27 @@
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
+
+from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import WeaveScorerResult
-from pydantic import Field, PrivateAttr
 
 if TYPE_CHECKING:
     from presidio_analyzer import (
         AnalyzerEngine,
-        EntityRecognizer,
         RecognizerResult,
     )
     from presidio_anonymizer import AnonymizerEngine
+
+
+def get_available_entities() -> list[str]:
+    """Get available entities from Presidio"""
+    from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+
+    registry = RecognizerRegistry()
+    analyzer = AnalyzerEngine(registry=registry)
+    return [
+        recognizer.supported_entities[0] for recognizer in analyzer.registry.recognizers
+    ]
 
 
 class PresidioEntityRecognitionGuardrail(weave.Scorer):
@@ -44,15 +55,8 @@ class PresidioEntityRecognitionGuardrail(weave.Scorer):
 
     @property
     def available_entities(self) -> list[str]:
-        """Get available entities from Presidio"""
-        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+        return get_available_entities()
 
-        registry = RecognizerRegistry()
-        analyzer = AnalyzerEngine(registry=registry)
-        return [
-            recognizer.supported_entities[0] for recognizer in analyzer.registry.recognizers
-        ]
-    
     def model_post_init(self, __context: Any) -> None:
         from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
         from presidio_anonymizer import AnonymizerEngine
@@ -146,7 +150,9 @@ class PresidioEntityRecognitionGuardrail(weave.Scorer):
             output, analyzer_results
         )
         reason = self.create_reason(detected_entities)
-        anonymized_text = self.anonymize_text(output, analyzer_results, detected_entities)
+        anonymized_text = self.anonymize_text(
+            output, analyzer_results, detected_entities
+        )
         return WeaveScorerResult(
             passed=not bool(detected_entities),
             metadata={
