@@ -1,3 +1,4 @@
+import warnings
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr
@@ -46,6 +47,15 @@ class InstructorLLMScorer(LLMScorer):
         )
 
 
+def check_cuda(device: str) -> None:
+    import torch
+
+    if torch.cuda.is_available() and device == "cpu":
+        warnings.warn(
+            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference"
+        )
+
+
 class HuggingFacePipelineScorer(weave.Scorer):
     """
     Base class for using Hugging Face pipelines for moderation scoring.
@@ -79,13 +89,14 @@ class HuggingFacePipelineScorer(weave.Scorer):
         frozen=True,
     )
 
-    _pipeline: "Pipeline" = PrivateAttr(default=None)
+    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
+        check_cuda(self.device)
         if self._pipeline is None:
-            self._pipeline = self.load_pipeline()
+            self.load_pipeline()
 
-    def load_pipeline(self) -> "Pipeline":
+    def load_pipeline(self) -> None:
         raise NotImplementedError(
             "Subclasses must implement the `load_pipeline` method."
         )
@@ -109,6 +120,7 @@ class HuggingFaceScorer(weave.Scorer):
 
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
+        check_cuda(self.device)
         if self._model is None:
             self.load_model()
         else:
