@@ -53,12 +53,11 @@ __all__ = [
     "PromptInjectionLLMGuardrail",
     "PresidioScorer",
     "PydanticScorer",
-    "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
     "WeaveBiasScorerV1",
     "WeaveToxicityScorerV1",
-    "_validate_scorer_signature",
     "WeaveCoherenceScorerV1",
+    "WeaveFluencyScorerV1",
 ]
