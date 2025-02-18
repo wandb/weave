@@ -24,6 +24,8 @@ In this notebook we will learn to use Weave's Leaderboard to compare model perfo
 3. Use these techniques to evaluate a matrix of models vs evaluations.
 4. Review the leaderboard in the Weave UI.
 
+![zip-code-leaderboard](https://github.com/user-attachments/assets/f154b358-8ea1-4b2b-8444-aa54b5d6ff6a)
+
 ## Step 1: Generate a dataset of fake zip code data
 
 First we will create a function `generate_dataset_rows` that generates a list of fake zip code data.
