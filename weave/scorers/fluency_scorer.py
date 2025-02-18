@@ -37,8 +37,6 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     """
 
     task: str = "text-classification"
-    model_name_or_path: str = ""
-    device: str = "auto"
     threshold: float = Field(
         default=FLUENCY_SCORER_THRESHOLD,
         description="The threshold for the non-fluent score.",
@@ -62,7 +60,8 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     @validate_call
     @weave.op
     def score(self, output: str) -> WeaveScorerResult:
-        pipeline_output = self._pipeline(output)[0]  # type: ignore
+        assert self._pipeline is not None
+        pipeline_output = self._pipeline(output)[0]
         fluency_score = next(
             pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
         )
