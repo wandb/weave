@@ -89,14 +89,14 @@ class HuggingFacePipelineScorer(weave.Scorer):
         frozen=True,
     )
 
-    _pipeline: "Pipeline" = PrivateAttr(default=None)
+    _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
         check_cuda(self.device)
         if self._pipeline is None:
-            self._pipeline = self.load_pipeline()
+            self.load_pipeline()
 
-    def load_pipeline(self) -> "Pipeline":
+    def load_pipeline(self) -> None:
         raise NotImplementedError(
             "Subclasses must implement the `load_pipeline` method."
         )
