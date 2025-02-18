@@ -84,3 +84,15 @@ async def test_predict_long_overlap(rolling_window_scorer):
     rolling_window_scorer.aggregation_method = "max"
     result = rolling_window_scorer._predict_long(input_ids)
     assert result == [5, 30]
+
+
+@pytest.mark.asyncio
+async def test_device_immutability(rolling_window_scorer):
+    # Check that device is accessible
+    assert rolling_window_scorer.device is not None
+
+    # Check that device cannot be changed after initialization
+    with pytest.raises(ValueError) as exc_info:
+        rolling_window_scorer.device = "cuda"
+
+    assert "Field is frozen" in str(exc_info.value)
