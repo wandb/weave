@@ -325,6 +325,10 @@ def test_sync_eval_parallelism(client):
     }
     assert time.time() - now < 5
 def test_evaluation_from_weaveobject_missing_evaluation_name(client):
+    # Setup
+    weave.publish(score)
+    weave.publish(dataset)
+
     # Create and save an Evaluation object
     evaluation = Evaluation(
         dataset=dataset,
