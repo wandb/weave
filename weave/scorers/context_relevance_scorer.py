@@ -8,7 +8,6 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
 )
 
@@ -73,7 +72,6 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     model_max_length: int = 1280
 
     def load_model(self) -> None:
-        ensure_hf_imports()
         from transformers import AutoModelForTokenClassification
 
         self._local_model_path = load_hf_model_weights(

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 from pydantic import Field, PrivateAttr
 
 import weave
+from weave.scorers.utils import ensure_hf_imports
 
 if TYPE_CHECKING:
     import torch
@@ -92,6 +93,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
     def model_post_init(self, __context: Any) -> None:
+        ensure_hf_imports()
         check_cuda(self.device)
         if self._pipeline is None:
             self.load_pipeline()
@@ -121,6 +123,7 @@ class HuggingFaceScorer(weave.Scorer):
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
         check_cuda(self.device)
+        ensure_hf_imports()
         if self._model is None:
             self.load_model()
         else:
