@@ -1843,3 +1843,90 @@ def test_delete_op_version(client):
     # but the ref is still deleted
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         op_ref.get()
+
+
+def test_get_objects(client):
+    # Create some test objects of different types
+    class ModelA(weave.Object):
+        x: int
+
+    class ModelB(weave.Object):
+        y: str
+
+    class Dataset(weave.Object):
+        data: list[int]
+
+    # Save objects
+    model_a1 = ModelA(x=1)
+    model_a2 = ModelA(x=2)
+    model_b = ModelB(y="test")
+    dataset = Dataset(data=[1, 2, 3])
+
+    client._save_object(model_a1, "model_a")
+    client._save_object(model_a2, "model_a")  # New version of model_a
+    client._save_object(model_b, "model_b")
+    client._save_object(dataset, "dataset")
+
+    # Test listing all objects (should get latest versions only)
+    objects = client.get_objects()
+    assert len(objects) == 3  # model_a (latest), model_b, dataset
+    
+    # Verify we get the latest version of model_a
+    model_a_obj = next(obj for obj in objects if obj.object_id == "model_a")
+    assert model_a_obj.val["x"] == 2  # Latest version has x=2
+
+    # Test filtering by base class
+    model_objects = client.get_objects(base_object_classes=["ModelA"])
+    assert len(model_objects) == 1
+    assert model_objects[0].object_id == "model_a"
+
+    dataset_objects = client.get_objects(base_object_classes=["Dataset"])
+    assert len(dataset_objects) == 1
+    assert dataset_objects[0].object_id == "dataset"
+
+    # Test pagination
+    objects_page1 = client.get_objects(limit=2)
+    assert len(objects_page1) == 2
+
+    objects_page2 = client.get_objects(limit=2, offset=2)
+    assert len(objects_page2) == 1  # Only one object left
+
+    # Test sorting
+    objects_sorted = client.get_objects(sort_by=[tsi.SortBy(field="object_id", direction="asc")])
+    assert [obj.object_id for obj in objects_sorted] == ["dataset", "model_a", "model_b"]
+
+
+def test_get_object_versions(client):
+    # Create multiple versions of the same object
+    class TestModel(weave.Object):
+        version: int
+        name: str
+
+    # Save multiple versions
+    for i in range(3):
+        model = TestModel(version=i, name=f"version_{i}")
+        client._save_object(model, "test_model")
+
+    # Get all versions
+    versions = client.get_object_versions("test_model")
+    assert len(versions) == 3
+
+    # Verify version contents
+    version_numbers = [v.val["version"] for v in versions]
+    assert sorted(version_numbers) == [0, 1, 2]
+
+    # Test pagination
+    versions_page = client.get_object_versions("test_model", limit=2)
+    assert len(versions_page) == 2
+
+    # Test sorting by creation time
+    versions_sorted = client.get_object_versions(
+        "test_model",
+        sort_by=[tsi.SortBy(field="created_at", direction="desc")]
+    )
+    version_numbers = [v.val["version"] for v in versions_sorted]
+    assert version_numbers == [2, 1, 0]  # Latest version first
+
+    # Test getting versions of non-existent object
+    with pytest.raises(NotFoundError):
+        client.get_object_versions("nonexistent_object")

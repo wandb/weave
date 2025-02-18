@@ -110,8 +110,14 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TraceServerInterface,
+    FileContentReadReq,
+    TableQueryReq,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.sqlite_trace_server import (
+    NotFoundError as sqliteNotFoundError,
+)
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -1904,6 +1910,89 @@ class WeaveClient:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_objects(
+        self,
+        *,
+        base_object_classes: list[str] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortBy] | None = None,
+    ) -> list[ObjSchema]:
+        """
+        Get a list of object groups in the project. Each group represents an object and its versions.
+        By default, only returns the latest version of each object.
+
+        Args:
+            base_object_classes: Filter objects by their base classes (e.g. ["Model", "Dataset"])
+            limit: Maximum number of objects to return
+            offset: Number of objects to skip
+            sort_by: List of fields to sort by. Currently supports 'object_id' and 'created_at'
+
+        Returns:
+            A list of ObjSchema objects representing the latest version of each object.
+        """
+        filter = ObjectVersionFilter(
+            base_object_classes=base_object_classes,
+            latest_only=True,  # Always get latest version for object groups
+            is_op=False,  # Exclude ops from object listing
+        )
+
+        response = self.server.objs_query(
+            ObjQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+            )
+        )
+        return response.objs
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_object_versions(
+        self,
+        object_id: str,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortBy] | None = None,
+    ) -> list[ObjSchema]:
+        """
+        Get all versions of a specific object.
+
+        Args:
+            object_id: The ID of the object to get versions for
+            limit: Maximum number of versions to return
+            offset: Number of versions to skip
+            sort_by: List of fields to sort by. Currently supports 'object_id' and 'created_at'
+
+        Returns:
+            A list of ObjSchema objects representing all versions of the object.
+
+        Raises:
+            NotFoundError: If no versions of the object are found.
+        """
+        filter = ObjectVersionFilter(
+            object_ids=[object_id],
+            is_op=False,  # Exclude ops
+        )
+
+        response = self.server.objs_query(
+            ObjQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+            )
+        )
+        
+        if not response.objs:
+            raise NotFoundError(f"Object {object_id} not found")
+            
+        return response.objs
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
