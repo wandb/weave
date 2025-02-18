@@ -243,7 +243,9 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     def _predict(
         self, query: str, context: Union[str, list[str]], output: str
     ) -> float:
-        assert self._pipeline is not None, "Pipeline not loaded, check your `model_name_or_path`"
+        assert (
+            self._pipeline is not None
+        ), "Pipeline not loaded, check your `model_name_or_path`"
         tokenizer = self._pipeline.tokenizer
         context_str = "\n\n".join(context) if isinstance(context, list) else context
         inps = query + "\n\n" + context_str
