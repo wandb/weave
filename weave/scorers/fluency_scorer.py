@@ -5,7 +5,6 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
 )
 
@@ -28,17 +27,15 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         >>> scorer = WeaveFluencyScorerV1()
         >>> result = scorer.score("This text is fluent.")
         >>> print(result)
-        {
-            'pass': True,
-            'extras': {
+        WeaveScorerResult(
+            passed=True,
+            metadata={
                 'score': 0.95
             }
-        }
+        )
     """
 
     task: str = "text-classification"
-    model_name_or_path: str = ""
-    device: str = "auto"
     threshold: float = Field(
         default=FLUENCY_SCORER_THRESHOLD,
         description="The threshold for the non-fluent score.",
@@ -48,7 +45,6 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         """Loads the _pipeline attribute using HF utilities"""
         from transformers import pipeline
 
-        ensure_hf_imports()
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["fluency_scorer"]
         )
@@ -62,12 +58,13 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     @validate_call
     @weave.op
     def score(self, output: str) -> WeaveScorerResult:
-        pipeline_output = self._pipeline(output)[0]  # type: ignore
+        assert self._pipeline is not None
+        pipeline_output = self._pipeline(output)[0]
         fluency_score = next(
             pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
         )
         passed = fluency_score >= self.threshold
         return WeaveScorerResult(
             passed=passed,
-            extras={"score": fluency_score},
+            metadata={"score": fluency_score},
         )

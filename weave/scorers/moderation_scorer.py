@@ -9,7 +9,6 @@ from weave.scorers.scorer_types import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
 )
 
@@ -94,6 +93,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         >>> scorer = ToxicityScorer()
         >>> result = scorer.score("This is a hateful message.")
         >>> print(result)
+
         WeaveScorerResult(extras={
             'Race/Origin': 3,
             'Gender/Sex': 0,
@@ -124,7 +124,6 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
 
         self._local_model_path = load_hf_model_weights(
@@ -191,24 +190,25 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     Args:
         model_name_or_path (str): The name of the model to use. Defaults to `"wandb/bias_scorer"`.
         task (str): The pipeline task type. Defaults to `"text-classification"`.
-        device (str): The device to use for inference. Defaults to `None`, which will use `cuda` if available.
-        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.5`.
-        pipeline_kwargs (dict[str, Any]): Additional keyword arguments for the pipeline. Defaults to `{"top_k": 2}`.
+        device (str): The device to use for inference. Defaults to `cpu`, set to `cuda` if GPU is available.
+        threshold (float): The threshold for the bias score to flag the input. Defaults to `0.6`.
 
     Note: This Scorer's `score` method expects a string input for its `output` parameter.
 
     Returns:
-        dict[str, Any]: A dictionary indicating whether each bias category is detected.
+        WeaveScorerResult: An object containing:
+            - extras (dict[str, Any]): A dictionary mapping bias categories, such as "gender_bias" and "racial_bias", to their respective scores.
+            - passed (bool): A flag indicating whether the text passed the bias thresholds (True if none of the thresholds were exceeded, False otherwise).
 
     Example:
-        >>> from weave.scorers.moderation_scorer import CustomBiasScorer
-        >>> scorer = CustomBiasScorer()
+        >>> from weave.scorers.moderation_scorer import WeaveBiasScorerV1
+        >>> scorer = WeaveBiasScorerV1()
         >>> result = scorer.score("This text contains gender bias.")
         >>> print(result)
-        {
-            'gender_bias': True,
-            'racial_bias': False
-        }
+        WeaveScorerResult(extras={
+            'gender_bias_score': 0.7,
+            'racial_bias_score': 0.3
+        }, passed=False)
     """
 
     threshold: float = Field(
@@ -223,7 +223,6 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        ensure_hf_imports()
         from transformers import AutoModelForSequenceClassification
 
         self._local_model_path = load_hf_model_weights(

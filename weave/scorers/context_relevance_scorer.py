@@ -1,14 +1,13 @@
 from typing import Any, Union
 
 import numpy as np
-from pydantic import validate_call
+from pydantic import Field, validate_call
 
 import weave
-from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.default_models import MODEL_PATHS
+from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.utils import (
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
 )
 
@@ -28,17 +27,16 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     Args:
         model_name_or_path (str): Path or name of model weights to load
         device (str): Device to run model on, defaults to "cpu"
-        threshold (float): Threshold for relevance classification, defaults to 0.7
-        debug (bool): Enable debug logging, defaults to False
+        threshold (float): Threshold for relevance classification, defaults to 0.55
         return_all_spans (bool): Return all spans, defaults to False
 
     Note: This Scorer's `score` method expects the context to be passed to its `output` parameter as
     a string or list of strings.
 
     Returns:
-        dict: A dictionary containing:
-            - pass (bool): Whether the output was flagged as relevant (score >= threshold)
-            - extras (dict): Contains:
+        WeaveScorerResult: An object containing:
+            - passed (bool): Whether the output was flagged as relevant (score >= threshold)
+            - metadata (dict): Contains:
                 - score (float): Overall relevance score between 0 and 1
                 - all_spans (list[dict], optional): If `return_all_spans` is True, includes list of all relevant
                   text spans with their scores, where each dict has:
@@ -46,37 +44,42 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
                     - score (float): The relevance score for this span
 
     Example:
-        >>> scorer = ContextRelevanceScorer(return_all_spans=True)
+        >>> scorer = WeaveContextRelevanceScorerV1(return_all_spans=True)
         >>> result = scorer.score(
         ...     query="What is the capital of France?",
         ...     output=["Paris is the capital of France."], # the context to score
         ... )
         >>> print(result)
-        {
-            'pass': True,
-            'extras': {
+        WeaveScorerResult(
+            passed=True,
+            metadata={
                 'score': 0.92,
                 'all_spans': [
                     {'text': 'Paris is the capital of France', 'score': 0.92}
                 ]
             }
-        }
+        )
     """
 
-    threshold: float = CONTEXT_RELEVANCE_SCORER_THRESHOLD
+    threshold: float = Field(
+        default=CONTEXT_RELEVANCE_SCORER_THRESHOLD,
+        description="The threshold for relevance classification.",
+    )
+    return_all_spans: bool = Field(
+        default=False,
+        description="Whether to return all spans.",
+    )
     model_max_length: int = 1280
-    return_all_spans: bool = False
 
     def load_model(self) -> None:
-        ensure_hf_imports()
         from transformers import AutoModelForTokenClassification
 
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
         )
         self._model = AutoModelForTokenClassification.from_pretrained(
-            self._local_model_path, device_map=self.device
-        )
+            self._local_model_path
+        ).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
@@ -86,16 +89,15 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             self._local_model_path,
             model_max_length=self.model_max_length,
         )
-        print(f"Model and tokenizer loaded on {self.device}")
 
     def _score_document(
         self, query: str, document: str, threshold: float
     ) -> tuple[list[dict[str, Any]], int, int]:
         """Score a single document."""
         import torch
-        
-        assert self._tokenizer is not None # keep mypy happy
-        assert self._model is not None # keep mypy happy
+
+        assert self._tokenizer is not None  # keep mypy happy
+        assert self._model is not None  # keep mypy happy
 
         input_text = query + f" {self._tokenizer.sep_token} " + document
         model_inputs = self._tokenizer(
@@ -156,7 +158,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         query: str,
         output: Union[str, list[str]],  # Pass the context to the `output` parameter
     ) -> WeaveScorerResult:
-        all_spans = []
+        all_spans: list[dict[str, Any]] = []
         total_weighted_score = 0.0
         total_length = 0
 
@@ -176,10 +178,10 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
                 total_length += total_tokens
 
         final_score = total_weighted_score / total_length if total_length > 0 else 0.0
-        extras = {"score": final_score}
+        metadata: dict[str, Any] = {"score": final_score}
         if self.return_all_spans:
-            extras["all_spans"] = all_spans  # type: ignore
+            metadata["all_spans"] = all_spans
         return WeaveScorerResult(
             passed=final_score >= self.threshold,
-            extras=extras,
+            metadata=metadata,
         )
