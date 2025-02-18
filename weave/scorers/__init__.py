@@ -7,7 +7,6 @@ from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
-from weave.scorers.guardrails import PromptInjectionLLMGuardrail
 from weave.scorers.hallucination_scorer import HallucinationFreeScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.moderation_scorer import (
@@ -17,6 +16,9 @@ from weave.scorers.moderation_scorer import (
 )
 from weave.scorers.presidio_entity_recognition_guardrail import (
     PresidioEntityRecognitionGuardrail,
+)
+from weave.scorers.prompt_injection_guardrail import (
+    PromptInjectionLLMGuardrail,
 )
 from weave.scorers.pydantic_scorer import PydanticScorer
 from weave.scorers.ragas_scorer import (
