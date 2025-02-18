@@ -28,8 +28,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     Args:
         model_name_or_path (str): Path or name of model weights to load
         device (str): Device to run model on, defaults to "cpu"
-        threshold (float): Threshold for relevance classification, defaults to 0.7
-        debug (bool): Enable debug logging, defaults to False
+        threshold (float): Threshold for relevance classification, defaults to 0.55
         return_all_spans (bool): Return all spans, defaults to False
 
     Note: This Scorer's `score` method expects the context to be passed to its `output` parameter as
