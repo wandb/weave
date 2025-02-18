@@ -1,9 +1,9 @@
+import warnings
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
-from pydantic import Field, PrivateAttr, field_validator
+from pydantic import Field, PrivateAttr
 
 import weave
-from weave.scorers.utils import set_device
 
 if TYPE_CHECKING:
     import torch
@@ -47,6 +47,15 @@ class InstructorLLMScorer(LLMScorer):
         )
 
 
+def check_cuda(device: str) -> None:
+    import torch
+
+    if torch.cuda.is_available() and device == "cpu":
+        warnings.warn(
+            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference"
+        )
+
+
 class HuggingFacePipelineScorer(weave.Scorer):
     """
     Base class for using Hugging Face pipelines for moderation scoring.
@@ -74,24 +83,16 @@ class HuggingFacePipelineScorer(weave.Scorer):
         description="The task to use for the pipeline, for example 'text-classification'"
     )
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: Union[str, Any] = Field(
-        default="auto",
-        description="The device to use for the model",
-        validate_default=True,
+    device: str = Field(
+        default="cpu",
+        description="The device to use for the model, default to cpu.",
+        frozen=True,
     )
+
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
-        import torch
-
-        if isinstance(v, torch.device):
-            return v
-        else:
-            return set_device(v)
-
     def model_post_init(self, __context: Any) -> None:
+        check_cuda(self.device)
         if self._pipeline is None:
             self.load_pipeline()
 
@@ -109,26 +110,17 @@ class HuggingFaceScorer(weave.Scorer):
     """Score model outputs using a Hugging Face model."""
 
     model_name_or_path: str = Field(default="", description="The path to the model")
-    device: Union[str, Any] = Field(
-        default="auto",
-        description="The device to use for the model",
-        validate_default=True,
+    device: str = Field(
+        default="cpu",
+        frozen=True,
+        description="The device to use model, default to cpu.",
     )
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def validate_device(cls, v: Union[str, "torch.device"]) -> "torch.device":
-        import torch
-
-        if isinstance(v, torch.device):
-            return v
-        else:
-            return set_device(v)
-
     def model_post_init(self, __context: Any = None) -> None:
         """Template method for post-initialization."""
+        check_cuda(self.device)
         if self._model is None:
             self.load_model()
         else:

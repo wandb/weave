@@ -1,52 +1,21 @@
 import json
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
 
-if TYPE_CHECKING:
-    from torch import device
-
 
 class WeaveScorerResult(BaseModel):
     """The result of a weave.Scorer.score method."""
 
     passed: bool = Field(description="Whether the scorer passed or not")
-    extras: dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
-
-
-def set_device(device: str = "auto") -> "device":
-    """Set the device to use for the model.
-
-    Args:
-        device: The device to use for the model.
-
-    Returns:
-        The device to use for the model.
-    """
-    import torch
-
-    try:
-        cuda_available = torch.cuda.is_available()
-        if not cuda_available and "cuda" in str(device):
-            # could be `cuda:0`, `cuda:1`, etc.
-            raise ValueError("CUDA is not available")
-        if device == "auto":
-            if cuda_available:
-                device = "cuda"
-            elif torch.backends.mps.is_available():
-                device = "mps"
-            else:
-                device = "cpu"
-        return torch.device(device)
-    except:
-        return torch.device("cpu")
 
 
 def download_model(artifact_path: Union[str, Path]) -> Path:
