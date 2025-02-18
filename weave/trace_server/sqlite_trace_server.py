@@ -971,7 +971,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         WITH OrderedDigests AS (
             SELECT
                 json_each.value AS digest,
-                json_each.id AS original_order
+                CAST(json_each.key AS INTEGER) AS original_order
             FROM
                 tables,
                 json_each(tables.row_digests)
@@ -981,7 +981,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         SELECT
             tr.digest,
-            tr.val
+            tr.val,
+            OrderedDigests.original_order
         FROM
             OrderedDigests
             JOIN table_rows tr ON OrderedDigests.digest = tr.digest
@@ -1002,7 +1003,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableQueryRes(
             rows=[
-                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+                tsi.TableRowSchema(
+                    digest=r[0],
+                    val=json.loads(r[1]),
+                    original_index=r[2],  # Add the original index
+                )
                 for r in query_result
             ]
         )
