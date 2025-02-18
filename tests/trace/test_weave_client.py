@@ -1867,7 +1867,9 @@ def test_global_attributes_with_call_attributes(client_creator):
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(global_attributes={"global_attr": "global", "env": "test"}) as client:
+    with client_creator(
+        global_attributes={"global_attr": "global", "env": "test"}
+    ) as client:
         with weave.attributes({"local_attr": "local", "env": "override"}):
             my_op(1)
 
