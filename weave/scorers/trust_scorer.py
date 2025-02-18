@@ -113,8 +113,9 @@ class WeaveTrustScorerV1(weave.Scorer):
 
     # Model configuration
     device: str = Field(
-        default="auto",
+        default="cpu",
         description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')",
+        from_default=True,
     )
     context_relevance_model_name_or_path: str = Field(
         default="",
