@@ -98,10 +98,10 @@ class PresidioEntityRecognitionGuardrail(weave.Scorer):
         detected_entities: dict[str, list[str]] = {}
         for result in analyzer_results:
             entity_type = result.entity_type
-            text_slice = output[result.start : result.end]
+            text_chunk = output[result.start : result.end]
             if entity_type not in detected_entities:
                 detected_entities[entity_type] = []
-            detected_entities[entity_type].append(text_slice)
+            detected_entities[entity_type].append(text_chunk)
         return detected_entities
 
     @weave.op
