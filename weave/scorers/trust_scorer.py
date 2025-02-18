@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
 from typing import Any, Optional, Union
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, validate_call
 
 import weave
 from weave.scorers import (
@@ -26,7 +26,7 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
-from weave.scorers.utils import WeaveScorerResult, check_score_param_type
+from weave.scorers.utils import WeaveScorerResult
 
 
 class WeaveTrustScorerError(Exception):
@@ -346,7 +346,7 @@ class WeaveTrustScorerV1(weave.Scorer):
             "advisory_issues": advisory_issues,
             "extras": {"raw_outputs": raw_results, "scores": scores},
         }
-
+    @validate_call
     @weave.op
     def score(
         self,
@@ -362,9 +362,6 @@ class WeaveTrustScorerV1(weave.Scorer):
             context: Union[str, list[str]], The context to score the query against
             output: str, The output to score, e.g. the output of a LLM
         """
-        check_score_param_type(query, str, "query", self)
-        check_score_param_type(context, (str, list), "context", self)
-        check_score_param_type(output, str, "output", self)
         result = self._score_with_logic(query=query, context=context, output=output)
         return WeaveScorerResult(
             passed=result["passed"],
