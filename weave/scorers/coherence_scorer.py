@@ -62,7 +62,7 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
 
         return WeaveScorerResult(
             passed=passed,
-            extras={
+            metadata={
                 "coherence_label": coherence_output["label"],
                 "coherence_id": self._label2id[coherence_output["label"]],
                 "score": coherence_output["score"],

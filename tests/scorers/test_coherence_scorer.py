@@ -20,8 +20,8 @@ def test_score_messages(weave_coherence_scorer):
     output = "This is a coherent response."
     result = weave_coherence_scorer._score_messages(query, output)
     # Check that the pydantic model has the expected attributes.
-    assert result.extras is not None
-    assert result.extras["coherence_label"] == "A Little Incoherent"
+    assert result.metadata is not None
+    assert result.metadata["coherence_label"] == "A Little Incoherent"
 
 
 @pytest.mark.asyncio
@@ -36,8 +36,8 @@ async def test_score_with_chat_history(weave_coherence_scorer):
     ]
     # Call score using the new argument names.
     result = weave_coherence_scorer.score(query, output, chat_history=chat_history)
-    assert result.extras is not None
-    assert result.extras["coherence_label"] == "A Little Incoherent"
+    assert result.metadata is not None
+    assert result.metadata["coherence_label"] == "A Little Incoherent"
 
 
 @pytest.mark.asyncio
@@ -48,5 +48,5 @@ async def test_score_with_context(weave_coherence_scorer):
     context = "This is additional context."
     # Call score with the context parameter.
     result = weave_coherence_scorer.score(query, output, context=context)
-    assert result.extras is not None
-    assert result.extras["coherence_label"] == "A Little Incoherent"
+    assert result.metadata is not None
+    assert result.metadata["coherence_label"] == "A Little Incoherent"
