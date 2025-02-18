@@ -333,11 +333,9 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
         async def predict(self, input) -> str:
             return eval(input)
 
-
     @weave.op()
     def score(target, output):
         return target == output
-
 
     # Create and save an Evaluation object
     evaluation = Evaluation(
@@ -346,12 +344,12 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
         name="test-eval",
     )
     ref = weave.publish(evaluation)
-    
+
     # To simulate it being an older object, we delete the evaluation_name attribute from
-    # the gotten weave object.  
+    # the gotten weave object.
     eval_obj = ref.get(objectify=False)
     delattr(eval_obj._val, "evaluation_name")
-    
+
     # We should still be able to load the Evaluation object even if this attr doesn't exist
     # and it should continue to work and produce expected results
     evaluation = Evaluation.from_obj(eval_obj)
