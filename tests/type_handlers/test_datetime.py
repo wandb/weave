@@ -1,14 +1,12 @@
 from datetime import datetime, timezone
-from PIL import Image
-import io
-import pytest
 
-from weave.trace import serializer
+import pytest
+from PIL import Image
 
 
 def test_attribute_behavior():
     # Create a small test image
-    img = Image.new('RGB', (1, 1))
+    img = Image.new("RGB", (1, 1))
     # This works - PIL Image objects can have new attributes added
     img.art = "test"
     assert img.art == "test"
@@ -32,4 +30,4 @@ def test_datetime_serialization(client):
     ref = client._save_object(naive_dt, "my-naive-datetime")
     loaded_dt = client.get(ref)
     assert loaded_dt == naive_dt.replace(tzinfo=timezone.utc)
-    assert loaded_dt.tzinfo == timezone.utc 
+    assert loaded_dt.tzinfo == timezone.utc
