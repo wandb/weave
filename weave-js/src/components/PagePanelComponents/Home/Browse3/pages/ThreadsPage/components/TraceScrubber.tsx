@@ -33,6 +33,22 @@ const Label = styled.div`
   flex-shrink: 0;
 `;
 
+const CountIndicator = styled.div`
+  width: 60px;
+  font-size: 12px;
+  color: #64748B;
+  flex-shrink: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+`;
+
+const ScrubberContent = styled.div`
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+`;
+
 interface RangeInputProps {
   $progress: number;
 }
@@ -140,15 +156,20 @@ const createScrubber = ({label, getNodes, alwaysEnabled}: ScrubberConfig) => {
     return (
       <ScrubberRow>
         <Label>{label}</Label>
-        <RangeInput
-          type="range"
-          min={0}
-          max={Math.max(0, nodes.length - 1)}
-          value={currentIndex}
-          onChange={handleChange}
-          $progress={progress}
-          disabled={!alwaysEnabled && nodes.length <= 1}
-        />
+        <ScrubberContent>
+          <RangeInput
+            type="range"
+            min={0}
+            max={Math.max(0, nodes.length - 1)}
+            value={currentIndex}
+            onChange={handleChange}
+            $progress={progress}
+            disabled={!alwaysEnabled && nodes.length <= 1}
+          />
+          <CountIndicator>
+            {nodes.length > 0 ? `${currentIndex + 1}/${nodes.length}` : '0/0'}
+          </CountIndicator>
+        </ScrubberContent>
       </ScrubberRow>
     );
   };

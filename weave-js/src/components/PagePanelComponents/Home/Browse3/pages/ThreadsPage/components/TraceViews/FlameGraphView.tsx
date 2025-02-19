@@ -91,10 +91,9 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
 
   return (
     <div className="h-full overflow-hidden">
-      <h3 className="p-4 text-lg font-semibold">Flame Graph View</h3>
       <div
         ref={containerRef}
-        className="h-[calc(100%-4rem)] w-full overflow-hidden px-4">
+        className="h-[100%] w-full overflow-hidden px-4">
         {dimensions.width > 0 && dimensions.height > 0 && (
           <FlameGraph
             data={flameData}

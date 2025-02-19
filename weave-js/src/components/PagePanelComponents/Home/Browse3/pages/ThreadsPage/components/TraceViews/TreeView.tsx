@@ -99,8 +99,7 @@ export const TreeView: React.FC<TraceViewProps> = ({
 
   return (
     <div className="h-full overflow-hidden">
-      <h3 className="p-4 text-lg font-semibold">Tree View</h3>
-      <div className="h-[calc(100%-4rem)] overflow-y-auto px-4">
+      <div className="h-[100%] overflow-y-auto px-4">
         <div className="flex flex-col gap-2">
           {rootNodes.map(node => (
             <TreeNode
