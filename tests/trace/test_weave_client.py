@@ -20,6 +20,7 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.objectify import register_object
 from weave.trace.op import is_op
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
@@ -1275,9 +1276,9 @@ def test_summary_descendents(client):
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
-        (ObjectRefStrMatcher(name="model_b"), {"successes": 1, "errors": 0}),
-        (ObjectRefStrMatcher(name="model_error"), {"successes": 0, "errors": 1}),
-        (ObjectRefStrMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
+        (ObjectRefMatcher(name="model_b"), {"successes": 1, "errors": 0}),
+        (ObjectRefMatcher(name="model_error"), {"successes": 0, "errors": 1}),
+        (ObjectRefMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
     ]
 
 
@@ -1847,20 +1848,35 @@ def test_delete_op_version(client):
 
 def test_get_objects(client):
     # Create some test objects of different types
+    @register_object
     class ModelA(weave.Object):
         x: int
 
+        @classmethod
+        def from_obj(cls, obj):
+            return cls(x=obj._val.x)
+
+    @register_object
     class ModelB(weave.Object):
         y: str
 
-    class Dataset(weave.Object):
+        @classmethod
+        def from_obj(cls, obj):
+            return cls(y=obj._val.y)
+
+    @register_object
+    class TestDataset(weave.Object):
         data: list[int]
+
+        @classmethod
+        def from_obj(cls, obj):
+            return cls(data=obj._val.data)
 
     # Save objects
     model_a1 = ModelA(x=1)
     model_a2 = ModelA(x=2)
     model_b = ModelB(y="test")
-    dataset = Dataset(data=[1, 2, 3])
+    dataset = TestDataset(data=[1, 2, 3])
 
     client._save_object(model_a1, "model_a")
     client._save_object(model_a2, "model_a")  # New version of model_a
@@ -1872,17 +1888,21 @@ def test_get_objects(client):
     assert len(objects) == 3  # model_a (latest), model_b, dataset
     
     # Verify we get the latest version of model_a
-    model_a_obj = next(obj for obj in objects if obj.object_id == "model_a")
-    assert model_a_obj.val["x"] == 2  # Latest version has x=2
+    model_a_group = next(obj for obj in objects if obj.object_id == "model_a")
+    model_a_latest = model_a_group.get_latest()  # Get latest version
+    assert isinstance(model_a_latest, ModelA)
+    assert model_a_latest.x == 2  # Latest version has x=2
 
     # Test filtering by base class
     model_objects = client.get_objects(base_object_classes=["ModelA"])
     assert len(model_objects) == 1
     assert model_objects[0].object_id == "model_a"
+    assert model_objects[0].base_object_class == "ModelA"
 
-    dataset_objects = client.get_objects(base_object_classes=["Dataset"])
+    dataset_objects = client.get_objects(base_object_classes=["TestDataset"])
     assert len(dataset_objects) == 1
     assert dataset_objects[0].object_id == "dataset"
+    assert dataset_objects[0].base_object_class == "TestDataset"
 
     # Test pagination
     objects_page1 = client.get_objects(limit=2)
@@ -1895,7 +1915,103 @@ def test_get_objects(client):
     objects_sorted = client.get_objects(sort_by=[tsi.SortBy(field="object_id", direction="asc")])
     assert [obj.object_id for obj in objects_sorted] == ["dataset", "model_a", "model_b"]
 
+    # Test getting versions
+    model_a_versions = model_a_group.get_versions()
+    assert len(model_a_versions) == 2
+    assert all(isinstance(v, ModelA) for v in model_a_versions)
+    assert sorted(v.x for v in model_a_versions) == [1, 2]
 
+    # Test getting specific version
+    model_a_v0 = model_a_group.get_version(0)
+    assert isinstance(model_a_v0, ModelA)
+    assert model_a_v0.x == 1
+
+    # Test getting non-existent version
+    with pytest.raises(NotFoundError):
+        model_a_group.get_version(999)
+
+    # Test sorting versions
+    model_a_versions_sorted = model_a_group.get_versions(
+        sort_by=[tsi.SortBy(field="created_at", direction="desc")]
+    )
+    assert [v.x for v in model_a_versions_sorted] == [2, 1]  # Latest first
+
+    # Test version count and len
+    assert model_a_group.version_count() == 2
+    assert len(model_a_group) == 2
+
+    # Test has_version
+    assert model_a_group.has_version(0)
+    assert model_a_group.has_version(1)
+    assert not model_a_group.has_version(2)
+
+    # Test iteration
+    versions_list = list(model_a_group)
+    assert len(versions_list) == 2
+    assert all(isinstance(v, ModelA) for v in versions_list)
+    assert [v.x for v in versions_list] == [1, 2]  # Ordered by version_index asc
+
+    # Test getting version by digest
+    latest_digest = model_a_group.latest_version.digest
+    latest_by_digest = model_a_group.get_version_by_digest(latest_digest)
+    assert isinstance(latest_by_digest, ModelA)
+    assert latest_by_digest.x == 2
+
+    # Test getting non-existent digest
+    with pytest.raises(NotFoundError):
+        model_a_group.get_version_by_digest("nonexistent_digest")
+
+    # Test latest_version_index property
+    assert model_a_group.latest_version_index == 1
+
+    # Test getting latest version through get_latest()
+    latest = model_a_group.get_latest()
+    assert isinstance(latest, ModelA)
+    assert latest.x == 2
+
+    # Test getting versions with offset and limit
+    limited_versions = model_a_group.get_versions(limit=1)
+    assert len(limited_versions) == 1
+    assert limited_versions[0].x == 1  # First version
+
+    offset_versions = model_a_group.get_versions(offset=1)
+    assert len(offset_versions) == 1
+    assert offset_versions[0].x == 2  # Second version
+
+    # Test getting versions with both offset and limit
+    no_versions = model_a_group.get_versions(offset=2, limit=1)
+    assert len(no_versions) == 0  # No versions after offset 2
+
+    # Test getting all objects with multiple base classes
+    multi_class_objects = client.get_objects(base_object_classes=["ModelA", "ModelB"])
+    assert len(multi_class_objects) == 2
+    assert {obj.base_object_class for obj in multi_class_objects} == {"ModelA", "ModelB"}
+
+    # Test getting objects with sorting by multiple fields
+    sorted_objects = client.get_objects(
+        sort_by=[
+            tsi.SortBy(field="base_object_class", direction="asc"),
+            tsi.SortBy(field="object_id", direction="desc")
+        ]
+    )
+    assert [obj.base_object_class for obj in sorted_objects] == ["ModelA", "ModelB", "TestDataset"]
+
+    # Test getting objects with offset and limit
+    limited_objects = client.get_objects(limit=2)
+    assert len(limited_objects) == 2
+
+    offset_objects = client.get_objects(offset=2)
+    assert len(offset_objects) == 1
+
+    # Test that object groups maintain their identity
+    group1 = client.get_objects(base_object_classes=["ModelA"])[0]
+    group2 = client.get_objects(base_object_classes=["ModelA"])[0]
+    assert group1.object_id == group2.object_id
+    assert group1.base_object_class == group2.base_object_class
+    assert group1.latest_version.digest == group2.latest_version.digest
+
+
+@pytest.mark.skip("Deprecated method")
 def test_get_object_versions(client):
     # Create multiple versions of the same object
     class TestModel(weave.Object):

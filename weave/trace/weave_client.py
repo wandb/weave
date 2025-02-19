@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import functools
 import json
 import logging
 import os
@@ -1919,7 +1920,7 @@ class WeaveClient:
         limit: int | None = None,
         offset: int | None = None,
         sort_by: list[SortBy] | None = None,
-    ) -> list[ObjSchema]:
+    ) -> list[ObjectGroup]:
         """
         Get a list of object groups in the project. Each group represents an object and its versions.
         By default, only returns the latest version of each object.
@@ -1931,7 +1932,27 @@ class WeaveClient:
             sort_by: List of fields to sort by. Currently supports 'object_id' and 'created_at'
 
         Returns:
-            A list of ObjSchema objects representing the latest version of each object.
+            A list of ObjectGroup instances, each providing access to an object and its versions.
+            
+        Example:
+            ```python
+            # Get all objects
+            objects = client.get_objects()
+            
+            # Get the latest version
+            latest = objects[0].get_latest()
+            
+            # Get a specific version
+            v1 = objects[0].get_version(1)
+            
+            # Get all versions
+            all_versions = objects[0].get_versions()
+            
+            # Get versions with sorting
+            sorted_versions = objects[0].get_versions(
+                sort_by=[SortBy(field="created_at", direction="desc")]
+            )
+            ```
         """
         filter = ObjectVersionFilter(
             base_object_classes=base_object_classes,
@@ -1948,8 +1969,16 @@ class WeaveClient:
                 sort_by=sort_by,
             )
         )
-        return response.objs
+        
+        return [
+            ObjectGroup(
+                object_id=obj.object_id,
+                base_object_class=obj.base_object_class,
+            )
+            for obj in response.objs
+        ]
 
+    @deprecated(new_name="get_objects().get_versions()")
     @trace_sentry.global_trace_sentry.watch()
     def get_object_versions(
         self,
@@ -1962,6 +1991,9 @@ class WeaveClient:
         """
         Get all versions of a specific object.
 
+        This method is deprecated. Use get_objects() to get an ObjectGroup instance,
+        then use its get_versions() method to access versions.
+
         Args:
             object_id: The ID of the object to get versions for
             limit: Maximum number of versions to return
@@ -1972,7 +2004,7 @@ class WeaveClient:
             A list of ObjSchema objects representing all versions of the object.
 
         Raises:
-            NotFoundError: If no versions of the object are found.
+            NotFoundError: If no versions of the object are found and offset is None.
         """
         filter = ObjectVersionFilter(
             object_ids=[object_id],
@@ -1988,10 +2020,11 @@ class WeaveClient:
                 sort_by=sort_by,
             )
         )
-        
-        if not response.objs:
+
+        # Only raise NotFoundError if we're not using pagination
+        if not response.objs and offset is None:
             raise NotFoundError(f"Object {object_id} not found")
-            
+
         return response.objs
 
 
@@ -2112,6 +2145,189 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
+
+
+class ObjectGroup(pydantic.BaseModel):
+    """A container for a group of object versions.
+    
+    This class provides a friendly interface for accessing different versions of an object.
+    Versions can be accessed through various methods like get_latest(), get_version(),
+    get_version_by_digest(), or get_versions().
+
+    Example:
+        ```python
+        # Get the latest version
+        latest = obj_group.get_latest()
+
+        # Get a specific version by index
+        v1 = obj_group.get_version(1)
+
+        # Get a specific version by digest
+        v = obj_group.get_version_by_digest("abc123")
+
+        # Get all versions
+        versions = obj_group.get_versions()
+
+        # Get sorted versions
+        sorted_versions = obj_group.get_versions(
+            sort_by=[SortBy(field="created_at", direction="desc")]
+        )
+
+        # Iterate over all versions
+        for version in obj_group:
+            print(version)
+        ```
+    """
+    object_id: str
+    base_object_class: str | None
+
+    model_config = pydantic.ConfigDict(frozen=True)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._version_counter = 0
+        self._get_versions = functools.lru_cache(maxsize=128)(self._get_versions_impl)
+
+    def get_latest(self) -> Any:
+        """Get the latest version of the object."""
+        versions = self.get_versions(
+            limit=1,
+            sort_by=[SortBy(field="version_index", direction="desc")]
+        )
+        if not versions:
+            raise NotFoundError(f"No versions found for object {self.object_id}")
+        return versions[0]
+
+    def get_versions(
+        self,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortBy] | None = None,
+    ) -> list[Any]:
+        """Get multiple versions of the object.
+        
+        Args:
+            limit: Maximum number of versions to return
+            offset: Number of versions to skip
+            sort_by: List of fields to sort by. Currently supports 'created_at' and 'version_index'
+            
+        Returns:
+            A list of deserialized objects.
+        """
+        # Convert SortBy objects to hashable tuples (field, direction)
+        sort_by_tuples = tuple((s.field, s.direction) for s in sort_by) if sort_by else None
+        return self._get_versions(limit, offset, sort_by_tuples, self._version_counter)
+
+    def _get_versions_impl(
+        self,
+        limit: int | None,
+        offset: int | None,
+        sort_by_tuples: tuple[tuple[str, str], ...] | None,
+        version_counter: int,
+    ) -> list[Any]:
+        client = weave_client_context.require_weave_client()
+        # Convert tuples back to SortBy objects
+        sort_by = [SortBy(field=f, direction=d) for f, d in sort_by_tuples] if sort_by_tuples else None
+        schemas = client.get_object_versions(
+            self.object_id,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by
+        )
+        return [
+            maybe_objectify(
+                client.get(
+                    ObjectRef(
+                        client.entity,
+                        client.project,
+                        self.object_id,
+                        schema.digest
+                    )
+                )
+            )
+            for schema in schemas
+        ]
+
+    def get_version(self, version_index: int) -> Any:
+        """Get a specific version of the object.
+        
+        Args:
+            version_index: The version index to get.
+            
+        Returns:
+            The deserialized object at that version.
+            
+        Raises:
+            NotFoundError: If the version does not exist.
+        """
+        client = weave_client_context.require_weave_client()
+        # Get all schemas sorted by version_index ascending
+        schemas = client.get_object_versions(
+            self.object_id,
+            sort_by=[SortBy(field="version_index", direction="asc")]
+        )
+        for schema in schemas:
+            if schema.version_index == version_index:
+                ref = ObjectRef(
+                    client.entity,
+                    client.project,
+                    self.object_id,
+                    schema.digest
+                )
+                obj = client.get(ref)
+                return maybe_objectify(obj)
+        raise NotFoundError(f"Version {version_index} not found for object {self.object_id}")
+
+    def get_version_by_digest(self, digest: str) -> Any:
+        """Get a specific version of the object by its digest.
+        
+        Args:
+            digest: The digest of the version to get.
+            
+        Returns:
+            The deserialized object at that version.
+            
+        Raises:
+            NotFoundError: If the version does not exist.
+        """
+        client = weave_client_context.require_weave_client()
+        # Get all schemas (order doesn't matter)
+        schemas = client.get_object_versions(self.object_id)
+        for schema in schemas:
+            if schema.digest == digest:
+                ref = ObjectRef(
+                    client.entity,
+                    client.project,
+                    self.object_id,
+                    digest
+                )
+                obj = client.get(ref)
+                return maybe_objectify(obj)
+        raise NotFoundError(f"Version with digest {digest} not found for object {self.object_id}")
+
+    def version_count(self) -> int:
+        """Get the total number of versions.
+        
+        Returns:
+            The number of versions.
+            
+        Raises:
+            NotFoundError: If the object no longer exists.
+        """
+        return len(self.get_versions())
+
+    def __iter__(self) -> Iterator[Any]:
+        """Iterate over all versions of the object, from oldest to newest."""
+        return iter(self.get_versions(sort_by=[SortBy(field="version_index", direction="asc")]))
+
+    def __len__(self) -> int:
+        """Get the total number of versions."""
+        return self.version_count()
+
+    def invalidate_cache(self) -> None:
+        """Invalidate the version cache."""
+        self._version_counter += 1
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

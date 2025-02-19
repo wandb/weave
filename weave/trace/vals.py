@@ -259,7 +259,9 @@ class WeaveObject(Traceable):
         return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
-        return self._val == other
+        if not isinstance(other, WeaveObject):
+            return False
+        return self._val == other._val
 
 
 class WeaveTable(Traceable):
