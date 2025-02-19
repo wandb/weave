@@ -153,18 +153,11 @@ export const BreadcrumbContainer = styled.div`
   color: #64748b;
   min-height: 32px;
   border-radius: 6px;
-
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+  
   &::-webkit-scrollbar {
-    height: 2px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f1f5f9;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 1px;
+    display: none;  /* Chrome, Safari and Opera */
   }
 `;
 
