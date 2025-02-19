@@ -59,8 +59,42 @@ const sidebars: SidebarsConfig = {
           collapsible: true,
           collapsed: false,
           label: "Evaluation",
+<<<<<<< HEAD
           link: { type: "doc", id: "guides/core-types/evaluations" },
           items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors", "guides/evaluation/builtin_scorers"],
+=======
+          items: [
+            "guides/core-types/evaluations",
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Online Evaluation",
+              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
+              items: [
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-guardrails",
+                  label: "Guardrails",
+                  autoAddBaseUrl: true,
+                },
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors",
+                  label: "Monitors",
+                  autoAddBaseUrl: true,
+                }
+              ],
+            },
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Scoring",
+              items: ["guides/evaluation/scorers",  "guides/evaluation/builtin_scorers"],
+            }
+          ],
+>>>>>>> master
         },
         "guides/core-types/prompts",
         "guides/core-types/models",
