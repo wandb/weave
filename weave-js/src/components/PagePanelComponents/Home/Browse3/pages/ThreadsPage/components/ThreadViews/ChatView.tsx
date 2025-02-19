@@ -10,7 +10,6 @@ import {ThreadViewProps} from '../../types';
 const Container = styled.div`
   height: 100%;
   overflow: hidden;
-
 `;
 
 const ScrollContainer = styled.div`
@@ -71,8 +70,8 @@ const SectionHeader = styled.div`
     opacity: 0;
     transition: opacity 0.2s;
   }
-  
-  &[data-scrolled="true"]::after {
+
+  &[data-scrolled='true']::after {
     opacity: 1;
   }
 `;
@@ -107,12 +106,12 @@ const Content = styled.div<{$isExpanded: boolean}>`
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
+    background: #cbd5e1;
     border-radius: 4px;
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background: #94A3B8;
+    background: #94a3b8;
   }
 `;
 
@@ -189,7 +188,6 @@ export const ChatView: React.FC<ThreadViewProps> = ({
 //     return value;
 //   });
 // };
-
 
 // const processInput = (input: any) => {
 //   return removeUnderscoredKeys(removeEmptyValues(input));

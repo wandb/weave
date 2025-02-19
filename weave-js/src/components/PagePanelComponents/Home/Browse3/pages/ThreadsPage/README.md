@@ -199,3 +199,20 @@ import {ThreadsPage} from './ThreadsPage';
 6. [ ] Accessibility improvements
 7. [ ] Test coverage
 8. [ ] Real thread list implementation 
+
+
+### Human TODO:
+* Finish the foundations of the idea
+   * [ ] Implement correct thread picker
+   * [ ] Allow a single trace to feel like a thread (how?)
+   * [ ] Simple APIs for thread tagging
+   * [ ] Build the Op (MPC) server?
+* Make it mergable
+   * [ ] Add full detail to the call view
+   * [ ] Make sure we include things like cost
+   * [ ] Overal Style Audit
+   * [ ] Figure out better way to render chat view for huge input/outputs
+* New Ideas
+   * [ ] Add polling to make the graphs interactive and live feeling
+   * [ ] Explore "State" mutations
+   * [ ] Explore Capturing Logs / Thoughts / STDOUT / STDERR (Perhaps a blend with W&B core?)

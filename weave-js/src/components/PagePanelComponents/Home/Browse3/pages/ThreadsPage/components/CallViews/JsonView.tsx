@@ -1,11 +1,10 @@
 import JsonView from '@uiw/react-json-view';
 import Input from '@wandb/weave/common/components/Input';
 import {JSONPath} from 'jsonpath-plus';
-import React, {useMemo,useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {Button} from '../../../../../../../Button';
-import {Icon} from '../../../../../../../Icon';
 import {CallViewProps} from '../../types';
 
 const Container = styled.div`
@@ -38,12 +37,12 @@ const ScrollContainer = styled.div`
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
+    background: #cbd5e1;
     border-radius: 4px;
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background: #94A3B8;
+    background: #94a3b8;
   }
 `;
 
@@ -59,6 +58,31 @@ const HelpText = styled.div`
   margin-left: 8px;
 `;
 
+const PrimitiveValue = styled.div`
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &.number {
+    color: #0891b2;
+  }
+
+  &.string {
+    color: #166534;
+  }
+
+  &.boolean {
+    color: #9333ea;
+  }
+
+  &.null {
+    color: #dc2626;
+    font-style: italic;
+  }
+`;
+
 export const CallJsonView: React.FC<CallViewProps> = ({call}) => {
   const [filter, setFilter] = useState('');
   const [showHelp, setShowHelp] = useState(false);
@@ -67,14 +91,16 @@ export const CallJsonView: React.FC<CallViewProps> = ({call}) => {
 
   // Apply JSONPath filter and handle errors
   const filteredData = useMemo(() => {
-    if (!filter) { return data; }
+    if (!filter) {
+      return data;
+    }
 
     try {
       // Add root selector if not present
       const query = filter.startsWith('$') ? filter : '$' + filter;
       const result = JSONPath({
         path: query,
-        json: data,
+        json: data ?? {},
         wrap: false,
       });
       setError(null);
@@ -87,11 +113,37 @@ export const CallJsonView: React.FC<CallViewProps> = ({call}) => {
 
   const helpExamples = [
     {query: '$.inputs', desc: 'Get all inputs'},
-    {query: '$..[?(@.type=="string")]', desc: 'Find all objects with type "string"'},
+    {
+      query: '$..[?(@.type=="string")]',
+      desc: 'Find all objects with type "string"',
+    },
     {query: '$..id', desc: 'Get all id fields at any level'},
     {query: '$.outputs[*]', desc: 'Get all outputs array elements'},
     {query: '$..[?(@.value>100)]', desc: 'Find objects with value > 100'},
   ];
+
+  // Helper to render primitive values
+  const renderPrimitive = (value: any) => {
+    if (value === null) {
+      return <PrimitiveValue className="null">null</PrimitiveValue>;
+    }
+
+    const type = typeof value;
+    switch (type) {
+      case 'string':
+        return <PrimitiveValue className="string">"{value}"</PrimitiveValue>;
+      case 'number':
+        return <PrimitiveValue className="number">{value}</PrimitiveValue>;
+      case 'boolean':
+        return (
+          <PrimitiveValue className="boolean">
+            {value.toString()}
+          </PrimitiveValue>
+        );
+      default:
+        return <PrimitiveValue>{String(value)}</PrimitiveValue>;
+    }
+  };
 
   return (
     <Container>
@@ -114,9 +166,14 @@ export const CallJsonView: React.FC<CallViewProps> = ({call}) => {
       {showHelp && (
         <Controls style={{borderTop: '1px solid #e2e8f0'}}>
           <HelpText>
-            <div style={{fontWeight: 500, marginBottom: '4px'}}>JSONPath Examples:</div>
+            <div style={{fontWeight: 500, marginBottom: '4px'}}>
+              JSONPath Examples:
+            </div>
             {helpExamples.map((ex, i) => (
-              <div key={i} style={{cursor: 'pointer'}} onClick={() => setFilter(ex.query)}>
+              <div
+                key={i}
+                style={{cursor: 'pointer'}}
+                onClick={() => setFilter(ex.query)}>
                 <code style={{color: '#3b82f6'}}>{ex.query}</code> - {ex.desc}
               </div>
             ))}
@@ -124,26 +181,21 @@ export const CallJsonView: React.FC<CallViewProps> = ({call}) => {
         </Controls>
       )}
       <ScrollContainer>
-        <JsonView
-          value={filteredData}
-          style={{backgroundColor: 'transparent'}}
-          displayDataTypes={false}
-          displayObjectSize={true}
-          enableClipboard={true}
-          highlightUpdates={true}
-          collapsed={1}
-          shortenTextAfterLength={120}
-          theme={{
-            background: 'transparent',
-            fontSize: '13px',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            valueColor: '#334155',
-            keyColor: '#0f766e',
-            borderColor: '#e2e8f0',
-            base00: '#f8fafc',
-          }}
-        />
+        {filteredData === null || typeof filteredData !== 'object' ? (
+          renderPrimitive(filteredData)
+        ) : (
+          <JsonView
+            value={filteredData}
+            style={{backgroundColor: 'transparent'}}
+            displayDataTypes={false}
+            displayObjectSize={false}
+            enableClipboard={false}
+            highlightUpdates={false}
+            collapsed={false}
+            shortenTextAfterLength={120}
+          />
+        )}
       </ScrollContainer>
     </Container>
   );
-}; 
+};

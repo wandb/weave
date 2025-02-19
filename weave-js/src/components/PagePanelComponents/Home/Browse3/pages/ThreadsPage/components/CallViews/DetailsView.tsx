@@ -5,4 +5,4 @@ import {CallViewProps} from '../../types';
 
 export const DetailsView: React.FC<CallViewProps> = ({call}) => {
   return <CallDetails call={call} />;
-}; 
+};
