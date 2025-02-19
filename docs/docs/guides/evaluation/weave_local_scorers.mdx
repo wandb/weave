@@ -18,8 +18,6 @@ import TabItem from '@theme/TabItem';
    - These models can be run on CPU or GPU, although for best performance we recommend using a GPU. 
    - The model weights are stored in public W&B Artifacts and are downloaded when the scorer class is instantiated. 
 
-   
-
    ## Prerequisites
    
    **Installation**
@@ -281,7 +279,9 @@ import TabItem from '@theme/TabItem';
     This scorer uses the [Presidio library](https://github.com/microsoft/presidio) to detect Personally Identifiable Information (PII) in your AI system's inputs and outputs.
 
     **Notes:**
-    - TODO
+    - You can specify specific entity types (like emails or phone numbers) by passing a list of Presidio entities to the `selected_entities` parameter. Otherwise Presidio will try and detect all entity types in its default entities list.
+    - You can also pass additional custom recognizers you have written to the `custom_recognizers` parameter as a list of type `presidio.EntityRecognizer`
+    - If you are passing in non-english text you can use the `language` parameter to specify the language of the text.
 
     ```python
     import weave
