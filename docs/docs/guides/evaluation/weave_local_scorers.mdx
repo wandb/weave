@@ -8,10 +8,10 @@ import TabItem from '@theme/TabItem';
 
    Weave's local scorers are a suite of small language models designed to run locally on your machine, at very low latency, to score the **safety** and **quality** of your AI system's inputs, context and output. 
    
-   Some of these models have been fine-tuned by Weights & Biases, others are SOTA open-source small language models trained by the community. W&B Reports were used when training and evaluating these models, you can see all of the training and evaluation details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA)
+   Some of these models have been fine-tuned by Weights & Biases, others are SOTA open-source small language models trained by the community. W&B Reports were used when training and evaluating these models, you can see all training and evaluation details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA)
 
    **Note:**
-   - These models can be run on CPU or GPU although for best performance we recommend using a GPU. 
+   - These models can be run on CPU or GPU, although for best performance we recommend using a GPU. 
    - The model weights are stored in public W&B Artifacts and are downloaded when the scorer class is instantiated. 
 
    
@@ -244,19 +244,19 @@ import TabItem from '@theme/TabItem';
     def print_trust_scorer_result(result):
         print()
         print(f"Output is trustworthy: {result.passed}")
-        print(f"Trust level: {result.extras['trust_level']}")
+        print(f"Trust level: {result.metadata['trust_level']}")
         if not result.passed:
             print("Triggered scorers:")
-            for scorer_name, scorer_data in result.extras['raw_outputs'].items():
-            if not scorer_data.passed:
-                print(f"  - {scorer_name} did not pass")
+            for scorer_name, scorer_data in result.metadata['raw_outputs'].items():
+                if not scorer_data.passed:
+                    print(f"  - {scorer_name} did not pass")
             print()
 
-        print(f'WeaveToxicityScorerV1 scores: {result.extras["scores"]["WeaveToxicityScorerV1"]}')
-        print(f'WeaveHallucinationScorerV1 scores: {result.extras["scores"]["WeaveHallucinationScorerV1"]}')
-        print(f'WeaveContextRelevanceScorerV1 score: {result.extras["scores"]["WeaveContextRelevanceScorerV1"]}')
-        print(f'WeaveCoherenceScorerV1 score: {result.extras["scores"]["WeaveCoherenceScorerV1"]}')
-        print(f'WeaveFluencyScorerV1: {result.extras["scores"]["WeaveFluencyScorerV1"]}')
+        print(f'WeaveToxicityScorerV1 scores: {result.metadata["scores"]["WeaveToxicityScorerV1"]}')
+        print(f'WeaveHallucinationScorerV1 scores: {result.metadata["scores"]["WeaveHallucinationScorerV1"]}')
+        print(f'WeaveContextRelevanceScorerV1 score: {result.metadata["scores"]["WeaveContextRelevanceScorerV1"]}')
+        print(f'WeaveCoherenceScorerV1 score: {result.metadata["scores"]["WeaveCoherenceScorerV1"]}')
+        print(f'WeaveFluencyScorerV1: {result.metadata["scores"]["WeaveFluencyScorerV1"]}')
         print()
 
     # There are 2 issues with the input data: irrelevant context, hallucinated output
@@ -297,6 +297,6 @@ import TabItem from '@theme/TabItem';
   <TabItem value="typescript" label="TypeScript">
     Weave local scorers are not available in TypeScript yet. Stay tuned! 
     
-    To use Weave scorers in TypeScript, see [function-based scorers](../scorers/custom-scorers.md#function-based-scorers).
+    To use Weave scorers in TypeScript, see [function-based scorers](scorers#function-based-scorers).
   </TabItem>
 </Tabs>
