@@ -10,9 +10,7 @@ from weave.scorers.utils import WeaveScorerResult
 class DummyScorer(weave.Scorer):
     @weave.op
     def score(self, output: str, query: str):
-        return WeaveScorerResult(
-            passed=True, metadata={"dummy": True}, extras={"score": 1}
-        )
+        return WeaveScorerResult(passed=True, metadata={"dummy": True, "score": 1})
 
 
 @pytest.fixture
@@ -27,6 +25,13 @@ def trust_scorer():
         run_in_parallel=False,
     )
     return scorer
+
+
+def test_simple_score(trust_scorer):
+    result = trust_scorer.score(
+        output="dummy output", context="dummy context", query="dummy query"
+    )
+    assert not result.passed
 
 
 def test_preprocess_text(trust_scorer):
@@ -52,17 +57,19 @@ def test_filter_inputs_for_scorer(trust_scorer):
 
 def test_score_all_with_dummy_scorers(trust_scorer):
     # Replace the loaded scorers with dummy ones to simulate controlled outcomes.
-    class AlwaysPassScorer:
+    class AlwaysPassScore(weave.Scorer):
+        @weave.op
         def score(self, **kwargs):
             return WeaveScorerResult(passed=True, metadata={"score": 0.1})
 
-    class AlwaysFailScorer:
+    class AlwaysFailScore(weave.Scorer):
+        @weave.op
         def score(self, **kwargs):
             return WeaveScorerResult(passed=False, metadata={"score": 0.9})
 
     trust_scorer._loaded_scorers = {
-        "AlwaysPass": AlwaysPassScorer(),
-        "AlwaysFail": AlwaysFailScorer(),
+        "AlwaysPass": AlwaysPassScore(),
+        "AlwaysFail": AlwaysFailScore(),
     }
 
     results = trust_scorer._score_all(
@@ -76,32 +83,34 @@ def test_score_all_with_dummy_scorers(trust_scorer):
 
 def test_score_with_logic(trust_scorer):
     # Create dummy critical and advisory scorers to verify nuanced trust logic.
-    class DummyCriticalScorer:
+    class DummyCriticalScore(weave.Scorer):
+        @weave.op
         def score(self, **kwargs):
             return WeaveScorerResult(
-                passed=False, metadata={"score": 0.8}, extras={"score": 0.8}
+                passed=False, metadata={"score": 0.8, "score_2": 0.8}
             )
 
-    class DummyAdvisoryScorer:
+    class DummyAdvisoryScore(weave.Scorer):
+        @weave.op
         def score(self, **kwargs):
             return WeaveScorerResult(
-                passed=False, metadata={"score": 0.4}, extras={"score": 0.4}
+                passed=False, metadata={"score": 0.4, "score_2": 0.4}
             )
 
     # Override the loaded scorers and classification sets.
     trust_scorer._loaded_scorers = {
-        "DummyCritical": DummyCriticalScorer(),
-        "DummyAdvisory": DummyAdvisoryScorer(),
+        "DummyCritical": DummyCriticalScore(),
+        "DummyAdvisory": DummyAdvisoryScore(),
     }
-    trust_scorer._critical_scorers = {DummyCriticalScorer}
-    trust_scorer._advisory_scorers = {DummyAdvisoryScorer}
+    trust_scorer._critical_scorers = {DummyCriticalScore}
+    trust_scorer._advisory_scorers = {DummyAdvisoryScore}
 
     result = trust_scorer._score_with_logic(
         query="dummy query", context="dummy context", output="dummy output"
     )
     # Since a critical scorer failed, overall trust should be low.
-    assert result["trust_level"] == "low_critical-issues-found"
-    assert result["passed"] is False
-    assert "DummyCritical" in result["critical_issues"]
+    assert result.metadata["trust_level"] == "low_critical-issues-found"
+    assert not result.passed
+    assert "DummyCritical" in result.metadata["critical_issues"]
     # Presence of advisory issues should still be reported.
-    assert "DummyAdvisory" in result["advisory_issues"]
+    assert "DummyAdvisory" in result.metadata["advisory_issues"]

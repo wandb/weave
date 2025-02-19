@@ -92,11 +92,11 @@ class WeaveTrustScorerV1(weave.Scorer):
                 "critical_issues": [],
                 "advisory_issues": [],
                 "raw_outputs": {
-                    "WeaveToxicityScorerV1": {"passed": True, "extras": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
-                    "WeaveHallucinationScorerV1": {"passed": True, "extras": {"score": 0.1}},
-                    "WeaveContextRelevanceScorerV1": {"passed": True, "extras": {"score": 0.85}},
-                    "WeaveFluencyScorerV1": {"passed": True, "extras": {"score": 0.95}},
-                    "WeaveCoherenceScorerV1": {"passed": True, "extras": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
+                    "WeaveToxicityScorerV1": {"passed": True, "metadata": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0}},
+                    "WeaveHallucinationScorerV1": {"passed": True, "metadata": {"score": 0.1}},
+                    "WeaveContextRelevanceScorerV1": {"passed": True, "metadata": {"score": 0.85}},
+                    "WeaveFluencyScorerV1": {"passed": True, "metadata": {"score": 0.95}},
+                    "WeaveCoherenceScorerV1": {"passed": True, "metadata": {"coherence_label": "Perfectly Coherent", "coherence_id": 4, "score": 0.9}}
                 },
                 "scores": {
                     "WeaveToxicityScorerV1": {"Race/Origin": 0, "Gender/Sex": 0, "Religion": 0, "Ability": 0, "Violence": 0},
@@ -148,15 +148,19 @@ class WeaveTrustScorerV1(weave.Scorer):
     )
 
     # Define scorer categories
-    _critical_scorers: set[type[weave.Scorer]] = {
-        WeaveToxicityScorerV1,
-        WeaveHallucinationScorerV1,
-        WeaveContextRelevanceScorerV1,
-    }
-    _advisory_scorers: set[type[weave.Scorer]] = {
-        WeaveFluencyScorerV1,
-        WeaveCoherenceScorerV1,
-    }
+    _critical_scorers: set[weave.Scorer] = PrivateAttr(
+        default_factory=lambda: {
+            WeaveToxicityScorerV1,
+            WeaveHallucinationScorerV1,
+            WeaveContextRelevanceScorerV1,
+        }
+    )
+    _advisory_scorers: set[weave.Scorer] = PrivateAttr(
+        default_factory=lambda: {
+            WeaveFluencyScorerV1,
+            WeaveCoherenceScorerV1,
+        }
+    )
 
     # Private attributes
     _loaded_scorers: dict[str, weave.Scorer] = PrivateAttr(default_factory=dict)
@@ -181,16 +185,14 @@ class WeaveTrustScorerV1(weave.Scorer):
 
     def _load_scorers(self) -> None:
         """Load all scorers with appropriate configurations."""
-        base_params: dict[str, Any] = {
-            "column_map": self.column_map,
-            "device": self.device,
-        }
-
         # Load all scorers (both critical and advisory)
         all_scorers = self._critical_scorers | self._advisory_scorers
 
         for scorer_cls in all_scorers:
-            scorer_params = base_params.copy()
+            scorer_params: dict[str, Any] = {
+                "column_map": self.column_map,
+                "device": self.device,
+            }
 
             # Add specific threshold parameters based on scorer type
             if scorer_cls == WeaveContextRelevanceScorerV1:
@@ -247,8 +249,8 @@ class WeaveTrustScorerV1(weave.Scorer):
     def _score_all(
         self,
         output: str,
-        context: Optional[Union[str, list[str]]] = None,
-        query: Optional[str] = None,
+        context: Union[str, list[str]],
+        query: str,
     ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results."""
         # Preprocess inputs
@@ -291,17 +293,19 @@ class WeaveTrustScorerV1(weave.Scorer):
                     results[scorer_name] = scorer.score(
                         **self._filter_inputs_for_scorer(scorer, inputs)
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    raise WeaveTrustScorerError(
+                        f"Error calling {scorer_name}: {e}", errors=e
+                    )
 
         return results
 
     def _score_with_logic(
         self,
-        query: Optional[str],
-        context: Optional[Union[str, list[str]]],
+        query: str,
+        context: Union[str, list[str]],
         output: str,
-    ) -> dict[str, Any]:
+    ) -> WeaveScorerResult:
         """Score with nuanced logic for trustworthiness."""
         raw_results = self._score_all(output=output, context=context, query=query)
 
@@ -335,17 +339,20 @@ class WeaveTrustScorerV1(weave.Scorer):
         scores = {}
         for name, result in raw_results.items():
             if name == "WeaveToxicityScorerV1":
-                scores[name] = result.extras  # Toxicity returns category scores
-            elif hasattr(result, "extras") and "score" in result.extras:
-                scores[name] = result.extras["score"]
+                scores[name] = result.metadata  # Toxicity returns category scores
+            elif hasattr(result, "metadata") and "score" in result.metadata:
+                scores[name] = result.metadata["score"]
 
-        return {
-            "passed": passed,
-            "trust_level": trust_level,
-            "critical_issues": critical_issues,
-            "advisory_issues": advisory_issues,
-            "extras": {"raw_outputs": raw_results, "scores": scores},
-        }
+        return WeaveScorerResult(
+            passed=passed,
+            metadata={
+                "trust_level": trust_level,
+                "critical_issues": critical_issues,
+                "advisory_issues": advisory_issues,
+                "raw_outputs": raw_results,
+                "scores": scores,
+            },
+        )
 
     @validate_call
     @weave.op
@@ -363,14 +370,4 @@ class WeaveTrustScorerV1(weave.Scorer):
             context: Union[str, list[str]], The context to score the query against
             output: str, The output to score, e.g. the output of a LLM
         """
-        result = self._score_with_logic(query=query, context=context, output=output)
-        return WeaveScorerResult(
-            passed=result["passed"],
-            metadata={
-                "trust_level": result["trust_level"],
-                "critical_issues": result["critical_issues"],
-                "advisory_issues": result["advisory_issues"],
-                "raw_outputs": result["extras"]["raw_outputs"],
-                "scores": result["extras"]["scores"],
-            },
-        )
+        return self._score_with_logic(query=query, context=context, output=output)
