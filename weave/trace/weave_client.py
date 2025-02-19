@@ -836,6 +836,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
+        print("GETTING", ref.digest)
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
@@ -874,6 +875,7 @@ class WeaveClient:
                 ref_read_res = self.server.refs_read_batch(
                     RefsReadBatchReq(refs=[ref.uri()])
                 )
+                print(">>>>>>ref_read_res>>>>>", ref.uri(), "->", ref_read_res)
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -1905,6 +1907,8 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        import threading
+
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)

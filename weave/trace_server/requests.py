@@ -147,16 +147,24 @@ class LoggingHTTPAdapter(HTTPAdapter):
         return response
 
 
-session = Session()
-if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
-    adapter = LoggingHTTPAdapter()
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+# Add threading.local() to store thread-local sessions
+_thread_local = threading.local()
+
+
+def get_session() -> Session:
+    """Get or create a thread-local session."""
+    if not hasattr(_thread_local, "session"):
+        _thread_local.session = Session()
+        if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
+            adapter = LoggingHTTPAdapter()
+            _thread_local.session.mount("http://", adapter)
+            _thread_local.session.mount("https://", adapter)
+    return _thread_local.session
 
 
 def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
     """Send a GET request with optional logging."""
-    return session.get(url, params=params, **kwargs)
+    return get_session().get(url, params=params, **kwargs)
 
 
 def post(
@@ -166,4 +174,4 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return session.post(url, data=data, json=json, **kwargs)
+    return get_session().post(url, data=data, json=json, **kwargs)

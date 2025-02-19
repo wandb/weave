@@ -42,7 +42,7 @@ REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
 
 
-def _is_retryable_exception(e: Exception) -> bool:
+def _is_retryable_exception(e: BaseException) -> bool:
     # Don't retry pydantic validation errors
     if isinstance(e, ValidationError):
         return False
@@ -211,14 +211,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _generic_request(
         self,
         url: str,
-        req: BaseModel,
+        req: Union[BaseModel, dict[str, Any]],
         req_model: type[BaseModel],
         res_model: type[BaseModel],
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req)
-        return res_model.model_validate(r.json())
+        result = res_model.model_validate(r.json())
+        return cast(res_model, result)
 
     def _generic_stream_request(
         self,
@@ -338,18 +339,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
-        return self._generic_request(
-            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
+        if isinstance(req, dict):
+            req = tsi.ObjCreateReq.model_validate(req)
+        print(">>>>>>obj_create>>>>>", req.obj.object_id)
+        return cast(
+            tsi.ObjCreateRes,
+            self._generic_request(
+                "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
+            ),
         )
 
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
-        return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
+        if isinstance(req, dict):
+            req = tsi.ObjReadReq.model_validate(req)
+        print(">>>>>>obj_read>>>>>", req.object_id, req.digest)
+        return cast(
+            tsi.ObjReadRes,
+            self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes),
+        )
 
     def objs_query(
         self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
     ) -> tsi.ObjQueryRes:
-        return self._generic_request(
-            "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
+        if isinstance(req, dict):
+            req = tsi.ObjQueryReq.model_validate(req)
+        print(">>>>>>objs_query>>>>>", req.filter)
+        return cast(
+            tsi.ObjQueryRes,
+            self._generic_request("/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes),
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -436,6 +453,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_query(
         self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
+        print(">>>>>>table_query>>>>>", req.project_id, req.digest)
         return self._generic_request(
             "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
         )
@@ -443,6 +461,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
+        print(">>>>>>table_query_stream>>>>>", req.project_id, req.digest)
         # Need to manually iterate over this until the stram endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
@@ -457,6 +476,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
+        print(">>>>>>refs_read_batch>>>>>", req.refs)
         return self._generic_request(
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
@@ -472,6 +492,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        import threading
+
+        print(">>>>>>file_create>>>>>", req.name, threading.current_thread().name)
         r = requests.post(
             self.trace_server_url + "/files/create",
             auth=self._auth,
@@ -492,6 +515,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        import threading
+
+        print(
+            ">>>>>file_content_read>>>>>", req.digest, threading.current_thread().name
+        )
         r = requests.post(
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
