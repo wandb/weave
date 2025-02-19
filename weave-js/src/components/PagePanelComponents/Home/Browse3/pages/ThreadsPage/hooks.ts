@@ -26,7 +26,7 @@ export const useThreadList = (
     // Simulate API call for now
     setLoading(true);
     setTimeout(() => {
-      setThreads(['thread-id-1', 'thread-id-2']);
+      setThreads(['_roots_']);
       setLoading(false);
     }, 500);
   }, [entity, project]);
@@ -133,13 +133,16 @@ const fetchBareThreadTraces = (
   project: string,
   threadId: string
 ): Promise<TraceCallSchema[]> => {
+  let query: any = {"$expr":{"$eq":[{"$getField":"attributes.thread_id"},{"$literal":threadId}]}}
+  if (threadId === '_roots_') {
+    query = undefined
+  }
   const traceCallsProm = client.callsQuery({
     project_id: `${entity}/${project}`,
     filter: {
       trace_roots_only: true,
-      // TODO: This is a placeholder for dev
-      op_names: ['weave:///company-of-agents/mini-lms/op/Agent.go:*'],
     },
+    query: query,
     limit: 10,
     sort_by: [{field: 'started_at', direction: 'desc'}],
     columns: [

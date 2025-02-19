@@ -1,3 +1,6 @@
+import Input from '@wandb/weave/common/components/Input';
+import {IconNames} from '@wandb/weave/components/Icon';
+import backendHost from '@wandb/weave/config';
 import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
 
@@ -9,11 +12,14 @@ import {ThreadViewProps} from '../../types';
 
 const Container = styled.div`
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 `;
 
 const ScrollContainer = styled.div`
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
 `;
@@ -121,12 +127,71 @@ const ExpandButton = styled(Button)`
   min-height: 0 !important;
 `;
 
-export const ChatView: React.FC<ThreadViewProps> = ({
-  onTraceSelect,
-  traceRoots,
-  selectedTraceId,
+const ConnectionPanel = styled.div`
+  flex-shrink: 0;
+  border-top: 1px solid #e2e8f0;
+  padding: 16px;
+  background: #f8fafc;
+`;
+
+const ConnectionForm = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+`;
+
+const FormSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+`;
+
+const FormLabel = styled.label`
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+`;
+
+const ErrorMessage = styled.div`
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+`;
+
+interface ConnectionStatus {
+  isConnected: boolean;
+  url: string;
+  schema: any;
+  error: string | null;
+  threadId: string | null;
+}
+
+interface FormField {
+  name: string;
+  type: string;
+  description?: string;
+  required?: boolean;
+}
+
+// Shared components for both views
+interface ThreadContentProps {
+  loading: boolean;
+  error: Error | null;
+  traceRoots: TraceCallSchema[];
+  selectedTraceId?: string;
+  onTraceSelect: (traceId: string) => void;
+}
+
+const ThreadContent: React.FC<ThreadContentProps> = ({
   loading,
   error,
+  traceRoots,
+  selectedTraceId,
+  onTraceSelect,
 }) => {
   if (loading) {
     return (
@@ -145,57 +210,260 @@ export const ChatView: React.FC<ThreadViewProps> = ({
   }
 
   return (
+    <ChatList>
+      {traceRoots.map(traceRoot => (
+        <ChatRow
+          key={traceRoot.id}
+          traceRootCall={traceRoot}
+          selectedTraceId={selectedTraceId}
+          onTraceSelect={onTraceSelect}
+        />
+      ))}
+    </ChatList>
+  );
+};
+
+// Static view for browsing existing threads
+export const StaticThreadView: React.FC<ThreadViewProps> = ({
+  onTraceSelect,
+  traceRoots,
+  selectedTraceId,
+  loading,
+  error,
+}) => {
+  return (
     <Container>
       <ScrollContainer>
-        <ChatList>
-          {traceRoots.map(traceRoot => (
-            <ChatRow
-              key={traceRoot.id}
-              traceRootCall={traceRoot}
-              selectedTraceId={selectedTraceId}
-              onTraceSelect={onTraceSelect}
-            />
-          ))}
-        </ChatList>
+        <ThreadContent
+          loading={loading}
+          error={error}
+          traceRoots={traceRoots}
+          selectedTraceId={selectedTraceId}
+          onTraceSelect={onTraceSelect}
+        />
       </ScrollContainer>
     </Container>
   );
 };
 
-// const processRecursively = (obj: any, fn: (key: string, value: any) => any) => {
-//   for (const key in obj) {
-//     if (obj.hasOwnProperty(key)) {
-//         obj[key] = fn(key, processRecursively(obj[key], fn));
-//     }
-//   }
-//   return obj;
-// };
+// Connected view with runtime controls
+export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
+  onTraceSelect,
+  traceRoots,
+  selectedTraceId,
+  loading,
+  error,
+  onThreadSelect,
+}) => {
+  // Connection state
+  const [connection, setConnection] = useState<ConnectionStatus>({
+    isConnected: false,
+    url: 'http://localhost:2323',
+    schema: null,
+    error: null,
+    threadId: null,
+  });
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
 
-// const removeUnderscoredKeys = (obj: any) => {
-//   return processRecursively(obj, (key, value) => {
-//     if (key.startsWith('_')) {
-//       return undefined;
-//     }
-//     return value;
-//   });
-// };
+  // Connect to the local runtime
+  const handleConnect = async () => {
+    try {
+      // Validate URL protocol
+      const url = new URL(connection.url);
+      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '0.0.0.0';
+      
+      if (!isLocalhost && url.protocol !== 'https:') {
+        throw new Error('HTTPS is required for non-localhost connections');
+      }
 
-// const removeEmptyValues = (obj: any) => {
-//   return processRecursively(obj, (key, value) => {
-//     if (value === undefined || value === null) {
-//       return undefined;
-//     }
-//     return value;
-//   });
-// };
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      const response = await fetch(`${connection.url}/thread/schema`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch schema');
+      }
+      const schema = await response.json();
 
-// const processInput = (input: any) => {
-//   return removeUnderscoredKeys(removeEmptyValues(input));
-// };
+      // Generate a new UUID for the thread
+      const threadId = crypto.randomUUID();
 
-// const processOutput = (output: any) => {
-//   return removeUnderscoredKeys(removeEmptyValues(output));
-// };
+      // Set the thread ID as the selected thread
+      onTraceSelect('');  // Clear any existing trace selection first
+      setFormValues({thread_id: threadId});  // Set form values before connection state
+      
+      setConnection(prev => ({
+        ...prev,
+        isConnected: true,
+        schema,
+        error: null,
+        threadId,
+      }));
+
+      // Update the parent's thread selection
+      if (onThreadSelect) {
+        onThreadSelect(threadId);
+      }
+    } catch (err) {
+      setConnection(prev => ({
+        ...prev,
+        isConnected: false,
+        schema: null,
+        error: (err as Error).message,
+        threadId: null,
+      }));
+      setFormValues({});
+      onTraceSelect('');  // Clear trace selection on error
+      if (onThreadSelect) {
+        onThreadSelect('');  // Clear thread selection on error
+      }
+    }
+  };
+
+  // Disconnect from the runtime
+  const handleDisconnect = () => {
+    setConnection(prev => ({
+      ...prev,
+      isConnected: false,
+      schema: null,
+      error: null,
+      threadId: null,
+    }));
+    setFormValues({});
+    // Clear selections when disconnecting
+    onTraceSelect('');
+    if (onThreadSelect) {
+      onThreadSelect('');
+    }
+  };
+
+  // Run the thread with current form values
+  const handleRun = async () => {
+    if (!connection.threadId) return;
+    
+    setIsRunning(true);
+    setRunError(null);
+    try {
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      const response = await fetch(`${connection.url}/thread/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formValues),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to run thread');
+      }
+      const result = await response.json();
+      console.log('Run result:', result);
+    } catch (err) {
+      setRunError((err as Error).message);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  // Extract form fields from schema
+  const formFields = useMemo(() => {
+    if (!connection.schema) {
+      return [];
+    }
+    return Object.entries(connection.schema.properties || {}).map(
+      ([name, def]: [string, any]) => ({
+        name,
+        type: def.type,
+        description: def.description,
+        required: (connection.schema.required || []).includes(name),
+      })
+    );
+  }, [connection.schema]);
+
+  return (
+    <Container>
+      {connection.isConnected && (
+        <ScrollContainer>
+          <ThreadContent
+            loading={loading}
+            error={error}
+            traceRoots={traceRoots}
+            selectedTraceId={selectedTraceId}
+            onTraceSelect={onTraceSelect}
+          />
+        </ScrollContainer>
+      )}
+      <ConnectionPanel>
+        <ConnectionForm>
+          <Input
+            type="text"
+            placeholder="Enter runtime URL"
+            value={connection.url}
+            onChange={e =>
+              setConnection(prev => ({...prev, url: e.target.value}))
+            }
+            style={{width: '300px'}}
+          />
+          <Button
+            variant="primary"
+            onClick={connection.isConnected ? handleDisconnect : handleConnect}
+            icon={connection.isConnected ? IconNames.Close : IconNames.LinkAlt}
+            disabled={loading}>
+            {connection.isConnected ? 'Disconnect' : 'Connect'}
+          </Button>
+        </ConnectionForm>
+        {connection.error && <ErrorMessage>{connection.error}</ErrorMessage>}
+        
+        {!connection.isConnected && (
+          <div style={{marginTop: '8px', fontSize: '12px', color: '#64748B'}}>
+            Note: Use HTTP for localhost connections (e.g., http://localhost:2323). HTTPS is required for all other hosts.
+          </div>
+        )}
+        
+        {connection.isConnected && formFields.length > 0 && (
+          <FormSection>
+            <FormLabel>Thread Parameters</FormLabel>
+            {formFields.map(field => (
+              <div key={field.name}>
+                <FormLabel>
+                  {field.name}
+                  {field.required && ' *'}
+                </FormLabel>
+                {field.name === 'thread_id' ? (
+                  <Input
+                    type="text"
+                    value={connection.threadId || ''}
+                    disabled
+                    style={{backgroundColor: '#F1F5F9'}}
+                  />
+                ) : (
+                  <Input
+                    type={field.type === 'number' ? 'number' : 'text'}
+                    placeholder={field.description}
+                    value={formValues[field.name] || ''}
+                    onChange={e =>
+                      setFormValues(prev => ({
+                        ...prev,
+                        [field.name]: e.target.value,
+                      }))
+                    }
+                  />
+                )}
+              </div>
+            ))}
+            <Button
+              variant="primary"
+              onClick={handleRun}
+              disabled={isRunning}
+              startIcon={isRunning ? IconNames.Loading : IconNames.Play}>
+              {isRunning ? 'Running...' : 'Run'}
+            </Button>
+            {runError && <ErrorMessage>{runError}</ErrorMessage>}
+          </FormSection>
+        )}
+      </ConnectionPanel>
+    </Container>
+  );
+};
 
 function ChatRow({
   traceRootCall,
@@ -232,6 +500,13 @@ function ChatRow({
     const rawInput = {...call?.traceCall?.inputs};
     if (rawInput && rawInput.self) {
       delete rawInput.self;
+    }
+    // Just some hacks for now
+    if (rawInput && rawInput.thread_id) {
+      delete rawInput.thread_id;
+    }
+    if (Object.keys(rawInput).length === 1) {
+      return rawInput[Object.keys(rawInput)[0]];
     }
     return rawInput;
   }, [call?.traceCall?.inputs]);

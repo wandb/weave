@@ -3,7 +3,7 @@ import {FC} from 'react';
 import {IconName} from '../../../../../Icon';
 import {DetailsView} from './components/CallViews/DetailsView';
 import {CallJsonView} from './components/CallViews/JsonView';
-import {ChatView} from './components/ThreadViews';
+import {ConnectedThreadView, StaticThreadView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {CodeView} from './components/TraceViews/CodeView';
 import {CallViewProps, ThreadViewProps, TraceViewProps} from './types';
@@ -34,10 +34,16 @@ export type CallViewRegistry = Array<ViewDefinition<CallViewProps>>;
 /** Available thread visualization views */
 export const threadViews: ThreadViewRegistry = [
   {
-    id: 'chat',
-    label: 'Chat',
+    id: 'static',
+    label: 'History',
+    icon: 'history',
+    component: StaticThreadView,
+  },
+  {
+    id: 'connected',
+    label: 'Connected',
     icon: 'forum-chat-bubble',
-    component: ChatView,
+    component: ConnectedThreadView,
   },
 ];
 

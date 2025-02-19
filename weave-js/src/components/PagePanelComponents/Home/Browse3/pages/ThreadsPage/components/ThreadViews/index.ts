@@ -1,1 +1,1 @@
-export {ChatView} from './ChatView';
+export {ConnectedThreadView, StaticThreadView} from './ChatView';

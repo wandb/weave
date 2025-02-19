@@ -45,6 +45,8 @@ export interface ThreadViewProps {
   loading: boolean;
   /** Error loading traces, if any */
   error: Error | null;
+  /** Callback when a thread is selected */
+  onThreadSelect?: (threadId: string) => void;
 }
 
 /**

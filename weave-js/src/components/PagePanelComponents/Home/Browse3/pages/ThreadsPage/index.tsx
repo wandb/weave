@@ -200,6 +200,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         selectedTraceId={selectedTraceId}
         loading={tracesLoading}
         error={tracesError}
+        onThreadSelect={setSelectedThreadId}
       />
     );
   };
