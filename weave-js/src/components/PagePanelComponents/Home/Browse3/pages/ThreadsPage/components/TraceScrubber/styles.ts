@@ -35,8 +35,57 @@ export const CountIndicator = styled.div`
 export const ScrubberContent = styled.div`
   flex: 1;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+`;
+
+export const ArrowButton = styled.button<{disabled?: boolean}>`
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: ${props => props.disabled ? '#CBD5E1' : '#64748B'};
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: #F1F5F9;
+    color: #0F172A;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+export const RangeContainer = styled.div`
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  /* Ensure the numeric indicator is always at the end */
+  & > ${CountIndicator} {
+    margin-left: auto;
+  }
+`;
+
+export const SliderContainer = styled.div`
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0; /* Ensure flex shrinking works properly */
 `;
 
 interface RangeInputProps {
@@ -143,7 +192,7 @@ export const TooltipContent = styled.div`
 `;
 
 export const BreadcrumbContainer = styled.div`
-  padding: 4px 8px;
+  padding: 4px 16px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -152,7 +201,8 @@ export const BreadcrumbContainer = styled.div`
   font-size: 12px;
   color: #64748b;
   min-height: 32px;
-  border-radius: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
   scrollbar-width: none;  /* Firefox */
   -ms-overflow-style: none;  /* IE and Edge */
   

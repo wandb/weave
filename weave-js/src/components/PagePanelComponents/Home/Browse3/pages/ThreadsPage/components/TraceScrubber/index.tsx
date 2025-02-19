@@ -6,9 +6,8 @@ import {
   SiblingScrubber,
   TimelineScrubber,
 } from './components/scrubbers';
-import {StackBreadcrumb} from './components/StackBreadcrumb';
 import {StackScrubber} from './components/StackScrubber';
-import {StackContextProvider} from './context';
+// import {StackContextProvider} from './context';
 import {Container} from './styles';
 
 interface TraceScrubberProps {
@@ -19,14 +18,11 @@ interface TraceScrubberProps {
 
 export const TraceScrubber: React.FC<TraceScrubberProps> = props => {
   return (
-    <StackContextProvider traceTreeFlat={props.traceTreeFlat}>
       <Container>
         <TimelineScrubber {...props} />
         <PeerScrubber {...props} />
         <SiblingScrubber {...props} />
         <StackScrubber {...props} />
-        <StackBreadcrumb {...props} />
       </Container>
-    </StackContextProvider>
   );
 };

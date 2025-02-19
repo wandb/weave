@@ -5,6 +5,8 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {CallDetailSection} from './components/CallDetailSection';
+import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
+import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
 import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
 import {ThreadsPageProps} from './types';
@@ -220,19 +222,28 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     const TraceViewComponent = getTraceView(traceViewId).component;
     return (
       <div className="flex h-full flex-col">
-        <div className="flex-1 overflow-hidden">
-          <TraceViewComponent
-            traceTreeFlat={traceTreeFlat}
-            selectedCallId={selectedCallId}
-            onCallSelect={setSelectedCallId}
-          />
-        </div>
         {Object.keys(traceTreeFlat).length > 0 && (
-          <TraceScrubber
-            traceTreeFlat={traceTreeFlat}
-            selectedCallId={selectedCallId}
-            onCallSelect={setSelectedCallId}
-          />
+          <StackContextProvider traceTreeFlat={traceTreeFlat}>
+            <StackBreadcrumb
+              traceTreeFlat={traceTreeFlat}
+              selectedCallId={selectedCallId}
+              onCallSelect={setSelectedCallId}
+            />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex-1 overflow-auto">
+                <TraceViewComponent
+                  traceTreeFlat={traceTreeFlat}
+                  selectedCallId={selectedCallId}
+                  onCallSelect={setSelectedCallId}
+                />
+              </div>
+              <TraceScrubber
+                traceTreeFlat={traceTreeFlat}
+                selectedCallId={selectedCallId}
+                onCallSelect={setSelectedCallId}
+              />
+            </div>
+          </StackContextProvider>
         )}
       </div>
     );
