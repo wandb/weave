@@ -1,13 +1,7 @@
 import React from 'react';
 
 import {Button} from '../../../../../../Button';
-
-interface ThreadViewProps {
-  onTraceSelect: (traceId: string) => void;
-  traces: string[];
-  loading: boolean;
-  error: Error | null;
-}
+import {ThreadViewProps} from '../viewRegistry';
 
 export const ThreadListView: React.FC<ThreadViewProps> = ({
   onTraceSelect,

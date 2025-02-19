@@ -35,6 +35,7 @@ export const useTracesForThread = (
       setLoading(false);
       return;
     }
+    setLoading(true);
     let mounted = true;
     const client = getClient();
     fetchBareThreadTraces(client, entity, project, threadId)
@@ -78,6 +79,7 @@ export const useBareTraceCalls = (
       setLoading(false);
       return;
     }
+    setLoading(true);
     let mounted = true;
     const client = getClient();
 

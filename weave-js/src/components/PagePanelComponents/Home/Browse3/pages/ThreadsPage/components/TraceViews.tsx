@@ -1,12 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../../../Button';
-import {TraceTreeFlat} from '../types';
-
-interface TraceViewProps {
-  traceTreeFlat: TraceTreeFlat;
-  onCallSelect: (callId: string) => void;
-}
+import {TraceViewProps} from '../viewRegistry';
 
 export const TraceListView: React.FC<TraceViewProps> = ({
   traceTreeFlat,

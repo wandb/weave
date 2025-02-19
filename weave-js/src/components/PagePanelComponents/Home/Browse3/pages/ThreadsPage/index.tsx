@@ -5,16 +5,15 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {CallDetailSection} from './components/CallDetailSection';
-import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
-import {
-  TraceListView,
-  TraceTableView,
-  TraceTimelineView,
-  TraceTreeView,
-} from './components/TraceViews';
 import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
-import {ThreadsPageProps, ThreadViewType, TraceViewType} from './types';
+import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
+import {
+  getThreadView,
+  getTraceView,
+  threadViews,
+  traceViews,
+} from './viewRegistry';
 
 export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   // Global state
@@ -28,24 +27,39 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     string | undefined
   >();
 
-  const setSelectedThreadId = useCallback((newThreadId: string) => {
-    setSelectedThreadIdDirect(newThreadId);
-    setSelectedTraceIdDirect(undefined);
-    setSelectedCallIdDirect(undefined);
-  }, []);
+  const setSelectedThreadId = useCallback(
+    (newThreadId: string) => {
+      if (newThreadId !== selectedThreadId) {
+        setSelectedThreadIdDirect(newThreadId);
+        setSelectedTraceIdDirect(undefined);
+        setSelectedCallIdDirect(undefined);
+      }
+    },
+    [selectedThreadId]
+  );
 
-  const setSelectedTraceId = useCallback((newTraceId: string) => {
-    setSelectedTraceIdDirect(newTraceId);
-    setSelectedCallIdDirect(undefined);
-  }, []);
+  const setSelectedTraceId = useCallback(
+    (newTraceId: string) => {
+      if (newTraceId !== selectedTraceId) {
+        setSelectedTraceIdDirect(newTraceId);
+        setSelectedCallIdDirect(undefined);
+      }
+    },
+    [selectedTraceId]
+  );
 
-  const setSelectedCallId = useCallback((newCallId: string) => {
-    setSelectedCallIdDirect(newCallId);
-  }, []);
+  const setSelectedCallId = useCallback(
+    (newCallId: string) => {
+      if (newCallId !== selectedCallId) {
+        setSelectedCallIdDirect(newCallId);
+      }
+    },
+    [selectedCallId]
+  );
 
   // View state
-  const [threadView, setThreadView] = useState<ThreadViewType>('list');
-  const [traceView, setTraceView] = useState<TraceViewType>('timeline');
+  const [threadViewId, setThreadViewId] = useState(threadViews[0].id);
+  const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
 
   // Data fetching
@@ -99,6 +113,19 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     }
   }, [traces, tracesLoading, tracesError, selectedTraceId, setSelectedTraceId]);
 
+  // Auto-select first call when trace calls load
+  useEffect(() => {
+    if (
+      !selectedCallId &&
+      traceCalls &&
+      traceCalls.length > 0 &&
+      !callsLoading &&
+      !callsError
+    ) {
+      setSelectedCallId(traceCalls[0].id);
+    }
+  }, [traceCalls, callsLoading, callsError, selectedCallId, setSelectedCallId]);
+
   // Derived data
   const traceTreeFlat = useMemo(
     () => buildTraceTreeFlat(traceCalls ?? []),
@@ -119,18 +146,15 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       );
     }
 
-    const props = {
-      onTraceSelect: setSelectedTraceId,
-      traces: traces ?? [],
-      loading: tracesLoading,
-      error: tracesError,
-    };
-    switch (threadView) {
-      case 'list':
-        return <ThreadListView {...props} />;
-      case 'timeline':
-        return <ThreadTimelineView {...props} />;
-    }
+    const ThreadViewComponent = getThreadView(threadViewId).component;
+    return (
+      <ThreadViewComponent
+        onTraceSelect={setSelectedTraceId}
+        traces={traces ?? []}
+        loading={tracesLoading}
+        error={tracesError}
+      />
+    );
   };
 
   const renderTraceView = () => {
@@ -197,20 +221,13 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       );
     }
 
-    const props = {
-      traceTreeFlat,
-      onCallSelect: setSelectedCallId,
-    };
-    switch (traceView) {
-      case 'timeline':
-        return <TraceTimelineView {...props} />;
-      case 'tree':
-        return <TraceTreeView {...props} />;
-      case 'table':
-        return <TraceTableView {...props} />;
-      case 'list':
-        return <TraceListView {...props} />;
-    }
+    const TraceViewComponent = getTraceView(traceViewId).component;
+    return (
+      <TraceViewComponent
+        traceTreeFlat={traceTreeFlat}
+        onCallSelect={setSelectedCallId}
+      />
+    );
   };
 
   return (
@@ -280,18 +297,15 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
             <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
               <h2 className="truncate text-sm font-semibold">Thread View</h2>
               <div className="flex items-center gap-2">
-                <Button
-                  variant={threadView === 'list' ? 'primary' : 'ghost'}
-                  onClick={() => setThreadView('list')}
-                  icon="list">
-                  List
-                </Button>
-                <Button
-                  variant={threadView === 'timeline' ? 'primary' : 'ghost'}
-                  onClick={() => setThreadView('timeline')}
-                  icon="chart-horizontal-bars">
-                  Timeline
-                </Button>
+                {threadViews.map(view => (
+                  <Button
+                    key={view.id}
+                    variant={threadViewId === view.id ? 'primary' : 'ghost'}
+                    onClick={() => setThreadViewId(view.id)}
+                    icon={view.icon}>
+                    {view.label}
+                  </Button>
+                ))}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -304,30 +318,15 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
             <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
               <h2 className="truncate text-sm font-semibold">Trace View</h2>
               <div className="flex items-center gap-2">
-                <Button
-                  variant={traceView === 'list' ? 'primary' : 'ghost'}
-                  onClick={() => setTraceView('list')}
-                  icon="list">
-                  List
-                </Button>
-                <Button
-                  variant={traceView === 'timeline' ? 'primary' : 'ghost'}
-                  onClick={() => setTraceView('timeline')}
-                  icon="chart-horizontal-bars">
-                  Timeline
-                </Button>
-                <Button
-                  variant={traceView === 'tree' ? 'primary' : 'ghost'}
-                  onClick={() => setTraceView('tree')}
-                  icon="miller-columns">
-                  Tree
-                </Button>
-                <Button
-                  variant={traceView === 'table' ? 'primary' : 'ghost'}
-                  onClick={() => setTraceView('table')}
-                  icon="table">
-                  Table
-                </Button>
+                {traceViews.map(view => (
+                  <Button
+                    key={view.id}
+                    variant={traceViewId === view.id ? 'primary' : 'ghost'}
+                    onClick={() => setTraceViewId(view.id)}
+                    icon={view.icon}>
+                    {view.label}
+                  </Button>
+                ))}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
