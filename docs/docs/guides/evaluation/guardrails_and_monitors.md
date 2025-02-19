@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Online Evaluation
+# Guardrails and Monitors
 
 ![Feedback](./../../../static/img/guardrails_scorers.png)
 
@@ -12,15 +12,6 @@ Building production LLM applications? Two questions likely keep you up at night:
 2. How do you measure and improve output quality over time?
 
 Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
-
-## Quick Navigation
-
-Choose your implementation path:
-- 🛡️ [Implementing Guardrails](./guardrails.md) - For active safety controls
-- 📊 [Implementing Monitors](./monitors.md) - For passive quality tracking
-- 🔍 [Available Scorers](./scorers.md) - Ready-to-use evaluation components
-
-## Foundation
 
 The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - a component that evaluates your function's inputs and outputs to measure quality, safety, or any other metric you care about. Scorers are versatile and can be used in two ways:
 
@@ -109,6 +100,44 @@ result, call = generate_text.call("Say hello")
 await call.apply_scorer(LengthScorer())
 ```
 
+## Using Scorers as Guardrails
+
+Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
+
+```python
+import weave
+from weave import Scorer
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    """Generate text using an LLM."""
+    # Your LLM generation logic here
+    return "Generated response..."
+
+class ToxicityScorer(Scorer):
+    @weave.op
+    def score(self, output: str) -> dict:
+        """
+        Evaluate content for toxic language.
+        """
+        # Your toxicity detection logic here
+        return {
+            "flagged": False,  # True if content is toxic
+            "reason": None     # Optional explanation if flagged
+        }
+
+async def generate_safe_response(prompt: str) -> str:
+    # Get result and Call object
+    result, call = generate_text.call(prompt)
+    
+    # Check safety
+    safety = await call.apply_scorer(ToxicityScorer())
+    if safety.result["flagged"]:
+        return f"I cannot generate that content: {safety.result['reason']}"
+    
+    return result
+```
+
 :::note Scorer Timing
 When applying scorers:
 - The main operation (`generate_text`) completes and is marked as finished in the UI
@@ -116,6 +145,38 @@ When applying scorers:
 - Scorer results are attached to the call once they complete
 - You can view scorer results in the UI or query them via the API
 :::
+
+## Using Scorers as Monitors
+
+Monitors help track quality metrics over time without blocking operations. This is useful for:
+- Identifying quality trends
+- Detecting model drift
+- Gathering data for model improvements
+
+```python
+import weave
+from weave import Scorer
+from weave.scorers import ValidJSONScorer, ValidXMLScorer
+
+import random
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    """Generate text using an LLM."""
+    return "Generated response..."
+
+async def generate_with_monitoring(prompt: str) -> str:
+    # Get both the result and tracking information
+    result, call = generate_text.call(prompt)
+    
+    # Sample monitoring (only monitor 10% of calls)
+    if random.random() < 0.1:
+        # Monitor multiple aspects asynchronously
+        await call.apply_scorer(ValidJSONScorer())
+        await call.apply_scorer(ValidXMLScorer())
+    
+    return result
+```
 
 ## Implementation Details
 
@@ -252,19 +313,66 @@ score = scorer.score(output="some text")
 For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
 
 
-#### Analyze and Improve
+## Production Best Practices
+
+### 1. Set Appropriate Sampling Rates
+```python
+@weave.op
+def generate_text(prompt: str) -> str:
+    return generate_response(prompt)
+
+async def generate_with_sampling(prompt: str) -> str:
+    result, call = generate_text.call(prompt)
+    
+    # Only monitor 10% of calls
+    if random.random() < 0.1:
+        await call.apply_scorer(ToxicityScorer())
+        await call.apply_scorer(QualityScorer())
+    
+    return result
+```
+
+### 2. Monitor Multiple Aspects
+```python
+async def evaluate_comprehensively(call):
+    await call.apply_scorer(ToxicityScorer())
+    await call.apply_scorer(QualityScorer())
+    await call.apply_scorer(LatencyScorer())
+```
+### 3. Analyze and Improve
 - Review trends in the Weave Dashboard
 - Look for patterns in low-scoring outputs
 - Use insights to improve your LLM system
 - Set up alerts for concerning patterns (coming soon)
 
-#### Access Historical Data
+### 4. Access Historical Data
 Scorer results are stored with their associated calls and can be accessed through:
 - The Call object's `feedback` field
 - The Weave Dashboard
 - Our query APIs
 
+### 5. Initialize Guards Efficiently
+
+For optimal performance, especially with locally-run models, initialize your guards outside of the main function. This pattern is particularly important when:
+- Your scorers load ML models
+- You're using local LLMs where latency is critical
+- Your scorers maintain network connections
+- You have high-traffic applications
+
 See the Complete Example section below for a demonstration of this pattern.
+
+:::caution Performance Tips
+For Guardrails:
+- Keep logic simple and fast
+- Consider caching common results
+- Avoid heavy external API calls
+- Initialize guards outside of your main functions to avoid repeated initialization costs
+
+For Monitors:
+- Use sampling to reduce load
+- Can use more complex logic
+- Can make external API calls
+:::
 
 ## Complete Example
 
@@ -379,9 +487,6 @@ This example demonstrates:
 
 ## Next Steps
 
-For detailed implementation guidance, see:
-- [Implementing Guardrails](./guardrails.md)
-- [Implementing Monitors](./monitors.md)
-- [Available Scorers](./scorers.md)
-- [Weave Ops](../../guides/tracking/ops.md)
+- Explore [Available Scorers](./scorers.md)
+- Learn about [Weave Ops](../../guides/tracking/ops.md)
 

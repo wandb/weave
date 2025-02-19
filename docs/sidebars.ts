@@ -61,14 +61,7 @@ const sidebars: SidebarsConfig = {
           label: "Evaluation",
           items: [
             "guides/core-types/evaluations",
-            {
-              type: "category",
-              collapsible: true,
-              collapsed: false,
-              label: "Online Evaluation",
-              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
-              items: ["guides/evaluation/guardrails", "guides/evaluation/monitors"],
-            },
+            "guides/evaluation/guardrails_and_monitors",
             {
               type: "category",
               collapsible: true,
