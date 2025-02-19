@@ -5,6 +5,7 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {CallDetailSection} from './components/CallDetailSection';
+import {TraceScrubber} from './components/TraceScrubber';
 import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
 import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
@@ -218,11 +219,22 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
     const TraceViewComponent = getTraceView(traceViewId).component;
     return (
-      <TraceViewComponent
-        traceTreeFlat={traceTreeFlat}
-        selectedCallId={selectedCallId}
-        onCallSelect={setSelectedCallId}
-      />
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-hidden">
+          <TraceViewComponent
+            traceTreeFlat={traceTreeFlat}
+            selectedCallId={selectedCallId}
+            onCallSelect={setSelectedCallId}
+          />
+        </div>
+        {Object.keys(traceTreeFlat).length > 0 && (
+          <TraceScrubber
+            traceTreeFlat={traceTreeFlat}
+            selectedCallId={selectedCallId}
+            onCallSelect={setSelectedCallId}
+          />
+        )}
+      </div>
     );
   };
 
