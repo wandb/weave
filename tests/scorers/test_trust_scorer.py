@@ -126,7 +126,7 @@ def test_trust_scorer_parallelism(trust_scorer):
         {
             "output": "test_output",
             "query": "test_query",
-            "extra": "should_be_filtered",
+            "context": "context",
         }
     ] * 100
 
@@ -134,5 +134,8 @@ def test_trust_scorer_parallelism(trust_scorer):
     def model(output):
         return output
 
-    evaluation = weave.Evaluation(dataset=ds, scorers=[model])
-    asyncio.run(evaluation.evaluate(model))
+    evaluation = weave.Evaluation(dataset=ds, scorers=[trust_scorer])
+    eval_result = asyncio.run(evaluation.evaluate(model))
+    assert "passed" in eval_result["WeaveTrustScorerV1"]
+    assert "metadata" in eval_result["WeaveTrustScorerV1"]
+    assert len(eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]) == 5
