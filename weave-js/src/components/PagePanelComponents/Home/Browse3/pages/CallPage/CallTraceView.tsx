@@ -87,7 +87,6 @@ export const CallTraceView: FC<{
   // call. Effectively this looks like expanding the clicked call.
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
-      console.time('onRowClick');
       if (!params.row.call) {
         return;
       }
@@ -127,7 +126,6 @@ export const CallTraceView: FC<{
         isParentRow: params.row.isParentRow,
         heirarchyDepth: params.row.hierarchy.length,
       });
-      console.timeEnd('onRowClick');
     },
     [
       call.callId,
@@ -161,11 +159,9 @@ export const CallTraceView: FC<{
   const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] =
     useCallback(
       node => {
-        console.time('isGroupExpandedByDefault');
         const result = expandKeys.has(
           node.groupingKey?.toString() ?? 'INVALID'
         );
-        console.timeEnd('isGroupExpandedByDefault');
         return result;
       },
       [expandKeys]
