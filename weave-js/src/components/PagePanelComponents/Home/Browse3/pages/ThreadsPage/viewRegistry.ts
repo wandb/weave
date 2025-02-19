@@ -2,7 +2,7 @@ import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
 import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
-import {FlameGraphView, TreeView} from './components/TraceViews';
+import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {ThreadViewProps, TraceViewProps} from './types';
 
 /**
@@ -53,6 +53,12 @@ export const traceViews: TraceViewRegistry = [
     label: 'Flame Graph',
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
+  },
+  {
+    id: 'graph',
+    label: 'Graph',
+    icon: 'chart-scatterplot',
+    component: GraphView,
   },
 ];
 
