@@ -3,34 +3,34 @@ import TabItem from '@theme/TabItem';
 
 # Local Weave Scorers
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/scorers_local_weave_scorers.ipynb">
+<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
+Weave's local scorers are a suite of small language models that run locally on your machine with minimal latency. These models evaluate the **safety** and **quality** of your AI system’s inputs, context, and outputs.
+
+Some of these models are fine-tuned by Weights & Biases, while others are state-of-the-art open-source models trained by the community. Weights & Biases (W&B) Reports were used for training and evaluation. You can find the full details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA).
+
+The model weights are publicly available in W&B Artifacts and are automatically downloaded when you instantiate the scorer class.
+
+:::tip
+While local scorers can be run on CPUs and GPUs, use GPUs for best performance.  
+:::
+
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
 
-  <a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/scorers_local_weave_scorers.ipynb">
-    <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-  </a>
+    ## Prerequisites
 
-   Weave's local scorers are a suite of small language models designed to run locally on your machine, at very low latency, to score the **safety** and **quality** of your AI system's inputs, context and output. 
-   
-   Some of these models have been fine-tuned by Weights & Biases, others are SOTA open-source small language models trained by the community. W&B Reports were used when training and evaluating these models, you can see all training and evaluation details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA)
-
-   **Note:**
-   - These models can be run on CPU or GPU, although for best performance we recommend using a GPU. 
-   - The model weights are stored in public W&B Artifacts and are downloaded when the scorer class is instantiated. 
-
-   ## Prerequisites
-   
-   **Installation**
-
-    To use Weave's local scorers you need to install some additional dependencies:
+    Before you can use Weave local scorers, install additional dependencies:
 
     ```bash
     pip install weave[scorers]
     ```
 
+    ## Select a scorer
 
-    ## Available local weave scorers
-
+    The following local scorers are available. Select a scorer based on your use case.
 
     | Scorer                           | Scenario                                                                                                                                                                      |
     |----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -47,15 +47,19 @@ import TabItem from '@theme/TabItem';
     ## `WeaveBiasScorerV1`
 
     This scorer assesses gender and race/origin bias. The scorer assesses bias along two dimensions:
-        - Race and Origin: Includes racism and bias against someone's country, region of origin, or immigration status.
-        - Gender and Sexuality: Includes sexism, misogyny, homophobia, transphobia, and sexual harassment.
+        
+        - Race and Origin: Racism and bias against a country or region of origin, immigration status, ethnicity, etc.
+        - Gender and Sexuality: Sexism, misogyny, homophobia, transphobia, sexual harassment, etc.
 
-    The [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource was fine-tuned by Weights & Biases for this task. See the [WeaveBiasScorerV1 W&B Report](https://wandb.ai/c-metrics/bias-benchmark/reports/Bias-Scorer--VmlldzoxMDM2MTgzNw) for more details on the model, the dataset and the calibration process.
+    `WeaveBiasScorerV1` uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model. For more details on the model, dataset and calibration process, see the [WeaveBiasScorerV1 W&B Report](https://wandb.ai/c-metrics/bias-benchmark/reports/Bias-Scorer--VmlldzoxMDM2MTgzNw) 
 
-    **Notes:**
+    ### Usage notes 
+
     - The `score` method expects a string to be passed to the `output` parameter. 
     - A higher score means that there is a stronger prediction of bias in the text.
     - The `threshold` parameter is set but can also be overridden on initialization.
+    
+    ### Usage example
 
     ```python
     import weave
@@ -72,22 +76,25 @@ import TabItem from '@theme/TabItem';
 
     ## `WeaveToxicityScorerV1`
 
-    This scorer assesses the input text for toxicity along five dimensions:
+    The `WeaveToxicityScorerV1` scorer assesses the input text for toxicity along five dimensions:
     
-        - Race and Origin: Includes racism and bias against someone's country, region of origin, or immigration status.
-        - Gender and Sexuality: Includes sexism, misogyny, homophobia, transphobia, and sexual harassment.
-        - Religious: Any bias or stereotype based on someone's religion.
+        - Race and Origin: Racism and bias against a country or region of origin, immigration status, ethnicity, etc.
+        - Gender and Sexuality: Sexism, misogyny, homophobia, transphobia, sexual harassment, etc.
+        - Religious: Bias or stereotype against someone's religion.
         - Ability: Bias according to someone's physical, mental, or intellectual ability or disability.
         - Violence and Abuse: Overly graphic descriptions of violence, threats of violence, or incitement of violence.
     
-    This scorer uses the open source [Celadon](https://huggingface.co/PleIAs/celadon) model from PleIAs. See the [WeaveToxicityScorerV1 W&B Report](https://wandb.ai/c-metrics/toxicity-benchmark/reports/Toxicity-Scorer--VmlldzoxMDMyNjc0NQ) for more details on the scorers evaluation.
+    The `WeaveToxicityScorerV1` uses the open source [Celadon](https://huggingface.co/PleIAs/celadon) model from PleIAs. For more information, see the [WeaveToxicityScorerV1 W&B Report](https://wandb.ai/c-metrics/toxicity-benchmark/reports/Toxicity-Scorer--VmlldzoxMDMyNjc0NQ).
 
-    **Notes:**
+    ### Usage notes
+
     - The `score` method expects a string to be passed to the `output` parameter. 
-    - The model gives scores from 0 to 3 across 5 different categories: 
-      - If the sum of these scores is above `total_threshold` (default 5) then the input will be flagged as toxic. 
-      - If any single category has a score higher than `category_threshold` (default 2) then the input will also be flagged as toxic. We tuned these default values to decrease false positives and improve recall.
-    - If you want a more aggressive filtering you can override the `category_threshold` parameter or the `total_threshold` parameter in the scorer constructor.
+    - The model returns scores from `0` to `3` across 5 different categories: 
+      - If the sum of these scores is above `total_threshold` (default value `5`), then the input is flagged as toxic. 
+      - If any single category has a score higher than `category_threshold` (default 2), then the input is flagged as toxic. Default values were fine-tuned to decrease false positives and improve recall.
+    - For more aggressive filtering, override the `category_threshold` parameter or the `total_threshold` parameter in the scorer constructor.
+
+    ### Usage example
 
     ```python
     import weave
@@ -106,12 +113,14 @@ import TabItem from '@theme/TabItem';
 
     This scorer checks if your AI system's output contains any hallucinations based on the input data.
 
-    It uses the open source [HHEM 2.1 model](https://huggingface.co/vectara/hallucination_evaluation_model) from Vectara. See the [WeaveHallucinationScorerV1 W&B Report](https://wandb.ai/c-metrics/hallucination/reports/Hallucination-Scorer--VmlldzoxMDM3NDA3MA) for more details on this scorers evaluations.
+    The `WeaveHallucinationScorerV1` uses the open source [HHEM 2.1 model](https://huggingface.co/vectara/hallucination_evaluation_model) from Vectara. For more information, see the [WeaveHallucinationScorerV1 W&B Report](https://wandb.ai/c-metrics/hallucination/reports/Hallucination-Scorer--VmlldzoxMDM3NDA3MA).
 
-    **Notes:**
+    ### Usage notes
     - The `score` method expects data to be passed to the `query` and `output` parameters. The context should be passed to the `output` parameter as a string or list of strings.
     - A higher output score means that there is a stronger prediction of hallucination in the output given the query and context.
-    - The `threshold` parameter is set but can also be overridden on initialization.
+    - The `threshold` parameter is set, but can also be overridden upon initialization.
+
+    ### Usage example 
 
     ```python
     import weave
@@ -135,14 +144,16 @@ import TabItem from '@theme/TabItem';
 
     This scorer is designed to be used when evaluating RAG systems. It scores the relevance of the context to the query.
 
-     The [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource was fine-tuned by Weights & Biases for this task. See the [WeaveContextRelevanceScorerV1 W&B Report](https://wandb.ai/c-metrics/context-relevance-scorer/reports/Context-Relevance-Scorer--VmlldzoxMDYxNjEyNA) for more details on this scorers evaluations.
+    The `WeaveContextRelevanceScorerV1` scorer uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource. For more details, see the [WeaveContextRelevanceScorerV1 W&B Report](https://wandb.ai/c-metrics/context-relevance-scorer/reports/Context-Relevance-Scorer--VmlldzoxMDYxNjEyNA).
 
-    **Notes:**
+    ### Usage notes
 
     - The `score` method expects data to be passed to the `query` and `output` parameters. The context should be passed to the `output` parameter as a string or list of strings.
     - A higher output score means that there is a stronger prediction of that the context is relevant to the query.
-    - The `threshold` parameter is set but can also be overridden on initialization.
+    - The `threshold` parameter is automatically set, but can also be overridden on initialization.
     - Passing `verbose = True` to the `score` method will return scores for each relevant chunk of text in the context.
+
+    ### Usage example
 
     ```python
     import weave
@@ -163,13 +174,15 @@ import TabItem from '@theme/TabItem';
 
     ## `WeaveCoherenceScorerV1`
 
-    This scorer checks the input text is coherent.
+    This scorer checks that the input text is coherent.
 
-    The [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource was fine-tuned by Weights & Biases for this task. See the [WeaveCoherenceScorerV1 W&B Report](https://wandb.ai/c-metrics/coherence_scorer/reports/Coherence-Scorer--VmlldzoxMDI5MjA1MA) for more details on this scorers' training and evaluations.
+    The `WeaveCoherenceScorerV1` scorer uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource. For more information, see the [WeaveCoherenceScorerV1 W&B Report](https://wandb.ai/c-metrics/coherence_scorer/reports/Coherence-Scorer--VmlldzoxMDI5MjA1MA).
 
-    **Notes:**
+    ### Usage notes
     - The `score` method expects text to be passed to the `query` and `output` parameters.
     - A higher output score means that there is a stronger prediction of coherence in the input text.
+
+    ### Usage example 
 
     ```python
     import weave
@@ -190,13 +203,16 @@ import TabItem from '@theme/TabItem';
 
     ## `WeaveFluencyScorerV1`
 
-    This scorer checks the input text is fluent.
+    This scorer checks the input text is fluent; that is, easy to read and understand, similar to human language. The scorer assesses input along dimensions such as grammar, syntax, and overall readability.
 
-    The [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) model from AnswerDotAI was fine-tuned by Weights & Biases for this task.See the [WeaveFluencyScorerV1 W&B Report](https://wandb.ai/c-metrics/fluency-eval/reports/Fluency-Scorer--VmlldzoxMTA3NzE2Ng) for more details on this scorers' training and evaluations.
+    The `WeaveFluencyScorerV1` scorer uses a fine-tuned [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) model from AnswerDotAI. For more information, see the [WeaveFluencyScorerV1 W&B Report](https://wandb.ai/c-metrics/fluency-eval/reports/Fluency-Scorer--VmlldzoxMTA3NzE2Ng).
 
-    **Notes:**
+    ### Usage notes
+
     - The `score` method expects text to be passed to the `output` parameter.
-    - A higher output score means that there is a stronger prediction of fluency in the input text.
+    - A higher output score indicates higher input text fluency.
+
+    ### Usage example 
 
     ```python
     import weave
@@ -216,25 +232,30 @@ import TabItem from '@theme/TabItem';
 
     ## `WeaveTrustScorerV1`
 
-    The `WeaveTrustScorerV1` is a composite scorer for RAG systems that evaluates the trustworthiness of model outputs by combining multiple specialized scorers into two categories. 
+    The `WeaveTrustScorerV1` is a composite scorer for RAG systems that evaluates the trustworthiness of model outputs by grouping the outputs of other scorers into two logical categories, Critical and Advisory. Based on the compostite score, `WeaveTrustScorerV1` returns a trust level score. The values for the trust level score are:
     
-    **Notes:**
+    - `high`: No issues detected
+    - `medium`: Only Advisory issues detected
+    - `low`: Critical issues detected or empty input
+    
+    Any input that does not pass a Critical scorer will automatically cause the `WeaveTrustScorerV1` to return `low`, while input that doesn't pass Advisory scorers will return `medium`.
+    
+    - Critical:
+        - `WeaveToxicityScorerV1`: Detects harmful, offensive, or inappropriate content
+        - `WeaveHallucinationScorerV1`: Identifies fabricated or unsupported information
+        - `WeaveContextRelevanceScorerV1`: Ensures output relevance to provided context
 
-    This scorer is suited for RAG pipelines. It requires query, context and output keys to score correctly.
+    - Advisory:
+        - `WeaveFluencyScorerV1`: Evaluates language quality and coherence
+        - `WeaveCoherenceScorerV1`: Checks for logical consistency and flow
 
-    1. Critical Scorers (automatic failure if pass is False):
-        - WeaveToxicityScorerV1: Detects harmful, offensive, or inappropriate content
-        - WeaveHallucinationScorerV1: Identifies fabricated or unsupported information
-        - WeaveContextRelevanceScorerV1: Ensures output relevance to provided context
+    
 
-    2. Advisory Scorers (warnings that may affect trust):
-        - WeaveFluencyScorerV1: Evaluates language quality and coherence
-        - WeaveCoherenceScorerV1: Checks for logical consistency and flow
+    ### Usage notes
+    - The use case for this scorer is in evalutating RAG pipelines. 
+    - `WeaveFluencyScorerV1` requires query, context and output keys to score correctly.
 
-    Trust Levels:
-        - "high": No issues detected
-        - "medium": Only advisory issues detected
-        - "low": Critical issues detected or empty input
+    ### Usage example
 
     ```python
     import weave
@@ -278,10 +299,13 @@ import TabItem from '@theme/TabItem';
 
     This scorer uses the [Presidio library](https://github.com/microsoft/presidio) to detect Personally Identifiable Information (PII) in your AI system's inputs and outputs.
 
-    **Notes:**
-    - You can specify specific entity types (like emails or phone numbers) by passing a list of Presidio entities to the `selected_entities` parameter. Otherwise Presidio will try and detect all entity types in its default entities list.
-    - You can also pass additional custom recognizers you have written to the `custom_recognizers` parameter as a list of type `presidio.EntityRecognizer`
-    - If you are passing in non-english text you can use the `language` parameter to specify the language of the text.
+    ### Usage notes
+
+    - To specify specific entity types, such as emails or phone numbers, pass a list of Presidio entities to the `selected_entities` parameter. Otherwise, Presidio will detect all entity types in its default entities list.
+    - Pass custom recognizers to the scorer as a list of type `presidio.EntityRecognizer` via the `custom_recognizers` parameter. 
+    - To pass non-Englis input to the scorer, use the `language` parameter to specify the language of the text.
+
+    ### Usage example
 
     ```python
     import weave
