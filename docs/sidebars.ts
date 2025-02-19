@@ -61,7 +61,27 @@ const sidebars: SidebarsConfig = {
           label: "Evaluation",
           items: [
             "guides/core-types/evaluations",
-            "guides/evaluation/guardrails_and_monitors",
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Online Evaluation",
+              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
+              items: [
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-guardrails",
+                  label: "Guardrails",
+                  autoAddBaseUrl: true,
+                },
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors",
+                  label: "Monitors",
+                  autoAddBaseUrl: true,
+                }
+              ],
+            },
             {
               type: "category",
               collapsible: true,
