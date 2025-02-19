@@ -38,7 +38,8 @@ export const ListView: React.FC<TraceViewProps> = ({
                   </div>
                   <div className="truncate text-xs text-moon-500">
                     Started: {formatTimestamp(call.started_at)}
-                    {call.ended_at && ` • Duration: ${formatDuration(duration)}`}
+                    {call.ended_at &&
+                      ` • Duration: ${formatDuration(duration)}`}
                   </div>
                 </div>
               </Button>
@@ -48,4 +49,4 @@ export const ListView: React.FC<TraceViewProps> = ({
       </div>
     </div>
   );
-}; 
+};

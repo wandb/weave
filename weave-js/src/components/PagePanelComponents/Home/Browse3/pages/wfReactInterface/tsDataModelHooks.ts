@@ -1926,7 +1926,7 @@ export const traceCallToUICallSchema = (
   traceCall: traceServerTypes.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
-  
+
   return {
     entity,
     project,

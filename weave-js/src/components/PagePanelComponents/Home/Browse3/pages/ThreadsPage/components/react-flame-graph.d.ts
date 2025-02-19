@@ -22,4 +22,4 @@ declare module 'react-flame-graph' {
   }
 
   export const FlameGraph: React.FC<FlameGraphProps>;
-} 
+}

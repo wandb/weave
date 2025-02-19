@@ -6,7 +6,7 @@ export const getColorForOpName = (opName: string): string => {
   // Use a simple string hash that sums char codes
   let hash = 0;
   for (let i = 0; i < opName.length; i++) {
-    hash = Math.abs((hash * 31) + opName.charCodeAt(i))
+    hash = Math.abs(hash * 31 + opName.charCodeAt(i));
   }
 
   // Use a more muted color palette
@@ -32,4 +32,4 @@ export const formatDuration = (ms: number): string => {
  */
 export const formatTimestamp = (timestamp: string): string => {
   return new Date(timestamp).toLocaleString();
-}; 
+};

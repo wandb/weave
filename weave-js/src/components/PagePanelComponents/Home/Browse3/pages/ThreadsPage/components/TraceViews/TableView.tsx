@@ -16,4 +16,4 @@ export const TableView: React.FC<TraceViewProps> = ({
       </pre>
     </div>
   );
-}; 
+};

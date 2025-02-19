@@ -1,5 +1,8 @@
 import React, {useMemo} from 'react';
-import {FlameGraph, FlameGraphNode as FlameGraphNodeType} from 'react-flame-graph';
+import {
+  FlameGraph,
+  FlameGraphNode as FlameGraphNodeType,
+} from 'react-flame-graph';
 
 import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
 import {TraceViewProps} from '../../types';
@@ -45,7 +48,9 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
     const rootNode = Object.values(traceTreeFlat).find(
       node => !node.parentId || !traceTreeFlat[node.parentId]
     );
-    if (!rootNode) { return null; }
+    if (!rootNode) {
+      return null;
+    }
 
     // Helper function to build the flame graph tree
     const buildFlameNode = (nodeId: string): FlameGraphNode => {
@@ -84,7 +89,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
   return (
     <div className="h-full overflow-hidden">
       <h3 className="p-4 text-lg font-semibold">Flame Graph View</h3>
-      <div 
+      <div
         ref={containerRef}
         className="h-[calc(100%-4rem)] w-full overflow-hidden px-4">
         {dimensions.width > 0 && dimensions.height > 0 && (
@@ -94,8 +99,10 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
             width={dimensions.width}
             onChange={(node: FlameGraphNodeType) => {
               const timing = node.timing;
-              if (!timing) { return; }
-              
+              if (!timing) {
+                return;
+              }
+
               // Find the node in our trace tree that matches this name and timing
               const matchingNode = Object.values(traceTreeFlat).find(
                 n =>
@@ -115,4 +122,4 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
       </div>
     </div>
   );
-}; 
+};

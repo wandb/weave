@@ -16,4 +16,4 @@ export const TimelineView: React.FC<TraceViewProps> = ({
       </pre>
     </div>
   );
-}; 
+};
