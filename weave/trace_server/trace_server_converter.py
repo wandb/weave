@@ -3,20 +3,13 @@ from typing import Callable, Optional, TypeVar, cast
 from pydantic import BaseModel
 
 from weave.trace_server import refs_internal as ri
+from weave.trace_server.errors import InvalidExternalRef, InvalidInternalRef
 
 A = TypeVar("A")
 B = TypeVar("B")
 
 weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
-
-
-class InvalidExternalRef(ValueError):
-    pass
-
-
-class InvalidInternalRef(ValueError):
-    pass
 
 
 def universal_ext_to_int_ref_converter(

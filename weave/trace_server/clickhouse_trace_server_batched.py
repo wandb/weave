@@ -542,7 +542,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if op.deleted_at is not None:
             raise ObjectDeletedError(
                 f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
-                deleted_at=op.deleted_at,
+                deleted_at=op.deleted_at.isoformat(),
             )
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
@@ -603,7 +603,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if obj.deleted_at is not None:
             raise ObjectDeletedError(
                 f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
-                deleted_at=obj.deleted_at,
+                deleted_at=obj.deleted_at.isoformat(),
             )
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
@@ -1523,7 +1523,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not api_key and provider != "bedrock" and provider != "bedrock_converse":
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
-                api_key_name=secret_name,
+                api_key=secret_name,
             )
 
         start_time = datetime.datetime.now()

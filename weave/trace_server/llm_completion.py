@@ -80,17 +80,17 @@ def get_bedrock_credentials(
     if not aws_region_name:
         raise MissingLLMApiKeyError(
             f"No AWS region name found for model {model_name}",
-            api_key_name="AWS_REGION_NAME",
+            api_key="AWS_REGION_NAME",
         )
     elif not aws_access_key_id:
         raise MissingLLMApiKeyError(
             f"No AWS access key ID found for model {model_name}",
-            api_key_name="AWS_ACCESS_KEY_ID",
+            api_key="AWS_ACCESS_KEY_ID",
         )
     elif not aws_secret_access_key:
         raise MissingLLMApiKeyError(
             f"No AWS secret access key found for model {model_name}",
-            api_key_name="AWS_SECRET_ACCESS_KEY",
+            api_key="AWS_SECRET_ACCESS_KEY",
         )
 
     return aws_access_key_id, aws_secret_access_key, aws_region_name
@@ -109,7 +109,7 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
     if not azure_api_base:
         raise MissingLLMApiKeyError(
             f"No Azure API base found for model {model_name}",
-            api_key_name="AZURE_API_BASE",
+            api_key="AZURE_API_BASE",
         )
 
     azure_api_version = (
@@ -120,7 +120,7 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
     if not azure_api_version:
         raise MissingLLMApiKeyError(
             f"No Azure API version found for model {model_name}",
-            api_key_name="AZURE_API_VERSION",
+            api_key="AZURE_API_VERSION",
         )
 
     return azure_api_base, azure_api_version
