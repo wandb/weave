@@ -562,15 +562,18 @@ def client_creator(request):
     def client(
         autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
         global_attributes: typing.Optional[dict[str, typing.Any]] = None,
+        settings: typing.Optional[weave.trace.settings.UserSettings] = None,
     ):
+        if settings is not None:
+            weave.trace.settings.parse_and_apply_settings(settings)
         inited_client = create_client(request, autopatch_settings, global_attributes)
         try:
             yield inited_client.client
         finally:
             inited_client.reset()
             autopatch.reset_autopatch()
-            # Reset global attributes
             weave.trace.api._global_attributes = {}
+            weave.trace.settings.parse_and_apply_settings(weave.trace.settings.UserSettings())
 
     yield client
 
