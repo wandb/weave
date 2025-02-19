@@ -6,15 +6,21 @@ check_litellm_installation()
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
-from weave.scorers.hallucination_scorer import HallucinationFreeScorer
+from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
+from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
+from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
+from weave.scorers.hallucination_scorer import (
+    HallucinationFreeScorer,
+    WeaveHallucinationScorerV1,
+)
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
     WeaveBiasScorerV1,
     WeaveToxicityScorerV1,
 )
-from weave.scorers.presidio_entity_recognition_guardrail import (
-    PresidioEntityRecognitionGuardrail,
+from weave.scorers.presidio_guardrail import (
+    PresidioScorer,
 )
 from weave.scorers.prompt_injection_guardrail import (
     PromptInjectionLLMGuardrail,
@@ -50,13 +56,15 @@ __all__ = [
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "PromptInjectionLLMGuardrail",
-    "PresidioEntityRecognitionGuardrail",
+    "PresidioScorer",
     "PydanticScorer",
-    "Scorer",
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidXMLScorer",
     "WeaveBiasScorerV1",
     "WeaveToxicityScorerV1",
-    "_validate_scorer_signature",
+    "WeaveCoherenceScorerV1",
+    "WeaveFluencyScorerV1",
+    "WeaveHallucinationScorerV1",
+    "WeaveContextRelevanceScorerV1",
 ]

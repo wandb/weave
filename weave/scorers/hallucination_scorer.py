@@ -10,13 +10,12 @@ from weave.scorers.scorer_types import HuggingFacePipelineScorer, LLMScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
     WeaveScorerResult,
-    ensure_hf_imports,
     load_hf_model_weights,
     stringify,
 )
 
 if TYPE_CHECKING:
-    from transformers.pipelines.base import Pipeline
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -225,15 +224,14 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     )
     _model_max_length: int = PrivateAttr(default=8192)
 
-    def load_pipeline(self) -> "Pipeline":
-        ensure_hf_imports()
+    def load_pipeline(self) -> None:
         from transformers import pipeline
 
         self._local_model_path = load_hf_model_weights(
             self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]
         )
-        # HuggingFacePipelineScorer's model_post_init will cache the pipeline at self._pipeline
-        return pipeline(
+
+        self._pipeline = pipeline(
             task=self.task,
             model=self._local_model_path,
             device=self.device,
@@ -243,6 +241,9 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     def _predict(
         self, query: str, context: Union[str, list[str]], output: str
     ) -> float:
+        assert (
+            self._pipeline is not None
+        ), "Pipeline not loaded, check your `model_name_or_path`"
         tokenizer = self._pipeline.tokenizer
         context_str = "\n\n".join(context) if isinstance(context, list) else context
         inps = query + "\n\n" + context_str
