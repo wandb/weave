@@ -1,26 +1,12 @@
 import React, {useMemo} from 'react';
 import {FlameGraph, FlameGraphNode as FlameGraphNodeType} from 'react-flame-graph';
 
-import {TraceViewProps} from '../../types';
 import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
+import {TraceViewProps} from '../../types';
+import {getColorForOpName} from './utils';
 
 // Use the imported type directly
 type FlameGraphNode = FlameGraphNodeType;
-
-const getColorForOpName = (opName: string): string => {
-  // Simple hash function to generate consistent colors
-  let hash = 0;
-  for (let i = 0; i < opName.length; i++) {
-    hash = opName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  // Use a more muted color palette
-  // - Lower saturation (40% instead of 70%)
-  // - Higher lightness (75% instead of 50%)
-  // - Rotate hue to favor blue/purple/green spectrum
-  const hue = (hash % 270) + 180; // Range from 180-450 (wraps around to 90), favoring cool colors
-  return `hsl(${hue}, 40%, 75%)`;
-};
 
 export const FlameGraphView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
@@ -59,7 +45,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
     const rootNode = Object.values(traceTreeFlat).find(
       node => !node.parentId || !traceTreeFlat[node.parentId]
     );
-    if (!rootNode) return null;
+    if (!rootNode) { return null; }
 
     // Helper function to build the flame graph tree
     const buildFlameNode = (nodeId: string): FlameGraphNode => {
@@ -108,7 +94,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
             width={dimensions.width}
             onChange={(node: FlameGraphNodeType) => {
               const timing = node.timing;
-              if (!timing) return;
+              if (!timing) { return; }
               
               // Find the node in our trace tree that matches this name and timing
               const matchingNode = Object.values(traceTreeFlat).find(
