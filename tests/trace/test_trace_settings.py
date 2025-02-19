@@ -68,19 +68,27 @@ def test_disabled_env_client():
 
 
 def test_print_call_link_setting(client_creator):
+    # Test with print_call_link=False
     parse_and_apply_settings(UserSettings(print_call_link=False))
+    output_without_link = ""
     with client_creator() as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
-    assert TRACE_CALL_EMOJI not in captured.getvalue()
+            output_without_link = captured.getvalue()
 
+    # Test with print_call_link=True
     parse_and_apply_settings(UserSettings(print_call_link=True))
+    output_with_link = ""
     with client_creator() as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
-    assert TRACE_CALL_EMOJI in captured.getvalue()
+            output_with_link = captured.getvalue()
+
+    # Make assertions outside of all context managers
+    assert TRACE_CALL_EMOJI not in output_without_link
+    assert TRACE_CALL_EMOJI in output_with_link
 
 
 def test_print_call_link_env(client):
