@@ -80,6 +80,7 @@ export const PlaygroundChat = ({
           maxHeight: 'calc(100% - 130px)',
           display: 'flex',
           position: 'relative',
+          overflowX: 'scroll',
         }}>
         {playgroundStates.map((state, idx) => (
           <React.Fragment key={idx}>
@@ -100,6 +101,7 @@ export const PlaygroundChat = ({
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
+                minWidth: '600px',
               }}>
               {state.loading && (
                 <Box
@@ -152,7 +154,7 @@ export const PlaygroundChat = ({
                   flexGrow: 1,
                 }}>
                 <Tailwind>
-                  <div className=" mx-auto mt-[32px] h-full min-w-[400px] max-w-[800px] pb-8">
+                  <div className=" mx-auto mt-[32px] h-full min-w-[300px] max-w-[800px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{

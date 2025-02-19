@@ -18,6 +18,8 @@ import {DEFAULT_SYSTEM_MESSAGE} from '../usePlaygroundState';
 import {LLMDropdown} from './LLMDropdown';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
+const MAX_CHATS = 4;
+
 type PlaygroundChatTopBarProps = {
   idx: number;
   settingsTab: number | null;
@@ -62,13 +64,11 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     } as OptionalTraceCallSchema);
   };
 
-  const handleCompare = () => {
-    if (onlyOneChat) {
-      setPlaygroundStates([
-        ...playgroundStates,
-        JSON.parse(JSON.stringify(playgroundStates[0])),
-      ]);
-    }
+  const handleDuplicateChat = (index: number) => {
+    setPlaygroundStates([
+      ...playgroundStates,
+      JSON.parse(JSON.stringify(playgroundStates[index])),
+    ]);
   };
 
   const handleModelChange = (
@@ -145,23 +145,29 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           variant="ghost"
           onClick={() => setConfirmClear(true)}
         />
-        {onlyOneChat ? (
+
+        {playgroundStates.length < MAX_CHATS && (
           <Button
-            tooltip={'Add chat'}
+            tooltip={'Duplicate chat'}
             endIcon="swap"
             size="medium"
             variant="ghost"
-            onClick={handleCompare}>
-            Compare
+            onClick={() => handleDuplicateChat(idx)}>
+            Duplicate
           </Button>
-        ) : (
+        )}
+
+        {!onlyOneChat && (
           <Button
             tooltip={'Remove chat'}
             endIcon="close"
             size="medium"
             variant="ghost"
             onClick={() => {
-              if (settingsTab === idx) {
+              if (
+                settingsTab === idx ||
+                settingsTab === playgroundStates.length - 1
+              ) {
                 setSettingsTab(0);
               }
               setPlaygroundStates(
