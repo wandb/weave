@@ -15,6 +15,26 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   onCallSelect,
 }) => {
   const {stackState} = useStackContext();
+  const selectedItemRef = React.useRef<HTMLButtonElement>(null);
+
+  // Scroll selected item into view when selection changes
+  React.useEffect(() => {
+    let mounted = true;
+    const doScroll = () => {
+      if (mounted && selectedItemRef.current) {
+        selectedItemRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    };
+
+    const timeout =   setTimeout(doScroll, 15);
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
+  }, [selectedCallId]);
 
   if (!selectedCallId || !stackState) {
     return null;
@@ -38,6 +58,7 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
         <React.Fragment key={node.id}>
           {index > 0 && <BreadcrumbSeparator>{'/'}</BreadcrumbSeparator>}
           <BreadcrumbItem
+            ref={node.id === selectedCallId ? selectedItemRef : undefined}
             $active={node.id === selectedCallId}
             onClick={() => onCallSelect(node.id)}
             title={node.name}>

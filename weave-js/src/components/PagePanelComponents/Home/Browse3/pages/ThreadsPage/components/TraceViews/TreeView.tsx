@@ -24,6 +24,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onCallSelect,
   level = 0,
 }) => {
+  const nodeRef = React.useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = React.useState(true);
   const hasChildren = childrenIds.length > 0;
   const duration = call.ended_at
@@ -32,8 +33,28 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
 
+  // Scroll into view when selected
+  React.useEffect(() => {
+    let mounted = true;
+    const doScroll = () => {
+      if (mounted && id === selectedCallId && nodeRef.current) {
+        nodeRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    };
+
+    const timeout = setTimeout(doScroll, 15);
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
+  }, [id, selectedCallId]);
+
   return (
     <div className="flex flex-col">
+      <span ref={nodeRef} >
       <Button
         variant={id === selectedCallId ? 'secondary' : 'ghost'}
         active={id === selectedCallId}
@@ -63,6 +84,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           </div>
         </div>
       </Button>
+      </span>
       {isExpanded && hasChildren && (
         <div className="flex flex-col">
           {childrenIds.map(childId => {
