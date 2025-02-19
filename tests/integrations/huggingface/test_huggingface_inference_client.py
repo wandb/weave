@@ -154,9 +154,6 @@ def test_huggingface_chat_completion_async(client):
     assert output.usage.prompt_tokens == 44
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -188,9 +185,6 @@ def test_huggingface_document_question_answering(client):
     assert output[0].answer == "us-001"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -224,9 +218,6 @@ def test_huggingface_document_question_answering_async(client):
     assert output[0].answer == "us-001"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -251,9 +242,6 @@ def test_huggingface_fill_mask(client):
     assert output[0].score > 0
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -342,9 +330,6 @@ def test_huggingface_question_answering_async(client):
     assert output.answer == "Clara"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -376,9 +361,6 @@ def test_huggingface_table_question_answering(client):
     assert output.answer == "AVERAGE > 36542"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -470,9 +452,6 @@ def test_huggingface_text_classification_async(client):
     assert output[0].score > 0
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -502,9 +481,6 @@ def test_huggingface_token_classification(client):
     assert output[0].score > 0
 
 
-@pytest.mark.skip(
-    reason="This test depends on a huggingface model endpoint that does not reliably work."
-)
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
