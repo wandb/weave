@@ -166,12 +166,67 @@ interface ScrubberConfig {
   alwaysEnabled?: boolean;
 }
 
-// Utility to create a scrubber component from a config
+// Modify the createScrubber to support maintaining state
 const createScrubber = ({label, description, getNodes, alwaysEnabled}: ScrubberConfig) => {
   const ScrubberComponent: React.FC<BaseScrubberProps> = (props) => {
     const {selectedCallId, onCallSelect} = props;
     
-    const nodes = React.useMemo(() => getNodes(props), [props]);
+    // Stack navigation state
+    const stackRef = React.useRef<{
+      originalCallId: string;
+      stack: string[];
+    } | null>(null);
+
+    // Get nodes, potentially using the stack reference
+    const nodes = React.useMemo(() => {
+      // Special case for stack navigation
+      if (label === 'Stack') {
+        if (!selectedCallId) return [];
+
+        const buildStack = (callId: string) => {
+          const stack: string[] = [];
+          let currentId = callId;
+          
+          // Build stack up to root
+          while (currentId) {
+            stack.unshift(currentId);
+            const node = props.traceTreeFlat[currentId];
+            if (!node) break;
+            currentId = node.parentId || '';
+          }
+
+          // Build stack down to leaves
+          currentId = callId;
+          while (currentId) {
+            const node = props.traceTreeFlat[currentId];
+            if (!node || node.childrenIds.length === 0) break;
+            // Take the first child in chronological order
+            const nextId = [...node.childrenIds].sort((a, b) => 
+              Date.parse(props.traceTreeFlat[a].call.started_at) - 
+              Date.parse(props.traceTreeFlat[b].call.started_at)
+            )[0];
+            stack.push(nextId);
+            currentId = nextId;
+          }
+
+          return stack;
+        };
+
+        // Only update the stack reference if the selected call changes from outside
+        // or if it hasn't been initialized yet
+        if (!stackRef.current || !stackRef.current.stack.includes(selectedCallId)) {
+          stackRef.current = {
+            originalCallId: selectedCallId,
+            stack: buildStack(selectedCallId),
+          };
+        }
+
+        return stackRef.current.stack;
+      }
+
+      // Normal case for other scrubbers
+      return getNodes(props);
+    }, [props, selectedCallId, label]);
 
     const currentIndex = selectedCallId ? nodes.indexOf(selectedCallId) : 0;
     const progress = nodes.length > 1 
@@ -264,23 +319,11 @@ const SiblingScrubber = createScrubber({
   },
 });
 
+// Simplify the StackScrubber to just return an empty array since logic is now in component
 const StackScrubber = createScrubber({
   label: 'Stack',
   description: 'Navigate up and down the call stack from root to the selected call',
-  getNodes: ({traceTreeFlat, selectedCallId}) => {
-    if (!selectedCallId) return [];
-    const stack: string[] = [];
-    let currentId = selectedCallId;
-    
-    while (currentId) {
-      stack.unshift(currentId);
-      const node = traceTreeFlat[currentId];
-      if (!node) break;
-      currentId = node.parentId || '';
-    }
-    
-    return stack;
-  },
+  getNodes: () => [], // Stack building is handled in the component
 });
 
 export const TraceScrubber: React.FC<TraceScrubberProps> = (props) => {
