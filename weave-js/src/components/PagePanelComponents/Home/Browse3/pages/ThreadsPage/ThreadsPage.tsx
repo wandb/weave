@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
@@ -23,12 +23,12 @@ type TraceTreeFlat = {
     childrenIds: string[];
     dfsOrder: number;
     call: TraceCallSchema;
-  }
-}
+  };
+};
 
 // View type definitions
 type ThreadViewType = 'list' | 'timeline';
-type TraceViewType = 'timeline' | 'tree' | 'table';
+type TraceViewType = 'timeline' | 'tree' | 'table' | 'list';
 
 // Thread Panel Components
 const ThreadListView: React.FC<{
@@ -45,7 +45,7 @@ const ThreadListView: React.FC<{
   }
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Thread List View</h3>
+      <h3 className="mb-4 text-lg font-semibold">Thread List View</h3>
       <div className="flex flex-col gap-2">
         {traces.map(traceId => (
           <Button
@@ -75,7 +75,7 @@ const ThreadTimelineView: React.FC<{
   }
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Thread Timeline View</h3>
+      <h3 className="mb-4 text-lg font-semibold">Thread Timeline View</h3>
       <div className="flex flex-col gap-2">
         {traces.map(traceId => (
           <Button
@@ -92,15 +92,56 @@ const ThreadTimelineView: React.FC<{
 };
 
 // Trace Panel Components
+const TraceListView: React.FC<{
+  traceTreeFlat: TraceTreeFlat;
+  onCallSelect: (callId: string) => void;
+}> = ({traceTreeFlat, onCallSelect}) => {
+  // Sort calls by start time
+  const sortedCalls = useMemo(() => {
+    return Object.values(traceTreeFlat)
+      .sort((a, b) => {
+        const aStartedAt = Date.parse(a.call.started_at);
+        const bStartedAt = Date.parse(b.call.started_at);
+        return bStartedAt - aStartedAt; // Most recent first
+      });
+  }, [traceTreeFlat]);
+
+  return (
+    <div className="p-4">
+      <h3 className="mb-4 text-lg font-semibold">List View</h3>
+      <div className="flex flex-col gap-2">
+        {sortedCalls.map(({call}) => (
+          <Button
+            key={call.id}
+            variant="ghost"
+            onClick={() => onCallSelect(call.id)}
+            className="justify-start text-left">
+            <div className="flex flex-col gap-1">
+              <div className="font-medium">{call.display_name || call.op_name}</div>
+              <div className="text-xs text-moon-500">
+                Started: {new Date(call.started_at).toLocaleString()}
+                {call.ended_at && ` • Duration: ${
+                  ((Date.parse(call.ended_at) - Date.parse(call.started_at)) / 1000).toFixed(2)
+                }s`}
+              </div>
+            </div>
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const TraceTimelineView: React.FC<{
   traceTreeFlat: TraceTreeFlat;
   onCallSelect: (callId: string) => void;
 }> = ({traceTreeFlat, onCallSelect}) => {
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Timeline View</h3>
+      <h3 className="mb-4 text-lg font-semibold">Timeline View</h3>
       <pre className="text-sm text-moon-500">
-        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in timeline
+        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in
+        timeline
       </pre>
     </div>
   );
@@ -112,9 +153,10 @@ const TraceTreeView: React.FC<{
 }> = ({traceTreeFlat, onCallSelect}) => {
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Tree View</h3>
+      <h3 className="mb-4 text-lg font-semibold">Tree View</h3>
       <pre className="text-sm text-moon-500">
-        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in tree
+        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in
+        tree
       </pre>
     </div>
   );
@@ -126,9 +168,10 @@ const TraceTableView: React.FC<{
 }> = ({traceTreeFlat, onCallSelect}) => {
   return (
     <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Table View</h3>
+      <h3 className="mb-4 text-lg font-semibold">Table View</h3>
       <pre className="text-sm text-moon-500">
-        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in table
+        {JSON.stringify(Object.keys(traceTreeFlat).length, null, 2)} calls in
+        table
       </pre>
     </div>
   );
@@ -166,7 +209,7 @@ const buildTraceTreeFlat = (traceCalls: TraceCallSchema[]): TraceTreeFlat => {
       parentId: call.parent_id,
       childrenIds: [],
       dfsOrder: 0,
-      call: call,
+      call,
     };
   });
   traceCalls.forEach(call => {
@@ -210,23 +253,101 @@ const buildTraceTreeFlat = (traceCalls: TraceCallSchema[]): TraceTreeFlat => {
 
 // Data Fetch
 
+const useThreadList = (
+  entity: string,
+  project: string
+): LoadableWithError<string[]> => {
+  // TODO: Implement this
+  return useMemo(() => {
+    return {
+      loading: false,
+      error: null,
+      result: ["thread-id-1", "thread-id-2"],
+    };
+  }, []);
+};
+
 const useTracesForThread = (
   entity: string,
   project: string,
-  threadId: string
+  threadId?: string
 ): LoadableWithError<string[]> => {
   // TODO: Implement this
-  return useMemo(() => ({
-    loading: false,
-    error: null,
-    result: ['0194bf80-6587-7780-96bb-c275b21f1f5d'],
-  }), []);
+  const getClient = useGetTraceServerClientContext();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [traces, setTraces] = useState<string[]>([]);
+  useEffect(() => {
+    if (!threadId) {
+      setTraces([]);
+      setLoading(false);
+      return;
+    }
+    let mounted = true;
+    const client = getClient();
+    fetchBareThreadTraces(client, entity, project, threadId).then(res => {
+      if (mounted) {
+        setTraces(res.map(c => c.trace_id));
+        setLoading(false);
+      }
+    }).catch(err => {
+      if (mounted) {
+        setError(err);
+        setLoading(false);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [entity, getClient, project, threadId]);
+  return {
+    loading,
+    error,
+    result: traces,
+  };
+};
+
+const fetchBareThreadTraces = (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  threadId: string
+): Promise<TraceCallSchema[]> => {
+  const traceCallsProm = client.callsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      trace_roots_only: true,
+      // TODO: This is a placeholder for dev
+      op_names: ["weave:///company-of-agents/mini-lms/op/Agent.go:*"],
+    },
+    limit: 10,
+    sort_by: [{"field":"started_at","direction":"desc"}],
+    columns: [
+      'project_id',
+      'id',
+      'op_name',
+      'display_name',
+      'trace_id',
+      'parent_id',
+      'started_at',
+      'attributes',
+      'inputs',
+      'ended_at',
+      'exception',
+      'summary',
+      'wb_run_id',
+      'wb_user_id',
+    ],
+    include_costs: false,
+    include_feedback: false,
+  });
+  return traceCallsProm.then(res => res.calls);
 };
 
 const useBareTraceCalls = (
   entity: string,
   project: string,
-  traceId: string
+  traceId?: string
 ): LoadableWithError<TraceCallSchema[]> => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -234,8 +355,14 @@ const useBareTraceCalls = (
   const getClient = useGetTraceServerClientContext();
 
   useEffect(() => {
+    if (!traceId) {
+      setTraceCalls([]);
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     const client = getClient();
+
     fetchBareTraceCalls(client, entity, project, traceId)
       .then(res => {
         if (mounted) {
@@ -271,6 +398,7 @@ const fetchBareTraceCalls = (
     filter: {
       trace_ids: [traceId],
     },
+    sort_by: [{"field":"started_at","direction":"desc"}],
     columns: [
       'project_id',
       'id',
@@ -295,10 +423,26 @@ const fetchBareTraceCalls = (
 
 export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   // Global state
-  const [selectedThreadId, setSelectedThreadId] = useState<string | undefined>(threadId);
-  const [selectedTraceId, setSelectedTraceId] = useState<string | undefined>();
-  const [selectedCallId, setSelectedCallId] = useState<string | undefined>();
+  const [selectedThreadId, setSelectedThreadIdDirect] = useState<string | undefined>(threadId);
+  const [selectedTraceId, setSelectedTraceIdDirect] = useState<string | undefined>();
+  const [selectedCallId, setSelectedCallIdDirect] = useState<string | undefined>();
+  console.log({selectedThreadId, selectedTraceId, selectedCallId});
 
+  const setSelectedThreadId = useCallback((threadId: string) => {
+    setSelectedThreadIdDirect(threadId);
+    setSelectedTraceIdDirect(undefined);
+    setSelectedCallIdDirect(undefined);
+  }, [setSelectedThreadIdDirect]);
+
+  const setSelectedTraceId = useCallback((traceId: string) => {
+    setSelectedTraceIdDirect(traceId);
+    setSelectedCallIdDirect(undefined);
+  }, [setSelectedTraceIdDirect]);
+
+  const setSelectedCallId = useCallback((callId: string) => {
+    setSelectedCallIdDirect(callId);
+  }, [setSelectedCallIdDirect]);
+  
   // View state
   const [threadView, setThreadView] = useState<ThreadViewType>('list');
   const [traceView, setTraceView] = useState<TraceViewType>('timeline');
@@ -306,33 +450,60 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
   // Data fetching
   const {
+    loading: threadsLoading,
+    error: threadsError,
+    result: threads,
+  } = useThreadList(entity, project);
+
+  const {
     loading: tracesLoading,
     error: tracesError,
     result: traces,
-  } = useTracesForThread(entity, project, selectedThreadId ?? '');
+  } = useTracesForThread(entity, project, selectedThreadId);
 
   const {
     loading: callsLoading,
     error: callsError,
     result: traceCalls,
-  } = useBareTraceCalls(entity, project, selectedTraceId ?? '');
+  } = useBareTraceCalls(entity, project, selectedTraceId);
+
+  // Auto-select first thread when threads load and none is selected
+  useEffect(() => {
+    if (!selectedThreadId && threads && threads.length > 0 && !threadsLoading && !threadsError) {
+      setSelectedThreadId(threads[0]);
+    }
+  }, [threads, threadsLoading, threadsError, selectedThreadId, setSelectedThreadId]);
+
+  // Auto-select first trace when traces load
+  useEffect(() => {
+    console.log({traces, tracesLoading, tracesError, selectedTraceId});
+    if (!selectedTraceId && traces && traces.length > 0 && !tracesLoading && !tracesError) {
+      console.log('auto-selecting trace', traces[0]);
+      setSelectedTraceId(traces[0]);
+    }
+  }, [traces, tracesLoading, tracesError, selectedTraceId, setSelectedTraceId]);
 
   // Derived data
-  const traceTreeFlat = useMemo(() => buildTraceTreeFlat(traceCalls ?? []), [traceCalls]);
-  const selectedCall = selectedCallId ? traceTreeFlat[selectedCallId]?.call : undefined;
+  const traceTreeFlat = useMemo(
+    () => buildTraceTreeFlat(traceCalls ?? []),
+    [traceCalls]
+  );
+  const selectedCall = selectedCallId
+    ? traceTreeFlat[selectedCallId]?.call
+    : undefined;
 
-  // Effect to clear downstream selections when parent selection changes
-  useEffect(() => {
-    setSelectedTraceId(undefined);
-    setSelectedCallId(undefined);
-  }, [selectedThreadId]);
-
-  useEffect(() => {
-    setSelectedCallId(undefined);
-  }, [selectedTraceId]);
 
   // Render helpers
   const renderThreadView = () => {
+    if (!selectedThreadId) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="info" className="mb-2" />
+          <p>Select a thread to begin exploring</p>
+        </div>
+      );
+    }
+
     const props = {
       onTraceSelect: setSelectedTraceId,
       traces: traces ?? [],
@@ -348,15 +519,69 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   };
 
   const renderTraceView = () => {
+    if (!selectedThreadId) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="info" className="mb-2" />
+          <p>Select a thread to view traces</p>
+        </div>
+      );
+    }
+
+    if (tracesLoading) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="loading" className="mb-2 animate-spin" />
+          <p>Loading traces...</p>
+        </div>
+      );
+    }
+
+    if (tracesError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-red-500">
+          <Icon name="warning" className="mb-2" />
+          <p>Error loading traces: {tracesError.message}</p>
+        </div>
+      );
+    }
+
+    if (!traces || traces.length === 0) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="info" className="mb-2" />
+          <p>No traces found for this thread</p>
+        </div>
+      );
+    }
+
     if (!selectedTraceId) {
-      return <div className="p-4 text-moon-500">Select a trace to view details</div>;
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="loading" className="mb-2 animate-spin" />
+          <p>Selecting trace...</p>
+        </div>
+      );
     }
+
     if (callsLoading) {
-      return <div className="p-4">Loading...</div>;
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="loading" className="mb-2 animate-spin" />
+          <p>Loading trace details...</p>
+        </div>
+      );
     }
+
     if (callsError) {
-      return <div className="p-4 text-red-500">Error: {callsError.message}</div>;
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-red-500">
+          <Icon name="warning" className="mb-2" />
+          <p>Error loading trace details: {callsError.message}</p>
+        </div>
+      );
     }
+
     const props = {
       traceTreeFlat,
       onCallSelect: setSelectedCallId,
@@ -368,6 +593,8 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         return <TraceTreeView {...props} />;
       case 'table':
         return <TraceTableView {...props} />;
+      case 'list':
+        return <TraceListView {...props} />;
     }
   };
 
@@ -382,13 +609,39 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
               open={isThreadMenuOpen}
               onOpenChange={setIsThreadMenuOpen}>
               <DropdownMenu.Trigger>
-                <Button variant="secondary" icon="overflow-vertical">
-                  Select Thread
+                <Button 
+                  variant="secondary" 
+                  icon={threadsLoading ? "loading" : "overflow-vertical"}
+                  disabled={threadsLoading || Boolean(threadsError)}
+                  className={threadsLoading ? "animate-spin" : ""}>
+                  {selectedThreadId ? `Thread: ${selectedThreadId}` : 'Select Thread'}
                 </Button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Content>
-                <DropdownMenu.Item>Thread 1</DropdownMenu.Item>
-                <DropdownMenu.Item>Thread 2</DropdownMenu.Item>
+                {threadsError ? (
+                  <DropdownMenu.Item className="text-red-500">
+                    <Icon name="warning" className="mr-2" />
+                    Error: {threadsError.message}
+                  </DropdownMenu.Item>
+                ) : threads && threads.length > 0 ? (
+                  threads.map(threadId => (
+                    <DropdownMenu.Item
+                      key={threadId}
+                      onSelect={() => {
+                        setSelectedThreadId(threadId);
+                        setIsThreadMenuOpen(false);
+                      }}>
+                      <div className="flex items-center gap-2">
+                        {threadId === selectedThreadId && (
+                          <Icon name="checkmark" className="text-green-500" />
+                        )}
+                        <span>{threadId}</span>
+                      </div>
+                    </DropdownMenu.Item>
+                  ))
+                ) : (
+                  <DropdownMenu.Item disabled>No threads available</DropdownMenu.Item>
+                )}
               </DropdownMenu.Content>
             </DropdownMenu.Root>
           </div>
@@ -415,9 +668,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {renderThreadView()}
-            </div>
+            <div className="flex-1 overflow-y-auto">{renderThreadView()}</div>
           </div>
 
           {/* Trace Panel - 40% */}
@@ -425,6 +676,12 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
             <div className="flex h-32 items-center justify-between border-b border-moon-250 px-8">
               <h2 className="text-sm font-semibold">Trace View</h2>
               <div className="flex items-center gap-2">
+                <Button
+                  variant={traceView === 'list' ? 'primary' : 'ghost'}
+                  onClick={() => setTraceView('list')}
+                  icon="list">
+                  List
+                </Button>
                 <Button
                   variant={traceView === 'timeline' ? 'primary' : 'ghost'}
                   onClick={() => setTraceView('timeline')}
@@ -445,17 +702,24 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {renderTraceView()}
-            </div>
+            <div className="flex-1 overflow-y-auto">{renderTraceView()}</div>
           </div>
 
           {/* Call Detail Panel - 30% */}
           <div className="flex flex-[3] flex-col border-l border-moon-250">
             <div className="flex h-full flex-col">
-              <CallDetailSection call={selectedCall} sectionTitle="Call Details" />
-              <CallDetailSection call={selectedCall} sectionTitle="Call Inputs" />
-              <CallDetailSection call={selectedCall} sectionTitle="Call Outputs" />
+              <CallDetailSection
+                call={selectedCall}
+                sectionTitle="Call Details"
+              />
+              <CallDetailSection
+                call={selectedCall}
+                sectionTitle="Call Inputs"
+              />
+              <CallDetailSection
+                call={selectedCall}
+                sectionTitle="Call Outputs"
+              />
             </div>
           </div>
         </div>
@@ -463,14 +727,24 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         {/* Main Footer */}
         <div className="flex h-32 items-center border-t border-moon-250 px-16">
           <span className="text-sm text-moon-500">
-            {tracesLoading ? 'Loading traces...' : 
-              tracesError ? `Error: ${tracesError.message}` :
-              selectedThreadId ? `Thread: ${selectedThreadId} (${traces?.length ?? 0} traces)` : 
-              'No thread selected'} {' | '}
-            {callsLoading ? 'Loading calls...' : 
-              callsError ? `Error: ${callsError.message}` :
-              selectedTraceId ? `Trace: ${selectedTraceId} (${Object.keys(traceTreeFlat).length} calls)` : 
-              'No trace selected'} {' | '}
+            {tracesLoading
+              ? 'Loading traces...'
+              : tracesError
+              ? `Error: ${tracesError.message}`
+              : selectedThreadId
+              ? `Thread: ${selectedThreadId} (${traces?.length ?? 0} traces)`
+              : 'No thread selected'}{' '}
+            {' | '}
+            {callsLoading
+              ? 'Loading calls...'
+              : callsError
+              ? `Error: ${callsError.message}`
+              : selectedTraceId
+              ? `Trace: ${selectedTraceId} (${
+                  Object.keys(traceTreeFlat).length
+                } calls)`
+              : 'No trace selected'}{' '}
+            {' | '}
             {selectedCallId ? `Call: ${selectedCallId}` : 'No call selected'}
           </span>
         </div>
