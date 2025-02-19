@@ -22,6 +22,7 @@ from tests.trace.util import (
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
     client_is_sqlite,
+    get_info_loglines,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
@@ -3255,3 +3256,47 @@ def test_calls_len(client):
 
     assert len(test.calls()) == 2
     assert len(client.get_calls()) == 2
+
+
+def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
+    @weave.op
+    def test():
+        return {"a": {"b": {"c": {"d": 1}}}}
+
+    test()
+    test()
+
+    calls = client.get_calls(
+        columns=[
+            "output",
+            "output.a",
+            "output.a.b",
+            "output.a.b.c",
+            "output.a.b.c.d",
+        ]
+    )
+
+    assert len(calls) == 2
+    assert calls[0].output == {"a": {"b": {"c": {"d": 1}}}}
+    assert calls[0].output["a"] == {"b": {"c": {"d": 1}}}
+    assert calls[0].output["a"]["b"] == {"c": {"d": 1}}
+    assert calls[0].output["a"]["b"]["c"] == {"d": 1}
+    assert calls[0].output["a"]["b"]["c"]["d"] == 1
+
+    # now make sure we don't make duplicate selects
+    if client_is_sqlite(client):
+        select_queries = [
+            line
+            for line in capsys.readouterr().out.split("\n")
+            if line.startswith("QUERY SELECT")
+        ]
+        for query in select_queries:
+            assert query.count("output") == 1
+    else:
+        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[
+            0
+        ]
+        assert (
+            select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
+            == 1
+        )
