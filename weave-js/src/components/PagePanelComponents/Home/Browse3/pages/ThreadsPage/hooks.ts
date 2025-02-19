@@ -41,7 +41,8 @@ export const useThreadList = (
 export const useTraceRootsForThread = (
   entity: string,
   project: string,
-  threadId?: string
+  threadId?: string,
+  pollIntervalMs: number = 0
 ): LoadableWithError<TraceCallSchema[]> => {
   const getClient = useGetTraceServerClientContext();
   const [loading, setLoading] = useState(true);
@@ -54,26 +55,47 @@ export const useTraceRootsForThread = (
       setLoading(false);
       return;
     }
-    setLoading(true);
+
     let mounted = true;
-    const client = getClient();
-    fetchBareThreadTraces(client, entity, project, threadId)
-      .then(res => {
+    let pollTimeout: NodeJS.Timeout | null = null;
+
+    const fetchTraces = async () => {
+      try {
+        const client = getClient();
+        const res = await fetchBareThreadTraces(client, entity, project, threadId);
         if (mounted) {
           setTraces(res);
           setLoading(false);
+          setError(null);
+
+          // Schedule next poll if interval is set
+          if (pollIntervalMs > 0 && mounted) {
+            pollTimeout = setTimeout(fetchTraces, pollIntervalMs);
+          }
         }
-      })
-      .catch(err => {
+      } catch (err) {
         if (mounted) {
-          setError(err);
+          setError(err as Error);
           setLoading(false);
+
+          // On error, retry after the same interval
+          if (pollIntervalMs > 0 && mounted) {
+            pollTimeout = setTimeout(fetchTraces, pollIntervalMs);
+          }
         }
-      });
+      }
+    };
+
+    // Initial fetch
+    fetchTraces();
+
     return () => {
       mounted = false;
+      if (pollTimeout) {
+        clearTimeout(pollTimeout);
+      }
     };
-  }, [entity, getClient, project, threadId]);
+  }, [entity, getClient, project, threadId, pollIntervalMs]);
 
   return {
     loading,

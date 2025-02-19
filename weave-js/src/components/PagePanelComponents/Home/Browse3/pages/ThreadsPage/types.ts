@@ -47,6 +47,8 @@ export interface ThreadViewProps {
   error: Error | null;
   /** Callback when a thread is selected */
   onThreadSelect?: (threadId: string) => void;
+  /** Polling interval in milliseconds (0 for no polling) */
+  pollIntervalMs?: number;
 }
 
 /**

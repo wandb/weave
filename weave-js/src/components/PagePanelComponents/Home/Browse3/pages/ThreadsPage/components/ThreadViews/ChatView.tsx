@@ -184,6 +184,7 @@ interface ThreadContentProps {
   traceRoots: TraceCallSchema[];
   selectedTraceId?: string;
   onTraceSelect: (traceId: string) => void;
+  pollIntervalMs?: number;
 }
 
 const ThreadContent: React.FC<ThreadContentProps> = ({
@@ -389,6 +390,7 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
             traceRoots={traceRoots}
             selectedTraceId={selectedTraceId}
             onTraceSelect={onTraceSelect}
+            pollIntervalMs={connection.isConnected ? 2000 : 0}
           />
         </ScrollContainer>
       )}

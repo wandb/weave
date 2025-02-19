@@ -91,7 +91,12 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     loading: tracesLoading,
     error: tracesError,
     result: traces,
-  } = useTraceRootsForThread(entity, project, selectedThreadId);
+  } = useTraceRootsForThread(
+    entity,
+    project,
+    selectedThreadId,
+    threadViewId === 'connected' ? 2000 : 0  // Poll every 2 seconds for connected view
+  );
 
   const {
     loading: callsLoading,
