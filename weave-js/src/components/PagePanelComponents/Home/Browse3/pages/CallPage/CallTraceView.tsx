@@ -158,12 +158,7 @@ export const CallTraceView: FC<{
   // we expand the groups for the current call.
   const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] =
     useCallback(
-      node => {
-        const result = expandKeys.has(
-          node.groupingKey?.toString() ?? 'INVALID'
-        );
-        return result;
-      },
+      node => expandKeys.has(node.groupingKey?.toString() ?? 'INVALID'),
       [expandKeys]
     );
 
@@ -393,13 +388,14 @@ export const useCallFlattenedTraceTree = (
     undefined,
     columns,
     undefined,
+    // Refetch the trace tree on delete or rename
     {refetchOnDelete: true}
   );
 
-  const traceCallsResult = useMemo(() => {
-    const result = traceCalls.result ?? [];
-    return result;
-  }, [traceCalls.result]);
+  const traceCallsResult = useMemo(
+    () => traceCalls.result ?? [],
+    [traceCalls.result]
+  );
 
   const costFilter: CallFilter = useMemo(
     () => ({
@@ -588,7 +584,7 @@ export const useCallFlattenedTraceTree = (
         queue.push({
           targetCall: {
             callId: `${targetCall.callId}_HIDDEN_CHILDREN_COUNT`,
-          } as CallSchema,
+          } as CallSchema, // HACK for sentinel value
           parentHierarchy: newHierarchy,
           path: newPath,
         });
