@@ -4,7 +4,9 @@ import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
-import {CallDetailSection} from './components/CallDetailSection';
+import { CallDetails } from '../CallPage/CallDetails';
+import { useWFHooks } from '../wfReactInterface/context';
+// import {CallDetailSection} from './components/CallDetailSection';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
@@ -286,11 +288,12 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     }
 
     return (
-      <>
-        <CallDetailSection call={selectedCall} sectionTitle="Call Details" />
-        <CallDetailSection call={selectedCall} sectionTitle="Call Inputs" />
-        <CallDetailSection call={selectedCall} sectionTitle="Call Outputs" />
-      </>
+      <CallDetailsForCallId entity={entity} project={project} callId={selectedCall.id} />
+      // <>
+      //   <CallDetailSection call={selectedCall} sectionTitle="Call Details" />
+      //   <CallDetailSection call={selectedCall} sectionTitle="Call Inputs" />
+      //   <CallDetailSection call={selectedCall} sectionTitle="Call Outputs" />
+      // </>
     );
   };
 
@@ -443,4 +446,21 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       </div>
     </Tailwind>
   );
+};
+
+
+const CallDetailsForCallId = ({callId, entity, project}: {callId: string, entity: string, project: string}) => {
+  const {useCall} = useWFHooks();
+  const call = useCall({
+    entity,
+    project,
+    callId,
+  });
+  if (call.loading) {
+    return <div>Loading...</div>;
+  }
+  if (call.result == null) {
+    return <div>No call found</div>;
+  }
+  return <CallDetails call={call.result} />;
 };
