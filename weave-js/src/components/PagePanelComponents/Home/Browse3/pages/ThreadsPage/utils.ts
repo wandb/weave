@@ -1,4 +1,5 @@
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {parseSpanName} from '../wfReactInterface/tsDataModelHooks';
 import {TraceTreeFlat} from './types';
 
 /**
@@ -81,4 +82,143 @@ export const buildTraceTreeFlat = (
   }
 
   return traceTreeFlat;
+};
+
+/**
+ * Represents a node in the visualization tree
+ */
+export interface VisTreeNode {
+  id: string;
+  label: string;
+  children: VisTreeNode[];
+  level: number;
+  // Metadata useful for visualization
+  size?: number; // Size of this subtree (number of descendants + 1)
+  depth?: number; // Max depth of this subtree
+  parentId?: string; // Reference to parent for easier traversal
+  metadata?: {
+    startTime: string;
+    endTime?: string;
+    duration?: number;
+    status?: string;
+    type?: string;
+  };
+}
+
+/**
+ * Represents a node in the code structure map
+ */
+export interface CodeMapNode {
+  opName: string; // The operation name (key for this node)
+  children: CodeMapNode[]; // Child operations
+  callIds: string[]; // All trace call IDs that map to this operation
+}
+
+/**
+ * Transforms a trace tree into a code structure map.
+ * This collapses the execution trace into a unique operation tree,
+ * representing the actual code structure rather than the execution flow.
+ */
+export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
+  // Helper to find a node in the ancestor chain or peer group
+  const findExistingOp = (
+    opName: string,
+    current: CodeMapNode,
+    ancestors: CodeMapNode[]
+  ): CodeMapNode | null => {
+    // Check ancestors first
+    const ancestorMatch = ancestors.find(a => a.opName === opName);
+    if (ancestorMatch) {
+      return ancestorMatch;
+    }
+
+    // Check peers (siblings of current node)
+    const currentParent = ancestors[ancestors.length - 1];
+    if (currentParent) {
+      const peerMatch = currentParent.children.find(c => c.opName === opName);
+      if (peerMatch) {
+        return peerMatch;
+      }
+    }
+
+    return null;
+  };
+
+  // Process a trace node at its target location in the code map
+  const processNode = (
+    callId: string,
+    target: CodeMapNode,
+    ancestors: CodeMapNode[]
+  ) => {
+    const node = traceTreeFlat[callId];
+    if (!node) {
+      return;
+    }
+
+    // Add this call to the target operation
+    target.callIds.push(callId);
+
+    // Process all children
+    node.childrenIds.forEach(childId => {
+      const childNode = traceTreeFlat[childId];
+      if (!childNode) {
+        return;
+      }
+
+      const childOpName = parseSpanName(childNode.call.op_name);
+
+      // Find if this operation exists in ancestors or peers
+      const existingOp = findExistingOp(childOpName, target, [
+        ...ancestors,
+        target,
+      ]);
+
+      if (existingOp) {
+        // Operation exists, process child at that location
+        processNode(
+          childId,
+          existingOp,
+          existingOp === target
+            ? ancestors
+            : ancestors.includes(existingOp)
+            ? ancestors.slice(0, ancestors.indexOf(existingOp) + 1)
+            : [...ancestors, target]
+        );
+      } else {
+        // New operation, create it as child of target
+        const newOp: CodeMapNode = {
+          opName: childOpName,
+          children: [],
+          callIds: [],
+        };
+        target.children.push(newOp);
+        processNode(childId, newOp, [...ancestors, target]);
+      }
+    });
+  };
+
+  // Start with root nodes
+  const rootMap = new Map<string, CodeMapNode>();
+
+  Object.values(traceTreeFlat)
+    .filter(node => !node.parentId || !traceTreeFlat[node.parentId])
+    .forEach(node => {
+      const opName = parseSpanName(node.call.op_name);
+
+      // Get or create root operation
+      let rootOp = rootMap.get(opName);
+      if (!rootOp) {
+        rootOp = {
+          opName,
+          children: [],
+          callIds: [],
+        };
+        rootMap.set(opName, rootOp);
+      }
+
+      // Process the node at this root operation
+      processNode(node.id, rootOp, []);
+    });
+
+  return Array.from(rootMap.values());
 };

@@ -8,7 +8,6 @@ import {CallDetailSection} from './components/CallDetailSection';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
-import {TraceMap} from './components/TraceMap';
 import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
 import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
@@ -238,16 +237,13 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                   onCallSelect={setSelectedCallId}
                 />
               </div>
-              <TraceScrubber
-                traceTreeFlat={traceTreeFlat}
-                selectedCallId={selectedCallId}
-                onCallSelect={setSelectedCallId}
-              />
-              <TraceMap
-                traceTreeFlat={traceTreeFlat}
-                selectedCallId={selectedCallId}
-                onCallSelect={setSelectedCallId}
-              />
+              {getTraceView(traceViewId).showScrubber && (
+                <TraceScrubber
+                  traceTreeFlat={traceTreeFlat}
+                  selectedCallId={selectedCallId}
+                  onCallSelect={setSelectedCallId}
+                />
+              )}
             </div>
           </StackContextProvider>
         )}

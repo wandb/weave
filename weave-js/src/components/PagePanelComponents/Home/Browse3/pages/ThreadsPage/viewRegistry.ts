@@ -3,6 +3,7 @@ import {FC} from 'react';
 import {IconName} from '../../../../../Icon';
 import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
+import {CodeView} from './components/TraceViews/CodeView';
 import {ThreadViewProps, TraceViewProps} from './types';
 
 /**
@@ -17,6 +18,8 @@ export interface ViewDefinition<T> {
   icon: IconName;
   /** The React component that implements the view */
   component: FC<T>;
+  /** Whether to show the scrubber for this view */
+  showScrubber?: boolean;
 }
 
 /** Registry of available thread views */
@@ -47,18 +50,28 @@ export const traceViews: TraceViewRegistry = [
     label: 'Tree',
     icon: 'layout-tabs',
     component: TreeView,
+    showScrubber: true,
+  },
+  {
+    id: 'code',
+    label: 'Code',
+    icon: 'code-alt',
+    component: CodeView,
+    showScrubber: false,
   },
   {
     id: 'flamegraph',
     label: 'Flame Graph',
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
+    showScrubber: true,
   },
   {
     id: 'graph',
     label: 'Graph',
     icon: 'chart-scatterplot',
     component: GraphView,
+    showScrubber: true,
   },
 ];
 

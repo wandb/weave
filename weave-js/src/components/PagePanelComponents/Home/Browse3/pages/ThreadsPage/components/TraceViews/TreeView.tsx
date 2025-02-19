@@ -38,36 +38,36 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   return (
     <div className="flex flex-col">
-      <span ref={nodeRef} >
-      <Button
-        variant={id === selectedCallId ? 'secondary' : 'ghost'}
-        active={id === selectedCallId}
-        onClick={() => onCallSelect(id)}
-        className="w-full justify-start text-left">
-        <div className="flex w-full items-center gap-2">
-          <div style={{width: level * 20}} />
-          {hasChildren && (
-            <Icon
-              name={chevronIcon}
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-              className="shrink-0 cursor-pointer"
-            />
-          )}
-          {!hasChildren && <div className="w-4" />}
-          <div className="flex flex-1 flex-col gap-1 overflow-hidden">
-            <div className="truncate font-medium">
-              {getCallDisplayName(call)}
-            </div>
-            <div className="truncate text-xs text-moon-500">
-              Started: {formatTimestamp(call.started_at)}
-              {call.ended_at && ` • Duration: ${formatDuration(duration)}`}
+      <span ref={nodeRef}>
+        <Button
+          variant={id === selectedCallId ? 'secondary' : 'ghost'}
+          active={id === selectedCallId}
+          onClick={() => onCallSelect(id)}
+          className="w-full justify-start text-left">
+          <div className="flex w-full items-center gap-2">
+            <div style={{width: level * 20}} />
+            {hasChildren && (
+              <Icon
+                name={chevronIcon}
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                className="shrink-0 cursor-pointer"
+              />
+            )}
+            {!hasChildren && <div className="w-4" />}
+            <div className="flex flex-1 flex-col gap-1 overflow-hidden">
+              <div className="truncate font-medium">
+                {getCallDisplayName(call)}
+              </div>
+              <div className="truncate text-xs text-moon-500">
+                Started: {formatTimestamp(call.started_at)}
+                {call.ended_at && ` • Duration: ${formatDuration(duration)}`}
+              </div>
             </div>
           </div>
-        </div>
-      </Button>
+        </Button>
       </span>
       {isExpanded && hasChildren && (
         <div className="flex flex-col">
