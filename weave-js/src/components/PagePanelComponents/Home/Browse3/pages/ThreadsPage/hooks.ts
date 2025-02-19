@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import React from 'react';
 
+import {useWFHooks} from '../wfReactInterface/context';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
@@ -107,11 +108,13 @@ export const useTraceRootsForThread = (
 export const useBareTraceCalls = (
   entity: string,
   project: string,
-  traceId?: string
+  traceId?: string,
+  pollIntervalMs: number = 1000
 ): LoadableWithError<TraceCallSchema[]> => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [traceCalls, setTraceCalls] = useState<TraceCallSchema[]>([]);
+  const [shouldPoll, setShouldPoll] = useState(true);
   const getClient = useGetTraceServerClientContext();
 
   useEffect(() => {
@@ -120,27 +123,52 @@ export const useBareTraceCalls = (
       setLoading(false);
       return;
     }
-    setLoading(true);
-    let mounted = true;
-    const client = getClient();
 
-    fetchBareTraceCalls(client, entity, project, traceId)
-      .then(res => {
+    let mounted = true;
+    let pollTimeout: NodeJS.Timeout | undefined;
+
+    const fetchCalls = async () => {
+      try {
+        const client = getClient();
+        const res = await fetchBareTraceCalls(client, entity, project, traceId);
+        
         if (mounted) {
           setTraceCalls(res);
           setLoading(false);
+          setError(null);
+
+          // Check if any call in the trace is still running
+          const hasRunningCalls = res.some(call => !call.ended_at);
+          setShouldPoll(hasRunningCalls);
+
+          // Schedule next poll if we should continue polling
+          if (hasRunningCalls && pollIntervalMs > 0) {
+            pollTimeout = setTimeout(fetchCalls, pollIntervalMs);
+          }
         }
-      })
-      .catch(err => {
+      } catch (err) {
         if (mounted) {
-          setError(err);
+          setError(err as Error);
           setLoading(false);
+          // Continue polling on error
+          setShouldPoll(true);
+          if (pollIntervalMs > 0) {
+            pollTimeout = setTimeout(fetchCalls, pollIntervalMs);
+          }
         }
-      });
+      }
+    };
+
+    // Initial fetch
+    fetchCalls();
+
     return () => {
       mounted = false;
+      if (pollTimeout) {
+        clearTimeout(pollTimeout);
+      }
     };
-  }, [entity, getClient, project, traceId]);
+  }, [entity, getClient, project, traceId, pollIntervalMs, shouldPoll]);
 
   return {
     loading,
@@ -216,6 +244,7 @@ const fetchBareTraceCalls = (
       'summary',
       'wb_run_id',
       'wb_user_id',
+      'output',
     ],
     include_costs: false,
     include_feedback: false,
@@ -251,4 +280,113 @@ export const useScrollIntoView = (
       clearTimeout(timeout);
     };
   }, [elementRef, shouldScroll, options]);
+};
+
+interface CallResult {
+  traceCall: TraceCallSchema;
+}
+
+/**
+ * Hook to poll a call until it completes
+ */
+export const usePollingCall = (
+  entity: string,
+  project: string,
+  callId: string,
+  pollIntervalMs: number = 1000
+) => {
+  const {useCall} = useWFHooks();
+  const getClient = useGetTraceServerClientContext();
+  const [polledCall, setPolledCall] = useState<CallResult | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [shouldPoll, setShouldPoll] = useState(true);
+
+  // Initial call data
+  const initialCallResult = useCall({
+    entity,
+    project,
+    callId,
+  });
+
+  // Function to fetch call data directly
+  const fetchCall = async () => {
+    try {
+      const client = getClient();
+      const res = await client.callsQuery({
+        project_id: `${entity}/${project}`,
+        filter: {
+          call_ids: [callId],
+        },
+        columns: [
+          'project_id',
+          'id',
+          'op_name',
+          'display_name',
+          'trace_id',
+          'parent_id',
+          'started_at',
+          'attributes',
+          'inputs',
+          'ended_at',
+          'exception',
+          'summary',
+          'wb_run_id',
+          'wb_user_id',
+          'output',
+        ],
+        include_costs: false,
+        include_feedback: false,
+      });
+      
+      if (res.calls.length > 0) {
+        const call = res.calls[0];
+        setPolledCall({
+          traceCall: call,
+        });
+        // Update polling state based on latest data
+        setShouldPoll(!call.ended_at);
+        setError(null);
+      }
+    } catch (err) {
+      setError(err as Error);
+      // Continue polling on error
+      setShouldPoll(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set up polling when the call is running
+  useEffect(() => {
+    let mounted = true;
+    let pollTimeout: NodeJS.Timeout | undefined;
+
+    const poll = async () => {
+      if (!mounted) return;
+      await fetchCall();
+      
+      // Schedule next poll if we should continue polling
+      if (mounted && shouldPoll) {
+        pollTimeout = setTimeout(poll, pollIntervalMs);
+      }
+    };
+
+    // Start polling
+    poll();
+
+    return () => {
+      mounted = false;
+      if (pollTimeout) {
+        clearTimeout(pollTimeout);
+      }
+    };
+  }, [entity, project, callId, pollIntervalMs, getClient, shouldPoll]);
+
+  // Use polled data once available, fall back to initial call data
+  return {
+    loading: loading && initialCallResult.loading,
+    error: error,
+    result: polledCall || initialCallResult.result,
+  };
 };

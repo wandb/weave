@@ -9,6 +9,7 @@ import {Icon} from '../../../../../../../Icon';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {TraceCallSchema} from '../../../wfReactInterface/traceServerClientTypes';
 import {ThreadViewProps} from '../../types';
+import {usePollingCall} from '../../hooks';
 
 const Container = styled.div`
   height: 100%;
@@ -82,6 +83,18 @@ const SectionHeader = styled.div`
   }
 `;
 
+const RunningIndicator = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3B82F6;
+  padding: 8px;
+  text-align: center;
+`;
+
 const Label = styled.div`
   font-size: 11px;
   font-weight: 500;
@@ -130,7 +143,7 @@ const ExpandButton = styled(Button)`
 const ConnectionPanel = styled.div`
   flex-shrink: 0;
   border-top: 1px solid #e2e8f0;
-  padding: 16px;
+  padding: 8px 16px;
   background: #f8fafc;
 `;
 
@@ -144,10 +157,18 @@ const FormSection = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px;
+  padding: 8px;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background: white;
+  margin-top: 8px;
+`;
+
+const ChatInput = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
 `;
 
 const FormLabel = styled.label`
@@ -268,6 +289,29 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
 
+  // Extract form fields from schema
+  const formFields = useMemo(() => {
+    if (!connection.schema) {
+      return [];
+    }
+    return Object.entries(connection.schema.properties || {})
+      .filter(([name]) => name !== 'thread_id') // Exclude thread_id
+      .map(([name, def]: [string, any]) => ({
+        name,
+        type: def.type,
+        description: def.description,
+        required: (connection.schema.required || []).includes(name),
+      }));
+  }, [connection.schema]);
+
+  // Check if we have a single string input field
+  const isSingleStringInput = useMemo(() => {
+    return (
+      formFields.length === 1 &&
+      formFields[0].type === 'string'
+    );
+  }, [formFields]);
+
   // Connect to the local runtime
   const handleConnect = async () => {
     try {
@@ -314,9 +358,9 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
         threadId: null,
       }));
       setFormValues({});
-      onTraceSelect('');  // Clear trace selection on error
+      onTraceSelect('');
       if (onThreadSelect) {
-        onThreadSelect('');  // Clear thread selection on error
+        onThreadSelect('');
       }
     }
   };
@@ -331,7 +375,6 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
       threadId: null,
     }));
     setFormValues({});
-    // Clear selections when disconnecting
     onTraceSelect('');
     if (onThreadSelect) {
       onThreadSelect('');
@@ -342,6 +385,17 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
   const handleRun = async () => {
     if (!connection.threadId) return;
     
+    // Store the current values
+    const currentValues = {...formValues};
+    const fieldName = isSingleStringInput ? formFields[0].name : null;
+    
+    // Clear the form immediately
+    if (fieldName) {
+      setFormValues({thread_id: connection.threadId, [fieldName]: ''});
+    } else {
+      setFormValues({thread_id: connection.threadId});
+    }
+    
     setIsRunning(true);
     setRunError(null);
     try {
@@ -351,35 +405,40 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formValues),
+        body: JSON.stringify({
+          ...currentValues,
+          thread_id: connection.threadId,
+        }),
       });
       if (!response.ok) {
         throw new Error('Failed to run thread');
       }
       const result = await response.json();
       console.log('Run result:', result);
+
+      // Trigger an immediate re-poll by re-selecting the current trace
+      if (selectedTraceId) {
+        onTraceSelect(selectedTraceId);
+      }
     } catch (err) {
       setRunError((err as Error).message);
+      // Restore the form values on error
+      setFormValues(currentValues);
     } finally {
       setIsRunning(false);
     }
   };
 
-  // Extract form fields from schema
-  const formFields = useMemo(() => {
-    if (!connection.schema) {
-      return [];
+  // Create a new thread
+  const handleNewThread = () => {
+    const threadId = crypto.randomUUID();
+    setFormValues({thread_id: threadId});
+    if (onThreadSelect) {
+      onThreadSelect(threadId);
     }
-    return Object.entries(connection.schema.properties || {}).map(
-      ([name, def]: [string, any]) => ({
-        name,
-        type: def.type,
-        description: def.description,
-        required: (connection.schema.required || []).includes(name),
-      })
-    );
-  }, [connection.schema]);
+  };
 
+  // console.log('connection', formValues, formFields, formValues[formFields[0].name] ?? '');
   return (
     <Container>
       {connection.isConnected && (
@@ -395,73 +454,110 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
         </ScrollContainer>
       )}
       <ConnectionPanel>
-        <ConnectionForm>
-          <Input
-            type="text"
-            placeholder="Enter runtime URL"
-            value={connection.url}
-            onChange={e =>
-              setConnection(prev => ({...prev, url: e.target.value}))
-            }
-            style={{width: '300px'}}
-          />
-          <Button
-            variant="primary"
-            onClick={connection.isConnected ? handleDisconnect : handleConnect}
-            icon={connection.isConnected ? IconNames.Close : IconNames.LinkAlt}
-            disabled={loading}>
-            {connection.isConnected ? 'Disconnect' : 'Connect'}
-          </Button>
-        </ConnectionForm>
-        {connection.error && <ErrorMessage>{connection.error}</ErrorMessage>}
-        
-        {!connection.isConnected && (
-          <div style={{marginTop: '8px', fontSize: '12px', color: '#64748B'}}>
-            Note: Use HTTP for localhost connections (e.g., http://localhost:2323). HTTPS is required for all other hosts.
+        {!connection.isConnected ? (
+          <>
+            <ConnectionForm>
+              <Input
+                type="text"
+                placeholder="Enter runtime URL"
+                value={connection.url}
+                onChange={e =>
+                  setConnection(prev => ({...prev, url: e.target.value}))
+                }
+                style={{width: '300px'}}
+              />
+              <Button
+                variant="primary"
+                onClick={handleConnect}
+                icon={IconNames.LinkAlt}
+                disabled={loading}>
+                Connect
+              </Button>
+            </ConnectionForm>
+            {connection.error && <ErrorMessage>{connection.error}</ErrorMessage>}
+            <div style={{marginTop: '8px', fontSize: '12px', color: '#64748B'}}>
+              Note: Use HTTP for localhost connections (e.g., http://localhost:2323). HTTPS is required for all other hosts.
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between">
+            {isSingleStringInput ? (
+              <ChatInput>
+                <Input
+                  type="text"
+                  placeholder={formFields[0].description || 'Type your message...'}
+                  value={formValues[formFields[0].name] ?? ''}
+                  onChange={e =>
+                    setFormValues(prev => ({
+                      ...prev,
+                      [formFields[0].name]: e.target.value,
+                    }))
+                  }
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleRun();
+                    }
+                  }}
+                  style={{flex: 1}}
+                />
+                <Button
+                  variant="primary"
+                  onClick={handleRun}
+                  disabled={isRunning}
+                  icon={isRunning ? IconNames.Loading : IconNames.Play}>
+                  {isRunning ? 'Sending...' : 'Send'}
+                </Button>
+              </ChatInput>
+            ) : (
+              <FormSection>
+                {formFields.map(field => (
+                  <div key={field.name}>
+                    <FormLabel>
+                      {field.name}
+                      {field.required && ' *'}
+                    </FormLabel>
+                    <Input
+                      type={field.type === 'number' ? 'number' : 'text'}
+                      placeholder={field.description}
+                      value={formValues[field.name] ?? ''}
+                      onChange={e =>
+                        setFormValues(prev => ({
+                          ...prev,
+                          [field.name]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <Button
+                  variant="primary"
+                  onClick={handleRun}
+                  disabled={isRunning}
+                  startIcon={isRunning ? IconNames.Loading : IconNames.Play}>
+                  {isRunning ? 'Running...' : 'Run'}
+                </Button>
+              </FormSection>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={handleNewThread}
+                icon={IconNames.AddNew}
+                title="Start new thread">
+                New Thread
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleDisconnect}
+                icon={IconNames.Close}
+                title="Disconnect">
+                Disconnect
+              </Button>
+            </div>
           </div>
         )}
-        
-        {connection.isConnected && formFields.length > 0 && (
-          <FormSection>
-            <FormLabel>Thread Parameters</FormLabel>
-            {formFields.map(field => (
-              <div key={field.name}>
-                <FormLabel>
-                  {field.name}
-                  {field.required && ' *'}
-                </FormLabel>
-                {field.name === 'thread_id' ? (
-                  <Input
-                    type="text"
-                    value={connection.threadId || ''}
-                    disabled
-                    style={{backgroundColor: '#F1F5F9'}}
-                  />
-                ) : (
-                  <Input
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    placeholder={field.description}
-                    value={formValues[field.name] || ''}
-                    onChange={e =>
-                      setFormValues(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value,
-                      }))
-                    }
-                  />
-                )}
-              </div>
-            ))}
-            <Button
-              variant="primary"
-              onClick={handleRun}
-              disabled={isRunning}
-              startIcon={isRunning ? IconNames.Loading : IconNames.Play}>
-              {isRunning ? 'Running...' : 'Run'}
-            </Button>
-            {runError && <ErrorMessage>{runError}</ErrorMessage>}
-          </FormSection>
-        )}
+        {runError && <ErrorMessage>{runError}</ErrorMessage>}
       </ConnectionPanel>
     </Container>
   );
@@ -476,7 +572,6 @@ function ChatRow({
   selectedTraceId: string | undefined;
   onTraceSelect: (traceId: string) => void;
 }) {
-  const {useCall} = useWFHooks();
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
   const [isInputScrolled, setIsInputScrolled] = useState(false);
@@ -492,11 +587,11 @@ function ChatRow({
     setScrolled(target.scrollTop > 2); // Add small threshold for better UX
   };
 
-  const {loading, result: call} = useCall({
-    entity: traceRootCall.project_id.split('/')[0],
-    project: traceRootCall.project_id.split('/')[1],
-    callId: traceRootCall.id,
-  });
+  const {loading, result: call} = usePollingCall(
+    traceRootCall.project_id.split('/')[0],
+    traceRootCall.project_id.split('/')[1],
+    traceRootCall.id
+  );
 
   const input = useMemo(() => {
     const rawInput = {...call?.traceCall?.inputs};
@@ -517,6 +612,8 @@ function ChatRow({
     const rawOutput = call?.traceCall?.output;
     return rawOutput;
   }, [call?.traceCall?.output]);
+
+  const isRunning = !call?.traceCall?.ended_at;
 
   const handleClick = (e: React.MouseEvent) => {
     // Don't trigger trace selection when clicking expand buttons
@@ -562,12 +659,19 @@ function ChatRow({
           />
         </SectionHeader>
         <ContentWrapper>
-          <Content
-            ref={outputContentRef}
-            $isExpanded={isOutputExpanded}
-            onScroll={e => handleScroll(e, setIsOutputScrolled)}>
-            {loading ? 'Loading...' : JSON.stringify(output, null, 2)}
-          </Content>
+          {isRunning ? (
+            <RunningIndicator>
+              <Icon name="loading" className="animate-spin" />
+              Running...
+            </RunningIndicator>
+          ) : (
+            <Content
+              ref={outputContentRef}
+              $isExpanded={isOutputExpanded}
+              onScroll={e => handleScroll(e, setIsOutputScrolled)}>
+              {loading ? 'Loading...' : JSON.stringify(output, null, 2)}
+            </Content>
+          )}
         </ContentWrapper>
       </Section>
     </ChatItem>
