@@ -1,1 +1,1 @@
-export {DetailsView} from './DetailsView'; 
+export {DetailsView} from './DetailsView';

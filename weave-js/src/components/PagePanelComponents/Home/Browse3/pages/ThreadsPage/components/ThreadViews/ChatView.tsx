@@ -232,8 +232,8 @@ function ChatRow({
 
   const input = useMemo(() => {
     const rawInput = {...call?.traceCall?.inputs};
-    if (rawInput && rawInput['self']) {
-      delete rawInput['self'];
+    if (rawInput && rawInput.self) {
+      delete rawInput.self;
     }
     return rawInput;
   }, [call?.traceCall?.inputs]);

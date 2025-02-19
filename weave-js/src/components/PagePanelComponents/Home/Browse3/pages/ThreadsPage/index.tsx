@@ -4,6 +4,7 @@ import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
+import {useWFHooks} from '../wfReactInterface/context';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
@@ -22,7 +23,6 @@ import {
   threadViews,
   traceViews,
 } from './viewRegistry';
-import {useWFHooks} from '../wfReactInterface/context';
 
 interface CallViewWrapperProps {
   entity: string;

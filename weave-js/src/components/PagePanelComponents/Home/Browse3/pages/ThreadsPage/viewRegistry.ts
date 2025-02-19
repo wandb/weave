@@ -2,6 +2,7 @@ import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
 import {DetailsView} from './components/CallViews/DetailsView';
+import {CallJsonView} from './components/CallViews/JsonView';
 import {ChatView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {CodeView} from './components/TraceViews/CodeView';
@@ -77,8 +78,14 @@ export const callViews: CallViewRegistry = [
   {
     id: 'details',
     label: 'Details',
-    icon: 'list',
+    icon: 'list-bullets',
     component: DetailsView,
+  },
+  {
+    id: 'json',
+    label: 'JSON',
+    icon: 'code-alt',
+    component: CallJsonView,
   },
 ];
 
