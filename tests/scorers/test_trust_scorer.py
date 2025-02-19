@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 import weave
@@ -114,3 +116,23 @@ def test_score_with_logic(trust_scorer):
     assert "DummyCritical" in result.metadata["critical_issues"]
     # Presence of advisory issues should still be reported.
     assert "DummyAdvisory" in result.metadata["advisory_issues"]
+
+
+# we need to test parallelism and how it plays with weave.Evaluations
+def test_trust_scorer_parallelism(trust_scorer):
+    trust_scorer.run_in_parallel = True
+
+    ds = [
+        {
+            "output": "test_output",
+            "query": "test_query",
+            "extra": "should_be_filtered",
+        }
+    ] * 100
+
+    @weave.op
+    def model(output):
+        return output
+
+    evaluation = weave.Evaluation(dataset=ds, scorers=[model])
+    asyncio.run(evaluation.evaluate(model))
