@@ -9,9 +9,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - d90b6b26-2863-4b37-97d0-8f588f6c01bd
+      - b1792f99-5e6f-4819-aae7-e4188a8cd56c
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: GET
     uri: https://huggingface.co/api/tasks
   response:
@@ -95,7 +95,8 @@ interactions:
         models take a (document, question) pair as input and return an answer in natural
         language. Models usually rely on multi-modal features, combining text, position
         of words (bounding-boxes) and image.\",\"widgetModels\":[\"impira/layoutlm-invoices\"],\"youtubeId\":\"\",\"id\":\"document-question-answering\",\"label\":\"Document
-        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"visual-document-retrieval\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"visual-document-retrieval\",\"label\":\"Visual
+        Document Retrieval\",\"libraries\":[\"transformers\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
         dataset containing cleaned articles of all languages. Can be used to train
         `feature-extraction` models.\",\"id\":\"wikipedia\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"India,
         officially the Republic of India, is a country in South Asia.\",\"type\":\"text\"}],\"outputs\":[{\"table\":[[\"Dimension
@@ -724,29 +725,29 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '75866'
+      - '76131'
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 06 Feb 2025 05:52:31 GMT
+      - Wed, 19 Feb 2025 17:36:44 GMT
       ETag:
-      - W/"1285a-mpc2fdSsHWn76IZKBEOfnoriq8E"
+      - W/"12963-vyIYgItlbQqfuVxsEg2yioEcYRQ"
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 69f54fd525eb29c918e6e1c0a7125022.cloudfront.net (CloudFront)
+      - 1.1 d009eadb22dc9a331d226eae5883932a.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - ZDqi7aCQJs-Dz7ZzlweMEXVo_n04-_X6XTMk30bRlXcqVpb5hKNaaA==
+      - bHqkkgKrkXc8ljiIydwcuuzLtuVnP59X2OAx69PoUcNsHK2o37X3qQ==
       X-Amz-Cf-Pop:
-      - BCN50-P1
+      - CCU50-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-67a44e1f-5a3bd71d0a1cd841523e5d32;d90b6b26-2863-4b37-97d0-8f588f6c01bd
+      - Root=1-67b616ac-12d921f2794b0be47843d03a;b1792f99-5e6f-4819-aae7-e4188a8cd56c
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -767,44 +768,51 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - 175f1a93-6017-437d-81f4-c7116cb8e946
+      - 4c988682-2f4b-49c0-ac56-01757fa95ebe
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/deepset/roberta-base-squad2
+    uri: https://router.huggingface.co/hf-inference/models/deepset/roberta-base-squad2
   response:
     body:
       string: '{"score":0.9326568841934204,"start":11,"end":16,"answer":"Clara"}'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '65'
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 05:52:33 GMT
-      Transfer-Encoding:
-      - chunked
+      - Wed, 19 Feb 2025 17:36:45 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 5795cfb7762205b7d50d5ba7ce4d8746.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - bZf9i-DOzKjvUsYskFs3jhYvIRJswqEb5HMLiGONLRFuHBEXCyXgqg==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
       access-control-allow-credentials:
       - 'true'
-      access-control-expose-headers:
-      - x-compute-type, x-compute-time
-      server:
-      - uvicorn
+      cross-origin-opener-policy:
+      - same-origin
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-compute-characters:
-      - '55'
       x-compute-time:
-      - '0.548'
+      - '0.034'
       x-compute-type:
-      - cpu
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
+      - cache
       x-request-id:
-      - sHo5V3
+      - Root=1-67b616ad-359f44e00ba71ce87528e6ed;4c988682-2f4b-49c0-ac56-01757fa95ebe
       x-sha:
       - adc3b06f79f797d1c575d5479d6f5efe54a9e3b4
     status:
