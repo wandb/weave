@@ -341,14 +341,17 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
           <div className="flex w-[30%] flex-col overflow-hidden border-r border-moon-250">
             <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
               <h2 className="truncate text-sm font-semibold">Thread View</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {threadViews.map(view => (
                   <Button
                     key={view.id}
                     variant={threadViewId === view.id ? 'primary' : 'ghost'}
                     onClick={() => setThreadViewId(view.id)}
-                    icon={view.icon}>
-                    {view.label}
+                    icon={view.icon}
+                    size="small"
+                    className="!p-3"
+                    title={view.label}>
+                    <span className="sr-only">{view.label}</span>
                   </Button>
                 ))}
               </div>
@@ -362,14 +365,17 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
           <div className="flex w-[40%] flex-col overflow-hidden">
             <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
               <h2 className="truncate text-sm font-semibold">Trace View</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {traceViews.map(view => (
                   <Button
                     key={view.id}
                     variant={traceViewId === view.id ? 'primary' : 'ghost'}
                     onClick={() => setTraceViewId(view.id)}
-                    icon={view.icon}>
-                    {view.label}
+                    icon={view.icon}
+                    size="small"
+                    className="!p-3"
+                    title={view.label}>
+                    <span className="sr-only">{view.label}</span>
                   </Button>
                 ))}
               </div>
