@@ -1,26 +1,30 @@
 import React from 'react';
 
-import {BaseScrubberProps, ScrubberConfig} from '../types';
 import {
+  CountIndicator,
+  Label,
+  RangeInput,
+  ScrubberContent,
   ScrubberRow,
   TooltipContainer,
-  Label,
   TooltipContent,
-  ScrubberContent,
-  RangeInput,
-  CountIndicator,
 } from '../styles';
+import {BaseScrubberProps, ScrubberConfig} from '../types';
 
-export const createScrubber = ({label, description, getNodes, alwaysEnabled}: ScrubberConfig) => {
-  const ScrubberComponent: React.FC<BaseScrubberProps> = (props) => {
+export const createScrubber = ({
+  label,
+  description,
+  getNodes,
+  alwaysEnabled,
+}: ScrubberConfig) => {
+  const ScrubberComponent: React.FC<BaseScrubberProps> = props => {
     const {selectedCallId, onCallSelect} = props;
-    
+
     const nodes = React.useMemo(() => getNodes(props), [props]);
 
     const currentIndex = selectedCallId ? nodes.indexOf(selectedCallId) : 0;
-    const progress = nodes.length > 1 
-      ? (currentIndex / (nodes.length - 1)) * 100 
-      : 0;
+    const progress =
+      nodes.length > 1 ? (currentIndex / (nodes.length - 1)) * 100 : 0;
 
     const handleChange = React.useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,4 +64,4 @@ export const createScrubber = ({label, description, getNodes, alwaysEnabled}: Sc
   };
 
   return React.memo(ScrubberComponent);
-}; 
+};

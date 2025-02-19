@@ -1,12 +1,12 @@
 import React from 'react';
 
-import {BaseScrubberProps} from '../types';
 import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,
   BreadcrumbItem,
   BreadcrumbSeparator,
 } from '../styles';
+import {BaseScrubberProps} from '../types';
 
 export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   traceTreeFlat,
@@ -14,17 +14,22 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   onCallSelect,
 }) => {
   const {stackState} = useStackContext();
-  
-  if (!selectedCallId || !stackState) return null;
+
+  if (!selectedCallId || !stackState) {
+    return null;
+  }
 
   const stack = stackState.stack.map(id => ({
     id,
-    name: traceTreeFlat[id]?.call.display_name || 
-          traceTreeFlat[id]?.call.op_name.split('/').pop() || 
-          id,
+    name:
+      traceTreeFlat[id]?.call.display_name ||
+      traceTreeFlat[id]?.call.op_name.split('/').pop() ||
+      id,
   }));
 
-  if (stack.length <= 1) return null;
+  if (stack.length <= 1) {
+    return null;
+  }
 
   return (
     <BreadcrumbContainer>
@@ -41,4 +46,4 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
       ))}
     </BreadcrumbContainer>
   );
-}; 
+};

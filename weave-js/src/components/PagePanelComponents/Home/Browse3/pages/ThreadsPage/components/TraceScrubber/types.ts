@@ -22,4 +22,4 @@ export interface StackContextType {
   stackState: StackState | null;
   setStackState: (state: StackState | null) => void;
   buildStackForCall: (callId: string) => string[];
-} 
+}

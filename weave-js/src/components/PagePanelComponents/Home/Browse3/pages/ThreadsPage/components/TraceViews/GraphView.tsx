@@ -175,7 +175,7 @@ const Flow: React.FC<TraceViewProps> = ({
 export const GraphView: React.FC<TraceViewProps> = props => {
   return (
     <div className="h-full overflow-hidden">
-      <div className="h-[100%]">
+      <div className="h-[100%] p-4">
         <ReactFlowProvider>
           <Flow {...props} />
         </ReactFlowProvider>

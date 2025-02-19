@@ -1,15 +1,15 @@
 import React from 'react';
 
 import {TraceTreeFlat} from '../../types';
-import {Container} from './styles';
-import {StackContextProvider} from './context';
-import {StackScrubber} from './components/StackScrubber';
-import {StackBreadcrumb} from './components/StackBreadcrumb';
 import {
-  TimelineScrubber,
   PeerScrubber,
   SiblingScrubber,
+  TimelineScrubber,
 } from './components/scrubbers';
+import {StackBreadcrumb} from './components/StackBreadcrumb';
+import {StackScrubber} from './components/StackScrubber';
+import {StackContextProvider} from './context';
+import {Container} from './styles';
 
 interface TraceScrubberProps {
   traceTreeFlat: TraceTreeFlat;
@@ -17,7 +17,7 @@ interface TraceScrubberProps {
   onCallSelect: (callId: string) => void;
 }
 
-export const TraceScrubber: React.FC<TraceScrubberProps> = (props) => {
+export const TraceScrubber: React.FC<TraceScrubberProps> = props => {
   return (
     <StackContextProvider traceTreeFlat={props.traceTreeFlat}>
       <Container>
@@ -29,4 +29,4 @@ export const TraceScrubber: React.FC<TraceScrubberProps> = (props) => {
       </Container>
     </StackContextProvider>
   );
-}; 
+};

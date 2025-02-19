@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 
 export const Container = styled.div`
-  border-top: 1px solid #E2E8F0;
+  border-top: 1px solid #e2e8f0;
   padding: 8px 16px;
 `;
 
@@ -19,14 +19,14 @@ export const ScrubberRow = styled.div`
 export const Label = styled.div`
   width: 80px;
   font-size: 12px;
-  color: #64748B;
+  color: #64748b;
   flex-shrink: 0;
 `;
 
 export const CountIndicator = styled.div`
   width: 60px;
   font-size: 12px;
-  color: #64748B;
+  color: #64748b;
   flex-shrink: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -49,10 +49,10 @@ export const RangeInput = styled.input<RangeInputProps>`
   height: 8px;
   background: linear-gradient(
     to right,
-    #3B82F6 0%,
-    #3B82F6 ${props => props.$progress}%,
-    #E2E8F0 ${props => props.$progress}%,
-    #E2E8F0 100%
+    #3b82f6 0%,
+    #3b82f6 ${props => props.$progress}%,
+    #e2e8f0 ${props => props.$progress}%,
+    #e2e8f0 100%
   );
   border-radius: 4px;
   cursor: pointer;
@@ -69,7 +69,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3B82F6;
+    background: #3b82f6;
     border: 2px solid white;
     margin-top: -4px;
     transition: transform 0.1s;
@@ -90,7 +90,7 @@ export const RangeInput = styled.input<RangeInputProps>`
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3B82F6;
+    background: #3b82f6;
     border: 2px solid white;
     transition: transform 0.1s;
   }
@@ -117,7 +117,7 @@ export const TooltipContent = styled.div`
   left: 0;
   margin-bottom: 8px;
   padding: 8px 12px;
-  background: #1E293B;
+  background: #1e293b;
   color: white;
   border-radius: 6px;
   font-size: 12px;
@@ -138,7 +138,7 @@ export const TooltipContent = styled.div`
     top: 100%;
     left: 16px;
     border: 6px solid transparent;
-    border-top-color: #1E293B;
+    border-top-color: #1e293b;
   }
 `;
 
@@ -151,18 +151,18 @@ export const BreadcrumbContainer = styled.div`
   overflow-x: auto;
   white-space: nowrap;
   font-size: 11px;
-  color: #64748B;
+  color: #64748b;
 
   &::-webkit-scrollbar {
     height: 2px;
   }
 
   &::-webkit-scrollbar-track {
-    background: #F1F5F9;
+    background: #f1f5f9;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
+    background: #cbd5e1;
     border-radius: 1px;
   }
 `;
@@ -170,20 +170,20 @@ export const BreadcrumbContainer = styled.div`
 export const BreadcrumbItem = styled.button<{$active?: boolean}>`
   padding: 2px 6px;
   border-radius: 4px;
-  background: ${props => props.$active ? '#E2E8F0' : 'transparent'};
-  color: ${props => props.$active ? '#1E293B' : '#64748B'};
-  font-weight: ${props => props.$active ? '500' : '400'};
+  background: ${props => (props.$active ? '#E2E8F0' : 'transparent')};
+  color: ${props => (props.$active ? '#1E293B' : '#64748B')};
+  font-weight: ${props => (props.$active ? '500' : '400')};
   cursor: pointer;
   border: none;
   transition: all 0.1s;
 
   &:hover {
-    background: #F1F5F9;
-    color: #1E293B;
+    background: #f1f5f9;
+    color: #1e293b;
   }
 `;
 
 export const BreadcrumbSeparator = styled.span`
-  color: #94A3B8;
+  color: #94a3b8;
   user-select: none;
-`; 
+`;

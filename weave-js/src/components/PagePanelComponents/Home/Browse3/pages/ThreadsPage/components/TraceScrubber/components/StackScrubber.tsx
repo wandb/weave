@@ -1,21 +1,21 @@
 import React from 'react';
 
-import {BaseScrubberProps} from '../types';
 import {useStackContext} from '../context';
 import {
+  CountIndicator,
+  Label,
+  RangeInput,
+  ScrubberContent,
   ScrubberRow,
   TooltipContainer,
-  Label,
   TooltipContent,
-  ScrubberContent,
-  RangeInput,
-  CountIndicator,
 } from '../styles';
+import {BaseScrubberProps} from '../types';
 
-export const StackScrubber: React.FC<BaseScrubberProps> = (props) => {
+export const StackScrubber: React.FC<BaseScrubberProps> = props => {
   const {selectedCallId} = props;
   const {stackState, setStackState, buildStackForCall} = useStackContext();
-  
+
   React.useEffect(() => {
     if (!selectedCallId) {
       setStackState(null);
@@ -36,7 +36,9 @@ export const StackScrubber: React.FC<BaseScrubberProps> = (props) => {
     <ScrubberRow>
       <TooltipContainer>
         <Label>Stack</Label>
-        <TooltipContent>Navigate up and down the call stack from root to the selected call</TooltipContent>
+        <TooltipContent>
+          Navigate up and down the call stack from root to the selected call
+        </TooltipContent>
       </TooltipContainer>
       <ScrubberContent>
         <RangeInput
@@ -44,7 +46,7 @@ export const StackScrubber: React.FC<BaseScrubberProps> = (props) => {
           min={0}
           max={Math.max(0, (stackState?.stack.length || 1) - 1)}
           value={stackState?.stack.indexOf(selectedCallId || '') || 0}
-          onChange={(e) => {
+          onChange={e => {
             const index = Math.min(
               (stackState?.stack.length || 1) - 1,
               Math.max(0, Math.floor(Number(e.target.value)))
@@ -53,17 +55,23 @@ export const StackScrubber: React.FC<BaseScrubberProps> = (props) => {
               props.onCallSelect(stackState.stack[index]);
             }
           }}
-          $progress={stackState?.stack.length ? 
-            ((stackState.stack.indexOf(selectedCallId || '') || 0) / (stackState.stack.length - 1)) * 100 
-            : 0}
+          $progress={
+            stackState?.stack.length
+              ? ((stackState.stack.indexOf(selectedCallId || '') || 0) /
+                  (stackState.stack.length - 1)) *
+                100
+              : 0
+          }
           disabled={!stackState?.stack.length || stackState.stack.length <= 1}
         />
         <CountIndicator>
-          {stackState?.stack.length ? 
-            `${(stackState.stack.indexOf(selectedCallId || '') || 0) + 1}/${stackState.stack.length}` 
+          {stackState?.stack.length
+            ? `${(stackState.stack.indexOf(selectedCallId || '') || 0) + 1}/${
+                stackState.stack.length
+              }`
             : '0/0'}
         </CountIndicator>
       </ScrubberContent>
     </ScrubberRow>
   );
-}; 
+};

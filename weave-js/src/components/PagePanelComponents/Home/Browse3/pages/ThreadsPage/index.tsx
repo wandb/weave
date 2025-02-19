@@ -219,7 +219,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
     const TraceViewComponent = getTraceView(traceViewId).component;
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex h-full flex-col">
         <div className="flex-1 overflow-hidden">
           <TraceViewComponent
             traceTreeFlat={traceTreeFlat}
