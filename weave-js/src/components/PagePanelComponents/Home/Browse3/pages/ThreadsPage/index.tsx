@@ -5,7 +5,7 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {CallDetailSection} from './components/CallDetailSection';
-import {TraceScrubber} from './components/TraceScrubber';
+import {TraceScrubber} from './components/TraceScrubber/index';
 import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
 import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
