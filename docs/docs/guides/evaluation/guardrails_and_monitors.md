@@ -13,6 +13,15 @@ Building production LLM applications? Two questions likely keep you up at night:
 
 Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
 
+## Quick Navigation
+
+Choose your implementation path:
+- 🛡️ [Implementing Guardrails](./guardrails.md) - For active safety controls
+- 📊 [Implementing Monitors](./monitors.md) - For passive quality tracking
+- 🔍 [Available Scorers](./scorers.md) - Ready-to-use evaluation components
+
+## Foundation
+
 The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - a component that evaluates your function's inputs and outputs to measure quality, safety, or any other metric you care about. Scorers are versatile and can be used in two ways:
 
 - **As Guardrails**: Block or modify unsafe content before it reaches users

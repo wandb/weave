@@ -10,6 +10,20 @@ Before implementing monitors, make sure you understand:
 - [Real-time evaluation concepts](./guardrails_and_monitors.md)
 :::
 
+## When to Use Monitors
+
+Monitors are ideal for scenarios where you need:
+
+| Requirement | Example Use Case |
+|------------|-----------------|
+| Quality Tracking | Measuring output coherence and relevance over time |
+| Performance Analysis | Tracking latency and resource usage patterns |
+| Model Drift Detection | Identifying changes in model behavior |
+| A/B Testing | Comparing different model versions or configurations |
+
+:::tip Cost Optimization
+Since monitors run asynchronously and can be sampled, they're perfect for comprehensive evaluation without impacting performance. Consider using [guardrails](./guardrails.md) if you need to block unsafe content in real-time.
+:::
 
 ## Using Scorers as Monitors
 

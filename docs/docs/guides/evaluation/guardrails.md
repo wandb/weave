@@ -10,6 +10,20 @@ Before implementing guardrails, make sure you understand:
 - [Real-time evaluation concepts](./guardrails_and_monitors.md)
 :::
 
+## When to Use Guardrails
+
+Guardrails are best suited for scenarios where you need:
+
+| Requirement | Example Use Case |
+|------------|-----------------|
+| Real-time Safety | Blocking toxic or harmful content before it reaches users |
+| Content Validation | Ensuring generated code is syntactically valid |
+| Data Privacy | Preventing exposure of sensitive information |
+| Format Enforcement | Guaranteeing output follows specific structure (JSON, XML, etc.) |
+
+:::tip Performance Impact
+Since guardrails run synchronously before returning results, they directly impact response time. Consider using [monitors](./monitors.md) instead if real-time intervention isn't required.
+:::
 
 ## Using Scorers as Guardrails
 
