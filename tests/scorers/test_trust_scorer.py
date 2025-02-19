@@ -8,11 +8,16 @@ from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.utils import WeaveScorerResult
 
 
-# Dummy scorer to test _filter_inputs_for_scorer functionality.
-class DummyScorer(weave.Scorer):
-    @weave.op
-    def score(self, output: str, query: str):
-        return WeaveScorerResult(passed=True, metadata={"dummy": True, "score": 1})
+@pytest.fixture
+def dummy_scorer():
+    "Dummy scorer to test _filter_inputs_for_scorer functionality."
+
+    class DummyScorer(weave.Scorer):
+        @weave.op
+        def score(self, output: str, query: str):
+            return WeaveScorerResult(passed=True, metadata={"dummy": True, "score": 1})
+
+    return DummyScorer()
 
 
 @pytest.fixture
@@ -44,14 +49,13 @@ def test_preprocess_text(trust_scorer):
     assert processed == expected
 
 
-def test_filter_inputs_for_scorer(trust_scorer):
-    dummy = DummyScorer()
+def test_filter_inputs_for_scorer(trust_scorer, dummy_scorer):
     inputs = {
         "output": "test_output",
         "query": "test_query",
         "extra": "should_be_filtered",
     }
-    filtered = trust_scorer._filter_inputs_for_scorer(dummy, inputs)
+    filtered = trust_scorer._filter_inputs_for_scorer(dummy_scorer, inputs)
     assert "output" in filtered
     assert "query" in filtered
     assert "extra" not in filtered
