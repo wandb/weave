@@ -88,10 +88,11 @@ export const CustomGridTreeDataGroupingCell: FC<
   ) : null;
 
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
+  const isHiddenChildrenCount = id === 'HIDDEN_CHILDREN_COUNT';
 
   const box = (
     <CursorBox
-      $isClickable={!isHiddenCount}
+      $isClickable={!isHiddenCount && !isHiddenChildrenCount}
       sx={{
         height: '100%',
         display: 'flex',
@@ -180,6 +181,8 @@ export const CustomGridTreeDataGroupingCell: FC<
       <CallOrCountRow>
         {isHiddenCount ? (
           <Box>{row.count.toLocaleString()} hidden calls</Box>
+        ) : isHiddenChildrenCount ? (
+          <Box>{row.count.toLocaleString()} hidden child calls</Box>
         ) : call != null ? (
           <>
             <Box

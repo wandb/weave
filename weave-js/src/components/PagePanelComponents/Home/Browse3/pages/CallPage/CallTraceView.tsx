@@ -27,6 +27,8 @@ const CallTrace = styled.div`
 `;
 CallTrace.displayName = 'S.CallTrace';
 
+const MAX_CHILDREN_TO_SHOW = 100;
+
 export const CallTraceView: FC<{
   call: CallSchema;
   selectedCall: CallSchema;
@@ -85,6 +87,7 @@ export const CallTraceView: FC<{
   // call. Effectively this looks like expanding the clicked call.
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
+      console.time('onRowClick');
       if (!params.row.call) {
         return;
       }
@@ -124,6 +127,7 @@ export const CallTraceView: FC<{
         isParentRow: params.row.isParentRow,
         heirarchyDepth: params.row.hierarchy.length,
       });
+      console.timeEnd('onRowClick');
     },
     [
       call.callId,
@@ -156,7 +160,14 @@ export const CallTraceView: FC<{
   // we expand the groups for the current call.
   const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] =
     useCallback(
-      node => expandKeys.has(node.groupingKey?.toString() ?? 'INVALID'),
+      node => {
+        console.time('isGroupExpandedByDefault');
+        const result = expandKeys.has(
+          node.groupingKey?.toString() ?? 'INVALID'
+        );
+        console.timeEnd('isGroupExpandedByDefault');
+        return result;
+      },
       [expandKeys]
     );
 
@@ -321,12 +332,18 @@ type CallRow = {
   isTraceRootCall: boolean;
   isParentRow?: boolean;
 };
-type CountRow = {
+type SiblingCountRow = {
   id: 'HIDDEN_SIBLING_COUNT';
   count: number;
   hierarchy: string[];
 };
-type Row = CallRow | CountRow;
+type HiddenChildrenCountRow = {
+  id: 'HIDDEN_CHILDREN_COUNT';
+  count: number;
+  hierarchy: string[];
+  parentId: string;
+};
+type Row = CallRow | SiblingCountRow | HiddenChildrenCountRow;
 
 type CallMap = Record<string, CallSchema>;
 type ChildCallLookup = Record<string, string[]>;
@@ -380,13 +397,13 @@ export const useCallFlattenedTraceTree = (
     undefined,
     columns,
     undefined,
-    // Refetch the trace tree on delete or rename
     {refetchOnDelete: true}
   );
-  const traceCallsResult = useMemo(
-    () => traceCalls.result ?? [],
-    [traceCalls.result]
-  );
+
+  const traceCallsResult = useMemo(() => {
+    const result = traceCalls.result ?? [];
+    return result;
+  }, [traceCalls.result]);
 
   const costFilter: CallFilter = useMemo(
     () => ({
@@ -534,13 +551,83 @@ export const useCallFlattenedTraceTree = (
         childIds.map(c => traceCallMap[c]).filter(c => c),
         [getCallSortExampleRow, getCallSortStartTime]
       );
-      childCalls.forEach(c =>
-        queue.push({
-          targetCall: c,
-          parentHierarchy: newHierarchy,
-          path: newPath,
-        })
-      );
+
+      // Add hidden children count row if needed
+      if (childCalls.length > MAX_CHILDREN_TO_SHOW) {
+        const visibleChildren = childCalls.slice(0, MAX_CHILDREN_TO_SHOW);
+        const hiddenCount = childCalls.length - MAX_CHILDREN_TO_SHOW;
+
+        // First add all visible children to queue
+        visibleChildren.forEach(c =>
+          queue.push({
+            targetCall: c,
+            parentHierarchy: newHierarchy,
+            path: newPath,
+          })
+        );
+
+        // Process all children in the queue that belong to this parent
+        const childrenToProcess = queue.filter(
+          item =>
+            item.parentHierarchy[item.parentHierarchy.length - 1] ===
+            targetCall.callId
+        );
+
+        // Remove these children from the main queue
+        queue.splice(0, childrenToProcess.length);
+
+        // Process the children
+        for (const next of childrenToProcess) {
+          const {
+            targetCall: childCall,
+            parentHierarchy: childHierarchy,
+            path: childPath,
+          } = next;
+          const childIdx = getIndexWithinSameNameSiblings(
+            childCall,
+            traceCallMap,
+            childCallLookup
+          );
+          const childNewPath = updatePath(
+            childPath,
+            childCall.spanName,
+            childIdx
+          );
+          const childSimilarity = scorePathSimilarity(
+            childNewPath,
+            selectedPath ?? ''
+          );
+          if (childSimilarity < selectedCallSimilarity) {
+            selectedCall = childCall;
+            selectedCallSimilarity = childSimilarity;
+          }
+          rows.push({
+            id: childCall.callId,
+            call: childCall,
+            status: childCall.rawSpan.status_code,
+            hierarchy: [...childHierarchy, childCall.callId],
+            path: childNewPath,
+            isTraceRootCall: childCall.callId === lastCall.callId,
+          });
+        }
+
+        // Finally add the hidden children count row
+        rows.push({
+          id: 'HIDDEN_CHILDREN_COUNT',
+          count: hiddenCount,
+          hierarchy: [...newHierarchy, 'HIDDEN_CHILDREN_COUNT'],
+          parentId: targetCall.callId,
+        });
+      } else {
+        // Add all children to queue if under limit
+        childCalls.forEach(c =>
+          queue.push({
+            targetCall: c,
+            parentHierarchy: newHierarchy,
+            path: newPath,
+          })
+        );
+      }
     }
 
     if (parentCall) {
@@ -587,7 +674,7 @@ export const useCallFlattenedTraceTree = (
       selectedCall = mainCall;
     }
 
-    // Epand the path to the selected call.
+    // Expand the path to the selected call.
     const expandKeys = new Set<string>();
     let callToExpand: CallSchema | null = selectedCall;
     while (callToExpand != null) {
