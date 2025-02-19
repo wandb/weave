@@ -80,7 +80,7 @@ async def predict(input: str, thread_id: str) -> str:
     ]
 
     client = openai.OpenAI()
-    max_steps = 5  # Maximum number of steps to prevent infinite loops
+    max_steps = 10  # Maximum number of steps to prevent infinite loops
     current_step = 0
     final_response = None
 
