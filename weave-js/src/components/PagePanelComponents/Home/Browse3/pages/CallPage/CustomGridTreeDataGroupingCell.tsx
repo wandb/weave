@@ -87,8 +87,9 @@ export const CustomGridTreeDataGroupingCell: FC<
     <IconParentBackUp color={MOON_500} width={18} height={18} />
   ) : null;
 
-  const isHiddenCount =
-    id === 'HIDDEN_SIBLING_COUNT' || id === 'HIDDEN_CHILDREN_COUNT';
+  const isHiddenChildCount =
+    typeof id === 'string' && id.endsWith('_HIDDEN_CHILDREN_COUNT');
+  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT' || isHiddenChildCount;
 
   const box = (
     <CursorBox
