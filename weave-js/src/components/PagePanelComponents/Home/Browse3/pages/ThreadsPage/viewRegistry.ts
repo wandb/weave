@@ -3,10 +3,11 @@ import {FC} from 'react';
 import {IconName} from '../../../../../Icon';
 import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
 import {
-  TraceListView,
-  TraceTableView,
-  TraceTimelineView,
-  TraceTreeView,
+  FlameGraphView,
+  ListView,
+  TableView,
+  TimelineView,
+  TreeView,
 } from './components/TraceViews';
 import {ThreadViewProps, TraceViewProps} from './types';
 
@@ -51,25 +52,31 @@ export const traceViews: TraceViewRegistry = [
     id: 'list',
     label: 'List',
     icon: 'list',
-    component: TraceListView,
+    component: ListView,
   },
   {
     id: 'timeline',
     label: 'Timeline',
     icon: 'chart-horizontal-bars',
-    component: TraceTimelineView,
+    component: TimelineView,
   },
   {
     id: 'tree',
     label: 'Tree',
     icon: 'miller-columns',
-    component: TraceTreeView,
+    component: TreeView,
   },
   {
     id: 'table',
     label: 'Table',
     icon: 'table',
-    component: TraceTableView,
+    component: TableView,
+  },
+  {
+    id: 'flamegraph',
+    label: 'Flame Graph',
+    icon: 'flash-bolt',
+    component: FlameGraphView,
   },
 ];
 
