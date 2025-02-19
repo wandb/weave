@@ -137,7 +137,7 @@ export const usePlaygroundState = () => {
           newState.responseFormat = inputs.response_format.type;
         }
         for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
-          if (inputs[value.pythonValue]) {
+          if (inputs[value.pythonValue] !== undefined) {
             const parsedValue = value.parseFn(inputs[value.pythonValue]);
             newState[key as NumericPlaygroundStateKey] = isNaN(parsedValue)
               ? DEFAULT_PLAYGROUND_STATE[key as NumericPlaygroundStateKey]
