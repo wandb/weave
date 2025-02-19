@@ -3,6 +3,7 @@ import React from 'react';
 import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
+import {DateTimeView} from './datetime.datetime/DateTimeView';
 
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;
@@ -41,6 +42,9 @@ const customWeaveTypeRegistry: {
   },
   'wave.Wave_read': {
     component: AudioPlayer,
+  },
+  'datetime.datetime': {
+    component: DateTimeView,
   },
 };
 
