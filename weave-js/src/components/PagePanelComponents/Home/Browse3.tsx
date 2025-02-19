@@ -80,6 +80,7 @@ import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
+import {ThreadsPage} from './Browse3/pages/ThreadsPage/ThreadsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
@@ -470,6 +471,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/compare`}>
           <ComparePageBinding />
+        </Route>
+        <Route path={`${projectRoot}/threads`}>
+          <ThreadsPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -969,6 +973,18 @@ const ComparePageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <ComparePage entity={params.entity} project={params.project} />;
+};
+
+const ThreadsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return (
+    <ThreadsPage
+      entity={params.entity}
+      project={params.project}
+      threadId={params.itemName}
+    />
+  );
 };
 
 const PlaygroundPageBinding = () => {

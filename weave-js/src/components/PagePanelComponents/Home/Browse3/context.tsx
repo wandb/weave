@@ -493,6 +493,15 @@ export const browse3ContextGen = (
         .join('&');
       return `${projectRoot(entityName, projectName)}/compare?${params}`;
     },
+    threadsUIUrl: (
+      entityName: string,
+      projectName: string,
+      threadId?: string
+    ) => {
+      return `${projectRoot(entityName, projectName)}/threads${
+        threadId ? `/${threadId}` : ''
+      }`;
+    },
   };
   return browse3Context;
 };
