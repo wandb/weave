@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Guardrails and Monitors
+# Online Evaluation: Guardrails and Monitors
 
 ![Feedback](./../../../static/img/guardrails_scorers.png)
 
@@ -100,7 +100,7 @@ result, call = generate_text.call("Say hello")
 await call.apply_scorer(LengthScorer())
 ```
 
-## Using Scorers as Guardrails
+## Using Scorers as Guardrails {#using-scorers-as-guardrails}
 
 Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
 
@@ -146,7 +146,7 @@ When applying scorers:
 - You can view scorer results in the UI or query them via the API
 :::
 
-## Using Scorers as Monitors
+## Using Scorers as Monitors {#using-scorers-as-monitors}
 
 Monitors help track quality metrics over time without blocking operations. This is useful for:
 - Identifying quality trends

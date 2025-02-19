@@ -325,7 +325,10 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
-        self.select_fields.append(get_field_by_name(field))
+        name = get_field_by_name(field)
+        if name in self.select_fields:
+            return self
+        self.select_fields.append(name)
         return self
 
     def add_condition(self, operand: "tsi_query.Operand") -> "CallsQuery":

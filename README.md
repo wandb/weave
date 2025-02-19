@@ -24,7 +24,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ## Documentation
 
-Our documentation site can be found [here](https://wandb.me/weave)
+Our documentation site can be found [here](https://wandb.me/weave).
 
 ## Installation
 ```
