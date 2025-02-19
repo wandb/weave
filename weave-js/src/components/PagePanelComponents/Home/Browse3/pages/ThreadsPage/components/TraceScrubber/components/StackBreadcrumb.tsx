@@ -7,6 +7,7 @@ import {
   BreadcrumbSeparator,
 } from '../styles';
 import {BaseScrubberProps} from '../types';
+import { getCallDisplayName } from '../../TraceViews/utils';
 
 export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   traceTreeFlat,
@@ -19,13 +20,13 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
     return null;
   }
 
-  const stack = stackState.stack.map(id => ({
-    id,
-    name:
-      traceTreeFlat[id]?.call.display_name ||
-      traceTreeFlat[id]?.call.op_name.split('/').pop() ||
+  const stack = stackState.stack.map(id => {
+    const call = traceTreeFlat[id]?.call;
+    return {
       id,
-  }));
+      name: call ? getCallDisplayName(call) : id,
+    };
+  });
 
   if (stack.length <= 1) {
     return null;
@@ -35,7 +36,7 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
     <BreadcrumbContainer>
       {stack.map((node, index) => (
         <React.Fragment key={node.id}>
-          {index > 0 && <BreadcrumbSeparator>/</BreadcrumbSeparator>}
+          {index > 0 && <BreadcrumbSeparator>{'/'}</BreadcrumbSeparator>}
           <BreadcrumbItem
             $active={node.id === selectedCallId}
             onClick={() => onCallSelect(node.id)}

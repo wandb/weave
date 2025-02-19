@@ -143,15 +143,16 @@ export const TooltipContent = styled.div`
 `;
 
 export const BreadcrumbContainer = styled.div`
-  margin-top: 8px;
-  padding: 4px 0;
+  padding: 4px 8px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   overflow-x: auto;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
   color: #64748b;
+  min-height: 32px;
+  border-radius: 6px;
 
   &::-webkit-scrollbar {
     height: 2px;
@@ -168,22 +169,48 @@ export const BreadcrumbContainer = styled.div`
 `;
 
 export const BreadcrumbItem = styled.button<{$active?: boolean}>`
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 0px 4px !important;
+  border-radius: 4px !important;
   background: ${props => (props.$active ? '#E2E8F0' : 'transparent')};
-  color: ${props => (props.$active ? '#1E293B' : '#64748B')};
+  color: ${props => (props.$active ? '#0F172A' : '#64748B')};
   font-weight: ${props => (props.$active ? '500' : '400')};
   cursor: pointer;
   border: none;
-  transition: all 0.1s;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+  position: relative;
 
   &:hover {
-    background: #f1f5f9;
-    color: #1e293b;
+    background: ${props => (props.$active ? '#E2E8F0' : '#F1F5F9')};
+    color: #0F172A;
   }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  ${props =>
+    props.$active &&
+    `
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 4px;
+      right: 4px;
+      height: 2px;
+      background: #3B82F6;
+      border-radius: 1px;
+    }
+  `}
 `;
 
 export const BreadcrumbSeparator = styled.span`
   color: #94a3b8;
   user-select: none;
+  font-size: 14px;
+  margin: 0 -2px;
+  opacity: 0.6;
 `;
