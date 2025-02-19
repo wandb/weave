@@ -152,6 +152,53 @@ const TooltipContent = styled.div`
   }
 `;
 
+// Add new styled components for breadcrumbs
+const BreadcrumbContainer = styled.div`
+  margin-top: 8px;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #64748B;
+
+  &::-webkit-scrollbar {
+    height: 2px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #F1F5F9;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 1px;
+  }
+`;
+
+const BreadcrumbItem = styled.button<{$active?: boolean}>`
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: ${props => props.$active ? '#E2E8F0' : 'transparent'};
+  color: ${props => props.$active ? '#1E293B' : '#64748B'};
+  font-weight: ${props => props.$active ? '500' : '400'};
+  cursor: pointer;
+  border: none;
+  transition: all 0.1s;
+
+  &:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+  }
+`;
+
+const BreadcrumbSeparator = styled.span`
+  color: #94A3B8;
+  user-select: none;
+`;
+
 // Common types and utilities
 interface BaseScrubberProps {
   traceTreeFlat: TraceTreeFlat;
@@ -165,6 +212,77 @@ interface ScrubberConfig {
   getNodes: (props: BaseScrubberProps) => string[];
   alwaysEnabled?: boolean;
 }
+
+// Add Stack Context
+interface StackState {
+  stack: string[];
+  originalCallId: string | null;
+}
+
+interface StackContextType {
+  stackState: StackState | null;
+  setStackState: (state: StackState | null) => void;
+  buildStackForCall: (callId: string) => string[];
+}
+
+const StackContext = React.createContext<StackContextType | null>(null);
+
+const useStackContext = () => {
+  const context = React.useContext(StackContext);
+  if (!context) {
+    throw new Error('useStackContext must be used within a StackContextProvider');
+  }
+  return context;
+};
+
+// Create a provider component
+const StackContextProvider: React.FC<{
+  children: React.ReactNode;
+  traceTreeFlat: TraceTreeFlat;
+}> = ({children, traceTreeFlat}) => {
+  const [stackState, setStackState] = React.useState<StackState | null>(null);
+
+  const buildStackForCall = React.useCallback((callId: string) => {
+    const stack: string[] = [];
+    let currentId = callId;
+    
+    // Build stack up to root
+    while (currentId) {
+      stack.unshift(currentId);
+      const node = traceTreeFlat[currentId];
+      if (!node) break;
+      currentId = node.parentId || '';
+    }
+
+    // Build stack down to leaves
+    currentId = callId;
+    while (currentId) {
+      const node = traceTreeFlat[currentId];
+      if (!node || node.childrenIds.length === 0) break;
+      // Take the first child in chronological order
+      const nextId = [...node.childrenIds].sort((a, b) => 
+        Date.parse(traceTreeFlat[a].call.started_at) - 
+        Date.parse(traceTreeFlat[b].call.started_at)
+      )[0];
+      stack.push(nextId);
+      currentId = nextId;
+    }
+
+    return stack;
+  }, [traceTreeFlat]);
+
+  const value = React.useMemo(() => ({
+    stackState,
+    setStackState,
+    buildStackForCall,
+  }), [stackState, buildStackForCall]);
+
+  return (
+    <StackContext.Provider value={value}>
+      {children}
+    </StackContext.Provider>
+  );
+};
 
 // Modify the createScrubber to support maintaining state
 const createScrubber = ({label, description, getNodes, alwaysEnabled}: ScrubberConfig) => {
@@ -319,20 +437,115 @@ const SiblingScrubber = createScrubber({
   },
 });
 
-// Simplify the StackScrubber to just return an empty array since logic is now in component
-const StackScrubber = createScrubber({
-  label: 'Stack',
-  description: 'Navigate up and down the call stack from root to the selected call',
-  getNodes: () => [], // Stack building is handled in the component
-});
+// Create a separate component for the stack scrubber to properly use hooks
+const StackScrubberContent: React.FC<BaseScrubberProps> = (props) => {
+  const {selectedCallId} = props;
+  const {stackState, setStackState, buildStackForCall} = useStackContext();
+  
+  React.useEffect(() => {
+    if (!selectedCallId) {
+      setStackState(null);
+      return;
+    }
 
+    // Only update stack state if we don't have one or if the selected call
+    // isn't in our current stack
+    if (!stackState || !stackState.stack.includes(selectedCallId)) {
+      setStackState({
+        originalCallId: selectedCallId,
+        stack: buildStackForCall(selectedCallId),
+      });
+    }
+  }, [selectedCallId, stackState, setStackState, buildStackForCall]);
+
+  return (
+    <ScrubberRow>
+      <TooltipContainer>
+        <Label>Stack</Label>
+        <TooltipContent>Navigate up and down the call stack from root to the selected call</TooltipContent>
+      </TooltipContainer>
+      <ScrubberContent>
+        <RangeInput
+          type="range"
+          min={0}
+          max={Math.max(0, (stackState?.stack.length || 1) - 1)}
+          value={stackState?.stack.indexOf(selectedCallId || '') || 0}
+          onChange={(e) => {
+            const index = Math.min(
+              (stackState?.stack.length || 1) - 1,
+              Math.max(0, Math.floor(Number(e.target.value)))
+            );
+            if (stackState?.stack[index]) {
+              props.onCallSelect(stackState.stack[index]);
+            }
+          }}
+          $progress={stackState?.stack.length ? 
+            ((stackState.stack.indexOf(selectedCallId || '') || 0) / (stackState.stack.length - 1)) * 100 
+            : 0}
+          disabled={!stackState?.stack.length || stackState.stack.length <= 1}
+        />
+        <CountIndicator>
+          {stackState?.stack.length ? 
+            `${(stackState.stack.indexOf(selectedCallId || '') || 0) + 1}/${stackState.stack.length}` 
+            : '0/0'}
+        </CountIndicator>
+      </ScrubberContent>
+    </ScrubberRow>
+  );
+};
+
+// Simplify the StackScrubber to just render the content component
+const StackScrubber: React.FC<BaseScrubberProps> = (props) => {
+  return <StackScrubberContent {...props} />;
+};
+
+// Modify the StackBreadcrumb to use context
+const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
+  traceTreeFlat,
+  selectedCallId,
+  onCallSelect,
+}) => {
+  const {stackState} = useStackContext();
+  
+  if (!selectedCallId || !stackState) return null;
+
+  const stack = stackState.stack.map(id => ({
+    id,
+    name: traceTreeFlat[id]?.call.display_name || 
+          traceTreeFlat[id]?.call.op_name.split('/').pop() || 
+          id,
+  }));
+
+  if (stack.length <= 1) return null;
+
+  return (
+    <BreadcrumbContainer>
+      {stack.map((node, index) => (
+        <React.Fragment key={node.id}>
+          {index > 0 && <BreadcrumbSeparator>/</BreadcrumbSeparator>}
+          <BreadcrumbItem
+            $active={node.id === selectedCallId}
+            onClick={() => onCallSelect(node.id)}
+            title={node.name}>
+            {node.name}
+          </BreadcrumbItem>
+        </React.Fragment>
+      ))}
+    </BreadcrumbContainer>
+  );
+};
+
+// Modify the main TraceScrubber component to include the context provider
 export const TraceScrubber: React.FC<TraceScrubberProps> = (props) => {
   return (
-    <Container>
-      <TimelineScrubber {...props} />
-      <PeerScrubber {...props} />
-      <SiblingScrubber {...props} />
-      <StackScrubber {...props} />
-    </Container>
+    <StackContextProvider traceTreeFlat={props.traceTreeFlat}>
+      <Container>
+        <TimelineScrubber {...props} />
+        <PeerScrubber {...props} />
+        <SiblingScrubber {...props} />
+        <StackScrubber {...props} />
+        <StackBreadcrumb {...props} />
+      </Container>
+    </StackContextProvider>
   );
 }; 
