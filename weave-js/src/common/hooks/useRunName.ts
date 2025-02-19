@@ -15,17 +15,21 @@ export const useRunName = (runNode: Node | null) => {
 
   const emptyObject = constNodeUnsafe({type: 'dict', objectType: 'any'}, {});
 
-  const customRunNamesNode = runNode != null ?  opPick({
-    obj: isVoidNode(frame.customRunNames)
-      ? emptyObject
-      : frame.customRunNames,
-    key: opRunId({run: runNode}),
-  }) : constString('');
+  const customRunNamesNode =
+    runNode != null
+      ? opPick({
+          obj: isVoidNode(frame.customRunNames)
+            ? emptyObject
+            : frame.customRunNames,
+          key: opRunId({run: runNode}),
+        })
+      : constString('');
 
-  const displayNameNode = runNode != null ? opRunName({run: runNode}) : constString('');
+  const displayNameNode =
+    runNode != null ? opRunName({run: runNode}) : constString('');
 
-  const { result: customRunName } = useNodeValue(customRunNamesNode);
-  const { result: displayName } = useNodeValue(displayNameNode);
+  const customRunNameValue = useNodeValue(customRunNamesNode);
+  const displayNameValue = useNodeValue(displayNameNode);
 
-  return customRunName ?? displayName ?? '';
+  return customRunNameValue.result ?? displayNameValue.result ?? '';
 };
