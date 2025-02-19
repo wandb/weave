@@ -4,9 +4,6 @@ import {IconName} from '../../../../../Icon';
 import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
 import {
   FlameGraphView,
-  ListView,
-  TableView,
-  TimelineView,
   TreeView,
 } from './components/TraceViews';
 import {ThreadViewProps, TraceViewProps} from './types';
@@ -49,33 +46,15 @@ export const threadViews: ThreadViewRegistry = [
 /** Available trace visualization views */
 export const traceViews: TraceViewRegistry = [
   {
-    id: 'list',
-    label: 'List',
-    icon: 'list',
-    component: ListView,
-  },
-  {
-    id: 'timeline',
-    label: 'Timeline',
-    icon: 'chart-horizontal-bars',
-    component: TimelineView,
-  },
-  {
     id: 'tree',
     label: 'Tree',
-    icon: 'miller-columns',
+    icon: 'layout-tabs',
     component: TreeView,
-  },
-  {
-    id: 'table',
-    label: 'Table',
-    icon: 'table',
-    component: TableView,
   },
   {
     id: 'flamegraph',
     label: 'Flame Graph',
-    icon: 'flash-bolt',
+    icon: 'chart-horizontal-bars',
     component: FlameGraphView,
   },
 ];
