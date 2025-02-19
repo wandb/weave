@@ -29,7 +29,10 @@ import {
   opPick,
   opRunId,
   Stack,
+  taggedValue,
   Type,
+  typedDict,
+  union,
   varNode,
   voidNode,
   WeaveInterface,
@@ -1226,7 +1229,16 @@ const IndexCell: React.FC<{
       : constString('inherit');
 
   const colorNodeValue = LLReact.useNodeValue(colorNode);
-  const runNameNodeValue = useRunName(props.runNode);
+
+  const runNode =
+    props.runNode !== null
+      ? weave.callFunction(props.runNode, {
+          row: props.rowNode as any,
+        })
+      : null;
+
+  const runName = useRunName(runNode);
+
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
@@ -1235,7 +1247,6 @@ const IndexCell: React.FC<{
   } else {
     const isSelected =
       index.result != null && index.result === props.activeRowIndex;
-    const runName = runNameNodeValue.result ?? '';
     const basicIndexContent = (
       <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
     );
