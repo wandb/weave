@@ -5,6 +5,7 @@ import React, {Dispatch, SetStateAction} from 'react';
 type ShowMoreButtonProps = {
   isShowingMore: boolean;
   setIsShowingMore: Dispatch<SetStateAction<boolean>>;
+  isNested?: boolean;
   isUser?: boolean;
   isSystemPrompt?: boolean;
 };
@@ -12,6 +13,7 @@ type ShowMoreButtonProps = {
 export const ShowMoreButton = ({
   isShowingMore,
   setIsShowingMore,
+  isNested,
   isUser,
   isSystemPrompt,
 }: ShowMoreButtonProps) => {
@@ -23,7 +25,7 @@ export const ShowMoreButton = ({
           ${
             isUser
               ? 'from-[#f4fbe8]'
-              : isSystemPrompt
+              : isSystemPrompt || isNested
               ? 'from-[#f8f8f8]'
               : 'from-white'
           } 
