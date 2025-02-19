@@ -52,33 +52,55 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
       return null;
     }
 
-    // Helper function to build the flame graph tree
-    const buildFlameNode = (nodeId: string): FlameGraphNode => {
+    // Calculate total trace duration for scaling
+    const traceStartTime = Date.parse(rootNode.call.started_at);
+    const traceEndTime = Object.values(traceTreeFlat).reduce((maxEnd, node) => {
+      const endTime = node.call.ended_at ? Date.parse(node.call.ended_at) : Date.now();
+      return Math.max(maxEnd, endTime);
+    }, traceStartTime);
+    const totalDuration = traceEndTime - traceStartTime;
+
+    // Minimum width as a percentage of total duration (1%)
+    const MIN_WIDTH_PERCENT = 0.01;
+    const minDuration = totalDuration * MIN_WIDTH_PERCENT;
+
+    // Helper function to build the flame graph tree and return total duration
+    const buildFlameNode = (nodeId: string): [FlameGraphNode, number] => {
       const node = traceTreeFlat[nodeId];
       const call = node.call;
       const startTime = Date.parse(call.started_at);
       const endTime = call.ended_at ? Date.parse(call.ended_at) : Date.now();
-      const duration = endTime - startTime;
+      let duration = endTime - startTime;
 
-      const children = node.childrenIds.map(childId => buildFlameNode(childId));
+      // First, build children and get their total adjusted duration
+      const childResults = node.childrenIds.map(childId => buildFlameNode(childId));
+      const children = childResults.map(([node]) => node);
+      const childrenTotalDuration = childResults.reduce((sum, [_, dur]) => sum + dur, 0);
+
+      // Ensure our duration is at least the minimum and can contain our children
+      duration = Math.max(duration, minDuration, childrenTotalDuration);
+
       const opNameReal = parseSpanName(call.op_name);
       const isSelected = nodeId === selectedCallId;
 
-      return {
-        id: nodeId,
-        name: getCallDisplayName(call),
-        value: duration,
-        children: children.length > 0 ? children : undefined,
-        backgroundColor: isSelected ? '#0066FF' : getColorForOpName(opNameReal),
-        color: isSelected ? 'white' : undefined,
-        timing: {
-          start: startTime,
-          end: endTime,
+      return [
+        {
+          id: nodeId,
+          name: getCallDisplayName(call),
+          value: duration,
+          children: children.length > 0 ? children : undefined,
+          backgroundColor: isSelected ? '#0066FF' : getColorForOpName(opNameReal),
+          color: isSelected ? 'white' : undefined,
+          timing: {
+            start: startTime,
+            end: endTime,
+          },
         },
-      };
+        duration
+      ];
     };
 
-    return buildFlameNode(rootNode.id);
+    return buildFlameNode(rootNode.id)[0];
   }, [traceTreeFlat, selectedCallId]);
 
   if (!flameData) {
