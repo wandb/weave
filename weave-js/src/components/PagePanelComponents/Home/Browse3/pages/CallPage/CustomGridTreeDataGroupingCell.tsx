@@ -87,12 +87,12 @@ export const CustomGridTreeDataGroupingCell: FC<
     <IconParentBackUp color={MOON_500} width={18} height={18} />
   ) : null;
 
-  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
-  const isHiddenChildrenCount = id === 'HIDDEN_CHILDREN_COUNT';
+  const isHiddenCount =
+    id === 'HIDDEN_SIBLING_COUNT' || id === 'HIDDEN_CHILDREN_COUNT';
 
   const box = (
     <CursorBox
-      $isClickable={!isHiddenCount && !isHiddenChildrenCount}
+      $isClickable={!isHiddenCount}
       sx={{
         height: '100%',
         display: 'flex',
@@ -181,8 +181,6 @@ export const CustomGridTreeDataGroupingCell: FC<
       <CallOrCountRow>
         {isHiddenCount ? (
           <Box>{row.count.toLocaleString()} hidden calls</Box>
-        ) : isHiddenChildrenCount ? (
-          <Box>{row.count.toLocaleString()} hidden child calls</Box>
         ) : call != null ? (
           <>
             <Box

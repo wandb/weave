@@ -27,7 +27,7 @@ const CallTrace = styled.div`
 `;
 CallTrace.displayName = 'S.CallTrace';
 
-const MAX_CHILDREN_TO_SHOW = 100;
+const MAX_CHILDREN_TO_SHOW = 50;
 
 export const CallTraceView: FC<{
   call: CallSchema;
