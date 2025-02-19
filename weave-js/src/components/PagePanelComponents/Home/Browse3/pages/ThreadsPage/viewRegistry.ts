@@ -1,7 +1,7 @@
 import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
-import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
+import {ListView, TimelineView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {CodeView} from './components/TraceViews/CodeView';
 import {ThreadViewProps, TraceViewProps} from './types';
@@ -33,13 +33,13 @@ export const threadViews: ThreadViewRegistry = [
     id: 'list',
     label: 'List',
     icon: 'list',
-    component: ThreadListView,
+    component: ListView,
   },
   {
     id: 'timeline',
     label: 'Timeline',
     icon: 'chart-horizontal-bars',
-    component: ThreadTimelineView,
+    component: TimelineView,
   },
 ];
 
