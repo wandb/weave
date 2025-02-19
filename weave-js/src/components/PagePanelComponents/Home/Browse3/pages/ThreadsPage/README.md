@@ -1,96 +1,106 @@
 # ThreadsPage Component
 
-The ThreadsPage is a React component that provides a sophisticated interface for exploring and analyzing execution traces in a thread-based system. It implements a three-panel layout that allows users to navigate through threads, traces, and detailed call information.
+The ThreadsPage component provides a sophisticated interface for exploring and analyzing execution traces in a thread-based system. It implements a three-panel layout with advanced navigation and visualization features.
 
 ## Core Concepts
 
+### Data Model
 - **Thread**: A collection of related traces
 - **Trace**: A sequence of function calls that form an execution path
 - **Call**: An individual function execution with inputs, outputs, and metadata
 
-## Component Architecture
-
-The component is organized into several key files:
+### Component Architecture
 
 ```
 ThreadsPage/
 ├── README.md           # Documentation
 ├── index.tsx          # Main component composition
-├── types.ts           # TypeScript type definitions
+├── types.ts           # TypeScript interfaces and types
 ├── hooks.ts           # Data fetching and state management
-├── utils.ts           # Utility functions for data transformation
+├── utils.ts           # Utility functions and tree operations
 ├── viewRegistry.ts    # View system configuration
-└── components/        # Reusable UI components
-    ├── ThreadViews/   # Thread visualization components
-    │   ├── ListView.tsx
-    │   └── TimelineView.tsx
-    └── TraceViews/    # Trace visualization components
-        ├── TreeView.tsx      # Hierarchical tree visualization
-        ├── FlameGraphView.tsx # Performance flame graph
-        ├── utils.ts          # Shared view utilities
-        └── index.ts          # View exports
+└── components/        # UI Components
+    ├── TraceScrubber/ # Navigation controls
+    │   ├── components/
+    │   │   ├── BaseScrubber.tsx
+    │   │   ├── StackScrubber.tsx
+    │   │   ├── StackBreadcrumb.tsx
+    │   │   └── scrubbers.ts
+    │   ├── context.tsx
+    │   ├── styles.ts
+    │   └── types.ts
+    └── TraceViews/    # Visualization components
+        ├── FlameGraphView.tsx
+        ├── GraphView.tsx
+        ├── TreeView.tsx
+        ├── utils.ts
+        └── index.ts
 ```
 
-### Key Features
+## Features
 
-1. **Three-Panel Layout**
-   - Left Panel (30%): Thread selection and visualization
-   - Middle Panel (40%): Trace visualization
-   - Right Panel (30%): Call details and metadata
+### 1. Layout System
+- Three-panel layout with optimized proportions:
+  - Thread Panel (30%): Thread selection and management
+  - Trace Panel (40%): Trace visualization and navigation
+  - Detail Panel (30%): Call details and metadata
 
-2. **View System**
-   - Extensible view registry pattern
-   - Each panel supports multiple visualization types
-   - Easy to add new view types
-   - Currently supported views:
-     - Thread Views: List, Timeline
-     - Trace Views: Tree, Flame Graph
+### 2. Navigation System
+- **TraceScrubber**: Multi-mode navigation through traces
+  - Timeline: Chronological navigation
+  - Peers: Navigate calls with same operation
+  - Siblings: Navigate calls with same parent
+  - Stack: Navigate up/down call stack
+  - Visual breadcrumb trail for stack navigation
 
-3. **Selection Cascade Pattern**
-   - Hierarchical selection (Thread → Trace → Call)
-   - Clear separation of selection and loading states
-   - Automatic clearing of downstream selections
-   - Auto-selection of first items at each level
+### 3. Visualization System
+- Multiple view types for different analysis needs:
+  - Tree View: Hierarchical call structure
+  - Flame Graph: Duration-based visualization
+  - Graph View: Relationship visualization
+- Each view optimized for specific use cases
 
-4. **Data Loading**
-   - Progressive loading of data
-   - Comprehensive loading states
-   - Error handling at each level
+### 4. State Management
+- Hierarchical state management:
+  - Thread selection → Trace selection → Call selection
+- Context-based state sharing
+- Efficient data structures for trace representation
 
-### Core Mechanics
+### 5. Data Loading
+- Progressive data loading
+- Comprehensive loading states
+- Error handling at each level
+- Auto-selection of initial items
 
-1. **Selection Flow**
-   ```
-   Thread Selection
-   ├── Clears trace and call selections
-   ├── Loads traces for thread
-   │   └── Auto-selects first trace when loaded
-   │       ├── Clears call selection
-   │       ├── Loads calls for trace
-   │       └── Auto-selects root call when loaded
-   ```
+## Implementation Details
 
-2. **Data Fetching**
-   - `useThreadList`: Fetches available threads
-   - `useTracesForThread`: Fetches traces for selected thread
-   - `useBareTraceCalls`: Fetches calls for selected trace
+### Data Structures
+- `TraceTreeFlat`: Optimized flat representation of trace tree
+- `StackState`: Managed via React Context for navigation
+- View registries for extensible visualization system
 
-3. **View Management**
-   - Centralized view registry
-   - Each view type defines:
-     - Unique identifier
-     - Display label
-     - Icon
-     - Component implementation
+### Key Components
+1. **TraceScrubber**
+   - Factory-based scrubber creation
+   - Shared styling and behavior
+   - Context-based stack management
 
-4. **Layout Management**
-   - Fixed panel widths with internal scrolling
-   - Overflow handling with text truncation
-   - Responsive to window resizing
+2. **TraceViews**
+   - Pluggable visualization system
+   - Shared utilities for consistency
+   - Performance optimizations
 
-### Usage
+### Utilities
+- Tree building and traversal
+- Duration calculations and formatting
+- Display name generation
+- Call state management
+
+## Usage
 
 ```tsx
+import {ThreadsPage} from './ThreadsPage';
+
 <ThreadsPage
   entity="your-entity"
   project="your-project"
@@ -98,65 +108,71 @@ ThreadsPage/
 />
 ```
 
-### Adding New Views
+## Development
 
-To add a new view:
+### Adding New Features
 
-1. Create the view component in the appropriate directory:
+1. **New View Type**
    ```tsx
-   // TraceViews/MyNewView.tsx
-   import {TraceViewProps} from '../../types';
-   import {formatDuration, formatTimestamp} from './utils';
-
-   export const MyNewView: React.FC<TraceViewProps> = ({
-     traceTreeFlat,
-     selectedCallId,
-     onCallSelect,
-   }) => {
-     // Implementation
-   };
-   ```
-
-2. Add it to the view registry:
-   ```tsx
-   // viewRegistry.ts
-   export const traceViews: TraceViewRegistry = [
-     // ... existing views ...
+   // 1. Create component
+   const MyView: React.FC<TraceViewProps> = (props) => { ... };
+   
+   // 2. Add to registry
+   export const traceViews = [
+     ...,
      {
-       id: 'my-new-view',
-       label: 'My New View',
-       icon: 'some-icon',
-       component: MyNewView,
+       id: 'my-view',
+       label: 'My View',
+       icon: 'icon-name',
+       component: MyView,
      },
    ];
    ```
 
-3. Export it in the index file:
+2. **New Scrubber Type**
    ```tsx
-   // TraceViews/index.ts
-   export {MyNewView} from './MyNewView';
+   // Use the factory pattern
+   export const MyScrubber = createScrubber({
+     label: 'My Scrubber',
+     description: 'Description',
+     getNodes: (props) => [...],
+   });
    ```
 
-### Shared Utilities
+### Best Practices
 
-The `TraceViews/utils.ts` file provides common functions:
+1. **Performance**
+   - Use memoization for expensive calculations
+   - Implement virtualization for large lists
+   - Optimize tree operations
 
-- `getColorForOpName`: Generates consistent colors for operations
-- `formatDuration`: Human-readable duration formatting
-- `formatTimestamp`: Consistent timestamp formatting
+2. **State Management**
+   - Keep state close to where it's used
+   - Use context for shared state
+   - Implement proper cleanup
 
-### Performance Considerations
+3. **Error Handling**
+   - Handle all error cases
+   - Provide meaningful error messages
+   - Implement recovery strategies
 
-- Uses memoization for expensive computations
-- Implements virtualization for large lists
-- Manages component re-renders through proper state management
-- Uses efficient data structures for trace tree representation
+## Recent Improvements
 
-## Future Improvements
+1. ✅ Improved trace tree building with better typing
+2. ✅ Enhanced error handling in data fetching
+3. ✅ Added stack navigation with breadcrumb trail
+4. ✅ Implemented peer and sibling navigation
+5. ✅ Added tooltips and visual feedback
+6. ✅ Improved duration formatting
+7. ✅ Enhanced type safety and documentation
 
-Potential areas for enhancement:
-1. Enhanced tree visualization with collapsible nodes
-2. Improved flame graph interactions and tooltips
-3. Advanced filtering and search capabilities
-4. Performance optimizations for large trace sets
-5. Additional view types for specific use cases 
+## Planned Improvements
+
+1. [ ] Search functionality
+2. [ ] Advanced filtering options
+3. [ ] Keyboard navigation
+4. [ ] Performance optimizations for large traces
+5. [ ] Additional visualization types
+6. [ ] Export capabilities
+7. [ ] Accessibility improvements
+8. [ ] Test coverage expansion 
