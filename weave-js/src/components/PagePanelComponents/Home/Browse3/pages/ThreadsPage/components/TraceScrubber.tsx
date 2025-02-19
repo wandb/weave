@@ -115,6 +115,43 @@ const RangeInput = styled.input<RangeInputProps>`
   }
 `;
 
+const TooltipContainer = styled.div`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+`;
+
+const TooltipContent = styled.div`
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #1E293B;
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+
+  ${TooltipContainer}:hover & {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 16px;
+    border: 6px solid transparent;
+    border-top-color: #1E293B;
+  }
+`;
+
 // Common types and utilities
 interface BaseScrubberProps {
   traceTreeFlat: TraceTreeFlat;
@@ -124,12 +161,13 @@ interface BaseScrubberProps {
 
 interface ScrubberConfig {
   label: string;
+  description: string;
   getNodes: (props: BaseScrubberProps) => string[];
   alwaysEnabled?: boolean;
 }
 
 // Utility to create a scrubber component from a config
-const createScrubber = ({label, getNodes, alwaysEnabled}: ScrubberConfig) => {
+const createScrubber = ({label, description, getNodes, alwaysEnabled}: ScrubberConfig) => {
   const ScrubberComponent: React.FC<BaseScrubberProps> = (props) => {
     const {selectedCallId, onCallSelect} = props;
     
@@ -155,7 +193,10 @@ const createScrubber = ({label, getNodes, alwaysEnabled}: ScrubberConfig) => {
 
     return (
       <ScrubberRow>
-        <Label>{label}</Label>
+        <TooltipContainer>
+          <Label>{label}</Label>
+          <TooltipContent>{description}</TooltipContent>
+        </TooltipContainer>
         <ScrubberContent>
           <RangeInput
             type="range"
@@ -180,6 +221,7 @@ const createScrubber = ({label, getNodes, alwaysEnabled}: ScrubberConfig) => {
 // Scrubber implementations
 const TimelineScrubber = createScrubber({
   label: 'Timeline',
+  description: 'Navigate through all calls in chronological order',
   alwaysEnabled: true,
   getNodes: ({traceTreeFlat}) => 
     Object.values(traceTreeFlat)
@@ -189,6 +231,7 @@ const TimelineScrubber = createScrubber({
 
 const PeerScrubber = createScrubber({
   label: 'Peers',
+  description: 'Navigate through all calls with the same op as the selected call',
   getNodes: ({traceTreeFlat, selectedCallId}) => {
     if (!selectedCallId) return [];
     const currentNode = traceTreeFlat[selectedCallId];
@@ -203,6 +246,7 @@ const PeerScrubber = createScrubber({
 
 const SiblingScrubber = createScrubber({
   label: 'Siblings',
+  description: 'Navigate through calls that share the same parent as the selected call',
   getNodes: ({traceTreeFlat, selectedCallId}) => {
     if (!selectedCallId) return [];
     const currentNode = traceTreeFlat[selectedCallId];
@@ -222,6 +266,7 @@ const SiblingScrubber = createScrubber({
 
 const StackScrubber = createScrubber({
   label: 'Stack',
+  description: 'Navigate up and down the call stack from root to the selected call',
   getNodes: ({traceTreeFlat, selectedCallId}) => {
     if (!selectedCallId) return [];
     const stack: string[] = [];

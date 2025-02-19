@@ -18,7 +18,7 @@ export const ThreadListView: React.FC<ThreadViewProps> = ({
   }
   return (
     <div className="h-full overflow-hidden">
-      <div className="h-[100%] overflow-y-auto px-4">
+      <div className="h-[100%] overflow-y-auto p-4">
         <div className="flex flex-col gap-2">
           {traces.map(traceId => (
             <Button
@@ -51,7 +51,7 @@ export const ThreadTimelineView: React.FC<ThreadViewProps> = ({
   }
   return (
     <div className="h-full overflow-hidden">
-      <div className="h-[100%] overflow-y-auto px-4">
+      <div className="h-[100%] overflow-y-auto p-4">
         <div className="flex flex-col gap-2">
           {traces.map(traceId => (
             <Button
