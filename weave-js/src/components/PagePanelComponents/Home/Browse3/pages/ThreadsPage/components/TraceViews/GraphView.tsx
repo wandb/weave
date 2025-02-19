@@ -109,7 +109,7 @@ const Flow: React.FC<TraceViewProps> = ({
   onCallSelect,
 }) => {
   // Calculate initial layout once
-  const {nodes, edges} = useMemo(() => {
+  const {nodes: initialRawNodes, edges} = useMemo(() => {
     const initialNodes: Node[] = [];
     const initialEdges: Edge[] = [];
 
@@ -126,6 +126,7 @@ const Flow: React.FC<TraceViewProps> = ({
           label: getCallDisplayName(call),
           color: getColorForOpName(opName),
         },
+        selected: false,
       });
 
       // Create edges to children
@@ -142,6 +143,24 @@ const Flow: React.FC<TraceViewProps> = ({
     // Apply the dagre layout
     return getLayoutedElements(initialNodes, initialEdges);
   }, [traceTreeFlat]);
+
+  const [nodes, setNodes] = React.useState(initialRawNodes);
+
+  // Update nodes when selection changes, debounced to avoid excessive updates
+  // This timeout helps to prevent Reactflow from completely borking.
+  React.useEffect(() => {
+    const updateNodes = () => {
+      setNodes(currentNodes =>
+        currentNodes.map(node => ({
+          ...node,
+          selected: node.id === selectedCallId,
+        }))
+      );
+    };
+
+    const timeout = setTimeout(updateNodes, 0);
+    return () => clearTimeout(timeout);
+  }, [selectedCallId]);
 
   const {fitView} = useReactFlow();
 

@@ -18,11 +18,11 @@ interface TraceScrubberProps {
 
 export const TraceScrubber: React.FC<TraceScrubberProps> = props => {
   return (
-      <Container>
-        <TimelineScrubber {...props} />
-        <PeerScrubber {...props} />
-        <SiblingScrubber {...props} />
-        <StackScrubber {...props} />
-      </Container>
+    <Container>
+      <TimelineScrubber {...props} />
+      <PeerScrubber {...props} />
+      <SiblingScrubber {...props} />
+      <StackScrubber {...props} />
+    </Container>
   );
 };

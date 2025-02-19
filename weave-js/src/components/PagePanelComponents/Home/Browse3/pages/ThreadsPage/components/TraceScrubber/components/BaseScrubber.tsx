@@ -9,9 +9,9 @@ import {
   RangeInput,
   ScrubberContent,
   ScrubberRow,
+  SliderContainer,
   TooltipContainer,
   TooltipContent,
-  SliderContainer,
 } from '../styles';
 import {BaseScrubberProps, ScrubberConfig} from '../types';
 

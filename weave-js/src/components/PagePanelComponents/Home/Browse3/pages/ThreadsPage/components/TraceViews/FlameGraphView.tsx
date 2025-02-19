@@ -55,7 +55,9 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
     // Calculate total trace duration for scaling
     const traceStartTime = Date.parse(rootNode.call.started_at);
     const traceEndTime = Object.values(traceTreeFlat).reduce((maxEnd, node) => {
-      const endTime = node.call.ended_at ? Date.parse(node.call.ended_at) : Date.now();
+      const endTime = node.call.ended_at
+        ? Date.parse(node.call.ended_at)
+        : Date.now();
       return Math.max(maxEnd, endTime);
     }, traceStartTime);
     const totalDuration = traceEndTime - traceStartTime;
@@ -73,9 +75,14 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
       let duration = endTime - startTime;
 
       // First, build children and get their total adjusted duration
-      const childResults = node.childrenIds.map(childId => buildFlameNode(childId));
-      const children = childResults.map(([node]) => node);
-      const childrenTotalDuration = childResults.reduce((sum, [_, dur]) => sum + dur, 0);
+      const childResults = node.childrenIds.map(childId =>
+        buildFlameNode(childId)
+      );
+      const children = childResults.map(([innerNode]) => innerNode);
+      const childrenTotalDuration = childResults.reduce(
+        (sum, [_, dur]) => sum + dur,
+        0
+      );
 
       // Ensure our duration is at least the minimum and can contain our children
       duration = Math.max(duration, minDuration, childrenTotalDuration);
@@ -89,14 +96,16 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
           name: getCallDisplayName(call),
           value: duration,
           children: children.length > 0 ? children : undefined,
-          backgroundColor: isSelected ? '#0066FF' : getColorForOpName(opNameReal),
+          backgroundColor: isSelected
+            ? '#0066FF'
+            : getColorForOpName(opNameReal),
           color: isSelected ? 'white' : undefined,
           timing: {
             start: startTime,
             end: endTime,
           },
         },
-        duration
+        duration,
       ];
     };
 

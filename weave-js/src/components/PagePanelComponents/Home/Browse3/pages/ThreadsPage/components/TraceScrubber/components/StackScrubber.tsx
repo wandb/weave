@@ -38,11 +38,14 @@ export const StackScrubber: React.FC<BaseScrubberProps> = props => {
 
   const currentIndex = stackState?.stack.indexOf(selectedCallId || '') || 0;
   const stackLength = stackState?.stack.length || 0;
-  const progress = stackLength > 1 ? (currentIndex / (stackLength - 1)) * 100 : 0;
+  const progress =
+    stackLength > 1 ? (currentIndex / (stackLength - 1)) * 100 : 0;
 
   const moveStep = React.useCallback(
     (step: number) => {
-      if (!stackState?.stack) return;
+      if (!stackState?.stack) {
+        return;
+      }
       const newIndex = Math.min(
         stackState.stack.length - 1,
         Math.max(0, currentIndex + step)
@@ -56,7 +59,9 @@ export const StackScrubber: React.FC<BaseScrubberProps> = props => {
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!stackState?.stack) return;
+      if (!stackState?.stack) {
+        return;
+      }
       const index = Math.min(
         stackState.stack.length - 1,
         Math.max(0, Math.floor(Number(e.target.value)))

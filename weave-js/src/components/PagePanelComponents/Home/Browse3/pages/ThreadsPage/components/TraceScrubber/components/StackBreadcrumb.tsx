@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {getCallDisplayName} from '../../TraceViews/utils';
 import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,
@@ -7,7 +8,6 @@ import {
   BreadcrumbSeparator,
 } from '../styles';
 import {BaseScrubberProps} from '../types';
-import { getCallDisplayName } from '../../TraceViews/utils';
 
 export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   traceTreeFlat,

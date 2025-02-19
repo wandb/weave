@@ -48,14 +48,14 @@ export const ArrowButton = styled.button<{disabled?: boolean}>`
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: ${props => props.disabled ? '#CBD5E1' : '#64748B'};
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  color: ${props => (props.disabled ? '#CBD5E1' : '#64748B')};
+  cursor: ${props => (props.disabled ? 'not-allowed' : 'pointer')};
   transition: all 0.15s ease;
   flex-shrink: 0;
 
   &:hover:not(:disabled) {
-    background: #F1F5F9;
-    color: #0F172A;
+    background: #f1f5f9;
+    color: #0f172a;
   }
 
   &:active:not(:disabled) {
@@ -203,11 +203,11 @@ export const BreadcrumbContainer = styled.div`
   min-height: 32px;
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
-  scrollbar-width: none;  /* Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
-  
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+
   &::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+    display: none; /* Chrome, Safari and Opera */
   }
 `;
 
@@ -227,7 +227,7 @@ export const BreadcrumbItem = styled.button<{$active?: boolean}>`
 
   &:hover {
     background: ${props => (props.$active ? '#E2E8F0' : '#F1F5F9')};
-    color: #0F172A;
+    color: #0f172a;
   }
 
   &:active {
