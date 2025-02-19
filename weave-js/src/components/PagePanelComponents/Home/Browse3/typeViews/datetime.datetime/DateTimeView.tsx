@@ -17,7 +17,7 @@ type DateTimeViewProps = {
 };
 
 export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
-  // Handle null/undefined cases
+  // Handle null/undefined cases early
   if (data == null) {
     return <NotApplicable />;
   }
@@ -30,28 +30,28 @@ export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
 
   // Handle CustomWeaveTypePayload
   const {useFileContent} = useWFHooks();
-  const datetimeFile = data.files?.['obj.json'];
-  const datetimeContent = useFileContent(
+  const datetimeKey = 'obj.json';
+  const datetimeBinary = useFileContent(
     entity || '',
     project || '',
-    datetimeFile,
-    {
-      skip: !datetimeFile || !entity || !project,
-    }
+    data.files[datetimeKey] || '',
+    {skip: !(datetimeKey in data.files)}
   );
 
-  if (!datetimeFile || !entity || !project) {
+  if (!(datetimeKey in data.files)) {
     return <NotApplicable />;
-  } else if (datetimeContent.loading) {
+  }
+
+  if (datetimeBinary.loading) {
     return <LoadingDots />;
-  } else if (datetimeContent.result == null) {
+  }
+
+  if (datetimeBinary.result == null) {
     return <NotApplicable />;
   }
 
   try {
-    const content = JSON.parse(
-      new TextDecoder().decode(datetimeContent.result)
-    );
+    const content = JSON.parse(new TextDecoder().decode(datetimeBinary.result));
 
     if (!content.isoformat) {
       return <NotApplicable />;
