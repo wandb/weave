@@ -5,6 +5,7 @@ import {TraceViewProps} from '../types';
 
 export const TraceListView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
+  selectedCallId,
   onCallSelect,
 }) => {
   const sortedCalls = useMemo(() => {
@@ -20,11 +21,11 @@ export const TraceListView: React.FC<TraceViewProps> = ({
       <h3 className="p-4 text-lg font-semibold">List View</h3>
       <div className="h-[calc(100%-4rem)] overflow-y-auto px-4">
         <div className="flex flex-col gap-2">
-          {sortedCalls.map(({call}) => (
+          {sortedCalls.map(({id, call}) => (
             <Button
-              key={call.id}
-              variant="ghost"
-              onClick={() => onCallSelect(call.id)}
+              key={id}
+              variant={id === selectedCallId ? 'secondary' : 'ghost'}
+              onClick={() => onCallSelect(id)}
               className="w-full justify-start text-left">
               <div className="flex w-full flex-col gap-1 overflow-hidden">
                 <div className="truncate font-medium">
@@ -50,6 +51,7 @@ export const TraceListView: React.FC<TraceViewProps> = ({
 
 export const TraceTimelineView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
+  selectedCallId,
   onCallSelect,
 }) => {
   return (
@@ -65,6 +67,7 @@ export const TraceTimelineView: React.FC<TraceViewProps> = ({
 
 export const TraceTreeView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
+  selectedCallId,
   onCallSelect,
 }) => {
   return (
@@ -80,6 +83,7 @@ export const TraceTreeView: React.FC<TraceViewProps> = ({
 
 export const TraceTableView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
+  selectedCallId,
   onCallSelect,
 }) => {
   return (

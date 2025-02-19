@@ -156,7 +156,7 @@ const fetchBareTraceCalls = (
     filter: {
       trace_ids: [traceId],
     },
-    sort_by: [{field: 'started_at', direction: 'desc'}],
+    sort_by: [{field: 'started_at', direction: 'asc'}],
     columns: [
       'project_id',
       'id',

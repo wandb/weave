@@ -6,6 +6,7 @@ import {ThreadViewProps} from '../types';
 export const ThreadListView: React.FC<ThreadViewProps> = ({
   onTraceSelect,
   traces,
+  selectedTraceId,
   loading,
   error,
 }) => {
@@ -23,7 +24,7 @@ export const ThreadListView: React.FC<ThreadViewProps> = ({
           {traces.map(traceId => (
             <Button
               key={traceId}
-              variant="ghost"
+              variant={traceId === selectedTraceId ? 'secondary' : 'ghost'}
               onClick={() => onTraceSelect(traceId)}
               className="w-full justify-start">
               <span className="truncate">{traceId}</span>
@@ -38,6 +39,7 @@ export const ThreadListView: React.FC<ThreadViewProps> = ({
 export const ThreadTimelineView: React.FC<ThreadViewProps> = ({
   onTraceSelect,
   traces,
+  selectedTraceId,
   loading,
   error,
 }) => {
@@ -55,7 +57,7 @@ export const ThreadTimelineView: React.FC<ThreadViewProps> = ({
           {traces.map(traceId => (
             <Button
               key={traceId}
-              variant="ghost"
+              variant={traceId === selectedTraceId ? 'primary' : 'ghost'}
               onClick={() => onTraceSelect(traceId)}
               className="w-full justify-start">
               <span className="truncate">{traceId}</span>

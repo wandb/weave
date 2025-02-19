@@ -145,6 +145,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       <ThreadViewComponent
         onTraceSelect={setSelectedTraceId}
         traces={traces ?? []}
+        selectedTraceId={selectedTraceId}
         loading={tracesLoading}
         error={tracesError}
       />
@@ -219,6 +220,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     return (
       <TraceViewComponent
         traceTreeFlat={traceTreeFlat}
+        selectedCallId={selectedCallId}
         onCallSelect={setSelectedCallId}
       />
     );

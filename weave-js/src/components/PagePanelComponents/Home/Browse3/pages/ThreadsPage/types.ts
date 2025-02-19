@@ -38,6 +38,8 @@ export interface ThreadViewProps {
   onTraceSelect: (traceId: string) => void;
   /** Available traces for the thread */
   traces: string[];
+  /** Currently selected trace ID */
+  selectedTraceId?: string;
   /** Whether traces are currently loading */
   loading: boolean;
   /** Error loading traces, if any */
@@ -50,6 +52,8 @@ export interface ThreadViewProps {
 export interface TraceViewProps {
   /** The flattened trace call tree */
   traceTreeFlat: TraceTreeFlat;
+  /** Currently selected call ID */
+  selectedCallId?: string;
   /** Callback when a call is selected */
   onCallSelect: (callId: string) => void;
 }
