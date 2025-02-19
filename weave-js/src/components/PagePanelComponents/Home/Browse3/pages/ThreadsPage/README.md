@@ -14,16 +14,21 @@ The component is organized into several key files:
 
 ```
 ThreadsPage/
-├── README.md
+├── README.md           # Documentation
 ├── index.tsx          # Main component composition
 ├── types.ts           # TypeScript type definitions
 ├── hooks.ts           # Data fetching and state management
 ├── utils.ts           # Utility functions for data transformation
 ├── viewRegistry.ts    # View system configuration
 └── components/        # Reusable UI components
-    ├── ThreadViews.tsx     # Thread list and timeline views
-    ├── TraceViews.tsx      # Trace visualizations
-    └── CallDetailSection.tsx # Call details panel
+    ├── ThreadViews/   # Thread visualization components
+    │   ├── ListView.tsx
+    │   └── TimelineView.tsx
+    └── TraceViews/    # Trace visualization components
+        ├── TreeView.tsx      # Hierarchical tree visualization
+        ├── FlameGraphView.tsx # Performance flame graph
+        ├── utils.ts          # Shared view utilities
+        └── index.ts          # View exports
 ```
 
 ### Key Features
@@ -37,6 +42,9 @@ ThreadsPage/
    - Extensible view registry pattern
    - Each panel supports multiple visualization types
    - Easy to add new view types
+   - Currently supported views:
+     - Thread Views: List, Timeline
+     - Trace Views: Tree, Flame Graph
 
 3. **Selection Cascade Pattern**
    - Hierarchical selection (Thread → Trace → Call)
@@ -90,42 +98,29 @@ ThreadsPage/
 />
 ```
 
-### Data Requirements
-
-The component expects:
-- A trace server client context
-- Entity and project identifiers
-- Optional initial thread ID
-
-### Error Handling
-
-The component handles several error cases:
-- Missing thread selection
-- Failed data fetching
-- Empty data sets
-- Loading states
-
-### Performance Considerations
-
-- Uses memoization for expensive computations
-- Implements virtualization for large lists
-- Manages component re-renders through proper state management
-- Uses efficient data structures for trace tree representation
-
 ### Adding New Views
 
 To add a new view:
 
-1. Create the view component implementing the appropriate interface:
+1. Create the view component in the appropriate directory:
    ```tsx
-   const MyNewView: React.FC<ThreadViewProps | TraceViewProps> = (props) => {
+   // TraceViews/MyNewView.tsx
+   import {TraceViewProps} from '../../types';
+   import {formatDuration, formatTimestamp} from './utils';
+
+   export const MyNewView: React.FC<TraceViewProps> = ({
+     traceTreeFlat,
+     selectedCallId,
+     onCallSelect,
+   }) => {
      // Implementation
    };
    ```
 
 2. Add it to the view registry:
    ```tsx
-   export const threadViews: ThreadViewRegistry = [
+   // viewRegistry.ts
+   export const traceViews: TraceViewRegistry = [
      // ... existing views ...
      {
        id: 'my-new-view',
@@ -136,11 +131,32 @@ To add a new view:
    ];
    ```
 
+3. Export it in the index file:
+   ```tsx
+   // TraceViews/index.ts
+   export {MyNewView} from './MyNewView';
+   ```
+
+### Shared Utilities
+
+The `TraceViews/utils.ts` file provides common functions:
+
+- `getColorForOpName`: Generates consistent colors for operations
+- `formatDuration`: Human-readable duration formatting
+- `formatTimestamp`: Consistent timestamp formatting
+
+### Performance Considerations
+
+- Uses memoization for expensive computations
+- Implements virtualization for large lists
+- Manages component re-renders through proper state management
+- Uses efficient data structures for trace tree representation
+
 ## Future Improvements
 
 Potential areas for enhancement:
-1. More sophisticated timeline visualization
-2. Advanced filtering and search capabilities
-3. Enhanced metadata display
+1. Enhanced tree visualization with collapsible nodes
+2. Improved flame graph interactions and tooltips
+3. Advanced filtering and search capabilities
 4. Performance optimizations for large trace sets
 5. Additional view types for specific use cases 

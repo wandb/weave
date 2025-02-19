@@ -6,7 +6,7 @@ import {
 
 import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
 import {TraceViewProps} from '../../types';
-import {getColorForOpName} from './utils';
+import {getCallDisplayName, getColorForOpName} from './utils';
 
 // Use the imported type directly
 type FlameGraphNode = FlameGraphNodeType;
@@ -64,7 +64,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
       const opNameReal = parseSpanName(call.op_name);
 
       return {
-        name: call.display_name || opNameReal,
+        name: getCallDisplayName(call),
         value: duration,
         children: children.length > 0 ? children : undefined,
         backgroundColor: getColorForOpName(opNameReal),
@@ -106,7 +106,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
               // Find the node in our trace tree that matches this name and timing
               const matchingNode = Object.values(traceTreeFlat).find(
                 n =>
-                  (n.call.display_name || n.call.op_name) === node.name &&
+                  getCallDisplayName(n.call) === node.name &&
                   Date.parse(n.call.started_at) === timing.start &&
                   (n.call.ended_at
                     ? Date.parse(n.call.ended_at)
