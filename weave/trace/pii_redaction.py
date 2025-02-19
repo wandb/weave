@@ -1,4 +1,3 @@
-import json
 from typing import Any, Union
 
 from presidio_analyzer import AnalyzerEngine
@@ -50,12 +49,19 @@ def redact_pii(
             return value
 
     if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except json.JSONDecodeError:
-            pass
+        return redact_pii_string(data)
 
     return redact_recursive(data)
+
+
+def redact_pii_string(data: str) -> str:
+    analyzer = AnalyzerEngine()
+    anonymizer = AnonymizerEngine()
+    fields = redact_pii_fields()
+    entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
+    results = analyzer.analyze(text=data, language="en", entities=entities)
+    redacted = anonymizer.anonymize(text=data, analyzer_results=results)
+    return redacted.text
 
 
 def track_pii_redaction_enabled(
