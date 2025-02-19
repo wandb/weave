@@ -106,8 +106,17 @@ def pick(self, key):
         {"self": self.object_type, "key": types.Const(types.String(), key)}
     )
     data = arrow_as_array(self._arrow_data)
-    path = _dict_utils.split_escaped_string(key)
+    # This isn't ideal, but first check if the entire key is
+    # pickable (because it's the most specific).
+    # If not, split the key up into paths and perform the pick.
+
+    # This is necessary because there was a change to unescape
+    # dots because run history is flattened.
+    path = [key]
     result = _awl_pick(data, path)
+    if pa.compute.all(pa.compute.is_null(result)).as_py():
+        path = _dict_utils.split_escaped_string(key)
+        result = _awl_pick(data, path)
     return ArrowWeaveList(result, object_type, self._artifact)
 
 
