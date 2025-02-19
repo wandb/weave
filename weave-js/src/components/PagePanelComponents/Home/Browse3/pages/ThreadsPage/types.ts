@@ -1,4 +1,5 @@
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 /**
  * Props for the ThreadsPage component
@@ -56,4 +57,12 @@ export interface TraceViewProps {
   selectedCallId?: string;
   /** Callback when a call is selected */
   onCallSelect: (callId: string) => void;
+}
+
+/**
+ * Props shared by all call view components
+ */
+export interface CallViewProps {
+  /** The loaded call data */
+  call: CallSchema;
 }

@@ -4,9 +4,6 @@ import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
-import { CallDetails } from '../CallPage/CallDetails';
-import { useWFHooks } from '../wfReactInterface/context';
-// import {CallDetailSection} from './components/CallDetailSection';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
@@ -18,11 +15,56 @@ import {
 import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
 import {
+  callViews,
+  getCallView,
   getThreadView,
   getTraceView,
   threadViews,
   traceViews,
 } from './viewRegistry';
+import {useWFHooks} from '../wfReactInterface/context';
+
+interface CallViewWrapperProps {
+  entity: string;
+  project: string;
+  callId: string;
+  viewId: string;
+}
+
+const CallViewWrapper: React.FC<CallViewWrapperProps> = ({
+  entity,
+  project,
+  callId,
+  viewId,
+}) => {
+  const {useCall} = useWFHooks();
+  const {loading, result} = useCall({
+    entity,
+    project,
+    callId,
+  });
+
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-moon-500">
+        <Icon name="loading" className="mb-2 animate-spin" />
+        <p>Loading call details...</p>
+      </div>
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-red-500">
+        <Icon name="warning" className="mb-2" />
+        <p>Error loading call details: Call not found</p>
+      </div>
+    );
+  }
+
+  const CallViewComponent = getCallView(viewId).component;
+  return <CallViewComponent call={result} />;
+};
 
 export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   // Global state
@@ -36,6 +78,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   const [threadViewId, setThreadViewId] = useState(threadViews[0].id);
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
+  const [callViewId, setCallViewId] = useState(callViews[0].id);
 
   // Data fetching
   const {
@@ -288,12 +331,12 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     }
 
     return (
-      <CallDetailsForCallId entity={entity} project={project} callId={selectedCall.id} />
-      // <>
-      //   <CallDetailSection call={selectedCall} sectionTitle="Call Details" />
-      //   <CallDetailSection call={selectedCall} sectionTitle="Call Inputs" />
-      //   <CallDetailSection call={selectedCall} sectionTitle="Call Outputs" />
-      // </>
+      <CallViewWrapper
+        entity={entity}
+        project={project}
+        callId={selectedCall.id}
+        viewId={callViewId}
+      />
     );
   };
 
@@ -413,6 +456,23 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
           {/* Call Detail Panel - 30% */}
           <div className="flex w-[30%] flex-col overflow-hidden border-l border-moon-250">
+            <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
+              <h2 className="truncate text-sm font-semibold">Call View</h2>
+              <div className="flex items-center gap-3">
+                {callViews.map(view => (
+                  <Button
+                    key={view.id}
+                    variant={callViewId === view.id ? 'primary' : 'ghost'}
+                    onClick={() => setCallViewId(view.id)}
+                    icon={view.icon}
+                    size="small"
+                    className="!p-3"
+                    title={view.label}>
+                    <span className="sr-only">{view.label}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
             <div className="flex h-full min-h-0 flex-col overflow-hidden">
               {renderCallDetails()}
             </div>
@@ -446,21 +506,4 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       </div>
     </Tailwind>
   );
-};
-
-
-const CallDetailsForCallId = ({callId, entity, project}: {callId: string, entity: string, project: string}) => {
-  const {useCall} = useWFHooks();
-  const call = useCall({
-    entity,
-    project,
-    callId,
-  });
-  if (call.loading) {
-    return <div>Loading...</div>;
-  }
-  if (call.result == null) {
-    return <div>No call found</div>;
-  }
-  return <CallDetails call={call.result} />;
 };

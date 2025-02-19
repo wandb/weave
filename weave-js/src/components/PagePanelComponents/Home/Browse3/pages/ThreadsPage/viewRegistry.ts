@@ -1,10 +1,11 @@
 import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
+import {DetailsView} from './components/CallViews/DetailsView';
 import {ChatView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {CodeView} from './components/TraceViews/CodeView';
-import {ThreadViewProps, TraceViewProps} from './types';
+import {CallViewProps, ThreadViewProps, TraceViewProps} from './types';
 
 /**
  * Definition for a view component and its metadata
@@ -26,6 +27,8 @@ export interface ViewDefinition<T> {
 export type ThreadViewRegistry = Array<ViewDefinition<ThreadViewProps>>;
 /** Registry of available trace views */
 export type TraceViewRegistry = Array<ViewDefinition<TraceViewProps>>;
+/** Registry of available call views */
+export type CallViewRegistry = Array<ViewDefinition<CallViewProps>>;
 
 /** Available thread visualization views */
 export const threadViews: ThreadViewRegistry = [
@@ -69,6 +72,16 @@ export const traceViews: TraceViewRegistry = [
   },
 ];
 
+/** Available call visualization views */
+export const callViews: CallViewRegistry = [
+  {
+    id: 'details',
+    label: 'Details',
+    icon: 'list',
+    component: DetailsView,
+  },
+];
+
 /**
  * Get a thread view by ID, falling back to the first view if not found
  */
@@ -80,3 +93,9 @@ export const getThreadView = (viewId: string) =>
  */
 export const getTraceView = (viewId: string) =>
   traceViews.find(view => view.id === viewId) ?? traceViews[0];
+
+/**
+ * Get a call view by ID, falling back to the first view if not found
+ */
+export const getCallView = (viewId: string) =>
+  callViews.find(view => view.id === viewId) ?? callViews[0];
