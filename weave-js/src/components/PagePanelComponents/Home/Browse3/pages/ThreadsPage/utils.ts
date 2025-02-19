@@ -4,12 +4,14 @@ import {TraceTreeFlat} from './types';
 
 /**
  * Builds a flattened representation of a trace call tree.
+ * This is the core data structure used throughout the application for representing
+ * and navigating trace calls.
  *
- * The resulting structure:
- * - Maps call IDs to their node information
- * - Maintains parent-child relationships
- * - Assigns DFS ordering for consistent display
- * - Preserves all call metadata
+ * Key features:
+ * - Maps call IDs to their node information for O(1) lookup
+ * - Maintains parent-child relationships for tree traversal
+ * - Assigns DFS ordering for consistent display and navigation
+ * - Preserves all call metadata for display and analysis
  *
  * @param traceCalls - Array of trace calls to build the tree from
  * @returns Flattened tree structure with parent-child relationships
@@ -106,18 +108,31 @@ export interface VisTreeNode {
 }
 
 /**
- * Represents a node in the code structure map
+ * Represents a node in the code structure map.
+ * This is used to transform the execution trace into a logical code structure view.
  */
 export interface CodeMapNode {
-  opName: string; // The operation name (key for this node)
-  children: CodeMapNode[]; // Child operations
-  callIds: string[]; // All trace call IDs that map to this operation
+  /** The operation name (key for this node) */
+  opName: string;
+  /** Child operations in the code structure */
+  children: CodeMapNode[];
+  /** All trace call IDs that map to this operation */
+  callIds: string[];
 }
 
 /**
  * Transforms a trace tree into a code structure map.
  * This collapses the execution trace into a unique operation tree,
  * representing the actual code structure rather than the execution flow.
+ * 
+ * Key features:
+ * - Collapses multiple calls to the same operation into a single node
+ * - Maintains the logical structure of the code
+ * - Preserves references to all calls for each operation
+ * - Handles recursive calls by reusing existing nodes
+ * 
+ * @param traceTreeFlat The flattened trace tree to transform
+ * @returns An array of root CodeMapNodes representing the code structure
  */
 export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
   // Helper to find a node in the ancestor chain or peer group

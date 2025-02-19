@@ -18,31 +18,33 @@ const TreePanel = styled.div`
   height: 50%;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
-
+  padding: 8px;
   border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 `;
 
 const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
-  margin: 1px;
-  padding-left: ${props => props.$level * 12}px;
-  border: 1px solid ${props => (props.$isSelected ? '#93C5FD' : '#E2E8F0')};
+  margin: 2px 0;
+  padding: 8px;
+  border: 1px solid ${props => (props.$isSelected ? '#93C5FD' : '#E2e8f0')};
   border-radius: 4px;
   background: ${props => (props.$isSelected ? '#EFF6FF' : 'white')};
   transition: all 0.1s ease-in-out;
+  margin-left: 8px;
 `;
 
 const NodeHeader = styled.button`
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   border: none;
   background: none;
   text-align: left;
   cursor: pointer;
   min-height: 32px;
+  user-select: none;
 
   &:hover {
     background: rgba(0, 0, 0, 0.02);
@@ -50,16 +52,16 @@ const NodeHeader = styled.button`
 `;
 
 const NodeContent = styled.div<{$isExpanded: boolean}>`
-  padding: ${props => (props.$isExpanded ? '0 0 4px 12px' : '0')};
   display: ${props => (props.$isExpanded ? 'flex' : 'none')};
   flex-wrap: wrap;
   gap: 4px;
+  
 `;
 
 const CallPanel = styled.div`
   height: 50%;
   overflow-y: auto;
-  background: white;
+  background: #f8fafc;
 `;
 
 const CallPanelHeader = styled.div`
@@ -78,7 +80,8 @@ const CallList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: #e2e8f0;
+  padding: 8px;
+  background: #f8fafc;
 `;
 
 const CallItem = styled.div<{$isSelected?: boolean}>`
@@ -89,6 +92,8 @@ const CallItem = styled.div<{$isSelected?: boolean}>`
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  border: 1px solid ${props => (props.$isSelected ? '#93C5FD' : '#E2e8f0')};
+  border-radius: 4px;
 
   &:hover {
     background: ${props => (props.$isSelected ? '#DBEAFE' : '#F8FAFC')};

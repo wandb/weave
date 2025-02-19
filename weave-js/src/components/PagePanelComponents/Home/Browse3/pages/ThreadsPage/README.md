@@ -8,6 +8,7 @@ The ThreadsPage component provides a sophisticated interface for exploring and a
 - **Thread**: A collection of related traces
 - **Trace**: A sequence of function calls that form an execution path
 - **Call**: An individual function execution with inputs, outputs, and metadata
+- **Operation**: A logical grouping of calls that represent the same function/code path
 
 ### Component Architecture
 
@@ -30,6 +31,7 @@ ThreadsPage/
     │   ├── styles.ts
     │   └── types.ts
     └── TraceViews/    # Visualization components
+        ├── CodeView.tsx
         ├── FlameGraphView.tsx
         ├── GraphView.tsx
         ├── TreeView.tsx
@@ -51,11 +53,12 @@ ThreadsPage/
   - Peers: Navigate calls with same operation
   - Siblings: Navigate calls with same parent
   - Stack: Navigate up/down call stack
-  - Visual breadcrumb trail for stack navigation
+- **StackBreadcrumb**: Visual breadcrumb trail for stack navigation
 
 ### 3. Visualization System
 - Multiple view types for different analysis needs:
   - Tree View: Hierarchical call structure
+  - Code View: Operation-centric view with call details
   - Flame Graph: Duration-based visualization
   - Graph View: Relationship visualization
 - Each view optimized for specific use cases
@@ -63,36 +66,53 @@ ThreadsPage/
 ### 4. State Management
 - Hierarchical state management:
   - Thread selection → Trace selection → Call selection
-- Context-based state sharing
+- Context-based state sharing via StackContext
 - Efficient data structures for trace representation
 
 ### 5. Data Loading
-- Progressive data loading
-- Comprehensive loading states
+- Progressive data loading with loading states
 - Error handling at each level
 - Auto-selection of initial items
+- Optimistic updates for better UX
 
 ## Implementation Details
 
 ### Data Structures
-- `TraceTreeFlat`: Optimized flat representation of trace tree
-- `StackState`: Managed via React Context for navigation
-- View registries for extensible visualization system
+1. **TraceTreeFlat**
+   - Optimized flat representation of trace tree
+   - O(1) lookup for any call by ID
+   - Maintains parent-child relationships
+   - Includes DFS ordering for consistent display
+
+2. **CodeMapNode**
+   - Represents the logical code structure
+   - Collapses multiple calls to same operation
+   - Handles recursive calls
+   - Maintains call references for each operation
+
+3. **StackState**
+   - Managed via React Context
+   - Tracks current call stack
+   - Enables breadcrumb navigation
+   - Preserves original selection
 
 ### Key Components
-1. **TraceScrubber**
+
+1. **CodeView**
+   - Split panel design (50/50)
+   - Operation tree with call list
+   - Synchronized selection
+   - Duration and error statistics
+
+2. **TraceScrubber**
    - Factory-based scrubber creation
    - Shared styling and behavior
-   - Context-based stack management
-
-2. **TraceViews**
-   - Pluggable visualization system
-   - Shared utilities for consistency
-   - Performance optimizations
+   - Multiple navigation modes
+   - Visual progress indicators
 
 ### Utilities
 - Tree building and traversal
-- Duration calculations and formatting
+- Duration calculations
 - Display name generation
 - Call state management
 
@@ -125,13 +145,13 @@ import {ThreadsPage} from './ThreadsPage';
        label: 'My View',
        icon: 'icon-name',
        component: MyView,
+       showScrubber: true,
      },
    ];
    ```
 
 2. **New Scrubber Type**
    ```tsx
-   // Use the factory pattern
    export const MyScrubber = createScrubber({
      label: 'My Scrubber',
      description: 'Description',
@@ -145,34 +165,37 @@ import {ThreadsPage} from './ThreadsPage';
    - Use memoization for expensive calculations
    - Implement virtualization for large lists
    - Optimize tree operations
+   - Debounce frequent updates
 
 2. **State Management**
    - Keep state close to where it's used
    - Use context for shared state
    - Implement proper cleanup
+   - Handle edge cases
 
 3. **Error Handling**
    - Handle all error cases
    - Provide meaningful error messages
    - Implement recovery strategies
+   - Show loading states
 
 ## Recent Improvements
 
-1. ✅ Improved trace tree building with better typing
-2. ✅ Enhanced error handling in data fetching
-3. ✅ Added stack navigation with breadcrumb trail
-4. ✅ Implemented peer and sibling navigation
-5. ✅ Added tooltips and visual feedback
-6. ✅ Improved duration formatting
-7. ✅ Enhanced type safety and documentation
+1. ✅ Enhanced CodeView with operation-centric display
+2. ✅ Improved stack navigation with breadcrumb trail
+3. ✅ Added recursive call handling
+4. ✅ Implemented synchronized selection
+5. ✅ Enhanced error and duration statistics
+6. ✅ Improved visual consistency
+7. ✅ Added proper TypeScript documentation
 
 ## Planned Improvements
 
-1. [ ] Search functionality
-2. [ ] Advanced filtering options
-3. [ ] Keyboard navigation
-4. [ ] Performance optimizations for large traces
-5. [ ] Additional visualization types
-6. [ ] Export capabilities
-7. [ ] Accessibility improvements
-8. [ ] Test coverage expansion 
+1. [ ] Search and filtering
+2. [ ] Keyboard navigation
+3. [ ] Performance optimizations for large traces
+4. [ ] Additional visualization types
+5. [ ] Export capabilities
+6. [ ] Accessibility improvements
+7. [ ] Test coverage
+8. [ ] Real thread list implementation 

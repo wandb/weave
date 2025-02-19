@@ -6,18 +6,36 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {LoadableWithError} from '../wfReactInterface/wfDataModelHooksInterface';
 
+/**
+ * Hook to fetch and manage the list of available threads.
+ * Currently returns a static list for development.
+ * 
+ * @param entity - The entity (organization/user) context
+ * @param project - The project context
+ * @returns LoadableWithError containing the list of thread IDs
+ */
 export const useThreadList = (
   entity: string,
   project: string
 ): LoadableWithError<string[]> => {
-  // TODO: Implement this
-  return useMemo(() => {
-    return {
-      loading: false,
-      error: null,
-      result: ['thread-id-1', 'thread-id-2'],
-    };
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [threads, setThreads] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Simulate API call for now
+    setLoading(true);
+    setTimeout(() => {
+      setThreads(['thread-id-1', 'thread-id-2']);
+      setLoading(false);
+    }, 500);
+  }, [entity, project]);
+
+  return {
+    loading,
+    error,
+    result: threads,
+  };
 };
 
 export const useTracesForThread = (
