@@ -223,7 +223,9 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     return (
       <div className="flex h-full flex-col">
         {Object.keys(traceTreeFlat).length > 0 && (
-          <StackContextProvider traceTreeFlat={traceTreeFlat}>
+          <StackContextProvider
+            traceTreeFlat={traceTreeFlat}
+            selectedCallId={selectedCallId}>
             <StackBreadcrumb
               traceTreeFlat={traceTreeFlat}
               selectedCallId={selectedCallId}

@@ -30,7 +30,6 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   border-radius: 4px;
   background: ${props => (props.$isSelected ? '#EFF6FF' : 'white')};
   transition: all 0.1s ease-in-out;
-
 `;
 
 const NodeHeader = styled.button`
@@ -134,7 +133,6 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   const {setStackState, buildStackForCall} = useStackContext();
   const hasChildren = node.children.length > 0;
   const isSelected = node.opName === selectedOpName;
-  const [isExpanded, setIsExpanded] = useState(true);
 
   // Get duration range and stats for this operation
   const stats = useMemo(() => {
@@ -204,8 +202,8 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
         </div>
       </NodeHeader>
 
-      {hasChildren && isExpanded && (
-        <NodeContent $isExpanded={isExpanded}>
+      {hasChildren && (
+        <NodeContent $isExpanded={true}>
           {node.children.map(child => (
             <CodeMapNodeComponent
               key={child.opName}

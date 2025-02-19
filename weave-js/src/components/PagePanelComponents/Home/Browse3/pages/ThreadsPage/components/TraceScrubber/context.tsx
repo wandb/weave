@@ -18,7 +18,8 @@ export const useStackContext = () => {
 export const StackContextProvider: React.FC<{
   children: React.ReactNode;
   traceTreeFlat: TraceTreeFlat;
-}> = ({children, traceTreeFlat}) => {
+  selectedCallId?: string;
+}> = ({children, traceTreeFlat, selectedCallId}) => {
   const [stackState, setStackState] = React.useState<StackState | null>(null);
 
   const buildStackForCall = React.useCallback(
@@ -57,6 +58,18 @@ export const StackContextProvider: React.FC<{
     },
     [traceTreeFlat]
   );
+
+  // Update stack state whenever selected call changes
+  React.useEffect(() => {
+    if (selectedCallId) {
+      setStackState({
+        stack: buildStackForCall(selectedCallId),
+        originalCallId: selectedCallId,
+      });
+    } else {
+      setStackState(null);
+    }
+  }, [selectedCallId, buildStackForCall]);
 
   const value = React.useMemo(
     () => ({

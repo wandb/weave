@@ -158,7 +158,7 @@ const Flow: React.FC<TraceViewProps> = ({
       );
     };
 
-    const timeout = setTimeout(updateNodes, 0);
+    const timeout = setTimeout(updateNodes, 10);
     return () => clearTimeout(timeout);
   }, [selectedCallId]);
 
