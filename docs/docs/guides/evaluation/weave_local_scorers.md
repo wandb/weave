@@ -11,7 +11,9 @@ Weave's local scorers are a suite of small language models that run locally on y
 
 Some of these models are fine-tuned by Weights & Biases, while others are state-of-the-art open-source models trained by the community. Weights & Biases (W&B) Reports were used for training and evaluation. You can find the full details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA).
 
-The model weights are publicly available in W&B Artifacts and are automatically downloaded when you instantiate the scorer class.
+The model weights are publicly available in W&B Artifacts and are automatically downloaded when you instantiate the scorer class. The artifact paths can be found here if you'd like to download them yourself: `weave.scorers.default_models`
+
+The object returned from calling these scorers contains a `passed` boolean attribute to indicate whether the input text is safe or high quality as well as a `metadata` atttribute that contains more detail such as the raw score from the model.
 
 :::tip
 While local scorers can be run on CPUs and GPUs, use GPUs for best performance.  
