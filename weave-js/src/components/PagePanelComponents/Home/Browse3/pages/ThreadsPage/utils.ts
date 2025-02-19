@@ -35,13 +35,17 @@ export const buildTraceTreeFlat = (
     }
   });
 
+  const sortCalls = (a: TraceCallSchema, b: TraceCallSchema) => {
+    const aStartedAt = Date.parse(a.started_at);
+    const bStartedAt = Date.parse(b.started_at);
+    return aStartedAt - bStartedAt;
+  };
+
   // Sort children by start time for consistent ordering
   const sortFn = (a: string, b: string) => {
     const aCall = traceTreeFlat[a];
     const bCall = traceTreeFlat[b];
-    const aStartedAt = Date.parse(aCall.call.started_at);
-    const bStartedAt = Date.parse(bCall.call.started_at);
-    return aStartedAt - bStartedAt;
+    return sortCalls(aCall.call, bCall.call);
   };
 
   // Sort all children arrays
@@ -56,9 +60,7 @@ export const buildTraceTreeFlat = (
   );
 
   // Sort root calls by start time
-  rootCalls.sort(
-    (a, b) => Date.parse(a.call.started_at) - Date.parse(b.call.started_at)
-  );
+  rootCalls.sort((a, b) => sortCalls(a.call, b.call));
 
   // Process each tree in order
   let stack = rootCalls.map(node => node.id);

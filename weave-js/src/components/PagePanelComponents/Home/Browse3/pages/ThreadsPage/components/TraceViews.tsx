@@ -10,9 +10,7 @@ export const TraceListView: React.FC<TraceViewProps> = ({
 }) => {
   const sortedCalls = useMemo(() => {
     return Object.values(traceTreeFlat).sort((a, b) => {
-      const aStartedAt = Date.parse(a.call.started_at);
-      const bStartedAt = Date.parse(b.call.started_at);
-      return bStartedAt - aStartedAt;
+      return a.dfsOrder - b.dfsOrder;
     });
   }, [traceTreeFlat]);
 
