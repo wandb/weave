@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, { useEffect, useMemo, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
@@ -17,45 +17,11 @@ import {
 
 export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   // Global state
-  const [selectedThreadId, setSelectedThreadIdDirect] = useState<
-    string | undefined
-  >(threadId);
-  const [selectedTraceId, setSelectedTraceIdDirect] = useState<
-    string | undefined
-  >();
-  const [selectedCallId, setSelectedCallIdDirect] = useState<
-    string | undefined
-  >();
-
-  const setSelectedThreadId = useCallback(
-    (newThreadId: string) => {
-      if (newThreadId !== selectedThreadId) {
-        setSelectedThreadIdDirect(newThreadId);
-        setSelectedTraceIdDirect(undefined);
-        setSelectedCallIdDirect(undefined);
-      }
-    },
-    [selectedThreadId]
+  const [selectedThreadId, setSelectedThreadId] = useState<string | undefined>(
+    threadId
   );
-
-  const setSelectedTraceId = useCallback(
-    (newTraceId: string) => {
-      if (newTraceId !== selectedTraceId) {
-        setSelectedTraceIdDirect(newTraceId);
-        setSelectedCallIdDirect(undefined);
-      }
-    },
-    [selectedTraceId]
-  );
-
-  const setSelectedCallId = useCallback(
-    (newCallId: string) => {
-      if (newCallId !== selectedCallId) {
-        setSelectedCallIdDirect(newCallId);
-      }
-    },
-    [selectedCallId]
-  );
+  const [selectedTraceId, setSelectedTraceId] = useState<string | undefined>();
+  const [selectedCallId, setSelectedCallId] = useState<string | undefined>();
 
   // View state
   const [threadViewId, setThreadViewId] = useState(threadViews[0].id);
@@ -81,6 +47,17 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     result: traceCalls,
   } = useBareTraceCalls(entity, project, selectedTraceId);
 
+  // Clear downstream selections when thread changes or starts loading
+  useEffect(() => {
+    setSelectedTraceId(undefined);
+    setSelectedCallId(undefined);
+  }, [selectedThreadId, tracesLoading]);
+
+  // Clear call selection when trace changes or starts loading
+  useEffect(() => {
+    setSelectedCallId(undefined);
+  }, [selectedTraceId, callsLoading]);
+
   // Auto-select first thread when threads load and none is selected
   useEffect(() => {
     if (
@@ -100,7 +77,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     setSelectedThreadId,
   ]);
 
-  // Auto-select first trace when traces load
+  // Auto-select first trace when traces load and none is selected
   useEffect(() => {
     if (
       !selectedTraceId &&
@@ -113,25 +90,42 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     }
   }, [traces, tracesLoading, tracesError, selectedTraceId, setSelectedTraceId]);
 
-  // Auto-select first call when trace calls load
-  useEffect(() => {
-    if (
-      !selectedCallId &&
-      traceCalls &&
-      traceCalls.length > 0 &&
-      !callsLoading &&
-      !callsError
-    ) {
-      setSelectedCallId(traceCalls[0].id);
-    }
-  }, [traceCalls, callsLoading, callsError, selectedCallId, setSelectedCallId]);
-
   // Derived data
   const traceTreeFlat = useMemo(
     () => buildTraceTreeFlat(traceCalls ?? []),
     [traceCalls]
   );
-  const selectedCall = selectedCallId
+
+  // Auto-select first call when trace tree is built and no call is selected
+  useEffect(() => {
+    const treeEntries = Object.entries(traceTreeFlat);
+    if (
+      !selectedCallId &&
+      treeEntries.length > 0 &&
+      !callsLoading &&
+      !callsError
+    ) {
+      // Find the call with the lowest dfsOrder (root of the trace)
+      const [firstCallId] = treeEntries.reduce((acc, [id, node]) =>
+        node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
+      );
+      setSelectedCallId(firstCallId);
+    }
+  }, [
+    traceTreeFlat,
+    callsLoading,
+    callsError,
+    selectedCallId,
+    setSelectedCallId,
+  ]);
+
+  // Only show call details if we have valid data and aren't loading
+  const showCallDetails =
+    !callsLoading &&
+    !callsError &&
+    selectedCallId &&
+    traceTreeFlat[selectedCallId];
+  const selectedCall = showCallDetails
     ? traceTreeFlat[selectedCallId]?.call
     : undefined;
 
@@ -227,6 +221,43 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         traceTreeFlat={traceTreeFlat}
         onCallSelect={setSelectedCallId}
       />
+    );
+  };
+
+  const renderCallDetails = () => {
+    if (callsLoading) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="loading" className="mb-2 animate-spin" />
+          <p>Loading call details...</p>
+        </div>
+      );
+    }
+
+    if (callsError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-red-500">
+          <Icon name="warning" className="mb-2" />
+          <p>Error loading call details: {callsError.message}</p>
+        </div>
+      );
+    }
+
+    if (!selectedCall) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-moon-500">
+          <Icon name="info" className="mb-2" />
+          <p>Select a call to view details</p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <CallDetailSection call={selectedCall} sectionTitle="Call Details" />
+        <CallDetailSection call={selectedCall} sectionTitle="Call Inputs" />
+        <CallDetailSection call={selectedCall} sectionTitle="Call Outputs" />
+      </>
     );
   };
 
@@ -337,18 +368,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
           {/* Call Detail Panel - 30% */}
           <div className="flex w-[30%] flex-col overflow-hidden border-l border-moon-250">
             <div className="flex h-full min-h-0 flex-col overflow-hidden">
-              <CallDetailSection
-                call={selectedCall}
-                sectionTitle="Call Details"
-              />
-              <CallDetailSection
-                call={selectedCall}
-                sectionTitle="Call Inputs"
-              />
-              <CallDetailSection
-                call={selectedCall}
-                sectionTitle="Call Outputs"
-              />
+              {renderCallDetails()}
             </div>
           </div>
         </div>
