@@ -243,15 +243,13 @@ score = scorer.score(output="some text")
 For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
 
 
-## Production Best Practices
-
-### 1. Analyze and Improve
+#### Analyze and Improve
 - Review trends in the Weave Dashboard
 - Look for patterns in low-scoring outputs
 - Use insights to improve your LLM system
 - Set up alerts for concerning patterns (coming soon)
 
-### 2. Access Historical Data
+#### Access Historical Data
 Scorer results are stored with their associated calls and can be accessed through:
 - The Call object's `feedback` field
 - The Weave Dashboard

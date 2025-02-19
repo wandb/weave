@@ -49,22 +49,19 @@ async def generate_safe_response(prompt: str) -> str:
     return result
 ```
 
+### Guardrails Performance Optimization
 
-## Production Best Practices
+For optimal performance with guardrails, since they block the response:
 
-### 1. Initialize Guards Efficiently
+- **Initialize Guards Efficiently**
+  - Initialize scorers outside of request handlers
+  - Load ML models at module level
+  - Set up network connections in advance
+  - Particularly important for high-traffic applications
 
-For optimal performance, especially with locally-run models, initialize your guards outside of the main function. This pattern is particularly important when:
-- Your scorers load ML models
-- You're using local LLMs where latency is critical
-- Your scorers maintain network connections
-- You have high-traffic applications
+- **Optimize Scoring Logic**
+  - Keep logic simple and fast
+  - Consider caching common results
+  - Avoid heavy external API calls
+  - Initialize guards outside of main functions
 
-See the Complete Example section below for a demonstration of this pattern.
-
-:::caution Performance Tips
-- Keep logic simple and fast
-- Consider caching common results
-- Avoid heavy external API calls
-- Initialize guards outside of your main functions to avoid repeated initialization costs
-:::

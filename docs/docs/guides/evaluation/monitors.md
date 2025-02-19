@@ -44,35 +44,37 @@ async def generate_with_monitoring(prompt: str) -> str:
 ```
 
 
-## Production Best Practices
 
-### 1. Set Appropriate Sampling Rates
-```python
-@weave.op
-def generate_text(prompt: str) -> str:
-    return generate_response(prompt)
+### Monitoring Sampling and Performance
 
-async def generate_with_sampling(prompt: str) -> str:
-    result, call = generate_text.call(prompt)
-    
-    # Only monitor 10% of calls
-    if random.random() < 0.1:
-        await call.apply_scorer(ToxicityScorer())
-        await call.apply_scorer(QualityScorer())
-    
-    return result
-```
+Since monitors run in the background and don't block responses:
 
-### 2. Monitor Multiple Aspects
-```python
-async def evaluate_comprehensively(call):
-    await call.apply_scorer(ToxicityScorer())
-    await call.apply_scorer(QualityScorer())
-    await call.apply_scorer(LatencyScorer())
-```
+- **Set Appropriate Sampling Rates**
+  ```python
+  @weave.op
+  def generate_text(prompt: str) -> str:
+      return generate_response(prompt)
+  
+  async def generate_with_sampling(prompt: str) -> str:
+      result, call = generate_text.call(prompt)
+      
+      # Only monitor 10% of calls
+      if random.random() < 0.1:
+          await call.apply_scorer(ToxicityScorer())
+          await call.apply_scorer(QualityScorer())
+      
+      return result
+  ```
 
-:::caution Performance Tips
-- Use sampling to reduce load
-- Can use more complex logic
-- Can make external API calls
-:::
+- **Monitor Multiple Aspects**
+  ```python
+  async def evaluate_comprehensively(call):
+      await call.apply_scorer(ToxicityScorer())
+      await call.apply_scorer(QualityScorer())
+      await call.apply_scorer(LatencyScorer())
+  ```
+
+- **Performance Considerations**
+  - Use sampling to reduce load
+  - Can use more complex logic
+  - Can make external API calls
