@@ -1,5 +1,4 @@
 interactions:
-- request:
     body: null
     headers:
       Accept:
