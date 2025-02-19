@@ -8,6 +8,7 @@ import time
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import pytest
@@ -44,6 +45,12 @@ from weave.trace_server.trace_server_interface_util import (
 ## Hacky interface compatibility helpers
 
 ClientType = weave_client.WeaveClient
+
+
+@dataclass
+class ComplexAttribute:
+    a: int
+    b: dict[str, Any]
 
 
 def get_client_trace_server(
@@ -1238,7 +1245,12 @@ def test_attributes_on_ops(client):
     def op_with_attrs(a: int, b: int) -> int:
         return a + b
 
-    with weave.attributes({"custom": "attribute"}):
+    with weave.attributes(
+        {
+            "custom": "attribute",
+            "complex": ComplexAttribute(a=1, b={"c": 2}),
+        }
+    ):
         op_with_attrs(1, 2)
 
     res = get_client_trace_server(client).calls_query(
@@ -1251,6 +1263,15 @@ def test_attributes_on_ops(client):
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
         "custom": "attribute",
+        "complex": {
+            "__class__": {
+                "module": "test_client_trace",
+                "name": "ComplexAttribute",
+                "qualname": "ComplexAttribute",
+            },
+            "a": 1,
+            "b": {"c": 2},
+        },
         "weave": {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
