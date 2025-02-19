@@ -143,3 +143,26 @@ def test_trust_scorer_parallelism(trust_scorer):
     assert "passed" in eval_result["WeaveTrustScorerV1"]
     assert "metadata" in eval_result["WeaveTrustScorerV1"]
     assert len(eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]) == 5
+
+    # Check that none of the subscorers passed
+    raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
+    
+    # it's kind of boring...
+    for _, scorer_results in raw_outputs.items():
+        assert scorer_results["passed"]["true_count"] == 0
+        assert scorer_results["passed"]["true_fraction"] == 0.0
+
+    # Verify specific mean scores
+    assert raw_outputs["WeaveHallucinationScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.99999, rel=1e-4)
+    assert raw_outputs["WeaveCoherenceScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.20488, rel=1e-4)
+    assert raw_outputs["WeaveFluencyScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.40745, rel=1e-4)
+    assert raw_outputs["WeaveContextRelevanceScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.11111, rel=1e-4)
+
+    # Verify toxicity categories
+    toxicity_results = raw_outputs["WeaveToxicityScorerV1"]["metadata"]
+    assert toxicity_results["Ability"]["mean"] == 0.0
+    assert toxicity_results["Gender/Sex"]["mean"] == 0.0
+    assert toxicity_results["Violence"]["mean"] == 2.0
+    assert toxicity_results["Race/Origin"]["mean"] == 3.0
+    assert toxicity_results["Religion"]["mean"] == 2.0
+
