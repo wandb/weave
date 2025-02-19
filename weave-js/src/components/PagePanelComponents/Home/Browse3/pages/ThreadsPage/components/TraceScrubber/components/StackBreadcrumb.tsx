@@ -1,6 +1,7 @@
 import React from 'react';
 
 import {getCallDisplayName} from '../../TraceViews/utils';
+import {useScrollIntoView} from '../../../hooks';
 import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,
@@ -17,24 +18,11 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
   const {stackState} = useStackContext();
   const selectedItemRef = React.useRef<HTMLButtonElement>(null);
 
-  // Scroll selected item into view when selection changes
-  React.useEffect(() => {
-    let mounted = true;
-    const doScroll = () => {
-      if (mounted && selectedItemRef.current) {
-        selectedItemRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }
-    };
-
-    const timeout =   setTimeout(doScroll, 15);
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-    };
-  }, [selectedCallId]);
+  useScrollIntoView(selectedItemRef, Boolean(selectedCallId), {
+    behavior: 'smooth',
+    block: 'center',
+    inline: 'nearest',
+  });
 
   if (!selectedCallId || !stackState) {
     return null;

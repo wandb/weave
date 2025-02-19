@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 
 import {Button} from '../../../../../../../Button';
 import {Icon, IconName} from '../../../../../../../Icon';
+import {useScrollIntoView} from '../../hooks';
 import {TraceViewProps} from '../../types';
 import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
 
@@ -33,24 +34,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
 
-  // Scroll into view when selected
-  React.useEffect(() => {
-    let mounted = true;
-    const doScroll = () => {
-      if (mounted && id === selectedCallId && nodeRef.current) {
-        nodeRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }
-    };
-
-    const timeout = setTimeout(doScroll, 15);
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-    };
-  }, [id, selectedCallId]);
+  useScrollIntoView(nodeRef, id === selectedCallId);
 
   return (
     <div className="flex flex-col">
