@@ -37,7 +37,7 @@ export interface ThreadViewProps {
   /** Callback when a trace is selected */
   onTraceSelect: (traceId: string) => void;
   /** Available traces for the thread */
-  traces: string[];
+  traceRoots: TraceCallSchema[];
   /** Currently selected trace ID */
   selectedTraceId?: string;
   /** Whether traces are currently loading */

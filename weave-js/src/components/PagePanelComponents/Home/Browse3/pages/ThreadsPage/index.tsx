@@ -8,7 +8,11 @@ import {CallDetailSection} from './components/CallDetailSection';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
 import {TraceScrubber} from './components/TraceScrubber/index';
-import {useBareTraceCalls, useThreadList, useTracesForThread} from './hooks';
+import {
+  useBareTraceCalls,
+  useThreadList,
+  useTraceRootsForThread,
+} from './hooks';
 import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
 import {
@@ -42,7 +46,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     loading: tracesLoading,
     error: tracesError,
     result: traces,
-  } = useTracesForThread(entity, project, selectedThreadId);
+  } = useTraceRootsForThread(entity, project, selectedThreadId);
 
   const {
     loading: callsLoading,
@@ -89,7 +93,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       !tracesLoading &&
       !tracesError
     ) {
-      setSelectedTraceId(traces[0]);
+      setSelectedTraceId(traces[0].trace_id);
     }
   }, [traces, tracesLoading, tracesError, selectedTraceId, setSelectedTraceId]);
 
@@ -147,7 +151,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     return (
       <ThreadViewComponent
         onTraceSelect={setSelectedTraceId}
-        traces={traces ?? []}
+        traceRoots={traces ?? []}
         selectedTraceId={selectedTraceId}
         loading={tracesLoading}
         error={tracesError}
@@ -303,14 +307,18 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
               <DropdownMenu.Trigger>
                 <Button
                   variant="secondary"
-                  icon={threadsLoading ? 'loading' : 'overflow-vertical'}
-                  disabled={threadsLoading || Boolean(threadsError)}
-                  className={threadsLoading ? 'animate-spin' : ''}>
-                  <span className="truncate">
-                    {selectedThreadId
-                      ? `Thread: ${selectedThreadId}`
-                      : 'Select Thread'}
-                  </span>
+                  icon={threadsLoading ? undefined : 'overflow-vertical'}
+                  disabled={threadsLoading || Boolean(threadsError)}>
+                  <div className="flex items-center">
+                    {threadsLoading ? (
+                      <Icon name="loading" className="mr-2 animate-spin" />
+                    ) : null}
+                    <span className="truncate">
+                      {selectedThreadId
+                        ? `Thread: ${selectedThreadId}`
+                        : 'Select Thread'}
+                    </span>
+                  </div>
                 </Button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Content>

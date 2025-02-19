@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useState} from 'react';
 import React from 'react';
 
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
@@ -38,15 +38,15 @@ export const useThreadList = (
   };
 };
 
-export const useTracesForThread = (
+export const useTraceRootsForThread = (
   entity: string,
   project: string,
   threadId?: string
-): LoadableWithError<string[]> => {
+): LoadableWithError<TraceCallSchema[]> => {
   const getClient = useGetTraceServerClientContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [traces, setTraces] = useState<string[]>([]);
+  const [traces, setTraces] = useState<TraceCallSchema[]>([]);
 
   useEffect(() => {
     if (!threadId) {
@@ -60,7 +60,7 @@ export const useTracesForThread = (
     fetchBareThreadTraces(client, entity, project, threadId)
       .then(res => {
         if (mounted) {
-          setTraces(res.map(c => c.trace_id));
+          setTraces(res);
           setLoading(false);
         }
       })

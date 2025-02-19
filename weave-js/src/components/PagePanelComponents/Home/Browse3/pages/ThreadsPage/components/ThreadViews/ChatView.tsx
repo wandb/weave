@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import styled from 'styled-components';
 
+import {useWFHooks} from '../../../wfReactInterface/context';
+import {TraceCallSchema} from '../../../wfReactInterface/traceServerClientTypes';
 import {ThreadViewProps} from '../../types';
 
 const Container = styled.div`
   height: 100%;
   overflow: hidden;
-  background: #f8fafc;
+
 `;
 
 const ScrollContainer = styled.div`
@@ -27,14 +29,13 @@ const ChatItem = styled.div<{$isSelected?: boolean}>`
   gap: 1px;
   border: 1px solid ${props => (props.$isSelected ? '#3B82F6' : '#E2E8F0')};
   border-radius: 6px;
-  background: white;
+  background ${props => (props.$isSelected ? '#EFF6FF' : 'white')} ;
   cursor: pointer;
   transition: all 0.15s ease;
   overflow: hidden;
 
   &:hover {
-    border-color: ${props => (props.$isSelected ? '#3B82F6' : '#CBD5E1')};
-    background: ${props => (props.$isSelected ? '#EFF6FF' : '#F8FAFC')};
+    border-color: ${props => (props.$isSelected ? '#3B82F6' : '#94A3B8')};
   }
 `;
 
@@ -64,7 +65,7 @@ const Content = styled.div`
 
 export const ChatView: React.FC<ThreadViewProps> = ({
   onTraceSelect,
-  traces,
+  traceRoots,
   selectedTraceId,
   loading,
   error,
@@ -89,31 +90,112 @@ export const ChatView: React.FC<ThreadViewProps> = ({
     <Container>
       <ScrollContainer>
         <ChatList>
-          {traces.map(traceId => (
-            <ChatItem
-              key={traceId}
-              $isSelected={traceId === selectedTraceId}
-              onClick={() => onTraceSelect(traceId)}>
-              <InputSection>
-                <Label>Input</Label>
-                <Content>
-                  This is a placeholder input message for trace {traceId}. It
-                  could contain multiple lines of text and show the actual input
-                  parameters.
-                </Content>
-              </InputSection>
-              <OutputSection>
-                <Label>Output</Label>
-                <Content>
-                  This is a placeholder output message for trace {traceId}. It
-                  would show the actual result or response from the trace
-                  execution.
-                </Content>
-              </OutputSection>
-            </ChatItem>
+          {traceRoots.map(traceRoot => (
+            <ChatRow
+              key={traceRoot.id}
+              traceRootCall={traceRoot}
+              selectedTraceId={selectedTraceId}
+              onTraceSelect={onTraceSelect}
+            />
           ))}
         </ChatList>
       </ScrollContainer>
     </Container>
   );
 };
+
+// const processRecursively = (obj: any, fn: (key: string, value: any) => any) => {
+//   for (const key in obj) {
+//     if (obj.hasOwnProperty(key)) {
+//         obj[key] = fn(key, processRecursively(obj[key], fn));
+//     }
+//   }
+//   return obj;
+// };
+
+// const removeUnderscoredKeys = (obj: any) => {
+//   return processRecursively(obj, (key, value) => {
+//     if (key.startsWith('_')) {
+//       return undefined;
+//     }
+//     return value;
+//   });
+// };
+
+// const removeEmptyValues = (obj: any) => {
+//   return processRecursively(obj, (key, value) => {
+//     if (value === undefined || value === null) {
+//       return undefined;
+//     }
+//     return value;
+//   });
+// };
+
+
+// const processInput = (input: any) => {
+//   return removeUnderscoredKeys(removeEmptyValues(input));
+// };
+
+// const processOutput = (output: any) => {
+//   return removeUnderscoredKeys(removeEmptyValues(output));
+// };
+
+function ChatRow({
+  traceRootCall,
+  selectedTraceId,
+  onTraceSelect,
+}: {
+  traceRootCall: TraceCallSchema;
+  selectedTraceId: string | undefined;
+  onTraceSelect: (traceId: string) => void;
+}) {
+  const {useCall} = useWFHooks();
+  const {loading, result: call} = useCall({
+    entity: traceRootCall.project_id.split('/')[0],
+    project: traceRootCall.project_id.split('/')[1],
+    callId: traceRootCall.id,
+  });
+
+  const input = useMemo(() => {
+    const rawInput = {...call?.traceCall?.inputs};
+    if (rawInput && rawInput['self']) {
+      delete rawInput['self'];
+    }
+    return rawInput;
+    // return processInput(rawInput);
+  }, [call?.traceCall?.inputs])
+
+  const output = useMemo(() => {
+    const rawOutput = call?.traceCall?.output
+    return rawOutput;
+    // return processOutput(rawOutput);
+  }, [call?.traceCall?.output])
+
+  return (
+    <ChatItem
+      key={traceRootCall.id}
+      $isSelected={traceRootCall.trace_id === selectedTraceId}
+      onClick={() => onTraceSelect(traceRootCall.trace_id)}>
+      <InputSection>
+        <Label>Input</Label>
+        <Content>
+          {loading ? (
+            'Loading...'
+          ) : (
+            JSON.stringify(input, null, 2)
+          )}
+        </Content>
+      </InputSection>
+      <OutputSection>
+        <Label>Output</Label>
+        <Content>
+          {loading ? (
+            'Loading...'
+          ) : (
+            JSON.stringify(output, null, 2)
+          )}
+        </Content>
+      </OutputSection>
+    </ChatItem>
+  );
+}
