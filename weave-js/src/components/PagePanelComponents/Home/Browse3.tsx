@@ -80,7 +80,7 @@ import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
-import {ThreadsPage} from './Browse3/pages/ThreadsPage/ThreadsPage';
+import {ThreadsPage} from './Browse3/pages/ThreadsPage/index';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
