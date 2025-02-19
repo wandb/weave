@@ -23,6 +23,7 @@ export const TraceListView: React.FC<TraceViewProps> = ({
             <Button
               key={id}
               variant={id === selectedCallId ? 'secondary' : 'ghost'}
+              active={id === selectedCallId}
               onClick={() => onCallSelect(id)}
               className="w-full justify-start text-left">
               <div className="flex w-full flex-col gap-1 overflow-hidden">

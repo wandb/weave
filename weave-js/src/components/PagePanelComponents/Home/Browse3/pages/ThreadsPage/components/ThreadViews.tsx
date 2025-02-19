@@ -25,6 +25,7 @@ export const ThreadListView: React.FC<ThreadViewProps> = ({
             <Button
               key={traceId}
               variant={traceId === selectedTraceId ? 'secondary' : 'ghost'}
+              active={traceId === selectedTraceId}
               onClick={() => onTraceSelect(traceId)}
               className="w-full justify-start">
               <span className="truncate">{traceId}</span>
