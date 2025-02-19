@@ -1,4 +1,5 @@
 interactions:
+- request:
     body: ''
     headers:
       accept:
@@ -318,13 +319,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Wed, 19 Feb 2025 16:40:48 GMT
+      - Wed, 19 Feb 2025 17:36:42 GMT
       ETag:
       - W/"c48ac84a72a3006ab9f57be21afaa3b1b5b91d845ba602bf600dfe1339f2418d"
       Expires:
-      - Wed, 19 Feb 2025 16:45:48 GMT
+      - Wed, 19 Feb 2025 17:41:42 GMT
       Source-Age:
-      - '122'
+      - '209'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -334,19 +335,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '8'
+      - '16'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 90bf74d015b846fdb0735e24686693b22f1e2d1c
+      - 0e0c613aeefffabeaa0532fb9ef0dc69f90d2675
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - D333:5C61F:280C67:358785:67B4DD83
+      - 8844:31126C:45375D:5BB6F0:67B4DD87
       X-Served-By:
-      - cache-maa10223-MAA
+      - cache-bom4728-BOM
       X-Timer:
-      - S1739983248.204894,VS0,VE0
+      - S1739986603.920382,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -369,73 +370,56 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - b21ab9cc-fd7f-4e39-a2b0-d9270d5071ad
+      - 6ece7457-6ae1-4387-a1a3-8db1fad6dd14
       user-agent:
       - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
     uri: https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
   response:
     body:
-      string: '{"object":"chat.completion","id":"","created":1739983259,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"message":{"role":"assistant","content":"The
-        image showcases the iconic Statue of Liberty in New York City, prominently
-        featuring the statue''s copper-gold shimmer against the backdrop of the city''s
-        skyline."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":32,"total_tokens":76}}'
+      string: '{"object":"chat.completion","id":"","created":1739986358,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        image showcases the iconic Statue of Liberty in New York City, with the statue
+        situated on a small island surrounded by water and a skyline of city buildings
+        in the background."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":35,"total_tokens":79}}'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
       Access-Control-Expose-Headers:
       - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '506'
       Content-Type:
       - application/json
       Date:
-      - Wed, 19 Feb 2025 16:40:59 GMT
+      - Wed, 19 Feb 2025 17:36:43 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
-      Transfer-Encoding:
-      - chunked
       Via:
-      - 1.1 1607714021af07f8a918e4de3f3a8910.cloudfront.net (CloudFront)
+      - 1.1 9b54024ea9e954a7b4ed1fb94b9efefe.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - RJX4TDDP0-t6jEd6dJQeMTWiqvKlfEA0hFGOqur3WgS_GGwa5MnR3A==
+      - p584T43abpeEGk03fUOxw6ZdfQM56C47jclRvp7sZCR1PnumH22Lbw==
       X-Amz-Cf-Pop:
-      - MAA51-P3
+      - CCU50-P4
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       access-control-allow-credentials:
       - 'true'
-      access-control-allow-origin:
-      - '*'
       cross-origin-opener-policy:
       - same-origin
       vary:
-      - origin, access-control-request-method, access-control-request-headers, Origin,
-        Access-Control-Request-Method, Access-Control-Request-Headers
-      x-compute-characters:
-      - '365'
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       x-compute-time:
-      - '2.134828045'
+      - '4.4543221729999996'
       x-compute-type:
-      - 4-a10-g
-      x-generated-tokens:
-      - '32'
-      x-inference-time:
-      - '2087'
-      x-prompt-tokens:
-      - '44'
-      x-queue-time:
-      - '0'
+      - cache
       x-request-id:
-      - Root=1-67b60999-00887cbd1f5aec6c64a6a055;b21ab9cc-fd7f-4e39-a2b0-d9270d5071ad
+      - Root=1-67b616ab-609c144b6d9ea44a4cc7fa89;6ece7457-6ae1-4387-a1a3-8db1fad6dd14
       x-sha:
       - 9eb2daaa8597bf192a8b0e73f848f3a102794df5
-      x-time-per-token:
-      - '65'
-      x-total-time:
-      - '2134'
-      x-validation-time:
-      - '47'
     status:
       code: 200
       message: OK
