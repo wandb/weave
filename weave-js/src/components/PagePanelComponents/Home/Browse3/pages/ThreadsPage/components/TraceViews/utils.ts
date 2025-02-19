@@ -1,5 +1,5 @@
-import { TraceCallSchema } from "../../../wfReactInterface/traceServerClientTypes";
-import { parseSpanName } from "../../../wfReactInterface/tsDataModelHooks";
+import {TraceCallSchema} from '../../../wfReactInterface/traceServerClientTypes';
+import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
 
 /**
  * Generates a consistent color for a given operation name.
@@ -36,7 +36,6 @@ export const formatDuration = (ms: number): string => {
 export const formatTimestamp = (timestamp: string): string => {
   return new Date(timestamp).toLocaleString();
 };
-
 
 export const getCallDisplayName = (call: TraceCallSchema): string => {
   return call.display_name || parseSpanName(call.op_name);

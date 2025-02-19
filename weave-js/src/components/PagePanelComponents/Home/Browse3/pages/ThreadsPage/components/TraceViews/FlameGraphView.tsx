@@ -62,12 +62,15 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
 
       const children = node.childrenIds.map(childId => buildFlameNode(childId));
       const opNameReal = parseSpanName(call.op_name);
+      const isSelected = nodeId === selectedCallId;
 
       return {
+        id: nodeId,
         name: getCallDisplayName(call),
         value: duration,
         children: children.length > 0 ? children : undefined,
-        backgroundColor: getColorForOpName(opNameReal),
+        backgroundColor: isSelected ? '#0066FF' : getColorForOpName(opNameReal),
+        color: isSelected ? 'white' : undefined,
         timing: {
           start: startTime,
           end: endTime,
@@ -76,7 +79,7 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
     };
 
     return buildFlameNode(rootNode.id);
-  }, [traceTreeFlat]);
+  }, [traceTreeFlat, selectedCallId]);
 
   if (!flameData) {
     return (
@@ -97,24 +100,8 @@ export const FlameGraphView: React.FC<TraceViewProps> = ({
             data={flameData}
             height={dimensions.height}
             width={dimensions.width}
-            onChange={(node: FlameGraphNodeType) => {
-              const timing = node.timing;
-              if (!timing) {
-                return;
-              }
-
-              // Find the node in our trace tree that matches this name and timing
-              const matchingNode = Object.values(traceTreeFlat).find(
-                n =>
-                  getCallDisplayName(n.call) === node.name &&
-                  Date.parse(n.call.started_at) === timing.start &&
-                  (n.call.ended_at
-                    ? Date.parse(n.call.ended_at)
-                    : Date.now()) === timing.end
-              );
-              if (matchingNode) {
-                onCallSelect(matchingNode.id);
-              }
+            onChange={(node: {source: FlameGraphNodeType}) => {
+              onCallSelect(node.source.id);
             }}
             disableHover={false}
           />

@@ -2,10 +2,7 @@ import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
 import {ThreadListView, ThreadTimelineView} from './components/ThreadViews';
-import {
-  FlameGraphView,
-  TreeView,
-} from './components/TraceViews';
+import {FlameGraphView, TreeView} from './components/TraceViews';
 import {ThreadViewProps, TraceViewProps} from './types';
 
 /**
