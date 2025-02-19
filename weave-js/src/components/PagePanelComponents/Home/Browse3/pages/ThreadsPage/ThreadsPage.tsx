@@ -44,18 +44,20 @@ const ThreadListView: React.FC<{
     return <div className="p-4 text-red-500">Error: {error.message}</div>;
   }
   return (
-    <div className="p-4">
-      <h3 className="mb-4 text-lg font-semibold">Thread List View</h3>
-      <div className="flex flex-col gap-2">
-        {traces.map(traceId => (
-          <Button
-            key={traceId}
-            variant="ghost"
-            onClick={() => onTraceSelect(traceId)}
-            className="justify-start">
-            {traceId}
-          </Button>
-        ))}
+    <div className="h-full overflow-hidden">
+      <h3 className="p-4 text-lg font-semibold">Thread List View</h3>
+      <div className="h-[calc(100%-4rem)] overflow-y-auto px-4">
+        <div className="flex flex-col gap-2">
+          {traces.map(traceId => (
+            <Button
+              key={traceId}
+              variant="ghost"
+              onClick={() => onTraceSelect(traceId)}
+              className="w-full justify-start">
+              <span className="truncate">{traceId}</span>
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -74,18 +76,20 @@ const ThreadTimelineView: React.FC<{
     return <div className="p-4 text-red-500">Error: {error.message}</div>;
   }
   return (
-    <div className="p-4">
-      <h3 className="mb-4 text-lg font-semibold">Thread Timeline View</h3>
-      <div className="flex flex-col gap-2">
-        {traces.map(traceId => (
-          <Button
-            key={traceId}
-            variant="ghost"
-            onClick={() => onTraceSelect(traceId)}
-            className="justify-start">
-            {traceId}
-          </Button>
-        ))}
+    <div className="h-full overflow-hidden">
+      <h3 className="p-4 text-lg font-semibold">Thread Timeline View</h3>
+      <div className="h-[calc(100%-4rem)] overflow-y-auto px-4">
+        <div className="flex flex-col gap-2">
+          {traces.map(traceId => (
+            <Button
+              key={traceId}
+              variant="ghost"
+              onClick={() => onTraceSelect(traceId)}
+              className="w-full justify-start">
+              <span className="truncate">{traceId}</span>
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -96,37 +100,40 @@ const TraceListView: React.FC<{
   traceTreeFlat: TraceTreeFlat;
   onCallSelect: (callId: string) => void;
 }> = ({traceTreeFlat, onCallSelect}) => {
-  // Sort calls by start time
   const sortedCalls = useMemo(() => {
     return Object.values(traceTreeFlat)
       .sort((a, b) => {
         const aStartedAt = Date.parse(a.call.started_at);
         const bStartedAt = Date.parse(b.call.started_at);
-        return bStartedAt - aStartedAt; // Most recent first
+        return bStartedAt - aStartedAt;
       });
   }, [traceTreeFlat]);
 
   return (
-    <div className="p-4">
-      <h3 className="mb-4 text-lg font-semibold">List View</h3>
-      <div className="flex flex-col gap-2">
-        {sortedCalls.map(({call}) => (
-          <Button
-            key={call.id}
-            variant="ghost"
-            onClick={() => onCallSelect(call.id)}
-            className="justify-start text-left">
-            <div className="flex flex-col gap-1">
-              <div className="font-medium">{call.display_name || call.op_name}</div>
-              <div className="text-xs text-moon-500">
-                Started: {new Date(call.started_at).toLocaleString()}
-                {call.ended_at && ` • Duration: ${
-                  ((Date.parse(call.ended_at) - Date.parse(call.started_at)) / 1000).toFixed(2)
-                }s`}
+    <div className="h-full overflow-hidden">
+      <h3 className="p-4 text-lg font-semibold">List View</h3>
+      <div className="h-[calc(100%-4rem)] overflow-y-auto px-4">
+        <div className="flex flex-col gap-2">
+          {sortedCalls.map(({call}) => (
+            <Button
+              key={call.id}
+              variant="ghost"
+              onClick={() => onCallSelect(call.id)}
+              className="w-full justify-start text-left">
+              <div className="flex w-full flex-col gap-1 overflow-hidden">
+                <div className="font-medium truncate">
+                  {call.display_name || call.op_name}
+                </div>
+                <div className="text-xs text-moon-500 truncate">
+                  Started: {new Date(call.started_at).toLocaleString()}
+                  {call.ended_at && ` • Duration: ${
+                    ((Date.parse(call.ended_at) - Date.parse(call.started_at)) / 1000).toFixed(2)
+                  }s`}
+                </div>
               </div>
-            </div>
-          </Button>
-        ))}
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -183,13 +190,13 @@ const CallDetailSection: React.FC<{
   sectionTitle: string;
 }> = ({call, sectionTitle}) => {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex h-32 items-center justify-between border-b border-moon-250 px-8">
-        <h2 className="text-sm font-semibold">{sectionTitle}</h2>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
+        <h2 className="text-sm font-semibold truncate">{sectionTitle}</h2>
       </div>
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="min-h-0 flex-1 overflow-y-auto p-8">
         {call ? (
-          <pre className="text-sm text-moon-500">
+          <pre className="text-sm text-moon-500 overflow-x-auto whitespace-pre-wrap">
             {JSON.stringify(call, null, 2)}
           </pre>
         ) : (
@@ -600,11 +607,11 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
   return (
     <Tailwind style={{height: '100%'}}>
-      <div className="flex h-full w-full flex-col">
+      <div className="flex h-full w-full flex-col overflow-hidden">
         {/* Main Header */}
-        <div className="min-h-44 flex h-44 items-center justify-between border-b border-moon-250 px-16">
-          <div className="flex items-center gap-8">
-            <h1 className="text-lg font-semibold">Thread Explorer</h1>
+        <div className="flex h-44 min-h-44 shrink-0 items-center justify-between border-b border-moon-250 px-16">
+          <div className="flex items-center gap-8 overflow-hidden">
+            <h1 className="text-lg font-semibold truncate">Thread Explorer</h1>
             <DropdownMenu.Root
               open={isThreadMenuOpen}
               onOpenChange={setIsThreadMenuOpen}>
@@ -614,14 +621,16 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                   icon={threadsLoading ? "loading" : "overflow-vertical"}
                   disabled={threadsLoading || Boolean(threadsError)}
                   className={threadsLoading ? "animate-spin" : ""}>
-                  {selectedThreadId ? `Thread: ${selectedThreadId}` : 'Select Thread'}
+                  <span className="truncate">
+                    {selectedThreadId ? `Thread: ${selectedThreadId}` : 'Select Thread'}
+                  </span>
                 </Button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Content>
                 {threadsError ? (
                   <DropdownMenu.Item className="text-red-500">
-                    <Icon name="warning" className="mr-2" />
-                    Error: {threadsError.message}
+                    <Icon name="warning" className="mr-2 shrink-0" />
+                    <span className="truncate">Error: {threadsError.message}</span>
                   </DropdownMenu.Item>
                 ) : threads && threads.length > 0 ? (
                   threads.map(threadId => (
@@ -631,11 +640,11 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                         setSelectedThreadId(threadId);
                         setIsThreadMenuOpen(false);
                       }}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full items-center gap-2 overflow-hidden">
                         {threadId === selectedThreadId && (
-                          <Icon name="checkmark" className="text-green-500" />
+                          <Icon name="checkmark" className="text-green-500 shrink-0" />
                         )}
-                        <span>{threadId}</span>
+                        <span className="truncate">{threadId}</span>
                       </div>
                     </DropdownMenu.Item>
                   ))
@@ -648,11 +657,11 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Thread Panel - 30% */}
-          <div className="flex flex-[3] flex-col border-r border-moon-250">
-            <div className="flex h-32 items-center justify-between border-b border-moon-250 px-8">
-              <h2 className="text-sm font-semibold">Thread View</h2>
+          <div className="flex w-[30%] flex-col overflow-hidden border-r border-moon-250">
+            <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
+              <h2 className="text-sm font-semibold truncate">Thread View</h2>
               <div className="flex items-center gap-2">
                 <Button
                   variant={threadView === 'list' ? 'primary' : 'ghost'}
@@ -668,13 +677,15 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">{renderThreadView()}</div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {renderThreadView()}
+            </div>
           </div>
 
           {/* Trace Panel - 40% */}
-          <div className="flex flex-[4] flex-col">
-            <div className="flex h-32 items-center justify-between border-b border-moon-250 px-8">
-              <h2 className="text-sm font-semibold">Trace View</h2>
+          <div className="flex w-[40%] flex-col overflow-hidden">
+            <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
+              <h2 className="text-sm font-semibold truncate">Trace View</h2>
               <div className="flex items-center gap-2">
                 <Button
                   variant={traceView === 'list' ? 'primary' : 'ghost'}
@@ -702,12 +713,14 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">{renderTraceView()}</div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {renderTraceView()}
+            </div>
           </div>
 
           {/* Call Detail Panel - 30% */}
-          <div className="flex flex-[3] flex-col border-l border-moon-250">
-            <div className="flex h-full flex-col">
+          <div className="flex w-[30%] flex-col overflow-hidden border-l border-moon-250">
+            <div className="flex min-h-0 h-full flex-col overflow-hidden">
               <CallDetailSection
                 call={selectedCall}
                 sectionTitle="Call Details"
@@ -725,8 +738,8 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
         </div>
 
         {/* Main Footer */}
-        <div className="flex h-32 items-center border-t border-moon-250 px-16">
-          <span className="text-sm text-moon-500">
+        <div className="flex h-32 shrink-0 items-center border-t border-moon-250 px-16">
+          <span className="text-sm text-moon-500 truncate">
             {tracesLoading
               ? 'Loading traces...'
               : tracesError
