@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {Button} from '../../../../../../Button';
-import {ThreadViewProps} from '../viewRegistry';
+import {ThreadViewProps} from '../types';
 
 export const ThreadListView: React.FC<ThreadViewProps> = ({
   onTraceSelect,

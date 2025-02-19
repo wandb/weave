@@ -1,7 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../../../Button';
-import {TraceViewProps} from '../viewRegistry';
+import {TraceViewProps} from '../types';
 
 export const TraceListView: React.FC<TraceViewProps> = ({
   traceTreeFlat,

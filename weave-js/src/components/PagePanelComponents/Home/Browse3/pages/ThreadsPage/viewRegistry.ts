@@ -8,30 +8,28 @@ import {
   TraceTimelineView,
   TraceTreeView,
 } from './components/TraceViews';
-import {TraceTreeFlat} from './types';
+import {ThreadViewProps, TraceViewProps} from './types';
 
-export interface ThreadViewProps {
-  onTraceSelect: (traceId: string) => void;
-  traces: string[];
-  loading: boolean;
-  error: Error | null;
-}
-
-export interface TraceViewProps {
-  traceTreeFlat: TraceTreeFlat;
-  onCallSelect: (callId: string) => void;
-}
-
+/**
+ * Definition for a view component and its metadata
+ */
 export interface ViewDefinition<T> {
+  /** Unique identifier for the view */
   id: string;
+  /** Display label for the view */
   label: string;
+  /** Icon to show in the view selector */
   icon: IconName;
+  /** The React component that implements the view */
   component: FC<T>;
 }
 
+/** Registry of available thread views */
 export type ThreadViewRegistry = Array<ViewDefinition<ThreadViewProps>>;
+/** Registry of available trace views */
 export type TraceViewRegistry = Array<ViewDefinition<TraceViewProps>>;
 
+/** Available thread visualization views */
 export const threadViews: ThreadViewRegistry = [
   {
     id: 'list',
@@ -47,6 +45,7 @@ export const threadViews: ThreadViewRegistry = [
   },
 ];
 
+/** Available trace visualization views */
 export const traceViews: TraceViewRegistry = [
   {
     id: 'list',
@@ -74,8 +73,14 @@ export const traceViews: TraceViewRegistry = [
   },
 ];
 
+/**
+ * Get a thread view by ID, falling back to the first view if not found
+ */
 export const getThreadView = (viewId: string) =>
   threadViews.find(view => view.id === viewId) ?? threadViews[0];
 
+/**
+ * Get a trace view by ID, falling back to the first view if not found
+ */
 export const getTraceView = (viewId: string) =>
   traceViews.find(view => view.id === viewId) ?? traceViews[0];
