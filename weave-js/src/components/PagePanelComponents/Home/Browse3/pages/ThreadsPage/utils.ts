@@ -124,13 +124,13 @@ export interface CodeMapNode {
  * Transforms a trace tree into a code structure map.
  * This collapses the execution trace into a unique operation tree,
  * representing the actual code structure rather than the execution flow.
- * 
+ *
  * Key features:
  * - Collapses multiple calls to the same operation into a single node
  * - Maintains the logical structure of the code
  * - Preserves references to all calls for each operation
  * - Handles recursive calls by reusing existing nodes
- * 
+ *
  * @param traceTreeFlat The flattened trace tree to transform
  * @returns An array of root CodeMapNodes representing the code structure
  */

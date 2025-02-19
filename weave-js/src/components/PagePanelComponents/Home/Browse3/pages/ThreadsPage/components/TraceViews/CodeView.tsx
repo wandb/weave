@@ -55,7 +55,6 @@ const NodeContent = styled.div<{$isExpanded: boolean}>`
   display: ${props => (props.$isExpanded ? 'flex' : 'none')};
   flex-wrap: wrap;
   gap: 4px;
-  
 `;
 
 const CallPanel = styled.div`

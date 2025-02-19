@@ -1,7 +1,7 @@
 import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
-import {ListView, TimelineView} from './components/ThreadViews';
+import {ChatView} from './components/ThreadViews';
 import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
 import {CodeView} from './components/TraceViews/CodeView';
 import {ThreadViewProps, TraceViewProps} from './types';
@@ -30,16 +30,10 @@ export type TraceViewRegistry = Array<ViewDefinition<TraceViewProps>>;
 /** Available thread visualization views */
 export const threadViews: ThreadViewRegistry = [
   {
-    id: 'list',
-    label: 'List',
-    icon: 'list',
-    component: ListView,
-  },
-  {
-    id: 'timeline',
-    label: 'Timeline',
-    icon: 'chart-horizontal-bars',
-    component: TimelineView,
+    id: 'chat',
+    label: 'Chat',
+    icon: 'forum-chat-bubble',
+    component: ChatView,
   },
 ];
 

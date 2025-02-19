@@ -9,7 +9,7 @@ import {LoadableWithError} from '../wfReactInterface/wfDataModelHooksInterface';
 /**
  * Hook to fetch and manage the list of available threads.
  * Currently returns a static list for development.
- * 
+ *
  * @param entity - The entity (organization/user) context
  * @param project - The project context
  * @returns LoadableWithError containing the list of thread IDs
