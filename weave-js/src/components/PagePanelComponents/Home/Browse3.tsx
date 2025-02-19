@@ -32,8 +32,6 @@ import {
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
-import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {ComparePage} from './Browse3/compare/ComparePage';
 import {
   baseContext,
@@ -55,8 +53,6 @@ import {
 } from './Browse3/grid/pagination';
 import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
-import {BoardPage} from './Browse3/pages/BoardPage';
-import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
@@ -235,19 +231,6 @@ const Browse3Mounted: FC<{
         ) : (
           <Empty {...EMPTY_NO_TRACE_SERVER} />
         )}
-
-        <Route>
-          <Box component="main" sx={{flexGrow: 1, p: 3}}>
-            <Switch>
-              <Route path={`/${URL_BROWSE3}/:entity`}>
-                <Browse2EntityPage />
-              </Route>
-              <Route path={`/${URL_BROWSE3}`}>
-                <Browse2HomePage />
-              </Route>
-            </Switch>
-          </Box>
-        </Route>
       </Switch>
     </Box>
   );
@@ -464,18 +447,6 @@ const Browse3ProjectRoot: FC<{
             `${projectRoot}/leaderboards`,
           ]}>
           <LeaderboardPageBinding />
-        </Route>
-        {/* BOARDS */}
-        <Route
-          path={[
-            `${projectRoot}/boards/_new_board_`,
-            `${projectRoot}/boards/:boardId`,
-            `${projectRoot}/boards/:boardId/version/:versionId`,
-          ]}>
-          <BoardPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/boards`}>
-          <BoardsPageBinding />
         </Route>
         {/* TABLES */}
         <Route path={`${projectRoot}/tables/:tableId`}>
@@ -873,20 +844,6 @@ const OpVersionsPageBinding = () => {
 };
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
-const BoardPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemVersionParams>();
-
-  return (
-    <BoardPage
-      entity={params.entity}
-      project={params.project}
-      boardId={params.itemName}
-      versionId={params.version}
-    />
-  );
-};
-
-// TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemVersionParams>();
   return (
@@ -989,12 +946,6 @@ const OpsPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <OpsPage entity={params.entity} project={params.project} />;
-};
-
-const BoardsPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
-
-  return <BoardsPage entity={params.entity} project={params.project} />;
 };
 
 const ModsPageBinding = () => {

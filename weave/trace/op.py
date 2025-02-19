@@ -255,6 +255,9 @@ def _create_call(
 
     parent_call = call_context.get_current_call()
     attributes = call_attributes.get()
+    from weave.trace.serialize import dictify
+
+    attributes = dictify(attributes)
 
     return client.create_call(
         func,

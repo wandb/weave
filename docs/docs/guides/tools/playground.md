@@ -2,7 +2,7 @@
 
 > **The LLM Playground is currently in preview.**
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports OpenAI, Anthropic, Gemini, and Groq.
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports OpenAI, Anthropic, Google Gemini, Groq, and Amazon Bedrock models.
 
 ## Features
 
@@ -16,11 +16,11 @@ Evaluating LLM prompts and responses is challenging. The Weave Playground is des
 Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
 
 - [Prerequisites](#prerequisites)
-   - [Add provider credentials and information](#add-provider-credentials-and-information)
-   - [Access the Playground](#access-the-playground)
+  - [Add provider credentials and information](#add-provider-credentials-and-information)
+  - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
 - [Adjust LLM parameters](#adjust-llm-parameters)
-- [Add a function](#add-a-function) 
+- [Add a function](#add-a-function)
 - [Retry, edit, and delete messages](#retry-edit-and-delete-messages)
 - [Add a new message](#add-a-new-message)
 - [Compare LLMs](#compare-llms)
@@ -28,31 +28,35 @@ Get started with the Playground to optimize your LLM interactions and streamline
 
 ## Prerequisites
 
-Before you can use Playground, you must [add provider credentials](#add-provider-credentials-and-information), and [open the Playground UI](#access-the-playground). 
+Before you can use Playground, you must [add provider credentials](#add-provider-credentials-and-information), and [open the Playground UI](#access-the-playground).
 
-### Add provider credentials and information 
+### Add provider credentials and information
 
-Playground currently supports OpenAI, Anthropic, Gemini, Groq, and Amazon Bedrock models.
+Playground currently supports OpenAI, Anthropic, Gemini, Groq, Amazon Bedrock, and Azure models.
 To use one of the available models, add the appropriate information to your team secrets in W&B settings.
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
-- Gemini: `GOOGLE_API_KEY`
+- Google Gemini: `GOOGLE_API_KEY`
 - Groq: `GEMMA_API_KEY`
 - Amazon Bedrock:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-   - `AWS_REGION_NAME`
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
+  - `AWS_REGION_NAME`
+- Azure:
+  - `AZURE_API_KEY`
+  - `AZURE_API_BASE`
+  - `AZURE_API_VERSION`
 
 ### Access the Playground
 
 There are two ways to access the Playground:
 
-1. *Open a fresh Playground page with a simple system prompt*: In the sidebar, select **Playground**. Playground opens in the same tab.
-2. *Open Playground for a specific call*: 
-    1. In the sidebar, select the **Traces** tab. A list of traces displays.
-    2. In the list of traces, click the name of the call that you want to view. The call's details page opens.
-    3. Click **Open chat in playground**. Playground opens in a new tab.
+1. _Open a fresh Playground page with a simple system prompt_: In the sidebar, select **Playground**. Playground opens in the same tab.
+2. _Open Playground for a specific call_:
+   1. In the sidebar, select the **Traces** tab. A list of traces displays.
+   2. In the list of traces, click the name of the call that you want to view. The call's details page opens.
+   3. Click **Open chat in playground**. Playground opens in a new tab.
 
 ![Screenshot of Open in Playground button](imgs/open_chat_in_playground.png)
 
@@ -60,117 +64,125 @@ There are two ways to access the Playground:
 
 You can switch the LLM using the dropdown menu in the top left. The available models from various providers are listed below:
 
-- [AI21](#ai21)
-- [Amazon](#amazon)
+- [Amazon Bedrock](#amazon-bedrock)
 - [Anthropic](#anthropic)
-- [Cohere](#cohere)
-- [Google](#google)
+- [Azure](#azure)
+- [Google Gemini](#gemini)
 - [Groq](#groq)
-- [Meta](#meta)
-- [Mistral](#mistral)
 - [OpenAI](#openai)
 - [X.AI](#xai)
 
+### [Amazon Bedrock](../integrations/bedrock.md)
 
-### AI21
 - ai21.j2-mid-v1
 - ai21.j2-ultra-v1
-
-### Amazon
-- amazon.nova-lite
-- amazon.nova-micro
-- amazon.nova-pro
-- amazon.titan-text-express-v1
+- amazon.nova-micro-v1:0
+- amazon.nova-lite-v1:0
+- amazon.nova-pro-v1:0
 - amazon.titan-text-lite-v1
-
-### Anthropic
+- amazon.titan-text-express-v1
+- mistral.mistral-7b-instruct-v0:2
+- mistral.mixtral-8x7b-instruct-v0:1
+- mistral.mistral-large-2402-v1:0
+- mistral.mistral-large-2407-v1:0
+- anthropic.claude-3-sonnet-20240229-v1:0
 - anthropic.claude-3-5-sonnet-20240620-v1:0
 - anthropic.claude-3-haiku-20240307-v1:0
 - anthropic.claude-3-opus-20240229-v1:0
-- anthropic.claude-3-sonnet-20240229-v1:0
-- anthropic.claude-instant-v1
 - anthropic.claude-v2
 - anthropic.claude-v2:1
+- anthropic.claude-instant-v1
+- cohere.command-text-v14
+- cohere.command-light-text-v14
+- cohere.command-r-plus-v1:0
+- cohere.command-r-v1:0
+- meta.llama2-13b-chat-v1
+- meta.llama2-70b-chat-v1
+- meta.llama3-8b-instruct-v1:0
+- meta.llama3-70b-instruct-v1:0
+- meta.llama3-1-8b-instruct-v1:0
+- meta.llama3-1-70b-instruct-v1:0
+- meta.llama3-1-405b-instruct-v1:0
+
+### [Anthropic](../integrations/anthropic.md)
+
+- claude-3-5-sonnet-20240620
 - claude-3-5-sonnet-20241022
 - claude-3-haiku-20240307
 - claude-3-opus-20240229
 - claude-3-sonnet-20240229
 
-### Cohere
-- cohere.command-light-text-v14
-- cohere.command-r-plus-v1:0
-- cohere.command-r-v1:0
-- cohere.command-text-v14
+### [Azure](../integrations/azure.md)
 
-### Google
-- gemini/gemini-1.5-flash
+- azure/o1-mini
+- azure/o1-mini-2024-09-12
+- azure/o1
+- azure/o1-preview
+- azure/o1-preview-2024-09-12
+- azure/gpt-4o
+- azure/gpt-4o-2024-08-06
+- azure/gpt-4o-2024-11-20
+- azure/gpt-4o-2024-05-13
+- azure/gpt-4o-mini
+- azure/gpt-4o-mini-2024-07-18
+
+### [Google Gemini](../integrations/google-gemini.md)
+
 - gemini/gemini-1.5-flash-001
 - gemini/gemini-1.5-flash-002
 - gemini/gemini-1.5-flash-8b-exp-0827
 - gemini/gemini-1.5-flash-8b-exp-0924
 - gemini/gemini-1.5-flash-exp-0827
 - gemini/gemini-1.5-flash-latest
-- gemini/gemini-1.5-pro
+- gemini/gemini-1.5-flash
 - gemini/gemini-1.5-pro-001
 - gemini/gemini-1.5-pro-002
 - gemini/gemini-1.5-pro-exp-0801
 - gemini/gemini-1.5-pro-exp-0827
 - gemini/gemini-1.5-pro-latest
+- gemini/gemini-1.5-pro
 - gemini/gemini-pro
+- gemini/gemini-2.0-flash-exp
+- gemini/gemini-2.0-flash-thinking-exp
 
-### Groq
+### [Groq](../integrations/groq.md)
+
 - groq/gemma-7b-it
 - groq/gemma2-9b-it
-- groq/llama-3.1-70b-versatile
 - groq/llama-3.1-8b-instant
 - groq/llama3-70b-8192
 - groq/llama3-8b-8192
-- groq/llama3-groq-70b-8192-tool-use-preview
 - groq/llama3-groq-8b-8192-tool-use-preview
 - groq/mixtral-8x7b-32768
 
-### Meta
-- meta.llama2-13b-chat-v1
-- meta.llama2-70b-chat-v1
-- meta.llama3-1-405b-instruct-v1:0
-- meta.llama3-1-70b-instruct-v1:0
-- meta.llama3-1-8b-instruct-v1:0
-- meta.llama3-70b-instruct-v1:0
-- meta.llama3-8b-instruct-v1:0
+### [OpenAI](../integrations/openai.md)
 
-### Mistral
-- mistral.mistral-7b-instruct-v0:2
-- mistral.mistral-large-2402-v1:0
-- mistral.mistral-large-2407-v1:0
-- mistral.mixtral-8x7b-instruct-v0:1
-
-### OpenAI
-- gpt-3.5-turbo
+- gpt-4o-mini
 - gpt-3.5-turbo-0125
 - gpt-3.5-turbo-1106
-- gpt-3.5-turbo-16k
-- gpt-4
-- gpt-4-0125-preview
-- gpt-4-0314
-- gpt-4-0613
 - gpt-4-1106-preview
 - gpt-4-32k-0314
-- gpt-4-turbo
 - gpt-4-turbo-2024-04-09
 - gpt-4-turbo-preview
-- gpt-40-2024-05-13
-- gpt-40-2024-08-06
-- gpt-40-mini
-- gpt-40-mini-2024-07-18
+- gpt-4-turbo
+- gpt-4
+- gpt-4o-2024-05-13
+- gpt-4o-2024-08-06
+- gpt-4o-mini-2024-07-18
 - gpt-4o
-- o1-mini
+- gpt-4o-2024-11-20
 - o1-mini-2024-09-12
-- o1-preview
+- o1-mini
 - o1-preview-2024-09-12
+- o1-preview
+- o1-2024-12-17
 
 ### X.AI
-- xai/grok-beta
 
+- xai/grok-beta
+- xai/grok-2-1212
+- xai/grok-2
+- xai/grok-2-latest
 
 ## Adjust LLM parameters
 
@@ -178,7 +190,7 @@ You can experiment with different parameter values for your selected model. To a
 
 1. In the upper right corner of the Playground UI, click **Chat settings** to open the parameter settings dropdown.
 2. In the dropdown, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
-3. Click **Chat settings** to close the dropdown and save your changes. 
+3. Click **Chat settings** to close the dropdown and save your changes.
 
 ![Screenshot of Playground settings](imgs/playground_settings.png)
 
@@ -190,11 +202,11 @@ You can test how different models use functions based on input it receives from 
 2. In the dropdown, click **+ Add function**.
 3. In the pop-up, add your function information.
 4. To save your changes and close the function pop-up, click the **x** in the upper right corner.
-3. Click **Chat settings** to close the settings dropdown and save your changes.
+5. Click **Chat settings** to close the settings dropdown and save your changes.
 
 ## Retry, edit, and delete messages
 
-With Playground, you can retry, edit, and delete messages. To use this feature,  hover over the message you want to edit, retry, or delete. Three buttons display: **Delete**, **Edit**, and **Retry**.
+With Playground, you can retry, edit, and delete messages. To use this feature, hover over the message you want to edit, retry, or delete. Three buttons display: **Delete**, **Edit**, and **Retry**.
 
 - **Delete**: Remove the message from the chat.
 - **Edit**: Modify the message content.

@@ -27,9 +27,9 @@ import {useHistory} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
 
 import {isWeaveObjectRef, parseRef, parseRefMaybe} from '../../../../../react';
-import {flattenObjectPreservingWeaveTypes} from '../../Browse2/browse2Util';
 import {CellValue} from '../../Browse2/CellValue';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {flattenObjectPreservingWeaveTypes} from '../flattenObject';
 import {WeaveCHTableSourceRefContext} from '../pages/CallPage/DataTableView';
 import {TABLE_ID_EDGE_NAME} from '../pages/wfReactInterface/constants';
 import {useWFHooks} from '../pages/wfReactInterface/context';
@@ -99,15 +99,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     page: 0,
     pageSize: 50,
   });
-
-  // Reset sort model and pagination if we enter edit mode with sorting applied.
-  useEffect(() => {
-    if (isEditing && sortModel.length > 0) {
-      setPaginationModel({page: 0, pageSize: 50});
-      setSortModel([]);
-      setSortBy([]);
-    }
-  }, [isEditing, sortModel]);
 
   const sharedRef = useContext(WeaveCHTableSourceRefContext);
 
@@ -269,16 +260,14 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
 
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
-      return loadedRows.map((row, i) => {
+      return loadedRows.map(row => {
         const digest = row.digest;
-        const absoluteIndex =
-          i + paginationModel.pageSize * paginationModel.page;
         const value = flattenObjectPreservingWeaveTypes(row.val);
-        const editedRow = editedRows.get(absoluteIndex);
+        const editedRow = editedRows.get(row.original_index);
         return {
           ___weave: {
-            id: `${digest}_${absoluteIndex}`,
-            index: absoluteIndex,
+            id: `${digest}_${row.original_index}`,
+            index: row.original_index,
             isNew: false,
             serverValue: value,
           },
@@ -287,7 +276,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       });
     }
     return [];
-  }, [loadedRows, fetchQueryLoaded, editedRows, paginationModel]);
+  }, [loadedRows, fetchQueryLoaded, editedRows]);
 
   const combinedRows = useMemo(() => {
     if (
@@ -404,12 +393,12 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       flex: columnWidths[field as string] ? undefined : 1,
       minWidth: 100,
       editable: isEditing,
-      sortable: !isEditing,
+      sortable: true,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
-            <Box sx={{marginLeft: '8px'}}>
+            <Box sx={{marginLeft: '8px', height: '100%'}}>
               <CellValue value={params.value} />
             </Box>
           );
@@ -489,7 +478,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
               icon="add-new"
               onClick={handleAddRowsClick}
               variant="secondary"
-              size="small"
               tooltip="Add row">
               Add row
             </Button>
@@ -550,6 +538,22 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
           height: '100%',
           '& .MuiDataGrid-cell': {
             padding: '0',
+            // This vertical / horizontal center aligns <span>'s inside of the columns
+            // Fixes an issure where boolean checkboxes are top-aligned pre-edit
+            '& .MuiBox-root': {
+              '& span.cursor-inherit': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '34px',
+              },
+            },
+          },
+          // Removed default MUI blue from editing cell
+          '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {
+            '&:focus, &:focus-within': {
+              outline: 'none',
+            },
           },
           '& .MuiDataGrid-columnHeaders': {
             borderBottom: '1px solid rgba(224, 224, 224, 1)',

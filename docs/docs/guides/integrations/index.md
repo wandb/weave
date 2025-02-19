@@ -10,20 +10,20 @@ Weave provides automatic logging integrations for popular LLM providers and orch
 
 LLM providers are the vendors that offer access to large language models for generating predictions. Weave integrates with these providers to log and trace the interactions with their APIs:
 
-- **[OpenAI](/guides/integrations/openai)**
+- **[Amazon Bedrock](/guides/integrations/bedrock)**
 - **[Anthropic](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
 - **[Cohere](/guides/integrations/cohere)**
-- **[MistralAI](/guides/integrations/mistral)**
-- **[Microsoft Azure](/guides/integrations/azure)**
 - **[Google Gemini](/guides/integrations/google-gemini)**
-- **[Together AI](/guides/integrations/together_ai)**
 - **[Groq](/guides/integrations/groq)**
-- **[Open Router](/guides/integrations/openrouter)**
+- **[Hugging Face Hub](/guides/integrations/huggingface)**
 - **[LiteLLM](/guides/integrations/litellm)**
+- **[Microsoft Azure](/guides/integrations/azure)**
+- **[MistralAI](/guides/integrations/mistral)**
 - **[NVIDIA NIM](/guides/integrations/nvidia_nim)**
-
-
+- **[OpenAI](/guides/integrations/openai)**
+- **[Open Router](/guides/integrations/openrouter)**
+- **[Together AI](/guides/integrations/together_ai)**
 
 **[Local Models](/guides/integrations/local_models)**: For when you're running models on your own infrastructure.
 

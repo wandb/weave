@@ -3,6 +3,14 @@ import TabItem from '@theme/TabItem';
 
 # OpenAI
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_openai.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
+:::note
+Do you want to experiment with OpenAI models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+:::
+
 ## Tracing
 
 It’s important to store traces of LLM applications in a central database, both during development and in production. You’ll use these traces for debugging and to help build a dataset of tricky examples to evaluate against while improving your application.

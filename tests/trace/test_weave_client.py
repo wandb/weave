@@ -15,6 +15,7 @@ from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
+    client_is_sqlite,
 )
 from weave import Evaluation
 from weave.trace import refs, weave_client
@@ -32,9 +33,6 @@ from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
-)
-from weave.trace_server.sqlite_trace_server import (
-    SqliteTraceServer,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1370,8 +1368,7 @@ def test_table_partitioning(network_proxy_client):
 
 
 def test_summary_tokens_cost(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if is_sqlite:
+    if client_is_sqlite(client):
         # SQLite does not support costs
         return
 
@@ -1507,8 +1504,7 @@ def test_summary_tokens_cost(client):
 
 @pytest.mark.skip_clickhouse_client
 def test_summary_tokens_cost_sqlite(client):
-    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
-    if not is_sqlite:
+    if not client_is_sqlite(client):
         # only run this test for sqlite
         return
 
@@ -1847,3 +1843,43 @@ def test_delete_op_version(client):
     # but the ref is still deleted
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         op_ref.get()
+
+
+def test_global_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(global_attributes={"env": "test", "version": "1.0"}) as client:
+        my_op(1)
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Check global attributes are present
+        assert call.attributes["env"] == "test"
+        assert call.attributes["version"] == "1.0"
+
+
+def test_global_attributes_with_call_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(
+        global_attributes={"global_attr": "global", "env": "test"}
+    ) as client:
+        with weave.attributes({"local_attr": "local", "env": "override"}):
+            my_op(1)
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Both global and local attributes are present
+        assert call.attributes["global_attr"] == "global"
+        assert call.attributes["local_attr"] == "local"
+
+        # Local attributes override global ones
+        assert call.attributes["env"] == "override"

@@ -1,11 +1,15 @@
 import datetime
 import re
+from typing import Optional
 
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def client_is_sqlite(client):
-    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    return isinstance(
+        client.server._next_trace_server._internal_trace_server,
+        SqliteTraceServer,
+    )
 
 
 class AnyStrMatcher:
@@ -64,3 +68,30 @@ class DatetimeMatcher:
 
 class DummyTestException(Exception):
     pass
+
+
+def get_info_loglines(
+    caplog, match_string: Optional[str] = None, getattrs: list[str] = ["msg"]
+):
+    """
+    Get all log lines from caplog that match the given string.
+
+    Match string is compared to the message, and getattrs is a list of attributes to get from the record.
+
+    Example:
+    ```python
+    logger.info("my query", query="SELECT * FROM my_table")
+    ```
+
+    >>> get_info_loglines(caplog, "my query", ["msg", "query"])
+    >>> [{"msg": "my query", "query": "SELECT * FROM my_table"}]
+    """
+    lines = []
+    for record in caplog.records:
+        if match_string and record.msg != match_string:
+            continue
+        line = {}
+        for attr in getattrs:
+            line[attr] = getattr(record, attr)
+        lines.append(line)
+    return lines

@@ -50,7 +50,6 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {TailwindContents} from '../../../../../Tailwind';
-import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
   useWeaveflowCurrentRouteContext,
@@ -63,6 +62,7 @@ import {
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -111,7 +111,7 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-const MAX_EVAL_COMPARISONS = 5;
+
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
@@ -548,7 +548,7 @@ export const CallsTable: FC<{
     if (!needsUpdate) {
       return;
     }
-    const hiddenColumnVisiblityFalse = hiddenColumns.reduce((acc, col) => {
+    const hiddenColumnVisibilityFalse = hiddenColumns.reduce((acc, col) => {
       // Only add columns=false when not already in the model
       if (columnVisibilityModel[col] === undefined) {
         acc[col] = false;
@@ -558,7 +558,7 @@ export const CallsTable: FC<{
 
     setColumnVisibilityModel({
       ...columnVisibilityModel,
-      ...hiddenColumnVisiblityFalse,
+      ...hiddenColumnVisibilityFalse,
     });
   }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
@@ -590,17 +590,14 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                const maxForTable = isEvaluateTable
-                  ? MAX_EVAL_COMPARISONS
-                  : MAX_SELECT;
                 if (
                   selectedCalls.length ===
-                  Math.min(tableData.length, maxForTable)
+                  Math.min(tableData.length, MAX_SELECT)
                 ) {
                   setSelectedCalls([]);
                 } else {
                   setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, maxForTable)
+                    tableData.map(row => row.id).slice(0, MAX_SELECT)
                   );
                 }
               }}
@@ -610,19 +607,11 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabled =
-            !isSelected &&
-            (isEvaluateTable
-              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
-              : selectedCalls.length >= MAX_SELECT);
-          let tooltipText = '';
-          if (isEvaluateTable) {
-            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
-              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
-            }
-          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
-            tooltipText = `Selection limited to ${MAX_SELECT} items`;
-          }
+          const disabled = !isSelected && selectedCalls.length >= MAX_SELECT;
+          const tooltipText =
+            selectedCalls.length >= MAX_SELECT && !isSelected
+              ? `Selection limited to ${MAX_SELECT} items`
+              : '';
 
           return (
             <Tooltip title={tooltipText} placement="right" arrow>
@@ -652,7 +641,7 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+  }, [columns.cols, selectedCalls, tableData]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
