@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class PresidioScorer(weave.Scorer):
     """
     The `PresidioScorer` class is a guardrail for entity recognition and anonymization
@@ -29,6 +30,7 @@ class PresidioScorer(weave.Scorer):
 
     Offline mode for presidio: https://github.com/microsoft/presidio/discussions/1435
     """
+
     language: str = Field(
         default="en", description="The language of the text to be analyzed."
     )
@@ -38,7 +40,7 @@ class PresidioScorer(weave.Scorer):
     )
 
     selected_entities: Optional[list[str]] = Field(
-        default_factory=None,
+        default=None,
         description="A list of entity types to detect in the text.",
         examples=[["EMAIL_ADDRESS"]],
     )
@@ -61,11 +63,16 @@ class PresidioScorer(weave.Scorer):
                 self._analyzer.registry.add_recognizer(recognizer)
 
         # Get available entities dynamically
-        available_entities = [recognizer.supported_entities[0] for recognizer in self._analyzer.registry.recognizers]
+        available_entities = [
+            recognizer.supported_entities[0]
+            for recognizer in self._analyzer.registry.recognizers
+        ]
 
         if self.selected_entities is not None:
             # Filter out invalid entities and warn user
-            invalid_entities = list(set(self.selected_entities) - set(available_entities))
+            invalid_entities = list(
+                set(self.selected_entities) - set(available_entities)
+            )
             valid_entities = list(
                 set(self.selected_entities).intersection(available_entities)
             )
@@ -75,6 +82,8 @@ class PresidioScorer(weave.Scorer):
                     f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
                 )
                 self.selected_entities = valid_entities
+        else:
+            self.selected_entities = available_entities
 
     @weave.op
     def group_analyzer_results_by_entity_type(
@@ -105,9 +114,9 @@ class PresidioScorer(weave.Scorer):
 
         # Add information about what was checked
         explanation_parts.append("\nChecked for these entity types:")
-        for entity in self.selected_entities:
-            explanation_parts.append(f"- {entity}")
-
+        if self.selected_entities is not None:
+            for entity in self.selected_entities:
+                explanation_parts.append(f"- {entity}")
         return "\n".join(explanation_parts)
 
     @weave.op
@@ -126,7 +135,9 @@ class PresidioScorer(weave.Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, output: str, entities: Optional[list[str]] = None) -> WeaveScorerResult:
+    def score(
+        self, output: str, entities: Optional[list[str]] = None
+    ) -> WeaveScorerResult:
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")
         if entities is None:
