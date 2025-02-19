@@ -16,18 +16,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-def get_available_entities() -> list[str]:
-    """Get available entities from Presidio"""
-    from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
-
-    registry = RecognizerRegistry()
-    analyzer = AnalyzerEngine(registry=registry)
-    return [
-        recognizer.supported_entities[0] for recognizer in analyzer.registry.recognizers
-    ]
-
-
 class PresidioScorer(weave.Scorer):
     """
     The `PresidioScorer` class is a guardrail for entity recognition and anonymization
@@ -42,8 +30,8 @@ class PresidioScorer(weave.Scorer):
     Offline mode for presidio: https://github.com/microsoft/presidio/discussions/1435
     """
 
-    selected_entities: list[str] = Field(
-        default_factory=get_available_entities,
+    selected_entities: Optional[list[str]] = Field(
+        default_factory=None,
         description="A list of entity types to detect in the text.",
         examples=[["EMAIL_ADDRESS"]],
     )
@@ -57,10 +45,6 @@ class PresidioScorer(weave.Scorer):
     _analyzer: Optional["AnalyzerEngine"] = PrivateAttr(default=None)
     _anonymizer: Optional["AnonymizerEngine"] = PrivateAttr(default=None)
 
-    @property
-    def available_entities(self) -> list[str]:
-        return get_available_entities()
-
     def model_post_init(self, __context: Any) -> None:
         from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
         from presidio_anonymizer import AnonymizerEngine
@@ -69,25 +53,26 @@ class PresidioScorer(weave.Scorer):
         self._analyzer = AnalyzerEngine(registry=registry)
         self._anonymizer = AnonymizerEngine()
 
-        # Get available entities dynamically
-        available_entities = self.available_entities
-
-        # Filter out invalid entities and warn user
-        invalid_entities = list(set(self.selected_entities) - set(available_entities))
-        valid_entities = list(
-            set(self.selected_entities).intersection(available_entities)
-        )
-
-        if invalid_entities:
-            logger.warning(
-                f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
-            )
-            self.selected_entities = valid_entities
-
         # Add custom recognizers if provided
         if self.custom_recognizers:
             for recognizer in self.custom_recognizers:
                 self._analyzer.registry.add_recognizer(recognizer)
+
+        # Get available entities dynamically
+        available_entities = [recognizer.supported_entities[0] for recognizer in self._analyzer.registry.recognizers]
+
+        if self.selected_entities is not None:
+            # Filter out invalid entities and warn user
+            invalid_entities = list(set(self.selected_entities) - set(available_entities))
+            valid_entities = list(
+                set(self.selected_entities).intersection(available_entities)
+            )
+
+            if invalid_entities:
+                logger.warning(
+                    f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
+                )
+                self.selected_entities = valid_entities
 
     @weave.op
     def group_analyzer_results_by_entity_type(
@@ -139,11 +124,13 @@ class PresidioScorer(weave.Scorer):
         return anonymized_text
 
     @weave.op
-    def score(self, output: str) -> WeaveScorerResult:
+    def score(self, output: str, entities: Optional[list[str]] = None) -> WeaveScorerResult:
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")
+        if entities is None:
+            entities = self.selected_entities
         analyzer_results = self._analyzer.analyze(
-            text=str(output), entities=self.selected_entities, language=self.language
+            text=str(output), entities=entities, language=self.language
         )
         detected_entities = self.group_analyzer_results_by_entity_type(
             output, analyzer_results
