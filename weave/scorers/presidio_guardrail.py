@@ -29,12 +29,6 @@ class PresidioScorer(weave.Scorer):
 
     Offline mode for presidio: https://github.com/microsoft/presidio/discussions/1435
     """
-
-    selected_entities: Optional[list[str]] = Field(
-        default_factory=None,
-        description="A list of entity types to detect in the text.",
-        examples=[["EMAIL_ADDRESS"]],
-    )
     language: str = Field(
         default="en", description="The language of the text to be analyzed."
     )
@@ -42,6 +36,14 @@ class PresidioScorer(weave.Scorer):
         default_factory=list,
         description="A list of custom recognizers to add to the analyzer. Check Presidio's documentation for more information; https://microsoft.github.io/presidio/samples/python/customizing_presidio_analyzer/",
     )
+
+    selected_entities: Optional[list[str]] = Field(
+        default_factory=None,
+        description="A list of entity types to detect in the text.",
+        examples=[["EMAIL_ADDRESS"]],
+    )
+
+    # Private attributes
     _analyzer: Optional["AnalyzerEngine"] = PrivateAttr(default=None)
     _anonymizer: Optional["AnonymizerEngine"] = PrivateAttr(default=None)
 
