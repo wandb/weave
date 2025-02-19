@@ -21,6 +21,7 @@ KNOWN_TYPES = {
     "Op",
     "PIL.Image.Image",
     "wave.Wave_read",
+    "datetime.datetime",
 }
 
 
