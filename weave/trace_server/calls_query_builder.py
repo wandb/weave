@@ -38,7 +38,6 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
-    _process_query_to_conditions,
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
@@ -729,10 +728,6 @@ def make_simple_like_condition(
         return ""
 
     return f"AND {table_alias}.{field_name} LIKE '%{field_value}%'"
-
-    # if isinstance(condition.operand, tsi_query.EqOperation):
-    #     return f"calls_merged.display_name LIKE '%{condition.operand.eq_[1].literal_}%'"
-    return ""
 
 
 ALLOWED_CALL_FIELDS = {
