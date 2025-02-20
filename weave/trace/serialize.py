@@ -10,6 +10,8 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.serialization.protocol import SerializationContext
+from weave.trace.serialization.registry import REGISTRY
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -23,62 +25,95 @@ from weave.trace_server.trace_server_interface_util import bytes_digest
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
+# Register ref serializers
+from weave.trace.serialization.refs import ObjectRefSerializer, TableRefSerializer
+REGISTRY.register(ObjectRefSerializer)
+REGISTRY.register(TableRefSerializer)
 
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
-    if isinstance(obj, TableRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
-        for k, v in obj.__dict__.items():
-            res[k] = to_json(v, project_id, client, use_dictify)
-        return res
+    """Convert an object to a JSON-serializable format.
+    
+    This function handles the high-level serialization logic, attempting different
+    approaches in order:
+    1. Use registered serializers
+    2. Handle collections recursively
+    3. Try custom object encoding
+    4. Fall back to dictification or string representation
+    
+    Args:
+        obj: The object to serialize
+        project_id: The project ID for context
+        client: The WeaveClient instance
+        use_dictify: Whether to allow dictification as a fallback
+        
+    Returns:
+        A JSON-serializable representation of the object
+    """
+    # Create serialization context
+    context = SerializationContext(
+        project_id=project_id,
+        client=client,
+        ref_chain=[],
+        use_dictify=use_dictify
+    )
+    
+    # Try registered serializers first
+    try:
+        serializer = REGISTRY.get_for_object(obj)
+        result = serializer.serialize(obj, context)
+        return {
+            "_type": result.type_id,
+            "metadata": result.metadata,
+            "content": result.content
+        }
+    except ValueError:
+        pass
+        
+    # Handle collections
+    if isinstance(obj, (list, tuple)):
+        return [to_json(v, project_id, client, use_dictify) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
     elif isinstance_namedtuple(obj):
         return {
             k: to_json(v, project_id, client, use_dictify)
             for k, v in obj._asdict().items()
         }
-    elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client, use_dictify) for v in obj]
-    elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
-
+    elif isinstance(obj, ObjectRecord):
+        res = {"_type": obj._class_name}
+        for k, v in obj.__dict__.items():
+            res[k] = to_json(v, project_id, client, use_dictify)
+        return res
+        
+    # Handle primitives
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
-
-    # Add explicit handling for WeaveScorerResult models
+        
+    # Special case for WeaveScorerResult
     from weave.flow.scorer import WeaveScorerResult
-
     if isinstance(obj, WeaveScorerResult):
         return {
             k: to_json(v, project_id, client, use_dictify)
             for k, v in obj.model_dump().items()
         }
-
-    # This still blocks potentially on large-file i/o.
+        
+    # Try custom object encoding
     encoded = custom_objs.encode_custom_obj(obj)
-    if encoded is None:
-        if (
-            use_dictify
-            and not isinstance(obj, ALWAYS_STRINGIFY)
-            and not has_custom_repr(obj)
-        ):
-            return dictify(obj)
-
-        # TODO: I would prefer to only have this once in dictify? Maybe dictify and to_json need to be merged?
-        # However, even if dictify is false, i still want to try to convert to dict
-        elif as_dict := try_to_dict(obj):
-            return {
-                k: to_json(v, project_id, client, use_dictify)
-                for k, v in as_dict.items()
-            }
-        return fallback_encode(obj)
-    result = _build_result_from_encoded(encoded, project_id, client)
-
-    return result
+    if encoded is not None:
+        return _build_result_from_encoded(encoded, project_id, client)
+        
+    # Fall back to dictification or string representation
+    if use_dictify and not isinstance(obj, ALWAYS_STRINGIFY) and not has_custom_repr(obj):
+        return dictify(obj)
+    elif as_dict := try_to_dict(obj):
+        return {
+            k: to_json(v, project_id, client, use_dictify)
+            for k, v in as_dict.items()
+        }
+        
+    return fallback_encode(obj)
 
 
 def _build_result_from_encoded(
