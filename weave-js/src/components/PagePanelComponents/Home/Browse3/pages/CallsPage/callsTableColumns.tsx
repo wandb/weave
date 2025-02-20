@@ -435,14 +435,15 @@ function buildCallsTableColumns(
         // Add to scorer's group
         scorerGroup?.children.push({field});
         // remove the leading dot from the score path
-        const headerName = (parsed?.scorePath || colName).replace(/^\./, '');
+        const scorePath = (parsed?.scorePath || colName).replace(/^\./, '');
+        const headerName = `${scorerName}.${scorePath}`;
 
         scoreColumns.push({
           field,
           headerName,
           width: 150,
           renderHeader: () => {
-            return <div>{headerName}</div>;
+            return <div>{scorePath}</div>;
           },
           valueGetter: (unused: any, row: any) => {
             return row[colName];
