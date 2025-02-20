@@ -30,6 +30,7 @@ const SidebarSections = styled.div`
   gap: 20px;
   position: sticky;
   top: 0;
+  height: calc(100% - 12px); // Full page minus top margin
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
     gap: 14px;
     height: 100%;

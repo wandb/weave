@@ -28,6 +28,13 @@ const SidebarWrapper = styled.div`
     align-items: center;
   }
   cursor: pointer;
+
+  &.intercom-button {
+    margin-top: auto;
+    @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
+      margin-top: 0;
+    }
+  }
 `;
 SidebarWrapper.displayName = 'S.SidebarWrapper';
 
@@ -117,7 +124,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           return (
             <SidebarWrapper
               key={item.name}
-              className="night-aware"
+              className={`night-aware ${(item as any).className || ''}`}
               onClick={item.onClick}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}

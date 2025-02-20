@@ -250,7 +250,8 @@ export const useProjectSidebar = (
                 console.warn('Intercom is not available');
               }
             },
-            slug: undefined
+            slug: undefined,
+            className: 'intercom-button'
           },
         ];
 
