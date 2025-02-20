@@ -35,7 +35,6 @@ class OpenAIModerationScorer(weave.Scorer):
     )
 
     @weave.op
-    @validate_call
     async def score(self, output: str) -> dict:
         """
         Score the given text against the OpenAI moderation API.
