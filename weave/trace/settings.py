@@ -199,12 +199,12 @@ def scorers_dir() -> str:
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
-    if settings is None:
-        user_settings = UserSettings()
-    if isinstance(settings, dict):
-        user_settings = UserSettings.model_validate(settings)
     if isinstance(settings, UserSettings):
         user_settings = settings
+    elif isinstance(settings, dict):
+        user_settings = UserSettings.model_validate(settings)
+    else:
+        user_settings = UserSettings()
 
     user_settings.apply()
 
