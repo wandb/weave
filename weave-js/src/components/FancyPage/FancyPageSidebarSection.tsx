@@ -159,7 +159,9 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
             href: item.externalLink,
           };
           return (
-            <SidebarWrapper key={item.name} className={`night-aware ${item.className || ''}`}>
+            <SidebarWrapper
+              key={item.name}
+              className={`night-aware ${item.className || ''}`}>
               <TargetBlank
                 {...externalLinkProps}
                 style={{
