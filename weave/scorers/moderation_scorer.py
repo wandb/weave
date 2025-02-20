@@ -7,10 +7,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.scorer_types import RollingWindowScorer
-from weave.scorers.utils import (
-    MODEL_PATHS,
-    load_hf_model_weights,
-)
+from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights
 
 if TYPE_CHECKING:
     from torch import Tensor

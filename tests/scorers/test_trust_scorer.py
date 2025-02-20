@@ -4,8 +4,8 @@ import pytest
 
 import weave
 from tests.scorers.test_utils import TINY_MODEL_PATHS
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
-from weave.scorers.utils import WeaveScorerResult
 
 
 @pytest.fixture

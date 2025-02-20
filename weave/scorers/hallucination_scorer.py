@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Union
+from typing import Union
 
 from litellm import acompletion
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
@@ -8,14 +8,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.scorer_types import HuggingFacePipelineScorer, LLMScorer
-from weave.scorers.utils import (
-    MODEL_PATHS,
-    load_hf_model_weights,
-    stringify,
-)
-
-if TYPE_CHECKING:
-    pass
+from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights, stringify
 
 logger = logging.getLogger(__name__)
 

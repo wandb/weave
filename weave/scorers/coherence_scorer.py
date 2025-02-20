@@ -6,9 +6,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFacePipelineScorer
-from weave.scorers.utils import (
-    load_hf_model_weights,
-)
+from weave.scorers.utils import load_hf_model_weights
 
 
 class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
