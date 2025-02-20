@@ -265,7 +265,7 @@ async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
     target_feedback = feedbacks[0]
-    assert target_feedback.feedback_type == "wandb.runnable.WeaveScorerResult"
+    assert target_feedback.feedback_type == "wandb.runnable.MyScorer"
     assert isinstance(target_feedback, dict)
     assert target_feedback == {
         "passed": False,
