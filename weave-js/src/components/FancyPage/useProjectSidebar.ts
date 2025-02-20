@@ -235,11 +235,9 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             key: 'moreWeaveBoth',
             isShown: isShowAll,
-            menu: [
-              'weave/prompts',
-              'weave/models',
-              'weave/datasets',
-            ].concat(weaveOnlyMenu),
+            menu: ['weave/prompts', 'weave/models', 'weave/datasets'].concat(
+              weaveOnlyMenu
+            ),
           },
           {
             type: 'divider' as const,
