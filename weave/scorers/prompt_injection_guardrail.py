@@ -5,13 +5,13 @@ from litellm import acompletion
 from pydantic import BaseModel
 
 import weave
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.prompts import (
     PROMPT_INJECTION_GUARDRAIL_SYSTEM_PROMPT,
     PROMPT_INJECTION_GUARDRAIL_USER_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.utils import WeaveScorerResult
 
 
 class LLMGuardrailReasoning(BaseModel):
