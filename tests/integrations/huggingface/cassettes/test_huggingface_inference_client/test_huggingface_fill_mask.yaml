@@ -9,9 +9,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 509a2711-5657-4a01-a788-d4613f7293e2
+      - 56ba9d61-7a71-4d0a-b1c4-2aaeb603cb33
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: GET
     uri: https://huggingface.co/api/tasks
   response:
@@ -95,7 +95,8 @@ interactions:
         models take a (document, question) pair as input and return an answer in natural
         language. Models usually rely on multi-modal features, combining text, position
         of words (bounding-boxes) and image.\",\"widgetModels\":[\"impira/layoutlm-invoices\"],\"youtubeId\":\"\",\"id\":\"document-question-answering\",\"label\":\"Document
-        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"visual-document-retrieval\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"visual-document-retrieval\",\"label\":\"Visual
+        Document Retrieval\",\"libraries\":[\"transformers\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
         dataset containing cleaned articles of all languages. Can be used to train
         `feature-extraction` models.\",\"id\":\"wikipedia\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"India,
         officially the Republic of India, is a country in South Asia.\",\"type\":\"text\"}],\"outputs\":[{\"table\":[[\"Dimension
@@ -724,29 +725,29 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '75866'
+      - '76131'
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 06 Feb 2025 05:51:35 GMT
+      - Thu, 20 Feb 2025 06:28:18 GMT
       ETag:
-      - W/"1285a-mpc2fdSsHWn76IZKBEOfnoriq8E"
+      - W/"12963-vyIYgItlbQqfuVxsEg2yioEcYRQ"
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 618574fc216bf970c81f33dca491e4b2.cloudfront.net (CloudFront)
+      - 1.1 3afb65bf884226399258e315426ffde6.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - 8VSDyCEjEue2bq7ejb1CES0T_R0QP2CDjfGHGbWqOmupGxjWOs73KA==
+      - iV4ZffyP8UxxgUO6UPWye7PsMH_V4oH5L24KhzLo863LKqWzPEYGFA==
       X-Amz-Cf-Pop:
-      - DUS51-P4
+      - CCU50-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-67a44de7-2230e0d503ab1721063c5799;509a2711-5657-4a01-a788-d4613f7293e2
+      - Root=1-67b6cb82-761d3f8a3f190bba1e097cc6;56ba9d61-7a71-4d0a-b1c4-2aaeb603cb33
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -766,58 +767,11 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - de2154a2-f555-4239-8aef-795babce497b
+      - 6a3cd29f-24bd-47a8-b62e-47b14095810b
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/distilroberta-base
-  response:
-    body:
-      string: '{"error":"Model distilbert/distilroberta-base is currently loading","estimated_time":20.0}'
-    headers:
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '90'
-      Content-Type:
-      - application/json
-      Date:
-      - Thu, 06 Feb 2025 05:51:37 GMT
-      access-control-allow-credentials:
-      - 'true'
-      vary:
-      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
-      x-request-id:
-      - -pF_be
-    status:
-      code: 503
-      message: Service Unavailable
-- request:
-    body: '{"inputs": "The goal of life is <mask>.", "parameters": {}}'
-    headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate, zstd
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '59'
-      Content-Type:
-      - application/json
-      X-Amzn-Trace-Id:
-      - 45fb6adf-a116-46a3-9dda-1ed385489985
-      X-wait-for-model:
-      - '1'
-      user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
-    method: POST
-    uri: https://api-inference.huggingface.co/models/distilroberta-base
+    uri: https://router.huggingface.co/hf-inference/models/distilroberta-base
   response:
     body:
       string: '[{"score":0.06832392513751984,"token":45075,"token_str":" immortality","sequence":"The
@@ -827,35 +781,42 @@ interactions:
         simplicity","sequence":"The goal of life is simplicity."},{"score":0.024168511852622032,"token":22211,"token_str":"
         liberation","sequence":"The goal of life is liberation."}]'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '569'
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 05:51:49 GMT
-      Transfer-Encoding:
-      - chunked
+      - Thu, 20 Feb 2025 06:28:18 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 f3774474598dd2c32211295e787adf8e.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - pqBnGFNU4aVkssKsqT8y34iwmBQgCW3VKtVSL1azitWF4jvPtikMgQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
       access-control-allow-credentials:
       - 'true'
-      access-control-expose-headers:
-      - x-compute-type, x-compute-time
-      server:
-      - uvicorn
+      cross-origin-opener-policy:
+      - same-origin
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-compute-characters:
-      - '27'
       x-compute-time:
-      - '0.233'
+      - '0.042'
       x-compute-type:
-      - cpu
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
+      - cache
       x-request-id:
-      - qnIN0u
+      - Root=1-67b6cb82-575c4ba0718db9344d726095;6a3cd29f-24bd-47a8-b62e-47b14095810b
       x-sha:
       - fb53ab8802853c8e4fbdbcd0529f21fc6f459b2b
     status:
