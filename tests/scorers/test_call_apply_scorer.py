@@ -261,13 +261,13 @@ async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
     )
 
     assert apply_score_res.score_call.id is not None
-    assert isinstance(apply_score_res.result, dict)
-    assert apply_score_res.result == {
-        "passed": False,
-        "metadata": {"score": 0.8, "score_2": 0.8},
-    }
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
     target_feedback = feedbacks[0]
     assert target_feedback.feedback_type == "wandb.runnable.WeaveScorerResult"
+    assert isinstance(target_feedback, dict)
+    assert target_feedback == {
+        "passed": False,
+        "metadata": {"score": 0.8, "score_2": 0.8},
+    }
