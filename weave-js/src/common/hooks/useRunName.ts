@@ -16,7 +16,7 @@ export const useRunName = (runNode: Node | null) => {
   const emptyObject = constNodeUnsafe({type: 'dict', objectType: 'any'}, {});
 
   const customRunNamesNode =
-    runNode != null
+    runNode != null && frame.customRunNames != null
       ? opPick({
           obj: isVoidNode(frame.customRunNames)
             ? emptyObject
