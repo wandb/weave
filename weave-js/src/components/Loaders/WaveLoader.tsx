@@ -22,15 +22,34 @@ const Dot = React.memo(
   }
 );
 
-export const WaveLoader = ({size}: {size: 'small' | 'huge'}) => {
+export const WaveLoader = ({
+  size,
+  delayBeforeShow,
+}: {
+  size: 'small' | 'huge';
+  delayBeforeShow?: number;
+}) => {
+  const [okToShow, setOkToShow] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setOkToShow(true);
+    }, delayBeforeShow);
+    return () => clearTimeout(timer);
+  }, [delayBeforeShow]);
+
   return (
     <TailwindContents>
       <div
         className="flex items-center gap-x-4"
         data-test={`wave-loader-${size}`}>
-        <Dot size={size} />
-        <Dot delay=".3s" size={size} />
-        <Dot delay=".6s" size={size} />
+        {okToShow && (
+          <>
+            <Dot size={size} />
+            <Dot delay=".3s" size={size} />
+            <Dot delay=".6s" size={size} />
+          </>
+        )}
       </div>
     </TailwindContents>
   );
