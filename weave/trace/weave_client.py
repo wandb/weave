@@ -1101,6 +1101,8 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
+        _should_print_call_link = should_print_call_link()
+
         def send_start_call() -> bool:
             inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
             self.server.call_start(
@@ -1121,16 +1123,15 @@ class WeaveClient:
             )
             return True
 
-        fut = self.future_executor.defer(send_start_call)
-
         def on_complete(f: Future) -> None:
             try:
                 if f.result() and not call_context.get_current_call():
-                    if should_print_call_link():
+                    if _should_print_call_link:
                         print_call_link(call)
             except Exception:
                 pass
 
+        fut = self.future_executor.defer(send_start_call)
         fut.add_done_callback(on_complete)
 
         if use_stack:
