@@ -1,5 +1,10 @@
 import datetime
+import io
 import re
+import sys
+import time
+from collections.abc import Callable
+from contextlib import contextmanager
 from typing import Optional
 
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -95,3 +100,27 @@ def get_info_loglines(
             line[attr] = getattr(record, attr)
         lines.append(line)
     return lines
+
+
+@contextmanager
+def capture_output(callbacks: list[Callable[[], None]]):
+    captured_stdout = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = captured_stdout
+
+    try:
+        yield captured_stdout
+    except DummyTestException:
+        pass
+    finally:
+        for callback in callbacks:
+            callback()
+        sys.stdout = old_stdout
+
+
+def flushing_callback(client):
+    def _callback():
+        client.future_executor.flush()
+        time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
+
+    return _callback

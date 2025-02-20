@@ -45,7 +45,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -64,6 +64,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
     should_redact_pii,
 )
 from weave.trace.table import Table
@@ -1102,7 +1103,9 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
+        _should_print_call_link = should_print_call_link()
+
+        def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
@@ -1128,8 +1131,18 @@ class WeaveClient:
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    if _should_print_call_link:
+                        print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_start_call)
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)

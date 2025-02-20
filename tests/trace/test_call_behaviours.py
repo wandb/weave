@@ -1,10 +1,7 @@
-import io
-import sys
-from collections import Counter
-
 import pytest
 
 import weave
+from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 
 
@@ -19,21 +16,36 @@ async def afunc():
 
 
 def test_call_prints_link(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        func()
 
-    func()
-    output = captured_stdout.getvalue()
-    c = Counter(output)
-    assert c[TRACE_CALL_EMOJI] == 1
+    assert captured.getvalue().count(TRACE_CALL_EMOJI) == 1
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_doesnt_print_link_if_failed(client_with_throwing_server):
+    callbacks = [flushing_callback(client_with_throwing_server)]
+    with capture_output(callbacks) as captured:
+        func()
+
+    assert captured.getvalue().count(TRACE_CALL_EMOJI) == 0
 
 
 @pytest.mark.asyncio
 async def test_async_call_prints_link(client):
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
+    callbacks = [flushing_callback(client)]
+    with capture_output(callbacks) as captured:
+        await afunc()
 
-    await afunc()
-    output = captured_stdout.getvalue()
-    c = Counter(output)
-    assert c[TRACE_CALL_EMOJI] == 1
+    assert captured.getvalue().count(TRACE_CALL_EMOJI) == 1
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.asyncio
+async def test_async_call_doesnt_print_link_if_failed(client_with_throwing_server):
+    callbacks = [flushing_callback(client_with_throwing_server)]
+    with capture_output(callbacks) as captured:
+        await afunc()
+
+    assert captured.getvalue().count(TRACE_CALL_EMOJI) == 0
