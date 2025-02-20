@@ -321,15 +321,7 @@ def _make_calls_iterator(
 def _add_scored_by_to_calls_query(
     scored_by: list[str] | str | None, query: Query | None
 ) -> Query | None:
-    """Add scored_by filter to the query.
-    
-    Args:
-        scored_by: A list of scorer names/refs or a single scorer name/ref
-        query: The existing query to add the scored_by filter to
-        
-    Returns:
-        A new Query object with the scored_by filter added
-    """
+    # This logic might be pushed down to the server soon, but for now it lives here:
     if not scored_by:
         return query
 
@@ -343,19 +335,19 @@ def _add_scored_by_to_calls_query(
     for name in scored_by:
         ref = maybe_parse_uri(name)
         if ref and isinstance(ref, ObjectRef):
-            # If a full ref URI is provided, filter by exact ref
+            uri = name
+            scorer_name = ref.name
             exprs.append(
                 {
                     "$eq": (
                         get_field_expr(
-                            runnable_feedback_runnable_ref_selector(ref.name)
+                            runnable_feedback_runnable_ref_selector(scorer_name)
                         ),
-                        literal_expr(name),
+                        literal_expr(uri),
                     )
                 }
             )
         else:
-            # If just a name is provided, filter by any version of that scorer
             exprs.append(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
