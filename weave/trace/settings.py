@@ -62,6 +62,24 @@ class UserSettings(BaseModel):
     may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
 
+    redact_pii: bool = False
+    """Toggles PII redaction using Microsoft Presidio.
+
+    If True, redacts PII from trace data before sending to the server.
+    Can be overriden with the environment variable `WEAVE_REDACT_PII`
+    """
+
+    redact_pii_fields: list[str] = []
+    """List of fields to redact.
+
+    If redact_pii is True, this list of fields will be redacted.
+    If redact_pii is False, this list is ignored.
+    If this list is left empty, the default fields will be redacted.
+
+    A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
+    Can be overriden with the environment variable `WEAVE_REDACT_PII_FIELDS`
+    """
+
     capture_client_info: bool = True
     """Toggles capture of client information (Python version, SDK version) for ops."""
 
@@ -154,6 +172,14 @@ def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
 
+def should_redact_pii() -> bool:
+    return _should("redact_pii")
+
+
+def redact_pii_fields() -> list[str]:
+    return _list_str("redact_pii_fields")
+
+
 def use_server_cache() -> bool:
     return _should("use_server_cache")
 
@@ -203,6 +229,12 @@ def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
     return _context_vars[name].get()
+
+
+def _list_str(name: str) -> list[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env.split(",")
+    return _context_vars[name].get() or []
 
 
 def _optional_str(name: str) -> Optional[str]:

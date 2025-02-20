@@ -65,6 +65,7 @@ from weave.trace.settings import (
     should_capture_client_info,
     should_capture_system_info,
     should_print_call_link,
+    should_redact_pii,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -1033,11 +1034,12 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1103,8 +1105,16 @@ class WeaveClient:
 
         _should_print_call_link = should_print_call_link()
 
-        def send_start_call() -> bool:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
+        def send_start_call() -> None:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1219,7 +1229,15 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(

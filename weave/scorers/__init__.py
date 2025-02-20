@@ -39,6 +39,7 @@ from weave.scorers.string_scorer import (
     StringMatchScorer,
 )
 from weave.scorers.summarization_scorer import SummarizationScorer
+from weave.scorers.trust_scorer import WeaveTrustScorerV1
 from weave.scorers.xml_scorer import ValidXMLScorer
 
 __all__ = [
@@ -67,4 +68,5 @@ __all__ = [
     "WeaveFluencyScorerV1",
     "WeaveHallucinationScorerV1",
     "WeaveContextRelevanceScorerV1",
+    "WeaveTrustScorerV1",
 ]
