@@ -37,9 +37,9 @@ def to_json(
     
     This function handles the high-level serialization logic, attempting different
     approaches in order:
-    1. Use registered serializers
-    2. Handle collections recursively
-    3. Try custom object encoding
+    1. Try type handlers (for complex file-based types)
+    2. Use registered serializers (for refs and basic types)
+    3. Handle collections recursively
     4. Fall back to dictification or string representation
     
     Args:
@@ -51,6 +51,11 @@ def to_json(
     Returns:
         A JSON-serializable representation of the object
     """
+    # Try type handlers first for complex file-based types
+    encoded = custom_objs.encode_custom_obj(obj)
+    if encoded is not None:
+        return _build_result_from_encoded(encoded, project_id, client)
+    
     # Create serialization context
     context = SerializationContext(
         project_id=project_id,
@@ -59,7 +64,7 @@ def to_json(
         use_dictify=use_dictify
     )
     
-    # Try registered serializers first
+    # Try registered serializers for refs and basic types
     try:
         serializer = REGISTRY.get_for_object(obj)
         result = serializer.serialize(obj, context)
@@ -98,11 +103,6 @@ def to_json(
             k: to_json(v, project_id, client, use_dictify)
             for k, v in obj.model_dump().items()
         }
-        
-    # Try custom object encoding
-    encoded = custom_objs.encode_custom_obj(obj)
-    if encoded is not None:
-        return _build_result_from_encoded(encoded, project_id, client)
         
     # Fall back to dictification or string representation
     if use_dictify and not isinstance(obj, ALWAYS_STRINGIFY) and not has_custom_repr(obj):
