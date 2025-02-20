@@ -398,7 +398,6 @@ function buildCallsTableColumns(
   if (scoreColNames.length > 0) {
     // Group scores by scorer name
     const scorerGroups = new Map<string, string[]>();
-
     scoreColNames.forEach(colName => {
       const parsed = parseScorerFeedbackField(colName);
       if (parsed) {
@@ -410,7 +409,7 @@ function buildCallsTableColumns(
       }
     });
 
-    // Create scorer groups in the grouping model
+    // Create scorer groups in the grouping model for each scorer
     const scoreGroup = {
       groupId: 'scores',
       headerName: 'Scores',
