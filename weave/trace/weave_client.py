@@ -1574,7 +1574,7 @@ class WeaveClient:
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
         if isinstance(output, WeaveScorerResult):
-            results_json = output.model_dump_json()
+            results_json = output.model_dump()
         else:
             results_json = to_json(output, self._project_id(), self)
 
