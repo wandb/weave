@@ -1575,9 +1575,9 @@ class WeaveClient:
         if isinstance(output, WeaveScorerResult):
             results_json = output.model_dump_json()
         else:
-            results_json = to_json(output, self._project_id(), self, True)
-        # Prepare the supervision payload
+            results_json = to_json(output, self._project_id(), self)
 
+        # Prepare the supervision payload
         payload = {
             "output": results_json,
         }

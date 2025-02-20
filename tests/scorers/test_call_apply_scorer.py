@@ -209,3 +209,25 @@ async def test_async_scorer_obj(client: WeaveClient):
         scorer, additional_scorer_kwargs={"correct_answer": 2}
     )
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
+
+
+@pytest.mark.asyncio
+async def test_scorer_with_pydantic_output(client: WeaveClient):
+    @weave.op
+    def score(self, **kwargs):
+        return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
+
+    _, call = score.call()
+    apply_score_res = await call.apply_scorer(score)
+
+    assert apply_score_res.score_call.id is not None
+    assert isinstance(apply_score_res.result, dict)
+    assert apply_score_res.result == {
+        "passed": False,
+        "metadata": {"score": 0.8, "score_2": 0.8},
+    }
+
+    feedbacks = list(call.feedback)
+    assert len(feedbacks) == 1
+    target_feedback = feedbacks[0]
+    assert target_feedback.feedback_type == "wandb.runnable.WeaveScorerResult"
