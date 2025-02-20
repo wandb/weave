@@ -524,6 +524,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
 
     if settings.should_redact_pii():
         from weave.trace.pii_redaction import redact_pii_string
+
         op_function_code = redact_pii_string(op_function_code)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
