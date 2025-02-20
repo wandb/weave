@@ -1,6 +1,7 @@
 import React from 'react';
-import {Timestamp} from '../../../../../Timestamp';
+
 import {LoadingDots} from '../../../../../LoadingDots';
+import {Timestamp} from '../../../../../Timestamp';
 import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
@@ -17,6 +18,18 @@ type DateTimeViewProps = {
 };
 
 export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
+  const {useFileContent} = useWFHooks();
+  const datetimeKey = 'obj.json';
+  const isCustomType = data != null && typeof data === 'object';
+  const fileDigest =
+    isCustomType && datetimeKey in data.files ? data.files[datetimeKey] : '';
+  const datetimeBinary = useFileContent(
+    entity || '',
+    project || '',
+    fileDigest,
+    {skip: !isCustomType || !(datetimeKey in data.files)}
+  );
+
   // Handle null/undefined cases early
   if (data == null) {
     return <NotApplicable />;
@@ -29,15 +42,6 @@ export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
   }
 
   // Handle CustomWeaveTypePayload
-  const {useFileContent} = useWFHooks();
-  const datetimeKey = 'obj.json';
-  const datetimeBinary = useFileContent(
-    entity || '',
-    project || '',
-    data.files[datetimeKey] || '',
-    {skip: !(datetimeKey in data.files)}
-  );
-
   if (!(datetimeKey in data.files)) {
     return <NotApplicable />;
   }
@@ -50,16 +54,11 @@ export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
     return <NotApplicable />;
   }
 
-  try {
-    const content = JSON.parse(new TextDecoder().decode(datetimeBinary.result));
-
-    if (!content.isoformat) {
-      return <NotApplicable />;
-    }
-
-    const timestamp = new Date(content.isoformat).getTime() / 1000;
-    return <Timestamp value={timestamp} format="relative" />;
-  } catch (error) {
+  const content = JSON.parse(new TextDecoder().decode(datetimeBinary.result));
+  if (!content.isoformat) {
     return <NotApplicable />;
   }
+
+  const timestamp = new Date(content.isoformat).getTime() / 1000;
+  return <Timestamp value={timestamp} format="relative" />;
 };
