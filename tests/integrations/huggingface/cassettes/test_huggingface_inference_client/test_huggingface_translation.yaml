@@ -13,7 +13,7 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - 5b303528-8a0a-4af0-9fbe-46013aa288f3
+      - 237f83f7-6472-4140-a466-a46e2c45aa47
       user-agent:
       - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
@@ -33,13 +33,13 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 19 Feb 2025 17:36:46 GMT
+      - Thu, 20 Feb 2025 06:28:49 GMT
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Via:
-      - 1.1 9bd5493f891e1fa14bf1ea842e28f016.cloudfront.net (CloudFront)
+      - 1.1 5795cfb7762205b7d50d5ba7ce4d8746.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - XgQFNkuwJeO9mwGESGp_PxrHUfeCnd59Uts4SiulZf8Lv-VjGjOiqg==
+      - o97rZb0lFXuTXaCDxHEVqHz2uJicnwpe73B90gh9al48E0wmqDJf_w==
       X-Amz-Cf-Pop:
       - CCU50-P4
       X-Cache:
@@ -53,11 +53,11 @@ interactions:
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       x-compute-time:
-      - '0.266'
+      - '0.332'
       x-compute-type:
       - cache
       x-request-id:
-      - Root=1-67b616ae-1d4c4e5452b88ff2372132e3;5b303528-8a0a-4af0-9fbe-46013aa288f3
+      - Root=1-67b6cba1-2ef0d0ef2c32b30555473038;237f83f7-6472-4140-a466-a46e2c45aa47
       x-sha:
       - dd7f6540a7a48a7f4db59e5c0b9c42c8eea67f18
     status:
