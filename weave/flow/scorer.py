@@ -386,7 +386,7 @@ class PairwiseScorer(Scorer):
             async def score(self, output: Any, **kwargs) -> dict:
                 # Get the other model's output
                 other_output = await self._get_other_model_output(kwargs)
-                
+
                 # Compare the two outputs and return preference scores
                 return {
                     "model_a_better": 0.8,
@@ -415,10 +415,12 @@ class PairwiseScorer(Scorer):
         Returns:
             The output from the other model
         """
-        from weave.flow.model import apply_model_async, ApplyModelError
+        from weave.flow.model import ApplyModelError, apply_model_async
 
         other_model_result = await apply_model_async(
-            self.other_model, example, None  # No preprocessing for other model
+            self.other_model,
+            example,
+            None,  # No preprocessing for other model
         )
 
         if isinstance(other_model_result, ApplyModelError):

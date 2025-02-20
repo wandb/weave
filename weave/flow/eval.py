@@ -20,7 +20,6 @@ from weave.flow.model import (
 )
 from weave.flow.obj import Object
 from weave.flow.scorer import (
-    PairwiseScorer,
     Scorer,
     _has_oldstyle_scorers,
     _validate_scorer_signature,

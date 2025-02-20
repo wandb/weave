@@ -1075,7 +1075,9 @@ async def test_pairwise_scorer_basic(client):
     class PreferenceScorer(PairwiseScorer):
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
-            other_output = await self._get_other_model_output({"input_text": input_text})
+            other_output = await self._get_other_model_output(
+                {"input_text": input_text}
+            )
             if other_output is None:
                 return {"primary_is_better": False, "reason": "Other model failed"}
 
@@ -1131,7 +1133,9 @@ async def test_pairwise_scorer_multiple_scorers(client):
     class ResponseLengthScorer(PairwiseScorer):
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
-            other_output = await self._get_other_model_output({"input_text": input_text})
+            other_output = await self._get_other_model_output(
+                {"input_text": input_text}
+            )
             if other_output is None:
                 return {"primary_longer": False, "length_diff": 0}
 
@@ -1144,7 +1148,9 @@ async def test_pairwise_scorer_multiple_scorers(client):
     class MetadataComparisonScorer(PairwiseScorer):
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
-            other_output = await self._get_other_model_output({"input_text": input_text})
+            other_output = await self._get_other_model_output(
+                {"input_text": input_text}
+            )
             if other_output is None:
                 return {"models_match": False}
 
@@ -1190,7 +1196,9 @@ async def test_pairwise_scorer_invalid_model(client):
     class PreferenceScorer(PairwiseScorer):
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
-            other_output = await self._get_other_model_output({"input_text": input_text})
+            other_output = await self._get_other_model_output(
+                {"input_text": input_text}
+            )
             if other_output is None:
                 return {"compared": False}
             return {"compared": True}
@@ -1216,7 +1224,9 @@ async def test_pairwise_scorer_failing_model(client):
     class SimpleScorer(PairwiseScorer):
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
-            other_output = await self._get_other_model_output({"input_text": input_text})
+            other_output = await self._get_other_model_output(
+                {"input_text": input_text}
+            )
             if other_output is None:
                 return None  # Let the evaluation handle the failure case
             return {"compared": True}
