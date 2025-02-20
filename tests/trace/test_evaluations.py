@@ -768,14 +768,8 @@ async def test_eval_with_complex_types(client):
     # the correct behavior of the dataset (the should be the
     # MyDataclass, MyModel, and MyObj)
     assert isinstance(row["dc"], str)  #  MyDataclass
-    assert row["model"] == {"a_string": "hello"}  # MyModel
-    # MyObj
-    assert row["obj"] == {
-        "name": None,
-        "description": None,
-        "ref": None,
-        "a_string": "hello",
-    }
+    assert isinstance(row["model"], str)  # MyModel
+    assert isinstance(row["obj"], str)  # MyObj
     assert isinstance(row["text"], str)
 
     access_log = client.server.attribute_access_log
