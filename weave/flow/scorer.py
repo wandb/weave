@@ -9,6 +9,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 import weave
+from weave.flow.model import Model
 from weave.flow.obj import Object
 from weave.trace.errors import OpCallError
 from weave.trace.isinstance import weave_isinstance
@@ -365,3 +366,90 @@ async def apply_scorer_async(
         raise OpCallError(message)
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
+
+
+class PairwiseScorer(Scorer):
+    """Base class for scorers that compare outputs from two models.
+
+    This scorer type is used when you need to compare outputs from two different models
+    on the same input, for example to determine which model performs better in a head-to-head
+    comparison.
+
+    Attributes:
+        other_model: The second model to compare against. Must be a valid Model or Op instance.
+        column_map: Optional mapping from dataset column names to scorer parameter names.
+
+    Example:
+        ```python
+        class PreferenceScorer(PairwiseScorer):
+            @weave.op
+            async def score(self, output: dict, input_text: str) -> dict:
+                # Get comparison model output -- pass all needed inputs in a dict
+                other_output = await self._get_other_model_output(
+                    {"input_text": input_text}
+                )
+
+                # Handle case where comparison model fails
+                if other_output is None:
+                    return {"primary_is_better": False, "reason": "Comparison failed"}
+
+                # Compare outputs and return metrics
+                is_better = len(output["response"]) > len(other_output["response"])
+                return {
+                    "primary_is_better": is_better,
+                    "reason": "Primary model gave longer response"
+                }
+
+        # Usage:
+        model_a = MyModel()  # Primary model to evaluate
+        model_b = MyModel()  # Model to compare against
+        scorer = PreferenceScorer(other_model=model_b)
+        evaluation = Evaluation(dataset=my_dataset, scorers=[scorer])
+        results = await evaluation.evaluate(model_a)
+        ```
+    """
+
+    other_model: Union[Op, Model]
+
+    def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
+
+        from weave.flow.eval import is_valid_model
+
+        if not is_valid_model(self.other_model):
+            raise ValueError("other_model must be a valid Model or Op instance")
+
+    async def _get_other_model_output(self, example: dict) -> Any:
+        """Get output from the other model for comparison.
+
+        Args:
+            example: The input example data to run through the other model
+
+        Returns:
+            The output from the other model
+        """
+        from weave.flow.model import ApplyModelError, apply_model_async
+
+        other_model_result = await apply_model_async(
+            self.other_model,
+            example,
+            None,
+        )
+
+        if isinstance(other_model_result, ApplyModelError):
+            return None
+
+        return other_model_result.model_output
+
+    @weave.op
+    async def score(self, output: Any, **kwargs: Any) -> dict:
+        """Score the outputs from both models.
+
+        Args:
+            output: Output from the primary model being evaluated
+            **kwargs: Additional arguments from the dataset row
+
+        Returns:
+            A dictionary containing the comparison metrics
+        """
+        raise NotImplementedError
