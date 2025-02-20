@@ -431,19 +431,34 @@ function buildCallsTableColumns(
       colNames.forEach(colName => {
         const parsed = parseScorerFeedbackField(colName);
         const field = convertScorerFeedbackFieldToBackendFilter(colName);
-
+        if (parsed === null) {
+          scoreColumns.push({
+            field,
+            headerName: colName,
+            width: 150,
+            renderHeader: () => {
+              return <div> {colName}</div>;
+            },
+            valueGetter: (unused: any, row: any) => {
+              return row[colName];
+            },
+            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+              return <CellValue value={params.value} />;
+            },
+          });
+          return;
+        }
         // Add to scorer's group
         scorerGroup?.children.push({field});
-        // remove the leading dot from the score path
-        const scorePath = (parsed?.scorePath || colName).replace(/^\./, '');
-        const headerName = `${scorerName}.${scorePath}`;
+
+        const scorePayloadPath = parsed.scorePath.replace(/^\./, '');
 
         scoreColumns.push({
           field,
-          headerName,
+          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
           width: 150,
           renderHeader: () => {
-            return <div>{scorePath}</div>;
+            return <div>{scorePayloadPath}</div>;
           },
           valueGetter: (unused: any, row: any) => {
             return row[colName];
