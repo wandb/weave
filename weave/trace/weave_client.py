@@ -1105,7 +1105,7 @@ class WeaveClient:
 
         _should_print_call_link = should_print_call_link()
 
-        def send_start_call() -> None:
+        def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
