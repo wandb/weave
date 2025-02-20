@@ -120,11 +120,12 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           );
         }
 
-        if (item.onClick) {
+        // Handle onClick-only items as well (like Intercom button)
+        if (item.onClick && !item.externalLink) {
           return (
             <SidebarWrapper
               key={item.name}
-              className={`night-aware ${(item as any).className || ''}`}
+              className={`night-aware ${item.className || ''}`}
               onClick={item.onClick}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}
@@ -151,13 +152,14 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           onMouseLeave,
           'data-test': item.slug + '-tab',
         };
+
         if (item.externalLink) {
           const externalLinkProps = {
             ...baseLinkProps,
             href: item.externalLink,
           };
           return (
-            <SidebarWrapper key={item.name} className="night-aware">
+            <SidebarWrapper key={item.name} className={`night-aware ${item.className || ''}`}>
               <TargetBlank
                 {...externalLinkProps}
                 style={{

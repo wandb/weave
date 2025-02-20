@@ -54,6 +54,7 @@ export type FancyPageSidebarItemButton = {
   name: string;
   nameTooltip?: string;
   slug: string;
+  className?: string;
 
   // Some buttons should get active highlighting for multiple different slugs.
   additionalSlugs?: string[];
