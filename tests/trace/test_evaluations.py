@@ -1081,10 +1081,10 @@ async def test_pairwise_scorer_basic(client):
             if other_output is None:
                 return {"primary_is_better": False, "reason": "Other model failed"}
 
-            if "Prefer model A" in input_text:  # Model A wins
+            if "Prefer model A" in input_text:
                 primary_is_better = True
                 reason = "Model A gave a great answer"
-            else:  # Model B wins
+            else:
                 primary_is_better = False
                 reason = "Model B is preferred for this type of question"
 
@@ -1106,7 +1106,6 @@ async def test_pairwise_scorer_basic(client):
 
     result = await evaluation.evaluate(model_a)
 
-    # Assert exact shape of results
     expected_result = {
         "PreferenceScorer": {
             "primary_is_better": {"true_count": 2, "true_fraction": 0.5}
@@ -1228,7 +1227,7 @@ async def test_pairwise_scorer_failing_model(client):
                 {"input_text": input_text}
             )
             if other_output is None:
-                return None  # Let the evaluation handle the failure case
+                return None
             return {"compared": True}
 
     dataset = Dataset(rows=[{"input_text": "Test input"}])
@@ -1237,7 +1236,6 @@ async def test_pairwise_scorer_failing_model(client):
 
     result = await evaluation.evaluate(MainModel())
 
-    # Assert exact shape of results
     expected_result = {
         "SimpleScorer": None,  # Scorer returns None when other model fails
         "model_latency": {"mean": pytest.approx(0, abs=1)},

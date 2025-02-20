@@ -420,11 +420,10 @@ class PairwiseScorer(Scorer):
         other_model_result = await apply_model_async(
             self.other_model,
             example,
-            None,  # No preprocessing for other model
+            None,
         )
 
         if isinstance(other_model_result, ApplyModelError):
-            # If other model fails, return None
             return None
 
         return other_model_result.model_output
