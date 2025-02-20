@@ -383,7 +383,10 @@ class PairwiseScorer(Scorer):
         ```python
         class PreferenceScorer(PairwiseScorer):
             @weave.op
-            async def score(self, output: Any, other_output: Any, **kwargs) -> dict:
+            async def score(self, output: Any, **kwargs) -> dict:
+                # Get the other model's output
+                other_output = await self._get_other_model_output(kwargs)
+                
                 # Compare the two outputs and return preference scores
                 return {
                     "model_a_better": 0.8,
@@ -403,13 +406,33 @@ class PairwiseScorer(Scorer):
         if not is_valid_model(self.other_model):
             raise ValueError("other_model must be a valid Model or Op instance")
 
+    async def _get_other_model_output(self, example: dict) -> Any:
+        """Get output from the other model for comparison.
+
+        Args:
+            example: The input example data to run through the other model
+
+        Returns:
+            The output from the other model
+        """
+        from weave.flow.model import apply_model_async, ApplyModelError
+
+        other_model_result = await apply_model_async(
+            self.other_model, example, None  # No preprocessing for other model
+        )
+
+        if isinstance(other_model_result, ApplyModelError):
+            # If other model fails, return None
+            return None
+
+        return other_model_result.model_output
+
     @weave.op
-    async def score(self, output: Any, other_output: Any, **kwargs: Any) -> dict:
+    async def score(self, output: Any, **kwargs: Any) -> dict:
         """Score the outputs from both models.
 
         Args:
             output: Output from the primary model being evaluated
-            other_output: Output from the comparison model
             **kwargs: Additional arguments from the dataset row
 
         Returns:
