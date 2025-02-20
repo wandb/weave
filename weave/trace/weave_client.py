@@ -1568,6 +1568,7 @@ class WeaveClient:
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
+        # TODO: remove and handle all pydantic outputs
         from weave.scorers.utils import WeaveScorerResult
 
         # Prepare the result payload - we purposely do not map to refs here

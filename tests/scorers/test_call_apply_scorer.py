@@ -214,7 +214,7 @@ async def test_async_scorer_obj(client: WeaveClient):
 @pytest.mark.asyncio
 async def test_scorer_with_pydantic_output(client: WeaveClient):
     @weave.op
-    def score(self, **kwargs):
+    def score():
         return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
 
     _, call = score.call()
