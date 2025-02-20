@@ -5,11 +5,11 @@ from litellm import acompletion
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
 import weave
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.scorer_types import HuggingFacePipelineScorer, LLMScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    WeaveScorerResult,
     load_hf_model_weights,
     stringify,
 )

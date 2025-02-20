@@ -4,11 +4,11 @@ from litellm import amoderation
 from pydantic import Field, PrivateAttr, validate_call
 
 import weave
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.scorer_types import RollingWindowScorer
 from weave.scorers.utils import (
     MODEL_PATHS,
-    WeaveScorerResult,
     load_hf_model_weights,
 )
 
