@@ -240,11 +240,6 @@ export const useProjectSidebar = (
             ),
           },
           {
-            type: 'divider' as const,
-            key: 'dividerModelsWeave',
-            isShown: showWeaveSidebarItems,
-          },
-          {
             type: 'button' as const,
             name: 'Help',
             isShown: showWeaveSidebarItems,
@@ -256,8 +251,7 @@ export const useProjectSidebar = (
                 console.warn('Intercom is not available');
               }
             },
-            slug: undefined,
-            className: 'help-button',
+            slug: undefined
           },
         ];
 
