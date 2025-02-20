@@ -46,6 +46,42 @@ const DEFAULT_PLAYGROUND_STATE = {
   selectedChoiceIndex: 0,
 };
 
+type NumericPlaygroundStateKey =
+  | 'nTimes'
+  | 'temperature'
+  | 'topP'
+  | 'frequencyPenalty'
+  | 'presencePenalty';
+
+const NUMERIC_SETTINGS_MAPPING: Record<
+  NumericPlaygroundStateKey,
+  {
+    pythonValue: string;
+    parseFn: (value: string) => number;
+  }
+> = {
+  nTimes: {
+    pythonValue: 'n',
+    parseFn: parseInt,
+  },
+  temperature: {
+    pythonValue: 'temperature',
+    parseFn: parseFloat,
+  },
+  topP: {
+    pythonValue: 'top_p',
+    parseFn: parseFloat,
+  },
+  frequencyPenalty: {
+    pythonValue: 'frequency_penalty',
+    parseFn: parseFloat,
+  },
+  presencePenalty: {
+    pythonValue: 'presence_penalty',
+    parseFn: parseFloat,
+  },
+};
+
 export const usePlaygroundState = () => {
   const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>([
     DEFAULT_PLAYGROUND_STATE,
@@ -97,23 +133,16 @@ export const usePlaygroundState = () => {
             }
           }
         }
-        if (inputs.n) {
-          newState.nTimes = parseInt(inputs.n, 10);
-        }
-        if (inputs.temperature) {
-          newState.temperature = parseFloat(inputs.temperature);
-        }
         if (inputs.response_format) {
           newState.responseFormat = inputs.response_format.type;
         }
-        if (inputs.top_p) {
-          newState.topP = parseFloat(inputs.top_p);
-        }
-        if (inputs.frequency_penalty) {
-          newState.frequencyPenalty = parseFloat(inputs.frequency_penalty);
-        }
-        if (inputs.presence_penalty) {
-          newState.presencePenalty = parseFloat(inputs.presence_penalty);
+        for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
+          if (inputs[value.pythonValue] !== undefined) {
+            const parsedValue = value.parseFn(inputs[value.pythonValue]);
+            newState[key as NumericPlaygroundStateKey] = isNaN(parsedValue)
+              ? DEFAULT_PLAYGROUND_STATE[key as NumericPlaygroundStateKey]
+              : parsedValue;
+          }
         }
         if (inputs.model) {
           if (LLM_MAX_TOKENS_KEYS.includes(inputs.model as LLMMaxTokensKey)) {

@@ -53,6 +53,7 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/ops",
             "guides/tracking/objects",
             "guides/tracking/redact-pii"
+            "guides/tracking/faqs"
           ],
         },
         {
