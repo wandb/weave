@@ -21,9 +21,13 @@ def func():
 def test_disabled_setting(client):
     parse_and_apply_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 0
 
     parse_and_apply_settings(UserSettings(disabled=False))
     enabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 10
 
     assert (
         disabled_time * 10 < enabled_time
@@ -33,34 +37,17 @@ def test_disabled_setting(client):
 def test_disabled_env(client):
     os.environ["WEAVE_DISABLED"] = "true"
     disabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 0
 
     os.environ["WEAVE_DISABLED"] = "false"
     enabled_time = timeit.timeit(func, number=10)
+    calls = list(client.get_calls())
+    assert len(calls) == 10
 
     assert (
         disabled_time * 10 < enabled_time
     ), "Disabled weave should be faster than enabled weave"
-
-
-def test_disabled_env_client():
-    os.environ["WEAVE_DISABLED"] = "true"
-    client = weave.init("entity/project")
-
-    # Verify that the client is disabled
-    # Would be nicer to have a specific property
-    assert client.project == "DISABLED"
-
-    @weave.op
-    def func():
-        return 1
-
-    assert func() == 1
-
-    # No error implies that no calls were sent to the server
-    # since this would require writing to `entity/project`
-    client._flush()
-
-    os.environ["WEAVE_DISABLED"] = "false"
 
 
 def test_print_call_link_setting(client):

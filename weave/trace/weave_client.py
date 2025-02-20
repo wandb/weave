@@ -1022,7 +1022,7 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        from weave.trace.api import _global_postprocess_inputs
+        from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -1054,18 +1054,23 @@ class WeaveClient:
             trace_id = generate_id()
             parent_id = None
 
-        if attributes is None:
+        if not attributes:
             attributes = {}
 
-        attributes = AttributesDict(**attributes)
+        # First create an AttributesDict with global attributes, then update with local attributes
+        # Local attributes take precedence over global ones
+        attributes_dict = AttributesDict()
+        attributes_dict.update(_global_attributes)
+        attributes_dict.update(attributes)
+
         if should_capture_client_info():
-            attributes._set_weave_item("client_version", version.VERSION)
-            attributes._set_weave_item("source", "python-sdk")
-            attributes._set_weave_item("sys_version", sys.version)
+            attributes_dict._set_weave_item("client_version", version.VERSION)
+            attributes_dict._set_weave_item("source", "python-sdk")
+            attributes_dict._set_weave_item("sys_version", sys.version)
         if should_capture_system_info():
-            attributes._set_weave_item("os_name", platform.system())
-            attributes._set_weave_item("os_version", platform.version())
-            attributes._set_weave_item("os_release", platform.release())
+            attributes_dict._set_weave_item("os_name", platform.system())
+            attributes_dict._set_weave_item("os_version", platform.version())
+            attributes_dict._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
@@ -1078,7 +1083,7 @@ class WeaveClient:
             id=call_id,
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
-            attributes=attributes,
+            attributes=attributes_dict,
         )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
@@ -1108,7 +1113,7 @@ class WeaveClient:
                         started_at=started_at,
                         parent_id=parent_id,
                         inputs=inputs_json,
-                        attributes=attributes,
+                        attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
                     )
                 )
