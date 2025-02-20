@@ -49,9 +49,6 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
-
-
-
 def test_print_call_link_setting(client_creator):
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
         callbacks = [flushing_callback(client)]

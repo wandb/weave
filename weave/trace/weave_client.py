@@ -1232,7 +1232,7 @@ class WeaveClient:
                     )
                 )
             )
-        
+
         self.future_executor.defer(send_end_call)
 
         call_context.pop_call(call.id)
