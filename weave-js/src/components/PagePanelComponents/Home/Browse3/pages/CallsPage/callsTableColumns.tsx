@@ -484,7 +484,7 @@ function buildCallsTableColumns(
 
           scoreColumns.push({
             field,
-            headerName: leafName,
+            headerName: `Scores.${parsed.scorerName}${parsed.scorePath}`,
             width: 150,
             renderHeader: () => {
               return <div>{leafName}</div>;
