@@ -1,6 +1,5 @@
 import weave
 from weave.trace_server.trace_server_interface import SortBy
-from weave.trace_server.errors import NotFoundError
 
 
 class TestModel(weave.Object):
@@ -21,7 +20,7 @@ def test_object_group_caching(client_creator, mocker):
 
         # Mock get_object_versions to track calls
         mock_get_versions = mocker.patch.object(
-            client, 'get_object_versions', wraps=client.get_object_versions
+            client, "get_object_versions", wraps=client.get_object_versions
         )
 
         # First call on group1 should hit server
@@ -64,4 +63,4 @@ def test_object_group_caching(client_creator, mocker):
         # Should hit server again even with cached params
         versions7 = group1.get_versions()
         assert mock_get_versions.call_count == 5
-        assert len(versions7) == 2 
+        assert len(versions7) == 2

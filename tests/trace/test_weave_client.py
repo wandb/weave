@@ -1886,7 +1886,7 @@ def test_get_objects(client):
     # Test listing all objects (should get latest versions only)
     objects = client.get_objects()
     assert len(objects) == 3  # model_a (latest), model_b, dataset
-    
+
     # Verify we get the latest version of model_a
     model_a_group = next(obj for obj in objects if obj.object_id == "model_a")
     model_a_latest = model_a_group.get_latest()  # Get latest version
@@ -1912,8 +1912,14 @@ def test_get_objects(client):
     assert len(objects_page2) == 1  # Only one object left
 
     # Test sorting
-    objects_sorted = client.get_objects(sort_by=[tsi.SortBy(field="object_id", direction="asc")])
-    assert [obj.object_id for obj in objects_sorted] == ["dataset", "model_a", "model_b"]
+    objects_sorted = client.get_objects(
+        sort_by=[tsi.SortBy(field="object_id", direction="asc")]
+    )
+    assert [obj.object_id for obj in objects_sorted] == [
+        "dataset",
+        "model_a",
+        "model_b",
+    ]
 
     # Test getting versions
     model_a_versions = model_a_group.get_versions()
@@ -1985,16 +1991,23 @@ def test_get_objects(client):
     # Test getting all objects with multiple base classes
     multi_class_objects = client.get_objects(base_object_classes=["ModelA", "ModelB"])
     assert len(multi_class_objects) == 2
-    assert {obj.base_object_class for obj in multi_class_objects} == {"ModelA", "ModelB"}
+    assert {obj.base_object_class for obj in multi_class_objects} == {
+        "ModelA",
+        "ModelB",
+    }
 
     # Test getting objects with sorting by multiple fields
     sorted_objects = client.get_objects(
         sort_by=[
             tsi.SortBy(field="base_object_class", direction="asc"),
-            tsi.SortBy(field="object_id", direction="desc")
+            tsi.SortBy(field="object_id", direction="desc"),
         ]
     )
-    assert [obj.base_object_class for obj in sorted_objects] == ["ModelA", "ModelB", "TestDataset"]
+    assert [obj.base_object_class for obj in sorted_objects] == [
+        "ModelA",
+        "ModelB",
+        "TestDataset",
+    ]
 
     # Test getting objects with offset and limit
     limited_objects = client.get_objects(limit=2)
