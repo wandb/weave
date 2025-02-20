@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from weave.flow.scorer import ApplyScorerResult
+from weave.scorers.utils import WeaveScorerResult
 from weave.trace.op import OpCallError
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import Call, Op, WeaveClient
@@ -211,10 +212,36 @@ async def test_async_scorer_obj(client: WeaveClient):
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
 
+# @pytest.mark.asyncio
+# async def test_scorer_with_pydantic_output(client: WeaveClient):
+#     class MyPydantic(BaseModel):
+#         score: float
+#         score_2: float
+
+#     @weave.op
+#     def score():
+#         return MyPydantic(score=0.8, score_2=0.8)
+
+#     _, call = score.call()
+#     apply_score_res = await call.apply_scorer(score)
+
+#     assert apply_score_res.score_call.id is not None
+#     assert isinstance(apply_score_res.result, dict)
+#     assert apply_score_res.result == {
+#         "score": 0.8,
+#         "score_2": 0.8,
+#     }
+
+#     feedbacks = list(call.feedback)
+#     assert len(feedbacks) == 1
+#     target_feedback = feedbacks[0]
+#     assert target_feedback.feedback_type == "wandb.runnable.MyPydantic"
+
+
 @pytest.mark.asyncio
-async def test_scorer_with_pydantic_output(client: WeaveClient):
+async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
     @weave.op
-    def score():
+    def score(output):
         return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
 
     _, call = score.call()
