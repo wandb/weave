@@ -116,11 +116,10 @@ test = [
   "httpx",
 
   # BYOB
-  "boto3",
-  "azure-storage-blob",
-  "google-cloud-storage",
-  "moto[s3]",
-  "azure-storage-blob",
+  "boto3>=1.34.0",
+  "azure-storage-blob>=12.24.0",
+  "google-cloud-storage>=2.7.0",
+  "moto[s3]>=5.0.0",
 ]
 
 [project.scripts]
