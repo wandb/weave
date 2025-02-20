@@ -248,6 +248,16 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
       },
       {}
     );
+    // for any scorer feedback, parse the payload as json
+    Object.keys(feedback).forEach(key => {
+      if (key.startsWith('wandb.runnable.')) {
+        try {
+          feedback[key].payload.output = JSON.parse(
+            feedback[key].payload.output
+          );
+        } catch (e) {}
+      }
+    });
     c.traceCall = {
       ...c.traceCall,
       summary: {
