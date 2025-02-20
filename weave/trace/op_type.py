@@ -522,6 +522,11 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
+    if settings.should_redact_pii():
+        from weave.trace.pii_redaction import redact_pii_string
+
+        op_function_code = redact_pii_string(op_function_code)
+
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
     else:
