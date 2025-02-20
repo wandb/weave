@@ -37,8 +37,8 @@ export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
 
   // Handle direct ISO string input
   if (typeof data === 'string') {
-    const timestamp = new Date(data).getTime() / 1000;
-    return <Timestamp value={timestamp} format="relative" />;
+    const stringTimestamp = new Date(data).getTime() / 1000;
+    return <Timestamp value={stringTimestamp} format="relative" />;
   }
 
   // Handle CustomWeaveTypePayload
@@ -59,6 +59,6 @@ export const DateTimeView = ({entity, project, data}: DateTimeViewProps) => {
     return <NotApplicable />;
   }
 
-  const timestamp = new Date(content.isoformat).getTime() / 1000;
-  return <Timestamp value={timestamp} format="relative" />;
+  const customTypeTimestamp = new Date(content.isoformat).getTime() / 1000;
+  return <Timestamp value={customTypeTimestamp} format="relative" />;
 };
