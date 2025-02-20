@@ -396,47 +396,57 @@ function buildCallsTableColumns(
       c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
   );
   if (scoreColNames.length > 0) {
-    // Add feedback group to grouping model
+    // Group scores by scorer name
+    const scorerGroups = new Map<string, string[]>();
+
+    scoreColNames.forEach(colName => {
+      const parsed = parseScorerFeedbackField(colName);
+      if (parsed) {
+        const scorerName = parsed.scorerName;
+        if (!scorerGroups.has(scorerName)) {
+          scorerGroups.set(scorerName, []);
+        }
+        scorerGroups.get(scorerName)?.push(colName);
+      }
+    });
+
+    // Create scorer groups in the grouping model
     const scoreGroup = {
       groupId: 'scores',
       headerName: 'Scores',
-      children: [] as any[],
+      children: Array.from(scorerGroups.entries()).map(([scorerName, _]) => ({
+        groupId: `scores.${scorerName}`,
+        headerName: scorerName,
+        children: [] as any[],
+      })),
     };
     groupingModel.push(scoreGroup);
 
-    // Add feedback columns
-    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
-      c => {
-        const parsed = parseScorerFeedbackField(c);
-        const field = convertScorerFeedbackFieldToBackendFilter(c);
-        scoreGroup.children.push({
+    // Create columns for each scorer's fields
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = [];
+    scorerGroups.forEach((colNames, scorerName) => {
+      const scorerGroup = scoreGroup.children.find(
+        g => g.groupId === `scores.${scorerName}`
+      );
+
+      colNames.forEach(colName => {
+        const parsed = parseScorerFeedbackField(colName);
+        const field = convertScorerFeedbackFieldToBackendFilter(colName);
+
+        // Add to scorer's group
+        scorerGroup?.children.push({field});
+        // remove the leading dot from the score path
+        const headerName = (parsed?.scorePath || colName).replace(/^\./, '');
+
+        scoreColumns.push({
           field,
-        });
-        if (parsed === null) {
-          return {
-            field,
-            headerName: c,
-            width: 150,
-            renderHeader: () => {
-              return <div> {c}</div>;
-            },
-            valueGetter: (unused: any, row: any) => {
-              return row[c];
-            },
-            renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-              return <CellValue value={params.value} />;
-            },
-          };
-        }
-        return {
-          field,
-          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
+          headerName,
           width: 150,
           renderHeader: () => {
-            return <div>{parsed.scorerName + parsed.scorePath}</div>;
+            return <div>{headerName}</div>;
           },
           valueGetter: (unused: any, row: any) => {
-            return row[c];
+            return row[colName];
           },
           renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
             return (
@@ -450,9 +460,9 @@ function buildCallsTableColumns(
               </CellFilterWrapper>
             );
           },
-        };
-      }
-    );
+        });
+      });
+    });
     cols.push(...scoreColumns);
   }
 

@@ -255,7 +255,9 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
           feedback[key].payload.output = JSON.parse(
             feedback[key].payload.output
           );
-        } catch (e) {}
+        } catch (e) {
+          // pass
+        }
       }
     });
     c.traceCall = {
