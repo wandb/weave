@@ -219,7 +219,7 @@ async def test_async_scorer_obj(client: WeaveClient):
 #         score_2: float
 
 #     @weave.op
-#     def score():
+#     def score(output):
 #         return MyPydantic(score=0.8, score_2=0.8)
 
 #     _, call = score.call()
@@ -241,11 +241,24 @@ async def test_async_scorer_obj(client: WeaveClient):
 @pytest.mark.asyncio
 async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
     @weave.op
-    def score(output):
-        return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
+    def predict(x):
+        return x + 1
 
-    _, call = score.call()
-    apply_score_res = await call.apply_scorer(score)
+    class MyScorer(weave.Scorer):
+        offset: int
+
+        @weave.op
+        def score(self, x, output, correct_answer):
+            return WeaveScorerResult(
+                passed=False, metadata={"score": 0.8, "score_2": 0.8}
+            )
+
+    scorer = MyScorer(offset=0)
+
+    _, call = predict.call(1)
+    apply_score_res = await call.apply_scorer(
+        scorer, additional_scorer_kwargs={"correct_answer": 2}
+    )
 
     assert apply_score_res.score_call.id is not None
     assert isinstance(apply_score_res.result, dict)
