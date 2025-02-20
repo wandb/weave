@@ -1218,7 +1218,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> bool:
+        def send_end_call() -> None:
             output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
             self.server.call_end(
                 CallEndReq(
@@ -1232,9 +1232,8 @@ class WeaveClient:
                     )
                 )
             )
-            return True
-
-        fut = self.future_executor.defer(send_end_call)
+        
+        self.future_executor.defer(send_end_call)
 
         call_context.pop_call(call.id)
 

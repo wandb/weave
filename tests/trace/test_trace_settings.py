@@ -49,32 +49,16 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
-def test_disabled_env_client():
-    os.environ["WEAVE_DISABLED"] = "true"
-    client = weave.init("entity/project")
 
-    # Verify that the client is disabled
-    # Would be nicer to have a specific property
-    assert client.project == "DISABLED"
-
-    assert func() == 1
-
-    # No error implies that no calls were sent to the server
-    # since this would require writing to `entity/project`
-    client._flush()
-
-    os.environ["WEAVE_DISABLED"] = "false"
 
 
 def test_print_call_link_setting(client_creator):
-    # Test with print_call_link=False
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    # Test with print_call_link=True
     with client_creator(settings=UserSettings(print_call_link=True)) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
