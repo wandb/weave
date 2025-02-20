@@ -1624,7 +1624,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             settings = {}
             if self._use_async_insert:
                 settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
             self._insert(
                 "call_parts",
                 data=batch,
