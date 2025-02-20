@@ -761,7 +761,6 @@ async def test_eval_with_complex_types(client):
     # Verify that the access log does record such requests
     dataset = evaluation.evaluate.calls()[0].inputs["self"].dataset
     row = dataset.rows[0]
-    print(f"{row=}")
 
     assert isinstance(row["image"], Image.Image)
     # Very SAD: Datasets do not resursively save objects
