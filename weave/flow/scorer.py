@@ -388,7 +388,7 @@ class PairwiseScorer(Scorer):
                 other_output = await self._get_other_model_output(
                     {"input_text": input_text}
                 )
-                
+
                 # Handle case where comparison model fails
                 if other_output is None:
                     return {"primary_is_better": False, "reason": "Comparison failed"}
