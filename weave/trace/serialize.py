@@ -19,6 +19,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server.trace_server_interface_util import bytes_digest
+import pydantic
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -48,6 +49,10 @@ def to_json(
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
+
+    # Add explicit handling for Pydantic models
+    if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.model_dump().items()}
 
     # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
