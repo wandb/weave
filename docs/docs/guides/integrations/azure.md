@@ -8,7 +8,7 @@ For the latest tutorials, visit [Weights & Biases on Microsoft Azure](https://wa
 
 ## Getting started
 
-To get started using Azure with Weave, simply decorate the function(s) you want to track with `weave.op()`.
+To get started using Azure with Weave, simply decorate the function(s) you want to track with `weave.op`.
 
 ```python
 @weave.op()
