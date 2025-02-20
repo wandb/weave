@@ -573,7 +573,9 @@ def client_creator(request):
             inited_client.reset()
             autopatch.reset_autopatch()
             weave.trace.api._global_attributes = {}
-            weave.trace.settings.parse_and_apply_settings(weave.trace.settings.UserSettings())
+            weave.trace.settings.parse_and_apply_settings(
+                weave.trace.settings.UserSettings()
+            )
 
     yield client
 

@@ -49,7 +49,6 @@ def test_disabled_env(client):
     ), "Disabled weave should be faster than enabled weave"
 
 
-
 def test_disabled_env_client():
     os.environ["WEAVE_DISABLED"] = "true"
     client = weave.init("entity/project")
