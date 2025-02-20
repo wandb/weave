@@ -376,23 +376,36 @@ class PairwiseScorer(Scorer):
     comparison.
 
     Attributes:
-        other_model: The second model to compare against
-        column_map: Optional mapping from dataset column names to scorer parameter names
+        other_model: The second model to compare against. Must be a valid Model or Op instance.
+        column_map: Optional mapping from dataset column names to scorer parameter names.
 
     Example:
         ```python
         class PreferenceScorer(PairwiseScorer):
             @weave.op
-            async def score(self, output: Any, **kwargs) -> dict:
-                # Get the other model's output
-                other_output = await self._get_other_model_output(kwargs)
+            async def score(self, output: dict, input_text: str) -> dict:
+                # Get comparison model output -- pass all needed inputs in a dict
+                other_output = await self._get_other_model_output(
+                    {"input_text": input_text}
+                )
+                
+                # Handle case where comparison model fails
+                if other_output is None:
+                    return {"primary_is_better": False, "reason": "Comparison failed"}
 
-                # Compare the two outputs and return preference scores
+                # Compare outputs and return metrics
+                is_better = len(output["response"]) > len(other_output["response"])
                 return {
-                    "model_a_better": 0.8,
-                    "model_b_better": 0.2,
-                    "reasoning": "Model A's response was more detailed..."
+                    "primary_is_better": is_better,
+                    "reason": "Primary model gave longer response"
                 }
+
+        # Usage:
+        model_a = MyModel()  # Primary model to evaluate
+        model_b = MyModel()  # Model to compare against
+        scorer = PreferenceScorer(other_model=model_b)
+        evaluation = Evaluation(dataset=my_dataset, scorers=[scorer])
+        results = await evaluation.evaluate(model_a)
         ```
     """
 
