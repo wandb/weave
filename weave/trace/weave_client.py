@@ -1581,12 +1581,17 @@ class WeaveClient:
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
+        # TODO: remove and handle all pydantic outputs
+        from weave.scorers.utils import WeaveScorerResult
+
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
-        results_json = to_json(output, self._project_id(), self)
+        if isinstance(output, WeaveScorerResult):
+            results_json = output.model_dump()
+        else:
+            results_json = to_json(output, self._project_id(), self)
 
-        # # Prepare the supervision payload
-
+        # Prepare the supervision payload
         payload = {
             "output": results_json,
         }
