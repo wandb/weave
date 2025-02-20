@@ -21,7 +21,6 @@
 # subqueries, and put the project_id predicate in the innermost subquery, which fixes
 # the problem.
 
-
 import dataclasses
 import datetime
 import hashlib
@@ -35,6 +34,7 @@ from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
+import ddtrace
 import emoji
 from clickhouse_connect.driver import httputil
 from clickhouse_connect.driver.client import Client as CHClient
@@ -1754,6 +1754,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return res
 
+    @ddtrace.tracer.wrap(name="clickhouse-insert")
     def _insert(
         self,
         table: str,
