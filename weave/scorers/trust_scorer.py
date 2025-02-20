@@ -12,6 +12,7 @@ from typing import Any, Optional, Union
 from pydantic import Field, PrivateAttr, validate_call
 
 import weave
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers import (
     WeaveCoherenceScorerV1,
     WeaveContextRelevanceScorerV1,
@@ -26,7 +27,6 @@ from weave.scorers.moderation_scorer import (
     TOXICITY_CATEGORY_THRESHOLD,
     TOXICITY_TOTAL_THRESHOLD,
 )
-from weave.scorers.utils import WeaveScorerResult
 
 
 class WeaveTrustScorerError(Exception):
