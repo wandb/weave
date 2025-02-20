@@ -55,6 +55,7 @@ cohere = ["cohere>=5.9.1,<5.9.3"]
 dspy = ["dspy>=0.1.5", "litellm<=1.49.1"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 groq = ["groq>=0.13.0"]
+huggingface = ["huggingface-hub>=0.28.1"]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
@@ -75,7 +76,16 @@ litellm = ["litellm>=1.36.1"]
 llamaindex = ["llama-index>=0.10.35"]
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
-scorers = ["Levenshtein>=0.26.0","litellm>=1.58"]
+scorers = [
+  "Levenshtein>=0.26.0",
+  "litellm>=1.58",
+  "sentence-transformers>=3.3.1",
+  "scikit-learn>=1.5.2",
+  "transformers>=4.48.2",
+  "torch>=2.4.1",
+  "presidio-analyzer>=2.2.0",
+  "presidio-anonymizer>=2.2.0",
+]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0"]
 pandas-test = ["pandas>=2.2.3"]
