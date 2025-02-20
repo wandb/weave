@@ -211,7 +211,6 @@ async def test_async_scorer_obj(client: WeaveClient):
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
 
-
 @pytest.mark.asyncio
 async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
     @weave.op
