@@ -67,12 +67,14 @@ export type ChatRequest = {
   response_format?: Record<string, any>;
 };
 
-export type Choice = {
-  index: number;
-  message: Message;
-  finish_reason: string;
-  // logprobs
-};
+export type Choice =
+  | {
+      index: number;
+      message: Message;
+      finish_reason: string;
+      // logprobs
+    }
+  | Messages;
 
 export type Usage = {
   // Number of tokens in the generated completion.

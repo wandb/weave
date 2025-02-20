@@ -1,6 +1,6 @@
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {LLMMaxTokensKey} from './llmMaxTokens';
-
+import {Messages} from '../ChatView/types';
 export enum PlaygroundResponseFormats {
   Text = 'text',
   JsonObject = 'json_object',
@@ -24,6 +24,7 @@ export type PlaygroundState = {
   maxTokensLimit: number;
   model: LLMMaxTokensKey;
   selectedChoiceIndex: number;
+  previousMessages: Messages;
 };
 
 export type PlaygroundStateKey = keyof PlaygroundState;

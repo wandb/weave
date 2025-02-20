@@ -7,7 +7,10 @@ import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServer
 import {CompletionsCreateRes} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundState} from '../types';
 import {PlaygroundMessageRole} from '../types';
-import {getInputFromPlaygroundState} from '../usePlaygroundState';
+import {
+  getInputFromPlaygroundState,
+  appendPreviousMessages,
+} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
 
 export const useChatCompletionFunctions = (
@@ -52,7 +55,11 @@ export const useChatCompletionFunctions = (
       return state;
     });
 
-    setPlaygroundStates(finalStates);
+    const finalStatesWithPreviousMessages = finalStates.map(
+      appendPreviousMessages
+    );
+
+    setPlaygroundStates(finalStatesWithPreviousMessages);
     return true;
   };
 
@@ -112,6 +119,14 @@ export const useChatCompletionFunctions = (
           }
           const updatedState = JSON.parse(JSON.stringify(state));
           if (updatedState.traceCall?.inputs?.messages) {
+            updatedState.previousMessages.push(
+              appendChoiceToMessages(
+                updatedState,
+                updatedState.selectedChoiceIndex
+              )
+                .traceCall.inputs?.messages.slice(messageIndex + 1)
+                .filter((m: Message) => m !== undefined)
+            );
             updatedState.traceCall.inputs.messages =
               updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
           }

@@ -44,6 +44,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   maxTokensLimit: 16384,
   model: DEFAULT_MODEL,
   selectedChoiceIndex: 0,
+  previousMessages: [],
 };
 
 export const usePlaygroundState = () => {
@@ -129,6 +130,7 @@ export const usePlaygroundState = () => {
             newState.model = DEFAULT_MODEL;
           }
         }
+        appendPreviousMessages(newState);
         return [newState];
       });
     },
@@ -202,4 +204,16 @@ export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
     };
   }
   return parsedTraceCall;
+};
+
+export const appendPreviousMessages = (state: PlaygroundState) => {
+  if (state.previousMessages.length > 0) {
+    state.traceCall.output.choices = [
+      ...state.previousMessages,
+      ...(state.traceCall.output.choices as any),
+    ];
+
+    state.selectedChoiceIndex = state.previousMessages.length;
+  }
+  return state;
 };

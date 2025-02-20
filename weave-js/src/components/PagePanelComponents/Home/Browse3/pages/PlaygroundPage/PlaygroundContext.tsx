@@ -20,6 +20,7 @@ export type PlaygroundContextType = {
   ) => void;
 
   setSelectedChoiceIndex: (choiceIndex: number) => void;
+  selectedChoiceIndex: number;
 };
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
@@ -34,6 +35,7 @@ const DEFAULT_CONTEXT: PlaygroundContextType = {
   retry: () => {},
   sendMessage: () => {},
   setSelectedChoiceIndex: () => {},
+  selectedChoiceIndex: 0,
 };
 
 // Create context that can be undefined

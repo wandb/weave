@@ -18,6 +18,29 @@ export const ChoiceView = ({
   choiceIndex,
   messageHeader,
 }: ChoiceViewProps) => {
+  if (Array.isArray(choice)) {
+    return (
+      <div>
+        {choice.map((c, i) => {
+          if (i === 0) {
+            return (
+              <MessagePanel
+                key={i}
+                index={choiceIndex || 0 + i}
+                message={c}
+                choiceIndex={choiceIndex}
+                messageHeader={messageHeader}
+              />
+            );
+          }
+          return (
+            <MessagePanel key={i} index={choiceIndex || 0 + i} message={c} />
+          );
+        })}
+      </div>
+    );
+  }
+
   const {message} = choice;
   return (
     <MessagePanel

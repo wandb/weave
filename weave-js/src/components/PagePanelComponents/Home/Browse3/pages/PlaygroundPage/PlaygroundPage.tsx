@@ -8,6 +8,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {
+  appendPreviousMessages,
   DEFAULT_SYSTEM_MESSAGE,
   parseTraceCall,
   usePlaygroundState,
@@ -122,6 +123,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
               ...state,
               traceCall: parseTraceCall(c.traceCall || {}),
             };
+            newStates[idx] = appendPreviousMessages(newStates[idx]);
             break;
           }
         }

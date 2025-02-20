@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {ChoicesDrawer} from './ChoicesDrawer';
@@ -15,16 +15,29 @@ export const ChoicesView = ({
   choices,
   isStructuredOutput,
 }: ChoicesViewProps) => {
-  const {setSelectedChoiceIndex: setGlobalSelectedChoiceIndex} =
-    usePlaygroundContext();
+  const {
+    setSelectedChoiceIndex: setGlobalSelectedChoiceIndex,
+    selectedChoiceIndex: globalSelectedChoiceIndex,
+  } = usePlaygroundContext();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [localSelectedChoiceIndex, setLocalSelectedChoiceIndex] = useState(0);
+  const [localSelectedChoiceIndex, setLocalSelectedChoiceIndex] = useState(
+    globalSelectedChoiceIndex || 0
+  );
 
   const handleSetSelectedChoiceIndex = (choiceIndex: number) => {
     setLocalSelectedChoiceIndex(choiceIndex);
     setGlobalSelectedChoiceIndex(choiceIndex);
   };
+
+  useEffect(() => {
+    if (
+      globalSelectedChoiceIndex !== undefined &&
+      globalSelectedChoiceIndex !== localSelectedChoiceIndex
+    ) {
+      setLocalSelectedChoiceIndex(globalSelectedChoiceIndex);
+    }
+  }, [globalSelectedChoiceIndex]);
 
   if (choices.length === 0) {
     return null;
