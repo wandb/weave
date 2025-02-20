@@ -244,7 +244,7 @@ export const useProjectSidebar = (
           {
             type: 'divider' as const,
             key: 'dividerModelsWeave',
-            isShown: showWeaveSidebarItems || isShowAll,
+            isShown: showWeaveSidebarItems,
           },
           {
             type: 'button' as const,
