@@ -1,5 +1,7 @@
 import weave
 from weave.trace_server.trace_server_interface import SortBy
+import pytest
+from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 
 
 class TestModel(weave.Object):
@@ -32,21 +34,22 @@ def test_object_group_caching(client_creator, mocker):
         # Second call on group1 should use cache
         versions2 = group1.get_versions()
         assert mock_get_versions.call_count == 1  # Count shouldn't increase
-        assert versions2 == versions1
+        assert [v.value for v in versions2] == [v.value for v in versions1]
 
         # Call on group2 should hit server again (separate cache)
         versions3 = group2.get_versions()
         assert mock_get_versions.call_count == 2
-        assert versions3 == versions1
+        assert [v.value for v in versions3] == [v.value for v in versions1]
 
         # Different parameters should hit server again
         versions4 = group1.get_versions(limit=10)
         assert mock_get_versions.call_count == 3
+        assert [v.value for v in versions4] == [v.value for v in versions1]
 
         # Same parameters should use cache
         versions5 = group1.get_versions(limit=10)
         assert mock_get_versions.call_count == 3
-        assert versions5 == versions4
+        assert [v.value for v in versions5] == [v.value for v in versions4]
 
         # Different sort should hit server
         versions6 = group1.get_versions(
@@ -64,3 +67,49 @@ def test_object_group_caching(client_creator, mocker):
         versions7 = group1.get_versions()
         assert mock_get_versions.call_count == 5
         assert len(versions7) == 2
+
+
+def test_object_group_iteration(client_creator):
+    with client_creator() as client:
+        # Create test objects
+        obj1 = TestModel(value=1)
+        client._save_object(obj1, "test-obj")
+        obj2 = TestModel(value=2)
+        client._save_object(obj2, "test-obj")
+
+        # Get object group
+        groups = client.get_objects()
+        group = groups[0]
+
+        # Test __iter__
+        versions = list(group)
+        assert len(versions) == 2
+        assert versions[0].value == 2  # Newer version comes first
+        assert versions[1].value == 1  # Older version comes second
+
+        # Test __len__
+        assert len(group) == 2
+
+
+def test_object_group_get_version(client_creator):
+    with client_creator() as client:
+        # Create test objects with different versions
+        obj1 = TestModel(value=1)
+        client._save_object(obj1, "test-obj")
+        obj2 = TestModel(value=2)
+        client._save_object(obj2, "test-obj")
+
+        # Get object group
+        groups = client.get_objects()
+        group = groups[0]
+
+        # Test getting specific versions
+        version1 = group.get_version(0)  # First version
+        assert version1.value == 1
+
+        version2 = group.get_version(1)  # Second version
+        assert version2.value == 2
+
+        # Test getting non-existent version
+        with pytest.raises(NotFoundError):
+            group.get_version(2)  # Version index that doesn't exist

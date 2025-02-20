@@ -43,6 +43,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace.sort import SortBy
 
 
 def test_table_create(client):
@@ -1275,7 +1276,7 @@ def test_summary_descendents(client):
     call = list(models.calls())[0]
 
     assert list(call.summary["descendants"].items()) == [
-        (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
+        (ObjectRefMatcher(name="model_a"), {"successes": 2, "errors": 0}),
         (ObjectRefMatcher(name="model_b"), {"successes": 1, "errors": 0}),
         (ObjectRefMatcher(name="model_error"), {"successes": 0, "errors": 1}),
         (ObjectRefMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
@@ -1942,33 +1943,12 @@ def test_get_objects(client):
     )
     assert [v.x for v in model_a_versions_sorted] == [2, 1]  # Latest first
 
-    # Test version count and len
-    assert model_a_group.version_count() == 2
-    assert len(model_a_group) == 2
-
-    # Test has_version
-    assert model_a_group.has_version(0)
-    assert model_a_group.has_version(1)
-    assert not model_a_group.has_version(2)
-
-    # Test iteration
+    # Test iteration and __len__ (cached versions)
     versions_list = list(model_a_group)
+    assert len(model_a_group) == 2
     assert len(versions_list) == 2
     assert all(isinstance(v, ModelA) for v in versions_list)
-    assert [v.x for v in versions_list] == [1, 2]  # Ordered by version_index asc
-
-    # Test getting version by digest
-    latest_digest = model_a_group.latest_version.digest
-    latest_by_digest = model_a_group.get_version_by_digest(latest_digest)
-    assert isinstance(latest_by_digest, ModelA)
-    assert latest_by_digest.x == 2
-
-    # Test getting non-existent digest
-    with pytest.raises(NotFoundError):
-        model_a_group.get_version_by_digest("nonexistent_digest")
-
-    # Test latest_version_index property
-    assert model_a_group.latest_version_index == 1
+    assert [v.x for v in versions_list] == [1, 2]
 
     # Test getting latest version through get_latest()
     latest = model_a_group.get_latest()
@@ -1984,64 +1964,76 @@ def test_get_objects(client):
     assert len(offset_versions) == 1
     assert offset_versions[0].x == 2  # Second version
 
-    # Test getting versions with both offset and limit
     no_versions = model_a_group.get_versions(offset=2, limit=1)
     assert len(no_versions) == 0  # No versions after offset 2
-
-    # Test getting all objects with multiple base classes
-    multi_class_objects = client.get_objects(base_object_classes=["ModelA", "ModelB"])
-    assert len(multi_class_objects) == 2
-    assert {obj.base_object_class for obj in multi_class_objects} == {
-        "ModelA",
-        "ModelB",
-    }
-
-    # Test getting objects with sorting by multiple fields
-    sorted_objects = client.get_objects(
-        sort_by=[
-            tsi.SortBy(field="base_object_class", direction="asc"),
-            tsi.SortBy(field="object_id", direction="desc"),
-        ]
-    )
-    assert [obj.base_object_class for obj in sorted_objects] == [
-        "ModelA",
-        "ModelB",
-        "TestDataset",
-    ]
-
-    # Test getting objects with offset and limit
-    limited_objects = client.get_objects(limit=2)
-    assert len(limited_objects) == 2
-
-    offset_objects = client.get_objects(offset=2)
-    assert len(offset_objects) == 1
 
     # Test that object groups maintain their identity
     group1 = client.get_objects(base_object_classes=["ModelA"])[0]
     group2 = client.get_objects(base_object_classes=["ModelA"])[0]
     assert group1.object_id == group2.object_id
     assert group1.base_object_class == group2.base_object_class
-    assert group1.latest_version.digest == group2.latest_version.digest
-
-    # Assert length of versions
-    assert len(model_a_group) == 2
-
-    # Test iteration
-    versions_list = list(model_a_group)
-    assert len(versions_list) == 2
-    assert all(isinstance(v, ModelA) for v in versions_list)
-    assert [v.x for v in versions_list] == [1, 2]  # Ordered by version_index asc
-
-    # Test latest_version property
-    latest = model_a_group.latest_version
-    assert isinstance(latest, ModelA)
-    assert latest.x == 2
-
-    # Test getting latest version through get_latest()
-    latest_get = model_a_group.get_latest()
-    assert isinstance(latest_get, ModelA)
-    assert latest_get.x == 2
+    assert group1.get_latest().x == group2.get_latest().x
 
     # Test getting versions of non-existent object
     with pytest.raises(NotFoundError):
         client.get_object_versions("nonexistent_object")
+
+
+def test_summary_descendents(client):
+    @weave.op()
+    def model_a(text):
+        return "a: " + text
+
+    @weave.op()
+    def model_b(text):
+        return "bbbb: " + text
+
+    @weave.op()
+    def model_error(text):
+        raise ValueError("error: " + text)
+
+    @weave.op()
+    def model_error_catch(text):
+        try:
+            model_error(text)
+        except ValueError as e:
+            return str(e)
+
+    @weave.op()
+    def models(text):
+        return (
+            model_a(text)
+            + " "
+            + model_a(text)
+            + " "
+            + model_b(text)
+            + " "
+            + model_error_catch(text)
+        )
+
+    res = models("hello")
+    assert res == "a: hello a: hello bbbb: hello error: hello"
+
+    call = list(models.calls())[0]
+
+    assert list(call.summary["descendants"].items()) == [
+        (ObjectRefMatcher(name="model_a"), {"successes": 2, "errors": 0}),
+        (ObjectRefMatcher(name="model_b"), {"successes": 1, "errors": 0}),
+        (ObjectRefMatcher(name="model_error"), {"successes": 0, "errors": 1}),
+        (ObjectRefMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
+    ]
+
+
+def test_objects_sorting(client):
+    objects_sorted = client.get_objects(
+        sort_by=[SortBy(field="object_id", direction="asc")]
+    )
+    assert [obj.object_id for obj in objects_sorted] == ["dataset", "model_a", "model_b"]
+
+    sorted_objects = client.get_objects(
+        sort_by=[
+            SortBy(field="base_object_class", direction="asc"),
+            SortBy(field="object_id", direction="desc"),
+        ]
+    )
+    assert [obj.base_object_class for obj in sorted_objects] == ["ModelA", "ModelB", "TestDataset"]

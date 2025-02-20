@@ -2231,18 +2231,6 @@ class ObjectGroup(pydantic.BaseModel):
             f"Version {version_index} not found for object {self.object_id}"
         )
 
-    def get_version_by_digest(self, digest: str) -> Any:
-        """Get a specific version of the object by its digest."""
-        client = weave_client_context.require_weave_client()
-        ref = ObjectRef(client.entity, client.project, self.object_id, digest)
-        try:
-            obj = client.get(ref)
-            return maybe_objectify(obj)
-        except ValueError:
-            raise NotFoundError(
-                f"Version with digest {digest} not found for object {self.object_id}"
-            )
-
     def __iter__(self) -> Iterator[Any]:
         """Iterate over all versions of the object, from oldest to newest."""
         return iter(
@@ -2256,11 +2244,6 @@ class ObjectGroup(pydantic.BaseModel):
     def invalidate_cache(self) -> None:
         """Invalidate the version cache."""
         self._version_counter += 1
-
-    @property
-    def latest_version(self) -> Any:
-        """Get the latest version of the object (alias for get_latest())."""
-        return self.get_latest()
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
