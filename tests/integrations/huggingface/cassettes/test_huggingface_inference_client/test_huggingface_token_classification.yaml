@@ -9,9 +9,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 0de1157c-213d-4309-83b7-3435dc2fec7c
+      - 12f579d8-8d2d-419f-950d-cfb719483218
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: GET
     uri: https://huggingface.co/api/tasks
   response:
@@ -95,7 +95,8 @@ interactions:
         models take a (document, question) pair as input and return an answer in natural
         language. Models usually rely on multi-modal features, combining text, position
         of words (bounding-boxes) and image.\",\"widgetModels\":[\"impira/layoutlm-invoices\"],\"youtubeId\":\"\",\"id\":\"document-question-answering\",\"label\":\"Document
-        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"visual-document-retrieval\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"visual-document-retrieval\",\"label\":\"Visual
+        Document Retrieval\",\"libraries\":[\"transformers\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
         dataset containing cleaned articles of all languages. Can be used to train
         `feature-extraction` models.\",\"id\":\"wikipedia\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"India,
         officially the Republic of India, is a country in South Asia.\",\"type\":\"text\"}],\"outputs\":[{\"table\":[[\"Dimension
@@ -724,29 +725,29 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '75866'
+      - '76131'
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 06 Feb 2025 08:18:12 GMT
+      - Thu, 20 Feb 2025 06:28:43 GMT
       ETag:
-      - W/"1285a-mpc2fdSsHWn76IZKBEOfnoriq8E"
+      - W/"12963-vyIYgItlbQqfuVxsEg2yioEcYRQ"
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 ab7ef1002486648bddb0e6bc684500bc.cloudfront.net (CloudFront)
+      - 1.1 d03f5e49ef8a75531152544d3c363680.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - sl1KbAMBxmhQmak0lxl40s8ia9bsw2JQkiqh8UTgL5HG_4esVXLW7g==
+      - NE8K4gb6L6lDqlmGlz5S2GocciYoSR4gwcYfXTeq5uk1p9doIrOhcg==
       X-Amz-Cf-Pop:
-      - LHR62-C4
+      - CCU50-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-67a47044-4c628210383f98734852755e;0de1157c-213d-4309-83b7-3435dc2fec7c
+      - Root=1-67b6cb9b-407f042618988b5d3d4f4ffb;12f579d8-8d2d-419f-950d-cfb719483218
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -767,94 +768,52 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - 1fea8052-6c15-473a-b8eb-3ea73ca10189
+      - 99f97310-5004-4c5c-b01e-b0b6659ec870
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/FacebookAI/xlm-roberta-large-finetuned-conll03-english
-  response:
-    body:
-      string: '{"error":"Model FacebookAI/xlm-roberta-large-finetuned-conll03-english
-        is currently loading","estimated_time":89.58377838134766}'
-    headers:
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '128'
-      Content-Type:
-      - application/json
-      Date:
-      - Thu, 06 Feb 2025 08:18:14 GMT
-      access-control-allow-credentials:
-      - 'true'
-      vary:
-      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
-      x-request-id:
-      - Fx4pKH
-    status:
-      code: 503
-      message: Service Unavailable
-- request:
-    body: '{"inputs": "My name is Sarah Jessica Parker but you can call me Jessica",
-      "parameters": {}}'
-    headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate, zstd
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '91'
-      Content-Type:
-      - application/json
-      X-Amzn-Trace-Id:
-      - ecdb4252-5e46-4e2a-b56a-14c0f5526173
-      X-wait-for-model:
-      - '1'
-      user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
-    method: POST
-    uri: https://api-inference.huggingface.co/models/FacebookAI/xlm-roberta-large-finetuned-conll03-english
+    uri: https://router.huggingface.co/hf-inference/models/FacebookAI/xlm-roberta-large-finetuned-conll03-english
   response:
     body:
       string: '[{"entity_group":"PER","score":0.9999532103538513,"word":"Sarah Jessica
         Parker","start":11,"end":31},{"entity_group":"PER","score":0.9999523162841797,"word":"Jessica","start":52,"end":59}]'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '188'
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 08:18:28 GMT
-      Transfer-Encoding:
-      - chunked
+      - Thu, 20 Feb 2025 06:28:44 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 42711b32043ef413dd139e4e07296056.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - skWEwptqMPtvidy3qubXqa9XO0Dvhd0I36S2Pdw_FBYqXzRfnV-cGQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
       access-control-allow-credentials:
       - 'true'
-      access-control-expose-headers:
-      - x-compute-type, x-compute-time
-      server:
-      - uvicorn
+      cross-origin-opener-policy:
+      - same-origin
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-compute-characters:
-      - '59'
       x-compute-time:
-      - '0.187'
+      - '0.116'
       x-compute-type:
-      - cpu
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
+      - cache
       x-request-id:
-      - iggitS
+      - Root=1-67b6cb9c-38beba9f2152b8c87ab368b9;99f97310-5004-4c5c-b01e-b0b6659ec870
       x-sha:
       - 18f95e9924f3f452df09cc90945073906ef18f1e
     status:
