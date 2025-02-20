@@ -241,7 +241,6 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Help',
             isShown: showWeaveSidebarItems,
             iconName: IconNames.IntercomLogo,
             onClick: () => {
