@@ -2010,38 +2010,24 @@ def test_get_objects(client):
     assert group1.base_object_class == group2.base_object_class
     assert group1.latest_version.digest == group2.latest_version.digest
 
+    # Assert length of versions
+    assert len(model_a_group) == 2
 
-@pytest.mark.skip("Deprecated method")
-def test_get_object_versions(client):
-    # Create multiple versions of the same object
-    class TestModel(weave.Object):
-        version: int
-        name: str
+    # Test iteration
+    versions_list = list(model_a_group)
+    assert len(versions_list) == 2
+    assert all(isinstance(v, ModelA) for v in versions_list)
+    assert [v.x for v in versions_list] == [1, 2]  # Ordered by version_index asc
 
-    # Save multiple versions
-    for i in range(3):
-        model = TestModel(version=i, name=f"version_{i}")
-        client._save_object(model, "test_model")
+    # Test latest_version property
+    latest = model_a_group.latest_version
+    assert isinstance(latest, ModelA)
+    assert latest.x == 2
 
-    # Get all versions
-    versions = client.get_object_versions("test_model")
-    assert len(versions) == 3
-
-    # Verify version contents
-    version_numbers = [v.val["version"] for v in versions]
-    assert sorted(version_numbers) == [0, 1, 2]
-
-    # Test pagination
-    versions_page = client.get_object_versions("test_model", limit=2)
-    assert len(versions_page) == 2
-
-    # Test sorting by creation time
-    versions_sorted = client.get_object_versions(
-        "test_model",
-        sort_by=[tsi.SortBy(field="created_at", direction="desc")]
-    )
-    version_numbers = [v.val["version"] for v in versions_sorted]
-    assert version_numbers == [2, 1, 0]  # Latest version first
+    # Test getting latest version through get_latest()
+    latest_get = model_a_group.get_latest()
+    assert isinstance(latest_get, ModelA)
+    assert latest_get.x == 2
 
     # Test getting versions of non-existent object
     with pytest.raises(NotFoundError):

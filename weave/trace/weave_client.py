@@ -321,34 +321,45 @@ def _make_calls_iterator(
 def _add_scored_by_to_calls_query(
     scored_by: list[str] | str | None, query: Query | None
 ) -> Query | None:
-    # This logic might be pushed down to the server soon, but for now it lives here:
+    """Add scored_by filter to the query.
+    
+    Args:
+        scored_by: A list of scorer names/refs or a single scorer name/ref
+        query: The existing query to add the scored_by filter to
+        
+    Returns:
+        A new Query object with the scored_by filter added
+    """
     if not scored_by:
         return query
 
     if isinstance(scored_by, str):
         scored_by = [scored_by]
+
     exprs = []
     if query is not None:
         exprs.append(query["$expr"])
+
     for name in scored_by:
         ref = maybe_parse_uri(name)
         if ref and isinstance(ref, ObjectRef):
-            uri = name
-            scorer_name = ref.name
+            # If a full ref URI is provided, filter by exact ref
             exprs.append(
                 {
                     "$eq": (
                         get_field_expr(
-                            runnable_feedback_runnable_ref_selector(scorer_name)
+                            runnable_feedback_runnable_ref_selector(ref.name)
                         ),
-                        literal_expr(uri),
+                        literal_expr(name),
                     )
                 }
             )
         else:
+            # If just a name is provided, filter by any version of that scorer
             exprs.append(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
+
     return Query.model_validate({"$expr": {"$and": exprs}})
 
 
@@ -2153,30 +2164,6 @@ class ObjectGroup(pydantic.BaseModel):
     This class provides a friendly interface for accessing different versions of an object.
     Versions can be accessed through various methods like get_latest(), get_version(),
     get_version_by_digest(), or get_versions().
-
-    Example:
-        ```python
-        # Get the latest version
-        latest = obj_group.get_latest()
-
-        # Get a specific version by index
-        v1 = obj_group.get_version(1)
-
-        # Get a specific version by digest
-        v = obj_group.get_version_by_digest("abc123")
-
-        # Get all versions
-        versions = obj_group.get_versions()
-
-        # Get sorted versions
-        sorted_versions = obj_group.get_versions(
-            sort_by=[SortBy(field="created_at", direction="desc")]
-        )
-
-        # Iterate over all versions
-        for version in obj_group:
-            print(version)
-        ```
     """
     object_id: str
     base_object_class: str | None
@@ -2205,17 +2192,8 @@ class ObjectGroup(pydantic.BaseModel):
         offset: int | None = None,
         sort_by: list[SortBy] | None = None,
     ) -> list[Any]:
-        """Get multiple versions of the object.
-        
-        Args:
-            limit: Maximum number of versions to return
-            offset: Number of versions to skip
-            sort_by: List of fields to sort by. Currently supports 'created_at' and 'version_index'
-            
-        Returns:
-            A list of deserialized objects.
-        """
-        # Convert SortBy objects to hashable tuples (field, direction)
+        """Get multiple versions of the object."""
+        # Convert SortBy objects to hashable tuples for caching
         sort_by_tuples = tuple((s.field, s.direction) for s in sort_by) if sort_by else None
         return self._get_versions(limit, offset, sort_by_tuples, self._version_counter)
 
@@ -2250,19 +2228,8 @@ class ObjectGroup(pydantic.BaseModel):
         ]
 
     def get_version(self, version_index: int) -> Any:
-        """Get a specific version of the object.
-        
-        Args:
-            version_index: The version index to get.
-            
-        Returns:
-            The deserialized object at that version.
-            
-        Raises:
-            NotFoundError: If the version does not exist.
-        """
+        """Get a specific version of the object."""
         client = weave_client_context.require_weave_client()
-        # Get all schemas sorted by version_index ascending
         schemas = client.get_object_versions(
             self.object_id,
             sort_by=[SortBy(field="version_index", direction="asc")]
@@ -2280,42 +2247,19 @@ class ObjectGroup(pydantic.BaseModel):
         raise NotFoundError(f"Version {version_index} not found for object {self.object_id}")
 
     def get_version_by_digest(self, digest: str) -> Any:
-        """Get a specific version of the object by its digest.
-        
-        Args:
-            digest: The digest of the version to get.
-            
-        Returns:
-            The deserialized object at that version.
-            
-        Raises:
-            NotFoundError: If the version does not exist.
-        """
+        """Get a specific version of the object by its digest."""
         client = weave_client_context.require_weave_client()
-        # Get all schemas (order doesn't matter)
-        schemas = client.get_object_versions(self.object_id)
-        for schema in schemas:
-            if schema.digest == digest:
-                ref = ObjectRef(
-                    client.entity,
-                    client.project,
-                    self.object_id,
-                    digest
-                )
-                obj = client.get(ref)
-                return maybe_objectify(obj)
-        raise NotFoundError(f"Version with digest {digest} not found for object {self.object_id}")
-
-    def version_count(self) -> int:
-        """Get the total number of versions.
-        
-        Returns:
-            The number of versions.
-            
-        Raises:
-            NotFoundError: If the object no longer exists.
-        """
-        return len(self.get_versions())
+        ref = ObjectRef(
+            client.entity,
+            client.project,
+            self.object_id,
+            digest
+        )
+        try:
+            obj = client.get(ref)
+            return maybe_objectify(obj)
+        except ValueError:
+            raise NotFoundError(f"Version with digest {digest} not found for object {self.object_id}")
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate over all versions of the object, from oldest to newest."""
@@ -2323,11 +2267,16 @@ class ObjectGroup(pydantic.BaseModel):
 
     def __len__(self) -> int:
         """Get the total number of versions."""
-        return self.version_count()
+        return len(self.get_versions())
 
     def invalidate_cache(self) -> None:
         """Invalidate the version cache."""
         self._version_counter += 1
+
+    @property
+    def latest_version(self) -> Any:
+        """Get the latest version of the object (alias for get_latest())."""
+        return self.get_latest()
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
