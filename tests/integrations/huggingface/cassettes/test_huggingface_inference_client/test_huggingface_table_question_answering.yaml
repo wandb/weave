@@ -15,15 +15,19 @@ interactions:
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - 4b9c888a-251d-44a2-a041-2e9adc45c640
+      - 9b3fb779-163e-40c0-bf9e-0d1b73754b76
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/google/tapas-base-finetuned-wtq
+    uri: https://router.huggingface.co/hf-inference/models/google/tapas-base-finetuned-wtq
   response:
     body:
       string: '{"answer":"AVERAGE > 36542","coordinates":[[0,1]],"cells":["36542"],"aggregator":"AVERAGE"}'
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
       Content-Length:
@@ -31,22 +35,31 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 08:04:18 GMT
+      - Thu, 20 Feb 2025 06:28:31 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 081f4dccbf59d5fd34750786ea392d28.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - -rhDEkPupBS1LBuIUQ5UP6TW7b4Qf1tehBr1TDjYWzH7DGDWptjTCA==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
       access-control-allow-credentials:
       - 'true'
+      cross-origin-opener-policy:
+      - same-origin
       vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
       x-compute-time:
-      - '1.421'
+      - '0.050'
       x-compute-type:
       - cache
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
       x-request-id:
-      - MnRduX
+      - Root=1-67b6cb8f-79c16c41675685ae3f27eab0;9b3fb779-163e-40c0-bf9e-0d1b73754b76
       x-sha:
       - e3dde1905dea877b0df1a5c057533e48327dee77
     status:

@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import os
 import platform
 import re
 import sys
@@ -44,7 +45,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -63,6 +64,8 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
+    should_redact_pii,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -750,9 +753,19 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+BACKGROUND_PARALLELISM_MIX = 0.5
+
+
 class WeaveClient:
     server: TraceServerInterface
+
+    # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
+    # Fast-lane executor for operations guaranteed to not defer
+    # to child operations, impossible to deadlock
+    # Currently only used for create_file operation
+    # Mix of main and fastlane workers is set by BACKGROUND_PARALLELISM_MIX
+    future_executor_fastlane: FutureExecutor | None
 
     """
     A client for interacting with the Weave trace server.
@@ -775,7 +788,12 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.future_executor = FutureExecutor(max_workers=client_parallelism())
+        parallelism_main, parallelism_upload = get_parallelism_settings()
+        self.future_executor = FutureExecutor(max_workers=parallelism_main)
+        if parallelism_upload:
+            self.future_executor_fastlane = FutureExecutor(
+                max_workers=parallelism_upload
+            )
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -1006,7 +1024,7 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        from weave.trace.api import _global_postprocess_inputs
+        from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -1016,11 +1034,12 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1038,18 +1057,23 @@ class WeaveClient:
             trace_id = generate_id()
             parent_id = None
 
-        if attributes is None:
+        if not attributes:
             attributes = {}
 
-        attributes = AttributesDict(**attributes)
+        # First create an AttributesDict with global attributes, then update with local attributes
+        # Local attributes take precedence over global ones
+        attributes_dict = AttributesDict()
+        attributes_dict.update(_global_attributes)
+        attributes_dict.update(attributes)
+
         if should_capture_client_info():
-            attributes._set_weave_item("client_version", version.VERSION)
-            attributes._set_weave_item("source", "python-sdk")
-            attributes._set_weave_item("sys_version", sys.version)
+            attributes_dict._set_weave_item("client_version", version.VERSION)
+            attributes_dict._set_weave_item("source", "python-sdk")
+            attributes_dict._set_weave_item("sys_version", sys.version)
         if should_capture_system_info():
-            attributes._set_weave_item("os_name", platform.system())
-            attributes._set_weave_item("os_version", platform.version())
-            attributes._set_weave_item("os_release", platform.release())
+            attributes_dict._set_weave_item("os_name", platform.system())
+            attributes_dict._set_weave_item("os_version", platform.version())
+            attributes_dict._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
@@ -1062,7 +1086,7 @@ class WeaveClient:
             id=call_id,
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
-            attributes=attributes,
+            attributes=attributes_dict,
         )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
@@ -1079,8 +1103,18 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
+        _should_print_call_link = should_print_call_link()
+
+        def send_start_call() -> bool:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1092,13 +1126,23 @@ class WeaveClient:
                         started_at=started_at,
                         parent_id=parent_id,
                         inputs=inputs_json,
-                        attributes=attributes,
+                        attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    if _should_print_call_link:
+                        print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_start_call)
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -1185,7 +1229,15 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
@@ -1860,10 +1912,21 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def flush(self) -> None:
+        """
+        An optional flushing method for the client.
+        Forces all background tasks to be processed, which ensures parallel processing
+        during main thread execution. Can improve performance when user code completes
+        before data has been uploaded to the server.
+        """
+        self._flush()
+
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
+        if self.future_executor_fastlane:
+            self.future_executor_fastlane.flush()
         if self._server_is_flushable:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
@@ -1873,7 +1936,29 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
+
+
+def get_parallelism_settings() -> tuple[int | None, int | None]:
+    total_parallelism = client_parallelism()
+
+    # if user has explicitly set 0 or 1 for total parallelism,
+    # don't use fastlane executor
+    if total_parallelism is not None and total_parallelism <= 1:
+        return total_parallelism, 0
+
+    # if total_parallelism is None, calculate it
+    if total_parallelism is None:
+        total_parallelism = min(32, (os.cpu_count() or 1) + 4)
+
+    # use 50/50 split between main and fastlane
+    parallelism_main = int(total_parallelism * (1 - BACKGROUND_PARALLELISM_MIX))
+    parallelism_fastlane = total_parallelism - parallelism_main
+
+    return parallelism_main, parallelism_fastlane
 
 
 def safe_current_wb_run_id() -> str | None:
