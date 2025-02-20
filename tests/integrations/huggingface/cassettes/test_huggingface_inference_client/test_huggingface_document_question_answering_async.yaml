@@ -11,7 +11,7 @@ interactions:
       User-Agent:
       - python-requests/2.32.3
       X-Amzn-Trace-Id:
-      - ea8ae7a6-7985-4fd0-b388-a0d3439929ba
+      - 6ebea4d7-6ce2-4b18-8c1e-b3e348e0b4ce
     method: GET
     uri: https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png
   response:
@@ -465,7 +465,7 @@ interactions:
       Content-Type:
       - image/png
       Date:
-      - Thu, 06 Feb 2025 05:39:01 GMT
+      - Thu, 20 Feb 2025 06:28:14 GMT
       ETag:
       - '"78f9c64a3ffcfc436d52d523f3e3c5ad26c14b95"'
       Referrer-Policy:
@@ -473,11 +473,11 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 a519b78387f012b2d3b1ed2288111abe.cloudfront.net (CloudFront)
+      - 1.1 95a64b916cc7062be796d476a3fd8d74.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - Tit0KwlSeURl3ViYWasEFenTDLt6YG9W1bqZJYwVONKr3uTOg98Dqw==
+      - BkHqJVyer91gm6h_VHauY2kXEJYy--V5n-gtfwvyA7efSsDdjG_D5w==
       X-Amz-Cf-Pop:
-      - DUS51-P4
+      - CCU50-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
@@ -485,7 +485,7 @@ interactions:
       X-Repo-Commit:
       - 2359223c1837a7587402bda0f2643382a6eefeab
       X-Request-Id:
-      - Root=1-67a44af5-2b1704a21505ba763b83551b;ea8ae7a6-7985-4fd0-b388-a0d3439929ba
+      - Root=1-67b6cb7e-2e55d0f15ff5649967bf998f;6ebea4d7-6ce2-4b18-8c1e-b3e348e0b4ce
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -495,77 +495,49 @@ interactions:
     body: null
     headers:
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/impira/layoutlm-document-qa
-  response:
-    body:
-      string: '{"error":"Model impira/layoutlm-document-qa is currently loading","estimated_time":20.4470272064209}'
-    headers:
-      Access-Control-Allow-Credentials:
-      - 'true'
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '100'
-      Content-Type:
-      - application/json
-      Date:
-      - Thu, 06 Feb 2025 05:39:03 GMT
-      Vary:
-      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
-      x-request-id:
-      - GNdr_C
-    status:
-      code: 503
-      message: Service Unavailable
-- request:
-    body: null
-    headers:
-      X-wait-for-model:
-      - '1'
-      user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
-    method: POST
-    uri: https://api-inference.huggingface.co/models/impira/layoutlm-document-qa
+    uri: https://router.huggingface.co/hf-inference/models/impira/layoutlm-document-qa
   response:
     body:
       string: '[{"score":0.4251735210418701,"answer":"us-001","start":16,"end":16}]'
     headers:
       Access-Control-Allow-Credentials:
       - 'true'
+      Access-Control-Allow-Origin:
+      - '*'
       Access-Control-Expose-Headers:
-      - x-compute-type, x-compute-time
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '68'
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 05:39:12 GMT
-      Server:
-      - uvicorn
-      Transfer-Encoding:
-      - chunked
+      - Thu, 20 Feb 2025 06:28:15 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
       Vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-compute-characters:
-      - '26'
+      Via:
+      - 1.1 f881b3dd31ab6286675d899fd085a370.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - SViXEeDjUJyjXMDaYzd8wuOze8CrUUz1J-AG035x831UCyVpRbK9aQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      cross-origin-opener-policy:
+      - same-origin
       x-compute-time:
-      - '0.507'
+      - '0.478'
       x-compute-type:
-      - cpu
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
+      - cache
       x-request-id:
-      - X2YWZk
+      - Root=1-67b6cb7f-7848656f7319498e7e083317
       x-sha:
       - beed3c4d02d86017ebca5bd0fdf210046b907aa6
     status:
