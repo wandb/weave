@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import weave
-from weave.flow.scorer import ApplyScorerResult
+from weave.flow.scorer import ApplyScorerResult, WeaveScorerResult
 from weave.trace.op import OpCallError
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import Call, Op, WeaveClient
@@ -209,3 +209,40 @@ async def test_async_scorer_obj(client: WeaveClient):
         scorer, additional_scorer_kwargs={"correct_answer": 2}
     )
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
+
+
+
+@pytest.mark.asyncio
+async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
+    @weave.op
+    def predict(x):
+        return x + 1
+
+    class MyScorer(weave.Scorer):
+        offset: int
+
+        @weave.op
+        def score(self, x, output, correct_answer):
+            return WeaveScorerResult(
+                passed=False, metadata={"score": 0.8, "score_2": 0.8}
+            )
+
+    scorer = MyScorer(offset=0)
+
+    _, call = predict.call(1)
+    apply_score_res = await call.apply_scorer(
+        scorer, additional_scorer_kwargs={"correct_answer": 2}
+    )
+
+    assert apply_score_res.score_call.id is not None
+
+    feedbacks = list(call.feedback)
+    assert len(feedbacks) == 1
+    target_feedback = feedbacks[0]
+    assert target_feedback.feedback_type == "wandb.runnable.MyScorer"
+    assert isinstance(target_feedback.payload, dict)
+    assert target_feedback.payload["output"]["passed"] == False
+    assert target_feedback.payload["output"]["metadata"] == {
+        "score": 0.8,
+        "score_2": 0.8,
+    }
