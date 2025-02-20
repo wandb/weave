@@ -2,8 +2,8 @@ import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
-import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
+import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
   data: CustomWeaveTypePayload;
