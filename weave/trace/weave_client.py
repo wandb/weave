@@ -45,7 +45,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -64,6 +64,8 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
+    should_redact_pii,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -1022,7 +1024,7 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        from weave.trace.api import _global_postprocess_inputs
+        from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -1032,11 +1034,12 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1054,18 +1057,23 @@ class WeaveClient:
             trace_id = generate_id()
             parent_id = None
 
-        if attributes is None:
+        if not attributes:
             attributes = {}
 
-        attributes = AttributesDict(**attributes)
+        # First create an AttributesDict with global attributes, then update with local attributes
+        # Local attributes take precedence over global ones
+        attributes_dict = AttributesDict()
+        attributes_dict.update(_global_attributes)
+        attributes_dict.update(attributes)
+
         if should_capture_client_info():
-            attributes._set_weave_item("client_version", version.VERSION)
-            attributes._set_weave_item("source", "python-sdk")
-            attributes._set_weave_item("sys_version", sys.version)
+            attributes_dict._set_weave_item("client_version", version.VERSION)
+            attributes_dict._set_weave_item("source", "python-sdk")
+            attributes_dict._set_weave_item("sys_version", sys.version)
         if should_capture_system_info():
-            attributes._set_weave_item("os_name", platform.system())
-            attributes._set_weave_item("os_version", platform.version())
-            attributes._set_weave_item("os_release", platform.release())
+            attributes_dict._set_weave_item("os_name", platform.system())
+            attributes_dict._set_weave_item("os_version", platform.version())
+            attributes_dict._set_weave_item("os_release", platform.release())
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
@@ -1078,7 +1086,7 @@ class WeaveClient:
             id=call_id,
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
-            attributes=attributes,
+            attributes=attributes_dict,
         )
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
@@ -1095,8 +1103,18 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
+        _should_print_call_link = should_print_call_link()
+
+        def send_start_call() -> bool:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1108,13 +1126,23 @@ class WeaveClient:
                         started_at=started_at,
                         parent_id=parent_id,
                         inputs=inputs_json,
-                        attributes=attributes,
+                        attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        def on_complete(f: Future) -> None:
+            try:
+                if f.result() and not call_context.get_current_call():
+                    if _should_print_call_link:
+                        print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_start_call)
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -1201,7 +1229,15 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
