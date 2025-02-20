@@ -120,7 +120,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           );
         }
 
-        // Handle onClick-only items as well (like Intercom button)
+        // Handle onClick-only items (like Intercom button)
         if (item.onClick && !item.externalLink) {
           return (
             <SidebarWrapper
