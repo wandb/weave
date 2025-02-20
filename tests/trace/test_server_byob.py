@@ -86,7 +86,7 @@ def aws_storage_env():
         {
             "WF_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
             "WF_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
-            "WF_STORAGE_BUCKET_URI": "s3://test-bucket",
+            "WF_FILE_STORAGE_URI": "s3://test-bucket",
         },
     ):
         yield
@@ -104,7 +104,7 @@ def gcp_storage_env():
                 "client_secret": "",
                 "refresh_token": ""
             }""",
-            "WF_STORAGE_BUCKET_URI": "gs://test-bucket",
+            "WF_FILE_STORAGE_URI": "gs://test-bucket",
         },
     ):
         yield
@@ -121,7 +121,7 @@ def azure_storage_env():
                 "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
                 "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
             ),
-            "WF_STORAGE_BUCKET_URI": "azure://test-bucket",
+            "WF_FILE_STORAGE_URI": "azure://test-bucket",
         },
     ):
         yield

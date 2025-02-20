@@ -191,7 +191,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
-        storage_bucket_uri: Optional[str] = None,
+        file_storage_uri: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -204,7 +204,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._storage_bucket_uri = storage_bucket_uri
+        self._file_storage_uri = file_storage_uri
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -217,7 +217,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
-            storage_bucket_uri=wf_env.wf_storage_bucket_uri(),
+            file_storage_uri=wf_env.wf_file_storage_uri(),
         )
 
     @contextmanager
@@ -1239,12 +1239,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
+    # TODO: CONVERT THIS TO RETURN A FILESTORAGEURI OBJECT
+    def _get_base_file_storage_uri(self) -> Optional[str]:
+        """
+        Get the base storage URI for a project.
+
+        Currently this is quite simple as it uses the default storage bucket
+        for the entire client (most typically configured via environment variable).
+
+        However, in the near future, this might be something that is driven by
+        the project or a context variable. Leaving this method here for clarity
+        and future extensibility.
+        """
+        return self._file_storage_uri
+
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
+        base_file_storage_uri = self._get_base_file_storage_uri()
 
-        if self._storage_bucket_uri is not None:
+        if base_file_storage_uri is not None:
             bucket_uri = determine_bucket_uri(
-                self._storage_bucket_uri, req.project_id, digest
+                base_file_storage_uri, req.project_id, digest
             )
             store_in_bucket(bucket_uri, req.content)
             self._insert(
@@ -1337,10 +1352,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if file_storage_uri:
             # Verify storage URI is what we expect. This is an extra check to ensure
             # that the storage bucket URI is set correctly.
-            if self._storage_bucket_uri is None:
+            if self._file_storage_uri is None:
                 raise ValueError("Storage bucket URI is not set")
             expected_file_storage_uri = determine_bucket_uri(
-                self._storage_bucket_uri, req.project_id, req.digest
+                self._file_storage_uri, req.project_id, req.digest
             )
             if file_storage_uri != expected_file_storage_uri:
                 raise ValueError("File storage URI does not match expected URI")

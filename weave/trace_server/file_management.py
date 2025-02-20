@@ -34,11 +34,11 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
 
 
 def determine_bucket_uri(
-    base_storage_bucket_uri: str, project_id: str, digest: str
+    base_file_storage_uri: str, project_id: str, digest: str
 ) -> str:
     # BBBAAADDD
-    assert base_storage_bucket_uri.endswith("/")
-    return f"{base_storage_bucket_uri}{key_for_project_digest(project_id, digest)}"
+    assert base_file_storage_uri.endswith("/")
+    return f"{base_file_storage_uri}{key_for_project_digest(project_id, digest)}"
 
 
 class AWSCredentials(TypedDict, total=False):
@@ -323,14 +323,14 @@ def handle_azure_storage(
     )
 
 
-def store_in_bucket(storage_bucket_uri: str, bytes: bytes) -> str:
+def store_in_bucket(file_storage_uri: str, bytes: bytes) -> str:
     """
-    Stores a file in a storage bucket. storage_bucket_uri is the uri of the
+    Stores a file in a storage bucket. file_storage_uri is the uri of the
     bucket to store the file in - supports the following providers: Azure,
     GCP, and S3.
 
     Args:
-        storage_bucket_uri: The complete URI where the file should be stored
+        file_storage_uri: The complete URI where the file should be stored
             Format examples:
             - AWS: s3://bucket-name/path/to/file
             - GCP: gs://bucket-name/path/to/file
@@ -346,8 +346,8 @@ def store_in_bucket(storage_bucket_uri: str, bytes: bytes) -> str:
         NotImplementedError: For unimplemented providers (like local files)
         Various provider-specific exceptions for storage/auth failures
     """
-    provider, path = parse_storage_uri(storage_bucket_uri)
-    logger.info("Storing %d bytes at %s", len(bytes), storage_bucket_uri)
+    provider, path = parse_storage_uri(file_storage_uri)
+    logger.info("Storing %d bytes at %s", len(bytes), file_storage_uri)
     credentials: AllCredentials
     try:
         if provider == "s3":
@@ -366,11 +366,11 @@ def store_in_bucket(storage_bucket_uri: str, bytes: bytes) -> str:
             raise NotImplementedError("Local file storage not currently supported")
 
     except Exception as e:
-        logger.exception("Failed to store file at %s: %s", storage_bucket_uri, str(e))
+        logger.exception("Failed to store file at %s: %s", file_storage_uri, str(e))
         # Re-raise with more context
-        raise type(e)(f"Failed to store file at {storage_bucket_uri}: {str(e)}") from e
+        raise type(e)(f"Failed to store file at {file_storage_uri}: {str(e)}") from e
 
-    return storage_bucket_uri  # Return the full URI as it uniquely identifies the stored file
+    return file_storage_uri  # Return the full URI as it uniquely identifies the stored file
 
 
 # READ LAYER
@@ -489,14 +489,14 @@ def handle_azure_read(
     return data
 
 
-def read_from_bucket(storage_bucket_uri: str) -> bytes:
+def read_from_bucket(file_storage_uri: str) -> bytes:
     """
-    Reads a file from a storage bucket. storage_bucket_uri is the uri of the
+    Reads a file from a storage bucket. file_storage_uri is the uri of the
     bucket to read the file from - supports the following providers: Azure,
     GCP, and S3.
 
     Args:
-        storage_bucket_uri: The complete URI where the file should be read from
+        file_storage_uri: The complete URI where the file should be read from
             Format examples:
             - AWS: s3://bucket-name/path/to/file
             - GCP: gs://bucket-name/path/to/file
@@ -511,8 +511,8 @@ def read_from_bucket(storage_bucket_uri: str) -> bytes:
         NotImplementedError: For unimplemented providers (like local files)
         Various provider-specific exceptions for storage/auth failures
     """
-    provider, path = parse_storage_uri(storage_bucket_uri)
-    logger.info("Reading from %s", storage_bucket_uri)
+    provider, path = parse_storage_uri(file_storage_uri)
+    logger.info("Reading from %s", file_storage_uri)
 
     credentials: AllCredentials
 
@@ -536,6 +536,6 @@ def read_from_bucket(storage_bucket_uri: str) -> bytes:
             raise ValueError(f"Unsupported storage provider: {provider}")
 
     except Exception as e:
-        logger.exception("Failed to read file from %s: %s", storage_bucket_uri, str(e))
+        logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
         # Re-raise with more context
-        raise type(e)(f"Failed to read file from {storage_bucket_uri}: {str(e)}") from e
+        raise type(e)(f"Failed to read file from {file_storage_uri}: {str(e)}") from e

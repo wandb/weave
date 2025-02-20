@@ -30,9 +30,9 @@ def wf_clickhouse_database() -> str:
 # BYOB Settings
 
 
-def wf_storage_bucket_uri() -> Optional[str]:
+def wf_file_storage_uri() -> Optional[str]:
     """The storage bucket URI."""
-    return os.environ.get("WF_STORAGE_BUCKET_URI")
+    return os.environ.get("WF_FILE_STORAGE_URI")
 
 
 def wf_storage_bucket_aws_access_key_id() -> Optional[str]:
