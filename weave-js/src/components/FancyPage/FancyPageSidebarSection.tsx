@@ -71,7 +71,7 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
     <>
       {props.items.map(item => {
         if (item.type === 'divider') {
-          return <SidebarDivider key={item.key} />;
+          return <SidebarDivider className="sidebar-divider" key={item.key} />;
         }
         if (item.type === 'label') {
           return (

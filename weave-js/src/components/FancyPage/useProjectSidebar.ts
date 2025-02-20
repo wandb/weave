@@ -189,20 +189,6 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
-            name: 'Help',
-            isShown: isWeaveOnly,
-            iconName: IconNames.Info,
-            onClick: () => {
-              if (typeof window.Intercom === 'function') {
-                window.Intercom('showNewMessage');
-              } else {
-                console.warn('Intercom is not available');
-              }
-            },
-            slug: undefined,
-          },
-          {
-            type: 'button' as const,
             name: 'Scorers',
             slug: 'weave/scorers',
             isShown: false, // Only shown in overflow menu
@@ -253,8 +239,27 @@ export const useProjectSidebar = (
               'weave/prompts',
               'weave/models',
               'weave/datasets',
-              'weave/scorers',
             ].concat(weaveOnlyMenu),
+          },
+          {
+            type: 'divider' as const,
+            key: 'dividerModelsWeave',
+            isShown: showWeaveSidebarItems || isShowAll,
+          },
+          {
+            type: 'button' as const,
+            name: 'Help',
+            isShown: showWeaveSidebarItems,
+            iconName: IconNames.IntercomLogo,
+            onClick: () => {
+              if (typeof window.Intercom === 'function') {
+                window.Intercom('showNewMessage');
+              } else {
+                console.warn('Intercom is not available');
+              }
+            },
+            slug: undefined,
+            className: 'help-button',
           },
         ];
 

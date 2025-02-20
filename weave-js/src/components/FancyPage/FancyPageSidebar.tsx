@@ -30,6 +30,9 @@ const SidebarSections = styled.div`
   gap: 20px;
   position: sticky;
   top: 0;
+  & > .sidebar-divider + div {
+    margin-top: -6px; // Tighten up the spacing between the divider and the next item
+  }
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
     gap: 14px;
     height: 100%;
