@@ -251,7 +251,7 @@ export const useProjectSidebar = (
               }
             },
             slug: undefined,
-            className: 'intercom-button'
+            className: 'intercom-button',
           },
         ];
 

@@ -101,6 +101,7 @@ import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ig
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
+import {ReactComponent as ImportIntercomLogo} from '../../assets/icons/icon-intercom-logo.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
 import {ReactComponent as ImportJobCalculator} from '../../assets/icons/icon-job-calculator.svg';
 import {ReactComponent as ImportJobProgramCode} from '../../assets/icons/icon-job-program-code.svg';
@@ -269,7 +270,6 @@ import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
 import {ReactComponent as ImportZoomInTool} from '../../assets/icons/icon-zoom-in-tool.svg';
-import {ReactComponent as ImportIntercomLogo} from '../../assets/icons/icon-intercom-logo.svg';
 import {IconName} from './types';
 
 type SVGIconProps = SVGProps<SVGElement>;
