@@ -23,7 +23,6 @@ from weave.trace.ipython import (
 )
 from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
-from weave.trace.pii_redaction import redact_pii_string
 from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace_server.trace_server_interface_util import str_digest
@@ -524,6 +523,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
 
     if settings.should_redact_pii():
+        from weave.trace.pii_redaction import redact_pii_string
         op_function_code = redact_pii_string(op_function_code)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
