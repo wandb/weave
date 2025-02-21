@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from weave.trace.patcher import SymbolPatcher
+from weave.integrations.patcher import SymbolPatcher
 
 
 def test_symbol_patcher():
