@@ -40,6 +40,7 @@ quote_slashes = functools.partial(parse.quote, safe="")
 
 DEFAULT_WEAVE_OBJ_PROJECT = "weave"
 
+logger = logging.getLogger("ArtifactMembershipTesting")
 
 class WandbArtifactManifestEntry(typing.TypedDict):
     digest: str
@@ -745,6 +746,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if manifest is None:
             return None
         manifest_entry = manifest.get_entry_by_path(path)
+        logger.warning(f"\n\nlogging ===> manifest entry ===> {manifest_entry}")
         if manifest_entry is not None:
             # This is not a WeaveURI! Its the artifact reference style used
             # by the W&B Artifacts/media layer.

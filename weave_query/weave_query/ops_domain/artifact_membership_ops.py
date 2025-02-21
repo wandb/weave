@@ -1,6 +1,9 @@
+import logging
 import urllib
+import typing
 
 from weave_query import weave_types as types
+from weave_query import artifact_fs, artifact_wandb
 from weave_query.api import op
 from weave_query.gql_op_plugin import wb_gql_op_plugin
 from weave_query.ops_domain import wb_domain_types as wdt
@@ -8,6 +11,33 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_direct_edge_op,
     gql_prop_op,
 )
+
+logger = logging.getLogger("ArtifactMembershipTesting")
+
+static_art_membership_file_gql = """
+            versionIndex
+            artifact {
+                id
+                commitHash
+            }
+            artifactCollection {
+                id 
+                name 
+                defaultArtifactType {
+                    id 
+                    name 
+                    project {
+                        id 
+                        name 
+                        entity {
+                            id 
+                            name
+                        }
+                    }
+                }
+            }
+        """
+
 
 # Section 1/6: Tag Getters
 # None
@@ -71,25 +101,7 @@ gql_direct_edge_op(
 @op(
     name="artifactMembership-link",
     plugins=wb_gql_op_plugin(
-        lambda inputs, inner: """
-            versionIndex
-            artifactCollection {
-                id 
-                name 
-                defaultArtifactType {
-                    id 
-                    name 
-                    project {
-                        id 
-                        name 
-                        entity {
-                            id 
-                            name
-                        }
-                    }
-                }
-            }
-        """,
+        lambda inputs, inner: static_art_membership_file_gql,
     ),
 )
 def artifact_membership_link(
@@ -103,3 +115,72 @@ def artifact_membership_link(
         f"{urllib.parse.quote(artifactMembership['artifactCollection']['name'])}"
         f"/v{artifactMembership['versionIndex']}",
     )
+
+
+def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollectionMembership):
+    type_name = artifactMembership["artifactCollection"]["defaultArtifactType"]["name"]
+    collection_name = artifactMembership["artifactCollection"]["name"]
+    commit_hash = f"v{artifactMembership['versionIndex']}"
+    entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
+    project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
+    uri = artifact_wandb.WeaveWBArtifactURI(
+        collection_name, commit_hash, entity_name, project_name
+    )
+    logger.warning(f"\n\nlogging inside helper ===> versionIndex {commit_hash}; URI ===> {uri} \n\n")
+    return artifact_wandb.WandbArtifact(
+        name=collection_name,
+        type=type_name,
+        uri=uri,
+    )
+
+
+@op(
+    name="artifactMembership-_file_refine_output_type",
+    hidden=True,
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
+)
+def _membership_file_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembership, path: str):
+    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
+    return types.TypeRegistry.type_of(art_local.path_info(path))
+
+
+# Warning: the return type of this is incorrect! Weave0 treats
+# type 'file' (FilesystemArtifactFile) as both dir and file.
+# We have a refiner to do the correct thing, but the return
+# type is set to `File` so that the first non-refine compile
+# path will still work.
+@op(
+    name="artifactMembership-file",
+    refine_output_type=_membership_file_refine_output_type,
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
+)
+def file_(
+        artifactMembership: wdt.ArtifactCollectionMembership, path: str
+) -> typing.Union[
+    None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
+]:
+    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
+    return art_local.path_info(path)  # type: ignore
+
+@op(
+    name="artifactMembership-_files_refine_output_type",
+    hidden=True,
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
+)
+def _files_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembership):
+    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
+    return types.TypeRegistry.type_of(artifact_wandb.FilesystemArtifactFileIterator(art_local))
+
+
+@op(
+    name="artifactMembership-files",
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
+    refine_output_type=_files_refine_output_type,
+)
+def files(
+        artifactMembership: wdt.ArtifactCollectionMembership,
+) -> list[artifact_fs.FilesystemArtifactFile]:
+    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
+    return artifact_wandb.FilesystemArtifactFileIterator(art_local)

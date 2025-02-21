@@ -637,6 +637,7 @@ def file_(
 ) -> typing.Union[
     None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
+    raise TypeError("inside file op")
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
 
