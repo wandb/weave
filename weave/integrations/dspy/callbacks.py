@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from weave.integrations.dspy.dspy_sdk import dspy_postprocess_inputs
+from weave.integrations.dspy.dspy_utils import dspy_postprocess_inputs
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
