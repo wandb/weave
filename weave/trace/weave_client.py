@@ -116,6 +116,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -252,6 +254,39 @@ class PaginatedIterator(Generic[T, R]):
         if not self.size_func:
             raise TypeError("This iterator does not support len()")
         return self.size_func()
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Convert the iterator's contents to a pandas DataFrame.
+
+        Returns:
+            A pandas DataFrame containing all the data from the iterator.
+
+        Example:
+            ```python
+            calls = client.get_calls()
+            df = calls.to_pandas()
+            ```
+
+        Note:
+            This method will fetch all data from the iterator, which may involve
+            multiple network calls. For large datasets, consider using limits
+            or filters to reduce the amount of data fetched.
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required to use this method")
+
+        records = []
+        for item in self:
+            if isinstance(item, dict):
+                records.append(item)
+            elif hasattr(item, "to_dict"):
+                records.append(item.to_dict())
+            else:
+                raise ValueError(f"Unable to convert item to dict: {item}")
+
+        return pd.DataFrame(records)
 
 
 # TODO: should be Call, not WeaveObject
