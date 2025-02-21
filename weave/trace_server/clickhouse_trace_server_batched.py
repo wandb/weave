@@ -1240,6 +1240,81 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        digest = bytes_digest(req.content)
+        base_file_storage_uri = self._get_base_file_storage_uri()
+
+        if base_file_storage_uri is not None:
+            self._file_create_bucket(req, digest, base_file_storage_uri)
+        else:
+            self._file_create_clickhouse(req, digest)
+        return tsi.FileCreateRes(digest=digest)
+
+    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+        chunks = [
+            req.content[i : i + FILE_CHUNK_SIZE]
+            for i in range(0, len(req.content), FILE_CHUNK_SIZE)
+        ]
+        self._insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    i,
+                    len(chunks),
+                    req.name,
+                    chunk,
+                    len(chunk),
+                    None,
+                )
+                for i, chunk in enumerate(chunks)
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
+            ],
+        )
+
+    def _file_create_bucket(
+        self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
+    ) -> None:
+        target_file_storage_uri = base_file_storage_uri.with_path(
+            key_for_project_digest(req.project_id, digest)
+        )
+        store_in_bucket(target_file_storage_uri, req.content)
+        self._insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    0,
+                    0,
+                    req.name,
+                    b"",
+                    len(req.content),
+                    target_file_storage_uri,
+                )
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
+            ],
+        )
+
     def _get_base_file_storage_uri(self) -> Optional[FileStorageURI]:
         """
         Get the base storage URI for a project.
@@ -1259,73 +1334,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Supplied file storage uri contains path components: {self._file_storage_uri_str}"
             )
         return res
-
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        digest = bytes_digest(req.content)
-        base_file_storage_uri = self._get_base_file_storage_uri()
-
-        if base_file_storage_uri is not None:
-            target_file_storage_uri = base_file_storage_uri.with_path(
-                key_for_project_digest(req.project_id, digest)
-            )
-            store_in_bucket(target_file_storage_uri, req.content)
-            self._insert(
-                "files",
-                data=[
-                    (
-                        req.project_id,
-                        digest,
-                        0,
-                        0,
-                        req.name,
-                        b"",
-                        len(req.content),
-                        target_file_storage_uri,
-                    )
-                ],
-                column_names=[
-                    "project_id",
-                    "digest",
-                    "chunk_index",
-                    "n_chunks",
-                    "name",
-                    "val_bytes",
-                    "bytes_stored",
-                    "file_storage_uri",
-                ],
-            )
-        else:
-            chunks = [
-                req.content[i : i + FILE_CHUNK_SIZE]
-                for i in range(0, len(req.content), FILE_CHUNK_SIZE)
-            ]
-            self._insert(
-                "files",
-                data=[
-                    (
-                        req.project_id,
-                        digest,
-                        i,
-                        len(chunks),
-                        req.name,
-                        chunk,
-                        len(chunk),
-                        None,
-                    )
-                    for i, chunk in enumerate(chunks)
-                ],
-                column_names=[
-                    "project_id",
-                    "digest",
-                    "chunk_index",
-                    "n_chunks",
-                    "name",
-                    "val_bytes",
-                    "bytes_stored",
-                    "file_storage_uri",
-                ],
-            )
-        return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
