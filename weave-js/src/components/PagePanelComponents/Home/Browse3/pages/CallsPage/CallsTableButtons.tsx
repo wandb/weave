@@ -258,20 +258,22 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
-            <LabelWithSwitch
-              id="include-feedback"
-              label="Include feedback"
-              checked={includeFeedback}
-              onCheckedChange={setIncludeFeedback}
-              disabled={disabled}
-            />
-            <LabelWithSwitch
-              id="include-costs"
-              label="Include costs"
-              checked={includeCosts}
-              onCheckedChange={setIncludeCosts}
-              disabled={disabled}
-            />
+            <div className="flex items-center gap-12">
+              <LabelWithSwitch
+                id="include-feedback"
+                label="Include feedback"
+                checked={includeFeedback}
+                onCheckedChange={setIncludeFeedback}
+                disabled={disabled}
+              />
+              <LabelWithSwitch
+                id="include-costs"
+                label="Include costs"
+                checked={includeCosts}
+                onCheckedChange={setIncludeCosts}
+                disabled={disabled}
+              />
+            </div>
             <DownloadGrid
               pythonText={pythonText}
               curlText={curlText}
