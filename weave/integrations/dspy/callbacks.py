@@ -48,11 +48,11 @@ if not import_failed:
             if isinstance is not None:
                 inputs = {"self": dictify(instance), **inputs}
                 if hasattr(instance, "signature"):
-                    try:
+                    if hasattr(instance.signature, "model_json_schema"):
                         inputs["self"]["signature"] = (
                             instance.signature.model_json_schema()
                         )
-                    except Exception as e:
+                    else:
                         inputs["self"]["signature"] = instance.signature
             self._call_map[call_id] = gc.create_call(
                 "dspy.Module",
