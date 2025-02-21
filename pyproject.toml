@@ -134,8 +134,8 @@ test = [
   "filelock",
   "httpx",
   
-  "trace_server",
-  "trace_server_tests",
+  "weave[trace_server]",
+  "weave[trace_server_tests]",
 ]
 
 [project.scripts]
