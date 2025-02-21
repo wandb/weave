@@ -50,10 +50,10 @@ def get_aws_credentials() -> AWSCredentials:
     if access_key_id is None or secret_access_key is None:
         raise ValueError("AWS credentials not set")
 
-    creds: AWSCredentials = {
-        "access_key_id": access_key_id,
-        "secret_access_key": secret_access_key,
-    }
+    creds = AWSCredentials(
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+    )
     if session_token is not None:
         creds["session_token"] = session_token
     return creds
