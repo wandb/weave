@@ -15,6 +15,7 @@ import {
   isList,
   isListLike,
   isSimpleTypeShape,
+  isVoidNode,
   listObjectType,
   maybe,
   Node,
@@ -57,6 +58,8 @@ import {
 } from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
+
+import {defineColumnName} from './util';
 
 export type ColumnId = string;
 
@@ -838,7 +841,7 @@ export function insertColumnLeft(
   });
 }
 
-export function removeColumn(ts: TableState, colId: string) {
+export function removeColumn(ts: TableState, colId: string, stack?: Stack) {
   if (ts.groupBy.includes(colId)) {
     // We don't allow removing the group by column. The UI
     // removeColumnsToLeft and removeColumnsToRight from
@@ -846,6 +849,18 @@ export function removeColumn(ts: TableState, colId: string) {
     // state.
     return ts;
   }
+
+  if (stack) {
+    // If the column is used in the current filter, don't remove it.
+    const currentFilter = ts.preFilterFunction;
+    if (!isVoidNode(currentFilter)) {
+      const {usedStack} = dereferenceAllVars(currentFilter, stack);
+      if (usedStack.find(d => d.name === defineColumnName(ts, colId))) {
+        return ts;
+      }
+    }
+  }
+
   const colIndex = ts.order.indexOf(colId);
   if (colIndex === -1) {
     throw new Error('invalid remove col id' + colId);
@@ -860,24 +875,32 @@ export function removeColumn(ts: TableState, colId: string) {
   });
 }
 
-export function removeColumnsToRight(ts: TableState, colId: string) {
+export function removeColumnsToRight(
+  ts: TableState,
+  colId: string,
+  stack: Stack
+) {
   const colIndex = ts.order.indexOf(colId);
   if (colIndex === -1) {
     throw new Error('invalid remove col id' + colId);
   }
   for (let i = ts.order.length - 1; i > colIndex; i--) {
-    ts = removeColumn(ts, ts.order[i]);
+    ts = removeColumn(ts, ts.order[i], stack);
   }
   return ts;
 }
 
-export function removeColumnsToLeft(ts: TableState, colId: string) {
+export function removeColumnsToLeft(
+  ts: TableState,
+  colId: string,
+  stack: Stack
+) {
   const colIndex = ts.order.indexOf(colId);
   if (colIndex === -1) {
     throw new Error('invalid remove col id' + colId);
   }
-  for (let i = colIndex - 1; i > 0; i--) {
-    ts = removeColumn(ts, ts.order[i]);
+  for (let i = colIndex - 1; i >= 0; i--) {
+    ts = removeColumn(ts, ts.order[i], stack);
   }
   return ts;
 }
