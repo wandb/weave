@@ -1,9 +1,11 @@
-import pytest
-from weave.integrations.patcher import MultiPatcher, SymbolPatcher
-from tests.trace.util import DummyTestException
 from typing import Callable
 
+import pytest
+
+from tests.trace.util import DummyTestException
+from weave.integrations.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.context import call_context
+
 
 def assert_no_current_call():
     assert call_context.get_current_call() is None
