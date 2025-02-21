@@ -2,6 +2,7 @@ import logging
 from typing import Any, Callable, Union, cast
 
 import boto3
+import botocore
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from google.cloud import storage
@@ -15,7 +16,6 @@ from tenacity import (
 )
 
 from weave.trace_server.file_storage_credentials import (
-    AllCredentials,
     AWSCredentials,
     AzureAccountCredentials,
     AzureConnectionCredentials,
@@ -75,17 +75,7 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
     )
 
 
-@create_retry_decorator("s3_storage")
-def handle_s3_storage(
-    file_storage_uri: S3FileStorageURI, data: bytes, credentials: AWSCredentials
-) -> None:
-    """Handle storage for AWS S3."""
-    bucket_name = file_storage_uri.bucket
-    object_path = file_storage_uri.path
-    logger.debug(
-        "Preparing to upload to S3 bucket '%s' with path '%s'", bucket_name, object_path
-    )
-
+def get_s3_client(credentials: AWSCredentials) -> botocore.client.BaseClient:
     # Configure timeouts
     config = Config(
         connect_timeout=DEFAULT_CONNECT_TIMEOUT,
@@ -101,55 +91,66 @@ def handle_s3_storage(
         config=config,
     )
 
-    logger.debug("Uploading %d bytes to S3", len(data))
-    s3_client.put_object(Bucket=bucket_name, Key=object_path, Body=data)
-    logger.info("Successfully uploaded to S3: s3://%s/%s", bucket_name, object_path)
+    return s3_client
 
 
-@create_retry_decorator("gcs_storage")
-def handle_gcs_storage(
-    file_storage_uri: GCSFileStorageURI, data: bytes, credentials: GCPCredentials
+@create_retry_decorator("s3_storage")
+def handle_s3_store(
+    file_storage_uri: S3FileStorageURI, data: bytes, credentials: AWSCredentials
 ) -> None:
-    """Handle storage for Google Cloud Storage."""
-    bucket_name = file_storage_uri.bucket
-    object_path = file_storage_uri.path
-    logger.debug(
-        "Preparing to upload to GCS bucket '%s' with path '%s'",
-        bucket_name,
-        object_path,
+    """Handle storage for AWS S3."""
+    s3_client = get_s3_client(credentials)
+    s3_client.put_object(
+        Bucket=file_storage_uri.bucket, Key=file_storage_uri.path, Body=data
     )
 
-    # Configure client with timeouts
-    storage_client = storage.Client(
+
+@create_retry_decorator("s3_read")
+def handle_s3_read(
+    file_storage_uri: S3FileStorageURI, credentials: AWSCredentials
+) -> bytes:
+    """Handle reading from AWS S3."""
+    s3_client = get_s3_client(credentials)
+    response = s3_client.get_object(
+        Bucket=file_storage_uri.bucket, Key=file_storage_uri.path
+    )
+    return response["Body"].read()
+
+
+def get_gcs_client(credentials: GCPCredentials) -> storage.Client:
+    return storage.Client(
         credentials=credentials,
         client_options={"api_endpoint": "storage.googleapis.com"},
         timeout=DEFAULT_CONNECT_TIMEOUT,
     )
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(object_path)
-
-    # Use timeout for upload operation
-    logger.debug("Uploading %d bytes to GCS", len(data))
-    blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT)
-    logger.info("Successfully uploaded to GCS: gs://%s/%s", bucket_name, object_path)
 
 
-@create_retry_decorator("azure_storage")
-def handle_azure_storage(
-    file_storage_uri: AzureFileStorageURI,
-    data: bytes,
-    credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
+@create_retry_decorator("gcs_storage")
+def handle_gcs_store(
+    file_storage_uri: GCSFileStorageURI, data: bytes, credentials: GCPCredentials
 ) -> None:
-    """Handle storage for Azure Blob Storage."""
-    acount = file_storage_uri.account
-    container_name = file_storage_uri.container
-    blob_path = file_storage_uri.path
-    logger.debug(
-        "Preparing to upload to Azure container '%s' with path '%s'",
-        container_name,
-        blob_path,
-    )
+    """Handle storage for Google Cloud Storage."""
+    storage_client = get_gcs_client(credentials)
+    bucket = storage_client.bucket(file_storage_uri.bucket)
+    blob = bucket.blob(file_storage_uri.path)
+    blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT)
 
+
+@create_retry_decorator("gcs_read")
+def handle_gcs_read(
+    file_storage_uri: GCSFileStorageURI, credentials: GCPCredentials
+) -> bytes:
+    """Handle reading from Google Cloud Storage."""
+    storage_client = get_gcs_client(credentials)
+    bucket = storage_client.bucket(file_storage_uri.bucket)
+    blob = bucket.blob(file_storage_uri.path)
+    return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT)
+
+
+def get_azure_client(
+    account: str,
+    credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
+) -> BlobServiceClient:
     # Configure client with timeouts
     if "connection_string" in credentials:
         credentials = cast(AzureConnectionCredentials, credentials)
@@ -162,7 +163,7 @@ def handle_azure_storage(
     else:
         logger.debug("Initializing Azure client with account URL")
         credentials = cast(AzureAccountCredentials, credentials)
-        account__url = f"https://{acount}.blob.core.windows.net/"
+        account__url = f"https://{account}.blob.core.windows.net/"
         blob_service_client = BlobServiceClient(
             account_url=account__url,
             credential=credentials["credential"],
@@ -170,16 +171,40 @@ def handle_azure_storage(
             read_timeout=DEFAULT_READ_TIMEOUT,
         )
 
-    container_client = blob_service_client.get_container_client(container_name)
-    blob_client = container_client.get_blob_client(blob_path)
+    return blob_service_client
 
-    # Upload with retry and timeout handled by client config
-    logger.debug("Uploading %d bytes to Azure Blob Storage", len(data))
+
+@create_retry_decorator("azure_storage")
+def handle_azure_store(
+    file_storage_uri: AzureFileStorageURI,
+    data: bytes,
+    credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
+) -> None:
+    """Handle storage for Azure Blob Storage."""
+    blob_service_client = get_azure_client(file_storage_uri.account, credentials)
+    container_client = blob_service_client.get_container_client(
+        file_storage_uri.container
+    )
+    blob_client = container_client.get_blob_client(file_storage_uri.path)
     blob_client.upload_blob(data, overwrite=True)
-    logger.info("Successfully uploaded to Azure: az://%s/%s", container_name, blob_path)
 
 
-def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
+@create_retry_decorator("azure_read")
+def handle_azure_read(
+    file_storage_uri: AzureFileStorageURI,
+    credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
+) -> bytes:
+    """Handle reading from Azure Blob Storage."""
+    blob_service_client = get_azure_client(file_storage_uri.account, credentials)
+    container_client = blob_service_client.get_container_client(
+        file_storage_uri.container
+    )
+    blob_client = container_client.get_blob_client(file_storage_uri.path)
+    stream = blob_client.download_blob()
+    return stream.readall()
+
+
+def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> None:
     """
     Stores a file in a storage bucket. file_storage_uri is the uri of the
     bucket to store the file in - supports the following providers: Azure,
@@ -202,16 +227,15 @@ def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
         NotImplementedError: For unimplemented providers (like local files)
         Various provider-specific exceptions for storage/auth failures
     """
-    logger.info("Storing %d bytes at %s", len(bytes), file_storage_uri)
     try:
         if isinstance(file_storage_uri, S3FileStorageURI):
-            handle_s3_storage(file_storage_uri, bytes, get_aws_credentials())
+            handle_s3_store(file_storage_uri, bytes, get_aws_credentials())
 
         elif isinstance(file_storage_uri, S3FileStorageURI):
-            handle_gcs_storage(file_storage_uri, bytes, get_gcp_credentials())
+            handle_gcs_store(file_storage_uri, bytes, get_gcp_credentials())
 
         elif isinstance(file_storage_uri, S3FileStorageURI):
-            handle_azure_storage(file_storage_uri, bytes, get_azure_credentials())
+            handle_azure_store(file_storage_uri, bytes, get_azure_credentials())
 
         else:
             raise NotImplementedError(
@@ -223,123 +247,8 @@ def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
         # Re-raise with more context
         raise type(e)(f"Failed to store file at {file_storage_uri}: {str(e)}") from e
 
-    return file_storage_uri  # Return the full URI as it uniquely identifies the stored file
-
 
 # READ LAYER
-
-
-@create_retry_decorator("s3_read")
-def handle_s3_read(path: str, credentials: AWSCredentials) -> bytes:
-    """Handle reading from AWS S3."""
-    bucket_name, object_path = split_bucket_and_path(path, "s3")
-    logger.debug(
-        "Preparing to read from S3 bucket '%s' with path '%s'", bucket_name, object_path
-    )
-
-    # Configure timeouts
-    config = Config(
-        connect_timeout=DEFAULT_CONNECT_TIMEOUT,
-        read_timeout=DEFAULT_READ_TIMEOUT,
-        retries={"max_attempts": 0},  # Disable boto3's built-in retry to use our own
-    )
-
-    s3_client = boto3.client(
-        "s3",
-        aws_access_key_id=credentials.get("access_key_id"),
-        aws_secret_access_key=credentials.get("secret_access_key"),
-        aws_session_token=credentials.get("session_token"),
-        config=config,
-    )
-
-    logger.debug("Reading from S3")
-    response = s3_client.get_object(Bucket=bucket_name, Key=object_path)
-    data = response["Body"].read()
-    logger.info(
-        "Successfully read %d bytes from S3: s3://%s/%s",
-        len(data),
-        bucket_name,
-        object_path,
-    )
-    return data
-
-
-@create_retry_decorator("gcs_read")
-def handle_gcs_read(path: str, credentials: GCPCredentials) -> bytes:
-    """Handle reading from Google Cloud Storage."""
-    bucket_name, object_path = split_bucket_and_path(path, "gs")
-    logger.debug(
-        "Preparing to read from GCS bucket '%s' with path '%s'",
-        bucket_name,
-        object_path,
-    )
-
-    # Configure client with timeouts
-    storage_client = storage.Client(
-        credentials=credentials,
-        client_options={"api_endpoint": "storage.googleapis.com"},
-        timeout=DEFAULT_CONNECT_TIMEOUT,
-    )
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(object_path)
-
-    # Use timeout for download operation
-    logger.debug("Reading from GCS")
-    data = blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT)
-    logger.info(
-        "Successfully read %d bytes from GCS: gs://%s/%s",
-        len(data),
-        bucket_name,
-        object_path,
-    )
-    return data
-
-
-@create_retry_decorator("azure_read")
-def handle_azure_read(
-    path: str, credentials: Union[AzureConnectionCredentials, AzureAccountCredentials]
-) -> bytes:
-    """Handle reading from Azure Blob Storage."""
-    container_name, blob_path = split_bucket_and_path(path, "azure")
-    logger.debug(
-        "Preparing to read from Azure container '%s' with path '%s'",
-        container_name,
-        blob_path,
-    )
-
-    # Configure client with timeouts
-    if "connection_string" in credentials:
-        credentials = cast(AzureConnectionCredentials, credentials)
-        logger.debug("Initializing Azure client with connection string")
-        blob_service_client = BlobServiceClient.from_connection_string(
-            credentials["connection_string"],
-            connection_timeout=DEFAULT_CONNECT_TIMEOUT,
-            read_timeout=DEFAULT_READ_TIMEOUT,
-        )
-    else:
-        logger.debug("Initializing Azure client with account URL")
-        credentials = cast(AzureAccountCredentials, credentials)
-        blob_service_client = BlobServiceClient(
-            account_url=credentials["account_url"],
-            credential=credentials["credential"],
-            connection_timeout=DEFAULT_CONNECT_TIMEOUT,
-            read_timeout=DEFAULT_READ_TIMEOUT,
-        )
-
-    container_client = blob_service_client.get_container_client(container_name)
-    blob_client = container_client.get_blob_client(blob_path)
-
-    # Download with retry and timeout handled by client config
-    logger.debug("Reading from Azure Blob Storage")
-    stream = blob_client.download_blob()
-    data = stream.readall()
-    logger.info(
-        "Successfully read %d bytes from Azure: az://%s/%s",
-        len(data),
-        container_name,
-        blob_path,
-    )
-    return data
 
 
 def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
@@ -364,29 +273,20 @@ def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
         NotImplementedError: For unimplemented providers (like local files)
         Various provider-specific exceptions for storage/auth failures
     """
-    provider, path = parse_storage_uri(file_storage_uri)
-    logger.info("Reading from %s", file_storage_uri)
-
-    credentials: AllCredentials
-
     try:
-        if provider == "s3":
-            credentials = get_aws_credentials()
-            return handle_s3_read(path, credentials)
+        if isinstance(file_storage_uri, S3FileStorageURI):
+            return handle_s3_read(file_storage_uri, bytes, get_aws_credentials())
 
-        elif provider == "gs":
-            credentials = get_gcp_credentials()
-            return handle_gcs_read(path, credentials)
+        elif isinstance(file_storage_uri, S3FileStorageURI):
+            return handle_gcs_read(file_storage_uri, bytes, get_gcp_credentials())
 
-        elif provider == "azure":
-            credentials = get_azure_credentials()
-            return handle_azure_read(path, credentials)
-
-        elif provider == "file":
-            raise NotImplementedError("Local file storage not currently supported")
+        elif isinstance(file_storage_uri, S3FileStorageURI):
+            return handle_azure_read(file_storage_uri, bytes, get_azure_credentials())
 
         else:
-            raise ValueError(f"Unsupported storage provider: {provider}")
+            raise NotImplementedError(
+                f"file_storage_uri of type {type(file_storage_uri)} not supported"
+            )
 
     except Exception as e:
         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))

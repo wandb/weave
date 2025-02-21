@@ -29,11 +29,6 @@ class AzureAccountCredentials(TypedDict):
     ]  # Can be connection string, SAS token, or credential object
 
 
-AllCredentials = Union[
-    AWSCredentials, GCPCredentials, AzureConnectionCredentials, AzureAccountCredentials
-]
-
-
 def get_aws_credentials() -> AWSCredentials:
     # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
     """
