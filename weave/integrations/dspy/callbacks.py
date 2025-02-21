@@ -1,5 +1,6 @@
 from typing import Any, Optional
 
+from weave.trace.serialize import dictify
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.weave_client import Call
 
@@ -22,6 +23,8 @@ if not import_failed:
         ) -> None:
             print("on_lm_start")
             gc = weave_client_context.require_weave_client()
+            if isinstance is not None:
+                inputs = {"self": dictify(instance), **inputs}
             self._call_map[call_id] = gc.create_call(
                 "dspy.LM", inputs=inputs, display_name="dspy.LM"
             )

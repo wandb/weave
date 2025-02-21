@@ -108,11 +108,6 @@ def get_dspy_patcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
-                "LM.__call__",
-                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.LM"})),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
                 "Embedder.__call__",
                 dspy_wrapper(
                     base.model_copy(update={"name": base.name or "dspy.Embedder"})
