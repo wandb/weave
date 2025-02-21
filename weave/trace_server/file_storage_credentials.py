@@ -8,37 +8,42 @@ from weave.trace_server import environment
 
 
 class AWSCredentials(TypedDict, total=False):
-    """Type for AWS credentials dictionary."""
+    """AWS authentication credentials for S3 access.
+    The session_token is optional and only required for temporary credentials."""
 
     access_key_id: str
     secret_access_key: str
-    session_token: Optional[str]  # Optional
+    session_token: Optional[str]
 
 
 class AzureConnectionCredentials(TypedDict):
-    """Type for Azure connection string credentials."""
+    """Azure authentication using connection string format.
+    This is the preferred method for Azure authentication."""
 
     connection_string: str
 
 
 class AzureAccountCredentials(TypedDict):
-    """Type for Azure account credentials."""
+    """Azure authentication using account-based credentials.
+    Supports SAS tokens, connection strings, or Azure credential objects."""
 
-    credential: Union[
-        str, TokenCredential
-    ]  # Can be connection string, SAS token, or credential object
+    credential: Union[str, TokenCredential]
 
 
 def get_aws_credentials() -> AWSCredentials:
-    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
-    """
-    Returns AWS credentials needed for S3 access.
+    """Retrieves AWS credentials from environment variables.
+
+    Required env vars:
+        - WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID
+        - WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY
+    Optional env vars:
+        - WF_FILE_STORAGE_BUCKET_AWS_SESSION_TOKEN
 
     Returns:
-        Dict containing AWS credentials with keys:
-        - access_key_id: AWS access key ID
-        - secret_access_key: AWS secret access key
-        - session_token: Optional session token
+        AWSCredentials with access key, secret key, and optional session token
+
+    Raises:
+        ValueError: If required credentials are not set
     """
     access_key_id = environment.wf_storage_bucket_aws_access_key_id()
     secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
@@ -56,16 +61,16 @@ def get_aws_credentials() -> AWSCredentials:
 
 
 def get_gcp_credentials() -> GCPCredentials:
-    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
-    """
-    Returns GCP credentials needed for GCS access.
-    Uses a JSON string containing service account credentials.
+    """Retrieves GCP service account credentials from environment variables.
+
+    Required env vars:
+        - WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON: JSON string containing service account info
 
     Returns:
-        Google Cloud credentials object that can be used with storage client
+        GCPCredentials object configured for GCS access
 
     Raises:
-        ValueError: If no valid GCP credentials are found
+        ValueError: If credentials are missing or invalid JSON format
     """
     import json
 
@@ -85,17 +90,20 @@ def get_gcp_credentials() -> GCPCredentials:
 
 
 def get_azure_credentials() -> (
-    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
     Union[AzureConnectionCredentials, AzureAccountCredentials]
 ):
-    """
-    Returns Azure credentials needed for Blob storage access.
-    To be implemented by the client.
+    """Retrieves Azure credentials from environment variables.
+    Supports both connection string and account-based authentication.
+
+    Required env vars (one of):
+        - WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING
+        - WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL (base64 encoded)
 
     Returns:
-        Either:
-        - Dict with connection_string for connection string auth
-        - Dict with account_url and credential for account-based auth
+        Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars
+
+    Raises:
+        ValueError: If neither credential type is properly configured
     """
     connection_string = environment.wf_storage_bucket_azure_connection_string()
     if connection_string is not None:
