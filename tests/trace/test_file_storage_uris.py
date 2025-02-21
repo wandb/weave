@@ -25,7 +25,7 @@ def test_parse_uri_str(uri: str, expected_class):
 
 
 @pytest.mark.parametrize(
-    "uri,expected_class",
+    "uri",
     [
         "invalid://blah",
         "invalid://blah/blah",
