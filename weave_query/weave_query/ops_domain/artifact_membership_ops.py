@@ -120,7 +120,11 @@ def artifact_membership_link(
 def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollectionMembership):
     type_name = artifactMembership["artifactCollection"]["defaultArtifactType"]["name"]
     collection_name = artifactMembership["artifactCollection"]["name"]
-    commit_hash = f"v{artifactMembership['versionIndex']}"
+
+    # This is valid because the commitHash for portfolios is always null. So we will leverage
+    # the artifact's membership in its source collection to fetch it via the commitHash in
+    # downstream paths
+    commit_hash = artifactMembership["artifact"]["commitHash"]
     entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
     project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
     uri = artifact_wandb.WeaveWBArtifactURI(
