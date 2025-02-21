@@ -23,6 +23,7 @@ from weave.trace_server.file_storage_credentials import (
     get_azure_credentials,
     get_gcp_credentials,
 )
+from weave.trace_server.file_storage_uris import FileStorageURI
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -37,14 +38,6 @@ RETRY_MAX_WAIT = 10  # seconds
 
 def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
-
-
-def determine_bucket_uri(
-    base_file_storage_uri: str, project_id: str, digest: str
-) -> str:
-    # BBBAAADDD
-    assert base_file_storage_uri.endswith("/")
-    return f"{base_file_storage_uri}{key_for_project_digest(project_id, digest)}"
 
 
 def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
@@ -75,57 +68,6 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
         ),  # Log before retry attempts at DEBUG level
         after=after_retry,
     )
-
-
-def parse_storage_uri(uri: str) -> tuple[str, str]:
-    """
-    Parses a storage URI into provider and path components.
-
-    Args:
-        uri: Storage URI (e.g., s3://bucket/path, gs://bucket/path, azure://container/path)
-
-    Returns:
-        Tuple of (provider, path)
-
-    Raises:
-        ValueError: If the URI format is invalid or provider is unsupported
-    """
-    if not uri or "://" not in uri:
-        raise ValueError(f"Invalid storage URI format: {uri}")
-
-    provider, path = uri.split("://", 1)
-
-    if not path:
-        raise ValueError(f"No path specified in URI: {uri}")
-
-    if provider not in ["s3", "gs", "azure", "file"]:
-        raise ValueError(f"Unsupported storage provider: {provider}")
-
-    # BBBAAADDD
-    name, path = path.split("/", 1)
-    return provider, path
-
-
-def split_bucket_and_path(path: str, provider: str) -> tuple[str, str]:
-    """
-    Splits a storage path into bucket/container name and object path.
-
-    Args:
-        path: The full path after the protocol (e.g., 'bucket-name/path/to/file')
-        provider: The storage provider ('s3', 'gs', or 'azure')
-
-    Returns:
-        Tuple of (bucket_name, object_path)
-
-    Raises:
-        ValueError: If the path format is invalid
-    """
-    if "/" not in path:
-        raise ValueError(
-            f"Invalid path format for {provider}: {path}. Must include bucket/container and path."
-        )
-    parts = path.split("/", 1)
-    return (parts[0], parts[1])  # Explicitly return a tuple
 
 
 @create_retry_decorator("s3_storage")
@@ -225,7 +167,7 @@ def handle_azure_storage(
     )
 
 
-def store_in_bucket(file_storage_uri: str, bytes: bytes) -> str:
+def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
     """
     Stores a file in a storage bucket. file_storage_uri is the uri of the
     bucket to store the file in - supports the following providers: Azure,
@@ -391,7 +333,7 @@ def handle_azure_read(
     return data
 
 
-def read_from_bucket(file_storage_uri: str) -> bytes:
+def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
     """
     Reads a file from a storage bucket. file_storage_uri is the uri of the
     bucket to read the file from - supports the following providers: Azure,

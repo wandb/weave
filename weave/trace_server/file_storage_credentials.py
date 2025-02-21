@@ -36,6 +36,7 @@ AllCredentials = Union[
 
 
 def get_aws_credentials() -> AWSCredentials:
+    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
     """
     Returns AWS credentials needed for S3 access.
 
@@ -61,6 +62,7 @@ def get_aws_credentials() -> AWSCredentials:
 
 
 def get_gcp_credentials() -> GCPCredentials:
+    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
     """
     Returns GCP credentials needed for GCS access.
     Uses a JSON string containing service account credentials.
@@ -89,6 +91,7 @@ def get_gcp_credentials() -> GCPCredentials:
 
 
 def get_azure_credentials() -> (
+    # FUTURE: When we move to project-specific buckets, this function will need to be able to fetch credential based on project / target bucket
     Union[AzureConnectionCredentials, AzureAccountCredentials]
 ):
     """

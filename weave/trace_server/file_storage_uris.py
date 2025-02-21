@@ -52,6 +52,9 @@ class FileStorageURI:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
+    def has_path(self) -> bool:
+        return self.path != ""
+
     def with_path(self, path: str) -> "FileStorageURI":
         copied = self.parse_uri_str(self.to_uri_str())
         copied.path = path

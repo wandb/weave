@@ -79,10 +79,11 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_management import (
-    determine_bucket_uri,
+    key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
 )
+from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
@@ -191,7 +192,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
-        file_storage_uri: Optional[str] = None,
+        file_storage_uri_str: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -204,7 +205,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._file_storage_uri = file_storage_uri
+        self._file_storage_uri_str = file_storage_uri_str
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -217,7 +218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
-            file_storage_uri=wf_env.wf_file_storage_uri(),
+            file_storage_uri_str=wf_env.wf_file_storage_uri(),
         )
 
     @contextmanager
@@ -1239,8 +1240,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
-    # TODO: CONVERT THIS TO RETURN A FILESTORAGEURI OBJECT
-    def _get_base_file_storage_uri(self) -> Optional[str]:
+    def _get_base_file_storage_uri(self) -> Optional[FileStorageURI]:
         """
         Get the base storage URI for a project.
 
@@ -1251,17 +1251,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         the project or a context variable. Leaving this method here for clarity
         and future extensibility.
         """
-        return self._file_storage_uri
+        if not self._file_storage_uri_str:
+            return None
+        res = FileStorageURI.parse_uri_str(self._file_storage_uri_str)
+        if res.has_path():
+            raise ValueError(
+                f"Supplied file storage uri contains path components: {self._file_storage_uri_str}"
+            )
+        return res
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
         base_file_storage_uri = self._get_base_file_storage_uri()
 
         if base_file_storage_uri is not None:
-            bucket_uri = determine_bucket_uri(
-                base_file_storage_uri, req.project_id, digest
+            target_file_storage_uri = base_file_storage_uri.with_path(
+                key_for_project_digest(req.project_id, digest)
             )
-            store_in_bucket(bucket_uri, req.content)
+            store_in_bucket(target_file_storage_uri, req.content)
             self._insert(
                 "files",
                 data=[
@@ -1273,7 +1280,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         req.name,
                         b"",
                         len(req.content),
-                        bucket_uri,
+                        target_file_storage_uri,
                     )
                 ],
                 column_names=[
@@ -1342,23 +1349,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
-        file_storage_uri = query_result.result_rows[0][2]
+        file_storage_uri_str = query_result.result_rows[0][2]
         if n_chunks == 0:
-            if not file_storage_uri:
+            if not file_storage_uri_str:
                 raise ValueError("File not found")
         elif len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
 
-        if file_storage_uri:
-            # Verify storage URI is what we expect. This is an extra check to ensure
-            # that the storage bucket URI is set correctly.
-            if self._file_storage_uri is None:
-                raise ValueError("Storage bucket URI is not set")
-            expected_file_storage_uri = determine_bucket_uri(
-                self._file_storage_uri, req.project_id, req.digest
-            )
-            if file_storage_uri != expected_file_storage_uri:
-                raise ValueError("File storage URI does not match expected URI")
+        if file_storage_uri_str:
+            file_storage_uri = FileStorageURI.parse_uri_str(file_storage_uri_str)
             bytes = read_from_bucket(file_storage_uri)
         else:
             bytes = b"".join(chunks)
