@@ -9,9 +9,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 0c1d5467-b91a-4e02-8120-3b5a660eb6c3
+      - 2d1d9240-6f07-4b60-a1ce-e24a93f6324a
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: GET
     uri: https://huggingface.co/api/tasks
   response:
@@ -95,7 +95,8 @@ interactions:
         models take a (document, question) pair as input and return an answer in natural
         language. Models usually rely on multi-modal features, combining text, position
         of words (bounding-boxes) and image.\",\"widgetModels\":[\"impira/layoutlm-invoices\"],\"youtubeId\":\"\",\"id\":\"document-question-answering\",\"label\":\"Document
-        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"visual-document-retrieval\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"visual-document-retrieval\",\"label\":\"Visual
+        Document Retrieval\",\"libraries\":[\"transformers\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
         dataset containing cleaned articles of all languages. Can be used to train
         `feature-extraction` models.\",\"id\":\"wikipedia\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"India,
         officially the Republic of India, is a country in South Asia.\",\"type\":\"text\"}],\"outputs\":[{\"table\":[[\"Dimension
@@ -724,29 +725,29 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '75866'
+      - '76131'
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 06 Feb 2025 05:52:40 GMT
+      - Thu, 20 Feb 2025 06:28:28 GMT
       ETag:
-      - W/"1285a-mpc2fdSsHWn76IZKBEOfnoriq8E"
+      - W/"12963-vyIYgItlbQqfuVxsEg2yioEcYRQ"
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 630d35bf6016c7c9ee87eeeb6a015258.cloudfront.net (CloudFront)
+      - 1.1 d03f5e49ef8a75531152544d3c363680.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - g8g4e7e-Sx9YdtyqgoINHfYj2IX29lp3k6FQXNztny0hWDI5xCHkDw==
+      - v1bvTLQevk3NrkXOhF8unOYiELexY_bnX1hpTbndJ2OWjo-RsCehbA==
       X-Amz-Cf-Pop:
-      - BCN50-P1
+      - CCU50-P1
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-67a44e28-040b20d77650f93138aa0271;0c1d5467-b91a-4e02-8120-3b5a660eb6c3
+      - Root=1-67b6cb8c-49f42fd36b8649f26915ce1c;2d1d9240-6f07-4b60-a1ce-e24a93f6324a
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -756,15 +757,19 @@ interactions:
     body: null
     headers:
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
     method: POST
-    uri: https://api-inference.huggingface.co/models/deepset/roberta-base-squad2
+    uri: https://router.huggingface.co/hf-inference/models/deepset/roberta-base-squad2
   response:
     body:
       string: '{"score":0.9326568841934204,"start":11,"end":16,"answer":"Clara"}'
     headers:
       Access-Control-Allow-Credentials:
       - 'true'
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
       Content-Length:
@@ -772,20 +777,29 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 06 Feb 2025 05:52:42 GMT
+      - Thu, 20 Feb 2025 06:28:28 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
       Vary:
       - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
+      Via:
+      - 1.1 5795cfb7762205b7d50d5ba7ce4d8746.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - X6Q0VfGjDNfRbnOUD2m1r36wRXTe6L_NoExp4g16XzU4QQ2OIwJ3FQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      cross-origin-opener-policy:
+      - same-origin
       x-compute-time:
-      - '0.548'
+      - '0.062'
       x-compute-type:
       - cache
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /
       x-request-id:
-      - k-xEGl
+      - Root=1-67b6cb8c-6db1232a1b875c6b78347a83
       x-sha:
       - adc3b06f79f797d1c575d5479d6f5efe54a9e3b4
     status:

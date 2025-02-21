@@ -539,7 +539,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
           '& .MuiDataGrid-cell': {
             padding: '0',
             // This vertical / horizontal center aligns <span>'s inside of the columns
-            // Fixes an issure where boolean checkboxes are top-aligned pre-edit
+            // Fixes an issue where boolean checkboxes are top-aligned pre-edit
             '& .MuiBox-root': {
               '& span.cursor-inherit': {
                 display: 'flex',
