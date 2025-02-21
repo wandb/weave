@@ -1152,7 +1152,8 @@ class WeaveClient:
 
         def on_complete(f: Future) -> None:
             try:
-                if _should_print_call_link and f.result() and not _current_call:
+                root_call_did_not_error = f.result() and not _current_call
+                if root_call_did_not_error and _should_print_call_link:
                     print_call_link(call)
             except Exception:
                 pass
