@@ -52,6 +52,8 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/tracing",
             "guides/tracking/ops",
             "guides/tracking/objects",
+            "guides/tracking/redact-pii",
+            "guides/tracking/faqs"
           ],
         },
         {
@@ -87,7 +89,11 @@ const sidebars: SidebarsConfig = {
               collapsible: true,
               collapsed: false,
               label: "Scoring",
-              items: ["guides/evaluation/scorers",  "guides/evaluation/builtin_scorers"],
+              items: [
+                "guides/evaluation/scorers", 
+                "guides/evaluation/builtin_scorers",
+                "guides/evaluation/weave_local_scorers"
+              ],
             }
           ],
         },
@@ -126,7 +132,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
-            "guides/integrations/google-gemini",
+            "guides/integrations/google",
             "guides/integrations/groq",
             "guides/integrations/huggingface",
             "guides/integrations/litellm",

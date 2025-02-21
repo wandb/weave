@@ -20,6 +20,7 @@ os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
+| `WANDB_API_KEY` | `string` | `None` | If set, automatically log into W&B Weave without being prompted for your API key. To generate an API key, log in to your W&B account and go to [https://wandb.ai/authorize](https://wandb.ai/authorize). |
 | `WEAVE_DISABLED` | `bool` | `false` | When set to `true`, disables all Weave tracing. Weave ops will behave like regular functions. |
 | `WEAVE_PRINT_CALL_LINK` | `bool` | `true` | Controls whether to print a link to the Weave UI when calling a Weave op. |
 | `WEAVE_CAPTURE_CODE` | `bool` | `true` | Controls whether to save code for ops so they can be reloaded for later use. |

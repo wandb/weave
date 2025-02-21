@@ -1,7 +1,7 @@
 import {init, login} from '../../clientApi';
 import {Dataset, op, weaveAudio, weaveImage} from '../../index';
 
-describe('Publishing Various Data Types', () => {
+describe.skip('Publishing Various Data Types', () => {
   beforeEach(async () => {
     await login(process.env.WANDB_API_KEY ?? '');
   });

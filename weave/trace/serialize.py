@@ -49,6 +49,15 @@ def to_json(
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
 
+    # Add explicit handling for WeaveScorerResult models
+    from weave.flow.scorer import WeaveScorerResult
+
+    if isinstance(obj, WeaveScorerResult):
+        return {
+            k: to_json(v, project_id, client, use_dictify)
+            for k, v in obj.model_dump().items()
+        }
+
     # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
