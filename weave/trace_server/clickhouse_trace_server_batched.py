@@ -1358,16 +1358,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
         file_storage_uri_str = query_result.result_rows[0][2]
-        if n_chunks == 0:
-            if not file_storage_uri_str:
-                raise ValueError("File not found")
-        elif len(chunks) != n_chunks:
-            raise ValueError("Missing chunks")
+
+        # THere are 2 cases:
+        # 1: file_storage_uri_str is not none (storing in file store)
+        # 2: file_storage_uri_str is None (storing directly in clickhouse)
 
         if file_storage_uri_str:
+            # Read from storage
+            if n_chunks != 0:
+                raise ValueError(f"Expected n_chunks=0, found {n_chunks}")
+            if len(chunks) != 1:
+                raise ValueError(f"Expected 1 result, found {len(chunks)}")
             file_storage_uri = FileStorageURI.parse_uri_str(file_storage_uri_str)
             bytes = read_from_bucket(file_storage_uri)
         else:
+            # Read from Clickhouse
+            if len(chunks) != n_chunks:
+                raise ValueError("Missing chunks")
             bytes = b"".join(chunks)
 
         return tsi.FileContentReadRes(content=bytes)
