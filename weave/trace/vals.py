@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import inspect
 import logging
@@ -5,7 +7,7 @@ import operator
 import typing
 from collections.abc import Generator, Iterator
 from copy import deepcopy
-from typing import Any, Literal, Optional, SupportsIndex, Union
+from typing import Any, Literal, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -62,7 +64,7 @@ class MutationAppend:
 
 
 Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
-MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
+MutationOperation = Literal["setitem", "setattr", "append"]
 
 
 def make_mutation(
@@ -88,10 +90,10 @@ def make_mutation(
 
 
 class Traceable:
-    ref: Optional[RefWithExtra]
-    mutations: Optional[list[Mutation]] = None
-    root: "Traceable"
-    parent: Optional["Traceable"] = None
+    ref: RefWithExtra | None
+    mutations: list[Mutation] | None
+    root: Traceable
+    parent: Traceable | None
     server: TraceServerInterface
     _is_dirty: bool = False
 
@@ -160,7 +162,7 @@ def attribute_access_result(
     val_attr_val: Any,
     attr_name: str,
     *,
-    server: Optional[TraceServerInterface],
+    server: TraceServerInterface | None,
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
@@ -195,10 +197,10 @@ class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
-        ref: Optional[RefWithExtra],
+        ref: RefWithExtra | None,
         server: TraceServerInterface,
-        root: typing.Optional[Traceable],
-        parent: Optional[Traceable] = None,
+        root: Traceable | None,
+        parent: Traceable | None = None,
     ) -> None:
         self._val = val
         self.ref = ref
@@ -206,7 +208,7 @@ class WeaveObject(Traceable):
         self.root = root or self
         self.parent = parent
 
-    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+    def __deepcopy__(self, memo: dict) -> WeaveObject:
         val_copy = deepcopy(self._val, memo)
         res = WeaveObject(
             val_copy,
@@ -267,12 +269,12 @@ class WeaveTable(Traceable):
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
+        table_ref: TableRef | None,
+        ref: RefWithExtra | None,
         server: TraceServerInterface,
         filter: TableRowFilter,
-        root: Optional[Traceable],
-        parent: Optional[Traceable] = None,
+        root: Traceable | None,
+        parent: Traceable | None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
@@ -280,11 +282,11 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: Optional[list[dict]] = None
+        self._rows: list[dict] | None = None
 
         # _prefetched_rows is a local cache of rows that can be used to
         # avoid a remote call. Should only be used by internal code.
-        self._prefetched_rows: Optional[list[dict]] = None
+        self._prefetched_rows: list[dict] | None = None
 
     @property
     def rows(self) -> list[dict]:
@@ -431,7 +433,7 @@ class WeaveTable(Traceable):
 
             page_index += 1
 
-    def __getitem__(self, key: Union[int, slice, str]) -> Any:
+    def __getitem__(self, key: int | slice | str) -> Any:
         rows = self.rows
         if isinstance(key, (int, slice)):
             return rows[key]
@@ -461,9 +463,9 @@ class WeaveList(Traceable, list):
         self,
         *args: Any,
         server: TraceServerInterface,
-        ref: Optional[RefWithExtra] = None,
-        root: Optional[Traceable] = None,
-        parent: Optional[Traceable] = None,
+        ref: RefWithExtra | None,
+        root: Traceable | None,
+        parent: Traceable | None,
     ) -> None:
         self.server = server
 
@@ -472,7 +474,7 @@ class WeaveList(Traceable, list):
         self.parent = parent
         super().__init__(*args)
 
-    def __deepcopy__(self, memo: dict) -> "WeaveList":
+    def __deepcopy__(self, memo: dict) -> WeaveList:
         items_copy = [deepcopy(item, memo) for item in self]
         res = WeaveList(
             items_copy,
@@ -484,7 +486,7 @@ class WeaveList(Traceable, list):
         memo[id(self)] = res
         return res
 
-    def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
+    def __getitem__(self, i: SupportsIndex | slice) -> Any:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
         index = operator.index(i)
@@ -492,7 +494,7 @@ class WeaveList(Traceable, list):
         index_val = super().__getitem__(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
 
-    def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
+    def __setitem__(self, i: SupportsIndex | slice, value: Any) -> None:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
         if (index := operator.index(i)) >= len(self):
@@ -537,9 +539,9 @@ class WeaveDict(Traceable, dict):
         self,
         *args: Any,
         server: TraceServerInterface,
-        ref: Optional[RefWithExtra] = None,
-        root: Optional[Traceable] = None,
-        parent: Optional[Traceable] = None,
+        ref: RefWithExtra | None = None,
+        root: Traceable | None = None,
+        parent: Traceable | None = None,
         **kwargs: Any,
     ) -> None:
         self.server = server
@@ -549,7 +551,7 @@ class WeaveDict(Traceable, dict):
         self.parent = parent
         super().__init__(*args, **kwargs)
 
-    def __deepcopy__(self, memo: dict) -> "WeaveDict":
+    def __deepcopy__(self, memo: dict) -> WeaveDict:
         items_copy = {k: deepcopy(v, memo) for k, v in self.items()}
         res = WeaveDict(
             items_copy,
@@ -616,9 +618,9 @@ class WeaveDict(Traceable, dict):
 
 def make_trace_obj(
     val: Any,
-    new_ref: Optional[RefWithExtra],  # Can this actually be None?
+    new_ref: RefWithExtra | None,  # Can this actually be None?
     server: TraceServerInterface,
-    root: Optional[Traceable],
+    root: Traceable | None,
     parent: Any = None,
 ) -> Any:
     if isinstance(val, Traceable):
