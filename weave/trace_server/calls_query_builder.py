@@ -572,7 +572,8 @@ class CallsQuery(BaseModel):
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
-                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                    field=sort_by.field.field,
+                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
                 )
                 for sort_by in self.order_fields
             ]
@@ -697,34 +698,93 @@ class CallsQuery(BaseModel):
         return _safely_format_sql(raw_sql)
 
 
+def _like_value(value: str) -> str:
+    """Helper to create a LIKE pattern for string matching."""
+    return f"%{value}%"
+
+
 def make_simple_like_condition(
     pb: ParamBuilder, condition: Condition, table_alias: str = "calls_merged"
 ) -> str:
+    """Creates a simple LIKE condition for the SQL query. Used to prepend
+    before JSON_VALUE is used. Optimization for ch s3 reads.
+
+    Only applies to string fields.
+
+    Args:
+        pb: Parameter builder for generating SQL parameters
+        condition: The condition to convert to SQL
+        table_alias: The table alias to use in the SQL (default: "calls_merged")
+
+    Returns:
+        SQL string with the LIKE condition or empty string if not applicable
+    """
+    # Handle different operation types
     if isinstance(condition.operand, tsi_query.EqOperation):
-        field_name = get_field_by_name(condition.operand.eq_[0].get_field_).field
-        field_value = condition.operand.eq_[1].literal_
+        # Get field name from first operand
+        field_op = condition.operand.eq_[0]
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Get value from second operand
+        value_op = condition.operand.eq_[1]
+        if not isinstance(value_op, tsi_query.LiteralOperation):
+            return ""
+        # Only apply to string values
+        if not isinstance(value_op.literal_, str):
+            return ""
+        field_value = value_op.literal_
+
     elif isinstance(condition.operand, tsi_query.ContainsOperation):
-        field_name = get_field_by_name(
-            condition.operand.contains_.input.get_field_
-        ).field
-        field_value = condition.operand.contains_.substr.literal_
+        # Get field name from input operand
+        field_op = condition.operand.contains_.input
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Get value from substr operand
+        value_op = condition.operand.contains_.substr
+        if not isinstance(value_op, tsi_query.LiteralOperation):
+            return ""
+        # Only apply to string values
+        if not isinstance(value_op.literal_, str):
+            return ""
+        field_value = value_op.literal_
+
     elif isinstance(condition.operand, tsi_query.InOperation):
-        field_name = get_field_by_name(condition.operand.in_[0].get_field_).field
-        sql = " AND ("
+        # Get field name from first operand
+        field_op = condition.operand.in_[0]
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Build OR conditions for each value in the IN clause
+        sql_parts = []
         for op in condition.operand.in_[1]:
-            op_wildcard_value = f"%{op.literal_}%"
+            if not isinstance(op, tsi_query.LiteralOperation):
+                return ""
+            # Only apply to string values
+            if not isinstance(op.literal_, str):
+                return ""
+            op_wildcard_value = _like_value(op.literal_)
             op_sql_value = _param_slot(pb.add_param(op_wildcard_value), "String")
-            sql += f"{table_alias}.{field_name} LIKE {op_sql_value} OR "
-        sql = sql[:-4]
-        sql += ")"
-        return sql
+            sql_parts.append(f"{table_alias}.{field_name} LIKE {op_sql_value}")
+
+        if not sql_parts:
+            return ""
+        return f" AND ({' OR '.join(sql_parts)})"
+
     else:
         return ""
 
-    wildcard_value = f"%{field_value}%"
+    # For EQ and CONTAINS operations, create a single LIKE condition
+    wildcard_value = _like_value(field_value)
     sql_value = _param_slot(pb.add_param(wildcard_value), "String")
-
-    return f"AND + {table_alias}.{field_name} LIKE {sql_value} "
+    return f" AND {table_alias}.{field_name} LIKE {sql_value}"
 
 
 ALLOWED_CALL_FIELDS = {
