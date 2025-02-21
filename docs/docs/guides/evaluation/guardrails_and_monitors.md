@@ -100,11 +100,7 @@ result, call = generate_text.call("Say hello")
 await call.apply_scorer(LengthScorer())
 ```
 
-<<<<<<< HEAD
-## Using Scorers as Guardrails
-=======
 ## Using Scorers as Guardrails {#using-scorers-as-guardrails}
->>>>>>> master
 
 Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
 
@@ -150,11 +146,7 @@ When applying scorers:
 - You can view scorer results in the UI or query them via the API
 :::
 
-<<<<<<< HEAD
-## Using Scorers as Monitors
-=======
 ## Using Scorers as Monitors {#using-scorers-as-monitors}
->>>>>>> master
 
 Monitors help track quality metrics over time without blocking operations. This is useful for:
 - Identifying quality trends

@@ -61,10 +61,6 @@ const sidebars: SidebarsConfig = {
           collapsible: true,
           collapsed: false,
           label: "Evaluation",
-<<<<<<< HEAD
-          link: { type: "doc", id: "guides/core-types/evaluations" },
-          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors", "guides/evaluation/builtin_scorers"],
-=======
           items: [
             "guides/core-types/evaluations",
             {
@@ -100,7 +96,6 @@ const sidebars: SidebarsConfig = {
               ],
             }
           ],
->>>>>>> master
         },
         "guides/core-types/prompts",
         "guides/core-types/models",
