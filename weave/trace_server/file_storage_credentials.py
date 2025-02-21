@@ -17,15 +17,13 @@ class AWSCredentials(TypedDict, total=False):
 
 
 class AzureConnectionCredentials(TypedDict):
-    """Azure authentication using connection string format.
-    This is the preferred method for Azure authentication."""
+    """Azure authentication using connection string format."""
 
     connection_string: str
 
 
 class AzureAccountCredentials(TypedDict):
-    """Azure authentication using account-based credentials.
-    Supports SAS tokens, connection strings, or Azure credential objects."""
+    """Azure authentication using account-based credentials."""
 
     credential: Union[str, TokenCredential]
 

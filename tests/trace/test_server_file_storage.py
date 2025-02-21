@@ -8,6 +8,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import storage
 from moto import mock_aws
 
+from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
@@ -147,6 +148,8 @@ def run_test(client: WeaveClient):
 
 @pytest.mark.usefixtures("aws_storage_env")
 def test_aws_storage(client: WeaveClient, s3):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
     """Test file storage using AWS S3"""
     res = run_test(client)
 
@@ -166,6 +169,8 @@ def test_aws_storage(client: WeaveClient, s3):
 
 @pytest.mark.usefixtures("gcp_storage_env")
 def test_gcp_storage(client: WeaveClient, gcs):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
     """Test file storage using Google Cloud Storage"""
     res = run_test(client)
 
@@ -177,6 +182,8 @@ def test_gcp_storage(client: WeaveClient, gcs):
 
 @pytest.mark.usefixtures("azure_storage_env")
 def test_azure_storage(client: WeaveClient, azure_blob):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
     """Test file storage using Azure Blob Storage"""
     res = run_test(client)
 

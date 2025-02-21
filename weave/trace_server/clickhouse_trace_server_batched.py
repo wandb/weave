@@ -1300,7 +1300,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     req.name,
                     b"",
                     len(req.content),
-                    target_file_storage_uri,
+                    target_file_storage_uri.to_uri_str(),
                 )
             ],
             column_names=[
