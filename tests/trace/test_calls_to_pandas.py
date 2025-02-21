@@ -71,8 +71,8 @@ async def test_calls_to_pandas_with_evaluations(client):
     )
     res = await ev.evaluate(model)
 
-    calls = client.get_calls().to_pandas()
-    assert len(calls) == (
+    calls_df = client.get_calls().to_pandas()
+    assert len(calls_df) == (
         1  # evaluate
         + 3 * 2  # predict and score + model
         + 1  # summarize
