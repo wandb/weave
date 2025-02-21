@@ -741,7 +741,6 @@ def make_trace_obj(
         # when we are doing evaluations!
         val.set_prefetched_rows(rows)
     if isinstance(val, TableRef):
-        print("ELSEEEEEE")
         val = WeaveTable(
             table_ref=val,
             ref=new_ref,

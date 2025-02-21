@@ -1936,7 +1936,6 @@ class WeaveClient:
             self.server.call_processor.wait_until_all_processed()  # type: ignore
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
