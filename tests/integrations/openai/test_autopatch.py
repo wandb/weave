@@ -6,8 +6,12 @@ from typing import Any
 import pytest
 from openai import OpenAI
 
+from weave.integrations.autopatch import (
+    AutopatchSettings,
+    IntegrationSettings,
+    OpSettings,
+)
 from weave.integrations.openai import openai_sdk
-from weave.integrations.autopatch import AutopatchSettings, IntegrationSettings, OpSettings
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
