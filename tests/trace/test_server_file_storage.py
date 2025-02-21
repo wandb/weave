@@ -1,3 +1,4 @@
+import base64
 import os
 from unittest import mock
 
@@ -18,18 +19,16 @@ from weave.trace_server.trace_server_interface import FileContentReadReq, FileCr
 def generate_test_private_key():
     """Generate a valid RSA private key for testing."""
     private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
+        public_exponent=65537, key_size=2048, backend=default_backend()
     )
 
     private_key_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
+        encryption_algorithm=serialization.NoEncryption(),
     )
 
-    return private_key_bytes.decode('utf-8')
+    return private_key_bytes.decode("utf-8")
 
 
 @pytest.fixture
@@ -50,7 +49,9 @@ def s3():
 @pytest.fixture
 def mock_gcp_credentials():
     """Mock GCP credentials to prevent any actual authentication."""
-    with mock.patch('google.oauth2.service_account.Credentials.from_service_account_info') as mock_creds:
+    with mock.patch(
+        "google.oauth2.service_account.Credentials.from_service_account_info"
+    ) as mock_creds:
         # Create a mock credentials object that won't try to authenticate
         mock_creds.return_value = AnonymousCredentials()
         yield
@@ -71,32 +72,43 @@ def gcs():
 
     # Store uploaded data for verification
     uploaded_data = {}
+
     def mock_upload(data, timeout=None):
-        uploaded_data['content'] = data
+        uploaded_data["content"] = data
+
     mock_blob.upload_from_string.side_effect = mock_upload
 
-    with mock.patch('google.cloud.storage.Client', return_value=mock_storage_client):
+    with mock.patch("google.cloud.storage.Client", return_value=mock_storage_client):
         yield mock_storage_client
+
+
+# Use Azurite's default account key, see https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite?tabs=npm%2Cblob-storage#install-azurite
+GENERATED_FAKE_AZ_CRED = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+# Double encode it as required by the Azure client
+B64_GENERATED_FAKE_AZ_CRED = base64.b64encode(GENERATED_FAKE_AZ_CRED.encode()).decode()
+ACCOUNT_URL = "http://127.0.0.1:10000/devstoreaccount1"
 
 
 @pytest.fixture
 def azure_blob():
     """Azure Blob Storage using Azurite emulator"""
-    conn_str = (
-        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
-        "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
-        "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-    )
-    client = BlobServiceClient.from_connection_string(conn_str)
+    conn_str = f"DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey={GENERATED_FAKE_AZ_CRED};BlobEndpoint={ACCOUNT_URL};"
 
-    # Create test container
-    try:
-        client.create_container("test-bucket")
-    except Exception:
-        # Container might already exist in Azurite
-        pass
+    # Create the actual Azurite client
+    azurite_client = BlobServiceClient.from_connection_string(conn_str)
 
-    yield client
+    # Mock the BlobServiceClient creation to always return our Azurite client
+    with mock.patch("azure.storage.blob.BlobServiceClient") as mock_client:
+        mock_client.from_connection_string.return_value = azurite_client
+
+        # Create test container
+        try:
+            azurite_client.create_container("test-bucket")
+        except Exception:
+            # Container might already exist in Azurite
+            pass
+
+        yield azurite_client
 
 
 @pytest.fixture
@@ -143,8 +155,9 @@ def azure_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": "1234567890",
-            "WF_FILE_STORAGE_URI": "az://test-account/test-bucket",
+            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": B64_GENERATED_FAKE_AZ_CRED,
+            "WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL": ACCOUNT_URL,
+            "WF_FILE_STORAGE_URI": "az://devstoreaccount1/test-bucket",
         },
     ):
         yield
@@ -215,5 +228,9 @@ def test_azure_storage(client: WeaveClient, azure_blob):
 
     # Verify the object exists in Azure and has correct content
     container_client = azure_blob.get_container_client("test-bucket")
-    blob_client = container_client.get_blob_client(res.digest)
+    # Hard-coding project for ease. If we change how CI generates projects, this is ok to change
+    project = "c2hhd24vdGVzdC1wcm9qZWN0"
+    blob_client = container_client.get_blob_client(
+        f"weave/projects/{project}/files/{res.digest}"
+    )
     assert blob_client.download_blob().readall() == b"Hello, world!"

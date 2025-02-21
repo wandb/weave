@@ -60,6 +60,11 @@ def wf_storage_bucket_azure_credential() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64")
 
 
+def wf_storage_bucket_azure_account_url() -> Optional[str]:
+    """The Azure account url (optional override)."""
+    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL")
+
+
 def wf_storage_bucket_gcp_credentials_json() -> Optional[str]:
     """The GCP credentials JSON string."""
     return os.environ.get("WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON")

@@ -26,6 +26,7 @@ class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
     credential: Union[str, TokenCredential]
+    account_url: Optional[str]
 
 
 def get_aws_credentials() -> AWSCredentials:
@@ -110,4 +111,5 @@ def get_azure_credentials() -> (
     if b64_credential is None:
         raise ValueError("Azure credentials not set")
     credential = base64.b64decode(b64_credential).decode("utf-8")
-    return AzureAccountCredentials(credential=credential)
+    account_url = environment.wf_storage_bucket_azure_account_url()
+    return AzureAccountCredentials(credential=credential, account_url=account_url)

@@ -181,7 +181,10 @@ class AzureStorageClient(FileStorageClient):
             )
         else:
             account_creds = cast(AzureAccountCredentials, self.credentials)
-            account_url = f"https://{account}.blob.core.windows.net/"
+            if account_creds["account_url"]:
+                account_url = account_creds["account_url"]
+            else:
+                account_url = f"https://{account}.blob.core.windows.net/"
             return BlobServiceClient(
                 account_url=account_url,
                 credential=account_creds["credential"],
