@@ -51,12 +51,12 @@ class Dataset(Object):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        return cls(
-            name=obj.name,
-            description=obj.description,
-            ref=obj.ref,
-            rows=obj.rows,
-        )
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
 
     @classmethod
     def from_calls(cls, calls: Iterable[Call]) -> Self:
