@@ -45,9 +45,9 @@ RETRY_MAX_WAIT = 10  # seconds
 
 def store_in_bucket(file_storage_uri: FileStorageURI, data: bytes) -> None:
     """Store a file in a storage bucket."""
+    client = _get_storage_client(file_storage_uri)
     try:
-        client = _get_storage_client(file_storage_uri)
-        client.store(file_storage_uri, data)
+        return client.store(file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s: %s", file_storage_uri, str(e))
         raise type(e)(f"Failed to store file at {file_storage_uri}: {str(e)}") from e
@@ -55,8 +55,8 @@ def store_in_bucket(file_storage_uri: FileStorageURI, data: bytes) -> None:
 
 def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
     """Read a file from a storage bucket."""
+    client = _get_storage_client(file_storage_uri)
     try:
-        client = _get_storage_client(file_storage_uri)
         return client.read(file_storage_uri)
     except Exception as e:
         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
