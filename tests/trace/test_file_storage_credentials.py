@@ -81,6 +81,7 @@ def test_get_azure_credentials():
         creds = get_azure_credentials()
         assert creds == {
             "credential": "test-credential",
+            "account_url": None,
         }
 
     with mock.patch.dict(
