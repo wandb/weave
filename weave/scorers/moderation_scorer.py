@@ -4,13 +4,10 @@ from litellm import amoderation
 from pydantic import Field, PrivateAttr, validate_call
 
 import weave
+from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.scorer_types import RollingWindowScorer
-from weave.scorers.utils import (
-    MODEL_PATHS,
-    WeaveScorerResult,
-    load_hf_model_weights,
-)
+from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -35,7 +32,6 @@ class OpenAIModerationScorer(weave.Scorer):
     )
 
     @weave.op
-    @validate_call
     async def score(self, output: str) -> dict:
         """
         Score the given text against the OpenAI moderation API.
