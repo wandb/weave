@@ -22,10 +22,11 @@ def test_get_aws_credentials():
         },
     ):
         creds = get_aws_credentials()
-        assert isinstance(creds, dict)
-        assert creds["access_key_id"] == "test-key"
-        assert creds["secret_access_key"] == "test-secret"
-        assert creds["session_token"] == "test-token"
+        assert creds == {
+            "access_key_id": "test-key",
+            "secret_access_key": "test-secret",
+            "session_token": "test-token",
+        }
 
     # Test with required credentials only (no session token)
     with mock.patch.dict(
@@ -36,10 +37,10 @@ def test_get_aws_credentials():
         },
     ):
         creds = get_aws_credentials()
-        assert isinstance(creds, dict)
-        assert creds["access_key_id"] == "test-key"
-        assert creds["secret_access_key"] == "test-secret"
-        assert "session_token" not in creds
+        assert creds == {
+            "access_key_id": "test-key",
+            "secret_access_key": "test-secret",
+        }
 
     # Test with missing required credentials
     with mock.patch.dict(os.environ, {}, clear=True):
@@ -56,10 +57,9 @@ def test_get_azure_credentials():
         },
     ):
         creds = get_azure_credentials()
-        assert isinstance(creds, dict)
-        # Check for connection string credentials structure
-        assert "connection_string" in creds
-        assert creds["connection_string"] == "test-connection-string"
+        assert creds == {
+            "connection_string": "test-connection-string",
+        }
 
     # Test with account credentials
     with mock.patch.dict(
@@ -79,10 +79,9 @@ def test_get_azure_credentials():
         },
     ):
         creds = get_azure_credentials()
-        assert isinstance(creds, dict)
-        # Check for account credentials structure
-        assert "credential" in creds
-        assert creds["credential"] == "test-credential"
+        assert creds == {
+            "credential": "test-credential",
+        }
 
     with mock.patch.dict(
         os.environ,
@@ -94,12 +93,10 @@ def test_get_azure_credentials():
         },
     ):
         creds = get_azure_credentials()
-        assert isinstance(creds, dict)
-        # Check for account credentials structure
-        assert "credential" in creds
-        assert creds["credential"] == "test-credential"
-        assert "account_url" in creds
-        assert creds["account_url"] == "some_account_url"
+        assert creds == {
+            "credential": "test-credential",
+            "account_url": "some_account_url",
+        }
 
     # Test with missing credentials
     with mock.patch.dict(os.environ, {}, clear=True):

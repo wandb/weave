@@ -1,19 +1,18 @@
 import base64
-from typing import Optional, TypedDict, Union
+from typing import NotRequired, TypedDict, Union
 
-from azure.core.credentials import TokenCredential
 from google.oauth2.credentials import Credentials as GCPCredentials
 
 from weave.trace_server import environment
 
 
-class AWSCredentials(TypedDict, total=False):
+class AWSCredentials(TypedDict):
     """AWS authentication credentials for S3 access.
     The session_token is optional and only required for temporary credentials."""
 
     access_key_id: str
     secret_access_key: str
-    session_token: Optional[str]
+    session_token: NotRequired[str]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -25,8 +24,8 @@ class AzureConnectionCredentials(TypedDict):
 class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
-    credential: Union[str, TokenCredential]
-    account_url: Optional[str]
+    credential: str
+    account_url: NotRequired[str]
 
 
 def get_aws_credentials() -> AWSCredentials:

@@ -25,6 +25,26 @@ def test_parse_uri_str(uri: str, expected_class):
 
 
 @pytest.mark.parametrize(
+    "uri,expected_class",
+    [
+        "invalid://blah",
+        "invalid://blah/blah",
+        "s3://",
+        "gcs://",
+        "az://",
+        "s3:///path",
+        "gcs:///path",
+        "az://container",
+        "az:///container",
+    ],
+)
+def test_parse_uri_str_failure(uri: str):
+    """Test that URIs are parsed into the correct class type."""
+    with pytest.raises(URIParseError):
+        FileStorageURI.parse_uri_str(uri)
+
+
+@pytest.mark.parametrize(
     "uri,expected_attrs",
     [
         (

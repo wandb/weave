@@ -14,6 +14,7 @@ class URIParseError(ValueError):
 
     pass
 
+
 @dataclass(frozen=True)
 class FileStorageURI:
     """Base class for all file storage URIs.
