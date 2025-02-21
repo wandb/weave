@@ -244,7 +244,10 @@ def openai_accumulator(
                 choices=output_choices,
                 created=value.created,  # Each chunk has the same timestamp
                 model=value.model,
-                object=value.object,
+                # The AzureOpenAI service will return an initial chunk with object=''
+                # which causes a pydantic_core._pydantic_core.ValidationError as
+                # the OpenAI SDK requires this literal value.
+                object=value.object or "chat.completion.chunk",
                 system_fingerprint=value.system_fingerprint,
             )
             return acc
