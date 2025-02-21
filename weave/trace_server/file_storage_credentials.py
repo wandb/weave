@@ -1,7 +1,8 @@
 import base64
-from typing import NotRequired, TypedDict, Union
+from typing import Optional, TypedDict, Union
 
 from google.oauth2.credentials import Credentials as GCPCredentials
+from typing_extensions import NotRequired
 
 from weave.trace_server import environment
 
@@ -12,7 +13,7 @@ class AWSCredentials(TypedDict):
 
     access_key_id: str
     secret_access_key: str
-    session_token: NotRequired[str]
+    session_token: NotRequired[Optional[str]]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -25,7 +26,7 @@ class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
     credential: str
-    account_url: NotRequired[str]
+    account_url: NotRequired[Optional[str]]
 
 
 def get_aws_credentials() -> AWSCredentials:
