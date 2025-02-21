@@ -82,6 +82,7 @@ class FileStorageURI:
         return f"{self.__class__.__name__}({self.to_uri_str()})"
 
 
+@dataclass(frozen=True)
 class S3FileStorageURI(FileStorageURI):
     """Amazon S3 storage URI handler.
 
@@ -134,6 +135,7 @@ class S3FileStorageURI(FileStorageURI):
         )
 
 
+@dataclass(frozen=True)
 class GCSFileStorageURI(FileStorageURI):
     """Google Cloud Storage URI handler.
 
@@ -186,6 +188,7 @@ class GCSFileStorageURI(FileStorageURI):
         )
 
 
+@dataclass(frozen=True)
 class AzureFileStorageURI(FileStorageURI):
     """Azure Blob Storage URI handler.
 
