@@ -256,6 +256,7 @@ class PaginatedIterator(Generic[T, R]):
 
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 def _make_calls_iterator(
@@ -270,6 +271,7 @@ def _make_calls_iterator(
     include_feedback: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         response = server.calls_query(
@@ -310,6 +312,7 @@ def _make_calls_iterator(
         size_func=size_func,
         limit=limit_override,
         offset=offset_override,
+        page_size=page_size,
     )
 
 
@@ -549,7 +552,16 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> CallsIter:
+    def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
+        """
+        Get the children of the call.
+
+        Args:
+            page_size: Tune performance by changing the number of calls fetched at a time.
+
+        Returns:
+            An iterator of calls.
+        """
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
@@ -561,6 +573,7 @@ class Call:
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
+            page_size=page_size,
         )
 
     def delete(self) -> bool:
@@ -907,6 +920,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
         scored_by: str | list[str] | None = None,
+        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -926,6 +940,7 @@ class WeaveClient:
                 to filter by. Multiple scorers are ANDed together. If passing in just the name,
                 then scores for all versions of the scorer are returned. If passing in the full ref
                 URI, then scores for a specific version of the scorer are returned.
+            page_size: Tune performance by changing the number of calls fetched at a time.
 
         Returns:
             An iterator of calls.
@@ -946,6 +961,7 @@ class WeaveClient:
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
+            page_size=page_size,
         )
 
     @deprecated(new_name="get_calls")
