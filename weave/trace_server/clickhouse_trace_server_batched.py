@@ -78,7 +78,7 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.file_management import (
+from weave.trace_server.file_storage import (
     key_for_project_digest,
     read_from_bucket,
     store_in_bucket,
