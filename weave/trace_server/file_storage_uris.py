@@ -77,6 +77,9 @@ class FileStorageURI:
                 return candidate_class._from_parse_result(parsed_uri)
         raise URIParseError(f"No matching scheme for file storage URI: {uri}")
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.to_uri_str()})"
+
 
 class S3FileStorageURI(FileStorageURI):
     """Amazon S3 storage URI handler.

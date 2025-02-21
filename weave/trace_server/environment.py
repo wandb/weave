@@ -55,11 +55,6 @@ def wf_storage_bucket_azure_connection_string() -> Optional[str]:
     return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING")
 
 
-def wf_storage_bucket_azure_account_url() -> Optional[str]:
-    """The Azure account URL."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL")
-
-
 def wf_storage_bucket_azure_credential() -> Optional[str]:
     """The Azure credential."""
     return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL")

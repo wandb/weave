@@ -24,7 +24,6 @@ class AzureConnectionCredentials(TypedDict):
 class AzureAccountCredentials(TypedDict):
     """Type for Azure account credentials."""
 
-    account_url: str
     credential: Union[
         str, TokenCredential
     ]  # Can be connection string, SAS token, or credential object
@@ -106,9 +105,8 @@ def get_azure_credentials() -> (
     connection_string = environment.wf_storage_bucket_azure_connection_string()
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
-    account_url = environment.wf_storage_bucket_azure_account_url()
     b64_credential = environment.wf_storage_bucket_azure_credential()
-    if account_url is None or b64_credential is None:
+    if b64_credential is None:
         raise ValueError("Azure credentials not set")
     credential = base64.b64decode(b64_credential).decode("utf-8")
-    return AzureAccountCredentials(account_url=account_url, credential=credential)
+    return AzureAccountCredentials(credential=credential)

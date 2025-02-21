@@ -23,7 +23,12 @@ from weave.trace_server.file_storage_credentials import (
     get_azure_credentials,
     get_gcp_credentials,
 )
-from weave.trace_server.file_storage_uris import FileStorageURI
+from weave.trace_server.file_storage_uris import (
+    AzureFileStorageURI,
+    FileStorageURI,
+    GCSFileStorageURI,
+    S3FileStorageURI,
+)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -71,9 +76,12 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
 
 
 @create_retry_decorator("s3_storage")
-def handle_s3_storage(path: str, data: bytes, credentials: AWSCredentials) -> None:
+def handle_s3_storage(
+    file_storage_uri: S3FileStorageURI, data: bytes, credentials: AWSCredentials
+) -> None:
     """Handle storage for AWS S3."""
-    bucket_name, object_path = split_bucket_and_path(path, "s3")
+    bucket_name = file_storage_uri.bucket
+    object_path = file_storage_uri.path
     logger.debug(
         "Preparing to upload to S3 bucket '%s' with path '%s'", bucket_name, object_path
     )
@@ -99,9 +107,12 @@ def handle_s3_storage(path: str, data: bytes, credentials: AWSCredentials) -> No
 
 
 @create_retry_decorator("gcs_storage")
-def handle_gcs_storage(path: str, data: bytes, credentials: GCPCredentials) -> None:
+def handle_gcs_storage(
+    file_storage_uri: GCSFileStorageURI, data: bytes, credentials: GCPCredentials
+) -> None:
     """Handle storage for Google Cloud Storage."""
-    bucket_name, object_path = split_bucket_and_path(path, "gs")
+    bucket_name = file_storage_uri.bucket
+    object_path = file_storage_uri.path
     logger.debug(
         "Preparing to upload to GCS bucket '%s' with path '%s'",
         bucket_name,
@@ -125,12 +136,14 @@ def handle_gcs_storage(path: str, data: bytes, credentials: GCPCredentials) -> N
 
 @create_retry_decorator("azure_storage")
 def handle_azure_storage(
-    path: str,
+    file_storage_uri: AzureFileStorageURI,
     data: bytes,
     credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
 ) -> None:
     """Handle storage for Azure Blob Storage."""
-    container_name, blob_path = split_bucket_and_path(path, "azure")
+    acount = file_storage_uri.account
+    container_name = file_storage_uri.container
+    blob_path = file_storage_uri.path
     logger.debug(
         "Preparing to upload to Azure container '%s' with path '%s'",
         container_name,
@@ -149,8 +162,9 @@ def handle_azure_storage(
     else:
         logger.debug("Initializing Azure client with account URL")
         credentials = cast(AzureAccountCredentials, credentials)
+        account__url = f"https://{acount}.blob.core.windows.net/"
         blob_service_client = BlobServiceClient(
-            account_url=credentials["account_url"],
+            account_url=account__url,
             credential=credentials["credential"],
             connection_timeout=DEFAULT_CONNECT_TIMEOUT,
             read_timeout=DEFAULT_READ_TIMEOUT,
@@ -162,9 +176,7 @@ def handle_azure_storage(
     # Upload with retry and timeout handled by client config
     logger.debug("Uploading %d bytes to Azure Blob Storage", len(data))
     blob_client.upload_blob(data, overwrite=True)
-    logger.info(
-        "Successfully uploaded to Azure: azure://%s/%s", container_name, blob_path
-    )
+    logger.info("Successfully uploaded to Azure: az://%s/%s", container_name, blob_path)
 
 
 def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
@@ -178,7 +190,7 @@ def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
             Format examples:
             - AWS: s3://bucket-name/path/to/file
             - GCP: gs://bucket-name/path/to/file
-            - Azure: azure://container-name/path/to/file
+            - Azure: az://container-name/path/to/file
             - Local: file:///path/to/file (currently not supported)
         bytes: The file contents to store
 
@@ -190,24 +202,21 @@ def store_in_bucket(file_storage_uri: FileStorageURI, bytes: bytes) -> str:
         NotImplementedError: For unimplemented providers (like local files)
         Various provider-specific exceptions for storage/auth failures
     """
-    provider, path = parse_storage_uri(file_storage_uri)
     logger.info("Storing %d bytes at %s", len(bytes), file_storage_uri)
-    credentials: AllCredentials
     try:
-        if provider == "s3":
-            credentials = get_aws_credentials()
-            handle_s3_storage(path, bytes, credentials)
+        if isinstance(file_storage_uri, S3FileStorageURI):
+            handle_s3_storage(file_storage_uri, bytes, get_aws_credentials())
 
-        elif provider == "gs":
-            credentials = get_gcp_credentials()
-            handle_gcs_storage(path, bytes, credentials)
+        elif isinstance(file_storage_uri, S3FileStorageURI):
+            handle_gcs_storage(file_storage_uri, bytes, get_gcp_credentials())
 
-        elif provider == "azure":
-            credentials = get_azure_credentials()
-            handle_azure_storage(path, bytes, credentials)
+        elif isinstance(file_storage_uri, S3FileStorageURI):
+            handle_azure_storage(file_storage_uri, bytes, get_azure_credentials())
 
-        elif provider == "file":
-            raise NotImplementedError("Local file storage not currently supported")
+        else:
+            raise NotImplementedError(
+                f"file_storage_uri of type {type(file_storage_uri)} not supported"
+            )
 
     except Exception as e:
         logger.exception("Failed to store file at %s: %s", file_storage_uri, str(e))
@@ -325,7 +334,7 @@ def handle_azure_read(
     stream = blob_client.download_blob()
     data = stream.readall()
     logger.info(
-        "Successfully read %d bytes from Azure: azure://%s/%s",
+        "Successfully read %d bytes from Azure: az://%s/%s",
         len(data),
         container_name,
         blob_path,
@@ -344,7 +353,7 @@ def read_from_bucket(file_storage_uri: FileStorageURI) -> bytes:
             Format examples:
             - AWS: s3://bucket-name/path/to/file
             - GCP: gs://bucket-name/path/to/file
-            - Azure: azure://container-name/path/to/file
+            - Azure: az://container-name/path/to/file
             - Local: file:///path/to/file (currently not supported)
 
     Returns:

@@ -64,7 +64,6 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL": "test-url",
             "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL": "test-credential",
         },
     ):
@@ -73,7 +72,6 @@ def test_get_azure_credentials():
         # Check for account credentials structure
         assert "account_url" in creds
         assert "credential" in creds
-        assert creds["account_url"] == "test-url"
         assert creds["credential"] == "test-credential"
 
     # Test with missing credentials
