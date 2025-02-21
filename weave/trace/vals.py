@@ -91,9 +91,9 @@ def make_mutation(
 
 class Traceable:
     ref: RefWithExtra | None
-    mutations: list[Mutation] | None
+    mutations: list[Mutation] | None = None
     root: Traceable
-    parent: Traceable | None
+    parent: Traceable | None = None
     server: TraceServerInterface
     _is_dirty: bool = False
 
@@ -274,7 +274,7 @@ class WeaveTable(Traceable):
         server: TraceServerInterface,
         filter: TableRowFilter,
         root: Traceable | None,
-        parent: Traceable | None,
+        parent: Traceable | None = None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
@@ -463,9 +463,9 @@ class WeaveList(Traceable, list):
         self,
         *args: Any,
         server: TraceServerInterface,
-        ref: RefWithExtra | None,
-        root: Traceable | None,
-        parent: Traceable | None,
+        ref: RefWithExtra | None = None,
+        root: Traceable | None = None,
+        parent: Traceable | None = None,
     ) -> None:
         self.server = server
 
