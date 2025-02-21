@@ -144,8 +144,6 @@ class GCSStorageClient(FileStorageClient):
         """Initialize GCS client with credentials and default timeout configuration."""
         self.client = storage.Client(
             credentials=credentials,
-            client_options={"api_endpoint": "storage.googleapis.com"},
-            timeout=DEFAULT_CONNECT_TIMEOUT,
         )
 
     @create_retry_decorator("gcs_storage")

@@ -4,13 +4,32 @@ from unittest import mock
 import boto3
 import pytest
 from azure.storage.blob import BlobServiceClient
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from google.auth.credentials import AnonymousCredentials
-from google.cloud import storage
 from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
+
+
+def generate_test_private_key():
+    """Generate a valid RSA private key for testing."""
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+
+    private_key_bytes = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    return private_key_bytes.decode('utf-8')
 
 
 @pytest.fixture
@@ -29,34 +48,35 @@ def s3():
 
 
 @pytest.fixture
+def mock_gcp_credentials():
+    """Mock GCP credentials to prevent any actual authentication."""
+    with mock.patch('google.oauth2.service_account.Credentials.from_service_account_info') as mock_creds:
+        # Create a mock credentials object that won't try to authenticate
+        mock_creds.return_value = AnonymousCredentials()
+        yield
+
+
+@pytest.fixture
 def gcs():
-    """Google Cloud Storage mock using in-memory storage"""
-    # Create a mock GCS client that uses in-memory storage
-    storage_client = storage.Client(
-        project="test-project",
-        credentials=AnonymousCredentials(),
-    )
-    # Patch the _http and _connection to prevent actual API calls
-    storage_client._http = mock.Mock()
-    storage_client._connection = mock.Mock()
+    """Google Cloud Storage mock using method patches"""
+    # Create a mock storage client
+    mock_storage_client = mock.MagicMock()
+    mock_bucket = mock.MagicMock()
+    mock_blob = mock.MagicMock()
 
-    # Mock the bucket operations
-    bucket = storage_client.bucket("test-bucket")
-    bucket._properties = {"name": "test-bucket"}  # Minimum required properties
+    # Setup the mock chain
+    mock_storage_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
+    mock_blob.download_as_bytes.return_value = b"Hello, world!"
 
-    # Mock the basic blob operations
-    def mock_blob_upload(data):
-        blob._properties["size"] = len(data)
-        return None
+    # Store uploaded data for verification
+    uploaded_data = {}
+    def mock_upload(data, timeout=None):
+        uploaded_data['content'] = data
+    mock_blob.upload_from_string.side_effect = mock_upload
 
-    def mock_blob_download():
-        return b"Hello, world!"
-
-    blob = bucket.blob("test/path")
-    blob.upload_from_string = mock_blob_upload
-    blob.download_as_bytes = mock_blob_download
-
-    yield storage_client
+    with mock.patch('google.cloud.storage.Client', return_value=mock_storage_client):
+        yield mock_storage_client
 
 
 @pytest.fixture
@@ -100,12 +120,18 @@ def gcp_storage_env():
         os.environ,
         {
             "WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": """{
-                "type": "authorized_user",
-                "client_id": "",
-                "client_secret": "",
-                "refresh_token": ""
+                "type": "service_account",
+                "project_id": "test-project",
+                "private_key_id": "test-key-id",
+                "private_key": "test-key",
+                "client_email": "test@test-project.iam.gserviceaccount.com",
+                "client_id": "test-client-id",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
             }""",
-            "WF_FILE_STORAGE_URI": "gs://test-bucket",
+            "WF_FILE_STORAGE_URI": "gcs://test-bucket",
         },
     ):
         yield
@@ -167,7 +193,7 @@ def test_aws_storage(client: WeaveClient, s3):
     assert content == b"Hello, world!"
 
 
-@pytest.mark.usefixtures("gcp_storage_env")
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 def test_gcp_storage(client: WeaveClient, gcs):
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
