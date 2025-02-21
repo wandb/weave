@@ -1,3 +1,4 @@
+import base64
 import os
 from unittest import mock
 
@@ -67,12 +68,38 @@ def test_get_azure_credentials():
             "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": "test-credential",
         },
     ):
+        with pytest.raises(ValueError, match="Incorrect padding"):
+            creds = get_azure_credentials()
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": base64.b64encode(
+                b"test-credential"
+            ).decode(),
+        },
+    ):
         creds = get_azure_credentials()
         assert isinstance(creds, dict)
         # Check for account credentials structure
-        assert "account_url" in creds
         assert "credential" in creds
         assert creds["credential"] == "test-credential"
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": base64.b64encode(
+                b"test-credential"
+            ).decode(),
+            "WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL": "some_account_url",
+        },
+    ):
+        creds = get_azure_credentials()
+        assert isinstance(creds, dict)
+        # Check for account credentials structure
+        assert "credential" in creds
+        assert creds["credential"] == "test-credential"
+        assert "account_url" in creds
+        assert creds["account_url"] == "some_account_url"
 
     # Test with missing credentials
     with mock.patch.dict(os.environ, {}, clear=True):
