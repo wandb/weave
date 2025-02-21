@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 from rich.table import Table
 
-from weave.trace.autopatch import AutopatchSettings
+from weave.integrations.autopatch import AutopatchSettings
 
 
 def today() -> str:
