@@ -27,6 +27,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 - [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
 - [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
 - [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
+- [Verdict Pipeline evaluation](./builtin_scorers.mdx#verdictscorer)
 - [Toxicity detection (local)](./weave_local_scorers.md#weavetoxicityscorerv1)
 - [Context Relevance scoring (local)](./weave_local_scorers.md#weavecontextrelevancescorerv1)
 - And more!
