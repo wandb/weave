@@ -1,9 +1,7 @@
-import rich
-from typing import Any, Dict, Optional
-from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.patcher import Patcher
-from weave.trace.weave_client import Call
+from typing import Any, Optional
 
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.weave_client import Call
 
 import_failed = False
 
@@ -16,11 +14,12 @@ except Exception:
 if not import_failed:
 
     class WeaveCallback(BaseCallback):
-
         def __init__(self) -> None:
             self._call_map: dict[str, Call] = {}
 
-        def on_lm_start(self, call_id: str, instance: Any, inputs: Dict[str, Any]):
+        def on_lm_start(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
             print("on_lm_start")
             gc = weave_client_context.require_weave_client()
             self._call_map[call_id] = gc.create_call(
@@ -32,7 +31,7 @@ if not import_failed:
             call_id: str,
             outputs: Optional[Any],
             exception: Optional[Exception] = None,
-        ):
+        ) -> None:
             print("on_lm_end")
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
