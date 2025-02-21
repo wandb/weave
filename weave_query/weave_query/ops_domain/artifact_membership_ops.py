@@ -1,4 +1,3 @@
-import logging
 import urllib
 import typing
 
@@ -11,8 +10,6 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_direct_edge_op,
     gql_prop_op,
 )
-
-logger = logging.getLogger("ArtifactMembershipTesting")
 
 static_art_membership_file_gql = """
             versionIndex
@@ -36,7 +33,7 @@ static_art_membership_file_gql = """
                     }
                 }
             }
-        """
+            """
 
 
 # Section 1/6: Tag Getters
@@ -130,7 +127,6 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     uri = artifact_wandb.WeaveWBArtifactURI(
         collection_name, commit_hash, entity_name, project_name
     )
-    logger.warning(f"\n\nlogging inside helper ===> versionIndex {commit_hash}; URI ===> {uri} \n\n")
     return artifact_wandb.WandbArtifact(
         name=collection_name,
         type=type_name,

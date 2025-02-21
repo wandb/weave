@@ -4,7 +4,6 @@
 
 import datetime
 import json
-import logging
 import typing
 import urllib
 from urllib import parse
@@ -17,7 +16,6 @@ from weave_query import environment as weave_env
 from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
-logger = logging.getLogger("ArtifactMembershipTesting")
 
 def _file_path(
     uri: typing.Union[
@@ -112,7 +110,6 @@ class WandbFileManagerAsync:
         ],
         manifest_path: str,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        logger.warning(f"\n\nlogging manifest path in wandb_file_manager line 114 ==> {manifest_path} \n\n")
         if art_uri.version is None:
             raise errors.WeaveInternalError(
                 'Artifact URI has no version: "%s"' % art_uri
@@ -131,7 +128,6 @@ class WandbFileManagerAsync:
                 art_id=artifact_id,
             )
         else:
-            logger.warning(f"\n\nlogging art uri in wandb_file_manager line 133 ==> {art_uri}; and art_uri version: {art_uri.version} \n\n")
             manifest_url = await self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
                 art_uri.project_name,
