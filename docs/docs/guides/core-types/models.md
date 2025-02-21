@@ -80,10 +80,10 @@ A `Model` is a combination of data (which can include configuration, trained mod
 
     When [scoring](../evaluation/scorers.md) models in a Weave [evaluation](../core-types/evaluations.md), absolute value metrics (e.g. `9/10`) are typically less useful than relative ones (e.g. Model A performs better than Model B). _Pairwise evaluation_ allows you to compare the outputs of two models by ranking them relative to each other. This approach is particularly useful when you want to determine which model performs better for subjective tasks such as text generation, summarization, or question answering. With pairwise evaluation, you can obtain a relative preference ranking that reveals which model is best for specific inputs.
 
-    The following code sample demonstrates how to implement a pairwise evaluation in Weave by createing a [class-based scorer](../evaluation/scorers.md#class-based-scorers) called `PairwiseScorer`. The `PairwiseScorer` compares two models, `ModelA` and `ModelB`, and returns a relative score of the model outputs based on explicit hints in the input text.
+    The following code sample demonstrates how to implement a pairwise evaluation in Weave by creating a [class-based scorer](../evaluation/scorers.md#class-based-scorers) called `PreferenceScorer`. The `PreferenceScorer` compares two models, `ModelA` and `ModelB`, and returns a relative score of the model outputs based on explicit hints in the input text.
 
     ```python
-    from weave import Model, Evaluation, Scorer
+    from weave import Model, Evaluation, Scorer, Dataset
 
     class ModelA(Model):
         @weave.op
