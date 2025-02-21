@@ -1,9 +1,3 @@
-ALTER TABLE files DROP COLUMN bytes_stored;
-ALTER TABLE files DROP COLUMN file_storage_uri;
-
-ALTER TABLE files_stats DROP COLUMN bytes_stored;
-ALTER TABLE files_stats DROP COLUMN file_storage_uri;
-
 ALTER TABLE files_stats_view MODIFY QUERY
 SELECT
     files.project_id,
@@ -19,3 +13,11 @@ GROUP BY
     files.project_id,
     files.digest,
     files.chunk_index;
+
+ALTER TABLE files_stats DROP COLUMN file_storage_uri;
+
+ALTER TABLE files DROP COLUMN bytes_stored;
+ALTER TABLE files DROP COLUMN file_storage_uri;
+
+
+
