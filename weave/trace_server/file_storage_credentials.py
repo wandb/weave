@@ -97,7 +97,7 @@ def get_azure_credentials() -> (
 
     Required env vars (one of):
         - WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING
-        - WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL (base64 encoded)
+        - WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64 (base64 encoded)
 
     Returns:
         Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars

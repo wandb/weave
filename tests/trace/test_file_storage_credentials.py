@@ -64,7 +64,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL": "test-credential",
+            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": "test-credential",
         },
     ):
         creds = get_azure_credentials()

@@ -116,12 +116,8 @@ def azure_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING": (
-                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
-                "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
-                "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-            ),
-            "WF_FILE_STORAGE_URI": "az://test-bucket",
+            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": "1234567890",
+            "WF_FILE_STORAGE_URI": "az://test-account/test-bucket",
         },
     ):
         yield

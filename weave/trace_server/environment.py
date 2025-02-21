@@ -57,7 +57,7 @@ def wf_storage_bucket_azure_connection_string() -> Optional[str]:
 
 def wf_storage_bucket_azure_credential() -> Optional[str]:
     """The Azure credential."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL")
+    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64")
 
 
 def wf_storage_bucket_gcp_credentials_json() -> Optional[str]:
