@@ -84,8 +84,8 @@ def aws_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
-            "WF_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
             "WF_FILE_STORAGE_URI": "s3://test-bucket",
         },
     ):
@@ -98,7 +98,7 @@ def gcp_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": """{
+            "WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": """{
                 "type": "authorized_user",
                 "client_id": "",
                 "client_secret": "",
@@ -116,7 +116,7 @@ def azure_storage_env():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_STORAGE_BUCKET_AZURE_CONNECTION_STRING": (
+            "WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING": (
                 "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
                 "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
                 "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
