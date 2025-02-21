@@ -37,20 +37,20 @@ def serialize_dspy_objects(data: Any) -> Any:
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    from dspy import Predict
+    from dspy import Adapter, Predict
 
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
         if dictified_inputs_self["__class__"]["module"] == "__main__":
             dictified_inputs_self["__class__"]["module"] = ""
 
-        if isinstance(inputs["self"], Predict):
+        if isinstance(inputs["self"], Predict) or isinstance(inputs["self"], Adapter):
             if hasattr(inputs["self"], "signature"):
-                try:
+                if hasattr(inputs["self"].signature, "model_json_schema"):
                     dictified_inputs_self["signature"] = inputs[
                         "self"
                     ].signature.model_json_schema()
-                except Exception as e:
+                else:
                     dictified_inputs_self["signature"] = inputs["self"].signature
 
         dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
@@ -113,13 +113,13 @@ def get_dspy_patcher(
                     base.model_copy(update={"name": base.name or "dspy.Embedder"})
                 ),
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "Module.__call__",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.Module"})
-                ),
-            ),
+            # SymbolPatcher(
+            #     lambda: importlib.import_module("dspy"),
+            #     "Module.__call__",
+            #     dspy_wrapper(
+            #         base.model_copy(update={"name": base.name or "dspy.Module"})
+            #     ),
+            # ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
                 "Predict.__call__",

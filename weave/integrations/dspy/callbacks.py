@@ -1,7 +1,8 @@
 from typing import Any, Optional
 
-from weave.trace.serialize import dictify
+from weave.integrations.dspy.dspy_sdk import dspy_postprocess_inputs
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
 
 import_failed = False
@@ -21,12 +22,13 @@ if not import_failed:
         def on_lm_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
-            print("on_lm_start")
             gc = weave_client_context.require_weave_client()
             if isinstance is not None:
                 inputs = {"self": dictify(instance), **inputs}
             self._call_map[call_id] = gc.create_call(
-                "dspy.LM", inputs=inputs, display_name="dspy.LM"
+                "dspy.LM",
+                inputs=dspy_postprocess_inputs(inputs),
+                display_name="dspy.LM",
             )
 
         def on_lm_end(
@@ -35,7 +37,35 @@ if not import_failed:
             outputs: Optional[Any],
             exception: Optional[Exception] = None,
         ) -> None:
-            print("on_lm_end")
+            gc = weave_client_context.require_weave_client()
+            if call_id in self._call_map:
+                gc.finish_call(self._call_map[call_id], outputs, exception)
+
+        def on_module_start(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
+            gc = weave_client_context.require_weave_client()
+            if isinstance is not None:
+                inputs = {"self": dictify(instance), **inputs}
+                if hasattr(instance, "signature"):
+                    try:
+                        inputs["self"]["signature"] = (
+                            instance.signature.model_json_schema()
+                        )
+                    except Exception as e:
+                        inputs["self"]["signature"] = instance.signature
+            self._call_map[call_id] = gc.create_call(
+                "dspy.Module",
+                inputs=dspy_postprocess_inputs(inputs),
+                display_name="dspy.Module",
+            )
+
+        def on_module_end(
+            self,
+            call_id: str,
+            outputs: Optional[Any],
+            exception: Optional[Exception] = None,
+        ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(self._call_map[call_id], outputs, exception)
