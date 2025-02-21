@@ -91,17 +91,6 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-start-period=10s
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports:
-          - "10000:10000"
-          - "10001:10001"
-          - "10002:10002"
-        options: >-
-          --health-cmd "wget -q -O /dev/null http://127.0.0.1:10000/ || exit 1"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-start-period=10s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
