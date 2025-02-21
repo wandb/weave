@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
 
 if TYPE_CHECKING:

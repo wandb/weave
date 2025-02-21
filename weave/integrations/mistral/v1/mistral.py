@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 import weave
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from mistralai.models import (

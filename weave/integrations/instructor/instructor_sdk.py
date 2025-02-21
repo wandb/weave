@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 from .instructor_iterable_utils import instructor_wrapper_async, instructor_wrapper_sync
 from .instructor_partial_utils import instructor_wrapper_partial

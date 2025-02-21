@@ -1,5 +1,5 @@
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.patcher import Patcher
+from weave.integrations.patcher import Patcher
 from weave.trace.weave_client import Call
 
 TRANSFORM_EMBEDDINGS = False
