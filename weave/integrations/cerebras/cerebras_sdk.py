@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.integrations.autopatch import IntegrationSettings, OpSettings
 
 _cerebras_patcher: MultiPatcher | None = None
 

@@ -13,7 +13,7 @@ from typing import Any
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
 from weave.trace import urls, util, weave_client, weave_init
-from weave.trace.autopatch import AutopatchSettings
+from weave.integrations.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context

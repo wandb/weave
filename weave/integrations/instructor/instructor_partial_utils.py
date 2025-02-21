@@ -3,7 +3,7 @@ from typing import Callable, Optional
 from pydantic import BaseModel
 
 import weave
-from weave.trace.autopatch import OpSettings
+from weave.integrations.autopatch import OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
 
 

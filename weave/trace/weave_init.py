@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
+from weave.integrations import autopatch
+from weave.trace import errors, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server import sqlite_trace_server
