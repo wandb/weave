@@ -36,10 +36,10 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
         raise TypeError(
             f"Scorer {obj.__name__} must be an instance, not a class. Did you instantiate?"
         )
-    elif callable(obj) and not is_op(obj):
-        res = weave.op(obj)
     elif is_op(obj):
         res = as_op(obj)
+    elif callable(obj):
+        res = weave.op(obj)
     elif isinstance(obj, OpRef):
         res = obj.get()
     else:
