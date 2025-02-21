@@ -12,8 +12,8 @@ except ImportError:
     import_failed = True
 
 import weave
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.autopatch import IntegrationSettings, OpSettings
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
 

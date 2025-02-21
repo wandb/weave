@@ -15,7 +15,8 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from weave.trace import autopatch, weave_client, weave_init
+from weave.integrations import autopatch
+from weave.trace import weave_client, weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,

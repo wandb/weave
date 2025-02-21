@@ -4,8 +4,8 @@ import importlib
 from typing import Callable
 
 import weave
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.integrations.autopatch import IntegrationSettings, OpSettings
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 _notdiamond_patcher: MultiPatcher | None = None
 
