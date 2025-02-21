@@ -3,19 +3,10 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
-
-
-class WeaveScorerResult(BaseModel):
-    """The result of a weave.Scorer.score method."""
-
-    passed: bool = Field(description="Whether the scorer passed or not")
-    metadata: dict[str, Any] = Field(
-        description="Any extra information from the scorer like numerical scores, model outputs, etc."
-    )
 
 
 def download_model(artifact_path: Union[str, Path]) -> Path:

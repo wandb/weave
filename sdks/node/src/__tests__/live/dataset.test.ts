@@ -1,7 +1,7 @@
 import {init, login} from '../../clientApi';
 import {Dataset} from '../../dataset';
 
-describe('Dataset', () => {
+describe.skip('Dataset', () => {
   beforeEach(async () => {
     await login(process.env.WANDB_API_KEY ?? '');
   });

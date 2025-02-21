@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import ast
 import builtins
-import collections
-import collections.abc
 import inspect
 import io
 import json
@@ -10,9 +10,8 @@ import re
 import sys
 import textwrap
 import types as py_types
-import typing
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, Optional, Union, get_args, get_origin
+from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import serializer, settings
 from weave.trace.context.weave_client_context import get_weave_client
@@ -31,24 +30,6 @@ WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
-
-
-def type_code(type_: Any) -> str:
-    if isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_,
-        typing._GenericAlias,  # type: ignore
-    ):
-        args = ", ".join(type_code(t) for t in type_.__args__)
-        if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:
-            return f"list[{args}]"
-        elif type_.__origin__ == dict:
-            return f"dict[{args}]"
-        elif type_.__origin__ == typing.Union:
-            return f"typing.Union[{args}]"
-        else:
-            return f"{type_.__origin__}[{args}]"
-    else:
-        return type_.__name__
 
 
 def arg_names(args: ast.arguments) -> set[str]:
@@ -156,7 +137,7 @@ class ExternalVariableFinder(ast.NodeVisitor):
             self.external_vars[node.id] = True
 
 
-def resolve_var(fn: typing.Callable, var_name: str) -> Any:
+def resolve_var(fn: Callable, var_name: str) -> Any:
     """Given a python function, resolve a non-local variable name."""
     # First to see if the variable is in the closure
     if fn.__closure__:
@@ -188,13 +169,13 @@ class RefJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-class GetCodeDepsResult(typing.TypedDict):
+class GetCodeDepsResult(TypedDict):
     import_code: list[str]
     code: list[str]
     warnings: list[str]
 
 
-def get_source_notebook_safe(fn: typing.Callable) -> str:
+def get_source_notebook_safe(fn: Callable) -> str:
     # In ipython, we can't use inspect.getsource on classes defined in the notebook
     if is_running_interactively() and inspect.isclass(fn):
         try:
@@ -208,7 +189,7 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
     return textwrap.dedent(src)
 
 
-def reconstruct_signature(fn: typing.Callable) -> str:
+def reconstruct_signature(fn: Callable) -> str:
     sig = inspect.signature(fn)
     module = sys.modules[fn.__module__]
 
@@ -261,7 +242,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     return sig_str
 
 
-def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
+def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
     if is_op(fn):
         fn = as_op(fn)
         fn = fn.resolve_fn
@@ -299,7 +280,7 @@ def get_source_or_fallback(fn: typing.Callable, *, warnings: list[str]) -> str:
 
 
 def get_code_deps_safe(
-    fn: Union[typing.Callable, type],  # A function or a class
+    fn: Callable | type,  # A function or a class
     artifact: MemTraceFilesArtifact,
     depth: int = 0,
 ) -> GetCodeDepsResult:
@@ -338,9 +319,9 @@ def get_code_deps_safe(
 
 
 def _get_code_deps(
-    fn: Union[typing.Callable, type],  # A function or a class
+    fn: Callable | type,  # A function or a class
     artifact: MemTraceFilesArtifact,
-    seen: dict[Union[Callable, type], bool],
+    seen: dict[Callable | type, bool],
     depth: int = 0,
 ) -> GetCodeDepsResult:
     warnings: list[str] = []
@@ -473,7 +454,7 @@ def _get_code_deps(
 
 def find_last_weave_op_function(
     source_code: str,
-) -> Union[ast.FunctionDef, ast.AsyncFunctionDef, None]:
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
     """Given a string of python source code, find the last function that is decorated with 'weave.op'."""
     tree = ast.parse(source_code)
 
@@ -510,7 +491,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
     return deduped
 
 
-def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None:
+def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
     result = get_code_deps_safe(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
@@ -521,6 +502,11 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
             message += "\n  " + warning
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
+
+    if settings.should_redact_pii():
+        from weave.trace.pii_redaction import redact_pii_string
+
+        op_function_code = redact_pii_string(op_function_code)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
@@ -544,7 +530,7 @@ def save_instance(obj: "Op", artifact: MemTraceFilesArtifact, name: str) -> None
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
-) -> Optional["Op"]:
+) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
 
