@@ -140,7 +140,7 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     output_type=types.TypeType(),
     plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
 )
-def _membership_file_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembership, path: str):
+def _file_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembership, path: str):
     art_local = _artifact_membership_to_wb_artifact(artifactMembership)
     return types.TypeRegistry.type_of(art_local.path_info(path))
 
@@ -152,7 +152,7 @@ def _membership_file_refine_output_type(artifactMembership: wdt.ArtifactCollecti
 # path will still work.
 @op(
     name="artifactMembership-file",
-    refine_output_type=_membership_file_refine_output_type,
+    refine_output_type=_file_refine_output_type,
     plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
 )
 def file_(
@@ -160,6 +160,8 @@ def file_(
 ) -> typing.Union[
     None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
+    if not path:
+        raise ValueError("Invalid path provided")
     art_local = _artifact_membership_to_wb_artifact(artifactMembership)
     return art_local.path_info(path)  # type: ignore
 
