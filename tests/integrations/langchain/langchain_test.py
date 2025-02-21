@@ -205,6 +205,7 @@ def test_simple_chain_batch(
     assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
