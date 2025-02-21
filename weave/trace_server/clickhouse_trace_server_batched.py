@@ -1232,34 +1232,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        # First check if file with this digest already exists
-        import time
-        start = time.time()
         digest = bytes_digest(req.content)
-
-        # Query to check if file exists
-        query_result = self.ch_client.query(
-            """
-            SELECT count() 
-            FROM files 
-            WHERE project_id = {project_id:String} AND digest = {digest:String}
-            LIMIT 1
-            """,
-            parameters={"project_id": req.project_id, "digest": digest},
-        )
-
-        # If file exists, return early
-        if query_result.result_rows[0][0] > 0:
-            print(">>>>>>file_create [SKIP]>>>>>", time.time() - start)
-            return tsi.FileCreateRes(digest=digest)
-
-        # Otherwise proceed with file creation
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
         ]
-
-        start = time.time()
         self._insert(
             "files",
             data=[
@@ -1282,7 +1259,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "val_bytes",
             ],
         )
-        print(">>>>>>file_create>>>>>", time.time() - start)
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
