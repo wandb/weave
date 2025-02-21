@@ -8,7 +8,6 @@ import {toast} from 'react-toastify';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
-import {Pill} from '../../../../Tag/Pill';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowCurrentRouteContext} from '../context';
@@ -167,26 +166,29 @@ export const DatasetVersionPage: React.FC<{
     const deletedCountStr = String(deletedRows.length);
     return (
       <div className="flex gap-8">
-        <div className="mr-8 flex items-center gap-4">
-          <Tooltip
-            title={`${maybePluralize(Number(editCountStr), 'row')} edited`}
-            {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={editCountStr} icon="pencil-edit" color="blue" />
-            </div>
-          </Tooltip>
+        <div className="absolute right-[28px] top-[68px] flex gap-8 font-mono text-xs">
           <Tooltip
             title={`${maybePluralize(Number(addedCountStr), 'row')} added`}
             {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={addedCountStr} icon="add-new" color="green" />
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="add-new" width={12} height={12} />
+              <span>{addedCountStr}</span>
             </div>
           </Tooltip>
           <Tooltip
             title={`${maybePluralize(Number(deletedCountStr), 'row')} deleted`}
             {...TOOLTIP_PROPS}>
-            <div>
-              <Pill label={deletedCountStr} icon="delete" color="red" />
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="remove" width={12} height={12} />
+              <span>{deletedCountStr}</span>
+            </div>
+          </Tooltip>
+          <Tooltip
+            title={`${maybePluralize(Number(editCountStr), 'row')} edited`}
+            {...TOOLTIP_PROPS}>
+            <div className="flex items-center gap-1 text-xs font-semibold text-moon-500">
+              <Icon name="pencil-edit" width={12} height={12} />
+              <span>{editCountStr}</span>
             </div>
           </Tooltip>
         </div>
@@ -195,7 +197,6 @@ export const DatasetVersionPage: React.FC<{
           tooltip="Cancel"
           variant="secondary"
           size="medium"
-          icon="close"
           onClick={handleCancelClick}>
           Cancel
         </Button>
@@ -232,7 +233,7 @@ export const DatasetVersionPage: React.FC<{
       headerContent={
         <Tailwind>
           <div className="flex justify-between">
-            <div className="grid auto-cols-max grid-flow-col gap-[16px] text-[14px]">
+            <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
               <div className="block">
                 <p className="text-moon-500">Name</p>
                 <ObjectVersionsLink
@@ -270,8 +271,14 @@ export const DatasetVersionPage: React.FC<{
                   <Timestamp value={createdAtMs / 1000} format="relative" />
                 </p>
               </div>
+              {objectVersion.userId && (
+                <div className="block">
+                  <p className="text-moon-500">Created by</p>
+                  <UserLink userId={objectVersion.userId} includeName />
+                </div>
+              )}
             </div>
-            <div className="ml-auto mr-0">
+            <div className="ml-auto flex-shrink-0">
               {isEditing ? (
                 renderEditingControls()
               ) : (
@@ -284,12 +291,6 @@ export const DatasetVersionPage: React.FC<{
                   onClick={handleEditClick}
                 />
               )}
-              {objectVersion.userId && (
-                <div className="block">
-                  <p className="text-moon-500">Created by</p>
-                  <UserLink userId={objectVersion.userId} includeName />
-                </div>
-              )}
               {showDeleteButton && !isEditing && (
                 <DeleteObjectButtonWithModal objVersionSchema={objectVersion} />
               )}
@@ -297,44 +298,71 @@ export const DatasetVersionPage: React.FC<{
           </div>
         </Tailwind>
       }
-      tabs={[
-        {
-          label: 'Rows',
-          content: (
-            <ScrollableTabContent sx={{p: 0}}>
-              <Box sx={{flex: '0 0 auto', height: '100%'}}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <EditableDatasetView
-                        isEditing={isEditing}
-                        datasetObject={objectVersion.val}
+      tabs={
+        !isEditing
+          ? [
+              {
+                label: 'Rows',
+                content: (
+                  <ScrollableTabContent sx={{p: 0}}>
+                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <EditableDatasetView
+                              isEditing={isEditing}
+                              datasetObject={objectVersion.val}
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+              {
+                label: 'Use',
+                content: (
+                  <ScrollableTabContent>
+                    <Tailwind>
+                      <TabUseDataset
+                        name={objectName}
+                        uri={refUri}
+                        versionIndex={objectVersionIndex}
                       />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
-                )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Use',
-          content: (
-            <ScrollableTabContent>
-              <Tailwind>
-                <TabUseDataset
-                  name={objectName}
-                  uri={refUri}
-                  versionIndex={objectVersionIndex}
-                />
-              </Tailwind>
-            </ScrollableTabContent>
-          ),
-        },
-      ]}
+                    </Tailwind>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : [
+              {
+                label: 'Editing',
+                content: (
+                  <ScrollableTabContent sx={{p: 0}}>
+                    <Box sx={{flex: '0 0 auto', height: '100%'}}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <EditableDatasetView
+                              isEditing={isEditing}
+                              datasetObject={objectVersion.val}
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+      }
     />
   );
 };

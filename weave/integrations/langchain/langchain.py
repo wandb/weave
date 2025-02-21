@@ -39,9 +39,9 @@ from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
+from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 
 import_failed = False
@@ -161,7 +161,7 @@ if not import_failed:
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:
-                    attrs = wv_current_run.attributes or {}
+                    attrs = call_context.call_attributes.get()
                     # Now, the major condition:
                     if (
                         # 1. Both runs must be of type `RunnableSequence`
@@ -190,16 +190,20 @@ if not import_failed:
             fn_name = make_pythonic_function_name(run.name)
             complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"
             complete_op_name = truncate_op_name(complete_op_name)
+            call_attrs = call_context.call_attributes.get()
+            call_attrs.update(
+                {
+                    "lc_id": str(run.id),
+                    "parent_run_id": lc_parent_run_id,
+                    "lc_name": run.name,
+                }
+            )
             call = self.gc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
                 complete_op_name,
                 inputs=run_dict.get("inputs", {}),
                 parent=parent_run,
-                attributes={
-                    "lc_id": str(run.id),
-                    "parent_run_id": lc_parent_run_id,
-                    "lc_name": run.name,
-                },
+                attributes=call_attrs,
                 display_name=f"langchain.{run.run_type.capitalize()}.{run.name}",
                 use_stack=use_stack,
             )

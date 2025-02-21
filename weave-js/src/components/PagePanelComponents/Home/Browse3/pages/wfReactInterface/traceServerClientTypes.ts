@@ -217,6 +217,7 @@ export interface TraceObjSchema<
   project_id: string;
   object_id: string;
   created_at: string;
+  deleted_at: string | null;
   digest: string;
   version_index: number;
   is_latest: number;
@@ -234,6 +235,7 @@ export type TraceObjReadReq = {
   project_id: string;
   object_id: string;
   digest: string;
+  metadata_only?: boolean;
 };
 
 export type TraceObjReadRes = {
@@ -295,6 +297,7 @@ export type TraceTableQueryRes = {
   rows: Array<{
     digest: string;
     val: any;
+    original_index?: number;
   }>;
 };
 

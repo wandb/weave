@@ -1,7 +1,7 @@
 import React from 'react';
 import {PopupProps} from 'semantic-ui-react';
 
-import {Tooltip} from '../Tooltip';
+import {TooltipDeprecated} from '../TooltipDeprecated';
 
 type TagTooltipProps = React.HTMLAttributes<HTMLElement> &
   PopupProps & {
@@ -12,7 +12,7 @@ type TagTooltipProps = React.HTMLAttributes<HTMLElement> &
 export const TagTooltip = React.forwardRef<HTMLElement, TagTooltipProps>(
   ({value, children, ...passThroughProps}, ref) => {
     return (
-      <Tooltip
+      <TooltipDeprecated
         ref={ref}
         position="top center"
         content={

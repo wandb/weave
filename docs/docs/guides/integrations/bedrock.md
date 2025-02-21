@@ -2,6 +2,12 @@
 
 Weave automatically tracks and logs LLM calls made via Amazon Bedrock, AWS's fully managed service that offers foundation models from leading AI companies through a unified API.
 
+There are multiple ways to log LLM calls to Weave from Amazon Bedrock. You can use `weave.op` to create reusable operations for tracking any calls to a Bedrock model. Optionally, if you're using Anthropic models, you can use Weave’s built-in integration with Anthropic. 
+
+:::tip
+For the latest tutorials, visit [Weights & Biases on Amazon Web Services](https://wandb.ai/site/partners/aws/).
+:::
+
 ## Traces
 
 Weave will automatically capture traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client:
@@ -135,3 +141,15 @@ print(result)
 ```
 
 This approach allows you to version your experiments and easily track different configurations of your Bedrock-based application.
+
+## Learn more
+
+Learn more about using Amazon Bedrock with Weave
+
+### Try Bedrock in the Weave Playground
+
+Do you want to experiment with Amazon Bedrock models in the Weave UI without any set up? Try the [LLM Playground](../tools/playground.md).
+
+### Report: Compare LLMs on Bedrock for text summarization with Weave
+
+The [Compare LLMs on Bedrock for text summarization with Weave](https://wandb.ai/byyoung3/ML_NEWS3/reports/Compare-LLMs-on-Amazon-Bedrock-for-text-summarization-with-W-B-Weave--VmlldzoxMDI1MTIzNw) report explains how to use Bedrock in combination with Weave to evaluate and compare LLMs for summarization tasks, code samples included.

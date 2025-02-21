@@ -52,6 +52,8 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/tracing",
             "guides/tracking/ops",
             "guides/tracking/objects",
+            "guides/tracking/redact-pii",
+            "guides/tracking/faqs"
           ],
         },
         {
@@ -59,8 +61,41 @@ const sidebars: SidebarsConfig = {
           collapsible: true,
           collapsed: false,
           label: "Evaluation",
-          link: { type: "doc", id: "guides/core-types/evaluations" },
-          items: ["guides/evaluation/scorers", "guides/evaluation/guardrails_and_monitors"],
+          items: [
+            "guides/core-types/evaluations",
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Online Evaluation",
+              link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
+              items: [
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-guardrails",
+                  label: "Guardrails",
+                  autoAddBaseUrl: true,
+                },
+                {
+                  type: "link",
+                  href: "/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors",
+                  label: "Monitors",
+                  autoAddBaseUrl: true,
+                }
+              ],
+            },
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Scoring",
+              items: [
+                "guides/evaluation/scorers", 
+                "guides/evaluation/builtin_scorers",
+                "guides/evaluation/weave_local_scorers"
+              ],
+            }
+          ],
         },
         "guides/core-types/prompts",
         "guides/core-types/models",
@@ -93,20 +128,21 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
-            "guides/integrations/openai",
+            "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
-            "guides/integrations/mistral",
-            "guides/integrations/azure",
-            "guides/integrations/bedrock",
-            "guides/integrations/google-gemini",
-            "guides/integrations/together_ai",
+            "guides/integrations/google",
             "guides/integrations/groq",
-            "guides/integrations/openrouter",
+            "guides/integrations/huggingface",
             "guides/integrations/litellm",
+            "guides/integrations/azure",
+            "guides/integrations/mistral",
             "guides/integrations/nvidia_nim",
-          ],
+            "guides/integrations/openai",
+            "guides/integrations/openrouter",
+            "guides/integrations/together_ai",
+          ],          
         },
         "guides/integrations/local_models",
         {
@@ -132,6 +168,10 @@ const sidebars: SidebarsConfig = {
           type: "doc",
           id: "guides/platform/index",
         },
+        {
+          type: "doc",
+          id: "guides/platform/weave-self-managed",
+        }
       ],
     },
   ],

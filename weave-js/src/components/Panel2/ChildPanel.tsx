@@ -756,7 +756,6 @@ export const ChildPanel: React.FC<ChildPanelProps> = props => {
                   />
                 )}
                 <Tooltip
-                  position="top center"
                   trigger={
                     <Button
                       variant="ghost"

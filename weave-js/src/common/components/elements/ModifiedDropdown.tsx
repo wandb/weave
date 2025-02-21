@@ -1,6 +1,6 @@
 import './ModifiedDropdown.less';
 
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
 import _ from 'lodash';
 import memoize from 'memoize-one';
 import React, {
@@ -561,7 +561,7 @@ export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
         textOverflow: 'ellipsis',
       }}>
       {showTooltip ? (
-        <Tooltip
+        <TooltipDeprecated
           content={
             <span
               style={{

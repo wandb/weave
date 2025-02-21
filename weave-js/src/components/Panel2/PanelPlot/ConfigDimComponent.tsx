@@ -310,7 +310,7 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           indentation === 0 &&
           (isShared ? (
             <Tooltip
-              position="top right"
+              side="right"
               trigger={
                 <S.ConstrainedIconContainer
                   onClick={() => {
@@ -327,7 +327,7 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
             </Tooltip>
           ) : (
             <Tooltip
-              position="top right"
+              side="right"
               trigger={
                 <S.UnconstrainedIconContainer
                   // "sharing" the dimension means constraining it

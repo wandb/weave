@@ -21,6 +21,7 @@ from weave_query.arrow.list_ import (
     ArrowWeaveList,
     PathType,
     unsafe_awl_construction,
+    safe_list_array_from_arrays
 )
 from weave_query.language_features.tagging import tag_store, tagged_value_type
 
@@ -307,7 +308,7 @@ def recursively_build_pyarrow_array(
             mapper._object_type,
             py_objs_already_mapped,
         )
-        return pa.ListArray.from_arrays(
+        return safe_list_array_from_arrays(
             offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
         )
     elif pa.types.is_temporal(pyarrow_type):
