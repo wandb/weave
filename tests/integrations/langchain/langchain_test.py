@@ -183,6 +183,7 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
 )
 def test_simple_chain_batch(
     client: WeaveClient,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -197,6 +198,56 @@ def test_simple_chain_batch(
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch(calls)
+
+    log_lines = capsys.readouterr().out
+
+    assert log_lines.count("https://app.wandb.test/shawn/test-project/r/call") == 8
+    assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_simple_chain_batch_with_parent(
+    client: WeaveClient,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
+
+    @weave.op()
+    def run_chain():
+        prompt = PromptTemplate(
+            template="Explain {topic} in few words.",
+            input_variables=["topic"],
+        )
+        topics = [
+            "dog",
+            "cat",
+            "bird",
+            "banana",
+            "apple",
+            "car",
+            "train",
+            "plane",
+        ]
+        llm_chain = prompt | llm
+        llm_chain.batch(topics)
+
+    run_chain()
+
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+
+    log_lines = capsys.readouterr().out
+
+    assert log_lines.count("https://app.wandb.test/shawn/test-project/r/call") == 26
+    assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
 @pytest.mark.skip_clickhouse_client
