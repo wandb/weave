@@ -84,6 +84,7 @@ A `Model` is a combination of data (which can include configuration, trained mod
 
     ```python
     from weave import Model, Evaluation, Scorer, Dataset
+    from weave.flow.model import ApplyModelError, apply_model_async
 
     class ModelA(Model):
         @weave.op
@@ -101,9 +102,37 @@ A `Model` is a combination of data (which can include configuration, trained mod
 
     class PreferenceScorer(Scorer):
         @weave.op
+        async def _get_other_model_output(self, example: dict) -> Any:
+            """Get output from the other model for comparison.
+            Args:
+                example: The input example data to run through the other model
+            Returns:
+                The output from the other model
+            """
+
+            other_model_result = await apply_model_async(
+                self.other_model,
+                example,
+                None,
+            )
+
+          if isinstance(other_model_result, ApplyModelError):
+              return None
+
+          return other_model_result.model_output
+
+        @weave.op
         async def score(self, output: dict, input_text: str) -> dict:
+            """Compare the output of the primary model with the other model.
+            Args:
+                output (dict): The output from the primary model.
+                other_output (dict): The output from the other model being compared.
+                inputs (str): The input text used to generate the outputs.
+            Returns:
+                dict: A flat dictionary containing the comparison result and reason.
+            """
             other_output = await self._get_other_model_output(
-                {"input_text": input_text}
+                {"input_text": inputs}
             )
             if other_output is None:
                 return {"primary_is_better": False, "reason": "Other model failed"}
