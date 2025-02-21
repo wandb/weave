@@ -1022,6 +1022,8 @@ class WeaveClient:
         op: str | Op,
         inputs: dict,
         parent: Call | None = None,
+        parent_id: str | None = None,
+        trace_id: str | None = None,
         attributes: dict | None = None,
         display_name: str | Callable[[Call], str] | None = None,
         *,
@@ -1063,15 +1065,16 @@ class WeaveClient:
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
 
-        if parent is None and use_stack:
-            parent = call_context.get_current_call()
+        if not (parent_id and trace_id):
+            if parent is None and use_stack:
+                parent = call_context.get_current_call()
 
-        if parent:
-            trace_id = parent.trace_id
-            parent_id = parent.id
-        else:
-            trace_id = generate_id()
-            parent_id = None
+            if parent:
+                trace_id = parent.trace_id
+                parent_id = parent.id
+            else:
+                trace_id = generate_id()
+                parent_id = None
 
         if not attributes:
             attributes = {}

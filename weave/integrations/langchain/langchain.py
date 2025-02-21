@@ -153,8 +153,9 @@ if not import_failed:
                 self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             )
             use_stack = True
+            parent_id, trace_id = None, None
             if wv_parent_run is not None:
-                parent_run = wv_parent_run
+                parent_id, trace_id = wv_parent_run.parent_id, wv_parent_run.trace_id
             else:
                 # Here is our check for the specific condition
                 wv_current_run = call_context.get_current_call()
@@ -180,11 +181,23 @@ if not import_failed:
                         if wv_current_run.parent_id is None:
                             use_stack = False
                         else:
+                            # print(
+                            #     ">>>>>> getting parent call",
+                            #     "parent_id",
+                            #     wv_current_run.parent_id,
+                            #     "current_call",
+                            #     wv_current_run.id,
+                            #     wv_current_run.trace_id,
+                            # )
                             # Note: this is implemented as a network call - it would be much nice
                             # to refactor `create_call` such that it could accept a parent_id instead
                             # of an entire Parent object.
-                            parent_run = cast(
-                                Call, self.gc.get_call(wv_current_run.parent_id)
+                            # parent_run = cast(
+                            #     Call, self.gc.get_call(wv_current_run.parent_id)
+                            # )
+                            parent_id, trace_id = (
+                                wv_current_run.parent_id,
+                                wv_current_run.trace_id,
                             )
 
             fn_name = make_pythonic_function_name(run.name)
@@ -202,7 +215,9 @@ if not import_failed:
                 # Make sure to add the run name once the UI issue is figured out
                 complete_op_name,
                 inputs=run_dict.get("inputs", {}),
-                parent=parent_run,
+                # parent=parent_run,
+                parent_id=parent_id,
+                trace_id=trace_id,
                 attributes=call_attrs,
                 display_name=f"langchain.{run.run_type.capitalize()}.{run.name}",
                 use_stack=use_stack,
