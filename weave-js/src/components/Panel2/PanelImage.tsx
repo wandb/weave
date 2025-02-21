@@ -46,10 +46,15 @@ const useClassLabels = (input: Node<typeof inputType>) => {
 
   return useMemo(() => {
     if (!(runConfigLoading || runTagLoading) && runTag != null) {
-      const configSubset: {[key: string]: any} = JSON.parse(
-        runTag.configSubset
-      );
-      return _.get(configSubset, '_wandb.value.mask/class_labels', {});
+      try {
+        const configSubset: {[key: string]: any} = JSON.parse(
+          runTag.configSubset
+        );
+        return _.get(configSubset, '_wandb.value.mask/class_labels', {});
+      } catch (error) {
+        console.error('Failed to parse config subset:', error);
+        return {};
+      }
     }
     return {};
   }, [runTag, runTagLoading, runConfigLoading]);
