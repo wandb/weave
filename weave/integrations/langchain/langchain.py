@@ -153,7 +153,6 @@ if not import_failed:
                 self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             )
             use_stack = True
-            parent_id, trace_id = None, None
             if wv_parent_run is not None:
                 parent_run = wv_parent_run
             else:
