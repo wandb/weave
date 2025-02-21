@@ -113,13 +113,6 @@ def get_dspy_patcher(
                     base.model_copy(update={"name": base.name or "dspy.Embedder"})
                 ),
             ),
-            # SymbolPatcher(
-            #     lambda: importlib.import_module("dspy"),
-            #     "Module.__call__",
-            #     dspy_wrapper(
-            #         base.model_copy(update={"name": base.name or "dspy.Module"})
-            #     ),
-            # ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
                 "Predict.__call__",
