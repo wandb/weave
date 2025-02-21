@@ -6,7 +6,7 @@ from pydantic import BeforeValidator
 
 import weave
 from weave.flow.dataset import Dataset
-from weave.scorers.base_scorer import Scorer, _validate_scorer_signature
+from weave.flow.scorer import Scorer, _validate_scorer_signature
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.vals import WeaveObject
