@@ -23,7 +23,7 @@ if not import_failed:
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
             gc = weave_client_context.require_weave_client()
-            if isinstance is not None:
+            if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
             self._call_map[call_id] = gc.create_call(
                 "dspy.LM",
@@ -45,7 +45,7 @@ if not import_failed:
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
             gc = weave_client_context.require_weave_client()
-            if isinstance is not None:
+            if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
                 if hasattr(instance, "signature"):
                     if hasattr(instance.signature, "model_json_schema"):
