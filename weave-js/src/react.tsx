@@ -550,6 +550,21 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '$', // End of the string
   ].join('')
 );
+const RE_WEAVE_OP_VERSION_REF_PATHNAME = new RegExp(
+  [
+    '^', // Start of the string
+    PATTERN_ENTITY,
+    '/',
+    PATTERN_PROJECT,
+    '/op/',
+    '([a-zA-Z0-9-_/. ]{1,128})', // Op name
+    ':',
+    '([*]|[a-zA-Z0-9]+)', // Op version, allowing '*' for any version
+    '/?', // Ref extra portion is optional
+    PATTERN_REF_EXTRA, // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
 
 export const parseRefMaybe = (s: string): ObjectRef | null => {
   try {
@@ -611,7 +626,7 @@ export const parseRef = (ref: string): ObjectRef => {
   throw new Error(`Unknown protocol: ${url.protocol}`);
 };
 
-const parseWeaveRef = (ref: string): WeaveObjectRef => {
+export const parseWeaveRef = (ref: string): WeaveObjectRef => {
   const trimmed = ref.slice(WEAVE_REF_PREFIX.length);
   const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
   if (tableMatch !== null) {
@@ -636,6 +651,20 @@ const parseWeaveRef = (ref: string): WeaveObjectRef => {
       weaveKind: 'call' as WeaveKind,
       artifactName: callId,
       artifactVersion: '',
+      artifactRefExtra: '',
+    };
+  }
+  const opVersionMatch = trimmed.match(RE_WEAVE_OP_VERSION_REF_PATHNAME);
+  if (opVersionMatch !== null) {
+    const [entityName, projectName, opName, opVersion] =
+      opVersionMatch.slice(1);
+    return {
+      scheme: 'weave',
+      entityName,
+      projectName,
+      weaveKind: 'op' as WeaveKind,
+      artifactName: opName,
+      artifactVersion: opVersion,
       artifactRefExtra: '',
     };
   }

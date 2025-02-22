@@ -1,7 +1,7 @@
 import {Box} from '@mui/material';
 import React from 'react';
 
-import {parseRef} from '../../../../react';
+import {parseRef, parseWeaveRef} from '../../../../react';
 import {isArtifactRef, isWeaveRef} from '../Browse3/filters/common';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {
@@ -27,7 +27,13 @@ export const CellValue = ({value}: CellValueProps) => {
   if (value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isWeaveRef(value) || isArtifactRef(value)) {
+  if (isWeaveRef(value)) {
+    const parsed = parseWeaveRef(value);
+    if (parsed.weaveKind === 'op') {
+      return <SmallRef objRef={parsed} wfTable="OpVersion" />;
+    }
+    return <SmallRef objRef={parsed} />;
+  } else if (isArtifactRef(value)) {
     return <SmallRef objRef={parseRef(value)} />;
   }
   if (typeof value === 'boolean') {
