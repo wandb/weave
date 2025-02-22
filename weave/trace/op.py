@@ -584,7 +584,6 @@ def op(
     If you don't call `weave.init` then the function will behave as if it were
     not decorated.
 
-
     Args:
         func (Optional[Callable]): The function to be decorated. If None, the decorator
             is being called with parameters.
@@ -607,106 +606,85 @@ def op(
 
     Raises:
         ValueError: If the decorated object is not a function or method.
-
-
-    Example usage:
-
-    ```python
-    import weave
-    weave.init("my-project")
-
-    @weave.op
-    async def extract():
-        return await client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "user", "content": "Create a user as JSON"},
-            ],
-        )
-
-    await extract()  # calls the function and tracks the call in the Weave UI
-    ```
-
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
     if not 0 <= tracing_sample_rate <= 1:
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
+    def create_sync_wrapper(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            res, _ = _do_call(cast(Op, wrapper), *args, __should_raise=True, **kwargs)
+            return res
+
+        return wrapper
+
+    def create_async_wrapper(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            res, _ = await _do_call_async(
+                cast(Op, wrapper), *args, __should_raise=True, **kwargs
+            )
+            return res
+
+        return wrapper
+
+    def setup_wrapper_attributes(
+        wrapper: Callable, func: Callable, is_method: bool
+    ) -> None:
+        # Set core attributes
+        wrapper.resolve_fn = func  # type: ignore
+        wrapper.ref = None  # type: ignore
+        wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
+        wrapper.postprocess_output = postprocess_output  # type: ignore
+        wrapper._tracing_enabled = True  # type: ignore
+        wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
+
+        # Set name
+        inferred_name = func.__qualname__ if is_method else func.__name__
+        inferred_name = inferred_name.split(".<locals>.")[-1]
+        wrapper.name = name or inferred_name  # type: ignore
+
+        # Set call methods
+        wrapper.call = partial(call, wrapper)  # type: ignore
+        wrapper.calls = partial(calls, wrapper)  # type: ignore
+        wrapper.__call__ = wrapper  # type: ignore
+        wrapper.__self__ = wrapper  # type: ignore
+
+        # Set handlers
+        wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
+        wrapper._on_input_handler = None  # type: ignore
+        wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
+        wrapper._on_output_handler = None  # type: ignore
+        wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
+        wrapper._on_finish_handler = None  # type: ignore
+
+        # Set utilities
+        wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+
+        # Validate and set call display name
+        if callable(call_display_name):
+            params = inspect.signature(call_display_name).parameters
+            if len(params) != 1:
+                raise DisplayNameFuncError(
+                    "`call_display_name` function must take exactly 1 argument (the Call object)"
+                )
+        wrapper.call_display_name = call_display_name  # type: ignore
+
     def op_deco(func: Callable) -> Op:
-        # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
 
-        def create_wrapper(func: Callable) -> Op:
-            if is_async:
+        # Create appropriate wrapper based on sync/async
+        wrapper = create_async_wrapper(func) if is_async else create_sync_wrapper(func)
 
-                @wraps(func)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _do_call_async(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
-                    )
-                    return res
-            else:
+        # Set up all wrapper attributes
+        setup_wrapper_attributes(wrapper, func, is_method)
 
-                @wraps(func)
-                def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    res, _ = _do_call(
-                        cast(Op, wrapper), *args, __should_raise=True, **kwargs
-                    )
-                    return res
+        return cast(Op, wrapper)
 
-            # Tack these helpers on to our wrapper
-            wrapper.resolve_fn = func  # type: ignore
-
-            inferred_name = func.__qualname__ if is_method else func.__name__
-
-            # funcs and methods defined inside another func will have the
-            # name prefixed with {outer}.<locals>.{func_name}
-            # this is noisy for us, so we strip it out
-            inferred_name = inferred_name.split(".<locals>.")[-1]
-
-            wrapper.name = name or inferred_name  # type: ignore
-            wrapper.ref = None  # type: ignore
-
-            wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
-            wrapper.postprocess_output = postprocess_output  # type: ignore
-
-            wrapper.call = partial(call, wrapper)  # type: ignore
-            wrapper.calls = partial(calls, wrapper)  # type: ignore
-
-            wrapper.__call__ = wrapper  # type: ignore
-            wrapper.__self__ = wrapper  # type: ignore
-
-            wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
-            wrapper._on_input_handler = None  # type: ignore
-
-            wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
-            wrapper._on_output_handler = None  # type: ignore
-
-            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
-            wrapper._on_finish_handler = None  # type: ignore
-
-            wrapper._tracing_enabled = True  # type: ignore
-            wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
-
-            wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
-
-            if callable(call_display_name):
-                params = inspect.signature(call_display_name).parameters
-                if len(params) != 1:
-                    raise DisplayNameFuncError(
-                        "`call_display_name` function must take exactly 1 argument (the Call object)"
-                    )
-            wrapper.call_display_name = call_display_name  # type: ignore
-
-            return cast(Op, wrapper)
-
-        return create_wrapper(func)
-
-    if func is None:
-        return op_deco
-    return op_deco(func)
+    return op_deco if func is None else op_deco(func)
 
 
 def get_captured_code(op: Op) -> str:
