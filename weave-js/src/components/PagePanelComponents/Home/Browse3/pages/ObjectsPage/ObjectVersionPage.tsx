@@ -409,7 +409,7 @@ const ObjectVersionPageInner: React.FC<{
                     <CustomWeaveTypeProjectContext.Provider
                       value={{entity: entityName, project: projectName}}>
                       <ObjectViewerSection
-                        title=""
+                        title="Values"
                         data={viewerDataAsObject}
                         noHide
                         isExpanded
