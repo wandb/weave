@@ -10,7 +10,7 @@ SELECT
     files.chunk_index,
     anySimpleState(files.n_chunks) as n_chunks,
     anySimpleState(files.name) as name,
-    anySimpleState(length(files.val_bytes) + files.bytes_stored) AS size_bytes,
+    anySimpleState(IF(files.bytes_stored IS NOT NULL, files.bytes_stored, length(files.val_bytes))) AS size_bytes,
     anySimpleState(files.file_storage_uri) AS file_storage_uri,
     minSimpleState(files.created_at) AS created_at,
     maxSimpleState(files.created_at) AS updated_at
