@@ -73,6 +73,7 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
+    use_agg_fn: bool = True
 
     def as_sql(
         self,
@@ -81,6 +82,8 @@ class CallsMergedAggField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if not self.use_agg_fn:
+            return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
@@ -258,11 +261,14 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self, pb: ParamBuilder, table_alias: str, ignore_agg_fn: bool = False
+    ) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            ignore_agg_fn=ignore_agg_fn,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -280,6 +286,12 @@ class Condition(BaseModel):
     def is_heavy(self) -> bool:
         for field in self._get_consumed_fields():
             if field.is_heavy():
+                return True
+        return False
+
+    def is_feedback(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
 
@@ -448,8 +460,10 @@ class CallsQuery(BaseModel):
         )
         SELECT {SELECT_FIELDS}
         FROM calls_merged
+        FINAL                                   -- optional, if heavy filter conditions
         WHERE project_id = {PROJECT_ID}
         AND id IN filtered_calls
+        AND {HEAVY_FILTER_CONDITIONS}           -- optional heavy filter conditions
         GROUP BY (project_id, id)
         --- IF ORDER BY CANNOT BE PUSHED DOWN ---
         HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
@@ -558,7 +572,8 @@ class CallsQuery(BaseModel):
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
-                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                    field=sort_by.field.field,
+                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
                 )
                 for sort_by in self.order_fields
             ]
@@ -586,21 +601,38 @@ class CallsQuery(BaseModel):
         )
 
         having_filter_sql = ""
-        having_conditions_sql: list[str] = []
+        having_light_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
-            having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
+            having_light_conditions_sql.extend(
+                c.as_sql(pb, table_alias)
+                for c in self.query_conditions
+                if not c.is_heavy() or c.is_feedback()
             )
             for query_condition in self.query_conditions:
                 for field in query_condition._get_consumed_fields():
                     if isinstance(field, CallsMergedFeedbackPayloadField):
                         needs_feedback = True
         if self.hardcoded_filter is not None:
-            having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
+            having_light_conditions_sql.append(
+                self.hardcoded_filter.as_sql(pb, table_alias)
+            )
 
-        if len(having_conditions_sql) > 0:
+        if len(having_light_conditions_sql) > 0:
             having_filter_sql = "HAVING " + combine_conditions(
-                having_conditions_sql, "AND"
+                having_light_conditions_sql, "AND"
+            )
+
+        heavy_filter_sql = ""
+        simple_like_conditions_sql = ""
+        for condition in self.query_conditions:
+            if not condition.is_heavy() or condition.is_feedback():
+                continue
+
+            simple_like_conditions_sql += make_simple_like_condition(
+                pb, condition, table_alias
+            )
+            heavy_filter_sql += " AND " + condition.as_sql(
+                pb, table_alias, ignore_agg_fn=True
             )
 
         order_by_sql = ""
@@ -654,6 +686,8 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {simple_like_conditions_sql}
+        {heavy_filter_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -662,6 +696,95 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
+
+
+def _like_value(value: str) -> str:
+    """Helper to create a LIKE pattern for string matching."""
+    return f"%{value}%"
+
+
+def make_simple_like_condition(
+    pb: ParamBuilder, condition: Condition, table_alias: str = "calls_merged"
+) -> str:
+    """Creates a simple LIKE condition for the SQL query. Used to prepend
+    before JSON_VALUE is used. Optimization for ch s3 reads.
+
+    Only applies to string fields.
+
+    Args:
+        pb: Parameter builder for generating SQL parameters
+        condition: The condition to convert to SQL
+        table_alias: The table alias to use in the SQL (default: "calls_merged")
+
+    Returns:
+        SQL string with the LIKE condition or empty string if not applicable
+    """
+    # Handle different operation types
+    if isinstance(condition.operand, tsi_query.EqOperation):
+        # Get field name from first operand
+        field_op = condition.operand.eq_[0]
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Get value from second operand
+        value_op = condition.operand.eq_[1]
+        if not isinstance(value_op, tsi_query.LiteralOperation):
+            return ""
+        # Only apply to string values
+        if not isinstance(value_op.literal_, str):
+            return ""
+        field_value = value_op.literal_
+
+    elif isinstance(condition.operand, tsi_query.ContainsOperation):
+        # Get field name from input operand
+        field_op = condition.operand.contains_.input
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Get value from substr operand
+        value_op = condition.operand.contains_.substr
+        if not isinstance(value_op, tsi_query.LiteralOperation):
+            return ""
+        # Only apply to string values
+        if not isinstance(value_op.literal_, str):
+            return ""
+        field_value = value_op.literal_
+
+    elif isinstance(condition.operand, tsi_query.InOperation):
+        # Get field name from first operand
+        field_op = condition.operand.in_[0]
+        if not isinstance(field_op, tsi_query.GetFieldOperator):
+            return ""
+        field = get_field_by_name(field_op.get_field_)
+        field_name = field.field
+
+        # Build OR conditions for each value in the IN clause
+        sql_parts = []
+        for op in condition.operand.in_[1]:
+            if not isinstance(op, tsi_query.LiteralOperation):
+                return ""
+            # Only apply to string values
+            if not isinstance(op.literal_, str):
+                return ""
+            op_wildcard_value = _like_value(op.literal_)
+            op_sql_value = _param_slot(pb.add_param(op_wildcard_value), "String")
+            sql_parts.append(f"{table_alias}.{field_name} LIKE {op_sql_value}")
+
+        if not sql_parts:
+            return ""
+        return f" AND ({' OR '.join(sql_parts)})"
+
+    else:
+        return ""
+
+    # For EQ and CONTAINS operations, create a single LIKE condition
+    wildcard_value = _like_value(field_value)
+    sql_value = _param_slot(pb.add_param(wildcard_value), "String")
+    return f" AND {table_alias}.{field_name} LIKE {sql_value}"
 
 
 ALLOWED_CALL_FIELDS = {
@@ -713,6 +836,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    ignore_agg_fn: bool = False,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -781,7 +905,12 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            if isinstance(structured_field, CallsMergedAggField) and ignore_agg_fn:
+                structured_field.use_agg_fn = False
+                field = structured_field.as_sql(param_builder, table_alias)
+                structured_field.use_agg_fn = True  # reset to default
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):

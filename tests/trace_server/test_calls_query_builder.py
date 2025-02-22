@@ -6,6 +6,18 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 
 
+def assert_sql(cq: CallsQuery, exp_query, exp_params):
+    pb = ParamBuilder("pb")
+    query = cq.as_sql(pb)
+    params = pb.get_params()
+
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert exp_formatted == found_formatted
+    assert exp_params == params
+
+
 def test_query_baseline() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -273,15 +285,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
-        FROM calls_merged
+        FROM calls_merged FINAL
         WHERE
             calls_merged.project_id = {pb_2:String}
         AND
-            (calls_merged.id IN filtered_calls)
+            (calls_merged.id IN filtered_calls) AND
+            (JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}) = {pb_4:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
-        )
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
         """,
@@ -293,19 +303,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_4": "hello",
         },
     )
-
-
-def assert_sql(cq: CallsQuery, exp_query, exp_params):
-    pb = ParamBuilder("pb")
-    query = cq.as_sql(pb)
-    params = pb.get_params()
-
-    assert exp_params == params
-
-    exp_formatted = sqlparse.format(exp_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert exp_formatted == found_formatted
 
 
 def test_query_light_column_with_costs() -> None:
