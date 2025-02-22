@@ -125,6 +125,28 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     Returns:
         A weave Ref to the saved object.
     """
+    import weave
+
+    if not isinstance(obj, weave.Object):
+        return _publish(obj, name)
+
+    # Unlike WeaveObject, weave.Object (consider disambiguating...) does not have
+    # the dirtying mechanism to track if an object has been mutated.  Instead, we
+    # strip the ref and pretent the object is new.  If the digest is the same, then
+    # the version will stay the same.  Otherwise, a new version will be created.
+    # In case publishing fails, we restore the old ref.
+    old_ref, obj.ref = obj.ref, None
+    try:
+        new_ref = _publish(obj, name)
+    except Exception:
+        obj.ref = old_ref
+        raise
+
+    obj.ref = new_ref
+    return new_ref
+
+
+def _publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
     client = weave_client_context.require_weave_client()
 
     save_name: str
@@ -161,7 +183,17 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
                 ref.digest,
             )
         print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+
     return ref
+
+
+def delete(obj: Any) -> None:
+    import weave
+
+    if not isinstance(obj, (weave.Object, weave.ObjectRef)):
+        raise TypeError("Expected an Object or ObjectRef")
+
+    obj.delete()
 
 
 def ref(location: str) -> weave_client.ObjectRef:
@@ -312,4 +344,5 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "delete",
 ]
