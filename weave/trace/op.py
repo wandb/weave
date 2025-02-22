@@ -42,25 +42,6 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
 
-try:
-    from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
-except ImportError:
-    OPENAI_NOT_GIVEN = None
-
-try:
-    from cohere.base_client import COHERE_NOT_GIVEN
-except ImportError:
-    COHERE_NOT_GIVEN = None
-
-try:
-    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
-except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
-
-try:
-    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
-except ImportError:
-    CEREBRAS_NOT_GIVEN = None
 
 CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
@@ -94,34 +75,6 @@ FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 # Call, original function output, exception if occurred
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
-
-
-def _value_is_sentinel(param: Any) -> bool:
-    return param.default in (
-        None,
-        Ellipsis,
-        OPENAI_NOT_GIVEN,
-        COHERE_NOT_GIVEN,
-        ANTHROPIC_NOT_GIVEN,
-        CEREBRAS_NOT_GIVEN,
-    )
-
-
-def _apply_fn_defaults_to_inputs(
-    fn: Callable, inputs: Mapping[str, Any]
-) -> dict[str, Any]:
-    inputs = {**inputs}
-    sig = inspect.signature(fn)
-    for name, param in sig.parameters.items():
-        if name in inputs:
-            continue
-        if param.default != inspect.Parameter.empty and not _value_is_sentinel(param):
-            inputs[name] = param.default
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            inputs[name] = ()
-        if param.kind == inspect.Parameter.VAR_KEYWORD:
-            inputs[name] = {}
-    return inputs
 
 
 class WeaveKwargs(TypedDict):
@@ -217,6 +170,54 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
+    def _apply_fn_defaults_to_inputs(
+        fn: Callable, inputs: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        def _value_is_sentinel(param: Any) -> bool:
+            try:
+                from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
+            except ImportError:
+                OPENAI_NOT_GIVEN = None
+
+            try:
+                from cohere.base_client import COHERE_NOT_GIVEN
+            except ImportError:
+                COHERE_NOT_GIVEN = None
+
+            try:
+                from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
+            except ImportError:
+                ANTHROPIC_NOT_GIVEN = None
+
+            try:
+                from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
+            except ImportError:
+                CEREBRAS_NOT_GIVEN = None
+
+            return param.default in (
+                None,
+                Ellipsis,
+                OPENAI_NOT_GIVEN,
+                COHERE_NOT_GIVEN,
+                ANTHROPIC_NOT_GIVEN,
+                CEREBRAS_NOT_GIVEN,
+            )
+
+        inputs = {**inputs}
+        sig = inspect.signature(fn)
+        for name, param in sig.parameters.items():
+            if name in inputs:
+                continue
+            if param.default != inspect.Parameter.empty and not _value_is_sentinel(
+                param
+            ):
+                inputs[name] = param.default
+            if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                inputs[name] = ()
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
+                inputs[name] = {}
+        return inputs
+
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
