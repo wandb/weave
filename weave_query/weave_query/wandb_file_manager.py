@@ -17,7 +17,6 @@ from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, en
 
 tracer = engine_trace.tracer()  # type: ignore
 
-
 def _file_path(
     uri: typing.Union[
         artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
