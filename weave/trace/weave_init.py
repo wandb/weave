@@ -5,7 +5,7 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server.trace_server_interface import TraceServerInterface
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import stainless_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
@@ -106,7 +106,8 @@ def init_weave(
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
 
-    remote_server = init_weave_get_server(api_key)
+    username = get_username()
+    remote_server = init_weave_get_server(username, api_key)
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -124,8 +125,6 @@ def init_weave(
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
     autopatch.autopatch(autopatch_settings)
-
-    username = get_username()
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
@@ -178,7 +177,7 @@ def init_weave_disabled() -> InitializedClient:
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
-        init_weave_get_server("DISABLED", should_batch=False),
+        init_weave_get_server("DISABLED", "DISABLED", should_batch=False),
         ensure_project_exists=False,
     )
 
@@ -186,13 +185,15 @@ def init_weave_disabled() -> InitializedClient:
 
 
 def init_weave_get_server(
+    username: str | None = None,
     api_key: str | None = None,
     should_batch: bool = True,
-) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
-    if api_key is not None:
-        res.set_auth(("api", api_key))
-    return res
+) -> stainless_http_trace_server.StainlessHTTPTraceServer:
+    return stainless_http_trace_server.StainlessHTTPTraceServer(
+        should_batch=should_batch,
+        username=username,
+        password=api_key,
+    )
 
 
 def init_local() -> InitializedClient:
