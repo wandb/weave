@@ -92,6 +92,13 @@ import {
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
+  clearSelectedCalls,
+  getAllRowIds,
+  getRow,
+  getSelectedRowIds,
+  updateRows,
+} from './callsTableApiUtils';
+import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
@@ -562,11 +569,20 @@ export const CallsTable: FC<{
     });
   }, [columns.cols, columnVisibilityModel, setColumnVisibilityModel]);
 
+  // Instead of storing selection in state, we store rows with an isSelected property.
+  const [rows, setRows] = useState<any[]>(tableData);
+  useEffect(() => {
+    setRows(prevRows => {
+      const selectionMap: Record<string, boolean> = {};
+      prevRows.forEach(r => (selectionMap[r.id] = Boolean(r.isSelected)));
+      return tableData.map(row => ({
+        ...row,
+        isSelected: selectionMap[row.id] || false,
+      }));
+    });
+  }, [tableData]);
+
   // Selection Management
-  const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
-  const clearSelectedCalls = useCallback(() => {
-    setSelectedCalls([]);
-  }, [setSelectedCalls]);
   const muiColumns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -579,26 +595,35 @@ export const CallsTable: FC<{
         disableExport: true,
         display: 'flex',
         renderHeader: (params: any) => {
+          const allRowIds = getAllRowIds(apiRef.current, rows);
+          const rowCount = allRowIds.length;
+          const selectedCount = getSelectedRowIds(apiRef.current, rows).length;
+          const totalSelectable = Math.min(rowCount, MAX_SELECT);
           return (
             <Checkbox
               size="small"
               checked={
-                selectedCalls.length === 0
+                selectedCount === 0
                   ? false
-                  : selectedCalls.length === tableData.length
+                  : selectedCount === totalSelectable
                   ? true
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                if (
-                  selectedCalls.length ===
-                  Math.min(tableData.length, MAX_SELECT)
-                ) {
-                  setSelectedCalls([]);
+                const allRowIds = getAllRowIds(apiRef.current, rows);
+                if (selectedCount === totalSelectable) {
+                  // Unselect all rows.
+                  const updates = allRowIds.map(id => ({
+                    id,
+                    isSelected: false,
+                  }));
+                  updateRows(apiRef.current, updates);
                 } else {
-                  setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, MAX_SELECT)
-                  );
+                  // Select the first MAX_SELECT rows.
+                  const updates = allRowIds
+                    .slice(0, MAX_SELECT)
+                    .map(id => ({id, isSelected: true}));
+                  updateRows(apiRef.current, updates);
                 }
               }}
             />
@@ -606,42 +631,34 @@ export const CallsTable: FC<{
         },
         renderCell: (params: any) => {
           const rowId = params.id as string;
-          const isSelected = selectedCalls.includes(rowId);
-          const disabled = !isSelected && selectedCalls.length >= MAX_SELECT;
-          const tooltipText =
-            selectedCalls.length >= MAX_SELECT && !isSelected
-              ? `Selection limited to ${MAX_SELECT} items`
-              : '';
-
+          const isSelected = !!params.row.isSelected;
+          const overallSelectedCount = getSelectedRowIds(
+            apiRef.current,
+            rows
+          ).length;
+          const disabled = !isSelected && overallSelectedCount >= MAX_SELECT;
+          const tooltipText = disabled
+            ? `Selection limited to ${MAX_SELECT} items`
+            : '';
           return (
-            <Tooltip title={tooltipText} placement="right" arrow>
-              {/* https://mui.com/material-ui/react-tooltip/ */}
-              {/* By default disabled elements like <button> do not trigger user interactions */}
-              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
-              <span>
-                <Checkbox
-                  size="small"
-                  disabled={disabled}
-                  checked={isSelected}
-                  onCheckedChange={() => {
-                    if (isSelected) {
-                      setSelectedCalls(
-                        selectedCalls.filter(id => id !== rowId)
-                      );
-                    } else {
-                      setSelectedCalls([...selectedCalls, rowId]);
-                    }
-                  }}
-                />
-              </span>
-            </Tooltip>
+            <CallCheckboxCell
+              rowId={rowId}
+              isSelected={isSelected}
+              disabled={disabled}
+              tooltipText={tooltipText}
+              onToggle={() => {
+                const currentRow = getRow(apiRef.current, rowId);
+                const newValue = !currentRow?.isSelected;
+                updateRows(apiRef.current, [{id: rowId, isSelected: newValue}]);
+              }}
+            />
           );
         },
       },
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, rows, apiRef]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -723,6 +740,10 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
+  const curSelectedRows = useMemo(() => {
+    return getSelectedRowIds(apiRef.current, rows);
+  }, [rows, apiRef]);
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -751,8 +772,10 @@ export const CallsTable: FC<{
               filterModel={filterModel}
               columnInfo={filterFriendlyColumnInfo}
               setFilterModel={setFilterModel}
-              selectedCalls={selectedCalls}
-              clearSelectedCalls={clearSelectedCalls}
+              selectedCalls={curSelectedRows.map(id => id.toString())}
+              clearSelectedCalls={() =>
+                clearSelectedCalls(apiRef.current, rows)
+              }
             />
           )}
           <div className="flex items-center gap-6">
@@ -811,39 +834,43 @@ export const CallsTable: FC<{
                   router.compareEvaluationsUri(
                     entity,
                     project,
-                    selectedCalls,
+                    curSelectedRows.map(id => id.toString()),
                     null
                   )
                 );
               }}
-              disabled={selectedCalls.length === 0}
+              disabled={curSelectedRows.length === 0}
             />
           ) : (
             <CompareTracesTableButton
               onClick={() => {
                 history.push(
-                  router.compareCallsUri(entity, project, selectedCalls)
+                  router.compareCallsUri(
+                    entity,
+                    project,
+                    curSelectedRows.map(id => id.toString())
+                  )
                 );
               }}
-              disabled={selectedCalls.length < 2}
+              disabled={curSelectedRows.length < 2}
             />
           )}
-          {!isReadonly && selectedCalls.length !== 0 && (
+          {!isReadonly && rows.length !== 0 && (
             <>
               <div className="flex-none">
                 <BulkDeleteButton
                   onClick={() => setDeleteConfirmModalOpen(true)}
-                  disabled={selectedCalls.length === 0}
+                  disabled={rows.length === 0}
                 />
                 <ConfirmDeleteModal
-                  calls={tableData
-                    .filter(row => selectedCalls.includes(row.id))
+                  calls={rows
+                    .filter(r => r.isSelected)
                     .map(traceCallToUICallSchema)}
                   confirmDelete={deleteConfirmModalOpen}
                   setConfirmDelete={setDeleteConfirmModalOpen}
-                  onDeleteCallback={() => {
-                    setSelectedCalls([]);
-                  }}
+                  onDeleteCallback={() =>
+                    clearSelectedCalls(apiRef.current, rows)
+                  }
                 />
               </div>
               <ButtonDivider />
@@ -852,7 +879,7 @@ export const CallsTable: FC<{
 
           <div className="flex-none">
             <ExportSelector
-              selectedCalls={selectedCalls}
+              selectedCalls={curSelectedRows.map(id => id.toString())}
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
@@ -915,7 +942,7 @@ export const CallsTable: FC<{
         columnHeaderHeight={40}
         apiRef={apiRef}
         loading={callsLoading}
-        rows={tableData}
+        rows={rows}
         // initialState={initialState}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}
         columnVisibilityModel={columnVisibilityModel}
@@ -935,6 +962,15 @@ export const CallsTable: FC<{
         columns={muiColumns}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={newSelection => {
+          setRowSelectionModel(newSelection);
+          setRows(prevRows =>
+            prevRows.map(row => ({
+              ...row,
+              isSelected: newSelection.includes(row.id),
+            }))
+          );
+        }}
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooter={!callsLoading && callsTotal === 0}
@@ -1158,3 +1194,36 @@ function prepareFlattenedCallDataForTable(
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
+
+const CallCheckboxCell = React.memo(
+  function CallCheckboxCell({
+    rowId,
+    isSelected,
+    disabled,
+    tooltipText,
+    onToggle,
+  }: {
+    rowId: string;
+    isSelected: boolean;
+    disabled: boolean;
+    tooltipText: string;
+    onToggle: () => void;
+  }) {
+    return (
+      <Tooltip title={tooltipText} placement="right" arrow>
+        <span>
+          <Checkbox
+            size="small"
+            disabled={disabled}
+            checked={isSelected}
+            onCheckedChange={onToggle}
+          />
+        </span>
+      </Tooltip>
+    );
+  },
+  (prevProps, nextProps) =>
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.tooltipText === nextProps.tooltipText
+);
