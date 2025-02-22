@@ -1,152 +1,299 @@
 import os
+from typing import Literal
 
 import pytest
 
-from weave.integrations.integration_utilities import (
-    flatten_calls,
-    flattened_calls_to_names,
-)
-from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.integrations.integration_utilities import op_name_from_ref
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=[
+        "authorization",
+        "x-api-key",
+        "cookie",
+        "set-cookie",
+        "x-request-id",
+        "x-ratelimit-remaining-requests",
+        "x-ratelimit-remaining-tokens",
+    ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_dspy_language_models(client: WeaveClient) -> None:
+@pytest.mark.skip_clickhouse_client
+def test_dspy_lm_call(client) -> None:
     import dspy
 
-    os.environ["DSP_CACHEBOOL"] = "False"
-
-    gpt3_turbo = dspy.OpenAI(
-        model="gpt-3.5-turbo-1106",
-        max_tokens=300,
+    lm = dspy.LM(
+        "openai/gpt-4o-mini",
+        cache=False,
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
     )
-    dspy.configure(lm=gpt3_turbo)
-    prediction = gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
-    expected_prediction = "Hello! How can I assist you today?"
-    assert prediction == [expected_prediction]
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 4
+    response = lm("Say this is a test!", temperature=0.7)
+    assert "this is a test" in response[0].lower()
 
-    assert flattened_calls_to_names(flattened_calls) == [
-        ("dspy.OpenAI", 0),
-        ("dspy.OpenAI.request", 1),
-        ("dspy.OpenAI.basic_request", 2),
-        ("openai.chat.completions.create", 3),
-    ]
+    calls = list(client.calls())
+    assert len(calls) == 3
 
-    call_1, _ = flattened_calls[0]
-    assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = call_1.output
-    assert output_1[0] == expected_prediction
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+    assert "this is a test" in call.output[0].lower()
 
-    call_2, _ = flattened_calls[1]
-    assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = call_2.output
-    assert output_2["choices"][0]["finish_reason"] == "stop"
-    assert output_2["choices"][0]["message"]["content"] == expected_prediction
-    assert output_2["choices"][0]["message"]["role"] == "assistant"
-    assert output_2["model"] == "gpt-3.5-turbo-1106"
-    assert output_2["usage"]["completion_tokens"] == 9
-    assert output_2["usage"]["prompt_tokens"] == 21
-    assert output_2["usage"]["total_tokens"] == 30
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+    assert "this is a test" in call.output["choices"][0]["message"]["content"].lower()
 
-    call_3, _ = flattened_calls[2]
-    assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = call_3.output
-    assert output_3["choices"][0]["finish_reason"] == "stop"
-    assert output_3["choices"][0]["message"]["content"] == expected_prediction
-    assert output_3["choices"][0]["message"]["role"] == "assistant"
-    assert output_3["model"] == "gpt-3.5-turbo-1106"
-    assert output_3["usage"]["completion_tokens"] == 9
-    assert output_3["usage"]["prompt_tokens"] == 21
-    assert output_3["usage"]["total_tokens"] == 30
-    assert output_2["id"] == output_3["id"]
-    assert output_2["created"] == output_3["created"]
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "openai.chat.completions.create"
+    assert "this is a test" in call.output["choices"][0]["message"]["content"].lower()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=[
+        "authorization",
+        "x-api-key",
+        "cookie",
+        "set-cookie",
+        "x-request-id",
+        "x-ratelimit-remaining-requests",
+        "x-ratelimit-remaining-tokens",
+    ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_dspy_inline_signatures(client: WeaveClient) -> None:
+@pytest.mark.skip_clickhouse_client
+def test_dspy_chain_of_thought_call(client) -> None:
     import dspy
 
-    os.environ["DSP_CACHEBOOL"] = "False"
-
-    turbo = dspy.OpenAI(
-        model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        )
     )
-    dspy.settings.configure(lm=turbo)
-    classify = dspy.Predict("sentence -> sentiment")
-    prediction = classify(
-        sentence="it's a charming and often affecting journey."
-    ).sentiment
-    expected_prediction = "Positive"
-    assert prediction == expected_prediction
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-    assert len(flattened_calls) == 6
 
-    assert flattened_calls_to_names(flattened_calls) == [
-        ("dspy.Predict", 0),
-        ("dspy.Predict.forward", 1),
-        ("dspy.OpenAI", 2),
-        ("dspy.OpenAI.request", 3),
-        ("dspy.OpenAI.basic_request", 4),
-        ("openai.chat.completions.create", 5),
-    ]
-
-    call_1, _ = flattened_calls[0]
-    assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = call_1.output
+    math = dspy.ChainOfThought("question -> answer: float")
+    response = math(
+        question="Two dice are tossed. What is the probability that the sum equals two?"
+    )
     assert (
-        output_1
-        == """Prediction(
-    sentiment='Positive'
-)"""
-    )
-    call_2, _ = flattened_calls[1]
-    assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = call_2.output
+        0.025 <= response.answer <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {response.answer}"
+
+    calls = list(client.calls())
+    assert len(calls) == 10
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.ChainOfThought"
     assert (
-        output_2
-        == """Prediction(
-    sentiment='Positive'
-)"""
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Module"
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.ChainOfThought.forward"
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict"
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict.forward"
+    assert (
+        0.025 <= call.output["answer"] <= 0.03
+    ), f"Expected probability around 0.0277 (1/36), got {call.output['answer']}"
+
+
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "x-api-key",
+        "cookie",
+        "set-cookie",
+        "x-request-id",
+        "x-ratelimit-remaining-requests",
+        "x-ratelimit-remaining-tokens",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_classification(client) -> None:
+    import dspy
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        )
     )
 
-    call_3, _ = flattened_calls[2]
-    assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = call_3.output
-    assert output_3[0] == expected_prediction
+    class Classify(dspy.Signature):
+        """Classify sentiment of a given sentence."""
 
-    call_4, _ = flattened_calls[3]
-    assert call_4.exception is None and call_4.ended_at is not None
-    output_4 = call_4.output
-    assert output_4["choices"][0]["finish_reason"] == "stop"
-    assert output_4["choices"][0]["message"]["content"] == expected_prediction
-    assert output_4["choices"][0]["message"]["role"] == "assistant"
-    assert output_4["model"] == "gpt-3.5-turbo-0125"
-    assert output_4["usage"]["completion_tokens"] == 1
-    assert output_4["usage"]["prompt_tokens"] == 53
-    assert output_4["usage"]["total_tokens"] == 54
+        sentence: str = dspy.InputField()
+        sentiment: Literal["positive", "negative", "neutral"] = dspy.OutputField()
+        confidence: float = dspy.OutputField()
 
-    call_5, _ = flattened_calls[4]
-    assert call_5.exception is None and call_5.ended_at is not None
-    output_5 = call_5.output
-    assert output_5["choices"][0]["finish_reason"] == "stop"
-    assert output_5["choices"][0]["message"]["content"] == expected_prediction
-    assert output_5["choices"][0]["message"]["role"] == "assistant"
-    assert output_5["model"] == "gpt-3.5-turbo-0125"
-    assert output_5["usage"]["completion_tokens"] == 1
-    assert output_5["usage"]["prompt_tokens"] == 53
-    assert output_5["usage"]["total_tokens"] == 54
-    assert output_5["id"] == output_4["id"]
-    assert output_5["created"] == output_4["created"]
+    classify = dspy.Predict(Classify)
+    response = classify(
+        sentence="This book was super fun to read, though not the last chapter."
+    )
+
+    assert response.sentiment == "positive"
+    assert response.confidence > 0.5
+
+    calls = list(client.calls())
+    assert len(calls) == 7
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict"
+    assert response.sentiment == call.output["sentiment"]
+    assert response.confidence == call.output["confidence"]
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict.forward"
+    assert response.sentiment == call.output["sentiment"]
+    assert response.confidence == call.output["confidence"]
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.ChatAdapter"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Adapter"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+
+    call = calls[6]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "openai.chat.completions.create"
+
+
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "x-api-key",
+        "cookie",
+        "set-cookie",
+        "x-request-id",
+        "x-ratelimit-remaining-requests",
+        "x-ratelimit-remaining-tokens",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_information_extraction(client) -> None:
+    import dspy
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        )
+    )
+
+    class ExtractInfo(dspy.Signature):
+        """Extract structured information from text."""
+
+        text: str = dspy.InputField()
+        title: str = dspy.OutputField()
+        headings: list[str] = dspy.OutputField()
+        entities: list[dict[str, str]] = dspy.OutputField(
+            desc="a list of entities and their metadata"
+        )
+
+    module = dspy.Predict(ExtractInfo)
+
+    text = (
+        "Apple Inc. announced its latest iPhone 14 today."
+        "The CEO, Tim Cook, highlighted its new features in a press release."
+    )
+    response = module(text=text)
+    assert "apple" in response.title.lower()
+    assert "iphone" in response.title.lower()
+
+    calls = list(client.calls())
+    assert len(calls) == 7
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict"
+    assert response.title == call.output["title"]
+    assert response.headings == call.output["headings"]
+    assert response.entities == call.output["entities"]
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict.forward"
+    assert response.title == call.output["title"]
+    assert response.headings == call.output["headings"]
+    assert response.entities == call.output["entities"]
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.ChatAdapter"
+
+    call = calls[3]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Adapter"
+
+    call = calls[4]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.LM"
+
+    call = calls[5]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "litellm.completion"
+
+    call = calls[6]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "openai.chat.completions.create"

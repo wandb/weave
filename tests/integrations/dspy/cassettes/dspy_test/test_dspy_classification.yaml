@@ -1,0 +1,114 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `sentence`
+      (str)\n\nYour output fields are:\n1. `sentiment` (Literal[''positive'', ''negative'',
+      ''neutral''])\n2. `confidence` (float)\n\nAll interactions will be structured
+      in the following way, with the appropriate values filled in.\n\n[[ ## sentence
+      ## ]]\n{sentence}\n\n[[ ## sentiment ## ]]\n{sentiment}        # note: the value
+      you produce must exactly match (no extra characters) one of: positive; negative;
+      neutral\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you
+      produce must be a single float value\n\n[[ ## completed ## ]]\n\nIn adhering
+      to this structure, your objective is: \n        Classify sentiment of a given
+      sentence."},{"role":"user","content":"[[ ## sentence ## ]]\nThis book was super
+      fun to read, though not the last chapter.\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## sentiment ## ]]` (must be formatted
+      as a valid Python Literal[''positive'', ''negative'', ''neutral'']), then `[[
+      ## confidence ## ]]` (must be formatted as a valid Python float), and then ending
+      with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1208'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFLBbtswDL37KwT1Ghe248BNbtttOwzYhg0YksBQJdrhalOaRBcdivz7
+        IDuNXawDdjFgPr6n90g+J0JINHInpD4p1r3r0vfrT98/0wf+9vC1eve0/rIum/Wm/7GF9mPzS64i
+        w97/BM0vrFtte9cBo6UJ1h4UQ1TNqzLLy01WZiPQWwNdpLWO09KmPRKmRVaUaVal+d2FfbKoIcid
+        2CdCCPE8fqNPMvAkd2LUGis9hKBakLtrkxDS2y5WpAoBAytiuZpBbYmBRuv7vbi5EQGIsQfi+HM8
+        HsjZgIyPcKADTS3aUoMGSMNLT3Z7t1niY3wwE7x8zkMzBBUj09B1l/r56r+zrfP2Plzwa71BwnCq
+        PahgKXoNbJ0c0XMixHGc0/AqunTe9o5rtg9AUbAot5OenNezQIsLyJZVt6hX+eoNvdoAK+zCYtJS
+        K30CM1PntajBoF0AySL1327e0p6SI7X/Iz8DWoNjMLXzYFC/Tjy3eYjX+6+265RHwzKAf0QNNSP4
+        uAkDjRq66aZk+B0Y+rpBasE7j9NhNa6usm2VlyYvSpmckz8AAAD//wMAg5w412YDAAA=
+    headers:
+      CF-RAY:
+      - 91572162aaee2e58-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 21 Feb 2025 13:37:20 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '831'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998735'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_3fd5744591731ad3ebb3108ae745a1fb
+    status:
+      code: 200
+      message: OK
+version: 1
