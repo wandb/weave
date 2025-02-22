@@ -162,25 +162,3 @@ def file_(
 ]:
     art_local = _artifact_membership_to_wb_artifact(artifactMembership)
     return art_local.path_info(path)  # type: ignore
-
-@op(
-    name="artifactMembership-_files_refine_output_type",
-    hidden=True,
-    output_type=types.TypeType(),
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
-)
-def _files_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembership):
-    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
-    return types.TypeRegistry.type_of(artifact_wandb.FilesystemArtifactFileIterator(art_local))
-
-
-@op(
-    name="artifactMembership-files",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_membership_file_gql),
-    refine_output_type=_files_refine_output_type,
-)
-def files(
-        artifactMembership: wdt.ArtifactCollectionMembership,
-) -> list[artifact_fs.FilesystemArtifactFile]:
-    art_local = _artifact_membership_to_wb_artifact(artifactMembership)
-    return artifact_wandb.FilesystemArtifactFileIterator(art_local)
