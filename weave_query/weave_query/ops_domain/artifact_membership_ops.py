@@ -160,8 +160,6 @@ def file_(
 ) -> typing.Union[
     None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
-    if not path:
-        raise ValueError("Invalid path provided")
     art_local = _artifact_membership_to_wb_artifact(artifactMembership)
     return art_local.path_info(path)  # type: ignore
 
