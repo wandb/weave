@@ -1369,7 +1369,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         bytes = b""
 
         for result_row in result_rows:
-            chunk_file_storage_uri_str = result_rows[2]
+            chunk_file_storage_uri_str = result_row[2]
             if chunk_file_storage_uri_str:
                 file_storage_uri = FileStorageURI.parse_uri_str(
                     chunk_file_storage_uri_str
