@@ -197,6 +197,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Threads',
+            slug: 'weave/threads',
+            isShown: true, // Only shown in overflow menu
+            iconName: IconNames.MillerColumns,
+          },
+          {
+            type: 'button' as const,
             name: 'Leaders',
             slug: 'weave/leaderboards',
             isShown: false, // Only shown in overflow menu
