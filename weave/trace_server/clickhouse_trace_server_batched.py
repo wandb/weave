@@ -1286,6 +1286,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
     ) -> None:
         target_file_storage_uri = base_file_storage_uri.with_path(
+            # It is entirely compatible with the design to support chunking on the
+            # bucket side. Just need to add a `/CHUNK` suffix to the key.
             key_for_project_digest(req.project_id, digest)
         )
         store_in_bucket(target_file_storage_uri, req.content)
@@ -1296,7 +1298,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     req.project_id,
                     digest,
                     0,
-                    0,
+                    1,
                     req.name,
                     b"",
                     len(req.content),
@@ -1356,26 +1358,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             column_formats={"val_bytes": "bytes"},
         )
         n_chunks = query_result.result_rows[0][0]
-        chunks = [r[1] for r in query_result.result_rows]
-        file_storage_uri_str = query_result.result_rows[0][2]
+        result_rows = list(query_result.result_rows)
 
-        # THere are 2 cases:
+        if len(result_rows) != n_chunks:
+            raise ValueError("Missing chunks")
+
+        # There are 2 cases:
         # 1: file_storage_uri_str is not none (storing in file store)
         # 2: file_storage_uri_str is None (storing directly in clickhouse)
+        bytes = b""
 
-        if file_storage_uri_str:
-            # Read from storage
-            if n_chunks != 0:
-                raise ValueError(f"Expected n_chunks=0, found {n_chunks}")
-            if len(chunks) != 1:
-                raise ValueError(f"Expected 1 result, found {len(chunks)}")
-            file_storage_uri = FileStorageURI.parse_uri_str(file_storage_uri_str)
-            bytes = read_from_bucket(file_storage_uri)
-        else:
-            # Read from Clickhouse
-            if len(chunks) != n_chunks:
-                raise ValueError("Missing chunks")
-            bytes = b"".join(chunks)
+        for result_row in result_rows:
+            chunk_file_storage_uri_str = result_rows[2]
+            if chunk_file_storage_uri_str:
+                file_storage_uri = FileStorageURI.parse_uri_str(
+                    chunk_file_storage_uri_str
+                )
+                bytes += read_from_bucket(file_storage_uri)
+            else:
+                chunk_bytes = result_row[1]
+                bytes += chunk_bytes
 
         return tsi.FileContentReadRes(content=bytes)
 
