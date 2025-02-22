@@ -268,6 +268,7 @@ export const IconNames = {
   XAxis: 'x-axis',
   YoutubeSocial: 'youtube-social',
   ZoomInTool: 'zoom-in-tool',
+  IntercomLogo: 'intercom-logo',
 } as const;
 
 export type IconName = (typeof IconNames)[keyof typeof IconNames];

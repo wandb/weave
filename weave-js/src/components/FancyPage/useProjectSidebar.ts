@@ -4,6 +4,12 @@ import {useMemo} from 'react';
 
 import {FancyPageSidebarItem} from './FancyPageSidebar';
 
+declare global {
+  interface Window {
+    Intercom: (command: string, ...args: any[]) => void;
+  }
+}
+
 export const useProjectSidebar = (
   isLoading: boolean,
   viewingRestricted: boolean,
@@ -36,6 +42,7 @@ export const useProjectSidebar = (
 
   return useMemo(() => {
     const weaveOnlyMenu = [
+      'weave/scorers',
       'weave/leaderboards',
       'weave/operations',
       'weave/objects',
@@ -184,7 +191,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Scorers',
             slug: 'weave/scorers',
-            isShown: isWeaveOnly,
+            isShown: false, // Only shown in overflow menu
             iconName: IconNames.TypeNumberAlt,
           },
           {
@@ -228,12 +235,23 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             key: 'moreWeaveBoth',
             isShown: isShowAll,
-            menu: [
-              'weave/prompts',
-              'weave/models',
-              'weave/datasets',
-              'weave/scorers',
-            ].concat(weaveOnlyMenu),
+            menu: ['weave/prompts', 'weave/models', 'weave/datasets'].concat(
+              weaveOnlyMenu
+            ),
+          },
+          {
+            type: 'button' as const,
+            isShown: showWeaveSidebarItems,
+            iconName: IconNames.IntercomLogo,
+            onClick: () => {
+              if (typeof window.Intercom === 'function') {
+                window.Intercom('showNewMessage');
+              } else {
+                console.warn('Intercom is not available');
+              }
+            },
+            slug: undefined,
+            className: 'intercom-button',
           },
         ];
 

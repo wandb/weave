@@ -27,6 +27,14 @@ const SidebarWrapper = styled.div`
     display: flex;
     align-items: center;
   }
+  cursor: pointer;
+
+  &.intercom-button {
+    margin-top: auto;
+    @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
+      margin-top: 0;
+    }
+  }
 `;
 SidebarWrapper.displayName = 'S.SidebarWrapper';
 
@@ -112,6 +120,30 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           );
         }
 
+        // Handle onClick-only items (like Intercom button)
+        if (item.onClick && !item.externalLink) {
+          return (
+            <SidebarWrapper
+              key={item.name}
+              className={`night-aware ${item.className || ''}`}
+              onClick={item.onClick}
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
+              data-test={item.slug + '-tab'}>
+              <SidebarButton>
+                <ItemIcon color={colorIconBg}>
+                  <Icon
+                    name={item.iconName}
+                    color={colorIcon}
+                    role="presentation"
+                  />
+                </ItemIcon>
+                <ItemLabel color={colorText}>{item.name}</ItemLabel>
+              </SidebarButton>
+            </SidebarWrapper>
+          );
+        }
+
         const baseLinkProps = {
           onClick: () => {
             item.onClick?.();
@@ -120,13 +152,16 @@ const FancyPageSidebarSection = (props: FancyPageSidebarSectionProps) => {
           onMouseLeave,
           'data-test': item.slug + '-tab',
         };
+
         if (item.externalLink) {
           const externalLinkProps = {
             ...baseLinkProps,
             href: item.externalLink,
           };
           return (
-            <SidebarWrapper key={item.name} className="night-aware">
+            <SidebarWrapper
+              key={item.name}
+              className={`night-aware ${item.className || ''}`}>
               <TargetBlank
                 {...externalLinkProps}
                 style={{
