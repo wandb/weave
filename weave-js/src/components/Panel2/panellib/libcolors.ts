@@ -21,8 +21,11 @@ import {useMemo} from 'react';
 import {usePanelContext} from '.././PanelContext';
 
 export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
-  const {frame} = usePanelContext();
+  const {frame, useColorsNode} = usePanelContext();
   return useMemo(() => {
+    if (!useColorsNode) {
+      return voidNode();
+    }
     let rowType = inputNode.type;
     // Arbitrarily limit the number of times we unnest
     let limit = 10;
@@ -60,5 +63,5 @@ export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
         })
       ),
     });
-  }, [frame, inputNode]);
+  }, [frame, inputNode, useColorsNode]);
 };

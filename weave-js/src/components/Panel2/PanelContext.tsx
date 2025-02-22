@@ -10,7 +10,13 @@ import {
 } from '@wandb/weave/core';
 import {getChainRootVar} from '@wandb/weave/core/mutate';
 import {consoleGroup, consoleLog} from '@wandb/weave/util';
-import React, {ReactNode, useCallback, useContext, useMemo} from 'react';
+import React, {
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
 import {useDeepMemo} from '../../hookUtils';
 
@@ -127,6 +133,10 @@ export interface PanelContextState {
   ) => void;
 
   dashboardConfigOptions?: ReactNode;
+
+  useColorsNode: boolean;
+
+  setUseColorsNode: (useColorsNode: boolean) => void;
 }
 
 export const PanelContext = React.createContext<PanelContextState | null>(null);
@@ -139,6 +149,8 @@ const DEFAULT_CONTEXT: PanelContextState = {
   path: [],
   panelMaybeNode: null,
   triggerExpressionEvent: () => {},
+  useColorsNode: true,
+  setUseColorsNode: () => {},
 };
 
 export function usePanelContext() {
@@ -180,7 +192,12 @@ export const PanelContextProvider: React.FC<{
       stack,
       path,
       selectedPath: prevSelectedPath,
+      useColorsNode,
     } = usePanelContext();
+
+    const [internalUseColorsNode, setInternalUseColorsNode] = useState<boolean>(
+      useColorsNode ?? true
+    );
 
     const childPath = useMemo(
       () => (newPath ? path.concat(newPath) : path),
@@ -219,6 +236,8 @@ export const PanelContextProvider: React.FC<{
         panelMaybeNode: panelMaybeNode ?? null,
         triggerExpressionEvent,
         dashboardConfigOptions,
+        useColorsNode: internalUseColorsNode,
+        setUseColorsNode: setInternalUseColorsNode,
       };
     }, [
       childFrame,
@@ -230,6 +249,8 @@ export const PanelContextProvider: React.FC<{
       panelMaybeNode,
       triggerExpressionEvent,
       dashboardConfigOptions,
+      internalUseColorsNode,
+      setInternalUseColorsNode,
     ]);
 
     return (

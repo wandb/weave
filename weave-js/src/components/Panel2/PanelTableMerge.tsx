@@ -37,6 +37,7 @@ import React, {useCallback, useMemo} from 'react';
 import {useNodeWithServerType} from '../../react';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
+import {usePanelContext} from './PanelContext';
 import * as TableType from './PanelTable/tableType';
 
 const inputType = {
@@ -369,6 +370,7 @@ const PanelTableMergeConfig: React.FC<PanelTableMergeProps> = props => {
 
 const PanelTableMergeConfigInner: React.FC<PanelTableMergeProps> = props => {
   const {input, config, updateConfig} = props;
+  const {setUseColorsNode} = usePanelContext();
   const processedConfig = useProcessedConfig(config, input);
   const rowsObjType = useRowsOrListOfRowsObjType(input.type);
   const {allJoinKeys, joinableObjPathsMap} = useJoinKeys(
@@ -455,6 +457,11 @@ const PanelTableMergeConfigInner: React.FC<PanelTableMergeProps> = props => {
               setConfigCompareMethod(
                 data.value as ProcessedPanelTableMergeConfigType['compareMethod']
               );
+              if (data.value === 'joining') {
+                setUseColorsNode(false);
+              } else {
+                setUseColorsNode(true);
+              }
             }}
           />
         </ConfigPanel.ConfigOption>
