@@ -3,6 +3,9 @@ import nox
 nox.options.default_venv_backend = "uv"
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
+PY309_INCOMPATIBLE_SHARDS = [
+    "google_genai",
+]
 PY313_INCOMPATIBLE_SHARDS = [
     "anthropic",
     "cohere",
@@ -40,6 +43,7 @@ def lint(session):
         "cohere",
         "dspy",
         "google_ai_studio",
+        "google_genai",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
@@ -61,6 +65,9 @@ def tests(session, shard):
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
+    if session.python.startswith("3.9") and shard in PY309_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
+
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
 
@@ -75,7 +82,7 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
-    if shard == "google_ai_studio":
+    if shard in ["google_ai_studio", "google_genai"]:
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
