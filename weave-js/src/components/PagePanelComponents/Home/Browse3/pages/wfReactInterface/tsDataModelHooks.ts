@@ -578,7 +578,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -600,6 +601,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
