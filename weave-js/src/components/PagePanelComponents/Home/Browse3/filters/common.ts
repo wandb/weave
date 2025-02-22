@@ -307,7 +307,7 @@ const ArtifactRefStringSymbol = Symbol('ArtifactRefString');
 export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
 export type ArtifactRefString = string & {[ArtifactRefStringSymbol]: never};
 
-const isRefPrefixedString = (value: any): boolean => {
+export const isRefPrefixedString = (value: any): boolean => {
   if (typeof value !== 'string') {
     return false;
   }

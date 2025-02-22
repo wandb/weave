@@ -27,6 +27,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  TableCreateReq,
+  TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
   TraceCallReadReq,
@@ -267,6 +269,13 @@ export class DirectTraceServerClient {
   public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
     return this.makeRequest<TableUpdateReq, TableUpdateRes>(
       '/table/update',
+      req
+    );
+  }
+
+  public tableCreate(req: TableCreateReq): Promise<TableCreateRes> {
+    return this.makeRequest<TableCreateReq, TableCreateRes>(
+      '/table/create',
       req
     );
   }

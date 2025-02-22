@@ -394,3 +394,17 @@ export type TableUpdateRes = {
   digest: string;
   updated_row_digests: string[];
 };
+
+export type TableCreateReq = {
+  table: TableSchemaForInsert;
+};
+
+export type TableSchemaForInsert = {
+  project_id: string;
+  rows: Array<Record<string, any>>;
+};
+
+export type TableCreateRes = {
+  digest: string;
+  row_digests: string[];
+};
