@@ -417,21 +417,13 @@ def _do_call(
         pargs = _default_on_input_handler(op, args, kwargs)
 
     # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
+    if (
+        settings.should_disable_weave()
+        or weave_client_context.get_weave_client() is None
+        or not op._tracing_enabled
+        or not get_tracing_enabled()
+    ):
+        call.output = res = func(*pargs.args, **pargs.kwargs)
         return res, call
 
     current_call = call_context.get_current_call()
@@ -483,21 +475,13 @@ async def _do_call_async(
     call = _placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
-        res = await func(*args, **kwargs)
-        call.output = res
+    if (
+        settings.should_disable_weave()
+        or weave_client_context.get_weave_client() is None
+        or not op._tracing_enabled
+        or not get_tracing_enabled()
+    ):
+        call.output = res = await func(*args, **kwargs)
         return res, call
 
     current_call = call_context.get_current_call()
