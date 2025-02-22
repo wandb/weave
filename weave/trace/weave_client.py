@@ -25,6 +25,7 @@ from typing import (
 
 import pydantic
 from requests import HTTPError
+from typing_extensions import Self
 
 from weave import version
 from weave.trace import trace_sentry, urls
@@ -509,6 +510,16 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+
+    @classmethod
+    def as_placeholder(cls) -> Self:
+        return cls(
+            _op_name="",
+            trace_id="",
+            project_id="",
+            parent_id=None,
+            inputs={},
+        )
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
