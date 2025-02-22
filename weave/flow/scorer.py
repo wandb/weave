@@ -365,3 +365,12 @@ async def apply_scorer_async(
         raise OpCallError(message)
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
+
+
+class WeaveScorerResult(BaseModel):
+    """The result of a weave.Scorer.score method."""
+
+    passed: bool = Field(description="Whether the scorer passed or not")
+    metadata: dict[str, Any] = Field(
+        description="Any extra information from the scorer like numerical scores, model outputs, etc."
+    )

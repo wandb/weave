@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from pydantic import Field, PrivateAttr
 
 import weave
-from weave.scorers.utils import WeaveScorerResult
+from weave.flow.scorer import WeaveScorerResult
 
 if TYPE_CHECKING:
     from presidio_analyzer import (
