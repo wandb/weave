@@ -59,8 +59,27 @@ export const CallTimelineView: FC<{
 
   // Sort rows by start time
   const sortedRows = useMemo(() => {
+    const aiCallTypes = [
+      'openai.chat.completions.create',
+      'anthropic.Messages.create',
+      'anthropic.AsyncMessages.create'
+    ];
+
+    // Add debug logging
+    if (rows.length > 0) {
+      const firstCallRow = rows.find(row => 'call' in row) as CallRow;
+      if (firstCallRow) {
+        console.log('Example call object:', firstCallRow.call);
+      }
+    }
+
     return _.sortBy(
-      rows.filter(row => 'call' in row), // Only include call rows
+      rows.filter(row => {
+        if (!('call' in row)) return false; // Only include call rows
+        const callRow = row as CallRow;
+        return aiCallTypes.includes(callRow.call.spanName) || 
+               aiCallTypes.includes(callRow.call.rawSpan.name);
+      }),
       row => (row as CallRow).call.rawSpan.start_time_ms
     );
   }, [rows]);
