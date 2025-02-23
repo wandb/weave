@@ -39,6 +39,7 @@ export const CustomGridTreeDataGroupingCell: FC<
   GridRenderCellParams & {
     onClick?: (event: MouseEvent) => void;
     costLoading: boolean;
+    showTreeControls?: boolean;
   }
 > = props => {
   const {id, field, rowNode, row} = props;
@@ -91,6 +92,49 @@ export const CustomGridTreeDataGroupingCell: FC<
     typeof id === 'string' && id.endsWith('_HIDDEN_CHILDREN_COUNT');
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT' || isHiddenChildCount;
 
+  const cellContent = (
+    <CallOrCountRow>
+      {isHiddenCount ? (
+        <Box>{row.count.toLocaleString()} hidden calls</Box>
+      ) : call != null ? (
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
+            <Box
+              sx={{
+                mr: 1,
+              }}>
+              <StatusChip value={row.status} iconOnly />
+            </Box>
+            <Box
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: '1 1 auto',
+              }}>
+              {call.displayName ?? opNiceName(call.spanName)}
+            </Box>
+          </Box>
+          {call.traceCall?.summary && (
+            <TraceCostStats
+              usageData={call.traceCall.summary.usage}
+              costData={call.traceCall.summary.weave?.costs}
+              latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
+              costLoading={props.costLoading}
+            />
+          )}
+        </>
+      ) : (
+        <Box />
+      )}
+    </CallOrCountRow>
+  );
+
   const box = (
     <CursorBox
       $isClickable={!isHiddenCount}
@@ -101,124 +145,90 @@ export const CustomGridTreeDataGroupingCell: FC<
         alignItems: 'center',
         justifyContent: 'left',
         width: '100%',
+        pl: props.showTreeControls === false ? 2 : 0,
       }}>
-      {_.range(rowNode.depth).map(i => {
-        return (
+      {props.showTreeControls !== false && (
+        <>
+          {_.range(rowNode.depth).map(i => {
+            return (
+              <Box
+                key={i}
+                sx={{
+                  flex: `0 0 ${INSET_SPACING / 2}px`,
+                  width: `${INSET_SPACING / 2}px`,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    borderRight: BORDER_STYLE,
+                  }}></Box>
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    borderRight:
+                      isLastChild && i === rowNode.depth - 1 ? '' : BORDER_STYLE,
+                  }}></Box>
+              </Box>
+            );
+          })}
           <Box
-            key={i}
             sx={{
-              flex: `0 0 ${INSET_SPACING / 2}px`,
-              width: `${INSET_SPACING / 2}px`,
+              flex: `0 0 ${INSET_SPACING}px`,
+              width: `${INSET_SPACING}px`,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'top',
             }}>
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                borderRight: BORDER_STYLE,
-              }}></Box>
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                borderRight:
-                  isLastChild && i === rowNode.depth - 1 ? '' : BORDER_STYLE,
-              }}></Box>
-          </Box>
-        );
-      })}
-      <Box
-        sx={{
-          flex: `0 0 ${INSET_SPACING}px`,
-          width: `${INSET_SPACING}px`,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'top',
-        }}>
-        {rowNode.type === 'group' ? (
-          <MuiButton
-            onClick={handleClick}
-            tabIndex={-1}
-            size="small"
-            style={{
-              height: '26px',
-              width: '26px',
-              minWidth: '26px',
-              borderRadius: '50%',
-              color: TREE_COLOR,
-              marginTop: '8px',
-            }}>
-            <Icon
-              name={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
-            />
-          </MuiButton>
-        ) : (
-          <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              pr: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Box
-              sx={{
-                width: '100%',
-                height: '34px',
-                borderBottom: BORDER_STYLE,
-              }}></Box>
-            <Box sx={{width: '100%', height: '100%'}}></Box>
-          </Box>
-        )}
-      </Box>
-      <CallOrCountRow>
-        {isHiddenCount ? (
-          <Box>{row.count.toLocaleString()} hidden calls</Box>
-        ) : call != null ? (
-          <>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}>
+            {rowNode.type === 'group' ? (
+              <MuiButton
+                onClick={handleClick}
+                tabIndex={-1}
+                size="small"
+                style={{
+                  height: '26px',
+                  width: '26px',
+                  minWidth: '26px',
+                  borderRadius: '50%',
+                  color: TREE_COLOR,
+                  marginTop: '8px',
+                }}>
+                <Icon
+                  name={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
+                />
+              </MuiButton>
+            ) : (
               <Box
                 sx={{
-                  mr: 1,
+                  width: '100%',
+                  height: '100%',
+                  pr: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                <StatusChip value={row.status} iconOnly />
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '34px',
+                    borderBottom: BORDER_STYLE,
+                  }}></Box>
+                <Box sx={{width: '100%', height: '100%'}}></Box>
               </Box>
-              <Box
-                sx={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  flex: '1 1 auto',
-                }}>
-                {call.displayName ?? opNiceName(call.spanName)}
-              </Box>
-            </Box>
-            {call.traceCall?.summary && (
-              <TraceCostStats
-                usageData={call.traceCall.summary.usage}
-                costData={call.traceCall.summary.weave?.costs}
-                latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
-                costLoading={props.costLoading}
-              />
             )}
-          </>
-        ) : (
-          <Box />
-        )}
-      </CallOrCountRow>
+          </Box>
+        </>
+      )}
+      {cellContent}
       {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
     </CursorBox>
   );

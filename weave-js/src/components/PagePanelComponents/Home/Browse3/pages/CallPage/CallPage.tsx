@@ -46,6 +46,7 @@ import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
+import {CallTimelineView} from './CallTimelineView';
 
 export const CallPage: FC<{
   entity: string;
@@ -314,6 +315,8 @@ const CallPageInnerVertical: FC<{
 
   const callTabs = useCallTabs(currentCall);
 
+  const [viewType, setViewType] = useState<'tree' | 'timeline'>('tree');
+
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
   }
@@ -347,6 +350,14 @@ const CallPageInnerVertical: FC<{
               onClick={onToggleFeedbackExpand}
               className="ml-4"
             />
+            <Button
+              icon="marker"
+              tooltip={`Switch to ${viewType === 'tree' ? 'timeline' : 'tree'} view`}
+              variant="ghost"
+              active={viewType === 'timeline'}
+              onClick={() => setViewType(viewType === 'tree' ? 'timeline' : 'tree')}
+              className="ml-4"
+            />
           </Box>
         </Box>
       }
@@ -371,13 +382,20 @@ const CallPageInnerVertical: FC<{
           <div className="h-full bg-moon-50">
             {loading ? (
               <Loading centered />
-            ) : (
+            ) : viewType === 'tree' ? (
               <CallTraceView
                 call={call}
                 selectedCall={currentCall}
                 rows={rows}
                 forcedExpandKeys={expandKeys}
                 path={path}
+                costLoading={costLoading}
+              />
+            ) : (
+              <CallTimelineView
+                call={call}
+                selectedCall={currentCall}
+                rows={rows}
                 costLoading={costLoading}
               />
             )}
