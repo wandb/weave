@@ -15,6 +15,14 @@ import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {CallStatusType} from '../common/StatusChip';
 
 // Import the types from CallTraceView
+type GroupHeaderRow = {
+  id: string;
+  groupName: string;
+  count: number;
+  hierarchy: string[];
+  isGroupHeader: true;
+};
+
 type CallRow = {
   id: string;
   call: CallSchema;
@@ -38,7 +46,7 @@ type HiddenChildrenCountRow = {
   parentId: string;
 };
 
-type Row = CallRow | SiblingCountRow | HiddenChildrenCountRow;
+type Row = CallRow | SiblingCountRow | HiddenChildrenCountRow | GroupHeaderRow;
 
 const CallTimeline = styled.div`
   overflow: auto;
@@ -56,45 +64,141 @@ export const CallTimelineView: FC<{
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
   const [suppressScroll, setSuppressScroll] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(new Set<string>());
 
-  // Sort rows by start time
-  const sortedRows = useMemo(() => {
-    const aiCallTypes = [
-      'openai.chat.completions.create',
-      'anthropic.Messages.create',
-      'anthropic.AsyncMessages.create'
-    ];
+  // Define AI call types
+  const aiCallTypes = [
+    'openai.chat.completions.create',
+    'anthropic.Messages.create',
+    'anthropic.AsyncMessages.create'
+  ];
 
-    // Add debug logging
-    if (rows.length > 0) {
-      const firstCallRow = rows.find(row => 'call' in row) as CallRow;
-      if (firstCallRow) {
-        console.log('Example call object:', firstCallRow.call);
+  // Group and sort rows
+  const groupedRows = useMemo(() => {
+    const callRows = rows.filter(row => 'call' in row) as CallRow[];
+    
+    // First, sort all calls by start time
+    const sortedCalls = _.sortBy(callRows, 
+      row => row.call.rawSpan.start_time_ms
+    );
+
+    // Separate into AI and non-AI calls while preserving order
+    let currentGroup: CallRow[] = [];
+    const finalRows: Row[] = [];
+
+    sortedCalls.forEach((row, index) => {
+      const isAiCall = aiCallTypes.includes(row.call.spanName) || 
+                      aiCallTypes.includes(row.call.rawSpan.name);
+
+      if (isAiCall) {
+        // If we have accumulated non-AI calls, create a group
+        if (currentGroup.length > 0) {
+          const groupId = `non-ai-group-${finalRows.length}`;
+          
+          // Add group header at top level
+          finalRows.push({
+            id: groupId,
+            groupName: 'Other Calls',
+            count: currentGroup.length,
+            hierarchy: [groupId],
+            isGroupHeader: true
+          });
+
+          // Add non-AI calls under the group
+          currentGroup.forEach(call => {
+            finalRows.push({
+              ...call,
+              hierarchy: [groupId, call.id]
+            });
+          });
+          
+          currentGroup = [];
+        }
+
+        // Add AI call at top level
+        finalRows.push({
+          ...row,
+          hierarchy: [row.id]
+        });
+      } else {
+        currentGroup.push(row);
       }
+    });
+
+    // Handle any remaining non-AI calls
+    if (currentGroup.length > 0) {
+      const groupId = `non-ai-group-${finalRows.length}`;
+      
+      finalRows.push({
+        id: groupId,
+        groupName: 'Other Calls',
+        count: currentGroup.length,
+        hierarchy: [groupId],
+        isGroupHeader: true
+      });
+
+      currentGroup.forEach(call => {
+        finalRows.push({
+          ...call,
+          hierarchy: [groupId, call.id]
+        });
+      });
     }
 
-    return _.sortBy(
-      rows.filter(row => {
-        if (!('call' in row)) return false; // Only include call rows
-        const callRow = row as CallRow;
-        return aiCallTypes.includes(callRow.call.spanName) || 
-               aiCallTypes.includes(callRow.call.rawSpan.name);
-      }),
-      row => (row as CallRow).call.rawSpan.start_time_ms
-    );
-  }, [rows]);
+    return finalRows;
+  }, [rows, aiCallTypes]);
 
-  // Flatten the hierarchy - each call will be at the root level
-  const flattenedRows = useMemo(() => {
-    return sortedRows.map(row => ({
-      ...row,
-      hierarchy: [(row as CallRow).call.callId],
-    }));
-  }, [sortedRows]);
+  // Update grouping column definition to handle group headers
+  const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
+    () => ({
+      headerName: 'Timeline',
+      headerAlign: 'center',
+      flex: 1,
+      display: 'flex',
+      renderCell: params => {
+        if ('isGroupHeader' in params.row) {
+          return (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              cursor: 'pointer',
+              padding: '8px'
+            }}>
+              <span style={{ marginRight: '8px' }}>
+                {expandedGroups.has(params.row.id) ? '▼' : '▶'}
+              </span>
+              <span>{params.row.groupName} ({params.row.count})</span>
+            </div>
+          );
+        }
+        return (
+          <CustomGridTreeDataGroupingCell
+            {...params}
+            costLoading={costLoading}
+            showTreeControls={false}
+          />
+        );
+      },
+    }),
+    [costLoading, expandedGroups]
+  );
 
-  // Handle row clicks
+  // Handle row clicks including group headers
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
+      if ('isGroupHeader' in params.row) {
+        setExpandedGroups(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(params.row.id)) {
+            newSet.delete(params.row.id);
+          } else {
+            newSet.add(params.row.id);
+          }
+          return newSet;
+        });
+        return;
+      }
+
       if (!params.row.call) {
         return;
       }
@@ -184,22 +288,10 @@ export const CallTimelineView: FC<{
     }, 0);
   }, []);
 
-  // Custom grouping column definition
-  const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
-    () => ({
-      headerName: 'Timeline',
-      headerAlign: 'center',
-      flex: 1,
-      display: 'flex',
-      renderCell: params => (
-        <CustomGridTreeDataGroupingCell
-          {...params}
-          costLoading={costLoading}
-          showTreeControls={false}
-        />
-      ),
-    }),
-    [costLoading]
+  // Update isGroupExpandedByDefault
+  const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] = useCallback(
+    node => expandedGroups.has(node.groupingKey?.toString() ?? ''),
+    [expandedGroups]
   );
 
   // Add getTreeDataPath prop
@@ -218,10 +310,11 @@ export const CallTimelineView: FC<{
           treeData
           loading={animationBuffer}
           onRowClick={onRowClick}
-          rows={animationBuffer ? [] : flattenedRows}
+          rows={animationBuffer ? [] : groupedRows}
           columns={[]}
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
+          isGroupExpandedByDefault={isGroupExpandedByDefault}
           getRowClassName={getRowClassName}
           hideFooter
           rowSelection={false}
