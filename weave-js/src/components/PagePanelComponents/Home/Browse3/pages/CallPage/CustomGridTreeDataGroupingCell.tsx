@@ -26,7 +26,7 @@ const CallOrCountRow = styled.div`
   flex-direction: column;
   justify-items: center;
   gap: 6px;
-  padding-top: 10px;
+  padding-top: ${props => props.style?.paddingTop ?? '10px'};
 `;
 CallOrCountRow.displayName = 'S.CallOrCountRow';
 
@@ -40,6 +40,7 @@ export const CustomGridTreeDataGroupingCell: FC<
     onClick?: (event: MouseEvent) => void;
     costLoading: boolean;
     showTreeControls?: boolean;
+    style?: React.CSSProperties;
   }
 > = props => {
   const {id, field, rowNode, row} = props;
@@ -93,7 +94,7 @@ export const CustomGridTreeDataGroupingCell: FC<
   const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT' || isHiddenChildCount;
 
   const cellContent = (
-    <CallOrCountRow>
+    <CallOrCountRow style={props.style}>
       {isHiddenCount ? (
         <Box>{row.count.toLocaleString()} hidden calls</Box>
       ) : call != null ? (

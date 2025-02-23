@@ -75,6 +75,15 @@ export const CallTimelineView: FC<{
     'anthropic.AsyncMessages.create'
   ];
 
+  // Get the root call ID outside of useMemo
+  const rootCallId = useMemo(() => {
+    const callRows = rows.filter(row => 'call' in row) as CallRow[];
+    const sortedCalls = _.sortBy(callRows, 
+      row => row.call.rawSpan.start_time_ms
+    );
+    return sortedCalls.length > 0 ? sortedCalls[0].id : null;
+  }, [rows]);
+
   // Group and sort rows
   const groupedRows = useMemo(() => {
     const callRows = rows.filter(row => 'call' in row) as CallRow[];
@@ -84,67 +93,77 @@ export const CallTimelineView: FC<{
       row => row.call.rawSpan.start_time_ms
     );
 
-    // Separate into AI and non-AI calls while preserving order
+    // Initialize arrays
     let currentGroup: CallRow[] = [];
     const finalRows: Row[] = [];
 
-    sortedCalls.forEach((row, index) => {
-      const isAiCall = aiCallTypes.includes(row.call.spanName) || 
-                      aiCallTypes.includes(row.call.rawSpan.name);
-
-      if (isAiCall) {
-        // If we have accumulated non-AI calls, create a group
-        if (currentGroup.length > 0) {
-          const groupId = `non-ai-group-${finalRows.length}`;
-          
-          // Add group header at top level
-          finalRows.push({
-            id: groupId,
-            groupName: 'Other Calls',
-            count: currentGroup.length,
-            hierarchy: [groupId],
-            isGroupHeader: true
-          });
-
-          // Add non-AI calls under the group
-          currentGroup.forEach(call => {
-            finalRows.push({
-              ...call,
-              hierarchy: [groupId, call.id]
-            });
-          });
-          
-          currentGroup = [];
-        }
-
-        // Add AI call at top level
-        finalRows.push({
-          ...row,
-          hierarchy: [row.id]
-        });
-      } else {
-        currentGroup.push(row);
-      }
-    });
-
-    // Handle any remaining non-AI calls
-    if (currentGroup.length > 0) {
-      const groupId = `non-ai-group-${finalRows.length}`;
-      
+    // Always add the first call at the top if it exists
+    if (sortedCalls.length > 0) {
+      const rootCall = sortedCalls[0];
       finalRows.push({
-        id: groupId,
-        groupName: 'Other Calls',
-        count: currentGroup.length,
-        hierarchy: [groupId],
-        isGroupHeader: true
+        ...rootCall,
+        hierarchy: [rootCall.id]
       });
 
-      currentGroup.forEach(call => {
-        finalRows.push({
-          ...call,
-          hierarchy: [groupId, call.id]
-        });
+      // Process remaining calls
+      sortedCalls.slice(1).forEach(row => {
+        const isAiCall = aiCallTypes.includes(row.call.spanName) || 
+                        aiCallTypes.includes(row.call.rawSpan.name);
+
+        if (isAiCall) {
+          // If we have accumulated non-AI calls, create a group
+          if (currentGroup.length > 0) {
+            const groupId = `non-ai-group-${finalRows.length}`;
+            
+            // Add group header at top level
+            finalRows.push({
+              id: groupId,
+              groupName: 'Other Calls',
+              count: currentGroup.length,
+              hierarchy: [groupId],
+              isGroupHeader: true
+            });
+
+            // Add non-AI calls under the group
+            currentGroup.forEach(call => {
+              finalRows.push({
+                ...call,
+                hierarchy: [groupId, call.id]
+              });
+            });
+            
+            currentGroup = [];
+          }
+
+          // Add AI call at top level
+          finalRows.push({
+            ...row,
+            hierarchy: [row.id]
+          });
+        } else {
+          currentGroup.push(row);
+        }
       });
+
+      // Handle any remaining non-AI calls
+      if (currentGroup.length > 0) {
+        const groupId = `non-ai-group-${finalRows.length}`;
+        
+        finalRows.push({
+          id: groupId,
+          groupName: 'Other Calls',
+          count: currentGroup.length,
+          hierarchy: [groupId],
+          isGroupHeader: true
+        });
+
+        currentGroup.forEach(call => {
+          finalRows.push({
+            ...call,
+            hierarchy: [groupId, call.id]
+          });
+        });
+      }
     }
 
     return finalRows;
@@ -182,6 +201,9 @@ export const CallTimelineView: FC<{
           );
         }
 
+        // Check if this is the first call we placed at the top
+        const isFirstCall = params.row.id === rootCallId;
+        
         // Check if this is a non-AI call (child of a group)
         const isNonAiCall = params.row.hierarchy.length > 1;
         
@@ -191,7 +213,8 @@ export const CallTimelineView: FC<{
             alignItems: 'center',
             width: '100%',
             paddingLeft: isNonAiCall ? '32px' : '8px',
-            position: 'relative'
+            position: 'relative',
+            fontWeight: isFirstCall ? 600 : 'normal'
           }}>
             {isNonAiCall && (
               <div style={{
@@ -207,12 +230,13 @@ export const CallTimelineView: FC<{
               {...params}
               costLoading={costLoading}
               showTreeControls={false}
+              style={{ paddingTop: 0 }}
             />
           </div>
         );
       },
     }),
-    [costLoading, expandedGroups]
+    [costLoading, expandedGroups, rootCallId]
   );
 
   // Handle row clicks including group headers
@@ -271,10 +295,11 @@ export const CallTimelineView: FC<{
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
           borderTop: 'none',
+          padding: 0,
         },
         '& div div div div >.MuiDataGrid-cell:focus': {
           outline: 'none',
-        },
+        }
       },
       '& .MuiDataGrid-topContainer': {
         display: 'none',
