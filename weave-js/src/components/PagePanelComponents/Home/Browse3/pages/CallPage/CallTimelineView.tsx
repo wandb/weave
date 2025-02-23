@@ -13,6 +13,8 @@ import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {CallStatusType} from '../common/StatusChip';
+import {Icon} from '../../../../../Icon';
+import {MOON_500} from '../../../../../../common/css/color.styles';
 
 // Import the types from CallTraceView
 type GroupHeaderRow = {
@@ -162,21 +164,51 @@ export const CallTimelineView: FC<{
               display: 'flex', 
               alignItems: 'center',
               cursor: 'pointer',
-              padding: '8px'
+              padding: '0 8px',
+              height: '100%'
             }}>
-              <span style={{ marginRight: '8px' }}>
-                {expandedGroups.has(params.row.id) ? '▼' : '▶'}
-              </span>
+              <div style={{ 
+                marginRight: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                color: MOON_500
+              }}>
+                <Icon
+                  name={expandedGroups.has(params.row.id) ? 'chevron-down' : 'chevron-next'}
+                />
+              </div>
               <span>{params.row.groupName} ({params.row.count})</span>
             </div>
           );
         }
+
+        // Check if this is a non-AI call (child of a group)
+        const isNonAiCall = params.row.hierarchy.length > 1;
+        
         return (
-          <CustomGridTreeDataGroupingCell
-            {...params}
-            costLoading={costLoading}
-            showTreeControls={false}
-          />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            paddingLeft: isNonAiCall ? '32px' : '8px',
+            position: 'relative'
+          }}>
+            {isNonAiCall && (
+              <div style={{
+                position: 'absolute',
+                left: '16px',
+                top: 0,
+                bottom: 0,
+                width: '2px',
+                backgroundColor: '#e0e0e0'
+              }} />
+            )}
+            <CustomGridTreeDataGroupingCell
+              {...params}
+              costLoading={costLoading}
+              showTreeControls={false}
+            />
+          </div>
         );
       },
     }),
@@ -305,7 +337,7 @@ export const CallTimelineView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          rowHeight={64}
+          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 64)}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}
