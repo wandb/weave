@@ -39,9 +39,9 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
         class_names (list[str]): The list of target class names.
 
     Methods:
-        score(target: dict, model_output: Optional[dict]) -> dict:
+        score(target: dict, output: Optional[dict]) -> dict:
             Compares the target class labels with the model outputs to indicate correctness for each class.
-            Uses the "model_output" key for backwards compatibility.
+            Uses the "output" key for backwards compatibility.
 
         summarize(score_rows: list) -> Optional[dict]:
             Aggregates multiple scoring results to compute the precision, recall, and F1 score for each class.
@@ -75,17 +75,14 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
 
         return result
 
-    # NOTE: This is an old-style scorer that uses `model_output` instead of `output` for
-    # backwards compatibility.  In the future, this behavior may change to use the newer `output` key.
-    # You can still pass a `column_map` to map to the new `output` key if preferred.
     @weave.op()
-    def score(self, target: dict, model_output: Optional[dict]) -> dict:
+    def score(self, target: dict, output: Optional[dict]) -> dict:
         """
         Compare target labels with model outputs to determine correctness for each class.
 
         Args:
             target (dict): A dictionary mapping each class name to the ground truth label.
-            model_output (Optional[dict]): A dictionary mapping each class name to the model's output.
+            output (Optional[dict]): A dictionary mapping each class name to the model's output.
                 If None, outputs are treated as false.
 
         Returns:
@@ -98,7 +95,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)
-            class_output = model_output.get(class_name) if model_output else None
+            class_output = output.get(class_name) if output else None
             result[class_name] = {
                 "correct": class_label == class_output,
                 "negative": not class_output,
