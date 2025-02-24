@@ -15,6 +15,7 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "azure_ai": "AZURE_API_KEY",
     "bedrock": "BEDROCK_API_KEY",
     "bedrock_converse": "BEDROCK_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
     "fireworks": "FIREWORKS_API_KEY",
     "gemini": "GOOGLE_API_KEY",
     "groq": "GEMMA_API_KEY",

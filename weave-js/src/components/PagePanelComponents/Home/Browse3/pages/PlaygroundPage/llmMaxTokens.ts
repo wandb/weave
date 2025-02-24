@@ -469,6 +469,18 @@ export const LLM_MAX_TOKENS = {
     provider: 'xai',
     supports_function_calling: true,
   },
+
+  // DeepSeek models
+  'deepseek/deepseek-reasoner': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'deepseek/deepseek-chat': {
+    provider: 'deepseek',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
@@ -485,6 +497,7 @@ export const LLM_PROVIDERS = [
   'groq',
   'bedrock',
   'xai',
+  'deepseek',
 ];
 
 export const LLM_PROVIDER_LABELS: Record<
@@ -498,4 +511,5 @@ export const LLM_PROVIDER_LABELS: Record<
   groq: 'Groq',
   bedrock: 'AWS Bedrock',
   xai: 'xAI',
+  deepseek: 'DeepSeek',
 };
