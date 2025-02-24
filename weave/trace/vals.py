@@ -706,9 +706,9 @@ def make_trace_obj(
                 table_row_filter = TableRowFilter()
                 if (
                     len(extra) == 4
-                    and extra[0] == "attr"
+                    and extra[0] == OBJECT_ATTR_EDGE_NAME
                     and extra[1] == "rows"
-                    and extra[2] == "id"
+                    and extra[2] == TABLE_ROW_ID_EDGE_NAME
                 ):
                     table_row_filter.row_digests = [extra[3]]
 
