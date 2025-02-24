@@ -8,15 +8,7 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 
 @pytest.mark.vcr(
-    filter_headers=[
-        "authorization",
-        "x-api-key",
-        "cookie",
-        "set-cookie",
-        "x-request-id",
-        "x-ratelimit-remaining-requests",
-        "x-ratelimit-remaining-tokens",
-    ],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -68,15 +60,7 @@ def test_dspy_predict_module(client) -> None:
 
 
 @pytest.mark.vcr(
-    filter_headers=[
-        "authorization",
-        "x-api-key",
-        "cookie",
-        "set-cookie",
-        "x-request-id",
-        "x-ratelimit-remaining-requests",
-        "x-ratelimit-remaining-tokens",
-    ],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
@@ -134,15 +118,7 @@ def test_dspy_chain_of_thought_module(client) -> None:
 
 
 @pytest.mark.vcr(
-    filter_headers=[
-        "authorization",
-        "x-api-key",
-        "cookie",
-        "set-cookie",
-        "x-request-id",
-        "x-ratelimit-remaining-requests",
-        "x-ratelimit-remaining-tokens",
-    ],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
