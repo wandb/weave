@@ -100,80 +100,44 @@ export function createBoxControls(
 
 const defaultClassSetID = 'default';
 
-export type MaskClassLabels = {
-  key: string;
-  type: string;
-  value: {[key: string]: string};
-};
-
-const toClassValue = (className: string, classKey: string) => {
-  const keyNOrNan = parseInt(classKey, 10);
-  const color = isNaN(keyNOrNan)
-    ? colorFromName(classKey)
-    : colorN(keyNOrNan, ROBIN16);
-  return {color, name: className};
-};
-
 export const useImageControls = (
   inputType: Type,
-  currentControls?: OverlayControls,
-  maskClassLabels?: {[key: string]: MaskClassLabels}
+  currentControls?: OverlayControls
 ) => {
   const usableType = useMemo(() => {
     return nullableTaggableStrip(inputType) as ImageType;
   }, [inputType]);
 
+  // Images now only have a single class set (the default one) as the
+  // classes from all layers have been merged in the type system
   const classSets = useMemo(() => {
-    const defaultClassSet = _.mapValues(
-      usableType.classMap ?? {},
-      (className, classKey) => toClassValue(className, classKey)
-    ) as ClassSetState['classes'];
-
-    const classSetsFromLabels = Object.entries(maskClassLabels ?? {}).reduce(
-      (acc, [maskKey, mask]) => {
-        const controlId = `mask-${maskKey.replace(
-          'image_wandb_delimeter_',
-          ''
-        )}`;
-        acc[controlId] = {
-          classes: _.mapValues(mask.value, (labelName, labelKey) =>
-            toClassValue(labelName, labelKey)
-          ),
-        };
-        return acc;
-      },
-      {} as ClassSetControls
-    );
-
+    const classSet = _.mapValues(usableType.classMap ?? {}, (value, key) => {
+      const keyNOrNan = parseInt(key, 10);
+      const color = isNaN(keyNOrNan)
+        ? colorFromName(key)
+        : colorN(keyNOrNan, ROBIN16);
+      return {color, name: value};
+    }) as ClassSetState['classes'];
     return {
-      [defaultClassSetID]: {classes: defaultClassSet},
-      ...classSetsFromLabels,
+      [defaultClassSetID]: {classes: classSet},
     } as ClassSetControls;
-  }, [usableType, maskClassLabels]);
+  }, [usableType]);
 
   const maskControls: {[key: string]: MaskControlState} = useMemo(() => {
     const maskLayers = usableType.maskLayers ?? {};
     return _.fromPairs(
       _.keys(maskLayers).map(maskId => {
         const prefixedId = 'mask-' + maskId;
-        if (
-          currentControls &&
-          _.findKey(
-            currentControls,
-            control => control.classSetID === prefixedId
-          )
-        ) {
+        if (currentControls?.[prefixedId] != null) {
           return [prefixedId, currentControls[prefixedId] as MaskControlState];
         }
-        let classSetId = defaultClassSetID;
-        if (prefixedId in classSets) {
-          classSetId = prefixedId;
-        }
-        const classSet = classSets[classSetId];
-        const classSubset = _.pick(classSet.classes, ...maskLayers[maskId]);
+        const classSubset = _.pick(
+          classSets[defaultClassSetID].classes,
+          ...maskLayers[maskId]
+        );
         const newControl: MaskControlState = createMaskControls(
           prefixedId,
-          classSetId,
+          defaultClassSetID,
           {classes: classSubset}
         );
         return [prefixedId, newControl];
