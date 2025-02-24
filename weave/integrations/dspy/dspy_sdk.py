@@ -35,22 +35,6 @@ def get_dspy_patcher(
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("dspy"),
-                "Predict.__call__",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.Predict"})
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "Predict.forward",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.Predict.forward"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
                 "ChainOfThought.__call__",
                 dspy_wrapper(
                     base.model_copy(update={"name": base.name or "dspy.ChainOfThought"})

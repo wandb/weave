@@ -60,9 +60,9 @@ if not import_failed:
                     else:
                         inputs["self"]["signature"] = instance.signature
             self._call_map[call_id] = gc.create_call(
-                "dspy.Module",
+                f"dspy.{instance.__class__.__name__}",
                 inputs=dspy_postprocess_inputs(inputs),
-                display_name="dspy.Module",
+                display_name=f"dspy.{instance.__class__.__name__}",
             )
 
         def on_module_end(

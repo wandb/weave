@@ -35,7 +35,7 @@ def test_dspy_predict_module(client) -> None:
     assert "paris" in response.response.lower()
 
     calls = list(client.calls())
-    assert len(calls) == 8
+    assert len(calls) == 6
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -47,31 +47,19 @@ def test_dspy_predict_module(client) -> None:
         == "Given the fields `question`, produce the fields `response`."
     )
 
-    call = calls[1]
-    assert call.started_at < call.ended_at
-    trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "dspy.Module"
-    assert "paris" in call.output["response"].lower()
-
-    call = calls[2]
-    assert call.started_at < call.ended_at
-    trace_name = op_name_from_ref(call.op_name)
-    assert trace_name == "dspy.Predict.forward"
-    assert "paris" in call.output["response"].lower()
-
-    call = calls[5]
+    call = calls[3]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "dspy.LM"
     assert "paris" in call.output[0].lower()
 
-    call = calls[6]
+    call = calls[4]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "litellm.completion"
     assert "paris" in call.output["choices"][0]["message"]["content"].lower()
 
-    call = calls[7]
+    call = calls[5]
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "openai.chat.completions.create"
