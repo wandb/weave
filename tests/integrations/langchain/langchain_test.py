@@ -183,6 +183,7 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
 )
 def test_simple_chain_batch(
     client: WeaveClient,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -197,6 +198,12 @@ def test_simple_chain_batch(
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch(calls)
+
+    log_lines = capsys.readouterr().out
+
+    # one parent call link
+    assert log_lines.count("/shawn/test-project/r/call") == 1
+    assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
 @pytest.mark.skip_clickhouse_client

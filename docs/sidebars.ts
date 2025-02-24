@@ -132,7 +132,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
-            "guides/integrations/google-gemini",
+            "guides/integrations/google",
             "guides/integrations/groq",
             "guides/integrations/huggingface",
             "guides/integrations/litellm",

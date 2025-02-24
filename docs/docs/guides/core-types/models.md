@@ -3,10 +3,10 @@ import TabItem from '@theme/TabItem';
 
 # Models
 
+A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
+
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
-
     To create a model in Weave, you need the following:
 
     - a class that inherits from `weave.Model`
@@ -75,6 +75,92 @@ import TabItem from '@theme/TabItem';
     with weave.attributes({'env': 'production'}):
         model.predict('world')
     ```
+
+    ## Pairwise evaluation of models
+
+    When [scoring](../evaluation/scorers.md) models in a Weave [evaluation](../core-types/evaluations.md), absolute value metrics (e.g. `9/10` for Model A and `8/10` for Model B) are typically harder to assign than than relative ones (e.g. Model A performs better than Model B). _Pairwise evaluation_ allows you to compare the outputs of two models by ranking them relative to each other. This approach is particularly useful when you want to determine which model performs better for subjective tasks such as text generation, summarization, or question answering. With pairwise evaluation, you can obtain a relative preference ranking that reveals which model is best for specific inputs.
+
+    The following code sample demonstrates how to implement a pairwise evaluation in Weave by creating a [class-based scorer](../evaluation/scorers.md#class-based-scorers) called `PreferenceScorer`. The `PreferenceScorer` compares two models, `ModelA` and `ModelB`, and returns a relative score of the model outputs based on explicit hints in the input text.
+
+    ```python
+    from weave import Model, Evaluation, Scorer, Dataset
+    from weave.flow.model import ApplyModelError, apply_model_async
+
+    class ModelA(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            if "Prefer model A" in input_text:
+                return {"response": "This is a great answer from Model A"}
+            return {"response": "Meh, whatever"}
+
+    class ModelB(Model):
+        @weave.op
+        def predict(self, input_text: str):
+            if "Prefer model B" in input_text:
+                return {"response": "This is a thoughtful answer from Model B"}
+            return {"response": "I don't know"}
+
+    class PreferenceScorer(Scorer):
+        @weave.op
+        async def _get_other_model_output(self, example: dict) -> Any:
+            """Get output from the other model for comparison.
+            Args:
+                example: The input example data to run through the other model
+            Returns:
+                The output from the other model
+            """
+
+            other_model_result = await apply_model_async(
+                self.other_model,
+                example,
+                None,
+            )
+
+            if isinstance(other_model_result, ApplyModelError):
+                return None
+
+            return other_model_result.model_output
+
+        @weave.op
+        async def score(self, output: dict, input_text: str) -> dict:
+            """Compare the output of the primary model with the other model.
+            Args:
+                output (dict): The output from the primary model.
+                other_output (dict): The output from the other model being compared.
+                inputs (str): The input text used to generate the outputs.
+            Returns:
+                dict: A flat dictionary containing the comparison result and reason.
+            """
+            other_output = await self._get_other_model_output(
+                {"input_text": inputs}
+            )
+            if other_output is None:
+                return {"primary_is_better": False, "reason": "Other model failed"}
+
+            if "Prefer model A" in input_text:
+                primary_is_better = True
+                reason = "Model A gave a great answer"
+            else:
+                primary_is_better = False
+                reason = "Model B is preferred for this type of question"
+
+            return {"primary_is_better": primary_is_better, "reason": reason}
+
+    dataset = Dataset(
+        rows=[
+            {"input_text": "Prefer model A: Question 1"},  # Model A wins
+            {"input_text": "Prefer model A: Question 2"},  # Model A wins
+            {"input_text": "Prefer model B: Question 3"},  # Model B wins
+            {"input_text": "Prefer model B: Question 4"},  # Model B wins
+        ]
+    )
+
+    model_a = ModelA()
+    model_b = ModelB()
+    pref_scorer = PreferenceScorer(other_model=model_b)
+    evaluation = Evaluation(dataset=dataset, scorers=[pref_scorer])
+    evaluation.evaluate(model_a)
+```
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
