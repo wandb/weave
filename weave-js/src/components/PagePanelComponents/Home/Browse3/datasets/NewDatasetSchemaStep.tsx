@@ -32,6 +32,22 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
     return selectedCalls.length > 0 ? extractSourceSchema(selectedCalls) : [];
   }, [selectedCalls]);
 
+  const allFieldsIncluded = useMemo(() => {
+    return (
+      fieldConfigs.length > 0 && fieldConfigs.every(config => config.included)
+    );
+  }, [fieldConfigs]);
+
+  const handleToggleAll = () => {
+    const newIncluded = !allFieldsIncluded;
+    const newConfigs = fieldConfigs.map(config => ({
+      ...config,
+      included: newIncluded,
+    }));
+    onFieldConfigsChange(newConfigs);
+    resetEditState();
+  };
+
   // Initialize field configs when source schema changes
   useEffect(() => {
     if (sourceSchema.length > 0 && fieldConfigs.length === 0) {
@@ -148,6 +164,46 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
       </Typography>
       <Box sx={{height: 16}} />
       <Box sx={{bgcolor: '#F8F8F8', p: 2, borderRadius: 1}}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            mb: 3,
+            cursor: 'pointer',
+            userSelect: 'none',
+            width: 'fit-content',
+            '&:hover': {
+              opacity: 0.8,
+            },
+          }}
+          onClick={handleToggleAll}>
+          <Box
+            sx={{
+              width: 32,
+              height: 16,
+              borderRadius: 8,
+              bgcolor: allFieldsIncluded ? TEAL_500 : MOON_100,
+              position: 'relative',
+              transition: 'background-color 0.2s',
+            }}>
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                bgcolor: 'white',
+                position: 'absolute',
+                top: 2,
+                left: allFieldsIncluded ? 18 : 2,
+                transition: 'left 0.2s',
+              }}
+            />
+          </Box>
+          <Typography sx={typographyStyle}>
+            {allFieldsIncluded ? 'Deselect All' : 'Select All'}
+          </Typography>
+        </Box>
         <Box
           sx={{
             display: 'grid',
