@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 from weave.integrations.dspy.dspy_utils import (
     dspy_postprocess_inputs,
+    get_op_name_for_callback,
     serialize_dspy_objects,
 )
 from weave.trace.context import weave_client_context as weave_client_context
@@ -60,12 +61,7 @@ if not import_failed:
                     else:
                         inputs["self"]["signature"] = instance.signature
 
-            instance_class_name = instance.__class__.__name__
-            op_name = (
-                f"dspy.{instance_class_name}"
-                if "dspy." in inputs["self"]["__class__"]["module"]
-                else instance_class_name
-            )
+            op_name = get_op_name_for_callback(instance, inputs)
             self._call_map[call_id] = gc.create_call(
                 op_name,
                 inputs=dspy_postprocess_inputs(inputs),

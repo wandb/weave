@@ -30,8 +30,8 @@ interactions:
       content-type:
       - application/json
       cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -61,30 +61,27 @@ interactions:
   response:
     body:
       string: !!binary |
-        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
+        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
+        AAAA//8DAM3TPqU5CAAA
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 916e174b29234015-BOM
+      - 916e3490fc64f303-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -92,7 +89,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 24 Feb 2025 08:30:03 GMT
+      - Mon, 24 Feb 2025 08:50:01 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -103,10 +100,12 @@ interactions:
       - X-Request-ID
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '3781'
+      - '3676'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -124,7 +123,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_83b954f327e3d860f7c7c5ea148c57c6
+      - req_ccc49a2095166ac676cb57e498996e2a
     status:
       code: 200
       message: OK
@@ -139,665 +138,9 @@ interactions:
       ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
       top-level section of an article."},{"role":"user","content":"[[ ## topic ##
       ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Historical
-      Context\n\n[[ ## section_subheadings ## ]]\n[\"### Background of the World Cup\",
-      \"### Selection of Hosts\", \"### Significance of the 2002 Tournament\"]\n\nRespond
-      with the corresponding output fields, starting with the field `[[ ## reasoning
-      ## ]]`, then `[[ ## content ## ]]`, and then ending with the marker for `[[
-      ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '1216'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.63.2
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.63.2
-      x-stainless-raw-response:
-      - 'true'
-      x-stainless-read-timeout:
-      - '600.0'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.12.8
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFZNbxs3EL37VwzWh1wkQ/6Iv252gDRuDylQFy2QBMaInN1lzCUXnFnJ
-        QpD/XgwpaVeJW/QiQDvk8HHem8f5dgRQOVvdQmVaFNP1fn5/8fG6bfjxwZ9+xL/f39HmF8fd6f36
-        5ffnh2qmO+LyKxnZ7Toxses9iYuhhE0iFNKsp1cXi/Prt9eL8xzooiWv25pe5hdx3rng5meLs4v5
-        4mp+er3d3UZniKtb+HQEAPAt/yrOYOmluoXFbPelI2ZsqLrdLwKoUvT6pUJmx4JBqtkYNDEIhQz9
-        0yc4PoZEyDG40OifL18+h8eW4GyxOIP3D+/v4K+YvIV3Qw9rZEDwGGyH6RloRUHABZCWoHUsMW0g
-        1lDHKEv0fgZL0qwarl1imaRqyVvdescOAYMFE+dtZCELyw38EQdp4beYqAR/xR7DCTy2joHJaJmh
-        T3HlLDEQMwVx6GGJ5rlJcQiauo6pw7wyFoQShxSwoyAzcMH4we7AFezOoAd2TXC1MxgM6V00vEc9
-        y3/7FA0xa5TJK5pdmsgCIZ/Js4xbvy5TREsJXNd7Z0p0lzkXecQFdUz5O/cxSc7ghKHxcYkecLCO
-        gqET+DNYSsrr7gZMQJ40BYNjMGkwWg9Nh32fyDjco8z0v2Te1q0z7Q+1AYnxGXqPhvYAPHLe7roe
-        jWg9XRBK5ar5nEL4yefwORRNbUW2U9TxMXwYi/yuQNDVx8fHcD/S9mPFixYPZTgDYsGld9xS1tDp
-        zfliBi0yNCmuA0iEJZnYUc7VKSt9IhbXuDjw9K7uX28C95tSGNfRAVtkna6dHeKEFi2gT4R2A2sn
-        QUVpIQwdJT2zoy4mXHqFU2jS2npqKFhMG633hhKrxKdkvGGgVfRDlnGiWtWmaaOS4AtCvbO0076D
-        3KZb1RQpLQcB9ByLAloMjfLZR+8kM6JoOGbRaHuzwZ72Kp3q+mRH2h9F+tpeNXyILFy44un3V/tY
-        4W27nfeKz7Udy6n+QhZw0o8CnfPEEgPtPOegUFsD2rqEJeNYUahndWipCOXmcgYdPmcxy8SYMs2H
-        jOrG0ZFkHcHEIUhyxPvenmx2B52zdbbC59LZnI2JQuFmjRtVaZ9iF4VG4rb3StQo9HxKBJZEoZGW
-        AogeviRZa6ZcgXUcHae0c1YilPfoZWptiXxZ2bp+pPEVv8tcPO5r+9/vwZQgJZNpRSmfpo8Kn8CD
-        ALdxbVAbYidYJUAhkjhxKwpbP9WahbEcW+Ne5wNZsKEZtK5pvWvan1+KNwyJVDi5z9KQjSC7KXVu
-        XruA/qcGK03BJBBoDYlMTJYzDZS6DGnlaE1Ja5b5QBFt2WBoBpa6GFjS6K07p+57Qj9tyRO4s8U4
-        0PvNTNXClFYqcdVD71H0vcoVNIOXQUtIL7lTafs+xp5SedCmCjh8dDzhSsHg3rM9NWg2O2WVUurL
-        pbbAB4adBxiyxbKnA0OiemDUoSUM3m+/f99PID42fYpL3sb332sXHLdPRQg6bbDEvsrR70cAX/Kk
-        MxwML5V2RC9PEp8paMKzy/OSrxoHrDF6fnOxjUoU9GPg8u3V7JWET5YEnefJsFQZNC3Zces4Wel7
-        GyeBo8m1f4bzWu79YPV/0o8BY6gXsk99IuvM4ZXHZYm+5tfg9WX7MmfAlYrNGXoSR0mpsFTj4MtY
-        WPGGhbqn2oWGUp9cmQ3r/umqNvZycXN5eV0dfT/6BwAA//8DAKVfXyApCwAA
-    headers:
-      CF-RAY:
-      - 916e17665ed54015-BOM
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Mon, 24 Feb 2025 08:30:09 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '5781'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998737'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_52b219502070e0dffee6f7fe62be1e9e
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
-      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
-      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
-      section\n\nAll interactions will be structured in the following way, with the
-      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
-      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
-      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
-      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
-      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
-      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Tournament
-      Format\n\n[[ ## section_subheadings ## ]]\n[\"### Group Stage Structure\", \"###
-      Knockout Stage Overview\", \"### Match Scheduling\"]\n\nRespond with the corresponding
-      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
-      content ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '1195'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.63.2
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.63.2
-      x-stainless-raw-response:
-      - 'true'
-      x-stainless-read-timeout:
-      - '600.0'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.12.8
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        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
-    headers:
-      CF-RAY:
-      - 916e178d88394015-BOM
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Mon, 24 Feb 2025 08:30:13 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '4068'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998742'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_c2f5dd9e11a2ce3f34fcd7d23558d848
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
-      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
-      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
-      section\n\nAll interactions will be structured in the following way, with the
-      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
-      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
-      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
-      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
-      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
-      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Key
-      Matches\n\n[[ ## section_subheadings ## ]]\n[\"### Opening Match\", \"### Quarterfinal
-      Highlights\", \"### Final Match Analysis\"]\n\nRespond with the corresponding
-      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
-      content ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '1185'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.63.2
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.63.2
-      x-stainless-raw-response:
-      - 'true'
-      x-stainless-read-timeout:
-      - '600.0'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.12.8
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        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
-        aP740aOr4uTbyX8AAAD//wMACOl9ndALAAA=
-    headers:
-      CF-RAY:
-      - 916e17aa09d64015-BOM
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Mon, 24 Feb 2025 08:30:21 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '6911'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998745'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_c5743ecc9ce0179883a3f95d9aa0de79
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
-      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
-      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
-      section\n\nAll interactions will be structured in the following way, with the
-      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
-      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
-      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
-      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
-      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
-      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Star
-      Players\n\n[[ ## section_subheadings ## ]]\n[\"### Ronaldo''s Performance\",
-      \"### Other Notable Players\", \"### Emerging Talents\"]\n\nRespond with the
-      corresponding output fields, starting with the field `[[ ## reasoning ## ]]`,
-      then `[[ ## content ## ]]`, and then ending with the marker for `[[ ## completed
-      ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '1188'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.63.2
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.63.2
-      x-stainless-raw-response:
-      - 'true'
-      x-stainless-read-timeout:
-      - '600.0'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.12.8
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        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
-    headers:
-      CF-RAY:
-      - 916e17d79f894015-BOM
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Mon, 24 Feb 2025 08:30:31 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '9523'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998745'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_c20d193e984d8a67549b6cb11cc92b5b
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
-      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
-      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
-      section\n\nAll interactions will be structured in the following way, with the
-      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
-      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
-      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
-      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
-      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
-      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Controversies\n\n[[
-      ## section_subheadings ## ]]\n[\"### Refereeing Decisions\", \"### Disputed
-      Goals\", \"### Media Reactions\"]\n\nRespond with the corresponding output fields,
-      starting with the field `[[ ## reasoning ## ]]`, then `[[ ## content ## ]]`,
-      and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
-    headers:
-      accept:
-      - application/json
-      accept-encoding:
-      - gzip, deflate, zstd
-      connection:
-      - keep-alive
-      content-length:
-      - '1180'
-      content-type:
-      - application/json
-      cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
-      host:
-      - api.openai.com
-      user-agent:
-      - OpenAI/Python 1.63.2
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 1.63.2
-      x-stainless-raw-response:
-      - 'true'
-      x-stainless-read-timeout:
-      - '600.0'
-      x-stainless-retry-count:
-      - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.12.8
-    method: POST
-    uri: https://api.openai.com/v1/chat/completions
-  response:
-    body:
-      string: !!binary |
-        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
-    headers:
-      CF-RAY:
-      - 916e181599a94015-BOM
-      Connection:
-      - keep-alive
-      Content-Encoding:
-      - gzip
-      Content-Type:
-      - application/json
-      Date:
-      - Mon, 24 Feb 2025 08:30:37 GMT
-      Server:
-      - cloudflare
-      Transfer-Encoding:
-      - chunked
-      X-Content-Type-Options:
-      - nosniff
-      access-control-expose-headers:
-      - X-Request-ID
-      alt-svc:
-      - h3=":443"; ma=86400
-      cf-cache-status:
-      - DYNAMIC
-      openai-organization:
-      - wandb
-      openai-processing-ms:
-      - '5857'
-      openai-version:
-      - '2020-10-01'
-      strict-transport-security:
-      - max-age=31536000; includeSubDomains; preload
-      x-ratelimit-limit-requests:
-      - '30000'
-      x-ratelimit-limit-tokens:
-      - '150000000'
-      x-ratelimit-remaining-requests:
-      - '29999'
-      x-ratelimit-remaining-tokens:
-      - '149998746'
-      x-ratelimit-reset-requests:
-      - 2ms
-      x-ratelimit-reset-tokens:
-      - 0s
-      x-request-id:
-      - req_57796062f71bbf56bb941a1637e09406
-    status:
-      code: 200
-      message: OK
-- request:
-    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
-      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
-      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
-      section\n\nAll interactions will be structured in the following way, with the
-      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
-      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
-      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
-      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
-      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
-      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Impact
-      on Football\n\n[[ ## section_subheadings ## ]]\n[\"### Legacy of the 2002 World
-      Cup\", \"### Influence on Future Tournaments\", \"### Growth of Football in
-      Asia\"]\n\nRespond with the corresponding output fields, starting with the field
+      Context\n\n[[ ## section_subheadings ## ]]\n[\"### Co-hosting by South Korea
+      and Japan\", \"### Significance of the 2002 World Cup\", \"### Previous World
+      Cups\"]\n\nRespond with the corresponding output fields, starting with the field
       `[[ ## reasoning ## ]]`, then `[[ ## content ## ]]`, and then ending with the
       marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
     headers:
@@ -808,12 +151,12 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '1221'
+      - '1224'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=GlT4t6dlUCtPC3WNikttGIi7HqDxZ2tBdV0iqHn7O2Y-1740385793-1.0.1.1-Zb3.U_WZzX.QtgbDOAqMv37kkI64QLDbcjWrE1CVLq3emue.Ls4mRqDzzLZKogEoWpWcvQ7BMvidfnDJ7QHMsw;
-        _cfuvid=z9ONIXq0gSr9SGnMv.IJZFNAn0gz1SWaJtIXafNf0lc-1740385793836-0.0.1.1-604800000
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -843,37 +186,34 @@ interactions:
   response:
     body:
       string: !!binary |
-        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
-        K3OkWQ0AAA==
+        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
+        5rF23gsAAA==
     headers:
       CF-RAY:
-      - 916e183cad0d4015-BOM
+      - 916e34ab8a7bf303-BOM
       Connection:
       - keep-alive
       Content-Encoding:
@@ -881,7 +221,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 24 Feb 2025 08:30:44 GMT
+      - Mon, 24 Feb 2025 08:50:10 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -897,7 +237,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '6399'
+      - '7672'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -915,7 +255,532 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_9804d0b8ca384edbe15e1c094753bfd5
+      - req_d6c9559b597d1d6f1b7f58e77a34d69a
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
+      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
+      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
+      section\n\nAll interactions will be structured in the following way, with the
+      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
+      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
+      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
+      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Tournament
+      Format\n\n[[ ## section_subheadings ## ]]\n[\"### Qualification process\", \"###
+      Group stage structure\", \"### Knockout rounds\"]\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
+      content ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1192'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        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
+        L98sjr4f/RcAAP//AwC69RKeXwwAAA==
+    headers:
+      CF-RAY:
+      - 916e34dea8aaf303-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Feb 2025 08:50:19 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '8372'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998743'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_5ae48e6ca05e8ce9239fbdc922abdbf9
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
+      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
+      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
+      section\n\nAll interactions will be structured in the following way, with the
+      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
+      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
+      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
+      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Key
+      Matches\n\n[[ ## section_subheadings ## ]]\n[\"### Opening match\", \"### Quarter-finals\",
+      \"### Semi-finals\", \"### Final match\"]\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ##
+      content ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1188'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xWS28bRwy++1cQ60MvK0GSHdvxrSng1ukjaZ2iKOLAoGa5Wlazw80MV6oS5L8X
+        M/uSYwfoZYEdDl8fP5Lz+QQg4yK7hsxUqKZu7OzV+Zu713fhhbifwuursKSXb+0vn2z958XV+U2W
+        Rw1Z/0NGB625kbqxpCyuExtPqBStLi/PF2dXl4vlyySopSAb1TaNzs5lVrPj2WqxOp8tLmfLq167
+        EjYUsmt4fwIA8Dl9Y5yuoH+za1jkw0lNIeCGsuvxEkDmxcaTDEPgoOg0yyehEafkUujv38PpKXjC
+        II7dJv58+HDv3lUEq8ViBTe3N9/DX+JtAT+0DewxAIJFV9Tot0A7cgrsoBTRNVoLFQcVf8ghVLI3
+        GKJN19bkpQ1QUy0e15agRjUVBdAKFQw2yrsIFpToAqCX1hWgFcHGyprm8K7iAIFMRBf2nPxsKsub
+        SmFLh8FcDuyMbYvoNGpLQympJM7hY4teyc9KdmhDDoFqHn+w95j+B43Gy46TOXYhegvATiVeZA+B
+        N45LNugMJX2uGzQK4pIlldY7rMnp/N7duw7pHvoB59NT+JkO8GsXf7x2enoKb47j/nYxtmy2VICU
+        ZXT5unUEZ8s8Xc1hz1oBglaerY3GHoEBa9I9kYNXHj+xTdG/a33EEjVFf+uUvMOIOFq4Uyy4rWOp
+        /5atVFjjvNfNQRyBlF/lDCXuxLPGqvRcoKIHDlXRbGMwjZc9hRDDdW4oWxfharbsC9/9B9LehSMo
+        xX/lL58oEe10sX0XAOs1J9qogCdjketOk9XSfED890fU6CB/TBcoCbX1VECQesy3lhD5r+RCR4E4
+        BUhZeTeR/Ak2c/hNFNf2kCeBsRiercgrspuIOrmCiq6ivVQ9t3VTxUxXs0U0g24bYo4bScF6qeGP
+        WLpCehR3bGJnRsgbspaKwdbA6Mf9sK/IUzw+JM6ya8fyfWwpaCrBxoo/jCDeTfr37tY9tdk7LNHQ
+        SDdJzbNBdjELDqBcU+QZpoLOguKWApAz0kZKxmxo6M+KbDFyf3UxcD/gfvBVSM0OlYZ+WM4WAxI5
+        GGm9UjjECiEEbTsORgifQ3DPDpzE/raHOI0SG0aiNRZNCnyaIutWAW2QJw3gKbBlGuaGolE2aCG0
+        DXmObTOhejMNpI6XRxNqoNZz00FFtn1Q43RYDAj1TT708vPdPpDgUdl+JF+jO8zhdiiRPQA6ZcNN
+        GuEx10L2biw31eQ3VPSwc1wEfTFWs0UEtR9WPdgQjPhYhrVo1dH5KwbH1XOMfMmlVseZx9bOIYjl
+        gstDP1biwFbUNkDaYePGamRPvpJ2aGBsmjQuy8gJT9FZWlnfGOdp6VPRDfTjJeupbAPGRe9aa/vz
+        L+PWtrJpvKxDLx/PS3YcqoduI8cNHVSaLEm/nAB8SK+D9tHCzxovdaMPKlty0eDqxVVnL5seJZP0
+        7OpFL1VRtJPg4vwsf8bgQ0GKbMPRAyMzaCoqJtXpNYJtwXIkODlK+2k4z9keHyP/x/wkMIYapeKh
+        8VSweZzydM1TfLR969oIcwo4C+R3bOhBmXwsRUEltrZ7SmXhEJTqh5LdhnzjuXtPlc3DZWmKi8XL
+        i4ur7OTLyX8AAAD//wMAlQF8hl0KAAA=
+    headers:
+      CF-RAY:
+      - 916e35158db9f303-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Feb 2025 08:50:23 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '4492'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998745'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_df60d4853a27499373a570d32b158596
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
+      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
+      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
+      section\n\nAll interactions will be structured in the following way, with the
+      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
+      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
+      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
+      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Standout
+      Players\n\n[[ ## section_subheadings ## ]]\n[\"### Ronaldo\", \"### Zinedine
+      Zidane\", \"### Rivaldo\", \"### Other notable players\"]\n\nRespond with the
+      corresponding output fields, starting with the field `[[ ## reasoning ## ]]`,
+      then `[[ ## content ## ]]`, and then ending with the marker for `[[ ## completed
+      ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1194'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      CF-RAY:
+      - 916e35351eaef303-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Feb 2025 08:50:34 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '9967'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998743'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_88225404d25e6710b5ab483c23791dc6
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `topic`
+      (str)\n2. `section_heading` (str)\n3. `section_subheadings` (list[str])\n\nYour
+      output fields are:\n1. `reasoning` (str)\n2. `content` (str): markdown-formatted
+      section\n\nAll interactions will be structured in the following way, with the
+      appropriate values filled in.\n\n[[ ## topic ## ]]\n{topic}\n\n[[ ## section_heading
+      ## ]]\n{section_heading}\n\n[[ ## section_subheadings ## ]]\n{section_subheadings}\n\n[[
+      ## reasoning ## ]]\n{reasoning}\n\n[[ ## content ## ]]\n{content}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Draft a
+      top-level section of an article."},{"role":"user","content":"[[ ## topic ##
+      ]]\nOverview of the 2002 FIFA World Cup\n\n[[ ## section_heading ## ]]\n## Impact
+      on Football\n\n[[ ## section_subheadings ## ]]\n[\"### Legacy of the tournament\",
+      \"### Influence on future World Cups\", \"### Growth of football in Asia\"]\n\nRespond
+      with the corresponding output fields, starting with the field `[[ ## reasoning
+      ## ]]`, then `[[ ## content ## ]]`, and then ending with the marker for `[[
+      ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1216'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=2CoTFePX0r2A3h0vO3.IXvy7AAQdCLXDwkCpNPoqE.w-1740386992-1.0.1.1-PSSQ9Pgh5jjuoJk7EM5UOjlr4s3028nz25cfJb0RpCzl5eYScsuk5kgIN4ARN6e.Eij2GfwpnMe8cqNNaMhMdg;
+        _cfuvid=7jzVJAj7bsUSRaOo2Rc7ceEoNTs.GazCW5l0fYG1udY-1740386992589-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      CF-RAY:
+      - 916e3575dac2f303-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Feb 2025 08:50:39 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '5165'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998737'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_4144e402a77c7b5dd4a63519faa13803
     status:
       code: 200
       message: OK

@@ -289,7 +289,7 @@ def test_dspy_multi_stage_pipeline(client) -> None:
     assert "world cup" in article.title.lower()
 
     calls = list(client.calls())
-    assert len(calls) == 50
+    assert len(calls) == 43
 
     call = calls[0]
     assert call.started_at < call.ended_at

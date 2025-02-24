@@ -81,3 +81,12 @@ def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
         return op
 
     return wrapper
+
+
+def get_op_name_for_callback(instance: Any, inputs: dict[str, Any]) -> str:
+    instance_class_name = instance.__class__.__name__
+    return (
+        f"dspy.{instance_class_name}"
+        if "dspy." in inputs["self"]["__class__"]["module"]
+        else instance_class_name
+    )
