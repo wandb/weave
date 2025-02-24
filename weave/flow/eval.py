@@ -7,6 +7,9 @@ from typing import Any, Callable, Literal, Optional, Union
 from pydantic import PrivateAttr
 from rich import print
 from rich.console import Console
+from rich.panel import Panel
+from rich.pretty import Pretty
+from rich.progress import Progress
 from typing_extensions import Self
 
 import weave
@@ -192,7 +195,9 @@ class Evaluation(Object):
                     summary[name] = model_output_summary
         return summary
 
-    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
+    async def get_eval_results(
+        self, model: Union[Op, Model], verbose: bool = False
+    ) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
@@ -208,34 +213,47 @@ class Evaluation(Object):
                 return {self._output_key: None, "scores": {}}
             return eval_row
 
-        n_complete = 0
         dataset = self.dataset
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            if eval_row is None:
-                eval_row = {self._output_key: None, "scores": {}}
-            else:
-                eval_row["scores"] = eval_row.get("scores", {})
-            if self.scorers:
-                for scorer in self.scorers:
-                    scorer_attributes = get_scorer_attributes(scorer)
-                    scorer_name = scorer_attributes.scorer_name
-                    if scorer_name not in eval_row["scores"]:
-                        eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
+
+        n_complete = 0  # counter to track number of evaluated examples
+
+        with Progress() as progress:
+            task = progress.add_task("Evaluating examples", total=len(trial_rows))
+            async for _, eval_row in util.async_foreach(
+                trial_rows, eval_example, get_weave_parallelism()
+            ):
+                progress.update(task, advance=1)
+                n_complete += 1
+                if verbose:
+                    print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+                if eval_row is None:
+                    eval_row = {self._output_key: None, "scores": {}}
+                else:
+                    eval_row["scores"] = eval_row.get("scores", {})
+                if self.scorers:
+                    for scorer in self.scorers:
+                        scorer_attributes = get_scorer_attributes(scorer)
+                        scorer_name = scorer_attributes.scorer_name
+                        if scorer_name not in eval_row["scores"]:
+                            eval_row["scores"][scorer_name] = {}
+                eval_rows.append(eval_row)
         return EvaluationResults(rows=weave.Table(eval_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Op, Model]) -> dict:
-        eval_results = await self.get_eval_results(model)
+    async def evaluate(self, model: Union[Op, Model], verbose: bool = False) -> dict:
+        """
+        Evaluate the model on the dataset.
+
+        Args:
+            model: The model to evaluate.
+            verbose: Whether to print verbose output.
+        """
+        eval_results = await self.get_eval_results(model, verbose)
         summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+        console.print(Panel(Pretty(summary), title="Evaluation Summary", expand=True))
 
         return summary
 
