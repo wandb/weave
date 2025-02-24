@@ -16,7 +16,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
 
     Args:
         threshold (float): The threshold for the non-fluent score. Defaults to 0.5.
-        device (str): The device to use for inference. Defaults to "auto".
+        device (str): The device to use for inference. Defaults to "cpu".
 
     Note: This Scorer's `score` method expects the text to be passed as a string to its `output` parameter.
 

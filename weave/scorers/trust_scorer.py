@@ -63,7 +63,7 @@ class WeaveTrustScorerV1(weave.Scorer):
         - "low": Critical issues detected or empty input
 
     Args:
-        device (str): Device for model inference ("cpu", "cuda", "mps", "auto"). Defaults to "cpu".
+        device (str): Device for model inference ("cpu", "cuda", "mps", etc...). Defaults to "cpu".
         context_relevance_model_name_or_path (str, optional): Local path or W&B Artifact path for the context relevance model.
         hallucination_model_name_or_path (str, optional): Local path or W&B Artifact path for the hallucination model.
         toxicity_model_name_or_path (str, optional): Local path or W&B Artifact path for the toxicity model.

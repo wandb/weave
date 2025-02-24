@@ -15,8 +15,9 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
     Use wandb/coherence_scorer to check if the model output is coherent.
     Args:
-        model_name: The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
-        model_max_length: The maximum length of the model output. Defaults to 1024.
+        model_name_or_path (str): The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
+        device (str): Device for model inference ("cpu", "cuda", "mps", etc...). Defaults to "cpu".
+        model_max_length (int): The maximum length of the model output. Defaults to 1024.
 
     Example:
     >>> scorer = WeaveCoherenceScorerV1()

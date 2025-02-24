@@ -23,8 +23,8 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     and detailed span-level scores.
 
     Args:
-        model_name_or_path (str): Path or name of model weights to load
-        device (str): Device to run model on, defaults to "cpu"
+        model_name_or_path (str): The name of the context relevance scorer model to use. Defaults to `wandb/context_relevance_scorer`.
+        device (str): Device for model inference ("cpu", "cuda", "mps", etc...). Defaults to "cpu".
         threshold (float): Threshold for relevance classification, defaults to 0.55
         return_all_spans (bool): Return all spans, defaults to False
 
