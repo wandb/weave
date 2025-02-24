@@ -336,11 +336,20 @@ const CallPageInnerVertical: FC<{
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
+              icon="layout-vertical"
+              tooltip={`Switch to ${viewType === 'tree' ? 'timeline' : 'tree'} view`}
+              variant="ghost"
+              active={viewType === 'timeline'}
+              onClick={() => setViewType(viewType === 'tree' ? 'timeline' : 'tree')}
+              className="mr-4"
+            />
+            <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
+              className="mr-4"
             />
             <Button
               icon="marker"
@@ -348,14 +357,6 @@ const CallPageInnerVertical: FC<{
               variant="ghost"
               active={showFeedbackExpand ?? false}
               onClick={onToggleFeedbackExpand}
-              className="ml-4"
-            />
-            <Button
-              icon="marker"
-              tooltip={`Switch to ${viewType === 'tree' ? 'timeline' : 'tree'} view`}
-              variant="ghost"
-              active={viewType === 'timeline'}
-              onClick={() => setViewType(viewType === 'tree' ? 'timeline' : 'tree')}
               className="ml-4"
             />
           </Box>

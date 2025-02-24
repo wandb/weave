@@ -334,7 +334,7 @@ const CallTimelineView: FC<{
               display: 'flex', 
               alignItems: 'center',
               cursor: 'pointer',
-              padding: '0 24px',
+              padding: '0 20px',
               height: '100%'
             }}>
               <div style={{ 
@@ -346,7 +346,7 @@ const CallTimelineView: FC<{
                   name={expandedGroups.has(params.row.id) ? 'chevron-down' : 'chevron-next'}
                 />
               </div>
-              <span style={{ color: MOON_500 }}>{params.row.groupName} ({params.row.count})</span>
+              <span style={{ marginLeft: '8px', color: MOON_500 }}>{params.row.groupName} ({params.row.count})</span>
             </div>
           );
         }
@@ -390,8 +390,8 @@ const CallTimelineView: FC<{
             width: '100%',
             paddingTop: isNonAiCall ? '16px' : '0',
             paddingBottom: isNonAiCall ? '16px' : '0',
-            paddingLeft: isNonAiCall ? '16px' : '8px',
-            marginLeft: isNonAiCall ? '16px' : '0',
+            paddingLeft: isNonAiCall ? '21px' : '8px',
+            marginLeft: isNonAiCall ? '13px' : '0',
             position: 'relative',
             fontWeight: isFirstCall ? 600 : 'normal'
           }}>
