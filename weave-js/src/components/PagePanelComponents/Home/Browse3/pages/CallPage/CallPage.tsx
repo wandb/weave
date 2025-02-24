@@ -43,10 +43,10 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {CallTimelineView} from './CallTimelineView';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
-import {CallTimelineView} from './CallTimelineView';
 
 export const CallPage: FC<{
   entity: string;
@@ -337,10 +337,14 @@ const CallPageInnerVertical: FC<{
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-vertical"
-              tooltip={`Switch to ${viewType === 'tree' ? 'timeline' : 'tree'} view`}
+              tooltip={`Switch to ${
+                viewType === 'tree' ? 'timeline' : 'tree'
+              } view`}
               variant="ghost"
               active={viewType === 'timeline'}
-              onClick={() => setViewType(viewType === 'tree' ? 'timeline' : 'tree')}
+              onClick={() =>
+                setViewType(viewType === 'tree' ? 'timeline' : 'tree')
+              }
               className="mr-4"
             />
             <Button

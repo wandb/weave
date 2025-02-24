@@ -48,7 +48,7 @@ export const CustomGridTreeDataGroupingCell: FC<
   const {isParentRow} = row;
   const call = row.call as CallSchema | undefined;
   const apiRef = useGridApiContext();
-  
+
   const handleClick: ButtonProps['onClick'] = event => {
     if (rowNode.type !== 'group') {
       return;
@@ -64,7 +64,6 @@ export const CustomGridTreeDataGroupingCell: FC<
     event.stopPropagation();
   };
 
-  const hasCountRow = apiRef.current.getRowNode('HIDDEN_SIBLING_COUNT') != null;
   const isLastChild = useMemo(() => {
     if (rowNode.parent == null) {
       return false;
@@ -81,7 +80,7 @@ export const CustomGridTreeDataGroupingCell: FC<
     }
     const lastChildId = childrenIds[childrenIds.length - 1];
     return rowNode.id === lastChildId;
-  }, [apiRef, rowNode.id, rowNode.parent, hasCountRow]);
+  }, [apiRef, rowNode.id, rowNode.parent]);
 
   const tooltip = isParentRow
     ? 'This is the parent of the currently viewed call. Click to view.'
@@ -114,18 +113,28 @@ export const CustomGridTreeDataGroupingCell: FC<
                 whiteSpace: 'nowrap',
                 flex: '1 1 auto',
               }}>
-              {props.displayName ?? call.displayName ?? opNiceName(call.spanName)}
+              {props.displayName ??
+                call.displayName ??
+                opNiceName(call.spanName)}
             </Box>
           </Box>
           {call.traceCall?.summary && (
-            <Box sx={{ display: 'flex', alignItems: 'center', marginLeft: '-4px', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                marginLeft: '-4px',
+                gap: '8px',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}>
               <TraceCostStats
                 usageData={call.traceCall.summary.usage}
                 costData={call.traceCall.summary.weave?.costs}
                 latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
                 costLoading={props.costLoading}
               />
-              <Box sx={{ marginLeft: 'auto', marginRight: '16px' }}>
+              <Box sx={{marginLeft: 'auto', marginRight: '16px'}}>
                 <StatusChip value={row.status} iconOnly />
               </Box>
             </Box>
@@ -175,7 +184,9 @@ export const CustomGridTreeDataGroupingCell: FC<
                     width: '100%',
                     height: '100%',
                     borderRight:
-                      isLastChild && i === rowNode.depth - 1 ? '' : BORDER_STYLE,
+                      isLastChild && i === rowNode.depth - 1
+                        ? ''
+                        : BORDER_STYLE,
                   }}></Box>
               </Box>
             );
@@ -204,7 +215,9 @@ export const CustomGridTreeDataGroupingCell: FC<
                   marginTop: '8px',
                 }}>
                 <Icon
-                  name={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
+                  name={
+                    rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'
+                  }
                 />
               </MuiButton>
             ) : (
