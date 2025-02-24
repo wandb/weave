@@ -48,6 +48,7 @@ export const CustomGridTreeDataGroupingCell: FC<
   const {isParentRow} = row;
   const call = row.call as CallSchema | undefined;
   const apiRef = useGridApiContext();
+  
   const handleClick: ButtonProps['onClick'] = event => {
     if (rowNode.type !== 'group') {
       return;
@@ -80,7 +81,6 @@ export const CustomGridTreeDataGroupingCell: FC<
     }
     const lastChildId = childrenIds[childrenIds.length - 1];
     return rowNode.id === lastChildId;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, rowNode.id, rowNode.parent, hasCountRow]);
 
   const tooltip = isParentRow
@@ -105,6 +105,7 @@ export const CustomGridTreeDataGroupingCell: FC<
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
+              flex: 1,
             }}>
             <Box
               sx={{
@@ -117,14 +118,16 @@ export const CustomGridTreeDataGroupingCell: FC<
             </Box>
           </Box>
           {call.traceCall?.summary && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <StatusChip value={row.status} iconOnly />
+            <Box sx={{ display: 'flex', alignItems: 'center', marginLeft: '-4px', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
               <TraceCostStats
                 usageData={call.traceCall.summary.usage}
                 costData={call.traceCall.summary.weave?.costs}
                 latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
                 costLoading={props.costLoading}
               />
+              <Box sx={{ marginLeft: 'auto', marginRight: '16px' }}>
+                <StatusChip value={row.status} iconOnly />
+              </Box>
             </Box>
           )}
         </>
@@ -134,7 +137,7 @@ export const CustomGridTreeDataGroupingCell: FC<
     </CallOrCountRow>
   );
 
-  const box = (
+  const boxContent = (
     <CursorBox
       $isClickable={!isHiddenCount}
       sx={{
@@ -233,8 +236,8 @@ export const CustomGridTreeDataGroupingCell: FC<
   );
 
   return tooltip ? (
-    <Tooltip content={tooltip} noTriggerWrap trigger={box} />
+    <Tooltip content={tooltip} noTriggerWrap trigger={boxContent} />
   ) : (
-    box
+    boxContent
   );
 };
