@@ -79,7 +79,10 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.llm_completion import lite_llm_completion
+from weave.trace_server.llm_completion import (
+    lite_llm_completion,
+    CUSTOM_PROVIDER_PREFIX,
+)
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
@@ -1508,18 +1511,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CompletionsCreateRes:
         model_name = req.inputs.model
         model_info = self._model_to_provider_info_map.get(model_name)
-        if not model_info:
+        if not model_info and CUSTOM_PROVIDER_PREFIX not in model_name:
             raise InvalidRequest(f"No model info found for model {model_name}")
         secret_fetcher = _secret_fetcher_context.get()
         if not secret_fetcher:
             raise InvalidRequest(
                 f"No secret fetcher found, cannot fetch API key for model {model_name}"
             )
-        secret_name = model_info.get("api_key_name")
+        secret_name = (
+            model_info.get("api_key_name") if model_info else "ANTHROPIC_API_KEY"
+        )
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        provider = model_info.get("litellm_provider")
+        provider = model_info.get("litellm_provider") if model_info else "openai"
         if not api_key and provider != "bedrock" and provider != "bedrock_converse":
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",

@@ -1,0 +1,49 @@
+<mxfile host="65bd71144e">
+    <diagram id="yDT9HqhdNcUJ5kFNPOZ4" name="Page-1">
+        <mxGraphModel dx="621" dy="822" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="10" style="edgeStyle=none;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;fontSize=16;" edge="1" parent="1" source="2" target="7">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.012;entryY=0.556;entryDx=0;entryDy=0;entryPerimeter=0;fontSize=16;" edge="1" parent="1" source="2" target="6">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" style="edgeStyle=none;html=1;fontSize=16;" edge="1" parent="1" source="2" target="13">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="&lt;u&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Provider&lt;/font&gt;&lt;/b&gt;&lt;/u&gt;&lt;br&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; name: str&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; base_url: str&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp; &amp;nbsp; api_key_name: str&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; description: Optional[str] = None&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; extra_headers: Dict[str, str] = {}&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; return_type: ReturnType = ReturnType.OPENAI&lt;/div&gt;" style="whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=6;" vertex="1" parent="1">
+                    <mxGeometry x="910" y="280" width="280" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" style="edgeStyle=none;html=1;entryX=0.75;entryY=1;entryDx=0;entryDy=0;fontSize=16;" edge="1" parent="1" source="6" target="7">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="&lt;span style=&quot;&quot;&gt;&lt;b style=&quot;text-decoration-line: underline;&quot;&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;LLMModel&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; name: str&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; max_tokens: int&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; provider: base_object_def.RefStr&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; extra_headers: Dict[str, str] = {}&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; cost: CostConfig = CostConfig()&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; return_type: Optional[ReturnType]&amp;nbsp;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; mode: ModelMode = ModelMode.CHAT&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; default_params: ModelParams = ModelParams()&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; prompt: Optional[base_object_def.RefStr] = None&lt;/div&gt;&lt;/span&gt;" style="whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=6;" vertex="1" parent="1">
+                    <mxGeometry x="1275" y="250" width="420" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="&lt;u&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;PlaygroundProviderConfig&lt;/font&gt;&lt;/b&gt;&lt;/u&gt;&lt;br&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; name: str&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp;&amp;nbsp;&lt;span style=&quot;background-color: initial;&quot;&gt;provider: Optional[base_object_def.RefStr] = none&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; models: list[base_object_def.RefStr]&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp; &amp;nbsp; hidden_models: list[base_object_def.RefStr] = []&lt;/span&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=6;" vertex="1" parent="1">
+                    <mxGeometry x="970" y="70" width="310" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" style="edgeStyle=none;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;fontSize=16;" edge="1" parent="1" source="8" target="6">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="&lt;u&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Prompt&lt;/font&gt;&lt;/b&gt;&lt;/u&gt;&lt;br&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp;&lt;/div&gt;" style="whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=6;" vertex="1" parent="1">
+                    <mxGeometry x="1330" y="540" width="310" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="&lt;span style=&quot;&quot;&gt;&lt;b style=&quot;font-size: 16px;&quot;&gt;&lt;u&gt;LLMScorer&lt;br&gt;&lt;/u&gt;&lt;/b&gt;&lt;/span&gt;&lt;font size=&quot;1&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;client: LLM_clients | base_object_def.RefStr&lt;/span&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&amp;nbsp; &amp;nbsp; model_id: string&lt;/font&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;br&gt;&lt;/span&gt;" style="whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=6;" vertex="1" parent="1">
+                    <mxGeometry x="895" y="540" width="310" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="LLMScorer currently has client + model_id.&lt;br&gt;My proposal is to add support for provider + model_id.&lt;br&gt;This allows for scorers to be ran on custom providers&lt;br&gt;Would also need to update the create function to accept a provider instead of a client" style="text;strokeColor=none;align=left;fillColor=none;html=1;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="895" y="630" width="390" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="This is used for&amp;nbsp; playground LLM dropdown.&lt;br&gt;This can also be used to configure our existing non custom providers, so we dont show a bunch of useless models" style="text;strokeColor=none;align=left;fillColor=none;html=1;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="970" width="310" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="This adds funcationality to save &lt;br&gt;- default params&lt;br&gt;- different configs of the same model&lt;br&gt;- custom LLM Models to different providers" style="text;strokeColor=none;align=left;fillColor=none;html=1;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="1360" y="160" width="310" height="80" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
