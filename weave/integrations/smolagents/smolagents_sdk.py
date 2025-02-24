@@ -2,8 +2,8 @@ import importlib
 from typing import Any, Callable, Optional, Union
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.serialize import dictify
 
 _smolagents_patcher: Optional[MultiPatcher] = None
