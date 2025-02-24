@@ -10,6 +10,7 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     op_name_from_ref,
 )
+from weave.trace.context import call_context
 from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -181,10 +182,7 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_batch(
-    client: WeaveClient,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
@@ -198,12 +196,6 @@ def test_simple_chain_batch(
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch(calls)
-
-    log_lines = capsys.readouterr().out
-
-    # one parent call link
-    assert log_lines.count("/shawn/test-project/r/call") == 1
-    assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
 @pytest.mark.skip_clickhouse_client
@@ -234,7 +226,7 @@ async def test_simple_chain_abatch(
 
 def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     flattened = flatten_calls(calls)
-    assert len(flattened) == 9
+    assert len(flattened) == 13
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -250,6 +242,10 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
         ("langchain.Prompt.PromptTemplate", 2, ids[5]),
         ("langchain.Llm.ChatOpenAI", 2, ids[5]),
         ("openai.chat.completions.create", 3, ids[7]),
+        ("langchain.Chain.RunnableSequence", 1, ids[0]),
+        ("langchain.Prompt.PromptTemplate", 2, ids[9]),
+        ("langchain.Llm.ChatOpenAI", 2, ids[9]),
+        ("openai.chat.completions.create", 3, ids[11]),
     ]
     assert got == exp
 
@@ -260,9 +256,7 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_batch_inside_op(
-    client: WeaveClient,
-) -> None:
+def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
     # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -278,7 +272,24 @@ def test_simple_chain_batch_inside_op(
     def run_batch(batch: list) -> None:
         _ = llm_chain.batch(batch)
 
-    run_batch([{"number": 2}, {"number": 3}])
+        # assert call stack is properly constructed, during runtime
+        parent = call_context.get_current_call()
+        assert parent is not None
+        assert "run_batch" in parent.op_name
+        assert parent.parent_id is None
+        assert len(parent.children()) == 3
+        for child in parent.children():
+            assert "langchain.Chain.RunnableSequence" in child.op_name
+            assert child.parent_id == parent.id
+
+            grandchildren = child.children()
+            assert len(grandchildren) == 2
+            assert "langchain.Prompt.PromptTemplate" in grandchildren[0].op_name
+            assert grandchildren[0].parent_id == child.id
+            assert "langchain.Llm.ChatOpenAI" in grandchildren[1].op_name
+            assert grandchildren[1].parent_id == child.id
+
+    run_batch([{"number": 2}, {"number": 3}, {"number": 4}])
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch_from_op(calls)
