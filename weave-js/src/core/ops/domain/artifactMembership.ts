@@ -109,14 +109,12 @@ export const opArtifactMembershipFile = makeStandardOp({
     forwardOp,
     context
   ) => {
-    console.log('inside w0 op');
     if (artifactMembership == null) {
       throw new Error('opArtifactMembershipFile missing artifactMembership');
     }
     if (artifactMembership.artifact == null) {
       throw new Error('opArtifactMembershipFile missing artifact');
     }
-    console.log(artifactMembership.artifact, path);
     try {
       const result = await context.backend.getArtifactFileMetadata(
         artifactMembership.artifact.id,
