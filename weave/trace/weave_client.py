@@ -305,7 +305,6 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
