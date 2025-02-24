@@ -308,6 +308,9 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  useTableCreate: () => (
+    table: traceServerClientTypes.TableCreateReq
+  ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
