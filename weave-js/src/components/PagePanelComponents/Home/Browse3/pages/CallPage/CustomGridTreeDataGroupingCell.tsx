@@ -41,6 +41,7 @@ export const CustomGridTreeDataGroupingCell: FC<
     costLoading: boolean;
     showTreeControls?: boolean;
     style?: React.CSSProperties;
+    displayName?: string | React.ReactNode;
   }
 > = props => {
   const {id, field, rowNode, row} = props;
@@ -118,7 +119,7 @@ export const CustomGridTreeDataGroupingCell: FC<
                 whiteSpace: 'nowrap',
                 flex: '1 1 auto',
               }}>
-              {call.displayName ?? opNiceName(call.spanName)}
+              {props.displayName ?? call.displayName ?? opNiceName(call.spanName)}
             </Box>
           </Box>
           {call.traceCall?.summary && (

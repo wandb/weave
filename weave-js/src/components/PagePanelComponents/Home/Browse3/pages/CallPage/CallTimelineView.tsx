@@ -15,6 +15,89 @@ import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {CallStatusType} from '../common/StatusChip';
 import {Icon} from '../../../../../Icon';
 import {MOON_500} from '../../../../../../common/css/color.styles';
+import {isMessage} from '../ChatView/hooks';
+import {useWFHooks} from '../wfReactInterface/context';
+
+// Helper function to get the last message content
+const getLastMessageContent = (call: CallSchema): { userMessage: string | null; aiResponse: string | null } => {
+  console.log('Getting last message from call:', {
+    hasTraceCall: !!call.traceCall,
+    hasInputs: !!call.traceCall?.inputs,
+    inputsKeys: call.traceCall?.inputs ? Object.keys(call.traceCall.inputs) : [],
+    rawSpanAttributes: call.rawSpan?.attributes,
+    output: call.traceCall?.output
+  });
+
+  // Try different possible locations for messages
+  const messages = 
+    call.traceCall?.inputs?.messages || // Direct messages array
+    call.traceCall?.inputs?.input?.messages || // Nested in input object
+    call.rawSpan?.attributes?.messages || // In span attributes
+    (call.traceCall?.inputs?.input && JSON.parse(call.traceCall.inputs.input).messages); // JSON string in input
+
+  if (!messages || !Array.isArray(messages)) {
+    return { userMessage: null, aiResponse: null };
+  }
+
+  console.log('Found messages array:', messages);
+
+  let userMessage: string | null = null;
+  let aiResponse: string | null = null;
+
+  // Find the last user message
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (isMessage(message) && message.role === 'user' && typeof message.content === 'string' && !userMessage) {
+      userMessage = message.content;
+      break;
+    }
+  }
+
+  // Try to get AI response from different possible locations
+  aiResponse = (() => {
+    // Try to get from output choices first
+    const output = call.traceCall?.output as { choices?: Array<{ message?: { content?: string }, text?: string }> } | undefined;
+    if (output?.choices && Array.isArray(output.choices) && output.choices.length > 0) {
+      const choice = output.choices[0];
+      if (choice?.message?.content) {
+        return choice.message.content;
+      }
+      if (typeof choice?.text === 'string') {
+        return choice.text;
+      }
+    }
+
+    // If no choices, try to get from messages array
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (isMessage(message) && message.role === 'assistant' && typeof message.content === 'string') {
+        return message.content;
+      }
+    }
+
+    return null;
+  })();
+
+  return { userMessage, aiResponse };
+};
+
+// Helper function to check if a call is an AI call
+const isAICall = (call: CallSchema): boolean => {
+  const callName = call.spanName || call.rawSpan?.name;
+  console.log('Checking call:', {
+    spanName: call.spanName,
+    rawSpanName: call.rawSpan?.name,
+    isAI: aiCallTypes.includes(callName)
+  });
+  return aiCallTypes.includes(callName);
+};
+
+// Define AI call types
+const aiCallTypes = [
+  'openai.chat.completions.create',
+  'anthropic.Messages.create',
+  'anthropic.AsyncMessages.create'
+];
 
 // Import the types from CallTraceView
 type GroupHeaderRow = {
@@ -67,13 +150,7 @@ export const CallTimelineView: FC<{
   const currentRouter = useWeaveflowCurrentRouteContext();
   const [suppressScroll, setSuppressScroll] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set<string>());
-
-  // Define AI call types
-  const aiCallTypes = [
-    'openai.chat.completions.create',
-    'anthropic.Messages.create',
-    'anthropic.AsyncMessages.create'
-  ];
+  const {useCall} = useWFHooks();
 
   // Get the root call ID outside of useMemo
   const rootCallId = useMemo(() => {
@@ -83,6 +160,33 @@ export const CallTimelineView: FC<{
     );
     return sortedCalls.length > 0 ? sortedCalls[0].id : null;
   }, [rows]);
+
+  // Get all AI call IDs
+  const aiCallIds = useMemo(() => {
+    return rows
+      .filter(row => 'call' in row && isAICall((row as CallRow).call))
+      .map(row => (row as CallRow).call.callId);
+  }, [rows]);
+
+  // Fetch complete data for all AI calls
+  const aiCallsData = aiCallIds.map(callId =>
+    useCall({
+      entity: call.entity,
+      project: call.project,
+      callId,
+    })
+  );
+
+  // Create a map of complete call data
+  const completeCallDataMap = useMemo(() => {
+    const map = new Map<string, CallSchema>();
+    aiCallsData.forEach((callData, index) => {
+      if (!callData.loading && callData.result) {
+        map.set(aiCallIds[index], callData.result);
+      }
+    });
+    return map;
+  }, [aiCallsData, aiCallIds]);
 
   // Group and sort rows
   const groupedRows = useMemo(() => {
@@ -118,7 +222,7 @@ export const CallTimelineView: FC<{
             // Add group header at top level
             finalRows.push({
               id: groupId,
-              groupName: 'Other Calls',
+              groupName: 'Tools and functions',
               count: currentGroup.length,
               hierarchy: [groupId],
               isGroupHeader: true
@@ -206,6 +310,32 @@ export const CallTimelineView: FC<{
         
         // Check if this is a non-AI call (child of a group)
         const isNonAiCall = params.row.hierarchy.length > 1;
+
+        // Get the display name for AI calls
+        const displayName = (() => {
+          if ('call' in params.row) {
+            const call = params.row.call;
+            if (isAICall(call)) {
+              // Use the complete call data if available
+              const completeCallData = completeCallDataMap.get(call.callId);
+              if (completeCallData) {
+                const { userMessage, aiResponse } = getLastMessageContent(completeCallData);
+                if (userMessage) {
+                  const truncatedUser = userMessage.length > 50 ? userMessage.substring(0, 47) + '...' : userMessage;
+                  const truncatedAI = aiResponse && aiResponse.length > 50 ? aiResponse.substring(0, 47) + '...' : aiResponse;
+                  
+                  return (
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                      <div style={{fontSize: '14px', color: '#666'}}>Q: {truncatedUser}</div>
+                      {aiResponse && <div style={{fontSize: '14px'}}>A: {truncatedAI}</div>}
+                    </div>
+                  );
+                }
+              }
+            }
+          }
+          return undefined;
+        })();
         
         return (
           <div style={{
@@ -231,12 +361,13 @@ export const CallTimelineView: FC<{
               costLoading={costLoading}
               showTreeControls={false}
               style={{ paddingTop: 0 }}
+              displayName={displayName}
             />
           </div>
         );
       },
     }),
-    [costLoading, expandedGroups, rootCallId]
+    [costLoading, expandedGroups, rootCallId, aiCallTypes, completeCallDataMap]
   );
 
   // Handle row clicks including group headers
@@ -362,7 +493,7 @@ export const CallTimelineView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 64)}
+          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 84)}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}
