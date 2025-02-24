@@ -139,6 +139,35 @@ const CallTimeline = styled.div`
 `;
 CallTimeline.displayName = 'S.CallTimeline';
 
+const QAContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0px 4px;
+`;
+
+const MessageContainer = styled.div`
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 8px;
+`;
+
+const QuestionContainer = styled(MessageContainer)`
+  color: #fff;
+  background-color: #155B69;
+  margin-left: auto;
+`;
+
+const AnswerContainer = styled(MessageContainer)`
+  background-color: #f0f0f0;
+  margin-right: auto;
+`;
+
 export const CallTimelineView: FC<{
   call: CallSchema;
   selectedCall: CallSchema;
@@ -325,10 +354,10 @@ export const CallTimelineView: FC<{
                   const truncatedAI = aiResponse && aiResponse.length > 50 ? aiResponse.substring(0, 47) + '...' : aiResponse;
                   
                   return (
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                      <div style={{fontSize: '14px', color: '#666'}}>Q: {truncatedUser}</div>
-                      {aiResponse && <div style={{fontSize: '14px'}}>A: {truncatedAI}</div>}
-                    </div>
+                    <QAContainer>
+                      <QuestionContainer>{truncatedUser}</QuestionContainer>
+                      {aiResponse && <AnswerContainer>{truncatedAI}</AnswerContainer>}
+                    </QAContainer>
                   );
                 }
               }
@@ -493,7 +522,7 @@ export const CallTimelineView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 84)}
+          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 104)}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}
