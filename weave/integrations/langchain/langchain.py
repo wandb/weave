@@ -56,7 +56,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 

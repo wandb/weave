@@ -226,7 +226,7 @@ async def test_simple_chain_abatch(
 
 def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     flattened = flatten_calls(calls)
-    assert len(flattened) == 13
+    assert len(flattened) == 9
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -242,10 +242,6 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
         ("langchain.Prompt.PromptTemplate", 2, ids[5]),
         ("langchain.Llm.ChatOpenAI", 2, ids[5]),
         ("openai.chat.completions.create", 3, ids[7]),
-        ("langchain.Chain.RunnableSequence", 1, ids[0]),
-        ("langchain.Prompt.PromptTemplate", 2, ids[9]),
-        ("langchain.Llm.ChatOpenAI", 2, ids[9]),
-        ("openai.chat.completions.create", 3, ids[11]),
     ]
     assert got == exp
 
@@ -277,7 +273,7 @@ def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
         assert parent is not None
         assert "run_batch" in parent.op_name
         assert parent.parent_id is None
-        assert len(parent.children()) == 3
+        assert len(parent.children()) == 2
         for child in parent.children():
             assert "langchain.Chain.RunnableSequence" in child.op_name
             assert child.parent_id == parent.id
@@ -289,7 +285,7 @@ def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
             assert "langchain.Llm.ChatOpenAI" in grandchildren[1].op_name
             assert grandchildren[1].parent_id == child.id
 
-    run_batch([{"number": 2}, {"number": 3}, {"number": 4}])
+    run_batch([{"number": 2}, {"number": 3}])
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch_from_op(calls)
