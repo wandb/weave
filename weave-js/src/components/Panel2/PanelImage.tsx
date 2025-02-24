@@ -1,10 +1,7 @@
 import {BoundingBoxSliderControl} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {
-  Node,
   opAssetArtifactVersion,
-  opGetRunTag,
-  opRunConfig,
   replaceInputVariables,
   WBImage,
 } from '@wandb/weave/core';
@@ -35,42 +32,14 @@ type PanelImageProps = Panel2.PanelProps<
   PanelImageConfigType
 >;
 
-const useClassLabels = (input: Node<typeof inputType>) => {
-  const {loading: runConfigLoading} = CGReact.useNodeValue(
-    opRunConfig({run: opGetRunTag({obj: input})})
-  );
-
-  const {loading: runTagLoading, result: runTag} = CGReact.useNodeValue(
-    opGetRunTag({obj: input})
-  );
-
-  return useMemo(() => {
-    if (!(runConfigLoading || runTagLoading) && runTag != null) {
-      try {
-        const configSubset: {[key: string]: any} = JSON.parse(
-          runTag.configSubset
-        );
-        return _.get(configSubset, '_wandb.value.mask/class_labels', {});
-      } catch (error) {
-        console.error('Failed to parse config subset:', error);
-        return {};
-      }
-    }
-    return {};
-  }, [runTag, runTagLoading, runConfigLoading]);
-};
-
 const PanelImageConfig: FC<PanelImageProps> = ({
   config,
   updateConfig,
   input,
 }) => {
-  const classLabels = useClassLabels(input);
-
   const {classSets, controls} = Controls.useImageControls(
     input.type,
-    config?.overlayControls,
-    classLabels
+    config?.overlayControls
   );
   const updatedConfig = useMemo(() => {
     if (controls === config?.overlayControls) {
@@ -139,17 +108,11 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
 
   const image: WBImage = nodeValueQuery.result;
 
-  const classLabels = useClassLabels(inputNode);
-
   const {
     maskControls: mergedMaskControls,
     boxControls: mergedBoxControls,
     classSets,
-  } = Controls.useImageControls(
-    inputNode.type,
-    config?.overlayControls,
-    classLabels
-  );
+  } = Controls.useImageControls(inputNode.type, config?.overlayControls);
 
   const {imageBoxes, imageMasks, boxControls, maskControls} = useMemo(() => {
     const knownBoxKeys = image?.boxes != null ? _.keys(image.boxes) : [];
