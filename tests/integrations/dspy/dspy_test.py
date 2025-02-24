@@ -226,3 +226,72 @@ def test_dspy_information_extraction_module(client) -> None:
         call.inputs["self"]["signature"]["description"]
         == "Extract structured information from text."
     )
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_multi_stage_pipeline(client) -> None:
+    import dspy
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        ),
+        callbacks=[WeaveCallback()],
+    )
+
+    class Outline(dspy.Signature):
+        """Outline a thorough overview of a topic."""
+
+        topic: str = dspy.InputField()
+        title: str = dspy.OutputField()
+        sections: list[str] = dspy.OutputField()
+        section_subheadings: dict[str, list[str]] = dspy.OutputField(
+            desc="mapping from section headings to subheadings"
+        )
+
+    class DraftSection(dspy.Signature):
+        """Draft a top-level section of an article."""
+
+        topic: str = dspy.InputField()
+        section_heading: str = dspy.InputField()
+        section_subheadings: list[str] = dspy.InputField()
+        content: str = dspy.OutputField(desc="markdown-formatted section")
+
+    class DraftArticle(dspy.Module):
+        def __init__(self):
+            self.build_outline = dspy.ChainOfThought(Outline)
+            self.draft_section = dspy.ChainOfThought(DraftSection)
+
+        def forward(self, topic):
+            outline = self.build_outline(topic=topic)
+            sections = []
+            for heading, subheadings in outline.section_subheadings.items():
+                section, subheadings = (
+                    f"## {heading}",
+                    [f"### {subheading}" for subheading in subheadings],
+                )
+                section = self.draft_section(
+                    topic=outline.title,
+                    section_heading=section,
+                    section_subheadings=subheadings,
+                )
+                sections.append(section.content)
+            return dspy.Prediction(title=outline.title, sections=sections)
+
+    draft_article = DraftArticle()
+    article = draft_article(topic="World Cup 2002")
+    assert "world cup" in article.title.lower()
+
+    calls = list(client.calls())
+    assert len(calls) == 50
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "DraftArticle"
