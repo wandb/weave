@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class LiteLLMScorer(weave.Scorer):
-    """Wrapper around litellm's acompletion function."""
+    """Wrapper around litellm's functions."""
 
     model_id: str = Field(
         description="The model to use, check https://docs.litellm.ai/docs/providers for supported models"
