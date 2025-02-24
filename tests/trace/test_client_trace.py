@@ -3355,4 +3355,21 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     assert res[0].inputs["param"]["value1"] == "hello"
 
     # Does the query return the output?
+    with pytest.raises(TypeError):
+        # There will be no output because clickhouse hasn't merged the inputs and
+        # output yet
+        assert res[0].output["d"] == 5
+
+    # insert some more calls to encourage clickhouse to merge
+
+    @weave.op
+    def test():
+        return 1
+
+    test()
+    test()
+    test()
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
     assert res[0].output["d"] == 5
