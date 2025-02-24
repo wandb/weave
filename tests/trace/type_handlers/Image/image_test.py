@@ -186,6 +186,7 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
+@pytest.mark.skip("Temporarily skip live tests")
 @pytest.mark.asyncio
 async def test_many_images_will_consistently_log():
     # This test is a bit strange -- I can't get the issue to repro inside pytest, but
