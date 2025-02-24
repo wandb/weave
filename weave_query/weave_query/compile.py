@@ -30,6 +30,7 @@ from weave_query import (
 )
 from weave_query.language_features.tagging import tagged_value_type_helpers
 from weave_query.op_def import OpDef
+from weave_query._dict_utils import unescape_dots
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -464,7 +465,7 @@ def compile_apply_column_pushdown(
                 )
             if "run-history" in node.from_op.name:
                 history_cols = list(run_cols.keys())
-
+                history_cols = [unescape_dots(hc) for hc in history_cols]
                 if len(history_cols) > 0:
                     return graph.OutputNode(
                         node.type,
