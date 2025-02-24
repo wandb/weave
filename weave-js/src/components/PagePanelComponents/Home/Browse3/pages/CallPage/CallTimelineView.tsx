@@ -4,7 +4,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState, useRef} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -167,7 +167,19 @@ const AnswerContainer = styled(MessageContainer)`
   margin-right: auto;
 `;
 
-export const CallTimelineView: FC<{
+// Create a wrapper component that handles remounting
+const CallTimelineWrapper: FC<{
+  call: CallSchema;
+  selectedCall: CallSchema;
+  rows: Row[];
+  costLoading: boolean;
+}> = (props) => {
+  // Use the trace ID as the key to force remount when it changes
+  return <CallTimelineView key={props.call.traceId} {...props} />;
+};
+
+// Main component implementation
+const CallTimelineView: FC<{
   call: CallSchema;
   selectedCall: CallSchema;
   rows: Row[];
@@ -180,24 +192,20 @@ export const CallTimelineView: FC<{
   const [expandedGroups, setExpandedGroups] = useState(new Set<string>());
   const {useCall} = useWFHooks();
 
-  // Get the root call ID outside of useMemo
-  const rootCallId = useMemo(() => {
-    const callRows = rows.filter(row => 'call' in row) as CallRow[];
-    const sortedCalls = _.sortBy(callRows, 
-      row => row.call.rawSpan.start_time_ms
-    );
-    return sortedCalls.length > 0 ? sortedCalls[0].id : null;
-  }, [rows]);
+  // Ensure we have valid rows
+  const safeRows = useMemo(() => rows || [], [rows]);
 
   // Get all AI call IDs
   const aiCallIds = useMemo(() => {
-    return rows
-      .filter(row => 'call' in row && isAICall((row as CallRow).call))
-      .map(row => (row as CallRow).call.callId);
-  }, [rows]);
+    if (!Array.isArray(safeRows)) return [];
+    return safeRows
+      .filter(row => row && 'call' in row && (row as CallRow).call && isAICall((row as CallRow).call))
+      .map(row => (row as CallRow).call.callId)
+      .filter(Boolean);
+  }, [safeRows]);
 
   // Fetch complete data for all AI calls
-  const aiCallsData = aiCallIds.map(callId =>
+  const aiCallResults = aiCallIds.map(callId => 
     useCall({
       entity: call.entity,
       project: call.project,
@@ -208,46 +216,48 @@ export const CallTimelineView: FC<{
   // Create a map of complete call data
   const completeCallDataMap = useMemo(() => {
     const map = new Map<string, CallSchema>();
-    aiCallsData.forEach((callData, index) => {
-      if (!callData.loading && callData.result) {
+    if (!Array.isArray(aiCallResults)) return map;
+    aiCallResults.forEach((callData, index) => {
+      if (!callData?.loading && callData?.result && aiCallIds[index]) {
         map.set(aiCallIds[index], callData.result);
       }
     });
     return map;
-  }, [aiCallsData, aiCallIds]);
+  }, [aiCallResults, aiCallIds]);
 
-  // Group and sort rows
-  const groupedRows = useMemo(() => {
-    const callRows = rows.filter(row => 'call' in row) as CallRow[];
-    
-    // First, sort all calls by start time
-    const sortedCalls = _.sortBy(callRows, 
-      row => row.call.rawSpan.start_time_ms
-    );
+  // Process rows into groups
+  const processedRows = useMemo(() => {
+    if (!Array.isArray(safeRows)) return [];
 
-    // Initialize arrays
-    let currentGroup: CallRow[] = [];
+    const validRows = safeRows.filter(row => 
+      row && 'call' in row && row.call?.rawSpan?.start_time_ms != null
+    ) as CallRow[];
+
+    const sortedCalls = _.sortBy(validRows, row => row.call.rawSpan.start_time_ms);
+    if (sortedCalls.length === 0) return [];
+
     const finalRows: Row[] = [];
+    let currentGroup: CallRow[] = [];
+    const rootCall = sortedCalls[0];
 
-    // Always add the first call at the top if it exists
-    if (sortedCalls.length > 0) {
-      const rootCall = sortedCalls[0];
+    // Add root call
+    if (rootCall && rootCall.id) {
       finalRows.push({
         ...rootCall,
         hierarchy: [rootCall.id]
       });
 
       // Process remaining calls
-      sortedCalls.slice(1).forEach(row => {
-        const isAiCall = aiCallTypes.includes(row.call.spanName) || 
-                        aiCallTypes.includes(row.call.rawSpan.name);
+      for (const row of sortedCalls.slice(1)) {
+        if (!row?.call?.spanName && !row?.call?.rawSpan?.name) continue;
+
+        const isAiCall = (row.call.spanName && aiCallTypes.includes(row.call.spanName)) || 
+                        (row.call.rawSpan.name && aiCallTypes.includes(row.call.rawSpan.name));
 
         if (isAiCall) {
-          // If we have accumulated non-AI calls, create a group
+          // Handle existing group if any
           if (currentGroup.length > 0) {
             const groupId = `non-ai-group-${finalRows.length}`;
-            
-            // Add group header at top level
             finalRows.push({
               id: groupId,
               groupName: 'Tools and functions',
@@ -256,31 +266,33 @@ export const CallTimelineView: FC<{
               isGroupHeader: true
             });
 
-            // Add non-AI calls under the group
+            // Add group items
             currentGroup.forEach(call => {
-              finalRows.push({
-                ...call,
-                hierarchy: [groupId, call.id]
-              });
+              if (call?.id) {
+                finalRows.push({
+                  ...call,
+                  hierarchy: [groupId, call.id]
+                });
+              }
             });
-            
             currentGroup = [];
           }
 
-          // Add AI call at top level
-          finalRows.push({
-            ...row,
-            hierarchy: [row.id]
-          });
+          // Add AI call
+          if (row.id) {
+            finalRows.push({
+              ...row,
+              hierarchy: [row.id]
+            });
+          }
         } else {
           currentGroup.push(row);
         }
-      });
+      }
 
-      // Handle any remaining non-AI calls
+      // Handle any remaining group items
       if (currentGroup.length > 0) {
         const groupId = `non-ai-group-${finalRows.length}`;
-        
         finalRows.push({
           id: groupId,
           groupName: 'Other Calls',
@@ -290,16 +302,23 @@ export const CallTimelineView: FC<{
         });
 
         currentGroup.forEach(call => {
-          finalRows.push({
-            ...call,
-            hierarchy: [groupId, call.id]
-          });
+          if (call?.id) {
+            finalRows.push({
+              ...call,
+              hierarchy: [groupId, call.id]
+            });
+          }
         });
       }
     }
 
     return finalRows;
-  }, [rows, aiCallTypes]);
+  }, [safeRows]);
+
+  // Get root call ID
+  const rootCallId = useMemo(() => {
+    return processedRows[0]?.id || null;
+  }, [processedRows]);
 
   // Update grouping column definition to handle group headers
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
@@ -397,12 +416,14 @@ export const CallTimelineView: FC<{
         );
       },
     }),
-    [costLoading, expandedGroups, rootCallId, aiCallTypes, completeCallDataMap]
+    [costLoading, expandedGroups, rootCallId, completeCallDataMap]
   );
 
   // Handle row clicks including group headers
-  const onRowClick: DataGridProProps['onRowClick'] = useCallback(
-    params => {
+  const onRowClick = useCallback(
+    (params: any) => {
+      if (!params?.row) return;
+
       if ('isGroupHeader' in params.row) {
         setExpandedGroups(prev => {
           const newSet = new Set(prev);
@@ -416,10 +437,8 @@ export const CallTimelineView: FC<{
         return;
       }
 
-      if (!params.row.call) {
-        return;
-      }
-      const rowCall = params.row.call as CallSchema;
+      if (!params.row.call) return;
+
       setSuppressScroll(true);
       history.replace(
         currentRouter.callUIUrl(
@@ -508,13 +527,13 @@ export const CallTimelineView: FC<{
 
   // Update isGroupExpandedByDefault
   const isGroupExpandedByDefault: DataGridProProps['isGroupExpandedByDefault'] = useCallback(
-    node => expandedGroups.has(node.groupingKey?.toString() ?? ''),
+    node => expandedGroups.has(node.groupingKey?.toString() || ''),
     [expandedGroups]
   );
 
   // Add getTreeDataPath prop
   const getTreeDataPath: DataGridProProps['getTreeDataPath'] = useCallback(
-    row => row.hierarchy,
+    row => row.hierarchy || [],
     []
   );
 
@@ -524,19 +543,17 @@ export const CallTimelineView: FC<{
         <DataGridPro
           apiRef={apiRef}
           getRowHeight={params => {
-            if ('isGroupHeader' in params.model) {
-              return 40; // Group header height
-            }
+            if ('isGroupHeader' in params.model) return 40;
             if ('call' in params.model) {
-              return isAICall(params.model.call) ? 112 : 64; // AI calls get 112px, other calls get 64px
+              return isAICall(params.model.call) ? 112 : 64;
             }
-            return 52; // Default height for any other row types
+            return 52;
           }}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}
           onRowClick={onRowClick}
-          rows={animationBuffer ? [] : groupedRows}
+          rows={animationBuffer ? [] : processedRows}
           columns={[]}
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
@@ -549,4 +566,7 @@ export const CallTimelineView: FC<{
       </ErrorBoundary>
     </CallTimeline>
   );
-}; 
+};
+
+// Export the wrapper instead of the view directly
+export {CallTimelineWrapper as CallTimelineView}; 
