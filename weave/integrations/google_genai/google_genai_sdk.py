@@ -9,8 +9,8 @@ from weave.integrations.google_genai.imagen_utils import (
     google_genai_imagen_wrapper_async,
     google_genai_imagen_wrapper_sync,
 )
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 
 def get_google_genai_patcher(
