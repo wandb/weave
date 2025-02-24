@@ -2,7 +2,6 @@
 
 from textwrap import dedent
 
-from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
@@ -54,7 +53,7 @@ class ContextEntityRecallScorer(LLMScorer):
     async def _extract_entities(self, text: str) -> list[str]:
         # Use LLM to extract entities
         prompt = self.extraction_prompt.format(text=text)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[{"role": "user", "content": prompt}],
             response_format=EntityExtractionResponse,
             model=self.model_id,
@@ -125,7 +124,7 @@ class ContextRelevancyScorer(LLMScorer):
     @weave.op
     async def score(self, output: str, context: str) -> dict:
         prompt = self.relevancy_prompt.format(question=output, context=context)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[{"role": "user", "content": prompt}],
             response_format=RelevancyResponse,
             model=self.model_id,

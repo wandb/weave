@@ -32,7 +32,8 @@ def mock_acompletion(monkeypatch):
 
         return Response(choices=[Choice(message=Message(content=content))])
 
-    monkeypatch.setattr("weave.scorers.ragas_scorer.acompletion", _mock_acompletion)
+    monkeypatch.setattr("weave.scorers.ragas_scorer.ContextEntityRecallScorer._acompletion", _mock_acompletion)
+    monkeypatch.setattr("weave.scorers.ragas_scorer.ContextRelevancyScorer._acompletion", _mock_acompletion)
 
 
 @pytest.fixture

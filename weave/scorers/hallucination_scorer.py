@@ -1,7 +1,6 @@
 import logging
 from typing import Union
 
-from litellm import acompletion
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
 import weave
@@ -145,7 +144,7 @@ class HallucinationFreeScorer(LLMScorer):
     @weave.op
     async def score(self, output: str, context: str) -> HallucinationResponse:
         output = stringify(output)
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {

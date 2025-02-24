@@ -1,19 +1,18 @@
 from typing import TYPE_CHECKING, Union
 
-from litellm import amoderation
 from pydantic import Field, PrivateAttr, validate_call
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-from weave.scorers.scorer_types import RollingWindowScorer
+from weave.scorers.scorer_types import LiteLLMScorer, RollingWindowScorer
 from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights
 
 if TYPE_CHECKING:
     from torch import Tensor
 
 
-class OpenAIModerationScorer(weave.Scorer):
+class OpenAIModerationScorer(LiteLLMScorer):
     """
     Uses the OpenAI moderation API to check if the model output is safe.
 
@@ -39,7 +38,7 @@ class OpenAIModerationScorer(weave.Scorer):
         Args:
             output: text to check for moderation, must be a string
         """
-        response = await amoderation(
+        response = await self._amoderation(
             model=self.model_id,
             input=output,
         )

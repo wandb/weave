@@ -22,7 +22,7 @@ def mock_aembedding(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr("weave.scorers.similarity_scorer.aembedding", _mock_aembedding)
+    monkeypatch.setattr("weave.scorers.similarity_scorer.EmbeddingSimilarityScorer._aembedding", _mock_aembedding)
 
 
 @pytest.fixture

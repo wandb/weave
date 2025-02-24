@@ -8,12 +8,35 @@ from weave.scorers.utils import ensure_hf_imports
 
 if TYPE_CHECKING:
     import torch
+    from litellm import acompletion, aembedding, amoderation
     from transformers.modeling_utils import PreTrainedModel
     from transformers.pipelines.base import Pipeline
     from transformers.tokenization_utils import PreTrainedTokenizer
 
 
-class LLMScorer(weave.Scorer):
+class LiteLLMScorer(weave.Scorer):
+    """Wrapper around litellm's acompletion function."""
+
+    model_id: str = Field(
+        description="The model to use, check https://docs.litellm.ai/docs/providers for supported models"
+    )
+    _acompletion: "acompletion" = PrivateAttr()
+    _aembedding: "aembedding" = PrivateAttr()
+    _amoderation: "amoderation" = PrivateAttr()
+
+    def model_post_init(self, __context: Any) -> None:
+        try:
+            from litellm import acompletion, aembedding, amoderation  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
+            )
+        self._acompletion = acompletion
+        self._aembedding = aembedding
+        self._amoderation = amoderation
+
+
+class LLMScorer(LiteLLMScorer):
     """Score model outputs using a Large Language Model (LLM).
 
     This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
@@ -36,8 +59,6 @@ class LLMScorer(weave.Scorer):
     max_tokens: int = Field(
         ..., description="The maximum number of tokens in the response"
     )
-
-    # TODO: check if we can validate the model_id with litellm on a post_init method
 
 
 class InstructorLLMScorer(LLMScorer):
