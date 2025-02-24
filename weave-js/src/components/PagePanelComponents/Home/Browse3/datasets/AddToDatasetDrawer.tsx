@@ -255,6 +255,8 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
 
   const renderStepContent = () => {
     const isNewDataset = selectedDataset === null;
+    const hasDatasetChoice =
+      selectedDataset !== null || newDatasetName !== null;
 
     switch (currentStep) {
       case 1:
@@ -270,24 +272,28 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
               entity={entity}
               project={project}
             />
-            {!isNewDataset && selectedDataset && (
-              <SchemaMappingStep
-                selectedDataset={selectedDataset}
-                selectedCalls={selectedCalls}
-                entity={entity}
-                project={project}
-                fieldMappings={fieldMappings}
-                datasetObject={datasetObject}
-                onMappingChange={handleMappingChange}
-                onDatasetObjectLoaded={setDatasetObject}
-              />
-            )}
-            {isNewDataset && (
-              <NewDatasetSchemaStep
-                selectedCalls={selectedCalls}
-                fieldConfigs={fieldConfigs}
-                onFieldConfigsChange={setFieldConfigs}
-              />
+            {hasDatasetChoice && (
+              <>
+                {!isNewDataset && selectedDataset && (
+                  <SchemaMappingStep
+                    selectedDataset={selectedDataset}
+                    selectedCalls={selectedCalls}
+                    entity={entity}
+                    project={project}
+                    fieldMappings={fieldMappings}
+                    datasetObject={datasetObject}
+                    onMappingChange={handleMappingChange}
+                    onDatasetObjectLoaded={setDatasetObject}
+                  />
+                )}
+                {isNewDataset && (
+                  <NewDatasetSchemaStep
+                    selectedCalls={selectedCalls}
+                    fieldConfigs={fieldConfigs}
+                    onFieldConfigsChange={setFieldConfigs}
+                  />
+                )}
+              </>
             )}
           </div>
         );
