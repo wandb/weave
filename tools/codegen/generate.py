@@ -10,6 +10,7 @@ from pathlib import Path
 import click
 import httpx
 import tomlkit
+import yaml
 from rich import print
 
 WEAVE_PORT = 6345
@@ -146,15 +147,19 @@ def generate_code(
 @click.argument("repo_path", type=click.Path(exists=True))
 @click.argument("package_name")
 @click.option("--release", is_flag=True, help="Update to the latest version")
-def update_pyproject(repo_path: Path, package_name: str, release: bool = False) -> None:
+def update_pyproject(repo_path: str, package_name: str, release: bool = False) -> None:
     """Update the pyproject.toml file with the latest version of the generated code"""
     header("Updating pyproject.toml")
+    repo_path = Path(repo_path)  # Convert string path to Path object
     if release:
         version = _get_package_version(repo_path)
         _update_pyproject_toml(package_name, version, True)
         info(f"Updated {package_name} dependency to version: {version}")
     else:
         sha, remote_url = _get_repo_info(repo_path)
+        if not sha:
+            error(f"Failed to get git SHA (got: {sha=})")
+            sys.exit(1)
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
         info(f"Updated {package_name} dependency to SHA: {sha}")
 
@@ -225,8 +230,124 @@ def _update_pyproject_toml(
             else:
                 dependencies[i] = f"{package} @ git+{value}"
 
+    # Handle [tool.hatch.metadata] section
+    if is_version:
+        # For release, remove allow-direct-references if it exists
+        if (
+            "tool" in doc
+            and "hatch" in doc["tool"]
+            and "metadata" in doc["tool"]["hatch"]
+        ):
+            if "allow-direct-references" in doc["tool"]["hatch"]["metadata"]:
+                del doc["tool"]["hatch"]["metadata"]["allow-direct-references"]
+            # Clean up empty sections
+            if not doc["tool"]["hatch"]["metadata"]:
+                del doc["tool"]["hatch"]["metadata"]
+            if not doc["tool"]["hatch"]:
+                del doc["tool"]["hatch"]
+            if not doc["tool"]:
+                del doc["tool"]
+    else:
+        # For non-release, ensure allow-direct-references is true
+        if "tool" not in doc:
+            doc["tool"] = tomlkit.table()
+        if "hatch" not in doc["tool"]:
+            doc["tool"]["hatch"] = tomlkit.table()
+        if "metadata" not in doc["tool"]["hatch"]:
+            doc["tool"]["hatch"]["metadata"] = tomlkit.table()
+        doc["tool"]["hatch"]["metadata"]["allow-direct-references"] = True
+
     with open(pyproject_path, "w") as f:
         f.write(tomlkit.dumps(doc))
+
+
+@cli.command()  # type: ignore
+@click.option(
+    "--config",
+    default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
+    help="Path to config file",
+)
+def all(config: str) -> None:
+    """Run all codegen commands in sequence using config from yaml file"""
+    header("Running all codegen commands")
+
+    # Read config - handle relative paths
+    config_path = Path(config)
+    if not config_path.is_absolute():
+        config_path = Path.cwd() / config_path
+
+    try:
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f)
+    except FileNotFoundError:
+        error(f"Config file {config_path} not found")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        error(f"Failed to parse config file: {e}")
+        sys.exit(1)
+
+    # Validate required config
+    repo_path = cfg.get("repo_path")
+    package_name = cfg.get("package_name")
+    if not repo_path or not package_name:
+        error("repo_path and package_name must be specified in config")
+        sys.exit(1)
+
+    # Convert repo_path to absolute path if relative
+    repo_path = Path(repo_path)
+    if not repo_path.is_absolute():
+        repo_path = Path.cwd() / repo_path
+    repo_path = str(repo_path)
+
+    # 1. Get OpenAPI spec
+    info("Step 1: Getting OpenAPI spec")
+    output_file = cfg.get("openapi_output", STAINLESS_OAS_PATH)
+    # Convert output_file to absolute path if relative
+    output_path = Path(output_file)
+    if not output_path.is_absolute():
+        output_path = Path.cwd() / output_file
+    # Call get_openapi_spec with --output-file argument
+    ctx = click.get_current_context()
+    ctx.invoke(get_openapi_spec, output_file=str(output_path))
+
+    # 2. Generate code
+    info("Step 2: Generating code")
+    # Use repo_path as python_output
+    node_path = cfg.get("node_output")
+    typescript_path = cfg.get("typescript_output")
+    # Convert language paths to absolute if relative
+    if node_path:
+        node_path = (
+            str(Path.cwd() / node_path)
+            if not Path(node_path).is_absolute()
+            else node_path
+        )
+    if typescript_path:
+        typescript_path = (
+            str(Path.cwd() / typescript_path)
+            if not Path(typescript_path).is_absolute()
+            else typescript_path
+        )
+    # Call generate_code with proper arguments
+    ctx.invoke(
+        generate_code,
+        python_path=repo_path,
+        node_path=node_path,
+        typescript_path=typescript_path,
+    )
+
+    # 3. Update pyproject.toml
+    info("Step 3: Updating pyproject.toml")
+    release = cfg.get("release", False)
+    # Call update_pyproject with proper arguments
+    ctx.invoke(
+        update_pyproject,
+        repo_path=repo_path,
+        package_name=package_name,
+        release=release,
+    )
+
+    info("All codegen steps completed successfully!")
 
 
 if __name__ == "__main__":
