@@ -142,7 +142,7 @@ CallTimeline.displayName = 'S.CallTimeline';
 const QAContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
   padding: 0px 4px;
 `;
@@ -151,20 +151,19 @@ const MessageContainer = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 80%;
+  max-width: 85%;
   font-size: 14px;
-  padding: 4px 8px;
   border-radius: 8px;
 `;
 
 const QuestionContainer = styled(MessageContainer)`
   color: #fff;
   background-color: #155B69;
+  padding: 4px 8px;
   margin-left: auto;
 `;
 
 const AnswerContainer = styled(MessageContainer)`
-  background-color: #f0f0f0;
   margin-right: auto;
 `;
 
@@ -316,11 +315,10 @@ export const CallTimelineView: FC<{
               display: 'flex', 
               alignItems: 'center',
               cursor: 'pointer',
-              padding: '0 8px',
+              padding: '0 24px',
               height: '100%'
             }}>
               <div style={{ 
-                marginRight: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 color: MOON_500
@@ -329,7 +327,7 @@ export const CallTimelineView: FC<{
                   name={expandedGroups.has(params.row.id) ? 'chevron-down' : 'chevron-next'}
                 />
               </div>
-              <span>{params.row.groupName} ({params.row.count})</span>
+              <span style={{ color: MOON_500 }}>{params.row.groupName} ({params.row.count})</span>
             </div>
           );
         }
@@ -371,7 +369,10 @@ export const CallTimelineView: FC<{
             display: 'flex',
             alignItems: 'center',
             width: '100%',
-            paddingLeft: isNonAiCall ? '32px' : '8px',
+            paddingTop: isNonAiCall ? '16px' : '0',
+            paddingBottom: isNonAiCall ? '16px' : '0',
+            paddingLeft: isNonAiCall ? '16px' : '8px',
+            marginLeft: isNonAiCall ? '16px' : '0',
             position: 'relative',
             fontWeight: isFirstCall ? 600 : 'normal'
           }}>
@@ -522,7 +523,15 @@ export const CallTimelineView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          getRowHeight={params => ('isGroupHeader' in params.model ? 32 : 104)}
+          getRowHeight={params => {
+            if ('isGroupHeader' in params.model) {
+              return 40; // Group header height
+            }
+            if ('call' in params.model) {
+              return isAICall(params.model.call) ? 112 : 64; // AI calls get 112px, other calls get 64px
+            }
+            return 52; // Default height for any other row types
+          }}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}
