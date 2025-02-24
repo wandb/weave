@@ -48,7 +48,9 @@ dependencies = [
   "diskcache==5.6.3",        # Used for data caching
 
   # TODO: This needs to be updated each time we regenerate the trace server bindings.
-  # We will need some automation here
+  # Basically:
+  # 1. For normal dev, pin to a SHA and allow direct references
+  # 2. For deploys, pin to a specific version and remove allow-direct-references.
   "weave_trace @ git+https://github.com/wandb/weave-stainless.git@73294ddc7befb6a4d8da1a626b6b7edfa0f725ca",
 ]
 
