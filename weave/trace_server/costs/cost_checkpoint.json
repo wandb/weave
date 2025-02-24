@@ -5980,5 +5980,21 @@
       "output": 1.8e-08,
       "created_at": "2025-02-24 11:54:56"
     }
+  ],
+  "claude-3-7-sonnet-20250219": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
   ]
 }
