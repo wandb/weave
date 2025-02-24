@@ -126,17 +126,46 @@ Select a tab to see Python and TypeScript-specific code.
   </TabItem>
 </Tabs>
 
-## Edit and delete a `Dataset` in the UI
+## Create, edit, and delete a `Dataset` in the UI
 
-:::tip
-To follow along with the example screenshots shown in this section, run the code shown in the [`Dataset` quickstart](#dataset-quickstart) and navigate to the **Datasets** tab in the Weave UI.
-:::
+You can create, edit, and delete `Dataset`s in the UI.
 
-You can edit and delete existing `Dataset`s from the **Datasets** tab in the UI. To create a `Dataset`, [use one of the SDKs](#dataset-quickstart). 
+### Create a new `Dataset`
+
+1. Navigate to the Weave project you want to edit.
+
+2. In the sidebar, select **Traces**.
+
+3. Select one or more calls to include in your new `Dataset`.
+
+4. In the upper right-hand menu, click the **Add selected rows to a dataset** icon (located next to the trashcan icon).
+
+5. From the **Choose a dataset** dropdown, select **Create new**. The **Dataset name** field appears.
+
+6. In the **Dataset name** field, enter a name for your dataset. Options to **Configure dataset fields**  appear.
+
+    :::important
+    Dataset names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+    :::
+
+7. In **Configure dataset fields**, select the fields from your calls to include in the dataset.  
+    - You can customize the column names for each selected field.
+    - Optionally, you can deselect all fields.
+
+8. Once you've configured the dataset fields, click **Next**. The **Add examples to a dataset** screen appears.
+
+9. In the **Add examples to a dataset** screen, you can:  
+    - Add more examples by starting at step 8 of [ Add a new example to a `Dataset`](#add-a-new-example-to-a-dataset).
+    - Click **Back** to return to the dataset configuration page.
+
+10. Click **Create dataset**. Your new dataset is created.
+
+11. In the confirmation popup, click **View the dataset** to view the new `Dataset`. Alternatively, go to the **Datasets** tab.
 
 ### Edit a `Dataset` 
 
 1. Navigate to the Weave project containing the `Dataset` you want to edit.
+
 2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
 
    ![Dataset UI](./imgs/datasetui.png)
@@ -175,12 +204,12 @@ You can edit and delete existing `Dataset`s from the **Datasets** tab in the UI.
 ### Delete a `Dataset`
 
 1. Navigate to the Weave project containing the `Dataset` you want to edit.
+
 2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
+
 3. In the **Object** column, click the name and version of the `Dataset` you want to delete. A pop-out modal showing `Dataset` information like name, version, author, and `Dataset` rows displays.
 
-4. In the upper right-hand corner of the modal, click the trash can icon. 
-
-   ![`Dataset` UI - Delete a `Dataset` icon.](./imgs/dataset-trashcan.png)
+4. In the upper right-hand corner of the modal, click the trashcan icon. 
 
    A pop-up modal prompting you to confirm `Dataset` deletion displays. 
 
@@ -189,3 +218,31 @@ You can edit and delete existing `Dataset`s from the **Datasets** tab in the UI.
 5. In the pop-up modal, click the red **Delete** button to delete the `Dataset`. Alternatively, click **Cancel** if you don't want to delete the `Dataset`. 
 
    Now, the `Dataset` is deleted, and no longer visible in the **Datasets** tab in your Weave dashboard.
+
+### Add a new example to a `Dataset`
+
+1. Navigate to the Weave project you want to edit.
+
+2. In the sidebar, select **Traces**.
+
+3. Select one or more calls with `Datasets` for which you want to create new examples.
+
+4. In the upper right-hand menu, click the **Add selected rows to a dataset** icon (located next to the trashcan icon). Optionally, toggle **Show latest versions** to off to display all versions of all available datasets.
+
+5. From the **Choose a dataset** dropdown, select the `Dataset` you want to add examples to. Options to **Configure dataset fields** will display.
+
+6. (Optional) In **Configure dataset fields**, adjust the mapping of fields from your calls to the corresponding dataset columns.
+
+7. Once you've configured dataset fields, click **Next**. The **Add examples to a dataset** screen appears.
+
+8. Click **Add row** to create an empty row in the dataset for the new example.
+
+9. To add data to the new row, click the desired column within that row. The default **id** column in a `Dataset` row cannot be edited, as Weave assigns it automatically upon creation. An editing modal appears with **Text**, **Code**, and **Diff** options for formatting.
+
+10. Repeat step 9 for each column that you want to add data to in the new row. 
+
+11. Repeat step 10 for each row you want to add to the `Dataset`.
+
+12. Once you've added your example(s), click **Add to dataset**. Alternatively, to return to the **Configure dataset fields** screen, click **Back**.
+
+13. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
