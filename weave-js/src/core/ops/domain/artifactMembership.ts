@@ -1,4 +1,4 @@
-import {opFileType, replaceInputVariables} from '@wandb/weave/core';
+import {opFileType} from '@wandb/weave/core';
 import * as TypeHelpers from '@wandb/weave/core/model/helpers';
 import {docType} from '@wandb/weave/core/util/docs';
 import * as _ from 'lodash';
@@ -87,130 +87,6 @@ export const opArtifactMembershipLink = makeStandardOp({
   }),
 });
 
-export const opArtifactMembershipFilesType = makeStandardOp({
-  name: 'artifactMembership-_files_refine_output_type',
-  argTypes: artifactArgTypes,
-  description: `Returns the type of a ${docType('list')} of ${docType('file', {
-    plural: true,
-  })} of the ${docType('artifactMembership')}`,
-  argDescriptions: {
-    artifactMembership: artifactMembershipArgDescription,
-  },
-  hidden: true,
-  returnValueDescription: `The type of a ${docType('list')} of ${docType(
-    'file',
-    {
-      plural: true,
-    }
-  )} of the ${docType('artifactMembership')}`,
-  returnType: inputTypes => 'type',
-  resolver: async (
-    {artifactMembership},
-    rawInputs,
-    inputTypes,
-    forwardGraph,
-    forwardOp,
-    context
-  ) => {
-    try {
-      // This errors if the sequence has been deleted (or a race case in which
-      // the artifact is not created before the history step referencing it comes in)
-      // Note these awaits happen serially!
-      const result = await context.backend.getArtifactFileMetadata(
-        artifactMembership.artifact.id,
-        ''
-      );
-      if (result == null || result.type !== 'dir') {
-        throw new Error('opArtifactMembershipFiles: not a directory');
-      }
-      // See comment in opArtifactFiles for info about how this currently works.
-      const types = [];
-      for (const fileName of Object.keys(result.files)) {
-        const type = TypeHelpers.filePathToType(
-          result.files[fileName].fullPath
-        );
-        types.push(type);
-      }
-      return list(union(types));
-    } catch (e) {
-      console.warn('Error loading artifact from membership', {
-        err: e,
-        artifactMembership,
-      });
-      return list(union([]));
-    }
-  },
-});
-
-export const opArtifactMembershipFiles = makeStandardOp({
-  name: 'artifactMembership-files',
-  argTypes: artifactArgTypes,
-  description: `Returns the ${docType('list')} of ${docType('file', {
-    plural: true,
-  })} of the ${docType('artifactMembership')}`,
-  argDescriptions: {
-    artifactMembership: artifactMembershipArgDescription,
-  },
-  returnValueDescription: `The ${docType('list')} of ${docType('file', {
-    plural: true,
-  })} of the ${docType('artifactMembership')}`,
-  returnType: inputTypes => list({type: 'file'}),
-  resolver: async (
-    {artifactMembership},
-    rawInputs,
-    inputTypes,
-    forwardGraph,
-    forwardOp,
-    context
-  ) => {
-    try {
-      // This errors if the sequence has been deleted (or a race case in which
-      // the artifact is not created before the history step referencing it comes in)
-      // Note these awaits happen serially!
-      const result = await context.backend.getArtifactFileMetadata(
-        artifactMembership.artifact.id,
-        ''
-      );
-      if (result == null || result.type !== 'dir') {
-        throw new Error('opArtifactMembershipFiles: not a directory');
-      }
-      // See comment in opArtifactFiles for info about how this currently works.
-      return Object.keys(result.files).map(path => ({
-        artifact: {
-          id: artifactMembership.artifact.id,
-        },
-        path,
-      }));
-    } catch (e) {
-      console.warn('Error loading artifact from membership', {
-        err: e,
-        artifactMembership,
-      });
-      return [];
-    }
-  },
-  resolveOutputType: async (inputTypes, node, executableNode, client) => {
-    const artifactMembershipNode = replaceInputVariables(
-      executableNode.fromOp.inputs.artifactMembership,
-      client.opStore
-    );
-    const refineOp = opArtifactMembershipFilesType({
-      artifactMembership: artifactMembershipNode,
-    });
-    let result = await client.query(refineOp);
-
-    // This is a Weave1 hack. Weave1's type refinement ops return
-    // tagged/mapped results. But the Weave0 opKinds framework is going to do
-    // the same wrapping to the result we return here. So we unwrap the Weave1
-    // result and let it be rewrapped.
-    if (TypeHelpers.isTaggedValue(result)) {
-      result = TypeHelpers.taggedValueValueType(result);
-    }
-
-    return result ?? 'none';
-  },
-});
-
 export const opArtifactMembershipFile = makeStandardOp({
   name: 'artifactMembership-file',
   argTypes: {...artifactArgTypes, path: 'string'},
@@ -226,7 +102,7 @@ export const opArtifactMembershipFile = makeStandardOp({
   )} for the given path`,
   returnType: inputTypes => maybe({type: 'file'}),
   resolver: async (
-    inputs,
+    {artifactMembership, path},
     inputTypes,
     rawInputs,
     forwardGraph,
@@ -234,37 +110,26 @@ export const opArtifactMembershipFile = makeStandardOp({
     context
   ) => {
     console.log('inside w0 op');
-    // NOTE: We're passing inputs back directly, which is artifact path
-    // looks like {artifact: {id: <artifact_id>}, path: <string>}
-    // TODO: not final, file doesn't need to be artifact dependent
-    if (inputs.artifactMembership == null) {
+    if (artifactMembership == null) {
       throw new Error('opArtifactMembershipFile missing artifactMembership');
     }
-    const file = {
-      artifact: inputs.artifactMembership.artifact,
-      path: inputs.path,
-    };
-    const {artifact, path} = file;
-    console.log(inputs.artifactMembership, path);
+    if (artifactMembership.artifact == null) {
+      throw new Error('opArtifactMembershipFile missing artifact');
+    }
+    console.log(artifactMembership.artifact, path);
     try {
-      // This errors if the sequence has been deleted (or a race case in which
-      // the artifact is not created before the history step referencing it comes in)
       const result = await context.backend.getArtifactFileMetadata(
-        artifact.id,
+        artifactMembership.artifact.id,
         path
       );
-      // TODO: we should actually be storing the file metadata here, and
-      // the child ops can grab it (like toGraphql). We should use
-      // taggedvalue to store the artifact, instead of hard coding it. Tag
-      // value will properly propagate nulls etc.
       if (result == null) {
         return null;
       }
-      return {artifact: inputs.artifactMembership.artifact, path: inputs.path};
+      return {artifact: artifactMembership.artifact, path};
     } catch (e) {
       console.warn('Error loading artifact from membership', {
         err: e,
-        artifact,
+        artifact: artifactMembership.artifact,
         path,
       });
       return null;
