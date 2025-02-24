@@ -176,3 +176,53 @@ def test_dspy_classification_module(client) -> None:
     assert call.started_at < call.ended_at
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "openai.chat.completions.create"
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_dspy_information_extraction_module(client) -> None:
+    import dspy
+
+    dspy.configure(
+        lm=dspy.LM(
+            "openai/gpt-4o-mini",
+            cache=False,
+            api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        ),
+        callbacks=[WeaveCallback()],
+    )
+
+    class ExtractInfo(dspy.Signature):
+        """Extract structured information from text."""
+
+        text: str = dspy.InputField()
+        title: str = dspy.OutputField()
+        headings: list[str] = dspy.OutputField()
+        entities: list[dict[str, str]] = dspy.OutputField(
+            desc="a list of entities and their metadata"
+        )
+
+    module = dspy.Predict(ExtractInfo)
+
+    text = (
+        "Apple Inc. announced its latest iPhone 14 today."
+        "The CEO, Tim Cook, highlighted its new features in a press release."
+    )
+    response = module(text=text)
+    assert "apple" in response.title.lower()
+
+    calls = list(client.calls())
+    assert len(calls) == 6
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "dspy.Predict"
+    assert "apple" in call.output["title"].lower()
+    assert (
+        call.inputs["self"]["signature"]["description"]
+        == "Extract structured information from text."
+    )
