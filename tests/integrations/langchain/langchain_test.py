@@ -201,7 +201,8 @@ def test_simple_chain_batch(
 
     log_lines = capsys.readouterr().out
 
-    assert log_lines.count("https://app.wandb.test/shawn/test-project/r/call") == 8
+    # one parent call link
+    assert log_lines.count("/shawn/test-project/r/call") == 1
     assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
@@ -247,7 +248,8 @@ def test_simple_chain_batch_with_parent(
 
     log_lines = capsys.readouterr().out
 
-    assert log_lines.count("https://app.wandb.test/shawn/test-project/r/call") == 26
+    # one parent call link for each topic
+    assert log_lines.count("/shawn/test-project/r/call") == 8
     assert "Error in WeaveTracer.on_chain_start callback" not in log_lines
 
 
