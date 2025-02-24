@@ -285,12 +285,13 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
-        FROM calls_merged FINAL
+        FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_2:String}
         AND
             (calls_merged.id IN filtered_calls) AND
-            (JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}) = {pb_4:String})
+            (calls_merged.inputs_dump LIKE {pb_3:String}) AND
+            (JSON_VALUE(calls_merged.inputs_dump, {pb_4:String}) = {pb_5:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 10
@@ -299,8 +300,88 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_0": "my_user_id",
             "pb_1": ["a", "b"],
             "pb_2": "project",
+            "pb_3": "%hello%",
+            "pb_4": '$."param"."val"',
+            "pb_5": "hello",
+        },
+    )
+
+
+def test_query_multiple_heavy_columns() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("output")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["a", "b"],
+            )
+        )
+    )
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$contains": {
+                            "input": {"$getField": "inputs.param.val"},
+                            "substr": {"$literal": "hello"},
+                        }
+                    },
+                    {
+                        "$in": [
+                            {"$getField": "output.param1"},
+                            [{"$literal": "a"}, {"$literal": "b"}],
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+            AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND
+                (any(calls_merged.op_name) IN {pb_0:Array(String)})
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls) AND
+            (calls_merged.inputs_dump LIKE {pb_2:String}) AND
+            (calls_merged.output_dump LIKE {pb_5:String} OR calls_merged.output_dump LIKE {pb_6:String}) AND
+            position(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), {pb_4:String}) > 0 AND
+            (JSON_VALUE(calls_merged.output_dump, {pb_7:String}) IN ({pb_8:String},{pb_9:String}))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": ["a", "b"],
+            "pb_1": "project",
+            "pb_2": "%hello%",
             "pb_3": '$."param"."val"',
             "pb_4": "hello",
+            "pb_5": "%a%",
+            "pb_6": "%b%",
+            "pb_7": '$."param1"',
+            "pb_8": "a",
+            "pb_9": "b",
         },
     )
 

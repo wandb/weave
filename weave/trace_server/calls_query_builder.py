@@ -784,7 +784,7 @@ def make_simple_like_condition(
     # For EQ and CONTAINS operations, create a single LIKE condition
     wildcard_value = _like_value(field_value)
     sql_value = _param_slot(pb.add_param(wildcard_value), "String")
-    return f" AND {table_alias}.{field_name} LIKE {sql_value}"
+    return f" AND ({table_alias}.{field_name} LIKE {sql_value})"
 
 
 ALLOWED_CALL_FIELDS = {
