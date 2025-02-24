@@ -736,8 +736,11 @@ def make_simple_like_condition(
         if not isinstance(value_op.literal_, str):
             return ""
         field_value = value_op.literal_
+        wildcard_value = _like_value(field_value)
+        sql_value = _param_slot(pb.add_param(wildcard_value), "String")
+        return f" AND ({table_alias}.{field_name} LIKE {sql_value})"
 
-    elif isinstance(condition.operand, tsi_query.ContainsOperation):
+    if isinstance(condition.operand, tsi_query.ContainsOperation):
         # Get field name from input operand
         field_op = condition.operand.contains_.input
         if not isinstance(field_op, tsi_query.GetFieldOperator):
@@ -753,8 +756,17 @@ def make_simple_like_condition(
         if not isinstance(value_op.literal_, str):
             return ""
         field_value = value_op.literal_
+        is_case_insensitive = condition.operand.contains_.case_insensitive or False
 
-    elif isinstance(condition.operand, tsi_query.InOperation):
+        wildcard_value = _like_value(field_value)
+        column = f"{table_alias}.{field_name}"
+        if is_case_insensitive:
+            column = f"lower({column})"
+            wildcard_value = wildcard_value.lower()
+        sql_value = _param_slot(pb.add_param(wildcard_value), "String")
+        return f" AND ({column} LIKE {sql_value})"
+
+    if isinstance(condition.operand, tsi_query.InOperation):
         # Get field name from first operand
         field_op = condition.operand.in_[0]
         if not isinstance(field_op, tsi_query.GetFieldOperator):
@@ -778,13 +790,7 @@ def make_simple_like_condition(
             return ""
         return f" AND ({' OR '.join(sql_parts)})"
 
-    else:
-        return ""
-
-    # For EQ and CONTAINS operations, create a single LIKE condition
-    wildcard_value = _like_value(field_value)
-    sql_value = _param_slot(pb.add_param(wildcard_value), "String")
-    return f" AND ({table_alias}.{field_name} LIKE {sql_value})"
+    return ""
 
 
 ALLOWED_CALL_FIELDS = {
