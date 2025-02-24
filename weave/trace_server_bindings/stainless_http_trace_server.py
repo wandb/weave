@@ -307,13 +307,14 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
-        raise NotImplementedError("Deprecated")
+        stream = self.calls_query_stream(req)
+        return tsi.CallsQueryRes(calls=list(stream))
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         if isinstance(req, dict):
             req = tsi.CallsQueryReq.model_validate(req)
         req = cast(tsi.CallsQueryReq, req)
-        return self.stainless_client.calls.stream_query(**req)
+        return self.stainless_client.calls.stream_query(**req.model_dump())
 
     def calls_query_stats(
         self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]

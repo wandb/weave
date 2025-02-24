@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,7 +23,21 @@ STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
 
 def header(text: str):
-    print(f"[blue bold]===>> {text} <<===[/blue bold]")
+    print(f"[blue bold]╔{'═' * (len(text) + 4)}╗[/blue bold]")
+    print(f"[blue bold]║  {text}  ║[/blue bold]")
+    print(f"[blue bold]╚{'═' * (len(text) + 4)}╝[/blue bold]")
+
+
+def error(text: str):
+    print(f"[red bold]ERROR:   {text}[/red bold]")
+
+
+def warning(text: str):
+    print(f"[yellow bold]WARNING: {text}[/yellow bold]")
+
+
+def info(text: str):
+    print(f"[green bold]INFO:    {text}[/green bold]")
 
 
 @click.group()
@@ -40,10 +55,10 @@ def get_openapi_spec(output_file: str | None = None) -> None:
         output_file = str(Path.cwd() / STAINLESS_OAS_PATH)
 
     if not _kill_port(WEAVE_PORT):
-        print("Failed to kill process on port 6345")
+        error("Failed to kill process on port 6345")
         sys.exit(1)
 
-    print("Starting server...")
+    info("Starting server...")
     server = subprocess.Popen(
         [
             "uvicorn",
@@ -56,29 +71,29 @@ def get_openapi_spec(output_file: str | None = None) -> None:
 
     try:
         if not _wait_for_server(f"http://localhost:{WEAVE_PORT}"):
-            print("Server failed to start within timeout")
+            error("Server failed to start within timeout")
             server_out, server_err = server.communicate()
-            print("Server output:", server_out.decode())
-            print("Server error:", server_err.decode())
+            error("Server output:", server_out.decode())
+            error("Server error:", server_err.decode())
             sys.exit(1)
 
-        print("Fetching OpenAPI spec...")
+        info("Fetching OpenAPI spec...")
         response = httpx.get(f"http://localhost:{WEAVE_PORT}/openapi.json")
         spec = response.json()
 
         with open(output_file, "w") as f:
             json.dump(spec, f, indent=2)
-        print(f"Saved to {output_file}")
+        info(f"Saved to {output_file}")
 
     finally:
         # Try to cleanly shut down the server
-        print("Shutting down server...")
+        info("Shutting down server...")
         server.terminate()
         server.wait(timeout=5)
 
         # Force kill if server hasn't shut down
         if server.poll() is None:
-            print("Force killing server...")
+            warning("Force killing server...")
             server.kill()
             server.wait()
 
@@ -94,6 +109,21 @@ def generate_code(
 ) -> None:
     """Generate code from the OpenAPI spec"""
     header("Generating code with Stainless")
+
+    if not any([python_path, node_path, typescript_path]):
+        error(
+            "At least one of --python-path, --node-path, or --typescript-path must be provided"
+        )
+        sys.exit(1)
+
+    if not os.getenv("STAINLESS_API_KEY"):
+        error("STAINLESS_API_KEY is not set")
+        sys.exit(1)
+
+    if not os.getenv("GITHUB_TOKEN"):
+        error("GITHUB_TOKEN is not set")
+        sys.exit(1)
+
     cmd = [
         "node",
         f"{CODEGEN_BUNDLE_PATH}",
@@ -122,11 +152,11 @@ def update_pyproject(repo_path: Path, package_name: str, release: bool = False) 
     if release:
         version = _get_package_version(repo_path)
         _update_pyproject_toml(package_name, version, True)
-        print(f"Updated {package_name} dependency to version: {version}")
+        info(f"Updated {package_name} dependency to version: {version}")
     else:
         sha, remote_url = _get_repo_info(repo_path)
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
-        print(f"Updated {package_name} dependency to SHA: {sha}")
+        info(f"Updated {package_name} dependency to SHA: {sha}")
 
 
 def _kill_port(port) -> bool:
@@ -134,10 +164,10 @@ def _kill_port(port) -> bool:
     try:
         subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
-        print(f"Error: No process found on port {port}")
+        info(f"No process found on port {port}")
         return False
     else:
-        print(f"Successfully killed process on port {port}")
+        info(f"Successfully killed process on port {port}")
         return True
 
 
@@ -147,16 +177,16 @@ def _wait_for_server(url: str, timeout: int = 30, interval: int = 1) -> bool:
         try:
             httpx.get(url)
         except httpx.ConnectError:
-            print("Failed to connect to server, retrying...")
+            warning("Failed to connect to server, retrying...")
             time.sleep(interval)
         else:
-            print("Server is healthy!")
+            info("Server is healthy!")
             return True
     return False
 
 
 def _get_repo_info(repo_path: Path) -> tuple[str, str]:
-    print(f"Getting SHA for {repo_path}")
+    info(f"Getting SHA for {repo_path}")
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_path, capture_output=True, text=True
     ).stdout.strip()

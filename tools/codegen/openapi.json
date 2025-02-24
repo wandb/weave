@@ -4709,6 +4709,17 @@
           },
           "val": {
             "title": "Val"
+          },
+          "original_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Index"
           }
         },
         "type": "object",

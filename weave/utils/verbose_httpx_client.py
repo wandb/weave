@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,70 @@ import httpx
 from weave_trace import DefaultHttpxClient
 
 logger = logging.getLogger(__name__)
+
+
+class StreamingResponseWrapper:
+    """Wraps a streaming response to log content as it's yielded."""
+
+    def __init__(
+        self,
+        response: httpx.Response,
+        log_level: int,
+        max_body_length: int | None = None,
+    ):
+        self._response = response
+        self._log_level = log_level
+        self._max_body_length = max_body_length
+        self._chunk_count = 0
+
+    def _format_chunk(self, chunk: bytes) -> str:
+        try:
+            # Try to parse and format as JSON
+            body = json.loads(chunk)
+            formatted = json.dumps(body, indent=2)
+        except json.JSONDecodeError:
+            # If not JSON, use raw content
+            formatted = chunk.decode()
+
+        if self._max_body_length is not None and len(formatted) > self._max_body_length:
+            return formatted[: self._max_body_length] + "... [truncated]"
+        return formatted
+
+    def iter_bytes(self, *, chunk_size: int | None = None) -> Iterator[bytes]:
+        for chunk in self._response.iter_bytes(chunk_size=chunk_size):
+            self._chunk_count += 1
+            logger.log(
+                self._log_level,
+                f"Streaming chunk #{self._chunk_count}:\n{self._format_chunk(chunk)}\n",
+            )
+            yield chunk
+
+    def iter_lines(
+        self, *, decode_unicode: bool = True, chunk_size: int | None = None
+    ) -> Iterator[bytes]:
+        for line in self._response.iter_lines(
+            decode_unicode=decode_unicode, chunk_size=chunk_size
+        ):
+            self._chunk_count += 1
+            logger.log(
+                self._log_level,
+                f"Streaming line #{self._chunk_count}:\n{self._format_chunk(line)}\n",
+            )
+            yield line
+
+    def iter_text(
+        self, *, chunk_size: int | None = None, encoding: str | None = None
+    ) -> Iterator[str]:
+        for text in self._response.iter_text(chunk_size=chunk_size, encoding=encoding):
+            self._chunk_count += 1
+            logger.log(
+                self._log_level,
+                f"Streaming text #{self._chunk_count}:\n{text}\n",
+            )
+            yield text
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._response, name)
 
 
 class VerboseClient(DefaultHttpxClient):
@@ -68,7 +133,7 @@ class VerboseClient(DefaultHttpxClient):
         start_time = datetime.now()
 
         # Log request details
-        logger.log(self.log_level, f"\n{'='*50}")
+        logger.log(self.log_level, f"\n{'=' * 50}")
         logger.log(self.log_level, f"Request: {request.method} {request.url}")
         logger.log(self.log_level, f"Timestamp: {start_time.isoformat()}")
 
@@ -96,10 +161,16 @@ class VerboseClient(DefaultHttpxClient):
             logger.log(self.log_level, "Response Headers:")
             self._log_headers(response.headers, "  ")
 
-        if self.log_body:
+        if self.log_body and not kwargs.get("stream", False):
             logger.log(self.log_level, "Response Body:")
             logger.log(self.log_level, self._format_body(response.content))
+        elif self.log_body:
+            logger.log(self.log_level, "Response Body: <streaming>")
+            # Wrap the response to log streaming content
+            response = StreamingResponseWrapper(
+                response, self.log_level, self.max_body_length
+            )
 
-        logger.log(self.log_level, f"{'='*50}\n")
+        logger.log(self.log_level, f"{'=' * 50}\n")
 
         return response
