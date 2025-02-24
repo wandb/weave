@@ -108,12 +108,6 @@ export const CustomGridTreeDataGroupingCell: FC<
             }}>
             <Box
               sx={{
-                mr: 1,
-              }}>
-              <StatusChip value={row.status} iconOnly />
-            </Box>
-            <Box
-              sx={{
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -123,12 +117,15 @@ export const CustomGridTreeDataGroupingCell: FC<
             </Box>
           </Box>
           {call.traceCall?.summary && (
-            <TraceCostStats
-              usageData={call.traceCall.summary.usage}
-              costData={call.traceCall.summary.weave?.costs}
-              latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
-              costLoading={props.costLoading}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <StatusChip value={row.status} iconOnly />
+              <TraceCostStats
+                usageData={call.traceCall.summary.usage}
+                costData={call.traceCall.summary.weave?.costs}
+                latency_ms={call.traceCall.summary.weave?.latency_ms ?? 0}
+                costLoading={props.costLoading}
+              />
+            </Box>
           )}
         </>
       ) : (
