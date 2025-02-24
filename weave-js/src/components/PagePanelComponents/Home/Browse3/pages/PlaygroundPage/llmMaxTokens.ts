@@ -99,6 +99,11 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Anthropic models
+  'claude-3-7-sonnet-20250219': {
+    provider: 'anthropic',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
   'claude-3-5-sonnet-20240620': {
     provider: 'anthropic',
     max_tokens: 8192,
