@@ -35,7 +35,8 @@ def summarization_scorer(monkeypatch):
         return Response(choices=[Choice(message=Message(content=content))])
 
     monkeypatch.setattr(
-        "weave.scorers.summarization_scorer.SummarizationScorer._acompletion", _mock_acompletion
+        "weave.scorers.summarization_scorer.SummarizationScorer._acompletion",
+        _mock_acompletion,
     )
 
     return SummarizationScorer(
