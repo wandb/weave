@@ -1,0 +1,114 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `question`
+      (str)\n\nYour output fields are:\n1. `response` (str)\n\nAll interactions will
+      be structured in the following way, with the appropriate values filled in.\n\n[[
+      ## question ## ]]\n{question}\n\n[[ ## response ## ]]\n{response}\n\n[[ ## completed
+      ## ]]\n\nIn adhering to this structure, your objective is: \n        Given the
+      fields `question`, produce the fields `response`."},{"role":"user","content":"[[
+      ## question ## ]]\nwhat is the capital of france?\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## response ## ]]`, and then ending
+      with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '753'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.63.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.63.2
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFLBbpwwEL3zFSPnukRAUdnucQ9VLpFatT3trpDXHsCJsR2PiVpF+++V
+        gSxESaVeEJo37/m9mXlJAJiSbAdMdDyI3ul0X9678nlbFM0++7W/y+++V/dP2dl6+vFEbBMZ9vyA
+        IryyboXtncagrJlg4ZEHjKp5VWaftllVFiPQW4k60loX0tKmvTIqLbKiTLMqzbczu7NKILEdHBIA
+        gJfxG30aib/ZDrLNa6VHIt4i212bAJi3OlYYJ1IUuAlss4DCmoBmtH44wM0NeCRnDWH8P52O5meH
+        ILhTgWuwDXz13AgERfCNe0W3R3M0E3EOjXJirh/x2AzEY1AzaD3XL1fX2rbO2zPN+LXeKKOoqz1y
+        siY6pGAdG9FLAnAapzO8Ccyct70LdbCPaKJgXpaTHluWskK3Mxhs4HpV/1xsPtCrJQauNK3mywQX
+        HcqFuiyDD1LZFZCsUr9385H2lFyZ9n/kF0AIdAFl7TxKJd4mXto8xpv9V9t1yqNhRuiflcA6KPRx
+        ExIbPujpkhj9oYB93SjTondeTefUuLrKvlR5KfOiZMkl+QsAAP//AwBoug1zXAMAAA==
+    headers:
+      CF-RAY:
+      - 916d9bd79b76f2be-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Feb 2025 07:05:43 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=NaP7A6CuEMLwt3KR3Qn.ZqgB08kZMT1MI_NJ_nNq4xc-1740380743-1.0.1.1-RxSHTURxTFdg6P2J78FWSsER33jJNb8ElTqBc5Y1YZUe29LWUcmxmsQGnW8rNANnNUhKvcofdZcfN22VASAIkg;
+        path=/; expires=Mon, 24-Feb-25 07:35:43 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=SL8uhA8iN8SETyWcoQwFEg6HcCAPvtO1Lc_lh.1UFjg-1740380743050-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '411'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998847'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_c0ad4b37fd82d34f971ef007a5c11786
+    status:
+      code: 200
+      message: OK
+version: 1

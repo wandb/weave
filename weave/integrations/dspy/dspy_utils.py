@@ -1,4 +1,4 @@
-from typing import Any, Callable, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 import weave
 from weave.trace.autopatch import OpSettings

@@ -3,8 +3,8 @@ from __future__ import annotations
 import importlib
 
 from weave.integrations.dspy.dspy_utils import dspy_wrapper
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 _dspy_patcher: MultiPatcher | None = None
 

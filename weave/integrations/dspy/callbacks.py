@@ -1,6 +1,9 @@
 from typing import Any, Optional
 
-from weave.integrations.dspy.dspy_utils import dspy_postprocess_inputs
+from weave.integrations.dspy.dspy_utils import (
+    dspy_postprocess_inputs,
+    serialize_dspy_objects,
+)
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.serialize import dictify
 from weave.trace.weave_client import Call
@@ -39,7 +42,9 @@ if not import_failed:
         ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
-                gc.finish_call(self._call_map[call_id], outputs, exception)
+                gc.finish_call(
+                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                )
 
         def on_module_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
@@ -68,4 +73,6 @@ if not import_failed:
         ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
-                gc.finish_call(self._call_map[call_id], outputs, exception)
+                gc.finish_call(
+                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                )
