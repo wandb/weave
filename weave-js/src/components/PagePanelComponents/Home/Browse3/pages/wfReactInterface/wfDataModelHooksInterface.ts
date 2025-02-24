@@ -213,7 +213,8 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefCols?: string[],
-    includeFeedback?: boolean
+    includeFeedback?: boolean,
+    includeCosts?: boolean
   ) => Promise<Blob>;
   useObjCreate: () => (
     projectId: string,
