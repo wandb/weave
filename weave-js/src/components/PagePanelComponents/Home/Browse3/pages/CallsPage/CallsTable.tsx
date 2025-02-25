@@ -55,6 +55,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -92,6 +93,7 @@ import {
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
+  BulkAddToDatasetButton,
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
@@ -665,6 +667,24 @@ export const CallsTable: FC<{
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
+
+  // Replace the state and effect with a single memo
+  const selectedCallObjects = useMemo(() => {
+    if (!callsResult) {
+      return [];
+    }
+    return callsResult
+      .filter(
+        call =>
+          call?.traceCall?.id != null &&
+          selectedCalls.includes(call.traceCall.id)
+      )
+      .map(call => ({
+        digest: call.traceCall!.id,
+        val: call.traceCall!,
+      }));
+  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -844,6 +864,20 @@ export const CallsTable: FC<{
                   onDeleteCallback={() => {
                     setSelectedCalls([]);
                   }}
+                />
+              </div>
+              <ButtonDivider />
+              <div className="flex-none">
+                <BulkAddToDatasetButton
+                  onClick={() => setAddToDatasetModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <AddToDatasetDrawer
+                  entity={entity}
+                  project={project}
+                  open={addToDatasetModalOpen}
+                  onClose={() => setAddToDatasetModalOpen(false)}
+                  selectedCalls={selectedCallObjects}
                 />
               </div>
               <ButtonDivider />

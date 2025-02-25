@@ -116,6 +116,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -253,6 +255,39 @@ class PaginatedIterator(Generic[T, R]):
             raise TypeError("This iterator does not support len()")
         return self.size_func()
 
+    def to_pandas(self) -> pd.DataFrame:
+        """Convert the iterator's contents to a pandas DataFrame.
+
+        Returns:
+            A pandas DataFrame containing all the data from the iterator.
+
+        Example:
+            ```python
+            calls = client.get_calls()
+            df = calls.to_pandas()
+            ```
+
+        Note:
+            This method will fetch all data from the iterator, which may involve
+            multiple network calls. For large datasets, consider using limits
+            or filters to reduce the amount of data fetched.
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required to use this method")
+
+        records = []
+        for item in self:
+            if isinstance(item, dict):
+                records.append(item)
+            elif hasattr(item, "to_dict"):
+                records.append(item.to_dict())
+            else:
+                raise ValueError(f"Unable to convert item to dict: {item}")
+
+        return pd.DataFrame(records)
+
 
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
@@ -270,7 +305,6 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
@@ -285,7 +319,6 @@ def _make_calls_iterator(
                 query=query,
                 sort_by=sort_by,
                 columns=columns,
-                expand_columns=expand_columns,
             )
         )
         return response.calls
@@ -1120,6 +1153,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         _should_print_call_link = should_print_call_link()
+        _current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
@@ -1151,9 +1185,9 @@ class WeaveClient:
 
         def on_complete(f: Future) -> None:
             try:
-                if f.result() and not call_context.get_current_call():
-                    if _should_print_call_link:
-                        print_call_link(call)
+                root_call_did_not_error = f.result() and not _current_call
+                if root_call_did_not_error and _should_print_call_link:
+                    print_call_link(call)
             except Exception:
                 pass
 
