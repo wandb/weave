@@ -3300,3 +3300,25 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
             select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
             == 1
         )
+
+
+def test_req_mutability(client):
+    @weave.op
+    def test():
+        return 1
+
+    test()
+
+    req = tsi.CallsQueryReq.model_validate(
+        {
+            "project_id": get_client_project_id(client),
+        }
+    )
+    res = client.server.calls_query_stream(req)
+
+    assert len(res) == 1
+    assert res[0].output == 1
+
+    res2 = client.server.calls_query_stream(req)
+    assert len(res2) == 1
+    assert res2[0].output == 1
