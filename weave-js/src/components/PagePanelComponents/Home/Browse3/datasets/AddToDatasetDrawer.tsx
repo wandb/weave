@@ -60,6 +60,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [isNameValid, setIsNameValid] = useState(false);
   const [datasetKey, setDatasetKey] = useState<string>('');
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useRootObjectVersions, useTableUpdate, useObjCreate, useTableCreate} =
@@ -151,8 +152,10 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     if (dataset?.objectId !== selectedDataset?.objectId) {
       resetEditState();
       setSelectedDataset(dataset);
+      setIsCreatingNew(dataset === null);
     } else {
       setSelectedDataset(dataset);
+      setIsCreatingNew(dataset === null);
     }
   };
 
@@ -255,8 +258,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
 
   const renderStepContent = () => {
     const isNewDataset = selectedDataset === null;
-    const hasDatasetChoice =
-      selectedDataset !== null || newDatasetName !== null;
+    const showSchemaConfig = selectedDataset !== null || isCreatingNew;
 
     switch (currentStep) {
       case 1:
@@ -272,7 +274,7 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
               entity={entity}
               project={project}
             />
-            {hasDatasetChoice && (
+            {showSchemaConfig && (
               <>
                 {!isNewDataset && selectedDataset && (
                   <SchemaMappingStep
