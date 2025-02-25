@@ -1,3 +1,4 @@
+import logging
 import urllib
 import typing
 
@@ -113,7 +114,7 @@ def artifact_membership_link(
         f"/v{artifactMembership['versionIndex']}",
     )
 
-
+logger = logging.getLogger('ArtifactMembership')
 def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollectionMembership):
     type_name = artifactMembership["artifactCollection"]["defaultArtifactType"]["name"]
     collection_name = artifactMembership["artifactCollection"]["name"]
@@ -121,17 +122,21 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     # This is valid because the commitHash for portfolios is always null. So we will leverage
     # the artifact's membership in its source collection to fetch it via the commitHash in
     # downstream paths
-    commit_hash = artifactMembership["artifact"]["commitHash"]
+    commit_hash = artifactMembership["versionIndex"] #["artifact"]["commitHash"]
+    logger.warning(f"\n\nlogging inside artifact membership op => commit Hash but version Index {commit_hash}\n\n")
     entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
     project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
     uri = artifact_wandb.WeaveWBArtifactURI(
         collection_name, commit_hash, entity_name, project_name
     )
-    return artifact_wandb.WandbArtifact(
+    logger.warning(f"\n\nlogging inside artifact membership op => uri with version Index {uri}\n\n")
+    artifact = artifact_wandb.WandbArtifact(
         name=collection_name,
         type=type_name,
         uri=uri,
     )
+    logger.warning(f"\n\nlogging inside artifact membership op => artifact.version {artifact.version}\n\n")
+    return artifact
 
 
 @op(
