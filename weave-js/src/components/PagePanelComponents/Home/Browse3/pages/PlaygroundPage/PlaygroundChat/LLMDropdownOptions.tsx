@@ -82,8 +82,6 @@ const SubMenu = ({
   position: {top: number; left: number};
   onSelect: () => void;
 }) => {
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-
   return ReactDOM.createPortal(
     <Box
       sx={{
@@ -116,8 +114,6 @@ const SubMenu = ({
             p: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
-            backgroundColor:
-              index === selectedIndex ? hexToRGB(OBLIVION, 0.04) : undefined,
             '&:hover': {
               backgroundColor: hexToRGB(OBLIVION, 0.04),
             },
