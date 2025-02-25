@@ -32,6 +32,183 @@ def test_query_baseline() -> None:
     )
 
 
+def test_query_status_sort() -> None:
+    """Test that sorting by status field works correctly."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("status", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        ORDER BY
+            CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN 1
+                WHEN any(calls_merged.ended_at) IS NOT NULL THEN 2
+                ELSE 3
+            END DESC
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_status_sort_with_filter() -> None:
+    """Test that status sorting works with filters."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("status", "asc")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["a", "b"],
+            )
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND
+                (any(calls_merged.op_name) IN {pb_0:Array(String)}))
+        )
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        ORDER BY
+            CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN 1
+                WHEN any(calls_merged.ended_at) IS NOT NULL THEN 2
+                ELSE 3
+            END ASC
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
+    )
+
+
+def test_query_status_sort_with_limit() -> None:
+    """Test status sorting with limit, which tests query optimization paths."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_order("status", "desc")
+    cq.set_limit(20)
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["a", "b"],
+            )
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+            AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND
+                (any(calls_merged.op_name) IN {pb_0:Array(String)})
+            )
+            ORDER BY
+                CASE
+                    WHEN any(calls_merged.exception) IS NOT NULL THEN 1
+                    WHEN any(calls_merged.ended_at) IS NOT NULL THEN 2
+                    ELSE 3
+                END DESC
+            LIMIT 20
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        ORDER BY
+            CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN 1
+                WHEN any(calls_merged.ended_at) IS NOT NULL THEN 2
+                ELSE 3
+            END DESC
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
+    )
+
+
+def test_query_status_sort_with_multiple_sort_fields() -> None:
+    """Test that status sorting can be combined with other field sorting."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_order("status", "desc")
+    cq.add_order("started_at", "asc")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        ORDER BY
+            CASE
+                WHEN any(calls_merged.exception) IS NOT NULL THEN 1
+                WHEN any(calls_merged.ended_at) IS NOT NULL THEN 2
+                ELSE 3
+            END DESC,
+            any(calls_merged.started_at) ASC
+        """,
+        {"pb_0": "project"},
+    )
+
+
 def test_query_light_column() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")

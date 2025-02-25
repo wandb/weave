@@ -14,6 +14,11 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.computed_columns import (
+    DbEngine,
+    get_computed_column_sql,
+    is_computed_column,
+)
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -414,7 +419,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             order_parts = []
             for field, direction in order_by:
                 json_path: Optional[str] = None
-                if field.startswith("inputs"):
+                if is_computed_column(field):
+                    field = get_computed_column_sql(field, DbEngine.SQLITE)
+                elif field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
                         json_path = field[len("inputs.") :]

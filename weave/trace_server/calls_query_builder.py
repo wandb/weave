@@ -34,6 +34,11 @@ import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.computed_columns import (
+    DbEngine,
+    get_computed_column_sql,
+    is_computed_column,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -227,8 +232,14 @@ def json_dump_field_as_sql(
 class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
+    raw_sql: Optional[str] = None
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        """The sql string for ordering by this field"""
+        if hasattr(self, "raw_sql") and self.raw_sql is not None:
+            # Use raw SQL expression if provided
+            return f"{self.raw_sql} {self.direction}"
+
         options: list[tuple[Optional[tsi_query.CastTo], str]]
         if isinstance(
             self.field,
@@ -347,13 +358,29 @@ class CallsQuery(BaseModel):
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
+        """Add order."""
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
-        self.order_fields.append(
-            OrderField(field=get_field_by_name(field), direction=direction)
-        )
+
+        # Check if this is a computed column
+        if is_computed_column(field):
+            # Get the SQL for the computed column
+            computed_sql = get_computed_column_sql(
+                field, DbEngine.CLICKHOUSE, "calls_merged"
+            )
+            self.order_fields.append(
+                OrderField(
+                    field=CallsMergedField(field=f"{field}_computed"),
+                    direction=direction,
+                    raw_sql=computed_sql,
+                )
+            )
+            return self
+
+        field_obj = get_field_by_name(field)
+        self.order_fields.append(OrderField(field=field_obj, direction=direction))
         return self
 
     def set_limit(self, limit: int) -> "CallsQuery":
@@ -491,12 +518,21 @@ class CallsQuery(BaseModel):
             and not has_heavy_order
         )
 
+        # Check if we have a status sort field
+        has_status_sort = any(
+            order_field.field.field == "status_computed"
+            for order_field in self.order_fields
+        )
+
         predicate_pushdown_possible = (
             has_light_filter or has_light_query or has_light_order_filter
         )
 
         # Determine if we should optimize!
-        should_optimize = has_heavy_fields and predicate_pushdown_possible
+        # Always use CTE structure when there's both status sort and hardcoded filter
+        should_optimize = (has_heavy_fields and predicate_pushdown_possible) or (
+            has_status_sort and has_light_filter
+        )
 
         # Important: Always inject deleted_at into the query.
         # Note: it might be better to make this configurable.
@@ -643,14 +679,14 @@ class CallsQuery(BaseModel):
             )
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, 'String')}, '/call/', calls_merged.id))
+            ON (feedback.weave_ref = concat('weave-trace-internal:///', {_param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
-        WHERE calls_merged.project_id = {_param_slot(project_param, 'String')}
+        WHERE calls_merged.project_id = {_param_slot(project_param, "String")}
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}

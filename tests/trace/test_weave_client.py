@@ -1883,3 +1883,62 @@ def test_global_attributes_with_call_attributes(client_creator):
 
         # Local attributes override global ones
         assert call.attributes["env"] == "override"
+
+
+def test_calls_sort_by_status(client):
+    """Test sorting calls by status field."""
+    # Create multiple calls with different statuses
+    # First call will be completed successfully
+    call1 = client.create_call("test_op", {"input": "data1"})
+    client.finish_call(call1, {"output": "result1"})
+
+    # Second call will be in error state
+    call2 = client.create_call("test_op", {"input": "data2"})
+    try:
+        raise ValueError("Test error")
+    except ValueError as e:
+        client.fail_call(call2, e)
+
+    # Third call will be running (not finished)
+    call3 = client.create_call("test_op", {"input": "data3"})
+
+    # Test ascending order - we'll use summary.weave.status which works in both SQLite and ClickHouse
+    results_asc = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="summary.weave.status", direction="asc")]
+        )
+    )
+
+    # The number of calls might vary based on test environment,
+    # but we can verify the relative positions of our test calls
+    call1_idx = next((i for i, c in enumerate(results_asc) if c.id == call1.id), -1)
+    call2_idx = next((i for i, c in enumerate(results_asc) if c.id == call2.id), -1)
+    call3_idx = next((i for i, c in enumerate(results_asc) if c.id == call3.id), -1)
+
+    # Error is alphabetically first, then running, then success
+    assert call2_idx < call3_idx
+    assert call3_idx < call1_idx
+
+    # Test descending order
+    results_desc = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="summary.weave.status", direction="desc")]
+        )
+    )
+
+    call1_idx_desc = next(
+        (i for i, c in enumerate(results_desc) if c.id == call1.id), -1
+    )
+    call2_idx_desc = next(
+        (i for i, c in enumerate(results_desc) if c.id == call2.id), -1
+    )
+    call3_idx_desc = next(
+        (i for i, c in enumerate(results_desc) if c.id == call3.id), -1
+    )
+
+    # Success is alphabetically last, then running, then error
+    assert call1_idx_desc < call3_idx_desc
+    assert call3_idx_desc < call2_idx_desc
+
+    # Clean up
+    client.finish_call(call3, {"output": "result3"})
