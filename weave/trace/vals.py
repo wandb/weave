@@ -398,15 +398,26 @@ class WeaveTable(Traceable):
                 )
             )
 
-            if self._prefetched_rows is not None and len(response.rows) != len(
-                self._prefetched_rows
+            # Only check prefetched_rows on the first page
+            if (
+                page_index == 0
+                and self._prefetched_rows is not None
+                and len(response.rows) != len(self._prefetched_rows)
             ):
-                if get_raise_on_captured_errors():
-                    raise
-                logger.error(
-                    f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
-                )
-                self._prefetched_rows = None
+                # If we're paginating and have fewer rows than expected in the first page,
+                # this is normal and we should continue with pagination
+                if (
+                    len(response.rows) == page_size
+                    and len(self._prefetched_rows) > page_size
+                ):
+                    pass  # This is expected when paginating
+                else:
+                    if get_raise_on_captured_errors():
+                        raise
+                    logger.error(
+                        f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
+                    )
+                    self._prefetched_rows = None
 
             for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
@@ -419,7 +430,7 @@ class WeaveTable(Traceable):
                 val = (
                     item.val
                     if self._prefetched_rows is None
-                    else self._prefetched_rows[i]
+                    else self._prefetched_rows[page_index * page_size + i]
                 )
                 res = from_json(val, self.table_ref.project_id, self.server)
                 res = make_trace_obj(res, new_ref, self.server, self.root)

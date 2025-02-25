@@ -54,3 +54,16 @@ def test_dataset_from_calls(client):
     assert rows[1]["inputs"]["name"] == "Bob"
     assert rows[1]["inputs"]["age"] == 25
     assert rows[1]["output"] == "Hello Bob, you are 25!"
+
+
+def test_dataset_caching(client, capsys):
+    ds = weave.Dataset(rows=[{"a": i} for i in range(200)])
+    ref = weave.publish(ds)
+
+    ds2 = ref.get()
+
+    assert len(ds2) == 200
+
+    captured = capsys.readouterr()
+    assert "Expected length of response rows" not in captured.out
+    assert "Expected length of response rows" not in captured.err
