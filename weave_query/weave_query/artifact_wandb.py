@@ -405,7 +405,7 @@ class WandbArtifactType(artifact_fs.FilesystemArtifactType):
     def save_instance(self, obj, artifact, name) -> "WandbArtifactRef":
         return WandbArtifactRef(obj, None)
 
-logger = logging.getLogger('ArtifactMembership')
+
 class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
         self,
@@ -467,11 +467,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def _read_artifact_uri(
         self,
     ) -> typing.Optional[typing.Union["WeaveWBArtifactURI", "WeaveWBArtifactByIDURI"]]:
-        logger.warning(f"\n\nlogging inside artifact_wandb line 470 {self._resolved_read_artifact_uri}\n\n")
         if self._resolved_read_artifact_uri is not None:
             return self._resolved_read_artifact_uri
 
-        logger.warning(f"\n\nlogging inside artifact_wandb line 474 => unresolved uri {self._unresolved_read_artifact_or_client_uri}\n\n")
         if isinstance(
             self._unresolved_read_artifact_or_client_uri,
             (WeaveWBLoggedArtifactURI, WeaveWBArtifactURI, WeaveWBArtifactByIDURI),
@@ -996,7 +994,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and likely_commit_hash(self.version):
+        if self.version and (likely_commit_hash(self.version) or is_valid_version_index(self.version)):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
