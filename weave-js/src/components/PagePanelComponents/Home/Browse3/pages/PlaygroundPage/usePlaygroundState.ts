@@ -177,7 +177,8 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     type: 'function',
     function: func,
   }));
-  return {
+
+  const inputs = {
     // Adding this to prevent the exact same call from not getting run
     // eg running the same call in parallel
     key: Math.random() * 1000,
@@ -199,6 +200,16 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
           },
     tools: tools.length > 0 ? tools : undefined,
   };
+
+  if (state.model.includes('o3')) {
+    const {max_tokens, ...rest} = inputs;
+    return {
+      ...rest,
+      max_completion_tokens: max_tokens,
+    };
+  }
+
+  return inputs;
 };
 
 // This is a helper function to parse the trace call output for anthropic

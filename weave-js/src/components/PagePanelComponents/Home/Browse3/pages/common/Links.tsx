@@ -426,6 +426,7 @@ export const CallsLink: React.FC<{
   if (props.callCount != null) {
     label = props.callCount.toString();
     label += props.countIsLimited ? '+' : '';
+    label += ' ';
     label += maybePluralizeWord(props.callCount, 'call');
   }
   return (
