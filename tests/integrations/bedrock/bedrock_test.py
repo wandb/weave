@@ -123,6 +123,70 @@ MOCK_INVOKE_RESPONSE = {
     "ContentType": "application/json",
 }
 
+# Mock response for apply_guardrail
+MOCK_APPLY_GUARDRAIL_RESPONSE = {
+    "ResponseMetadata": {
+        "RequestId": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Fri, 20 Dec 2024 16:44:08 GMT",
+            "content-type": "application/json",
+            "content-length": "456",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        },
+        "RetryAttempts": 0,
+    },
+    "action": "ALLOW",  # or "GUARDRAIL_INTERVENED"
+    "outputs": [
+        {
+            "text": "I can provide general information about retirement planning. Consider diversifying your investments across stocks, bonds, and other assets based on your risk tolerance and time horizon. Consult with a financial advisor for personalized advice."
+        }
+    ],
+    "assessments": [
+        {
+            "topicPolicy": {
+                "topics": [
+                    {"name": "Financial advice", "type": "FILTERED", "confidence": 0.95}
+                ]
+            }
+        }
+    ],
+    "usage": {"inputTokens": 25, "outputTokens": 45, "totalTokens": 70},
+}
+
+# Mock response for apply_guardrail with intervention
+MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
+    "ResponseMetadata": {
+        "RequestId": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Fri, 20 Dec 2024 16:44:08 GMT",
+            "content-type": "application/json",
+            "content-length": "456",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        },
+        "RetryAttempts": 0,
+    },
+    "action": "GUARDRAIL_INTERVENED",
+    "outputs": [
+        {
+            "text": "I cannot provide specific investment advice. Please consult with a qualified financial advisor for personalized retirement planning guidance."
+        }
+    ],
+    "assessments": [
+        {
+            "topicPolicy": {
+                "topics": [
+                    {"name": "Financial advice", "type": "BLOCKED", "confidence": 0.98}
+                ]
+            }
+        }
+    ],
+    "usage": {"inputTokens": 25, "outputTokens": 30, "totalTokens": 55},
+}
+
 # Original botocore _make_api_call function
 orig = botocore.client.BaseClient._make_api_call
 
@@ -143,6 +207,18 @@ def mock_converse_make_api_call(self, operation_name, kwarg):
 def mock_invoke_make_api_call(self, operation_name, kwarg):
     if operation_name == "InvokeModel":
         return MOCK_INVOKE_RESPONSE
+    return orig(self, operation_name, kwarg)
+
+
+def mock_apply_guardrail_make_api_call(self, operation_name, kwarg):
+    if operation_name == "ApplyGuardrail":
+        # Check if we should return the intervention response based on the content
+        content = kwarg.get("content", [])
+        if content and isinstance(content, list) and len(content) > 0:
+            text_content = content[0].get("text", {}).get("text", "")
+            if "specific investment" in text_content.lower():
+                return MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE
+        return MOCK_APPLY_GUARDRAIL_RESPONSE
     return orig(self, operation_name, kwarg)
 
 
@@ -300,3 +376,85 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     assert summary is not None, "Summary should not be None"
     model_usage = summary["usage"][model_id]
     assert model_usage["requests"] == 1
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -> None:
+    from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
+
+    # Initialize the scorer
+    guardrail_id = "test-guardrail-id"
+    guardrail_version = "DRAFT"
+    source = "OUTPUT"
+    bedrock_kwargs = {"region_name": "us-east-1"}
+
+    scorer = BedrockGuardrailScorer(
+        guardrail_id=guardrail_id,
+        guardrail_version=guardrail_version,
+        source=source,
+        bedrock_runtime_kwargs=bedrock_kwargs,
+    )
+
+    # Test with content that should pass the guardrail
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_apply_guardrail_make_api_call,
+    ):
+        result = scorer.score(
+            "How should I think about retirement planning in general?"
+        )
+
+        # Verify the result
+        assert result.passed is True
+        assert "modified_output" in result.metadata
+        assert "usage" in result.metadata
+        assert "assessments" in result.metadata
+
+        # Check that the modified output matches our mock
+        assert (
+            result.metadata["modified_output"]
+            == MOCK_APPLY_GUARDRAIL_RESPONSE["outputs"][0]["text"]
+        )
+
+        # Check usage data
+        assert result.metadata["usage"]["inputTokens"] == 25
+        assert result.metadata["usage"]["outputTokens"] == 45
+        assert result.metadata["usage"]["totalTokens"] == 70
+
+    # Now verify that a trace was captured
+    calls = list(client.calls())
+    assert len(calls) >= 1, "Expected at least one trace call"
+    # Find the score call
+    score_calls = [call for call in calls if "score" in call._op_name]
+    assert len(score_calls) == 1, "Expected exactly one score call"
+    call = score_calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    # Test with content that should trigger guardrail intervention
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_apply_guardrail_make_api_call,
+    ):
+        result = scorer.score(
+            "Give me specific investment advice for my retirement to generate $5,000 monthly."
+        )
+
+        # Verify the result shows intervention
+        assert result.passed is False
+        assert "modified_output" in result.metadata
+        assert "usage" in result.metadata
+        assert "assessments" in result.metadata
+
+        # Check that the modified output matches our intervention mock
+        assert (
+            result.metadata["modified_output"]
+            == MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE["outputs"][0]["text"]
+        )
+
+        # Check usage data
+        assert result.metadata["usage"]["inputTokens"] == 25
+        assert result.metadata["usage"]["outputTokens"] == 30
+        assert result.metadata["usage"]["totalTokens"] == 55
