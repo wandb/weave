@@ -112,7 +112,7 @@ class PreferenceScorer(Scorer):
             dict: A flat dictionary containing the comparison result and reason.
         """
         other_output = await self._get_other_model_output(
-            {"input_text": inputs}
+            {"input_text": input_text}
         )
         if other_output is None:
             return {"primary_is_better": False, "reason": "Other model failed"}
