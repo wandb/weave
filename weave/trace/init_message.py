@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from weave.trace import urls
-from weave.trace.pypi_version_check import check_available
+from weave.utils.pypi_version_check import check_available
 
 if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
