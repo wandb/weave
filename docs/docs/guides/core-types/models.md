@@ -116,10 +116,11 @@ A `Model` is a combination of data (which can include configuration, trained mod
                 None,
             )
 
-          if isinstance(other_model_result, ApplyModelError):
-              return None
 
-          return other_model_result.model_output
+            if isinstance(other_model_result, ApplyModelError):
+                return None
+
+            return other_model_result.model_output
 
         @weave.op
         async def score(self, output: dict, input_text: str) -> dict:

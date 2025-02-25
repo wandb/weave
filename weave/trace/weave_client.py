@@ -305,7 +305,6 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
@@ -320,7 +319,6 @@ def _make_calls_iterator(
                 query=query,
                 sort_by=sort_by,
                 columns=columns,
-                expand_columns=expand_columns,
             )
         )
         return response.calls
@@ -1155,6 +1153,7 @@ class WeaveClient:
         project_id = self._project_id()
 
         _should_print_call_link = should_print_call_link()
+        _current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
@@ -1186,9 +1185,9 @@ class WeaveClient:
 
         def on_complete(f: Future) -> None:
             try:
-                if f.result() and not call_context.get_current_call():
-                    if _should_print_call_link:
-                        print_call_link(call)
+                root_call_did_not_error = f.result() and not _current_call
+                if root_call_did_not_error and _should_print_call_link:
+                    print_call_link(call)
             except Exception:
                 pass
 
