@@ -398,24 +398,20 @@ class WeaveTable(Traceable):
                 )
             )
 
-            # Only check prefetched_rows on the first page
-            if (
-                page_index == 0
-                and self._prefetched_rows is not None
-                and len(response.rows) != len(self._prefetched_rows)
-            ):
-                # If we're paginating and have fewer rows than expected in the first page,
-                # this is normal and we should continue with pagination
-                if (
-                    len(response.rows) == page_size
-                    and len(self._prefetched_rows) > page_size
+            # Check if we need to handle prefetched rows mismatch
+            if page_index == 0 and self._prefetched_rows is not None:
+                response_rows_len = len(response.rows)
+                prefetched_rows_len = len(self._prefetched_rows)
+
+                # Only log an error if this isn't a normal pagination scenario
+                if response_rows_len != prefetched_rows_len and not (
+                    response_rows_len == page_size and prefetched_rows_len > page_size
                 ):
-                    pass  # This is expected when paginating
-                else:
                     if get_raise_on_captured_errors():
                         raise
-                    logger.error(
-                        f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
+                    # Use internal_logger with DEBUG level instead of ERROR
+                    logger.debug(
+                        f"Pagination handling: Response rows ({response_rows_len}) don't match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
                     )
                     self._prefetched_rows = None
 
