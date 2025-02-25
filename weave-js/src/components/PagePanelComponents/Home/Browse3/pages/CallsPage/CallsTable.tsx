@@ -56,6 +56,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
+import {CallData} from '../../datasets/schemaUtils';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -157,6 +158,7 @@ const SelectionHeader: FC<{
   filterModel?: GridFilterModel;
   sortModel?: GridSortModel;
   tableData: FlattenedCallData[];
+  callsResult: CallSchema[];
 }> = ({
   selectedCount,
   isEvaluateTable,
@@ -172,6 +174,7 @@ const SelectionHeader: FC<{
   filterModel,
   sortModel,
   tableData,
+  callsResult,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isReadonly =
@@ -179,7 +182,7 @@ const SelectionHeader: FC<{
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
-  
+
   // Get the full call objects for selected calls to send, for bulk actions (like delete)
   const selectedCallObjects = useMemo(
     () =>
@@ -189,11 +192,29 @@ const SelectionHeader: FC<{
     [tableData, selectedCalls]
   );
 
+  // Get the call objects in CallData format for the dataset drawer
+  const selectedCallsForDataset = useMemo(
+    () =>
+      selectedCalls
+        .map(id => {
+          const call = callsResult.find(c => c.traceCall?.id === id);
+          if (!call?.traceCall) {
+            return null;
+          }
+          return {
+            digest: call.traceCall.id,
+            val: call.traceCall,
+          };
+        })
+        .filter((item): item is CallData => item !== null),
+    [selectedCalls, callsResult]
+  );
+
   return (
     <div className="flex w-full items-center gap-[8px]">
       {/* Left side group */}
-      <span className="text-sm text-moon-600 flex items-center">
-      <Button
+      <span className="flex items-center text-sm text-moon-600">
+        <Button
           icon="close"
           variant="ghost"
           size="small"
@@ -216,6 +237,17 @@ const SelectionHeader: FC<{
           selectedCount={selectedCount}
         />
       )}
+      <BulkAddToDatasetButton
+        onClick={() => setAddToDatasetModalOpen(true)}
+        disabled={selectedCalls.length === 0}
+      />
+      <AddToDatasetDrawer
+        entity={entity}
+        project={project}
+        open={addToDatasetModalOpen}
+        onClose={() => setAddToDatasetModalOpen(false)}
+        selectedCalls={selectedCallsForDataset}
+      />
       {!isReadonly && (
         <div className="flex-none">
           <BulkDeleteButton
@@ -704,36 +736,41 @@ export const CallsTable: FC<{
           // Get IDs of all rows on current page
           const currentPageRowIds = tableData.map(row => row.id);
           // Count how many of current page rows are selected
-          const currentPageSelectedCount = currentPageRowIds.filter(id => 
+          const currentPageSelectedCount = currentPageRowIds.filter(id =>
             selectedCalls.includes(id)
           ).length;
-          
+
           // Determine checkbox state:
           // - false if none selected
-          // - true if all selected 
+          // - true if all selected
           // - 'indeterminate' if some selected
-          const isChecked = currentPageSelectedCount === 0
-            ? false 
-            : currentPageSelectedCount === currentPageRowIds.length
-            ? true
-            : 'indeterminate';
+          const isChecked =
+            currentPageSelectedCount === 0
+              ? false
+              : currentPageSelectedCount === currentPageRowIds.length
+              ? true
+              : 'indeterminate';
 
-          const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+          const maxForTable = isEvaluateTable
+            ? MAX_EVAL_COMPARISONS
+            : MAX_SELECT;
           const isAtLimit = selectedCalls.length >= maxForTable;
-          
+
           // Determine tooltip text based on state
           let tooltipText = '';
           if (isChecked === false && isAtLimit) {
-            tooltipText = `Select limited to ${isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT} items`;
+            tooltipText = `Select limited to ${
+              isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT
+            } items`;
           } else if (isChecked === 'indeterminate') {
             tooltipText = 'De-select this page';
           } else if (isChecked === false) {
-            const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
             const availableSlots = maxForTable - selectedCalls.length;
             const pageSize = currentPageRowIds.length;
-            tooltipText = availableSlots < pageSize 
-              ? `Select ${availableSlots} items (max 100)`
-              : 'Select this page';
+            tooltipText =
+              availableSlots < pageSize
+                ? `Select ${availableSlots} items (max 100)`
+                : 'Select this page';
           } else {
             tooltipText = 'De-select this page';
           }
@@ -748,23 +785,28 @@ export const CallsTable: FC<{
                   onCheckedChange={() => {
                     if (isChecked === 'indeterminate') {
                       // If partially selected, deselect all items on current page
-                      setSelectedCalls(selectedCalls.filter(id => 
-                        !currentPageRowIds.includes(id)
-                      ));
+                      setSelectedCalls(
+                        selectedCalls.filter(
+                          id => !currentPageRowIds.includes(id)
+                        )
+                      );
                     } else if (isChecked === true) {
                       // If all selected, deselect all items on current page
-                      setSelectedCalls(selectedCalls.filter(id => 
-                        !currentPageRowIds.includes(id)
-                      ));
+                      setSelectedCalls(
+                        selectedCalls.filter(
+                          id => !currentPageRowIds.includes(id)
+                        )
+                      );
                     } else {
                       // If none selected, select all items on current page
-                      const missing = currentPageRowIds.filter(id => 
-                        !selectedCalls.includes(id)
+                      const missing = currentPageRowIds.filter(
+                        id => !selectedCalls.includes(id)
                       );
                       const availableSlots = maxForTable - selectedCalls.length;
-                      const additions = availableSlots < missing.length 
-                        ? missing.slice(0, availableSlots) 
-                        : missing;
+                      const additions =
+                        availableSlots < missing.length
+                          ? missing.slice(0, availableSlots)
+                          : missing;
                       setSelectedCalls([...selectedCalls, ...additions]);
                     }
                   }}
@@ -810,7 +852,7 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -832,23 +874,6 @@ export const CallsTable: FC<{
       ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
-
-  // Replace the state and effect with a single memo
-  const selectedCallObjects = useMemo(() => {
-    if (!callsResult) {
-      return [];
-    }
-    return callsResult
-      .filter(
-        call =>
-          call?.traceCall?.id != null &&
-          selectedCalls.includes(call.traceCall.id)
-      )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
-  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -968,6 +993,7 @@ export const CallsTable: FC<{
               filterModel={filterModel}
               sortModel={sortModel}
               tableData={tableData}
+              callsResult={callsResult}
             />
           </TailwindContents>
         ) : (
@@ -1321,10 +1347,6 @@ const OpSelector = ({
     </div>
   );
 };
-
-const ButtonDivider = () => (
-  <div className="h-24 flex-none border-l-[1px] border-moon-250" />
-);
 
 const useParentIdOptions = (
   entity: string,

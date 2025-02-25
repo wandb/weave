@@ -503,8 +503,7 @@ export const BulkDeleteButton: FC<{
         disabled={disabled}
         onClick={onClick}
         tooltip="Select rows with the checkbox to delete"
-        icon="delete">
-      </Button>
+        icon="delete"></Button>
     </Box>
   );
 };
@@ -529,8 +528,9 @@ export const BulkAddToDatasetButton: FC<{
       onClick={handleClick}
       disabled={disabled}
       tooltip="Add selected rows to a dataset"
-      icon="table"
-    />
+      icon="table">
+      Add to dataset
+    </Button>
   );
 };
 

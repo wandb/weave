@@ -86,11 +86,7 @@ export const ManageColumnsButton = ({
   return (
     <>
       <span ref={ref}>
-        <Button
-          variant="ghost"
-          icon="column"
-          onClick={onClick}>
-        </Button>
+        <Button variant="ghost" icon="column" onClick={onClick}></Button>
       </span>
       <Popover
         id={id}
