@@ -24,9 +24,10 @@ STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
 
 def header(text: str):
-    print(f"[blue bold]╔{'═' * (len(text) + 4)}╗[/blue bold]")
-    print(f"[blue bold]║  {text}  ║[/blue bold]")
-    print(f"[blue bold]╚{'═' * (len(text) + 4)}╝[/blue bold]")
+    """Display a prominent header"""
+    print(f"[bold blue]╔{'═' * (len(text) + 6)}╗[/bold blue]")
+    print(f"[bold blue]║   {text}   ║[/bold blue]")
+    print(f"[bold blue]╚{'═' * (len(text) + 6)}╝[/bold blue]")
 
 
 def error(text: str):
@@ -34,11 +35,11 @@ def error(text: str):
 
 
 def warning(text: str):
-    print(f"[yellow bold]WARNING: {text}[/yellow bold]")
+    print(f"[yellow]WARNING: {text}[/yellow]")
 
 
 def info(text: str):
-    print(f"[green bold]INFO:    {text}[/green bold]")
+    print(f"INFO:    {text}")
 
 
 @click.group()
@@ -261,46 +262,94 @@ def _update_pyproject_toml(
         f.write(tomlkit.dumps(doc))
 
 
+def _format_command(command_name: str, **kwargs) -> str:
+    """Format a command and its arguments for display"""
+    parts = [command_name]
+    for k, v in kwargs.items():
+        if v is not None:
+            k = k.replace("_", "-")
+            if isinstance(v, bool):
+                if v:
+                    parts.append(f"--{k}")
+            else:
+                parts.append(f"--{k}={v}")
+    return " ".join(parts)
+
+
+def _announce_command(cmd: str) -> None:
+    """Announce a command with a simple line format"""
+    print(f"\nINFO:    Running command: {cmd}")
+
+
 @cli.command()  # type: ignore
 @click.option(
     "--config",
     default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
     help="Path to config file",
 )
-def all(config: str) -> None:
-    """Run all codegen commands in sequence using config from yaml file"""
-    header("Running all codegen commands")
+@click.option("--repo-path", help="Path to the repository for code generation")
+@click.option("--package-name", help="Name of the package to update in pyproject.toml")
+@click.option("--openapi-output", help="Path to save the OpenAPI spec")
+@click.option("--node-output", help="Path for Node.js code generation output")
+@click.option("--typescript-output", help="Path for TypeScript code generation output")
+@click.option("--release", is_flag=True, help="Update to the latest version")
+def all(
+    config: str,
+    repo_path: str | None,
+    package_name: str | None,
+    openapi_output: str | None,
+    node_output: str | None,
+    typescript_output: str | None,
+    release: bool | None,
+) -> None:
+    """Run all codegen commands in sequence using config from yaml file and/or direct arguments"""
+    header("Running weave codegen")
 
-    # Read config - handle relative paths
+    # Initialize config dict
+    cfg: dict = {}
+
+    # Read config from file if it exists
     config_path = Path(config)
     if not config_path.is_absolute():
         config_path = Path.cwd() / config_path
 
     try:
-        with open(config_path) as f:
-            cfg = yaml.safe_load(f)
-    except FileNotFoundError:
-        error(f"Config file {config_path} not found")
-        sys.exit(1)
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = yaml.safe_load(f) or {}
+            info(f"Loaded config from {config_path}")
     except yaml.YAMLError as e:
         error(f"Failed to parse config file: {e}")
         sys.exit(1)
 
+    # Override config with direct arguments if provided
+    if repo_path is not None:
+        cfg["repo_path"] = repo_path
+    if package_name is not None:
+        cfg["package_name"] = package_name
+    if openapi_output is not None:
+        cfg["openapi_output"] = openapi_output
+    if node_output is not None:
+        cfg["node_output"] = node_output
+    if typescript_output is not None:
+        cfg["typescript_output"] = typescript_output
+    if release is not None:
+        cfg["release"] = release
+
     # Validate required config
-    repo_path = cfg.get("repo_path")
-    package_name = cfg.get("package_name")
-    if not repo_path or not package_name:
-        error("repo_path and package_name must be specified in config")
+    if not cfg.get("repo_path") or not cfg.get("package_name"):
+        error(
+            "repo_path and package_name must be specified either in config file or as arguments"
+        )
         sys.exit(1)
 
     # Convert repo_path to absolute path if relative
-    repo_path = Path(repo_path)
+    repo_path = Path(cfg["repo_path"])
     if not repo_path.is_absolute():
         repo_path = Path.cwd() / repo_path
     repo_path = str(repo_path)
 
     # 1. Get OpenAPI spec
-    info("Step 1: Getting OpenAPI spec")
     output_file = cfg.get("openapi_output", STAINLESS_OAS_PATH)
     # Convert output_file to absolute path if relative
     output_path = Path(output_file)
@@ -308,10 +357,11 @@ def all(config: str) -> None:
         output_path = Path.cwd() / output_file
     # Call get_openapi_spec with --output-file argument
     ctx = click.get_current_context()
+    cmd = _format_command("get_openapi_spec", output_file=str(output_path))
+    _announce_command(cmd)
     ctx.invoke(get_openapi_spec, output_file=str(output_path))
 
     # 2. Generate code
-    info("Step 2: Generating code")
     # Use repo_path as python_output
     node_path = cfg.get("node_output")
     typescript_path = cfg.get("typescript_output")
@@ -329,6 +379,13 @@ def all(config: str) -> None:
             else typescript_path
         )
     # Call generate_code with proper arguments
+    cmd = _format_command(
+        "generate_code",
+        python_path=repo_path,
+        node_path=node_path,
+        typescript_path=typescript_path,
+    )
+    _announce_command(cmd)
     ctx.invoke(
         generate_code,
         python_path=repo_path,
@@ -337,17 +394,24 @@ def all(config: str) -> None:
     )
 
     # 3. Update pyproject.toml
-    info("Step 3: Updating pyproject.toml")
     release = cfg.get("release", False)
     # Call update_pyproject with proper arguments
+    cmd = _format_command(
+        "update_pyproject",
+        repo_path=repo_path,
+        package_name=cfg["package_name"],
+        release=release,
+    )
+    _announce_command(cmd)
     ctx.invoke(
         update_pyproject,
         repo_path=repo_path,
-        package_name=package_name,
+        package_name=cfg["package_name"],
         release=release,
     )
 
-    info("All codegen steps completed successfully!")
+    print("\n")
+    header("Weave codegen completed successfully!")
 
 
 if __name__ == "__main__":

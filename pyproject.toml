@@ -51,11 +51,8 @@ dependencies = [
   # Basically:
   # 1. For normal dev, pin to a SHA and allow direct references
   # 2. For deploys, pin to a specific version and remove allow-direct-references.
-  "weave_trace @ git+https://github.com/wandb/weave-stainless.git@73294ddc7befb6a4d8da1a626b6b7edfa0f725ca",
+  "weave_trace @ git+https://github.com/wandb/weave.git@73294ddc7befb6a4d8da1a626b6b7edfa0f725ca",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [project.optional-dependencies]
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
@@ -161,6 +158,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
