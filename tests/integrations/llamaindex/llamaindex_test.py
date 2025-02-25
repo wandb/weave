@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 import pytest
-
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 import weave
 from weave.integrations.integration_utilities import (
     filter_body,
@@ -67,8 +67,6 @@ def test_llamaindex_quickstart(
     client: weave.trace.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)
 
@@ -93,8 +91,6 @@ async def test_llamaindex_quickstart_async(
     client: weave.trace.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)
 
