@@ -414,11 +414,10 @@ class WeaveTable(Traceable):
                 if response_rows_len != prefetched_rows_len and not (
                     response_rows_len == page_size and prefetched_rows_len > page_size
                 ):
+                    msg = f"Expected length of response rows ({response_rows_len}) to match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
                     if get_raise_on_captured_errors():
-                        raise
-                    logger.debug(
-                        f"Expected length of response rows ({response_rows_len}) to match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
-                    )
+                        raise ValueError(msg)
+                    logger.debug(msg)
                     self._prefetched_rows = None
 
             for i, item in enumerate(response.rows):
