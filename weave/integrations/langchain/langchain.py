@@ -39,9 +39,9 @@ from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
+from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 
 import_failed = False
@@ -56,7 +56,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -180,11 +180,17 @@ if not import_failed:
                         if wv_current_run.parent_id is None:
                             use_stack = False
                         else:
-                            # Note: this is implemented as a network call - it would be much nice
-                            # to refactor `create_call` such that it could accept a parent_id instead
-                            # of an entire Parent object.
-                            parent_run = cast(
-                                Call, self.gc.get_call(wv_current_run.parent_id)
+                            # Hack in memory parent call to satisfy `create_call`
+                            # Impact is the parent won't actually represent the parent call
+                            # so we do NOT want to save the parent to the stack
+                            use_stack = False
+                            parent_run = Call(
+                                id=wv_current_run.parent_id,
+                                trace_id=wv_current_run.trace_id,
+                                _op_name="",
+                                project_id="",
+                                parent_id=None,
+                                inputs={},
                             )
 
             fn_name = make_pythonic_function_name(run.name)
