@@ -53,7 +53,7 @@ def lint(session):
         "vertexai",
         "bedrock",
         "scorers",
-        "pandas-test",
+        "pandas_test",
         "huggingface",
     ],
 )
