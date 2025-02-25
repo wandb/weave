@@ -1,3 +1,5 @@
+import copy
+import io
 import json
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
@@ -52,11 +54,40 @@ def bedrock_on_finish_invoke(
 def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs.get("kwargs", {})
 
+
 def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
     exploded_kwargs = inputs.get("kwargs", {})
     if "body" in exploded_kwargs:
         exploded_kwargs["body"] = json.loads(exploded_kwargs["body"])
     return exploded_kwargs
+
+
+def postprocess_output_invoke(outputs: dict[str, Any]) -> dict[str, Any]:
+    """Process the outputs for logging without affecting the original response."""
+    if "body" in outputs:
+        # Get the original body
+        body = outputs["body"]
+
+        # Read the content
+        body_content = body.read()
+
+        # Create a copy of the outputs for logging
+        outputs_copy = {k: copy.deepcopy(v) for k, v in outputs.items() if k != "body"}
+
+        try:
+            # Try to parse as JSON for the logged copy
+            body_str = body_content.decode("utf-8")
+            outputs_copy["body"] = json.loads(body_str)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            # If we can't decode or parse, just use the raw content
+            outputs_copy["body"] = {"raw_content": str(body_content)}
+
+        # Create a BytesIO object from the content for the original response
+        outputs["body"] = io.BytesIO(body_content)
+
+        return outputs_copy
+    return outputs
+
 
 def _patch_converse(bedrock_client: "BaseClient") -> None:
     op = weave.op(
@@ -73,9 +104,18 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
         bedrock_client.invoke_model,
         name="BedrockRuntime.invoke",
         postprocess_inputs=postprocess_inputs_invoke,
+        postprocess_output=postprocess_output_invoke,
     )
     op._set_on_finish_handler(bedrock_on_finish_invoke)
     bedrock_client.invoke_model = op
+
+
+def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
+    op = weave.op(
+        bedrock_client.apply_guardrail,
+        name="BedrockRuntime.apply_guardrail",
+    )
+    bedrock_client.apply_guardrail = op
 
 
 def bedrock_stream_accumulator(
@@ -160,4 +200,5 @@ def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
 def patch_client(bedrock_client: "BaseClient") -> None:
     _patch_converse(bedrock_client)
     _patch_invoke(bedrock_client)
+    _patch_apply_guardrail(bedrock_client)
     _patch_converse_stream(bedrock_client)
