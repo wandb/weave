@@ -96,7 +96,7 @@ def test_server_caching(client):
         "hits": 0,
         "misses": 0,
         "errors": 0,
-        "skips": 8,
+        "skips": 7,
     }
 
 
