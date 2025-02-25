@@ -253,7 +253,7 @@ jobs:
             "openai",
             "vertexai",
             "scorers",
-            "pandas-test",
+            "pandas_test",
           ]
       fail-fast: false
     services:
