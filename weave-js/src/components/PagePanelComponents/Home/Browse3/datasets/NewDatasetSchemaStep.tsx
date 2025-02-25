@@ -152,7 +152,7 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
   }
 
   return (
-    <Stack spacing={"8px"} sx={{mt: "24px"}}>
+    <Stack spacing={'8px'} sx={{mt: '24px'}}>
       <Typography sx={{...typographyStyle, fontWeight: 600}}>
         Configure dataset fields
       </Typography>
@@ -166,7 +166,13 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
         included field, you can customize the column name that will appear in
         the resulting dataset.
       </Typography>
-      <Box sx={{bgcolor: '#F8F8F8', border: '1px solid #E0E0E0', p: 2, borderRadius: 1}}>
+      <Box
+        sx={{
+          bgcolor: '#F8F8F8',
+          border: '1px solid #E0E0E0',
+          p: 2,
+          borderRadius: 1,
+        }}>
         <Box
           sx={{
             display: 'grid',
@@ -188,7 +194,11 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
             }}
             onClick={handleToggleAll}>
             <Checkbox
-              checked={!allFieldsIncluded && someFieldsIncluded ? 'indeterminate' : allFieldsIncluded}
+              checked={
+                !allFieldsIncluded && someFieldsIncluded
+                  ? 'indeterminate'
+                  : allFieldsIncluded
+              }
               onCheckedChange={handleToggleAll}
               size="small"
             />
@@ -228,7 +238,9 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                 }}>
                 <Checkbox
                   checked={config.included}
-                  onCheckedChange={() => handleIncludedChange(config.sourceField)}
+                  onCheckedChange={() =>
+                    handleIncludedChange(config.sourceField)
+                  }
                   size="small"
                 />
                 <DataPreviewTooltip
