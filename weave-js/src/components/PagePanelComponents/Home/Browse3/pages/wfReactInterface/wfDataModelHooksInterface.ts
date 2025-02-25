@@ -213,7 +213,8 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefCols?: string[],
-    includeFeedback?: boolean
+    includeFeedback?: boolean,
+    includeCosts?: boolean
   ) => Promise<Blob>;
   useObjCreate: () => (
     projectId: string,
@@ -307,6 +308,9 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  useTableCreate: () => (
+    table: traceServerClientTypes.TableCreateReq
+  ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

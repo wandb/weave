@@ -1,5 +1,12 @@
 import {isEqual as _isEqual} from 'lodash';
-import React, {CSSProperties, FC, memo, ReactNode, useContext} from 'react';
+import React, {
+  CSSProperties,
+  FC,
+  memo,
+  ReactNode,
+  useCallback,
+  useContext,
+} from 'react';
 
 import {DragDropContext, DragDropState} from './DragDropContextProvider';
 import {DragRef} from './types';
@@ -49,8 +56,110 @@ const DropTargetComp: FC<DropTargetProps> = ({
     setDropRef,
     setShiftKey,
   } = context;
-  const validDropTarget = (ctx: DragDropState) =>
-    isValidDropTarget != null ? isValidDropTarget(ctx) : true;
+  const validDropTarget = useCallback(
+    (ctx: DragDropState) =>
+      isValidDropTarget != null ? isValidDropTarget(ctx) : true,
+    [isValidDropTarget]
+  );
+
+  const handleOnDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragRef != null && validDropTarget(context)) {
+        if (dropRef == null || !_isEqual(partRef, dropRef)) {
+          setDropRef(partRef);
+        }
+        if (onDragOver) {
+          onDragOver(context, e);
+        }
+      }
+    },
+    [
+      context,
+      dragRef,
+      dropRef,
+      onDragOver,
+      partRef,
+      setDropRef,
+      validDropTarget,
+    ]
+  );
+
+  const handleOnDragStart = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      onDragStart?.(e);
+    },
+    [onDragStart]
+  );
+
+  const handleOnDragEnter = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onDragEnter && dragRef && validDropTarget(context)) {
+        onDragEnter(context, e);
+      }
+    },
+    [context, dragRef, onDragEnter, validDropTarget]
+  );
+
+  const handleOnDragLeave = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (
+        onDragLeave &&
+        dragRef &&
+        clientXY != null &&
+        validDropTarget(context)
+      ) {
+        // Dragging over the target's children can trigger onDragLeave
+        // So we use the target bounds to decide if we should actually trigger it
+        // (We could also set pointer-events: none on children, but sometimes that causes other problems)
+        const targetBounds = e.currentTarget.getBoundingClientRect();
+        const [clientX, clientY] = clientXY;
+        if (
+          clientY < targetBounds.top ||
+          clientY > targetBounds.bottom ||
+          clientX < targetBounds.left ||
+          clientX > targetBounds.right
+        ) {
+          onDragLeave(context, e);
+        }
+      }
+    },
+    [context, dragRef, clientXY, onDragLeave, validDropTarget]
+  );
+
+  const handleOnDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (onDrop && dragRef && validDropTarget(context)) {
+        e.stopPropagation();
+        e.preventDefault();
+        onDrop(context, e);
+      }
+      setDropRef(null);
+      setDragData(null);
+      setDragStarted(false);
+      setDragging(false);
+      setDragRef(null);
+      setShiftKey(false);
+    },
+    [
+      context,
+      dragRef,
+      onDrop,
+      setDragData,
+      setDragRef,
+      setDragStarted,
+      setDragging,
+      setDropRef,
+      setShiftKey,
+      validDropTarget,
+    ]
+  );
+
   return (
     <div
       style={style || undefined}
@@ -58,65 +167,11 @@ const DropTargetComp: FC<DropTargetProps> = ({
       onClick={onClick}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
-      onDragOver={e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (dragRef != null && validDropTarget(context)) {
-          if (dropRef == null || !_isEqual(partRef, dropRef)) {
-            setDropRef(partRef);
-          }
-          if (onDragOver) {
-            onDragOver(context, e);
-          }
-        }
-      }}
-      onDragStart={e => {
-        onDragStart?.(e);
-      }}
-      onDragEnter={e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (onDragEnter && dragRef && validDropTarget(context)) {
-          onDragEnter(context, e);
-        }
-      }}
-      onDragLeave={e => {
-        e.stopPropagation();
-        e.preventDefault();
-        if (
-          onDragLeave &&
-          dragRef &&
-          clientXY != null &&
-          validDropTarget(context)
-        ) {
-          // Dragging over the target's children can trigger onDragLeave
-          // So we use the target bounds to decide if we should actually trigger it
-          // (We could also set pointer-events: none on children, but sometimes that causes other problems)
-          const targetBounds = e.currentTarget.getBoundingClientRect();
-          const [clientX, clientY] = clientXY;
-          if (
-            clientY < targetBounds.top ||
-            clientY > targetBounds.bottom ||
-            clientX < targetBounds.left ||
-            clientX > targetBounds.right
-          ) {
-            onDragLeave(context, e);
-          }
-        }
-      }}
-      onDrop={e => {
-        if (onDrop && dragRef && validDropTarget(context)) {
-          e.stopPropagation();
-          e.preventDefault();
-          onDrop(context, e);
-        }
-        setDropRef(null);
-        setDragData(null);
-        setDragStarted(false);
-        setDragging(false);
-        setDragRef(null);
-        setShiftKey(false);
-      }}>
+      onDragOver={handleOnDragOver}
+      onDragStart={handleOnDragStart}
+      onDragEnter={handleOnDragEnter}
+      onDragLeave={handleOnDragLeave}
+      onDrop={handleOnDrop}>
       {children}
     </div>
   );

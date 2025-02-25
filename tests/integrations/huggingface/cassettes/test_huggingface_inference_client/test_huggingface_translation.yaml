@@ -1,0 +1,66 @@
+interactions:
+- request:
+    body: '{"inputs": "My name is Wolfgang and I live in Berlin", "parameters": {}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '72'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - 237f83f7-6472-4140-a466-a46e2c45aa47
+      user-agent:
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
+    method: POST
+    uri: https://router.huggingface.co/hf-inference/models/Helsinki-NLP/opus-mt-en-fr
+  response:
+    body:
+      string: "[{\"translation_text\":\"Je m'appelle Wolfgang et je vis \xE0 Berlin.\"}]"
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '67'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 20 Feb 2025 06:28:49 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 5795cfb7762205b7d50d5ba7ce4d8746.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - o97rZb0lFXuTXaCDxHEVqHz2uJicnwpe73B90gh9al48E0wmqDJf_w==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      access-control-allow-credentials:
+      - 'true'
+      cross-origin-opener-policy:
+      - same-origin
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-compute-time:
+      - '0.332'
+      x-compute-type:
+      - cache
+      x-request-id:
+      - Root=1-67b6cba1-2ef0d0ef2c32b30555473038;237f83f7-6472-4140-a466-a46e2c45aa47
+      x-sha:
+      - dd7f6540a7a48a7f4db59e5c0b9c42c8eea67f18
+    status:
+      code: 200
+      message: OK
+version: 1

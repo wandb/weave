@@ -137,3 +137,10 @@ h6 { font-size: 1rem !important; }
     white-space: nowrap;
   }
 }
+
+/* Prevent keyword italicization in dark mode code blocks */
+[data-theme='dark'] .token.keyword,
+[data-theme='dark'] .token.operator,
+[data-theme='dark'] .token.builtin {
+  font-style: normal !important;
+}

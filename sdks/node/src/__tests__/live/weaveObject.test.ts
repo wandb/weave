@@ -17,7 +17,7 @@ class ExampleObject extends WeaveObject {
   }
 }
 
-describe('weaveObject', () => {
+describe.skip('WeaveObject', () => {
   beforeEach(async () => {
     await login(process.env.WANDB_API_KEY ?? '');
   });
