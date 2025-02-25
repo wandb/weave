@@ -89,12 +89,14 @@ type SmallWeaveRefProps = {
   objRef: WeaveObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
+  noLink?: boolean;
 };
 
 export const SmallWeaveRef = ({
   objRef,
   wfTable,
   iconOnly = false,
+  noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjectVersion} = useWFHooks();
@@ -134,7 +136,13 @@ export const SmallWeaveRef = ({
     : getObjectVersionLabel(objRef, versionIndex);
   return (
     <TailwindContents>
-      <SmallRefLoaded icon={icon} label={label} url={url} error={error} />
+      <SmallRefLoaded
+        icon={icon}
+        label={label}
+        url={url}
+        error={error}
+        noLink={noLink}
+      />
     </TailwindContents>
   );
 };

@@ -1440,11 +1440,7 @@ export const toGqlField = (
         ]),
       },
     ];
-  } else if (
-    forwardOp.op.name === 'artifactMembership-_files_refine_output_type' ||
-    forwardOp.op.name === 'artifactMembership-files' ||
-    forwardOp.op.name === 'artifactMembership-file'
-  ) {
+  } else if (forwardOp.op.name === 'artifactMembership-file') {
     return [
       {
         name: 'artifact',

@@ -40,6 +40,7 @@ quote_slashes = functools.partial(parse.quote, safe="")
 
 DEFAULT_WEAVE_OBJ_PROJECT = "weave"
 
+
 class WandbArtifactManifestEntry(typing.TypedDict):
     digest: str
     birthArtifactID: typing.Optional[str]

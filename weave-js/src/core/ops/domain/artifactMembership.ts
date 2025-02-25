@@ -1,4 +1,4 @@
-import {opFileType, replaceInputVariables} from '@wandb/weave/core';
+import {opFileType} from '@wandb/weave/core';
 import * as TypeHelpers from '@wandb/weave/core/model/helpers';
 import {docType} from '@wandb/weave/core/util/docs';
 import * as _ from 'lodash';
@@ -109,9 +109,6 @@ export const opArtifactMembershipFile = makeStandardOp({
     forwardOp,
     context
   ) => {
-    // NOTE: We're passing inputs back directly, which is artifact path
-    // looks like {artifact: {id: <artifact_id>}, path: <string>}
-    // TODO: not final, file doesn't need to be artifact dependent
     if (artifactMembership == null) {
       throw new Error('opArtifactMembershipFile missing artifactMembership');
     }
@@ -139,7 +136,7 @@ export const opArtifactMembershipFile = makeStandardOp({
     } catch (e) {
       console.warn('Error loading artifact file from membership', {
         err: e,
-        artifact: artifactMembership,
+        artifact: artifactMembership.artifact,
         path,
       });
       return null;
