@@ -299,7 +299,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   }
 
   return (
-    <Stack spacing={1} sx={{mt: 4}}>
+    <Stack spacing={"8px"} sx={{mt: "24px"}}>
       <Typography sx={{...typographyStyle, fontWeight: 600}}>
         Configure field mapping
       </Typography>
@@ -311,8 +311,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
         }}>
         Map fields from your calls to the corresponding dataset columns.
       </Typography>
-      <Box sx={{height: 16}} />
-      <Box sx={{bgcolor: '#F8F8F8', p: 2, borderRadius: 1}}>
+      <Box sx={{bgcolor: '#F8F8F8', border: '1px solid #E0E0E0', p: 2, borderRadius: 1}}>
         <Box
           sx={{
             display: 'grid',
