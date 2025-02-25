@@ -136,8 +136,8 @@ class S3FileStorageURI(FileStorageURI):
 class GCSFileStorageURI(FileStorageURI):
     """Google Cloud Storage URI handler.
 
-    Format: gcs://<bucket>/<path>
-    Example: gcs://my-bucket/path/to/object
+    Format: gs://<bucket>/<path>
+    Example: gs://my-bucket/path/to/object
 
     Attributes:
         scheme (str): Always 'gcs'
@@ -145,7 +145,7 @@ class GCSFileStorageURI(FileStorageURI):
         path (str): The object path within the bucket
     """
 
-    scheme = "gcs"
+    scheme = "gs"
     bucket: str
 
     def __init__(self, bucket: str, path: str):
