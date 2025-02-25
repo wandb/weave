@@ -1,5 +1,7 @@
 import asyncio
+import os
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -395,9 +397,11 @@ def test_evaluate_table_lazy_iter(client):
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == []
 
-    result = asyncio.run(evaluation.evaluate(model_predict))
-    assert result["output"] == {"mean": 149.5}
-    assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
+    # Make sure we have deterministic results
+    with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
+        result = asyncio.run(evaluation.evaluate(model_predict))
+        assert result["output"] == {"mean": 149.5}
+        assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
 
     log = client.server.attribute_access_log
     log = [l for l in log if not l.startswith("_")]
@@ -419,10 +423,5 @@ def test_evaluate_table_lazy_iter(client):
     assert counts_split_by_table_query[0] <= 13
     # Note: if this test suite is ran in a different order, then the low level eval ops will already be saved
     # so the first count can be different.
-    assert counts_split_by_table_query == [
-        counts_split_by_table_query[0],
-        700,
-        700,
-        700,
-        5,
-    ], log
+    count = counts_split_by_table_query[0]
+    assert counts_split_by_table_query == [count, 700, 700, 700, 5], log

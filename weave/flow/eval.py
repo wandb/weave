@@ -3,7 +3,7 @@ import logging
 import traceback
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Literal, Optional, TypeVar, Union
 
 from pydantic import PrivateAttr
 from rich import print
