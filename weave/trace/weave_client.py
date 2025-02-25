@@ -1920,9 +1920,13 @@ class WeaveClient:
         return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def _objects(
+        self, filter: ObjectVersionFilter | dict | None = None
+    ) -> list[ObjSchema]:
         if not filter:
             filter = ObjectVersionFilter()
+        elif isinstance(filter, dict):
+            filter = ObjectVersionFilter(**filter)
         else:
             filter = filter.model_copy()
         filter = cast(ObjectVersionFilter, filter)
@@ -1940,17 +1944,42 @@ class WeaveClient:
     def get_objects(
         self,
         *,
-        filter: ObjectVersionFilter | None = None,
+        filter: ObjectVersionFilter | dict | None = None,
     ) -> list[ObjectVersionCollection]:
         """
         Get objects with versions grouped by object ID.
 
+        This method retrieves objects from the Weave server and groups them by object ID,
+        returning a list of ObjectVersionCollection instances. Each collection contains
+        all versions of a single object.
+
         Args:
-            filter: Filter to apply to the objects query
+            filter: Filter to apply to the objects query. Can be used to filter by object IDs,
+                   base object classes, or other criteria.
 
         Returns:
-            A list of ObjectVersionCollection objects, each containing versions of a single object
+            A list of ObjectVersionCollection objects, each containing versions of a single object.
 
+        Examples:
+            ```python
+            # Get all objects
+            objects = client.get_objects()
+
+            # Get objects of a specific class
+            model_objects = client.get_objects(
+                filter=ObjectVersionFilter(base_object_classes=["Model"])
+            )
+
+            # You can also pass a dict for the filter
+            model_objects = client.get_objects(
+                filter={"base_object_classes": ["Model"]}
+            )
+
+            # Get specific objects by ID
+            specific_objects = client.get_objects(
+                filter=ObjectVersionFilter(object_ids=["my_model", "my_dataset"])
+            )
+            ```
         """
         all_objects = self._objects(filter)
 
@@ -1962,6 +1991,34 @@ class WeaveClient:
             ObjectVersionCollection(object_id, versions, self)
             for object_id, versions in grouped_objects.items()
         ]
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_versions(
+        self,
+        object_id: str,
+    ) -> ObjectVersionCollection:
+        """
+        Get all versions of a specific object by its ID.
+
+        This method retrieves all versions of an object with the given object_id
+        and returns them as an ObjectVersionCollection.
+
+        Args:
+            object_id: The ID of the object to retrieve versions for.
+
+        Returns:
+            An ObjectVersionCollection containing all versions of the specified object.
+            If the object doesn't exist, an empty collection is returned.
+
+        Examples:
+            ```python
+            # Get all versions of a specific object
+            model_versions = client.get_versions("my_model")
+            ```
+
+        """
+        objects = self._objects(ObjectVersionFilter(object_ids=[object_id]))
+        return ObjectVersionCollection(object_id, objects, self)
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
@@ -2140,7 +2197,12 @@ def elide_display_name(name: str) -> str:
 
 
 class ObjectVersionCollection:
-    """A collection of object versions for a single object."""
+    """A collection of object versions for a single object.
+
+    This class provides access to all versions of a specific object.
+    By default, versions are sorted by version_index in ascending order
+    (oldest to newest), unless explicitly sorted differently when created.
+    """
 
     def __init__(self, object_id: str, versions: list[ObjSchema], client: WeaveClient):
         """Initialize a collection of object versions.

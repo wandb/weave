@@ -53,6 +53,26 @@ def test_get_objects_with_filter(client: WeaveClient):
             assert obj["j"] == j
 
 
+def test_get_objects_with_filter_dict(client: WeaveClient):
+    generate_objects(client, obj_count=5, version_count=3)
+
+    filtered_collections = client.get_objects(filter={"object_ids": ["obj_0", "obj_1"]})
+    assert len(filtered_collections) == 2
+    assert {c.object_id for c in filtered_collections} == {"obj_0", "obj_1"}
+
+    for i, collection in enumerate(filtered_collections):
+        assert len(collection) == 3
+        assert isinstance(collection, ObjectVersionCollection)
+        assert collection.object_id.startswith(f"obj_{i}")
+
+        for j, obj in enumerate(collection):
+            assert isinstance(obj, WeaveDict)
+            assert "i" in obj
+            assert "j" in obj
+            assert obj["i"] == i
+            assert obj["j"] == j
+
+
 def test_get_objects_lazy_loading(client: WeaveClient):
     generate_objects(client, obj_count=3, version_count=3)
 
