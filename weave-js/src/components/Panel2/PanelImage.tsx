@@ -1,11 +1,14 @@
 import {BoundingBoxSliderControl} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {
+  isAssignableTo,
   Node,
   opAssetArtifactVersion,
   opGetRunTag,
   opRunConfig,
   replaceInputVariables,
+  taggedValue,
+  typedDict,
   WBImage,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -36,16 +39,27 @@ type PanelImageProps = Panel2.PanelProps<
 >;
 
 const useClassLabels = (input: Node<typeof inputType>) => {
+  const hasRunTag = isAssignableTo(
+    input.type,
+    taggedValue(typedDict({run: 'run'}), 'any')
+  );
+
   const {loading: runConfigLoading} = CGReact.useNodeValue(
-    opRunConfig({run: opGetRunTag({obj: input})})
+    opRunConfig({run: opGetRunTag({obj: input})}),
+    {skip: !hasRunTag}
   );
 
   const {loading: runTagLoading, result: runTag} = CGReact.useNodeValue(
-    opGetRunTag({obj: input})
+    opGetRunTag({obj: input}),
+    {skip: !hasRunTag}
   );
 
   return useMemo(() => {
-    if (!(runConfigLoading || runTagLoading) && runTag != null) {
+    if (
+      !(runConfigLoading || runTagLoading) &&
+      runTag != null &&
+      runTag.configSubset != null
+    ) {
       try {
         const configSubset: {[key: string]: any} = JSON.parse(
           runTag.configSubset
