@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, TypeVar, Union, cast
 
 from pydantic import PrivateAttr
 from rich import print
@@ -211,12 +212,13 @@ class Evaluation(Object):
         n_complete = 0
         dataset = self.dataset
         _rows = dataset.rows
-        trial_rows = list(_rows) * self.trials
+        num_rows = len(_rows) * self.trials
+        trial_rows = repeated_iterable(_rows, self.trials)
         async for example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+            print(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -266,3 +268,12 @@ def is_valid_model(model: Any) -> bool:
             and is_op(model.predict)
         )
     )
+
+
+T = TypeVar("T")
+
+
+def repeated_iterable(iterable: Iterable[T], n: int) -> Iterable[T]:
+    for val in iterable:
+        for _ in range(n):
+            yield val
