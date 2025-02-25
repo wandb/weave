@@ -3428,9 +3428,10 @@ def test_call_stream_query_heavy_query_batch(client):
         tsi.CallsQueryReq.model_validate(output_query)
     )
     if not client_is_sqlite(client):
+        # in clickhouse we don't know how many calls are merged,
+        # and the query filters out started_at is NULL, so this will
+        # likely fail to return all 10 calls.
         with pytest.raises(AssertionError):
-            # in clickhouse we don't know how many calls are merged
-            print("res", list(res))
             assert len(list(res)) == 10
             for call in res:
                 assert call.attributes["a"] == 5
@@ -3439,12 +3440,8 @@ def test_call_stream_query_heavy_query_batch(client):
         for call in res:
             assert call.attributes["a"] == 5
 
-    # Clickhouse normally merges after a query of a table like this.
-    # If so, the next query, while only filtering by inputs, will
-    # also include the outputs. So we should expect the correct
-    # results for both client.
-
-    # now query for inputs by string
+    # now query for inputs by string. This should be okay,
+    # because we don't filter out started_at is NULL
     input_string_query = {
         "project_id": project_id,
         "query": {
@@ -3464,7 +3461,20 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.inputs["param"]["value1"] == "hello"
         assert call.output["d"] == 5
 
-    # now that we have merged, the inital query should succeed
+    # Now lets query with a light filter + heavy filter, which
+    # changes how we filter out calls. Make sure that still works
+    input_string_query["filter"] = {"op_names": ["test_name"]}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
+
+    # By making these queries, clickhouse normally merges the call_parts
+    # into calls_merged, and we should be able to query the outputs
+    # and get the correct results.
     res1 = client.server.calls_query_stream(
         tsi.CallsQueryReq.model_validate(output_query)
     )
