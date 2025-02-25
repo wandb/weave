@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -1946,14 +1947,12 @@ class WeaveClient:
 
         Args:
             filter: Filter to apply to the objects query
-            limit: Maximum number of object collections to return
 
         Returns:
             A list of ObjectVersionCollection objects, each containing versions of a single object
 
         """
         all_objects = self._objects(filter)
-        from collections import defaultdict
 
         grouped_objects = defaultdict(list)
         for obj in all_objects:
