@@ -12,10 +12,10 @@ def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: i
             weave.publish({"i": i, "j": j}, name=f"obj_{i}")
 
 
-def test_list_objects_basic_and_iteration(client: WeaveClient):
+def test_get_objects_basic_and_iteration(client: WeaveClient):
     generate_objects(client, obj_count=5, version_count=3)
 
-    collections = client.list_objects()
+    collections = client.get_objects()
     assert len(collections) == 5
 
     for i, collection in enumerate(collections):
@@ -31,10 +31,10 @@ def test_list_objects_basic_and_iteration(client: WeaveClient):
             assert obj["j"] == j
 
 
-def test_list_objects_with_filter(client: WeaveClient):
+def test_get_objects_with_filter(client: WeaveClient):
     generate_objects(client, obj_count=5, version_count=3)
 
-    filtered_collections = client.list_objects(
+    filtered_collections = client.get_objects(
         filter=tsi.ObjectVersionFilter(object_ids=["obj_0", "obj_1"])
     )
     assert len(filtered_collections) == 2
@@ -53,10 +53,10 @@ def test_list_objects_with_filter(client: WeaveClient):
             assert obj["j"] == j
 
 
-def test_list_objects_lazy_loading(client: WeaveClient):
+def test_get_objects_lazy_loading(client: WeaveClient):
     generate_objects(client, obj_count=3, version_count=3)
 
-    collections = client.list_objects()
+    collections = client.get_objects()
 
     # No objects should be loaded initially
     assert len(collections[0]._weave_objects) == 0
@@ -71,10 +71,10 @@ def test_list_objects_lazy_loading(client: WeaveClient):
     assert len(collections[0]._weave_objects) == 2
 
 
-def test_list_objects_access_performance(client: WeaveClient):
+def test_get_objects_access_performance(client: WeaveClient):
     generate_objects(client, obj_count=2, version_count=2)
 
-    collections = client.list_objects()
+    collections = client.get_objects()
 
     start_time = time.time()
     _ = collections[0][0]

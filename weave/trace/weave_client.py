@@ -1936,13 +1936,13 @@ class WeaveClient:
         return response.objs
 
     @trace_sentry.global_trace_sentry.watch()
-    def list_objects(
+    def get_objects(
         self,
         *,
         filter: ObjectVersionFilter | None = None,
     ) -> list[ObjectVersionCollection]:
         """
-        List objects with versions grouped by object ID.
+        Get objects with versions grouped by object ID.
 
         Args:
             filter: Filter to apply to the objects query
