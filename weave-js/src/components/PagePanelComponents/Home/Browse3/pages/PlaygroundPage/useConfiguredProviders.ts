@@ -1,22 +1,17 @@
-import {
-  Secret,
-  useTeamSecrets,
-} from '@wandb/weave/common/hooks/useEntitySecrets';
+import {useSecrets} from '@wandb/weave/common/hooks/useSecrets';
 
 import {LLM_PROVIDER_SECRETS, LLM_PROVIDERS} from './llmMaxTokens';
 
-const hasAllSecrets = (secrets: Secret[], providerKey: string[]) => {
-  return providerKey.every(key => secrets.some(secret => secret.name === key));
+const hasAllSecrets = (secrets: string[], providerKey: string[]) => {
+  return providerKey.every(key => secrets.includes(key));
 };
 
-const missingSecrets = (secrets: Secret[], providerKey: string[]) => {
-  return providerKey
-    .filter(key => !secrets.some(secret => secret.name === key))
-    .join(', ');
+const missingSecrets = (secrets: string[], providerKey: string[]) => {
+  return providerKey.filter(key => !secrets.includes(key)).join(', ');
 };
 
 export const useConfiguredProviders = (entityName: string) => {
-  const {loading: secretsLoading, secrets} = useTeamSecrets(entityName);
+  const {loading: secretsLoading, secrets} = useSecrets({entityName});
 
   const providers = LLM_PROVIDERS.reduce((acc, provider) => {
     acc[provider] = {
