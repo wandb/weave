@@ -33,7 +33,7 @@ from rich import print
 
 # Server configuration
 WEAVE_PORT = 6345
-SERVER_TIMEOUT = 30  # seconds
+SERVER_TIMEOUT = 5  # seconds
 SERVER_CHECK_INTERVAL = 1  # seconds
 SUBPROCESS_TIMEOUT = 30  # seconds
 
