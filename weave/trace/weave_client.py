@@ -1940,8 +1940,6 @@ class WeaveClient:
         self,
         *,
         filter: ObjectVersionFilter | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
     ) -> list[ObjectVersionCollection]:
         """
         List objects with versions grouped by object ID.
@@ -1949,57 +1947,22 @@ class WeaveClient:
         Args:
             filter: Filter to apply to the objects query
             limit: Maximum number of object collections to return
-            offset: Number of object collections to skip
 
         Returns:
             A list of ObjectVersionCollection objects, each containing versions of a single object
 
-        Warning:
-            Using `limit` and `offset` parameters applies pagination at the collection level,
-            not at the individual object version level. This means you might receive incomplete
-            version groups if there are many objects with the same ID. Consider using the
-            `filter` parameter with specific `object_ids` if you need complete version groups.
         """
-        # Warn about potential incomplete groups when using pagination
-        if limit is not None or offset is not None:
-            import warnings
-
-            warnings.warn(
-                "Using limit or offset with list_objects may result in incomplete version groups. "
-                "Consider using filter with specific object_ids if you need complete version history.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        # Get all objects matching the filter
         all_objects = self._objects(filter)
+        from collections import defaultdict
 
-        # Group objects by object_id
-        grouped_objects: dict[str, list[ObjSchema]] = {}
+        grouped_objects = defaultdict(list)
         for obj in all_objects:
-            if obj.object_id not in grouped_objects:
-                grouped_objects[obj.object_id] = []
             grouped_objects[obj.object_id].append(obj)
 
-        # Create ObjectVersionCollection objects for each group
-        collections = [
+        return [
             ObjectVersionCollection(object_id, versions, self)
             for object_id, versions in grouped_objects.items()
         ]
-
-        # Sort collections by the latest version's creation time (newest first)
-        collections.sort(
-            key=lambda collection: collection.created_at,
-            reverse=True,
-        )
-
-        # Apply pagination if specified
-        if offset is not None:
-            collections = collections[offset:]
-        if limit is not None:
-            collections = collections[:limit]
-
-        return collections
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
@@ -2181,33 +2144,18 @@ class ObjectVersionCollection:
     """A collection of object versions for a single object."""
 
     def __init__(self, object_id: str, versions: list[ObjSchema], client: WeaveClient):
+        """Initialize a collection of object versions.
+
+        Args:
+            object_id: The ID of the object
+            versions: List of object versions
+            client: WeaveClient instance for loading objects
+        """
         self.object_id = object_id
         self._raw_versions = sorted(versions, key=lambda v: v.version_index)
         self._client = client
         # Dictionary to store loaded WeaveObjects by index
         self._weave_objects: dict[int, Any] = {}
-
-        # Store metadata for each version
-        self._metadata = {
-            v.digest: {
-                "created_at": v.created_at,
-                "version_index": v.version_index,
-                "is_latest": v.is_latest == 1,
-            }
-            for v in self._raw_versions
-        }
-
-        # Keep track of the latest version's digest for quick access
-        self._latest_digest = next(
-            (v.digest for v in self._raw_versions if v.is_latest == 1),
-            self._raw_versions[-1].digest if self._raw_versions else None,
-        )
-
-        # Keep track of the latest version's index for quick access
-        self._latest_index = next(
-            (i for i, v in enumerate(self._raw_versions) if v.is_latest == 1),
-            len(self._raw_versions) - 1 if self._raw_versions else None,
-        )
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate through all versions of this object as WeaveObject instances."""
@@ -2250,20 +2198,6 @@ class ObjectVersionCollection:
             self._weave_objects[index] = self._client.get(ref)
 
         return self._weave_objects[index]
-
-    @property
-    def latest(self) -> Any:
-        """Get the latest version of this object as a WeaveObject instance."""
-        if self._latest_index is not None:
-            return self._get_object_at_index(self._latest_index)
-        return None
-
-    @property
-    def created_at(self) -> datetime.datetime:
-        """Get the creation time of the latest version for sorting."""
-        if self._latest_digest and self._latest_digest in self._metadata:
-            return self._metadata[self._latest_digest]["created_at"]
-        return datetime.datetime.min
 
     @property
     def base_object_class(self) -> str | None:
