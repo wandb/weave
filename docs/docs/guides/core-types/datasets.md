@@ -154,9 +154,7 @@ You can create, edit, and delete `Dataset`s in the UI.
 
 8. Once you've configured the dataset fields, click **Next**. The **Add examples to a dataset** screen appears.
 
-9. In the **Add examples to a dataset** screen, you can:  
-    - Add more examples by starting at step 8 of [ Add a new example to a `Dataset`](#add-a-new-example-to-a-dataset).
-    - Click **Back** to return to the dataset configuration page.
+9. (Optional) In the **Add examples to a dataset** screen, add more examples to your dataset. Alternatively, click **Back** to return to the dataset configuration page.
 
 10. Click **Create dataset**. Your new dataset is created.
 
@@ -229,20 +227,14 @@ You can create, edit, and delete `Dataset`s in the UI.
 
 4. In the upper right-hand menu, click the **Add selected rows to a dataset** icon (located next to the trashcan icon). Optionally, toggle **Show latest versions** to off to display all versions of all available datasets.
 
-5. From the **Choose a dataset** dropdown, select the `Dataset` you want to add examples to. Options to **Configure dataset fields** will display.
+5. From the **Choose a dataset** dropdown, select the `Dataset` you want to add examples to. Options to **Configure field mapping** will display.
 
-6. (Optional) In **Configure dataset fields**, adjust the mapping of fields from your calls to the corresponding dataset columns.
+6. (Optional) In **Configure field mapping**, adjust the mapping of fields from your calls to the corresponding dataset columns.
 
-7. Once you've configured dataset fields, click **Next**. The **Add examples to a dataset** screen appears.
+7. Once you've configured field mappings, click **Next**. The **Add examples to a dataset** screen appears.
 
-8. Click **Add row** to create an empty row in the dataset for the new example.
+8. Click **Add row** to create a new example.
 
-9. To add data to the new row, click the desired column within that row. The default **id** column in a `Dataset` row cannot be edited, as Weave assigns it automatically upon creation. An editing modal appears with **Text**, **Code**, and **Diff** options for formatting.
+9. Once you've added your example(s), click **Add to dataset**. Alternatively, to return to the **Configure dataset fields** screen, click **Back**.
 
-10. Repeat step 9 for each column that you want to add data to in the new row. 
-
-11. Repeat step 10 for each row you want to add to the `Dataset`.
-
-12. Once you've added your example(s), click **Add to dataset**. Alternatively, to return to the **Configure dataset fields** screen, click **Back**.
-
-13. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
+10. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
