@@ -127,9 +127,8 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        return tsi.EnsureProjectExistsRes.model_validate(
-            project_creator.ensure_project_exists(entity, project)
-        )
+        wandb_api_res = project_creator.ensure_project_exists(entity, project)
+        return tsi.EnsureProjectExistsRes.model_validate(wandb_api_res)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -179,72 +178,6 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                     f"413 Client Error: {reason}", response=e.response
                 )
             raise
-
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
-    def _generic_request_executor(
-        self,
-        url: str,
-        req: BaseModel,
-        stream: bool = False,
-    ) -> requests.Response:
-        r = requests.post(
-            self.trace_server_url + url,
-            # `by_alias` is required since we have Mongo-style properties in the
-            # query models that are aliased to conform to start with `$`. Without
-            # this, the model_dump will use the internal property names which are
-            # not valid for the `model_validate` step.
-            data=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=self._auth,
-            stream=stream,
-        )
-        if r.status_code == 500:
-            reason_val = r.text
-            try:
-                reason_val = json.dumps(json.loads(reason_val), indent=2)
-            except json.JSONDecodeError:
-                reason_val = f"Reason: {reason_val}"
-            raise requests.HTTPError(
-                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
-                response=r,
-            )
-        r.raise_for_status()
-
-        return r
-
-    def _generic_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> BaseModel:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req)
-        return res_model.model_validate(r.json())
-
-    def _generic_stream_request(
-        self,
-        url: str,
-        req: BaseModel,
-        req_model: type[BaseModel],
-        res_model: type[BaseModel],
-    ) -> Iterator[BaseModel]:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield res_model.model_validate_json(line)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -535,72 +468,75 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
-        return self._generic_request(
-            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
-        )
+        if isinstance(req, dict):
+            req = tsi.FeedbackCreateReq.model_validate(req)
+        req = cast(tsi.FeedbackCreateReq, req)
+        return self.stainless_client.feedback.create(**req.model_dump())
 
     def feedback_query(
         self, req: Union[tsi.FeedbackQueryReq, dict[str, Any]]
     ) -> tsi.FeedbackQueryRes:
-        return self._generic_request(
-            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
-        )
+        if isinstance(req, dict):
+            req = tsi.FeedbackQueryReq.model_validate(req)
+        req = cast(tsi.FeedbackQueryReq, req)
+        return self.stainless_client.feedback.query(**req.model_dump())
 
     def feedback_purge(
         self, req: Union[tsi.FeedbackPurgeReq, dict[str, Any]]
     ) -> tsi.FeedbackPurgeRes:
-        return self._generic_request(
-            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
-        )
+        if isinstance(req, dict):
+            req = tsi.FeedbackPurgeReq.model_validate(req)
+        req = cast(tsi.FeedbackPurgeReq, req)
+        return self.stainless_client.feedback.purge(**req.model_dump())
 
     def feedback_replace(
         self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
     ) -> tsi.FeedbackReplaceRes:
-        return self._generic_request(
-            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
-        )
+        if isinstance(req, dict):
+            req = tsi.FeedbackReplaceReq.model_validate(req)
+        req = cast(tsi.FeedbackReplaceReq, req)
+        return self.stainless_client.feedback.replace(**req.model_dump())
 
     def actions_execute_batch(
         self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
     ) -> tsi.ActionsExecuteBatchRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ActionsExecuteBatchReq,
-            tsi.ActionsExecuteBatchRes,
-        )
+        if isinstance(req, dict):
+            req = tsi.ActionsExecuteBatchReq.model_validate(req)
+        req = cast(tsi.ActionsExecuteBatchReq, req)
+        return self.stainless_client.actions.execute_batch(**req.model_dump())
 
     # Cost API
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]
     ) -> tsi.CostQueryRes:
-        return self._generic_request(
-            "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
-        )
+        if isinstance(req, dict):
+            req = tsi.CostQueryReq.model_validate(req)
+        req = cast(tsi.CostQueryReq, req)
+        return self.stainless_client.cost.query(**req.model_dump())
 
     def cost_create(
         self, req: Union[tsi.CostCreateReq, dict[str, Any]]
     ) -> tsi.CostCreateRes:
-        return self._generic_request(
-            "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
-        )
+        if isinstance(req, dict):
+            req = tsi.CostCreateReq.model_validate(req)
+        req = cast(tsi.CostCreateReq, req)
+        return self.stainless_client.cost.create(**req.model_dump())
 
     def cost_purge(
         self, req: Union[tsi.CostPurgeReq, dict[str, Any]]
     ) -> tsi.CostPurgeRes:
-        return self._generic_request(
-            "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
-        )
+        if isinstance(req, dict):
+            req = tsi.CostPurgeReq.model_validate(req)
+        req = cast(tsi.CostPurgeReq, req)
+        return self.stainless_client.cost.purge(**req.model_dump())
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        return self._generic_request(
-            "/completions/create",
-            req,
-            tsi.CompletionsCreateReq,
-            tsi.CompletionsCreateRes,
-        )
+        if isinstance(req, dict):
+            req = tsi.CompletionsCreateReq.model_validate(req)
+        req = cast(tsi.CompletionsCreateReq, req)
+        return self.stainless_client.completions.create(**req.model_dump())
 
 
 __docspec__ = [
