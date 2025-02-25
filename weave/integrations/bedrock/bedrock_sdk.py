@@ -55,6 +55,10 @@ def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs.get("kwargs", {})
 
 
+def postprocess_inputs_apply_guardrail(inputs: dict[str, Any]) -> dict[str, Any]:
+    return inputs.get("kwargs", {})
+
+
 def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
     exploded_kwargs = inputs.get("kwargs", {})
     if "body" in exploded_kwargs:
@@ -114,6 +118,7 @@ def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
     op = weave.op(
         bedrock_client.apply_guardrail,
         name="BedrockRuntime.apply_guardrail",
+        postprocess_inputs=postprocess_inputs_apply_guardrail,
     )
     bedrock_client.apply_guardrail = op
 
