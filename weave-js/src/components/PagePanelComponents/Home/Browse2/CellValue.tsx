@@ -18,9 +18,10 @@ import {CellValueString} from './CellValueString';
 
 type CellValueProps = {
   value: any;
+  noLink?: boolean;
 };
 
-export const CellValue = ({value}: CellValueProps) => {
+export const CellValue = ({value, noLink}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -28,7 +29,7 @@ export const CellValue = ({value}: CellValueProps) => {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isWeaveRef(value) || isArtifactRef(value)) {
-    return <SmallRef objRef={parseRef(value)} />;
+    return <SmallRef objRef={parseRef(value)} noLink={noLink} />;
   }
   if (typeof value === 'boolean') {
     return (
