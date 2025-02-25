@@ -96,10 +96,10 @@ class PreferenceScorer(Scorer):
             None,
         )
 
-      if isinstance(other_model_result, ApplyModelError):
-          return None
+        if isinstance(other_model_result, ApplyModelError):
+            return None
 
-      return other_model_result.model_output
+        return other_model_result.model_output
 
     @weave.op
     async def score(self, output: dict, input_text: str) -> dict:
