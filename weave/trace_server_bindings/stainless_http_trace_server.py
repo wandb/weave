@@ -5,7 +5,7 @@ import io
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
@@ -87,6 +87,20 @@ def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
     return retry_state.outcome.result()
 
 
+def retry_func(func: Callable) -> Callable:
+    deco = tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
+    return deco(func)
+
+
 class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     """A trace server that uses the Stainless generated API."""
 
@@ -113,8 +127,6 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             self._auth = ("api", password)
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
-        print(f"{trace_server_url=}")
-
         self.stainless_client = WeaveTrace(
             username=username if username else "",
             password=password if password else "",
@@ -130,16 +142,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         wandb_api_res = project_creator.ensure_project_exists(entity, project)
         return tsi.EnsureProjectExistsRes.model_validate(wandb_api_res)
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_func
     def _flush_calls(
         self,
         batch: list,
@@ -179,20 +182,12 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 )
             raise
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_func
     def server_info(self) -> ServerInfoRes:
         return self.stainless_client.services.server_info()
 
     # Call API
+    @retry_func
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
@@ -216,6 +211,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.CallStartReq, req)
         return self.stainless_client.calls.start(start=req.start)
 
+    @retry_func
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
             req_as_obj: tsi.CallEndReq
@@ -231,12 +227,14 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.CallEndReq, req)
         return self.stainless_client.calls.end(end=req.end)
 
+    @retry_func
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         if isinstance(req, dict):
             req = tsi.CallReadReq.model_validate(req)
         req = cast(tsi.CallReadReq, req)
         return self.stainless_client.calls.read(**req)
 
+    @retry_func
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
@@ -246,12 +244,14 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    @retry_func
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         if isinstance(req, dict):
             req = tsi.CallsQueryReq.model_validate(req)
         req = cast(tsi.CallsQueryReq, req)
         return self.stainless_client.calls.stream_query(**req.model_dump())
 
+    @retry_func
     def calls_query_stats(
         self, req: Union[tsi.CallsQueryStatsReq, dict[str, Any]]
     ) -> tsi.CallsQueryStatsRes:
@@ -259,6 +259,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             req = tsi.CallsQueryStatsReq.model_validate(req)
         return self.stainless_client.calls.query_stats(**req)
 
+    @retry_func
     def calls_delete(
         self, req: Union[tsi.CallsDeleteReq, dict[str, Any]]
     ) -> tsi.CallsDeleteRes:
@@ -266,6 +267,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             req = tsi.CallsDeleteReq.model_validate(req)
         return self.stainless_client.calls.delete(**req)
 
+    @retry_func
     def call_update(
         self, req: Union[tsi.CallUpdateReq, dict[str, Any]]
     ) -> tsi.CallUpdateRes:
@@ -274,18 +276,20 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         return self.stainless_client.calls.update(**req)
 
     # Op API
-
+    @retry_func
     def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
         raise NotImplementedError("Not implemented")
 
+    @retry_func
     def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
         raise NotImplementedError("Not implemented")
 
+    @retry_func
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
         raise NotImplementedError("Not implemented")
 
     # Obj API
-
+    @retry_func
     def obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
@@ -294,6 +298,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.ObjCreateReq, req)
         return self.stainless_client.objects.create(obj=req.obj)
 
+    @retry_func
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
         if isinstance(req, dict):
             req = tsi.ObjReadReq.model_validate(req)
@@ -304,6 +309,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             object_id=req.object_id,
         )
 
+    @retry_func
     def objs_query(
         self, req: Union[tsi.ObjQueryReq, dict[str, Any]]
     ) -> tsi.ObjQueryRes:
@@ -312,12 +318,14 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.ObjQueryReq, req)
         return self.stainless_client.objects.query(**req)
 
+    @retry_func
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         if isinstance(req, dict):
             req = tsi.ObjDeleteReq.model_validate(req)
         req = cast(tsi.ObjDeleteReq, req)
         return self.stainless_client.objects.delete(**req)
 
+    @retry_func
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
@@ -357,6 +365,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         else:
             return self.stainless_client.tables.create(table=req.table)
 
+    @retry_func
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table updates can be decomposed into a series of
@@ -394,6 +403,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
                 updates=req.updates,
             )
 
+    @retry_func
     def table_query(
         self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
@@ -401,6 +411,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             req = req.model_dump()
         return self.stainless_client.tables.query(**req)
 
+    @retry_func
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
@@ -408,6 +419,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         res = self.table_query(req)
         yield from res.rows
 
+    @retry_func
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
@@ -415,6 +427,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             req = req.model_dump()
         return self.stainless_client.tables.query_stats(**req)
 
+    @retry_func
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
@@ -422,16 +435,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
             req = req.model_dump()
         return self.stainless_client.refs.read_batch(**req)
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_func
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
@@ -442,16 +446,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_func
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         r = requests.post(
             self.trace_server_url + "/files/content",
@@ -465,6 +460,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
 
+    @retry_func
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
@@ -473,6 +469,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.FeedbackCreateReq, req)
         return self.stainless_client.feedback.create(**req.model_dump())
 
+    @retry_func
     def feedback_query(
         self, req: Union[tsi.FeedbackQueryReq, dict[str, Any]]
     ) -> tsi.FeedbackQueryRes:
@@ -481,6 +478,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.FeedbackQueryReq, req)
         return self.stainless_client.feedback.query(**req.model_dump())
 
+    @retry_func
     def feedback_purge(
         self, req: Union[tsi.FeedbackPurgeReq, dict[str, Any]]
     ) -> tsi.FeedbackPurgeRes:
@@ -489,6 +487,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.FeedbackPurgeReq, req)
         return self.stainless_client.feedback.purge(**req.model_dump())
 
+    @retry_func
     def feedback_replace(
         self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
     ) -> tsi.FeedbackReplaceRes:
@@ -497,6 +496,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.FeedbackReplaceReq, req)
         return self.stainless_client.feedback.replace(**req.model_dump())
 
+    @retry_func
     def actions_execute_batch(
         self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
     ) -> tsi.ActionsExecuteBatchRes:
@@ -506,6 +506,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         return self.stainless_client.actions.execute_batch(**req.model_dump())
 
     # Cost API
+    @retry_func
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]
     ) -> tsi.CostQueryRes:
@@ -514,6 +515,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.CostQueryReq, req)
         return self.stainless_client.cost.query(**req.model_dump())
 
+    @retry_func
     def cost_create(
         self, req: Union[tsi.CostCreateReq, dict[str, Any]]
     ) -> tsi.CostCreateRes:
@@ -522,6 +524,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.CostCreateReq, req)
         return self.stainless_client.cost.create(**req.model_dump())
 
+    @retry_func
     def cost_purge(
         self, req: Union[tsi.CostPurgeReq, dict[str, Any]]
     ) -> tsi.CostPurgeRes:
@@ -530,6 +533,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         req = cast(tsi.CostPurgeReq, req)
         return self.stainless_client.cost.purge(**req.model_dump())
 
+    @retry_func
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
