@@ -55,6 +55,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -92,6 +93,7 @@ import {
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
+  BulkAddToDatasetButton,
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
@@ -111,8 +113,9 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-const MAX_EVAL_COMPARISONS = 5;
+
 const MAX_SELECT = 100;
+const MAX_EVAL_COMPARISONS = MAX_SELECT;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
@@ -170,11 +173,13 @@ const SelectionHeader: FC<{
   sortModel,
   tableData,
 }) => {
-  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
+  
   // Get the full call objects for selected calls to send, for bulk actions (like delete)
   const selectedCallObjects = useMemo(
     () =>
@@ -771,19 +776,11 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabled =
-            !isSelected &&
-            (isEvaluateTable
-              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
-              : selectedCalls.length >= MAX_SELECT);
-          let tooltipText = '';
-          if (isEvaluateTable) {
-            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
-              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
-            }
-          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
-            tooltipText = `Selection limited to ${MAX_SELECT} items`;
-          }
+          const disabled = !isSelected && selectedCalls.length >= MAX_SELECT;
+          const tooltipText =
+            selectedCalls.length >= MAX_SELECT && !isSelected
+              ? `Selection limited to ${MAX_SELECT} items`
+              : '';
 
           return (
             <Tooltip title={tooltipText} placement="right" arrow>
@@ -813,7 +810,7 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+  }, [columns.cols, selectedCalls, tableData]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -835,6 +832,23 @@ export const CallsTable: FC<{
       ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
+
+  // Replace the state and effect with a single memo
+  const selectedCallObjects = useMemo(() => {
+    if (!callsResult) {
+      return [];
+    }
+    return callsResult
+      .filter(
+        call =>
+          call?.traceCall?.id != null &&
+          selectedCalls.includes(call.traceCall.id)
+      )
+      .map(call => ({
+        digest: call.traceCall!.id,
+        val: call.traceCall!,
+      }));
+  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel

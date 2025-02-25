@@ -41,6 +41,34 @@ const MAX_EXPORT = 10_000;
 
 type SelectionState = 'all' | 'selected' | 'limit';
 
+const LabelWithSwitch: FC<{
+  id: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}> = ({id, label, checked, onCheckedChange, disabled}) => (
+  <div
+    className={classNames(
+      'flex items-center py-2',
+      disabled ? 'opacity-40' : ''
+    )}>
+    <Switch.Root
+      id={id}
+      size="small"
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      disabled={disabled}>
+      <Switch.Thumb size="small" checked={checked} />
+    </Switch.Root>
+    <label
+      htmlFor={id}
+      className={classNames('ml-6', disabled ? '' : 'cursor-pointer')}>
+      {label}
+    </label>
+  </div>
+);
+
 export const ExportSelector = ({
   selectedCalls,
   numTotalCalls,
@@ -77,6 +105,7 @@ export const ExportSelector = ({
     skip: viewerLoading,
   });
   const [includeFeedback, setIncludeFeedback] = useState(false);
+  const [includeCosts, setIncludeCosts] = useState(false);
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -130,7 +159,8 @@ export const ExportSelector = ({
       filterBy,
       leafColumns,
       refColumnsToExpand,
-      includeFeedback
+      includeFeedback,
+      includeCosts
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
@@ -165,7 +195,8 @@ export const ExportSelector = ({
     lowLevelFilter,
     filterBy,
     sortBy,
-    includeFeedback
+    includeFeedback,
+    includeCosts
   );
   const curlText = makeCurlText(
     callQueryParams.entity,
@@ -175,7 +206,8 @@ export const ExportSelector = ({
     filterBy,
     refColumnsToExpand,
     sortBy,
-    includeFeedback
+    includeFeedback,
+    includeCosts
   );
 
   return (
@@ -230,27 +262,21 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
-            <div
-              className={classNames(
-                'flex items-center py-2',
-                disabled ? 'opacity-40' : ''
-              )}>
-              <Switch.Root
+            <div className="flex items-center gap-12">
+              <LabelWithSwitch
                 id="include-feedback"
-                size="small"
+                label="Include feedback"
                 checked={includeFeedback}
                 onCheckedChange={setIncludeFeedback}
-                disabled={disabled}>
-                <Switch.Thumb size="small" checked={includeFeedback} />
-              </Switch.Root>
-              <label
-                htmlFor="include-feedback"
-                className={classNames(
-                  'ml-6',
-                  disabled ? '' : 'cursor-pointer'
-                )}>
-                Include feedback
-              </label>
+                disabled={disabled}
+              />
+              <LabelWithSwitch
+                id="include-costs"
+                label="Include costs"
+                checked={includeCosts}
+                onCheckedChange={setIncludeCosts}
+                disabled={disabled}
+              />
             </div>
             <DownloadGrid
               pythonText={pythonText}
@@ -483,6 +509,31 @@ export const BulkDeleteButton: FC<{
   );
 };
 
+export const BulkAddToDatasetButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = () => {
+    // Force tooltip to close by blurring the button
+    buttonRef.current?.blur();
+    onClick();
+  };
+
+  return (
+    <Button
+      ref={buttonRef}
+      variant="ghost"
+      size="medium"
+      onClick={handleClick}
+      disabled={disabled}
+      tooltip="Add selected rows to a dataset"
+      icon="table"
+    />
+  );
+};
+
 export const RefreshButton: FC<{
   onClick: () => void;
   disabled?: boolean;
@@ -539,7 +590,8 @@ function makeCodeText(
   filter: CallFilter,
   query: Query | undefined,
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
-  includeFeedback: boolean
+  includeFeedback: boolean,
+  includeCosts: boolean
 ) {
   let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
@@ -548,6 +600,9 @@ function makeCodeText(
     codeStr += `   filter={"call_ids": ["${filteredCallIds.join('", "')}"]},\n`;
     if (includeFeedback) {
       codeStr += `   include_feedback=True,\n`;
+    }
+    if (includeCosts) {
+      codeStr += `   include_costs=True,\n`;
     }
     // specifying call_ids ignores other filters, return early
     codeStr += `)`;
@@ -586,6 +641,9 @@ function makeCodeText(
   if (includeFeedback) {
     codeStr += `    include_feedback=True,\n`;
   }
+  if (includeCosts) {
+    codeStr += `    include_costs=True,\n`;
+  }
 
   codeStr += `)`;
 
@@ -600,7 +658,8 @@ function makeCurlText(
   query: Query | undefined,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
-  includeFeedback: boolean
+  includeFeedback: boolean,
+  includeCosts: boolean
 ) {
   const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   const filterStr = JSON.stringify(
@@ -640,7 +699,8 @@ curl '${baseUrl}/calls/stream_query' \\
   baseCurl += `    "limit":${MAX_EXPORT},
     "offset":0,
     "sort_by":${JSON.stringify(sortBy, null, 0)},
-    "include_feedback": ${includeFeedback}
+    "include_feedback": ${includeFeedback},
+    "include_costs": ${includeCosts}
   }'`;
 
   return baseCurl;

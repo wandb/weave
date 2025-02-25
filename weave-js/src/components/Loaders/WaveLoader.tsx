@@ -1,3 +1,4 @@
+import {useTimeout} from '@wandb/weave/common/util/hooks';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
 import React, {useMemo} from 'react';
@@ -22,10 +23,30 @@ const Dot = React.memo(
   }
 );
 
-export const WaveLoader = ({size}: {size: 'small' | 'huge'}) => {
+/**
+ * WaveLoader displays a row of Dot elements after an optional delay,
+ * instantly switching from completely hidden to visible.
+ *
+ * @param {Object} props
+ * @param {'small' | 'huge'} props.size - The size variant for each Dot.
+ * @param {number} [props.delayBeforeShow] - Time in ms to wait before showing the dots.
+ */
+export const WaveLoader = ({
+  size,
+  delayBeforeShow,
+}: {
+  size: 'small' | 'huge';
+  delayBeforeShow?: number;
+}) => {
+  const isReady = useTimeout(delayBeforeShow ?? 0);
   return (
     <TailwindContents>
-      <div className="flex items-center gap-x-4">
+      <div
+        className={classNames(
+          'flex items-center gap-x-4',
+          isReady ? 'opacity-100' : 'opacity-0'
+        )}
+        data-test={`wave-loader-${size}`}>
         <Dot size={size} />
         <Dot delay=".3s" size={size} />
         <Dot delay=".6s" size={size} />

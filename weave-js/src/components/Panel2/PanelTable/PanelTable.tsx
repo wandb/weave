@@ -83,6 +83,7 @@ import * as TableType from './tableType';
 import {
   BaseTableDataType,
   getColumnCellFormats,
+  getColumnVariables,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -228,19 +229,7 @@ const PanelTableInnerConfigSetter: React.FC<
   }, [config, tableState, autoTable]);
 
   const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
-    const defineColumnVariables = (currentTableState: Table.TableState) => {
-      return Object.keys(currentTableState.columns).reduce(
-        (acc: {[key: string]: NodeOrVoidNode}, colId) => {
-          const columnName =
-            currentTableState.columnNames[colId] || colId.replace(/-/g, '');
-          acc[columnName] = currentTableState.columnSelectFunctions[colId];
-          return acc;
-        },
-        {}
-      );
-    };
-
-    return defineColumnVariables(config.tableState ?? tableState ?? autoTable);
+    return getColumnVariables(config.tableState ?? tableState ?? autoTable);
   }, [config.tableState, tableState, autoTable]);
 
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);

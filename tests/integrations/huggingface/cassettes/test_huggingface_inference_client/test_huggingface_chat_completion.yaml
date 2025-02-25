@@ -1,0 +1,72 @@
+interactions:
+- request:
+    body: '{"model": "meta-llama/Llama-3.2-11B-Vision-Instruct", "max_tokens": 500,
+      "seed": 42, "stream": false, "messages": [{"role": "user", "content": [{"type":
+      "image_url", "image_url": {"url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"}},
+      {"type": "text", "text": "Describe this image in one sentence."}]}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '351'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - 7e34d8c1-28c5-441b-9a95-860be8e52c4f
+      user-agent:
+      - unknown/None; hf_hub/0.29.0; python/3.12.8; torch/2.6.0
+    method: POST
+    uri: https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
+  response:
+    body:
+      string: '{"object":"chat.completion","id":"","created":1740032299,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        image showcases the iconic Statue of Liberty in New York City, prominently
+        featuring the statue''s copper-gold shimmer against the backdrop of the city''s
+        skyline."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":44,"completion_tokens":32,"total_tokens":76}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '491'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 20 Feb 2025 06:28:03 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 f881b3dd31ab6286675d899fd085a370.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - rU657ugF9ErwgIPCj207k1t7EPdb3jNqoc06G1mKcnUPHzIOBvLR2A==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      access-control-allow-credentials:
+      - 'true'
+      cross-origin-opener-policy:
+      - same-origin
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-compute-time:
+      - '2.15392648'
+      x-compute-type:
+      - cache
+      x-request-id:
+      - Root=1-67b6cb73-4341b9c32aa563e633ad774b;7e34d8c1-28c5-441b-9a95-860be8e52c4f
+      x-sha:
+      - 9eb2daaa8597bf192a8b0e73f848f3a102794df5
+    status:
+      code: 200
+      message: OK
+version: 1

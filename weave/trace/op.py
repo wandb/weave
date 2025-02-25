@@ -255,6 +255,9 @@ def _create_call(
 
     parent_call = call_context.get_current_call()
     attributes = call_attributes.get()
+    from weave.trace.serialize import dictify
+
+    attributes = dictify(attributes)
 
     return client.create_call(
         func,
@@ -288,8 +291,6 @@ def _execute_op(
             exception,
             op=__op,
         )
-        if not call_context.get_current_call():
-            print_call_link(__call)
 
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):

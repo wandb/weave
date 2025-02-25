@@ -14,7 +14,6 @@ from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
-from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -648,7 +647,6 @@ def make_trace_obj(
                 )
             )
             val = from_json(read_res.obj.val, project_id, server)
-            prepare_obj(val)
         except ObjectDeletedError as e:
             # encountered a deleted object, return DeletedRef, warn and continue
             val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)

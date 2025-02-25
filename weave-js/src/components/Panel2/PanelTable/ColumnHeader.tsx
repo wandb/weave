@@ -8,6 +8,7 @@ import {
   canGroupType,
   canSortType,
   constFunction,
+  dereferenceAllVars,
   EditingNode,
   isListLike,
   isVoidNode,
@@ -21,6 +22,7 @@ import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
@@ -34,7 +36,7 @@ import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
-import {stripTag} from './util';
+import {defineColumnName, stripTag} from './util';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -180,7 +182,10 @@ export const ColumnHeader: React.FC<{
       workingSelectFunction.type !== 'invalid'
     ) {
       let panelUpdated = false;
-      if (workingSelectFunction !== propsSelectFunction) {
+      if (
+        weave.expToString(workingSelectFunction) !==
+        weave.expToString(propsSelectFunction)
+      ) {
         newState = Table.updateColumnSelect(
           newState,
           colId,
@@ -320,6 +325,17 @@ export const ColumnHeader: React.FC<{
       : columnTypeForGroupByChecks;
   }
 
+  const isUsedInFilter = useMemo(() => {
+    const currentFilter = tableState.preFilterFunction;
+    if (isVoidNode(currentFilter)) {
+      return false;
+    }
+    const {usedStack} = dereferenceAllVars(currentFilter, stack);
+    return !!usedStack.find(
+      d => d.name === defineColumnName(tableState, colId)
+    );
+  }, [colId, stack, tableState]);
+
   const columnMenuItems: WBMenuOption[] = useMemo(() => {
     let menuItems: WBMenuOption[] = [];
     menuItems.push({
@@ -432,10 +448,35 @@ export const ColumnHeader: React.FC<{
           value: 'remove',
           name: 'Remove',
           icon: 'delete',
+          disabled: isUsedInFilter,
           onSelect: () => {
             const newTableState = Table.removeColumn(tableState, colId);
             recordEvent('REMOVE_COLUMN');
             updateTableState(newTableState);
+          },
+          render: ({hovered, selected}) => {
+            return isUsedInFilter ? (
+              <Item data-test="remove-column" hovered={hovered}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    color: '#888',
+                  }}>
+                  <span style={{fontSize: 12}}>Remove</span>
+                  <sub style={{fontSize: 10}}>
+                    (Cannot remove column when used in a filter)
+                  </sub>
+                </div>
+                <ItemIcon style={{color: '#888'}} name="delete" />
+              </Item>
+            ) : (
+              <Item data-test="remove-column" hovered={hovered}>
+                Remove
+                <ItemIcon name="delete" />
+              </Item>
+            );
           },
         },
         {
@@ -443,7 +484,11 @@ export const ColumnHeader: React.FC<{
           name: 'Remove all right',
           icon: 'next',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToRight(tableState, colId);
+            const newTableState = Table.removeColumnsToRight(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_RIGHT');
             updateTableState(newTableState);
           },
@@ -453,7 +498,11 @@ export const ColumnHeader: React.FC<{
           name: 'Remove all left',
           icon: 'previous',
           onSelect: () => {
-            const newTableState = Table.removeColumnsToLeft(tableState, colId);
+            const newTableState = Table.removeColumnsToLeft(
+              tableState,
+              colId,
+              stack
+            );
             recordEvent('REMOVE_COLUMNS_TO_LEFT');
             updateTableState(newTableState);
           },
@@ -479,6 +528,7 @@ export const ColumnHeader: React.FC<{
     isPinned,
     setColumnPinState,
     isGroupCountColumn,
+    isUsedInFilter,
   ]);
 
   const colIsSorted =
@@ -657,6 +707,28 @@ export const ColumnHeader: React.FC<{
                         </PanelContextProvider>
                       </S.PanelSettings>
                     )}
+                </S.ColumnEditorSection>
+                <S.ColumnEditorSection>
+                  <Button
+                    data-test="column-header-apply"
+                    size="small"
+                    disabled={
+                      weave.expToString(workingSelectFunction) ===
+                        weave.expToString(propsSelectFunction) &&
+                      workingColumnName === propsColumnName &&
+                      workingPanelId === propsPanelId &&
+                      workingPanelConfig === propsPanelConfig
+                    }
+                    twWrapperStyles={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                    onClick={() => {
+                      applyWorkingState();
+                      setColumnSettingsOpen(false);
+                    }}>
+                    Apply
+                  </Button>
                 </S.ColumnEditorSection>
               </div>
             )
