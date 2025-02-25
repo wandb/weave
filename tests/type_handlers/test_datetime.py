@@ -43,8 +43,10 @@ def test_basic_datetime_serialization(client: WeaveClient):
     dt = make_datetime(tzinfo=EST)
     ref = weave.publish(dt)
     gotten_dt = ref.get()
-    assert gotten_dt == dt
-    assert gotten_dt.tzinfo == dt.tzinfo
+    # When a timezone-aware datetime is published, it's converted to UTC
+    utc_dt = dt.astimezone(timezone.utc)
+    assert gotten_dt == utc_dt
+    assert gotten_dt.tzinfo == timezone.utc
 
     # Test with naive datetime (should be converted to UTC)
     naive_dt = make_datetime()
@@ -65,8 +67,10 @@ def test_datetime_as_attribute(client: WeaveClient) -> None:
     assert ref is not None
 
     gotten_dt_wrapper = weave.ref(ref.uri()).get()
-    assert gotten_dt_wrapper.dt == dt
-    assert gotten_dt_wrapper.dt.tzinfo == dt.tzinfo
+    # When a timezone-aware datetime is published, it's converted to UTC
+    utc_dt = dt.astimezone(timezone.utc)
+    assert gotten_dt_wrapper.dt == utc_dt
+    assert gotten_dt_wrapper.dt.tzinfo == timezone.utc
 
 
 def test_datetime_as_call_io(client: WeaveClient) -> None:
@@ -126,8 +130,10 @@ def test_datetime_as_dataset_cells(client: WeaveClient):
     for gotten_row, dt in zip(dataset, dts):
         assert isinstance(gotten_row["dt"], datetime)
         if dt.tzinfo is not None:
-            assert gotten_row["dt"] == dt
-            assert gotten_row["dt"].tzinfo == dt.tzinfo
+            # When a timezone-aware datetime is published, it's converted to UTC
+            utc_dt = dt.astimezone(timezone.utc)
+            assert gotten_row["dt"] == utc_dt
+            assert gotten_row["dt"].tzinfo == timezone.utc
         else:
             # When a naive datetime is published, it's converted to UTC
             utc_dt = dt.replace(tzinfo=timezone.utc)

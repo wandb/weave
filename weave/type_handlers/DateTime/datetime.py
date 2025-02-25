@@ -28,25 +28,25 @@ class DatetimeWithArtifact(datetime.datetime):
 def save(obj: datetime.datetime, artifact: MemTraceFilesArtifact, name: str) -> None:
     """Serialize a datetime object to ISO format with timezone information.
 
-    If the datetime object is naive (has no timezone), it will be assumed to be UTC.
+    All datetime objects are converted to UTC for consistent serialization.
     """
+    # If the datetime is naive, convert it to UTC
     if obj.tzinfo is None:
         obj = obj.replace(tzinfo=datetime.timezone.utc)
+    else:
+        # Convert to UTC if it has a timezone
+        obj = obj.astimezone(datetime.timezone.utc)
 
-    # This is stored as JSON to match the pattern used by other handlers, but it
-    # can otherwise be stored as a string or not use artifact at all
+    # Store the datetime with its timezone
     with artifact.new_file(f"{name}.json") as f:
         json_str = json.dumps({"isoformat": obj.isoformat()})
         f.write(json_str)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> DatetimeWithArtifact:
-    """Deserialize an ISO format string back to a datetime object with timezone.
+def load(artifact: MemTraceFilesArtifact, name: str) -> datetime.datetime:
+    """Deserialize an ISO format string back to a datetime object with UTC timezone.
 
-    Returns a DatetimeWithArtifact instead of a regular datetime because standard
-    datetime objects cannot store the artifact reference that Weave requires.
-    The returned object behaves exactly like a regular datetime but can also
-    store the required artifact reference.
+    All datetime objects are returned with UTC timezone for consistency.
     """
     try:
         # Try to open as a string first
@@ -60,35 +60,43 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> DatetimeWithArtifact:
         else:
             raise
 
-    result = DatetimeWithArtifact.fromisoformat(data["isoformat"])
-    result.art = artifact
-    return result
+    # Create a datetime and ensure it's in UTC
+    dt = datetime.datetime.fromisoformat(data["isoformat"])
+    # If the datetime is naive, assume UTC
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    # Otherwise, convert to UTC
+    return dt.astimezone(datetime.timezone.utc)
 
 
 def inline_serialize(obj: datetime.datetime) -> dict:
     """Serialize a datetime object to a dictionary without using artifacts.
 
-    This provides a more efficient serialization option that avoids the network
-    overhead of reading from artifacts.
-
-    If the datetime object is naive (has no timezone), it will be assumed to be UTC.
+    All datetime objects are converted to UTC for consistent serialization.
     """
+    # If the datetime is naive, convert it to UTC
     if obj.tzinfo is None:
         obj = obj.replace(tzinfo=datetime.timezone.utc)
+    else:
+        # Convert to UTC if it has a timezone
+        obj = obj.astimezone(datetime.timezone.utc)
 
+    # Store the datetime with its timezone
     return {"isoformat": obj.isoformat()}
 
 
-def inline_deserialize(data: dict) -> DatetimeWithArtifact:
-    """Deserialize a dictionary back to a datetime object with timezone.
+def inline_deserialize(data: dict) -> datetime.datetime:
+    """Deserialize a dictionary back to a datetime object with UTC timezone.
 
-    Returns a DatetimeWithArtifact to maintain compatibility with the rest of
-    the system, but no artifact reference is needed since the data was serialized
-    inline.
+    All datetime objects are returned with UTC timezone for consistency.
     """
-    result = DatetimeWithArtifact.fromisoformat(data["isoformat"])
-    result.art = None
-    return result
+    # Create a datetime and ensure it's in UTC
+    dt = datetime.datetime.fromisoformat(data["isoformat"])
+    # If the datetime is naive, assume UTC
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    # Otherwise, convert to UTC
+    return dt.astimezone(datetime.timezone.utc)
 
 
 def register() -> None:

@@ -82,7 +82,9 @@ def _decode_custom_obj(
     load_instance_op._tracing_enabled = False  # type: ignore
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
     res = load_instance_op(art, "obj")
-    res.art = art
+    # Only set the art attribute if the object supports it
+    if hasattr(res, "art"):
+        res.art = art
     return res
 
 
