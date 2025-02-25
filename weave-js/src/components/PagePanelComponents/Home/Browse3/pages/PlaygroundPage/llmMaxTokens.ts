@@ -97,6 +97,16 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
+  'o3-mini': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'o3-mini-2025-01-31': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
 
   // Anthropic models
   'claude-3-7-sonnet-20250219': {

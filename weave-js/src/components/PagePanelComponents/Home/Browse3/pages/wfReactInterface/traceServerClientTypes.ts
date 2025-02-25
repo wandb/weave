@@ -314,7 +314,6 @@ export type CompletionsCreateInputs = {
   model: string;
   messages: any[];
   temperature: number;
-  max_tokens: number;
 
   // These are optional, depending on the LLM provider some accept these some dont
   stop?: string[];
@@ -326,6 +325,9 @@ export type CompletionsCreateInputs = {
     type: string;
   };
   tools?: any[];
+  // These are optional, o3 accepts max_completion_tokens, others accept max_tokens
+  max_tokens?: number;
+  max_completion_tokens?: number;
 };
 
 export type CompletionsCreateReq = {
