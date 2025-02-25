@@ -2177,17 +2177,14 @@ class ObjectVersionCollection:
     def _get_object_at_index(self, index: int) -> Any:
         if index not in self._weave_objects:
             version = self._raw_versions[index]
-            # Extract entity and project from project_id (format: "entity/project")
             entity, project = version.project_id.split("/", 1)
 
-            # Create an ObjectRef for this version
             ref = ObjectRef(
                 entity=entity,
                 project=project,
                 name=version.object_id,
                 _digest=version.digest,
             )
-            # Get the WeaveObject for this version
             self._weave_objects[index] = self._client.get(ref)
 
         return self._weave_objects[index]
