@@ -2148,27 +2148,22 @@ class ObjectVersionCollection:
 
         Args:
             object_id: The ID of the object
-            versions: List of object versions
+            versions: List of object versions (obj schemas)
             client: WeaveClient instance for loading objects
         """
         self.object_id = object_id
         self._raw_versions = sorted(versions, key=lambda v: v.version_index)
         self._client = client
-        # Dictionary to store loaded WeaveObjects by index
-        self._weave_objects: dict[int, Any] = {}
+        self._weave_objects: dict[int, Any] = {}  # {version: object}
 
     def __iter__(self) -> Iterator[Any]:
-        """Iterate through all versions of this object as WeaveObject instances."""
-        # Lazy load each object as we iterate
         for i in range(len(self._raw_versions)):
             yield self._get_object_at_index(i)
 
     def __len__(self) -> int:
-        """Return the number of versions in this collection."""
         return len(self._raw_versions)
 
     def __getitem__(self, index: int) -> Any:
-        """Get a specific version by index as a WeaveObject instance."""
         if index < 0 or index >= len(self._raw_versions):
             raise IndexError(
                 f"Index {index} out of range for collection with {len(self._raw_versions)} versions"
@@ -2176,12 +2171,10 @@ class ObjectVersionCollection:
         return self._get_object_at_index(index)
 
     def __repr__(self) -> str:
-        """String representation of the collection."""
         base_class = self.base_object_class or "Unknown"
         return f"ObjectVersionCollection(object_id='{self.object_id}', base_class='{base_class}', versions={len(self._raw_versions)})"
 
     def _get_object_at_index(self, index: int) -> Any:
-        """Get a WeaveObject at a specific index, loading it if necessary."""
         if index not in self._weave_objects:
             version = self._raw_versions[index]
             # Extract entity and project from project_id (format: "entity/project")
