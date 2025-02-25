@@ -80,8 +80,8 @@ class TestS3Storage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
-                "WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
+                "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+                "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
                 "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
             },
         ):
@@ -146,7 +146,8 @@ class TestGCSStorage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": """{
+                "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                    b"""{
                     "type": "service_account",
                     "project_id": "test-project",
                     "private_key_id": "test-key-id",
@@ -157,7 +158,8 @@ class TestGCSStorage:
                     "token_uri": "https://oauth2.googleapis.com/token",
                     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
                     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
-                }""",
+                }"""
+                ).decode(),
                 "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
             },
         ):
@@ -209,8 +211,8 @@ class TestAzureStorage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": AZURITE_B64_KEY,
-                "WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL": AZURITE_URL,
+                "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": AZURITE_B64_KEY,
+                "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": AZURITE_URL,
                 "WF_FILE_STORAGE_URI": f"az://{AZURITE_ACCOUNT}/{TEST_BUCKET}",
             },
         ):

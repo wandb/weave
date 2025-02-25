@@ -16,9 +16,9 @@ def test_get_aws_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
-            "WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
-            "WF_FILE_STORAGE_BUCKET_AWS_SESSION_TOKEN": "test-token",
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_AWS_SESSION_TOKEN": "test-token",
         },
     ):
         creds = get_aws_credentials()
@@ -32,8 +32,8 @@ def test_get_aws_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID": "test-key",
-            "WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
         },
     ):
         creds = get_aws_credentials()
@@ -53,7 +53,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING": "test-connection-string",
+            "WF_FILE_STORAGE_AZURE_CONNECTION_STRING": "test-connection-string",
         },
     ):
         creds = get_azure_credentials()
@@ -65,7 +65,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": "test-credential",
+            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": "test-credential",
         },
     ):
         with pytest.raises(ValueError, match="Incorrect padding"):
@@ -73,7 +73,7 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": base64.b64encode(
+            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
                 b"test-credential"
             ).decode(),
         },
@@ -87,10 +87,10 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64": base64.b64encode(
+            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
                 b"test-credential"
             ).decode(),
-            "WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL": "some_account_url",
+            "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "some_account_url",
         },
     ):
         creds = get_azure_credentials()
@@ -121,7 +121,9 @@ def test_get_gcp_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": test_creds_json,
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                test_creds_json.encode()
+            ).decode(),
         },
     ):
         with mock.patch("google.oauth2.service_account.Credentials") as mock_creds:
@@ -137,7 +139,10 @@ def test_get_gcp_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON": "invalid-json",
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": "invalid-json",
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                b"invalid-json"
+            ).decode(),
         },
     ):
         with pytest.raises(ValueError, match="Invalid GCP credentials JSON"):

@@ -33,10 +33,10 @@ def get_aws_credentials() -> AWSCredentials:
     """Retrieves AWS credentials from environment variables.
 
     Required env vars:
-        - WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID
-        - WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY
+        - WF_FILE_STORAGE_AWS_ACCESS_KEY_ID
+        - WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY
     Optional env vars:
-        - WF_FILE_STORAGE_BUCKET_AWS_SESSION_TOKEN
+        - WF_FILE_STORAGE_AWS_SESSION_TOKEN
 
     Returns:
         AWSCredentials with access key, secret key, and optional session token
@@ -63,7 +63,7 @@ def get_gcp_credentials() -> GCPCredentials:
     """Retrieves GCP service account credentials from environment variables.
 
     Required env vars:
-        - WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON: JSON string containing service account info
+        - WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64: JSON string containing service account info
 
     Returns:
         GCPCredentials object configured for GCS access
@@ -78,7 +78,7 @@ def get_gcp_credentials() -> GCPCredentials:
     creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()
     if not creds_json_b64:
         raise ValueError(
-            "No GCP credentials found. Set WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON_B64 environment variable."
+            "No GCP credentials found. Set WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64 environment variable."
         )
 
     try:
@@ -95,8 +95,8 @@ def get_azure_credentials() -> (
     Supports both connection string and account-based authentication.
 
     Required env vars (one of):
-        - WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING
-        - WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64 (base64 encoded)
+        - WF_FILE_STORAGE_AZURE_CONNECTION_STRING
+        - WF_FILE_STORAGE_AZURE_CREDENTIAL_B64 (base64 encoded)
 
     Returns:
         Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars

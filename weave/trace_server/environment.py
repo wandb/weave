@@ -37,34 +37,34 @@ def wf_file_storage_uri() -> Optional[str]:
 
 def wf_storage_bucket_aws_access_key_id() -> Optional[str]:
     """The AWS access key ID."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AWS_ACCESS_KEY_ID")
+    return os.environ.get("WF_FILE_STORAGE_AWS_ACCESS_KEY_ID")
 
 
 def wf_storage_bucket_aws_secret_access_key() -> Optional[str]:
     """The AWS secret access key."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AWS_SECRET_ACCESS_KEY")
+    return os.environ.get("WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY")
 
 
 def wf_storage_bucket_aws_session_token() -> Optional[str]:
     """The AWS session token."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AWS_SESSION_TOKEN")
+    return os.environ.get("WF_FILE_STORAGE_AWS_SESSION_TOKEN")
 
 
 def wf_storage_bucket_azure_connection_string() -> Optional[str]:
     """The Azure connection string."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CONNECTION_STRING")
+    return os.environ.get("WF_FILE_STORAGE_AZURE_CONNECTION_STRING")
 
 
 def wf_storage_bucket_azure_credential() -> Optional[str]:
     """The Azure credential."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_CREDENTIAL_B64")
+    return os.environ.get("WF_FILE_STORAGE_AZURE_CREDENTIAL_B64")
 
 
 def wf_storage_bucket_azure_account_url() -> Optional[str]:
     """The Azure account url (optional override)."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_AZURE_ACCOUNT_URL")
+    return os.environ.get("WF_FILE_STORAGE_AZURE_ACCOUNT_URL")
 
 
 def wf_storage_bucket_gcp_credentials_json_b64() -> Optional[str]:
-    """The GCP credentials JSON string."""
-    return os.environ.get("WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON_B64")
+    """The GCP credentials JSON string (base64 encoded)."""
+    return os.environ.get("WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64")
