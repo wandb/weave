@@ -87,6 +87,7 @@ export const opArtifactMembershipLink = makeStandardOp({
   }),
 });
 
+// Same as opArtifactVersionFile
 export const opArtifactMembershipFile = makeStandardOp({
   name: 'artifactMembership-file',
   argTypes: {...artifactArgTypes, path: 'string'},

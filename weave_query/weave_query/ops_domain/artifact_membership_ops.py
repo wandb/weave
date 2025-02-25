@@ -130,7 +130,7 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
         uri=uri,
     )
 
-
+# Same as the artifactVersion-_file_refine_output_type op
 @op(
     name="artifactMembership-_file_refine_output_type",
     hidden=True,
@@ -142,11 +142,7 @@ def _file_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembershi
     return types.TypeRegistry.type_of(art_local.path_info(path))
 
 
-# Warning: the return type of this is incorrect! Weave0 treats
-# type 'file' (FilesystemArtifactFile) as both dir and file.
-# We have a refiner to do the correct thing, but the return
-# type is set to `File` so that the first non-refine compile
-# path will still work.
+# Same as the artifactVersion-file op
 @op(
     name="artifactMembership-file",
     refine_output_type=_file_refine_output_type,
