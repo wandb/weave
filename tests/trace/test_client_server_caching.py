@@ -63,15 +63,14 @@ def test_server_caching(client):
         "errors": 0,
         "skips": 0,
     }
-
+    caching_server.reset_cache_recorder()
     rows = list(gotten_dataset)
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
-        # 1 obj read for the dataset (shouldn't we already have gotten this?)
         # 1 table read for the rows
         # 1 table_query_stats for len(rows)
         # 5 images
-        "misses": 8,
+        "misses": 7,
         "errors": 0,
         "skips": 0,
     }
