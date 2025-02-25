@@ -22,7 +22,7 @@ class FileStorageURI:
     specific parsing and validation rules for its storage type.
 
     Attributes:
-        scheme (str): The URI scheme (e.g., 's3', 'gcs', 'az')
+        scheme (str): The URI scheme (e.g., 's3', 'gs', 'az')
         path (str): The path component of the URI
     """
 
@@ -140,7 +140,7 @@ class GCSFileStorageURI(FileStorageURI):
     Example: gs://my-bucket/path/to/object
 
     Attributes:
-        scheme (str): Always 'gcs'
+        scheme (str): Always 'gs'
         bucket (str): The GCS bucket name
         path (str): The object path within the bucket
     """
