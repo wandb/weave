@@ -106,8 +106,7 @@ class PreferenceScorer(Scorer):
         """Compare the output of the primary model with the other model.
         Args:
             output (dict): The output from the primary model.
-            other_output (dict): The output from the other model being compared.
-            inputs (str): The input text used to generate the outputs.
+            input_text (str): The input text used to generate the outputs.
         Returns:
             dict: A flat dictionary containing the comparison result and reason.
         """
