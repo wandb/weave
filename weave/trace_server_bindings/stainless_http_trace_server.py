@@ -307,6 +307,9 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
+        if isinstance(req, dict):
+            req = tsi.CallsQueryReq.model_validate(req)
+        req = cast(tsi.CallsQueryReq, req)
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 

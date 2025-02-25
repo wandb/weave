@@ -75,8 +75,8 @@ def get_openapi_spec(output_file: str | None = None) -> None:
         if not _wait_for_server(f"http://localhost:{WEAVE_PORT}"):
             error("Server failed to start within timeout")
             server_out, server_err = server.communicate()
-            error("Server output:", server_out.decode())
-            error("Server error:", server_err.decode())
+            error(f"Server output: {server_out.decode()}")
+            error(f"Server error: {server_err.decode()}")
             sys.exit(1)
 
         info("Fetching OpenAPI spec...")
@@ -151,13 +151,13 @@ def generate_code(
 def update_pyproject(repo_path: str, package_name: str, release: bool = False) -> None:
     """Update the pyproject.toml file with the latest version of the generated code"""
     header("Updating pyproject.toml")
-    repo_path = Path(repo_path)  # Convert string path to Path object
+    path = Path(repo_path)
     if release:
-        version = _get_package_version(repo_path)
+        version = _get_package_version(path)
         _update_pyproject_toml(package_name, version, True)
         info(f"Updated {package_name} dependency to version: {version}")
     else:
-        sha, remote_url = _get_repo_info(repo_path)
+        sha, remote_url = _get_repo_info(path)
         if not sha:
             error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
@@ -348,10 +348,10 @@ def all(
         sys.exit(1)
 
     # Convert repo_path to absolute path if relative
-    repo_path = Path(cfg["repo_path"])
-    if not repo_path.is_absolute():
-        repo_path = Path.cwd() / repo_path
-    repo_path = str(repo_path)
+    path = Path(cfg["repo_path"])
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    str_path = str(path)
 
     # 1. Get OpenAPI spec
     output_file = cfg.get("openapi_output", STAINLESS_OAS_PATH)
@@ -385,14 +385,14 @@ def all(
     # Call generate_code with proper arguments
     cmd = _format_command(
         "generate_code",
-        python_path=repo_path,
+        python_path=str_path,
         node_path=node_path,
         typescript_path=typescript_path,
     )
     _announce_command(cmd)
     ctx.invoke(
         generate_code,
-        python_path=repo_path,
+        python_path=str_path,
         node_path=node_path,
         typescript_path=typescript_path,
     )
@@ -402,14 +402,14 @@ def all(
     # Call update_pyproject with proper arguments
     cmd = _format_command(
         "update_pyproject",
-        repo_path=repo_path,
+        repo_path=str_path,
         package_name=cfg["package_name"],
         release=release,
     )
     _announce_command(cmd)
     ctx.invoke(
         update_pyproject,
-        repo_path=repo_path,
+        repo_path=str_path,
         package_name=cfg["package_name"],
         release=release,
     )
