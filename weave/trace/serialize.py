@@ -75,6 +75,15 @@ def to_json(
 def _build_result_from_encoded(
     encoded: dict, project_id: str, client: WeaveClient
 ) -> Any:
+    # If we have inline data, just pass it through
+    if "inline_data" in encoded:
+        return {
+            "_type": encoded["_type"],
+            "weave_type": encoded["weave_type"],
+            "inline_data": encoded["inline_data"],
+        }
+
+    # Otherwise, handle artifact-based serialization
     file_digests = {}
     for name, val in encoded["files"].items():
         # Instead of waiting for the file to be created, we
@@ -264,6 +273,12 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
+            # Check if we have inline data
+            if "inline_data" in obj:
+                return custom_objs.decode_custom_obj(
+                    obj["weave_type"], {}, None, obj["inline_data"]
+                )
+            # Fall back to artifact-based deserialization
             files = _load_custom_obj_files(project_id, server, obj["files"])
             return custom_objs.decode_custom_obj(
                 obj["weave_type"], files, obj.get("load_op")

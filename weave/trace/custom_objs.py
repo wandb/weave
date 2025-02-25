@@ -31,6 +31,17 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get
         return None
+
+    # Use inline serialization if available
+    if serializer.inline_serialize is not None:
+        inline_data = serializer.inline_serialize(obj)
+        return {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": serializer.id()},
+            "inline_data": inline_data,
+        }
+
+    # Fall back to artifact-based serialization
     art = MemTraceFilesArtifact()
     serializer.save(obj, art, "obj")
 
@@ -79,6 +90,7 @@ def decode_custom_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
+    inline_data: Any = None,
 ) -> Any:
     _type = weave_type["type"]
     found_serializer = False
@@ -88,8 +100,13 @@ def decode_custom_obj(
         serializer = get_serializer_by_id(_type)
         if serializer is not None:
             found_serializer = True
-            load_instance_op = serializer.load
 
+            # If we have inline data and an inline deserializer, use it
+            if inline_data is not None and serializer.inline_deserialize is not None:
+                return serializer.inline_deserialize(inline_data)
+
+            # Otherwise use the standard artifact-based deserialization
+            load_instance_op = serializer.load
             try:
                 return _decode_custom_obj(encoded_path_contents, load_instance_op)
             except Exception as e:

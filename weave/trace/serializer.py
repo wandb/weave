@@ -50,6 +50,10 @@ class Serializer:
     # target class because protocol isinstance checks can fail in python3.12+
     instance_check: Callable[[Any], bool] | None = None
 
+    # Optional methods for inline serialization without requiring artifact files
+    inline_serialize: Callable[[Any], Any] | None = None
+    inline_deserialize: Callable[[Any], Any] | None = None
+
     def id(self) -> str:
         ser_id = self.target_class.__module__ + "." + self.target_class.__name__
         if ser_id.startswith("weave."):
@@ -69,8 +73,19 @@ def register_serializer(
     save: Callable,
     load: Callable,
     instance_check: Callable[[Any], bool] | None = None,
+    inline_serialize: Callable[[Any], Any] | None = None,
+    inline_deserialize: Callable[[Any], Any] | None = None,
 ) -> None:
-    SERIALIZERS.append(Serializer(target_class, save, load, instance_check))
+    SERIALIZERS.append(
+        Serializer(
+            target_class,
+            save,
+            load,
+            instance_check,
+            inline_serialize,
+            inline_deserialize,
+        )
+    )
 
 
 def get_serializer_by_id(id: str) -> Serializer | None:

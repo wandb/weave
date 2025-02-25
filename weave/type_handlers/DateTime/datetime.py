@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import json
-from typing import TextIO, cast
 
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
@@ -37,7 +36,8 @@ def save(obj: datetime.datetime, artifact: MemTraceFilesArtifact, name: str) -> 
     # This is stored as JSON to match the pattern used by other handlers, but it
     # can otherwise be stored as a string or not use artifact at all
     with artifact.new_file(f"{name}.json") as f:
-        json.dump({"isoformat": obj.isoformat()}, cast(TextIO, f))
+        json_str = json.dumps({"isoformat": obj.isoformat()})
+        f.write(json_str)
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> DatetimeWithArtifact:
@@ -48,12 +48,54 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> DatetimeWithArtifact:
     The returned object behaves exactly like a regular datetime but can also
     store the required artifact reference.
     """
-    with artifact.open(f"{name}.json") as f:
-        data = json.load(cast(TextIO, f))
+    try:
+        # Try to open as a string first
+        with artifact.open(f"{name}.json") as f:
+            data = json.load(f)
+    except AttributeError:
+        # If that fails, try to handle the case where the value is a string
+        val = artifact.path_contents.get(f"{name}.json")
+        if isinstance(val, str):
+            data = json.loads(val)
+        else:
+            raise
+
     result = DatetimeWithArtifact.fromisoformat(data["isoformat"])
     result.art = artifact
     return result
 
 
+def inline_serialize(obj: datetime.datetime) -> dict:
+    """Serialize a datetime object to a dictionary without using artifacts.
+
+    This provides a more efficient serialization option that avoids the network
+    overhead of reading from artifacts.
+
+    If the datetime object is naive (has no timezone), it will be assumed to be UTC.
+    """
+    if obj.tzinfo is None:
+        obj = obj.replace(tzinfo=datetime.timezone.utc)
+
+    return {"isoformat": obj.isoformat()}
+
+
+def inline_deserialize(data: dict) -> DatetimeWithArtifact:
+    """Deserialize a dictionary back to a datetime object with timezone.
+
+    Returns a DatetimeWithArtifact to maintain compatibility with the rest of
+    the system, but no artifact reference is needed since the data was serialized
+    inline.
+    """
+    result = DatetimeWithArtifact.fromisoformat(data["isoformat"])
+    result.art = None
+    return result
+
+
 def register() -> None:
-    serializer.register_serializer(datetime.datetime, save, load)
+    serializer.register_serializer(
+        datetime.datetime,
+        save,
+        load,
+        inline_serialize=inline_serialize,
+        inline_deserialize=inline_deserialize,
+    )
