@@ -4,7 +4,7 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.flow.scorer import WeaveScorerResult
-
+from weave.integrations.bedrock import patch_client
 
 class BedrockGuardrailScorer(weave.Scorer):
     """
@@ -28,9 +28,10 @@ class BedrockGuardrailScorer(weave.Scorer):
     source: str = Field(
         default="OUTPUT",
         description="The source of the content to evaluate, either 'INPUT' or 'OUTPUT'.",
+        choices=["INPUT", "OUTPUT"]
     )
     bedrock_runtime_kwargs: dict[str, Any] = Field(
-        default={},
+        default_factory=dict,
         description="Additional keyword arguments to pass to the Bedrock runtime client.",
     )
 
@@ -45,6 +46,7 @@ class BedrockGuardrailScorer(weave.Scorer):
             self._bedrock_runtime = boto3.client(
                 "bedrock-runtime", **self.bedrock_runtime_kwargs
             )
+            patch_client(self._bedrock_runtime)
         except ImportError:
             raise ImportError(
                 "boto3 is not installed. Please install it with 'pip install boto3' "
