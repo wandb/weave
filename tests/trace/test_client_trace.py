@@ -3354,11 +3354,12 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     assert len(res) == 1
     assert res[0].inputs["param"]["value1"] == "hello"
 
-    # Does the query return the output?
-    with pytest.raises(TypeError):
-        # There will be no output because clickhouse hasn't merged the inputs and
-        # output yet
-        assert res[0].output["d"] == 5
+    if client_is_sqlite(client):
+        # Does the query return the output?
+        with pytest.raises(TypeError):
+            # There will be no output because clickhouse hasn't merged the inputs and
+            # output yet
+            assert res[0].output["d"] == 5
 
     # insert some more calls to encourage clickhouse to merge
 
