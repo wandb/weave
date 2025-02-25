@@ -3374,3 +3374,101 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     res = _make_query("inputs.param.value1", "hello")
     assert len(res) == 1
     assert res[0].output["d"] == 5
+
+
+def test_call_stream_query_heavy_query_batch(client):
+    # start 10 calls
+    call_ids = []
+    project_id = get_client_project_id(client)
+    for i in range(10):
+        call_id = generate_id()
+        call_ids.append(call_id)
+        trace_id = generate_id()
+        parent_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name="test_name",
+            trace_id=trace_id,
+            parent_id=parent_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            - datetime.timedelta(seconds=1),
+            attributes={"a": 5},
+            inputs={"param": {"value1": "hello"}},
+        )
+        client.server.call_start(tsi.CallStartReq(start=start))
+
+    # end 10 calls
+    for i in range(10):
+        call_id = generate_id()
+        trace_id = generate_id()
+        parent_id = generate_id()
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_ids[i],
+            ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            summary={"c": 5},
+            output={"d": 5, "e": "f"},
+        )
+        client.server.call_end(tsi.CallEndReq(end=end))
+
+    # filter by output
+    output_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "output.e"},
+                    {"$literal": "f"},
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(output_query)
+    )
+    if not client_is_sqlite(client):
+        with pytest.raises(AssertionError):
+            # in clickhouse we don't know how many calls are merged
+            print("res", list(res))
+            assert len(list(res)) == 10
+            for call in res:
+                assert call.attributes["a"] == 5
+    else:
+        assert len(list(res)) == 10
+        for call in res:
+            assert call.attributes["a"] == 5
+
+    # Clickhouse normally merges after a query of a table like this.
+    # If so, the next query, while only filtering by inputs, will
+    # also include the outputs. So we should expect the correct
+    # results for both client.
+
+    # now query for inputs by string
+    input_string_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "inputs.param.value1"},
+                    {"$literal": "hello"},
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
+
+    # now that we have merged, the inital query should succeed
+    res1 = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(output_query)
+    )
+    assert len(list(res1)) == 10
+    for call in res1:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
