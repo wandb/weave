@@ -408,7 +408,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
         if not isinstance(req, dict):
-            req = req.model_dump()
+            req = req.model_dump(by_alias=True)
         return self.stainless_client.tables.query(**req)
 
     @retry_func
@@ -424,7 +424,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
         if not isinstance(req, dict):
-            req = req.model_dump()
+            req = req.model_dump(by_alias=True)
         return self.stainless_client.tables.query_stats(**req)
 
     @retry_func
@@ -432,7 +432,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
         if not isinstance(req, dict):
-            req = req.model_dump()
+            req = req.model_dump(by_alias=True)
         return self.stainless_client.refs.read_batch(**req)
 
     @retry_func
@@ -476,7 +476,8 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.FeedbackQueryReq.model_validate(req)
         req = cast(tsi.FeedbackQueryReq, req)
-        return self.stainless_client.feedback.query(**req.model_dump())
+        response = self.stainless_client.feedback.query(**req.model_dump(by_alias=True))
+        return tsi.FeedbackQueryRes(result=response.result)
 
     @retry_func
     def feedback_purge(
@@ -485,7 +486,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.FeedbackPurgeReq.model_validate(req)
         req = cast(tsi.FeedbackPurgeReq, req)
-        return self.stainless_client.feedback.purge(**req.model_dump())
+        return self.stainless_client.feedback.purge(**req.model_dump(by_alias=True))
 
     @retry_func
     def feedback_replace(
@@ -494,7 +495,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.FeedbackReplaceReq.model_validate(req)
         req = cast(tsi.FeedbackReplaceReq, req)
-        return self.stainless_client.feedback.replace(**req.model_dump())
+        return self.stainless_client.feedback.replace(**req.model_dump(by_alias=True))
 
     @retry_func
     def actions_execute_batch(
@@ -503,7 +504,9 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.ActionsExecuteBatchReq.model_validate(req)
         req = cast(tsi.ActionsExecuteBatchReq, req)
-        return self.stainless_client.actions.execute_batch(**req.model_dump())
+        return self.stainless_client.actions.execute_batch(
+            **req.model_dump(by_alias=True)
+        )
 
     # Cost API
     @retry_func
@@ -513,7 +516,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.CostQueryReq.model_validate(req)
         req = cast(tsi.CostQueryReq, req)
-        return self.stainless_client.cost.query(**req.model_dump())
+        return self.stainless_client.cost.query(**req.model_dump(by_alias=True))
 
     @retry_func
     def cost_create(
@@ -522,7 +525,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.CostCreateReq.model_validate(req)
         req = cast(tsi.CostCreateReq, req)
-        return self.stainless_client.cost.create(**req.model_dump())
+        return self.stainless_client.cost.create(**req.model_dump(by_alias=True))
 
     @retry_func
     def cost_purge(
@@ -531,7 +534,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.CostPurgeReq.model_validate(req)
         req = cast(tsi.CostPurgeReq, req)
-        return self.stainless_client.cost.purge(**req.model_dump())
+        return self.stainless_client.cost.purge(**req.model_dump(by_alias=True))
 
     @retry_func
     def completions_create(
@@ -540,7 +543,7 @@ class StainlessHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = tsi.CompletionsCreateReq.model_validate(req)
         req = cast(tsi.CompletionsCreateReq, req)
-        return self.stainless_client.completions.create(**req.model_dump())
+        return self.stainless_client.completions.create(**req.model_dump(by_alias=True))
 
 
 __docspec__ = [
