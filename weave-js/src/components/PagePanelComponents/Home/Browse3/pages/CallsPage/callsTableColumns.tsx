@@ -396,63 +396,118 @@ function buildCallsTableColumns(
       c.includes(RUNNABLE_FEEDBACK_OUTPUT_PART)
   );
   if (scoreColNames.length > 0) {
-    // Add feedback group to grouping model
+    // Group scores by scorer name and nested paths
+    const scorerGroups = new Map<string, Map<string, string[]>>();
+    scoreColNames.forEach(colName => {
+      const parsed = parseScorerFeedbackField(colName);
+      if (parsed) {
+        const scorerName = parsed.scorerName;
+        const pathParts = parsed.scorePath.replace(/^\./, '').split('.');
+        // Only create a group path if there are multiple parts
+        const groupPath =
+          pathParts.length > 1 ? pathParts.slice(0, -1).join('.') : '';
+
+        if (!scorerGroups.has(scorerName)) {
+          scorerGroups.set(scorerName, new Map());
+        }
+        const scorerGroup = scorerGroups.get(scorerName)!;
+        if (!scorerGroup.has(groupPath)) {
+          scorerGroup.set(groupPath, []);
+        }
+        scorerGroup.get(groupPath)!.push(colName);
+      }
+    });
+
+    // Create scorer groups in the grouping model for each scorer
     const scoreGroup = {
       groupId: 'scores',
       headerName: 'Scores',
-      children: [] as any[],
+      children: Array.from(scorerGroups.entries()).map(
+        ([scorerName, pathGroups]) => {
+          const scorerGroupChildren = Array.from(pathGroups.entries())
+            .filter(([groupPath, _]) => groupPath !== '') // Filter out non-grouped fields
+            .map(([groupPath, _]) => ({
+              groupId: `scores.${scorerName}.${groupPath}`,
+              headerName: groupPath,
+              children: [] as any[],
+            }));
+
+          return {
+            groupId: `scores.${scorerName}`,
+            headerName: scorerName,
+            children: scorerGroupChildren,
+          };
+        }
+      ),
     };
     groupingModel.push(scoreGroup);
 
-    // Add feedback columns
-    const scoreColumns: Array<GridColDef<TraceCallSchema>> = scoreColNames.map(
-      c => {
-        const parsed = parseScorerFeedbackField(c);
-        const field = convertScorerFeedbackFieldToBackendFilter(c);
-        scoreGroup.children.push({
-          field,
-        });
-        if (parsed === null) {
-          return {
+    // Create columns for each scorer's fields
+    const scoreColumns: Array<GridColDef<TraceCallSchema>> = [];
+    scorerGroups.forEach((pathGroups, scorerName) => {
+      pathGroups.forEach((colNames, groupPath) => {
+        const scorerGroup = groupPath
+          ? scoreGroup.children
+              .find(g => g.groupId === `scores.${scorerName}`)
+              ?.children.find(
+                g => g.groupId === `scores.${scorerName}.${groupPath}`
+              )
+          : scoreGroup.children.find(g => g.groupId === `scores.${scorerName}`);
+
+        colNames.forEach(colName => {
+          const parsed = parseScorerFeedbackField(colName);
+          const field = convertScorerFeedbackFieldToBackendFilter(colName);
+          if (parsed === null) {
+            scoreColumns.push({
+              field,
+              headerName: colName,
+              width: 150,
+              renderHeader: () => {
+                return <div>{colName}</div>;
+              },
+              valueGetter: (unused: any, row: any) => {
+                return row[colName];
+              },
+              renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
+                return <CellValue value={params.value} />;
+              },
+            });
+            return;
+          }
+
+          // Add to scorer's group
+          scorerGroup?.children.push({field});
+
+          const leafName =
+            parsed.scorePath.split('.').pop()?.replace(/^\./, '') ||
+            parsed.scorePath;
+
+          scoreColumns.push({
             field,
-            headerName: c,
+            headerName: `Scores.${parsed.scorerName}${parsed.scorePath}`,
             width: 150,
             renderHeader: () => {
-              return <div> {c}</div>;
+              return <div>{leafName}</div>;
             },
             valueGetter: (unused: any, row: any) => {
-              return row[c];
+              return row[colName];
             },
             renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-              return <CellValue value={params.value} />;
+              return (
+                <CellFilterWrapper
+                  onAddFilter={onAddFilter}
+                  field={field}
+                  rowId={params.id.toString()}
+                  operation={null}
+                  value={params.value}>
+                  <CellValue value={params.value} />
+                </CellFilterWrapper>
+              );
             },
-          };
-        }
-        return {
-          field,
-          headerName: 'Scores.' + parsed.scorerName + parsed.scorePath,
-          width: 150,
-          renderHeader: () => {
-            return <div>{parsed.scorerName + parsed.scorePath}</div>;
-          },
-          valueGetter: (unused: any, row: any) => {
-            return row[c];
-          },
-          renderCell: (params: GridRenderCellParams<TraceCallSchema>) => {
-            return (
-              <CellFilterWrapper
-                onAddFilter={onAddFilter}
-                field={field}
-                rowId={params.id.toString()}
-                operation={null}
-                value={params.value}>
-                <CellValue value={params.value} />
-              </CellFilterWrapper>
-            );
-          },
-        };
-      }
-    );
+          });
+        });
+      });
+    });
     cols.push(...scoreColumns);
   }
 

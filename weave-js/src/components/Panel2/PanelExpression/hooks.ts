@@ -610,6 +610,14 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
         ...results,
       ];
     }
+
+    // Only paginated tables are supported for run history tables stepper
+    results = results.filter(r => {
+      if (r.key.startsWith('run-history-tables-stepper')) {
+        return r.key === 'run-history-tables-stepper.row.table';
+      }
+      return true;
+    });
     return results;
   }, [handler, stackIds, weavePlotEnabled]);
 

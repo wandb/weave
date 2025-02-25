@@ -856,6 +856,14 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
         return Table(_get_table_like_awl_from_file(file).awl)
     except FileNotFoundError as e:
         return None
+    # Prevent a panel crash from stale file handle errors
+    # There are rare stale file handle errors that cause panel crashes as noted:
+    # https://wandb.atlassian.net/browse/WB-22355
+    except OSError as e:
+        import errno
+        if e.errno == errno.ESTALE:
+            return None
+        raise
 
 
 @op(name="file-partitionedTable")

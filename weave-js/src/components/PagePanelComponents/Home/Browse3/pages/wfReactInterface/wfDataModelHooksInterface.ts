@@ -112,6 +112,7 @@ export type ObjectVersionSchema<T extends any = any> = ObjectVersionKey & {
   baseObjectClass: string | null;
   createdAtMs: number;
   val: T;
+  userId?: string;
 };
 
 export type ObjectVersionFilter = {
@@ -212,7 +213,8 @@ export type WFDataModelHooksInterface = {
     query?: Query,
     columns?: string[],
     expandedRefCols?: string[],
-    includeFeedback?: boolean
+    includeFeedback?: boolean,
+    includeCosts?: boolean
   ) => Promise<Blob>;
   useObjCreate: () => (
     projectId: string,
@@ -221,7 +223,8 @@ export type WFDataModelHooksInterface = {
     baseObjectClass?: string
   ) => Promise<string>;
   useOpVersion: (
-    key: OpVersionKey | null
+    key: OpVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -232,7 +235,8 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
-    key: ObjectVersionKey | null
+    key: ObjectVersionKey | null,
+    metadataOnly?: boolean
   ) => LoadableWithError<ObjectVersionSchema | null>;
   useTableRowsQuery: (
     entity: string,
@@ -304,6 +308,9 @@ export type WFDataModelHooksInterface = {
     baseDigest: string,
     updates: traceServerClientTypes.TableUpdateSpec[]
   ) => Promise<traceServerClientTypes.TableUpdateRes>;
+  useTableCreate: () => (
+    table: traceServerClientTypes.TableCreateReq
+  ) => Promise<traceServerClientTypes.TableCreateRes>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

@@ -97,8 +97,23 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
+  'o3-mini': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'o3-mini-2025-01-31': {
+    provider: 'openai',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
 
   // Anthropic models
+  'claude-3-7-sonnet-20250219': {
+    provider: 'anthropic',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
   'claude-3-5-sonnet-20240620': {
     provider: 'anthropic',
     max_tokens: 8192,
@@ -122,6 +137,63 @@ export const LLM_MAX_TOKENS = {
   'claude-3-sonnet-20240229': {
     provider: 'anthropic',
     max_tokens: 4096,
+    supports_function_calling: true,
+  },
+
+  // Azure models
+  'azure/o1-mini': {
+    provider: 'azure',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'azure/o1-mini-2024-09-12': {
+    provider: 'azure',
+    max_tokens: 65536,
+    supports_function_calling: true,
+  },
+  'azure/o1': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-preview': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/o1-preview-2024-09-12': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o': {
+    provider: 'azure',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-08-06': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-11-20': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-2024-05-13': {
+    provider: 'azure',
+    max_tokens: 4096,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-mini': {
+    provider: 'azure',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4o-mini-2024-07-18': {
+    max_tokens: 16384,
+    provider: 'azure',
     supports_function_calling: true,
   },
 
@@ -192,6 +264,16 @@ export const LLM_MAX_TOKENS = {
     supports_function_calling: true,
   },
   'gemini/gemini-pro': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-exp': {
+    provider: 'gemini',
+    max_tokens: 8192,
+    supports_function_calling: true,
+  },
+  'gemini/gemini-2.0-flash-thinking-exp': {
     provider: 'gemini',
     max_tokens: 8192,
     supports_function_calling: true,
@@ -387,6 +469,21 @@ export const LLM_MAX_TOKENS = {
     provider: 'xai',
     supports_function_calling: true,
   },
+  'xai/grok-2-1212': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
+  'xai/grok-2': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
+  'xai/grok-2-latest': {
+    max_tokens: 131072,
+    provider: 'xai',
+    supports_function_calling: true,
+  },
 };
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
@@ -398,6 +495,7 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
 export const LLM_PROVIDERS = [
   'openai',
   'anthropic',
+  'azure',
   'gemini',
   'groq',
   'bedrock',
@@ -410,6 +508,7 @@ export const LLM_PROVIDER_LABELS: Record<
 > = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
+  azure: 'Azure',
   gemini: 'Google Gemini',
   groq: 'Groq',
   bedrock: 'AWS Bedrock',

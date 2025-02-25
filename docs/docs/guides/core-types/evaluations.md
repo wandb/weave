@@ -1,4 +1,4 @@
-# Evaluations
+# Offline Batch Evaluation
 
 Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
 
@@ -186,3 +186,71 @@ def function_to_evaluate(question: str):
 
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
+
+## Advanced evaluation usage
+
+### Using `preprocess_model_input` to format dataset rows before evaluating
+
+The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
+- Rename fields to match your model's expected input
+- Transform data into the correct format
+- Add or remove fields
+- Load additional data for each example
+
+Here's a simple example that shows how to use `preprocess_model_input` to rename fields:
+
+```python
+import weave
+from weave import Evaluation
+import asyncio
+
+# Our dataset has "input_text" but our model expects "question"
+examples = [
+    {"input_text": "What is the capital of France?", "expected": "Paris"},
+    {"input_text": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"input_text": "What is the square root of 64?", "expected": "8"},
+]
+
+@weave.op()
+def preprocess_example(example):
+    # Rename input_text to question
+    return {
+        "question": example["input_text"]
+    }
+
+@weave.op()
+def match_score(expected: str, model_output: dict) -> dict:
+    return {'match': expected == model_output['generated_text']}
+
+@weave.op()
+def function_to_evaluate(question: str):
+    return {'generated_text': f'Answer to: {question}'}
+
+# Create evaluation with preprocessing
+evaluation = Evaluation(
+    dataset=examples,
+    scorers=[match_score],
+    preprocess_model_input=preprocess_example
+)
+
+# Run the evaluation
+weave.init('preprocessing-example')
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+```
+
+In this example, our dataset contains examples with an `input_text` field, but our evaluation function expects a `question` parameter. The `preprocess_example` function transforms each example by renaming the field, allowing the evaluation to work correctly.
+
+The preprocessing function:
+1. Receives the raw example from your dataset
+2. Returns a dictionary with the fields your model expects
+3. Is applied to each example before it's passed to your evaluation function
+
+This is particularly useful when working with external datasets that may have different field names or structures than what your model expects.
+
+### Using HuggingFace Datasets with evaluations
+
+We are continuously improving our integrations with third-party services and libraries. 
+
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
+
+See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.

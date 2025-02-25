@@ -4,7 +4,7 @@ import React from 'react';
 import {parseRefMaybe} from '../../../../../../react';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {SmallRef} from '../../smallRef/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './cost';

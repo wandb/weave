@@ -111,6 +111,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
                 object_id TEXT,
+                wb_user_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
@@ -388,7 +389,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         select_columns = list(tsi.CallSchema.model_fields.keys())
         if req.columns:
             # TODO(gst): allow json fields to be selected
-            simple_columns = [x.split(".")[0] for x in req.columns]
+            simple_columns = list({x.split(".")[0] for x in req.columns})
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
             select_columns += [
@@ -617,7 +618,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
-        project_id, object_id = req.obj.project_id, req.obj.object_id
+        project_id, object_id, wb_user_id = (
+            req.obj.project_id,
+            req.obj.object_id,
+            req.obj.wb_user_id,
+        )
 
         # Validate
         object_id_validator(object_id)
@@ -641,8 +646,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     is_latest,
-                    deleted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    deleted_at,
+                    wb_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
                     kind = excluded.kind,
@@ -665,6 +671,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index,
                     1,
                     None,
+                    wb_user_id,
                 ),
             )
             conn.commit()
@@ -725,6 +732,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             include_deleted=True,
+            metadata_only=req.metadata_only,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
@@ -963,7 +971,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         WITH OrderedDigests AS (
             SELECT
                 json_each.value AS digest,
-                json_each.id AS original_order
+                CAST(json_each.key AS INTEGER) AS original_order
             FROM
                 tables,
                 json_each(tables.row_digests)
@@ -973,7 +981,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         SELECT
             tr.digest,
-            tr.val
+            tr.val,
+            OrderedDigests.original_order
         FROM
             OrderedDigests
             JOIN table_rows tr ON OrderedDigests.digest = tr.digest
@@ -994,7 +1003,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableQueryRes(
             rows=[
-                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+                tsi.TableRowSchema(
+                    digest=r[0],
+                    val=json.loads(r[1]),
+                    original_index=r[2],  # Add the original index
+                )
                 for r in query_result
             ]
         )
@@ -1282,7 +1295,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 digest,
                 version_index,
                 is_latest,
-                deleted_at
+                deleted_at,
+                wb_user_id
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1327,6 +1341,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     version_index=row[7],
                     is_latest=row[8],
                     deleted_at=row[9],
+                    wb_user_id=row[10],
                 )
             )
         return result

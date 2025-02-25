@@ -3,9 +3,11 @@ from __future__ import annotations
 import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
+from datetime import datetime
 from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
+from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -162,32 +164,7 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
-    def objectify(self, obj: Any) -> Any:
-        """Convert back to higher level object."""
-        class_name = getattr(obj, "_class_name", None)
-        if "EasyPrompt" == class_name:
-            from weave.flow.prompt.prompt import EasyPrompt
-
-            prompt = EasyPrompt.from_obj(obj)
-            # We want to use the ref on the object (and not self) as it will have had
-            # version number or latest alias resolved to a specific digest.
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
-        if "StringPrompt" == class_name:
-            from weave.flow.prompt.prompt import StringPrompt
-
-            prompt = StringPrompt.from_obj(obj)
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
-        if "MessagesPrompt" == class_name:
-            from weave.flow.prompt.prompt import MessagesPrompt
-
-            prompt = MessagesPrompt.from_obj(obj)
-            prompt.__dict__["ref"] = obj.ref
-            return prompt
-        return obj
-
-    def get(self) -> Any:
+    def get(self, *, objectify: bool = True) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
@@ -196,7 +173,7 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return self.objectify(gc.get(self))
+            return gc.get(self, objectify=objectify)
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
@@ -206,10 +183,10 @@ class ObjectRef(RefWithExtra):
             f"{self.entity}/{self.project}", ensure_project_exists=False
         )
         try:
-            res = init_client.client.get(self)
+            res = init_client.client.get(self, objectify=objectify)
         finally:
             init_client.reset()
-        return self.objectify(res)
+        return res
 
     def is_descended_from(self, potential_ancestor: ObjectRef) -> bool:
         if self.entity != potential_ancestor.entity:
@@ -227,6 +204,13 @@ class ObjectRef(RefWithExtra):
             for i in range(len(potential_ancestor.extra))
         )
 
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_object_version(self)
+
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
@@ -235,6 +219,13 @@ class OpRef(ObjectRef):
         if self.extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+    def delete(self) -> None:
+        from weave.trace.context.weave_client_context import get_weave_client
+
+        gc = get_weave_client()
+        if gc is not None:
+            gc.delete_op_version(self)
 
 
 @dataclass(frozen=True)
@@ -261,6 +252,19 @@ class CallRef(RefWithExtra):
         if self._extra:
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
+
+
+@dataclass(frozen=True)
+class DeletedRef(Ref):
+    ref: Ref
+    deleted_at: datetime
+    error: ObjectDeletedError
+
+    def __repr__(self) -> str:
+        return f"<DeletedRef {self.uri()}>"
+
+    def uri(self) -> str:
+        return self.ref.uri()
 
 
 AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
@@ -311,3 +315,10 @@ def parse_object_uri(uri: str) -> ObjectRef:
     if not isinstance(parsed := parse_uri(uri), ObjectRef):
         raise TypeError(f"URI is not for an Object: {uri}")
     return parsed
+
+
+def maybe_parse_uri(s: str) -> AnyRef | None:
+    try:
+        return parse_uri(s)
+    except ValueError:
+        return None

@@ -24,6 +24,9 @@ from weave.trace_server import (
 from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -203,6 +206,14 @@ def _check_server_up(host, port) -> bool:
                 "run",
                 "-d",
                 "--rm",
+                "-e",
+                "CLICKHOUSE_DB=default",
+                "-e",
+                "CLICKHOUSE_USER=default",
+                "-e",
+                "CLICKHOUSE_PASSWORD=",
+                "-e",
+                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
                 "-p",
                 f"{port}:8123",
                 "--name",
@@ -329,6 +340,10 @@ class TestOnlyUserInjectingExternalTraceServer(
     ) -> tsi.ActionsExecuteBatchRes:
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
+
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        req.obj.wb_user_id = self._user_id
+        return super().obj_create(req)
 
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
@@ -478,7 +493,9 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 
 
 def create_client(
-    request, autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None
+    request,
+    autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
+    global_attributes: typing.Optional[dict[str, typing.Any]] = None,
 ) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
@@ -511,11 +528,16 @@ def create_client(
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
+        # This is disabled by default, but we explicitly enable it here for testing
+        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+        server = CachingMiddlewareTraceServer.from_env(server)
         client = TestOnlyFlushingWeaveClient(
             entity, project, make_server_recorder(server)
         )
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch(autopatch_settings)
+        if global_attributes is not None:
+            weave.trace.api._global_attributes = global_attributes
 
     return inited_client
 
@@ -537,13 +559,23 @@ def client_creator(request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
-    def client(autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None):
-        inited_client = create_client(request, autopatch_settings)
+    def client(
+        autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
+        global_attributes: typing.Optional[dict[str, typing.Any]] = None,
+        settings: typing.Optional[weave.trace.settings.UserSettings] = None,
+    ):
+        if settings is not None:
+            weave.trace.settings.parse_and_apply_settings(settings)
+        inited_client = create_client(request, autopatch_settings, global_attributes)
         try:
             yield inited_client.client
         finally:
             inited_client.reset()
             autopatch.reset_autopatch()
+            weave.trace.api._global_attributes = {}
+            weave.trace.settings.parse_and_apply_settings(
+                weave.trace.settings.UserSettings()
+            )
 
     yield client
 

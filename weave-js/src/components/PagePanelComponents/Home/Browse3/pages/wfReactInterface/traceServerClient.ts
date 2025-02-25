@@ -8,6 +8,8 @@ import {
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
+  TableCreateReq,
+  TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
   TraceCallsDeleteReq,
@@ -123,6 +125,10 @@ export class TraceServerClient extends CachingTraceServerClient {
     return super.tableUpdate(req);
   }
 
+  public tableCreate(req: TableCreateReq): Promise<TableCreateRes> {
+    return super.tableCreate(req);
+  }
+
   public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
     const res = super.feedbackCreate(req).then(createRes => {
       const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
@@ -144,8 +150,8 @@ export class TraceServerClient extends CachingTraceServerClient {
     return res;
   }
 
-  public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
-    const res = super.objectDelete(req).then(r => {
+  public objDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+    const res = super.objDelete(req).then(r => {
       this.onObjectListeners.forEach(listener => listener());
       return r;
     });

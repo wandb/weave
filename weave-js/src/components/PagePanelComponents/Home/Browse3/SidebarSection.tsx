@@ -139,7 +139,7 @@ const SidebarSection = (props: SidebarSectionProps) => {
               key={item.name}
               content={<span>{item.nameTooltip}</span>}
               trigger={wrapper}
-              position="right center"
+              side="right"
             />
           );
         }

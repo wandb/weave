@@ -27,6 +27,8 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  TableCreateReq,
+  TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
   TraceCallReadReq,
@@ -234,7 +236,7 @@ export class DirectTraceServerClient {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   }
 
-  public objectDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
+  public objDelete(req: TraceObjDeleteReq): Promise<TraceObjDeleteRes> {
     return this.makeRequest<TraceObjDeleteReq, TraceObjDeleteRes>(
       '/obj/delete',
       req
@@ -267,6 +269,13 @@ export class DirectTraceServerClient {
   public tableUpdate(req: TableUpdateReq): Promise<TableUpdateRes> {
     return this.makeRequest<TableUpdateReq, TableUpdateRes>(
       '/table/update',
+      req
+    );
+  }
+
+  public tableCreate(req: TableCreateReq): Promise<TableCreateRes> {
+    return this.makeRequest<TableCreateReq, TableCreateRes>(
+      '/table/create',
       req
     );
   }

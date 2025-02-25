@@ -43,6 +43,12 @@
       "input": 3e-06,
       "output": 1.2e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "o1-mini-2024-09-12": [
@@ -835,6 +841,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "mistral/mistral-large-2402": [
@@ -1623,6 +1635,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "gemini-1.0-pro-vision": [
@@ -1631,6 +1649,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "gemini-1.0-pro-vision-001": [
@@ -1639,6 +1663,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "vertex_ai/claude-3-sonnet@20240229": [
@@ -1711,6 +1741,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-large@2407": [
@@ -1719,6 +1755,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-nemo@latest": [
@@ -1727,6 +1769,12 @@
       "input": 3e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/jamba-1.5-mini@001": [
@@ -1783,6 +1831,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/codestral@2405": [
@@ -1791,6 +1845,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "text-embedding-004": [
@@ -3217,6 +3277,12 @@
       "input": 1.63e-06,
       "output": 5.51e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 2.4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-instant-v1": [
@@ -5185,6 +5251,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "us.anthropic.claude-3-5-haiku-20241022-v1:0": [
@@ -5193,6 +5265,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "eu.anthropic.claude-3-5-haiku-20241022-v1:0": [
@@ -5201,6 +5279,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "us.meta.llama3-1-8b-instruct-v1:0": [
@@ -5273,6 +5357,644 @@
       "input": 1.00002e-06,
       "output": 2.99999e-06,
       "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "omni-moderation-latest": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-latest-intents": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-2024-09-26": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gpt-4o-audio-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "azure/o1": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/mistral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-latest": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-chat": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "deepseek",
+      "input": 2.7e-07,
+      "output": 1.1e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "deepseek/deepseek-coder": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-8b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-70b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gemini/gemini-2.0-flash-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large@2411-001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large-2411": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "command-r7b-12-2024": [
+    {
+      "provider": "cohere_chat",
+      "input": 1.5e-07,
+      "output": 3.75e-08,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/deepseek/deepseek-chat": [
+    {
+      "provider": "openrouter",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/openai/o1": [
+    {
+      "provider": "openrouter",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-v3": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-large": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3": [
+    {
+      "provider": "voyage",
+      "input": 6e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-code-3": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-multimodal-3": [
+    {
+      "provider": "voyage",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2": [
+    {
+      "provider": "voyage",
+      "input": 5e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1e-07,
+      "output": 2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-1B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-3B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 8e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1.5e-06,
+      "output": 3e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Qwen2.5-72B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 2e-06,
+      "output": 4e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-reasoner": [
+    {
+      "provider": "deepseek",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-vision-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini/gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "openrouter/deepseek/deepseek-r1": [
+    {
+      "provider": "openrouter",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-large-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-mini-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.5e-08,
+      "output": 1.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8e-07,
+      "output": 3.2e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 8.8e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free": [
+    {
+      "provider": "together_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p1-8b-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "o3-mini": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "o3-mini-2025-01-31": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o3-mini-2025-01-31": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o3-mini": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure_ai/deepseek-r1": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "groq/deepseek-r1-distill-llama-70b": [
+    {
+      "provider": "groq",
+      "input": 7.5e-07,
+      "output": 9.9e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini-2.0-flash-001": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini-2.0-flash-thinking-exp-01-21": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash-001": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash-lite-preview-02-05": [
+    {
+      "provider": "gemini",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "vertex_ai/codestral-2501": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o1-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-02-10 09:20:27"
+    }
+  ],
+  "azure/gpt-3.5-turbo-0125": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "azure/gpt-3.5-turbo": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cerebras/llama3.3-70b": [
+    {
+      "provider": "cerebras",
+      "input": 8.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "gemini-2.0-pro-exp-02-05": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "openrouter/google/gemini-2.0-flash-001": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "amazon.rerank-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cohere.rerank-v3-5:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "us.meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar": [
+    {
+      "provider": "perplexity",
+      "input": 1e-06,
+      "output": 1e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar-pro": [
+    {
+      "provider": "perplexity",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "jina-reranker-v2-base-multilingual": [
+    {
+      "provider": "jina_ai",
+      "input": 1.8e-08,
+      "output": 1.8e-08,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "claude-3-7-sonnet-20250219": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
     }
   ]
 }

@@ -1,5 +1,9 @@
 # Cohere
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_cohere.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 Weave automatically tracks and logs LLM calls made via the [Cohere Python library](https://github.com/cohere-ai/cohere-python) after `weave.init()` is called.
 
 ## Traces
@@ -12,17 +16,12 @@ Weave will automatically capture traces for [cohere-python](https://github.com/c
 import cohere
 import os
 import weave
-from weave.integrations.cohere import cohere_patcher
-
-# we need to patch before we create the client
-cohere_patcher.attempt_patch()
 
 # Use the Cohere library as usual
 co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
 
 # highlight-next-line
 weave.init("cohere_project")
-
 
 response = co.chat(
     message="How is the weather in Boston?",
@@ -47,15 +46,10 @@ Weave ops make results *reproducible* by automatically versioning code as you ex
 import cohere
 import os
 import weave
-from weave.integrations.cohere import cohere_patcher
-
-# we need to patch before we create the client
-cohere_patcher.attempt_patch()
 
 co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
 
 weave.init("cohere_project")
-
 
 # highlight-next-line
 @weave.op()
@@ -67,7 +61,6 @@ def weather(location: str, model: str) -> str:
         connectors=[{"id": "web-search"}],
     )
     return response.text
-
 
 print(weather("Boston", "command"))
 ```
@@ -86,8 +79,6 @@ In the example below, you can experiment with `model` and `temperature`. Every t
 import weave
 import cohere
 import os
-# we need to patch before we create the client
-cohere_patcher.attempt_patch()
 
 weave.init('weather-cohere')
 
@@ -115,4 +106,3 @@ print(result)
 ```
 
 [![cohere_model.png](imgs/cohere_model.png)](https://wandb.ai/capecape/cohere_dev/weave/models)
-

@@ -22,8 +22,8 @@ import React, {
 import {parseRefMaybe} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {objectRefDisplayName} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
+import {objectRefDisplayName} from '../../smallRef/SmallWeaveRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
   CustomWeaveTypePayload,

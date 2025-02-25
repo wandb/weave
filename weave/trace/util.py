@@ -61,35 +61,38 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.contexts: list[Context] = []
 
     # ignoring type here for convenience because otherwise you have to write a bunch of overloads
     # for py310+ and py39-
     def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:  # type: ignore
-        context = copy_context()
-        self.contexts.append(context)
-
-        wrapped_fn = partial(self._run_with_context, context, fn)
-        return super().submit(wrapped_fn, *args, **kwargs)
+        wrapped_fn = partial(self._run_with_context, fn)
+        return super().submit(wrapped_fn, copy_context(), *args, **kwargs)
 
     def map(
         self,
         fn: Callable,
-        *iterables: Iterable[Iterable],
+        *iterables: Iterable[Any],
         timeout: float | None = None,
         chunksize: int = 1,
     ) -> Iterator:
-        contexts = [copy_context() for _ in range(len(list(iterables[0])))]
-        self.contexts.extend(contexts)
+        first_iterable = list(iterables[0])
+        map_len = len(first_iterable)
 
-        wrapped_fn = partial(self._run_with_context, None, fn)
-        return super().map(wrapped_fn, *iterables, timeout=timeout, chunksize=chunksize)
+        # Create a context for each item in the first iterable
+        contexts = [copy_context() for _ in range(map_len)]
+
+        wrapped_fn = partial(self._run_with_context, fn)
+
+        # Convert lists to iterables for map()
+        map_iterables = (contexts, first_iterable, *iterables[1:])
+
+        return super().map(
+            wrapped_fn, *map_iterables, timeout=timeout, chunksize=chunksize
+        )
 
     def _run_with_context(
-        self, context: Context, fn: Callable, *args: Any, **kwargs: Any
+        self, fn: Callable, context: Context, *args: Any, **kwargs: Any
     ) -> Any:
-        if context is None:
-            context = self.contexts.pop(0)
         return context.run(fn, *args, **kwargs)
 
 

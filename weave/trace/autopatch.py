@@ -32,7 +32,8 @@ class IntegrationSettings(BaseModel):
 class AutopatchSettings(BaseModel):
     """Settings for auto-patching integrations."""
 
-    # These will be uncommented as we add support for more integrations.  Note that
+    # If True, other autopatch settings are ignored.
+    disable_autopatch: bool = False
 
     anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -40,6 +41,7 @@ class AutopatchSettings(BaseModel):
     dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
     google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    huggingface: IntegrationSettings = Field(default_factory=IntegrationSettings)
     instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
     litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
     mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -51,6 +53,11 @@ class AutopatchSettings(BaseModel):
 
 @validate_call
 def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
+    if settings is None:
+        settings = AutopatchSettings()
+    if settings.disable_autopatch:
+        return
+
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
@@ -59,6 +66,9 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
+    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
+        get_huggingface_patcher,
+    )
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -70,9 +80,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-
-    if settings is None:
-        settings = AutopatchSettings()
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
@@ -87,6 +94,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
+    get_huggingface_patcher(settings.huggingface).attempt_patch()
 
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -101,6 +109,9 @@ def reset_autopatch() -> None:
         get_google_genai_patcher,
     )
     from weave.integrations.groq.groq_sdk import get_groq_patcher
+    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
+        get_huggingface_patcher,
+    )
     from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
     from weave.integrations.langchain.langchain import langchain_patcher
     from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
@@ -126,6 +137,7 @@ def reset_autopatch() -> None:
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
+    get_huggingface_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()

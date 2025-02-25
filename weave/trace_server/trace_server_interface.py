@@ -186,6 +186,8 @@ class ObjSchema(BaseModel):
     base_object_class: Optional[str]
     val: Any
 
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
@@ -196,6 +198,8 @@ class ObjSchemaForInsert(BaseModel):
     set_base_object_class: Optional[str] = Field(
         include=False, default=None, deprecated=True
     )
+
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
     def model_post_init(self, __context: Any) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
@@ -417,6 +421,12 @@ class ObjReadReq(BaseModel):
     object_id: str
     digest: str
 
+    metadata_only: Optional[bool] = Field(
+        default=False,
+        description="If true, the `val` column is not read from the database and is empty."
+        "All other fields are returned.",
+    )
+
 
 class ObjReadRes(BaseModel):
     obj: ObjSchema
@@ -601,6 +611,7 @@ class TableUpdateRes(BaseModel):
 class TableRowSchema(BaseModel):
     digest: str
     val: Any
+    original_index: Optional[int] = None
 
 
 class TableCreateRes(BaseModel):

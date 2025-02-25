@@ -26,6 +26,7 @@ import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import {Select} from '../../../../../Form/Select';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
@@ -39,6 +40,34 @@ import {useFilterSortby} from './callsTableQuery';
 const MAX_EXPORT = 10_000;
 
 type SelectionState = 'all' | 'selected' | 'limit';
+
+const LabelWithSwitch: FC<{
+  id: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}> = ({id, label, checked, onCheckedChange, disabled}) => (
+  <div
+    className={classNames(
+      'flex items-center py-2',
+      disabled ? 'opacity-40' : ''
+    )}>
+    <Switch.Root
+      id={id}
+      size="small"
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      disabled={disabled}>
+      <Switch.Thumb size="small" checked={checked} />
+    </Switch.Root>
+    <label
+      htmlFor={id}
+      className={classNames('ml-6', disabled ? '' : 'cursor-pointer')}>
+      {label}
+    </label>
+  </div>
+);
 
 export const ExportSelector = ({
   selectedCalls,
@@ -72,6 +101,7 @@ export const ExportSelector = ({
     skip: viewerLoading,
   });
   const [includeFeedback, setIncludeFeedback] = useState(false);
+  const [includeCosts, setIncludeCosts] = useState(false);
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -125,7 +155,8 @@ export const ExportSelector = ({
       filterBy,
       leafColumns,
       refColumnsToExpand,
-      includeFeedback
+      includeFeedback,
+      includeCosts
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
@@ -155,14 +186,13 @@ export const ExportSelector = ({
   };
 
   const pythonText = makeCodeText(
-    callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     filterBy,
-    refColumnsToExpand,
     sortBy,
-    includeFeedback
+    includeFeedback,
+    includeCosts
   );
   const curlText = makeCurlText(
     callQueryParams.entity,
@@ -172,7 +202,8 @@ export const ExportSelector = ({
     filterBy,
     refColumnsToExpand,
     sortBy,
-    includeFeedback
+    includeFeedback,
+    includeCosts
   );
 
   return (
@@ -227,27 +258,21 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
-            <div
-              className={classNames(
-                'flex items-center py-2',
-                disabled ? 'opacity-40' : ''
-              )}>
-              <Switch.Root
+            <div className="flex items-center gap-12">
+              <LabelWithSwitch
                 id="include-feedback"
-                size="small"
+                label="Include feedback"
                 checked={includeFeedback}
                 onCheckedChange={setIncludeFeedback}
-                disabled={disabled}>
-                <Switch.Thumb size="small" checked={includeFeedback} />
-              </Switch.Root>
-              <label
-                htmlFor="include-feedback"
-                className={classNames(
-                  'ml-6',
-                  disabled ? '' : 'cursor-pointer'
-                )}>
-                Include feedback
-              </label>
+                disabled={disabled}
+              />
+              <LabelWithSwitch
+                id="include-costs"
+                label="Include costs"
+                checked={includeCosts}
+                onCheckedChange={setIncludeCosts}
+                disabled={disabled}
+              />
             </div>
             <DownloadGrid
               pythonText={pythonText}
@@ -469,6 +494,31 @@ export const BulkDeleteButton: FC<{
   );
 };
 
+export const BulkAddToDatasetButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = () => {
+    // Force tooltip to close by blurring the button
+    buttonRef.current?.blur();
+    onClick();
+  };
+
+  return (
+    <Button
+      ref={buttonRef}
+      variant="ghost"
+      size="medium"
+      onClick={handleClick}
+      disabled={disabled}
+      tooltip="Add selected rows to a dataset"
+      icon="table"
+    />
+  );
+};
+
 export const RefreshButton: FC<{
   onClick: () => void;
   disabled?: boolean;
@@ -520,37 +570,31 @@ function makeLeafColumns(visibleColumns: string[]) {
 }
 
 function makeCodeText(
-  entity: string,
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
   query: Query | undefined,
-  expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
-  includeFeedback: boolean
+  includeFeedback: boolean,
+  includeCosts: boolean
 ) {
-  let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
-  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
-  codeStr += `   "project_id": "${entity}/${project}",\n`;
-
+  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
+  codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
-      '", "'
-    )}"]},\n`;
-    if (expandColumns.length > 0) {
-      const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-      codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
-    }
+    codeStr += `   filter={"call_ids": ["${filteredCallIds.join('", "')}"]},\n`;
     if (includeFeedback) {
-      codeStr += `   "include_feedback": true,\n`;
+      codeStr += `   include_feedback=True,\n`;
+    }
+    if (includeCosts) {
+      codeStr += `   include_costs=True,\n`;
     }
     // specifying call_ids ignores other filters, return early
-    codeStr += `})`;
+    codeStr += `)`;
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
-    codeStr += `   "filter": {`;
+    codeStr += `    filter={`;
     if (filter.opVersionRefs) {
       codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
     }
@@ -573,21 +617,20 @@ function makeCodeText(
     codeStr += `},\n`;
   }
   if (query) {
-    codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
-  }
-  if (expandColumns.length > 0) {
-    const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-    codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+    codeStr += `    query=${JSON.stringify(query, null, 0)},\n`;
   }
 
   if (sortBy.length > 0) {
-    codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+    codeStr += `    sort_by=${JSON.stringify(sortBy, null, 0)},\n`;
   }
   if (includeFeedback) {
-    codeStr += `   "include_feedback": True,\n`;
+    codeStr += `    include_feedback=True,\n`;
+  }
+  if (includeCosts) {
+    codeStr += `    include_costs=True,\n`;
   }
 
-  codeStr += `})`;
+  codeStr += `)`;
 
   return codeStr;
 }
@@ -600,7 +643,8 @@ function makeCurlText(
   query: Query | undefined,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
-  includeFeedback: boolean
+  includeFeedback: boolean,
+  includeCosts: boolean
 ) {
   const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   const filterStr = JSON.stringify(
@@ -640,13 +684,23 @@ curl '${baseUrl}/calls/stream_query' \\
   baseCurl += `    "limit":${MAX_EXPORT},
     "offset":0,
     "sort_by":${JSON.stringify(sortBy, null, 0)},
-    "include_feedback": ${includeFeedback}
+    "include_feedback": ${includeFeedback},
+    "include_costs": ${includeCosts}
   }'`;
 
   return baseCurl;
 }
 
-export const PaginationButtons = () => {
+type PageSizeOption = {
+  readonly value: number;
+  readonly label: string;
+};
+
+type PaginationButtonsProps = {
+  hideControls?: boolean;
+};
+
+export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
@@ -665,35 +719,81 @@ export const PaginationButtons = () => {
   const start = rowCount > 0 ? page * pageSize + 1 : 0;
   const end = Math.min(rowCount, (page + 1) * pageSize);
 
+  const pageSizes = [10, 25, 50, 100];
+  if (!pageSizes.includes(pageSize)) {
+    pageSizes.push(pageSize);
+    pageSizes.sort((a, b) => a - b);
+  }
+  const pageSizeOptions = pageSizes.map(sz => ({
+    value: sz,
+    label: sz.toString(),
+  }));
+  const pageSizeValue = pageSizeOptions.find(o => o.value === pageSize);
+  const onPageSizeChange = (option: PageSizeOption | null) => {
+    if (option) {
+      apiRef.current.setPageSize(option.value);
+    }
+  };
+
   return (
-    <Box display="flex" alignItems="center" justifyContent="center" padding={1}>
-      <Button
-        variant="ghost"
-        size="medium"
-        onClick={handlePrevPage}
-        disabled={page === 0}
-        icon="chevron-back"
-      />
-      <Box
-        mx={1}
-        sx={{
-          fontSize: '14px',
-          fontWeight: '400',
-          color: MOON_500,
-          // This is so that when we go from 1-100 -> 101-200, the buttons dont jump
-          minWidth: '90px',
-          display: 'flex',
-          justifyContent: 'center',
-        }}>
-        {start}-{end} of {rowCount}
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="space-between"
+      width="100%"
+      padding={1}>
+      <Box display="flex" alignItems="center">
+        <Button
+          variant="ghost"
+          size="medium"
+          onClick={handlePrevPage}
+          disabled={page === 0}
+          icon="chevron-back"
+        />
+        <Box
+          mx={1}
+          sx={{
+            fontSize: '14px',
+            fontWeight: '400',
+            color: MOON_500,
+            // This is so that when we go from 1-100 -> 101-200, the buttons don't jump
+            minWidth: '90px',
+            display: 'flex',
+            justifyContent: 'center',
+          }}>
+          {start}-{end} of {rowCount}
+        </Box>
+        <Button
+          variant="ghost"
+          size="medium"
+          onClick={handleNextPage}
+          disabled={page >= pageCount - 1}
+          icon="chevron-next"
+        />
       </Box>
-      <Button
-        variant="ghost"
-        size="medium"
-        onClick={handleNextPage}
-        disabled={page >= pageCount - 1}
-        icon="chevron-next"
-      />
+      {hideControls ? null : (
+        <Box
+          sx={{
+            fontSize: '14px',
+            fontWeight: '400',
+            color: MOON_500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            // Regrettable hack to appear over Material scrollbar's z-index of 6.
+            zIndex: 7,
+          }}>
+          Per page:
+          <Select<PageSizeOption>
+            size="small"
+            menuPlacement="top"
+            options={pageSizeOptions}
+            value={pageSizeValue}
+            isSearchable={false}
+            onChange={onPageSizeChange}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

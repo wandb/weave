@@ -1,3 +1,4 @@
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -16,8 +17,8 @@ import React, {
 import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
-import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
-import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
+import {WFHighLevelObjectVersionFilter} from './pages/ObjectsPage/objectsPageTypes';
+import {WFHighLevelOpVersionFilter} from './pages/OpsPage/opsPageTypes';
 import {useURLSearchParamsDict} from './pages/util';
 import {
   AWL_ROW_EDGE_NAME,
@@ -35,7 +36,6 @@ const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
       ([k, v]) =>
         v != null &&
         v !== undefined &&
-        v !== false &&
         (_.isArray(v) ? v.length > 0 : true) &&
         (typeof v === 'string' ? v.length > 0 : true)
     )
@@ -149,7 +149,8 @@ export const browse2Context = {
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    gridFilters?: GridFilterModel
   ) => {
     throw new Error('Not implemented');
   },
@@ -375,16 +376,21 @@ export const browse3ContextGen = (
     callsUIUrl: (
       entityName: string,
       projectName: string,
-      filter?: WFHighLevelCallFilter
+      filter?: WFHighLevelCallFilter,
+      gridFilters?: GridFilterModel
     ) => {
+      const searchParams = new URLSearchParams();
       const prunedFilter = pruneEmptyFields(filter);
-      if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/calls`;
+      if (Object.keys(prunedFilter).length !== 0) {
+        searchParams.set('filter', JSON.stringify(prunedFilter));
+      }
+      if (gridFilters) {
+        searchParams.set('filters', JSON.stringify(gridFilters));
       }
       return `${projectRoot(
         entityName,
         projectName
-      )}/calls?filter=${encodeURIComponent(JSON.stringify(prunedFilter))}`;
+      )}/calls?${searchParams.toString()}`;
     },
     objectVersionsUIUrl: (
       entityName: string,
@@ -542,7 +548,12 @@ type RouteType = {
   callsUIUrl: (
     entityName: string,
     projectName: string,
-    filter?: WFHighLevelCallFilter
+    filter?: WFHighLevelCallFilter,
+    // Using GridFilterModel here is really bad. Somehow this leaked into
+    // the implementation and now it is a part of our URL spec forever... :(
+    // It should have been implemented as the `query` component of WFHighLevelCallFilter
+    // which maps to our actual service API.
+    gridFilters?: GridFilterModel
   ) => string;
   objectVersionsUIUrl: (
     entityName: string,

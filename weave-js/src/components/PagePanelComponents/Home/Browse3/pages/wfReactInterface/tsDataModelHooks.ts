@@ -578,7 +578,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -600,6 +601,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -676,7 +678,8 @@ const useFeedback = (
 
 const useOpVersion = (
   // Null value skips
-  key: OpVersionKey | null
+  key: OpVersionKey | null,
+  metadataOnly?: boolean
 ): LoadableWithError<OpVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -697,11 +700,12 @@ const useOpVersion = (
           }),
           object_id: deepKey?.opId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
           setOpVersionRes(res);
-          if (res.obj == null) {
+          if (res.obj == null && !metadataOnly) {
             setError(new Error(JSON.stringify(res)));
             // be conservative and unset the cache when there's an error
             if (deepKey) {
@@ -710,7 +714,7 @@ const useOpVersion = (
           }
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
@@ -765,13 +769,22 @@ const useOpVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     opVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedOpVersion, key, opVersionRes, error]);
+  }, [cachedOpVersion, key, opVersionRes, error, metadataOnly]);
 };
 
 const useOpVersions = (
@@ -891,7 +904,8 @@ const useFileContent = makeTraceServerEndpointHook<
 
 const useObjectVersion = (
   // Null value skips
-  key: ObjectVersionKey | null
+  key: ObjectVersionKey | null,
+  metadataOnly?: boolean
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -912,6 +926,7 @@ const useObjectVersion = (
           }),
           object_id: deepKey?.objectId ?? '',
           digest: deepKey?.versionHash ?? '',
+          metadata_only: metadataOnly ?? false,
         })
         .then(res => {
           loadingRef.current = false;
@@ -929,7 +944,7 @@ const useObjectVersion = (
           setError(new Error(JSON.stringify(err)));
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, metadataOnly]);
 
   return useMemo(() => {
     if (key == null) {
@@ -983,13 +998,22 @@ const useObjectVersion = (
       ...returnedResult,
     };
 
+    // Skip setting the cache if metadata only
+    if (metadataOnly) {
+      return {
+        loading: false,
+        result: cacheableResult,
+        error,
+      };
+    }
+
     objectVersionCache.set(key, cacheableResult);
     return {
       loading: false,
       result: cacheableResult,
       error,
     };
-  }, [cachedObjectVersion, key, objectVersionRes, error]);
+  }, [cachedObjectVersion, key, objectVersionRes, error, metadataOnly]);
 };
 
 export const convertTraceServerObjectVersionToSchema = <
@@ -1010,6 +1034,7 @@ export const convertTraceServerObjectVersionToSchema = <
     baseObjectClass: obj.base_object_class ?? null,
     versionIndex: obj.version_index,
     val: obj.val,
+    userId: obj.wb_user_id,
   };
 };
 
@@ -1151,7 +1176,7 @@ const useObjectDeleteFunc = () => {
           path: '',
         });
       });
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity,
           project,
@@ -1166,7 +1191,7 @@ const useObjectDeleteFunc = () => {
   const objectDeleteAllVersions = useCallback(
     (key: ObjectVersionKey) => {
       updateObjectCaches(key);
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
@@ -1188,7 +1213,7 @@ const useObjectDeleteFunc = () => {
           versionHash: digest,
         });
       });
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity,
           project,
@@ -1203,7 +1228,7 @@ const useObjectDeleteFunc = () => {
   const opDeleteAllVersions = useCallback(
     (key: OpVersionKey) => {
       updateOpCaches(key);
-      return getTsClient().objectDelete({
+      return getTsClient().objDelete({
         project_id: projectIdFromParts({
           entity: key.entity,
           project: key.project,
@@ -1979,6 +2004,19 @@ export const useTableUpdate = (): ((
   );
 };
 
+export const useTableCreate = (): ((
+  table: traceServerTypes.TableCreateReq
+) => Promise<traceServerTypes.TableCreateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (table: traceServerTypes.TableCreateReq) => {
+      return getTsClient().tableCreate(table);
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2005,6 +2043,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableRowsQuery,
   useTableQueryStats,
   useTableUpdate,
+  useTableCreate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

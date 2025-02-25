@@ -1,11 +1,17 @@
-from collections.abc import Iterator
-from typing import Any
+from collections.abc import Iterable, Iterator
+from typing import TYPE_CHECKING, Any
 
 from pydantic import field_validator
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.vals import WeaveTable
+from weave.trace.objectify import register_object
+from weave.trace.vals import WeaveObject, WeaveTable
+from weave.trace.weave_client import Call
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -15,6 +21,7 @@ def short_str(obj: Any, limit: int = 25) -> str:
     return str_val
 
 
+@register_object
 class Dataset(Object):
     """
     Dataset object with easy saving and automatic versioning
@@ -41,6 +48,33 @@ class Dataset(Object):
     """
 
     rows: weave.Table
+
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
+
+    @classmethod
+    def from_calls(cls, calls: Iterable[Call]) -> Self:
+        rows = [call.to_dict() for call in calls]
+        return cls(rows=rows)
+
+    @classmethod
+    def from_pandas(cls, df: "pd.DataFrame") -> Self:
+        rows = df.to_dict(orient="records")
+        return cls(rows=rows)
+
+    def to_pandas(self) -> "pd.DataFrame":
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required to use this method")
+
+        return pd.DataFrame(self.rows)
 
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
@@ -69,3 +103,12 @@ class Dataset(Object):
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
+
+    def __len__(self) -> int:
+        # TODO: This can be slow for large datasets...
+        return len(list(self.rows))
+
+    def __getitem__(self, key: int) -> dict:
+        if key < 0:
+            raise IndexError("Negative indexing is not supported")
+        return self.rows[key]
