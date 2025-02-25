@@ -1000,7 +1000,7 @@ export const CallsTable: FC<{
           <TailwindContents>
             <div className="flex w-full items-center">
               {/* Left side group */}
-              <div className="flex items-center gap-[8px]">
+              <div className="flex items-center gap-[8px] w-full">
                 <RefreshButton
                   onClick={() => calls.refetch()}
                   disabled={callsLoading}
@@ -1089,7 +1089,7 @@ export const CallsTable: FC<{
               </div>
 
               {/* Right side group */}
-              <div className="ml-auto flex items-center gap-[8px]">
+              <div className="ml-[8px] flex items-center gap-[8px]">
                 <div className="flex-none">
                   <ExportSelector
                     selectedCalls={selectedCalls}
