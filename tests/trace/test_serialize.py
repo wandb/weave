@@ -1,4 +1,11 @@
-from weave.trace.serialize import dictify, fallback_encode
+from pydantic import BaseModel
+
+from weave.trace.serialize import (
+    dictify,
+    fallback_encode,
+    is_pydantic_model_class,
+    to_json,
+)
 
 
 def test_dictify_simple() -> None:
@@ -198,4 +205,55 @@ def test_dictify_sanitizes_nested() -> None:
             },
             "api_key": "REDACTED",
         },
+    }
+
+
+def test_is_pydantic_model_class() -> None:
+    """We expect is_pydantic_model_class to return True for Pydantic model classes, and False otherwise.
+    Notably it should return False for instances of Pydantic model classes."""
+    assert not is_pydantic_model_class(int)
+    assert not is_pydantic_model_class(str)
+    assert not is_pydantic_model_class(list)
+    assert not is_pydantic_model_class(dict)
+    assert not is_pydantic_model_class(tuple)
+    assert not is_pydantic_model_class(set)
+    assert not is_pydantic_model_class(None)
+    assert not is_pydantic_model_class(42)
+    assert not is_pydantic_model_class("foo")
+    assert not is_pydantic_model_class({})
+    assert not is_pydantic_model_class([])
+
+    class CalendarEvent(BaseModel):
+        name: str
+        date: str
+        participants: list[str]
+
+    event = CalendarEvent(name="Test", date="2024-01-01", participants=["Alice", "Bob"])
+    assert not is_pydantic_model_class(event)
+    assert is_pydantic_model_class(CalendarEvent)
+
+
+def test_to_json_pydantic_class(client) -> None:
+    """We expect to_json to return the Pydantic schema for the class."""
+
+    class CalendarEvent(BaseModel):
+        name: str
+        date: str
+        participants: list[str]
+
+    project_id = "entity/project"
+    serialized = to_json(CalendarEvent, project_id, client, use_dictify=False)
+    assert serialized == {
+        "properties": {
+            "name": {"title": "Name", "type": "string"},
+            "date": {"title": "Date", "type": "string"},
+            "participants": {
+                "items": {"type": "string"},
+                "title": "Participants",
+                "type": "array",
+            },
+        },
+        "required": ["name", "date", "participants"],
+        "title": "CalendarEvent",
+        "type": "object",
     }
