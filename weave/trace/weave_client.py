@@ -2164,7 +2164,12 @@ class ObjectVersionCollection:
         return len(self._raw_versions)
 
     def __getitem__(self, index: int) -> Any:
-        if index < 0 or index >= len(self._raw_versions):
+        if index < 0:
+            # Technically it can be, but it will be confusing for most users.
+            raise IndexError(
+                "Negative indexing is not supported for ObjectVersionCollection"
+            )
+        elif index >= len(self._raw_versions):
             raise IndexError(
                 f"Index {index} out of range for collection with {len(self._raw_versions)} versions"
             )
@@ -2192,7 +2197,9 @@ class ObjectVersionCollection:
     @property
     def base_object_class(self) -> str | None:
         """Get the base object class of this object."""
-        return self._raw_versions[0].base_object_class if self._raw_versions else None
+        if self._raw_versions:
+            return self._raw_versions[0].base_object_class
+        return None
 
 
 __docspec__ = [WeaveClient, Call, CallsIter, ObjectVersionCollection]
