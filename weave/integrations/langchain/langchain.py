@@ -180,10 +180,8 @@ if not import_failed:
                         if wv_current_run.parent_id is None:
                             use_stack = False
                         else:
-                            # Hack in memory parent call to satisfy `create_call`
-                            # Impact is the parent won't actually represent the parent call
-                            # so we do NOT want to save the parent to the stack
-                            use_stack = False
+                            # Hack in memory parent call to satisfy `create_call` without actually
+                            # getting the parent.
                             parent_run = Call(
                                 id=wv_current_run.parent_id,
                                 trace_id=wv_current_run.trace_id,
