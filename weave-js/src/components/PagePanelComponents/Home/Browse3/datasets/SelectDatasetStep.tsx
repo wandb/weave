@@ -285,9 +285,9 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   };
 
   return (
-    <Stack spacing={"24px"} sx={{mt: "24px"}}>
+    <Stack spacing={'24px'} sx={{mt: '24px'}}>
       <Box>
-        <Typography sx={{...typographyStyle, fontWeight: 600, mb: "8px"}}>
+        <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
           Choose a dataset
         </Typography>
         <Box
@@ -321,7 +321,7 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: "8px",
+              gap: '8px',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}>
@@ -341,7 +341,7 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
 
       {isCreatingNew && (
         <Box>
-          <Typography sx={{...typographyStyle, fontWeight: 600, mb: "8px"}}>
+          <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
             Dataset name
           </Typography>
           <TextField

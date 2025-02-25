@@ -1,10 +1,9 @@
 import {Box, Stack, Typography} from '@mui/material';
-import {MOON_100, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import React, {useEffect, useMemo} from 'react';
 
+import {Checkbox} from '../../../../Checkbox';
 import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
-import {Checkbox} from '../../../../Checkbox';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {useDatasetEditContext} from './DatasetEditorContext';
 import {CallData, extractSourceSchema} from './schemaUtils';
