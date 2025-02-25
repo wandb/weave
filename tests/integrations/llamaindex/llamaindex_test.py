@@ -60,7 +60,12 @@ def fake_api_key() -> Generator[None, None, None]:
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+        "trace.wandb.ai",
+        "raw.githubusercontent.com",
+    ],
     before_record_request=filter_body,
 )
 def test_llamaindex_quickstart(
@@ -85,7 +90,12 @@ def test_llamaindex_quickstart(
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+        "trace.wandb.ai",
+        "raw.githubusercontent.com",
+    ],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
