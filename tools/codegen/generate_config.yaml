@@ -1,17 +1,25 @@
-# OpenAPI spec output location (optional, defaults to tools/codegen/openapi.json)
-openapi_output: tools/codegen/openapi.json
-
+# ==============
+# CONFIGURE ONCE
+# ==============
 # Path to the Python package repository (required)
 # This is used both as the output directory for generated Python code
 # and as the repository path for updating pyproject.toml
-repo_path: /Users/andrewtruong/repos/weave-stainless
+repo_path: absolute/path/to/your/local/stainless/python/repo
 
-# Optional output paths for other languages
-# node_output: weave-node
-# typescript_output: weave-typescript
+# Path to the Node package repository (optional)
+node_output: absolute/path/to/your/local/stainless/node/repo
+
+# Path to the TypeScript package repository (optional)
+typescript_output: absolute/path/to/your/local/stainless/typescript/repo
+
+# ==========================
+# PROBABLY SHOULD NOT CHANGE
+# ==========================
+# OpenAPI spec output location (required)
+openapi_output: tools/codegen/openapi.json
 
 # Package name for pyproject.toml updates (required)
-package_name: weave_trace
+package_name: weave_server_sdk
 
 # Whether to use release version instead of git SHA (optional, defaults to false)
 release: false

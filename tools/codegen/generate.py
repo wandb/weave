@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+"""
+Weave SDK Code Generator
+
+This module provides a command line interface for generating code from the OpenAPI
+specification of the Weave SDK.
+It supports the following commands:
+ - get_openapi_spec: Launches a temporary FastAPI server to retrieve and save the OpenAPI spec.
+ - generate_code: Uses Stainless to generate code for Python, Node.js, and TypeScript from the OpenAPI spec.
+ - update_pyproject: Updates the pyproject.toml file with the latest version or SHA of the generated package.
+ - all: Runs the entire code generation pipeline based on a configuration file.
+
+Environment:
+ - Ensure necessary environment variables (e.g., STAINLESS_API_KEY, GITHUB_TOKEN) are set.
+ - A local uvicorn server is used to fetch the OpenAPI spec.
+"""
+
 import json
 import os
 import subprocess
@@ -40,7 +56,12 @@ def cli() -> None:
 @cli.command()  # type: ignore
 @click.option("-o", "--output-file", help="Output file path for the OpenAPI spec")
 def get_openapi_spec(output_file: str | None = None) -> None:
-    """Spin up a local FastAPI app and get the OpenAPI spec"""
+    """Retrieve the OpenAPI specification from a temporary FastAPI server.
+
+    This command launches a uvicorn server running the trace server application,
+    waits for the server to be available, fetches the OpenAPI JSON specification,
+    and writes it to the specified output file.
+    """
     header("Getting OpenAPI spec")
 
     if output_file is None:
@@ -99,7 +120,11 @@ def generate_code(
     node_path: str | None = None,
     typescript_path: str | None = None,
 ) -> None:
-    """Generate code from the OpenAPI spec"""
+    """Generate code from the OpenAPI spec using Stainless.
+
+    At least one of --python-path, --node-path, or --typescript-path must be provided.
+    Generates code for the specified platforms based on the fetched OpenAPI specification.
+    """
     header("Generating code with Stainless")
 
     if not any([python_path, node_path, typescript_path]):
@@ -160,7 +185,11 @@ def generate_code(
 @click.argument("package_name")
 @click.option("--release", is_flag=True, help="Update to the latest version")
 def update_pyproject(repo_path: str, package_name: str, release: bool = False) -> None:
-    """Update the pyproject.toml file with the latest version of the generated code"""
+    """Update the pyproject.toml file with the latest version of the generated code.
+
+    This command updates the dependency for the given package in pyproject.toml to either a specific version
+    (if --release is specified) or a git SHA reference.
+    """
     header("Updating pyproject.toml")
     path = Path(repo_path)
     if release:
@@ -199,7 +228,14 @@ def all(
     typescript_output: str | None,
     release: bool | None,
 ) -> None:
-    """Run all codegen commands in sequence using config from yaml file and/or direct arguments"""
+    """Run all code generation commands in sequence.
+
+    This command performs the following steps:
+    1. Retrieve the OpenAPI specification.
+    2. Generate code using Stainless for the specified platforms.
+    3. Update the pyproject.toml file with the generated package information.
+    Configurations can be provided via a YAML file or directly as command-line arguments.
+    """
     header("Running weave codegen")
 
     # Initialize config dict
@@ -293,6 +329,11 @@ def info(text: str):
 
 
 def _kill_port(port: int) -> bool:
+    """Terminate any process listening on the specified port.
+
+    Executes a shell command to kill the process using the specified port.
+    Returns True if a process was successfully terminated, False otherwise.
+    """
     cmd = f"lsof -i :{port} | grep LISTEN | awk '{{print $2}}' | xargs kill -9"
     try:
         subprocess.run(
@@ -313,6 +354,11 @@ def _kill_port(port: int) -> bool:
 def _wait_for_server(
     url: str, timeout: int = SERVER_TIMEOUT, interval: int = SERVER_CHECK_INTERVAL
 ) -> bool:
+    """Wait for the server at the specified URL to become available.
+
+    Polls the URL until a successful connection is made or the timeout is reached.
+    Returns True if the server is responsive, otherwise returns False.
+    """
     end_time = time.time() + timeout
     while time.time() < end_time:
         try:
@@ -336,6 +382,10 @@ class RepoInfo:
 
 
 def _get_repo_info(repo_path: Path) -> RepoInfo:
+    """Retrieve the latest git commit SHA and remote URL for the repository.
+
+    Executes git commands in the specified repository path to obtain repository metadata.
+    """
     info(f"Getting SHA for {repo_path}")
     try:
         sha = subprocess.run(
@@ -361,6 +411,7 @@ def _get_repo_info(repo_path: Path) -> RepoInfo:
 
 
 def _get_package_version(repo_path: Path) -> str:
+    """Extract the package version from the pyproject.toml file located in the repository."""
     with open(repo_path / "pyproject.toml") as f:
         doc = tomlkit.parse(f.read())
     return doc["project"]["version"]
@@ -371,10 +422,21 @@ def _update_pyproject_toml(
     value: str,
     is_version: bool,
 ) -> None:
+    """Update the dependency entry for the given package in the pyproject.toml file.
+
+    If is_version is True, the dependency is set to the package version (==version),
+    otherwise, it's set to a git SHA reference.
+    """
     pyproject_path = Path("pyproject.toml")
 
     with open(pyproject_path) as f:
         doc = tomlkit.parse(f.read())
+
+    # Ensure dependencies is a tomlkit array for consistent formatting
+    if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
+        dependencies = tomlkit.array()
+        dependencies.extend(doc["project"]["dependencies"])
+        doc["project"]["dependencies"] = dependencies
 
     dependencies = doc["project"]["dependencies"]
     for i, dep in enumerate(dependencies):
@@ -411,11 +473,14 @@ def _update_pyproject_toml(
             doc["tool"]["hatch"]["metadata"] = tomlkit.table()
         doc["tool"]["hatch"]["metadata"]["allow-direct-references"] = True
 
+    # Format and write the file
+    formatted_content = tomlkit.dumps(doc)
     with open(pyproject_path, "w") as f:
-        f.write(tomlkit.dumps(doc))
+        f.write(formatted_content)
 
 
 def _format_command(command_name: str, **kwargs) -> str:
+    """Format a command-line string from the command name and provided options."""
     parts = [command_name]
     for k, v in kwargs.items():
         if v is not None:
@@ -429,10 +494,14 @@ def _format_command(command_name: str, **kwargs) -> str:
 
 
 def _announce_command(cmd: str) -> None:
+    """Display the command that is about to be executed."""
     print(f"\nINFO:    Running command: {cmd}")
 
 
 def _ensure_absolute_path(path: str | None) -> str | None:
+    """Convert a relative path to an absolute path based on the current working directory.
+    Returns the absolute path or None if input is None.
+    """
     if path is None:
         return None
     p = Path(path)
@@ -442,19 +511,16 @@ def _ensure_absolute_path(path: str | None) -> str | None:
 def _format_announce_invoke(
     ctx: click.Context, command: click.Command, **kwargs
 ) -> None:
-    """Helper function to format, announce and invoke a command.
-
-    Args:
-        ctx: Click context
-        command: Click command to invoke
-        **kwargs: Arguments to pass to the command
-    """
+    """Helper to format, announce, and invoke a click command with the given parameters."""
     cmd = _format_command(command.name, **kwargs)
     _announce_command(cmd)
     ctx.invoke(command, **kwargs)
 
 
 def _load_config(config_path: str | Path) -> dict[str, Any]:
+    """Load and parse a YAML configuration file from the specified path.
+    Returns a dictionary of configuration values, or an empty dictionary if the file does not exist.
+    """
     config_path = Path(config_path)
     if not config_path.exists():
         return {}
