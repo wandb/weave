@@ -194,12 +194,16 @@ def _wait_for_server(url: str, timeout: int = 30, interval: int = 1) -> bool:
 def _get_repo_info(repo_path: Path) -> tuple[str, str]:
     info(f"Getting SHA for {repo_path}")
     sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo_path, capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
     # Get remote URL from the current directory
     remote_url = subprocess.run(
         ["git", "remote", "get-url", "origin"],
+        cwd=repo_path,
         capture_output=True,
         text=True,
     ).stdout.strip()
