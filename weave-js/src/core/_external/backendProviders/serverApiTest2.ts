@@ -1,5 +1,10 @@
 import * as String from '@wandb/weave/common/util/string';
-import {MetadataNode, ServerAPI} from '@wandb/weave/core';
+import {
+  type DirMetadata,
+  type FileMetadata,
+  MetadataNode,
+  ServerAPI,
+} from '@wandb/weave/core';
 import * as _ from 'lodash';
 
 import * as Vega3 from '../util/vega3';
@@ -1016,6 +1021,11 @@ const FILE_METADATA: {
   },
 };
 
+// Todo: Not used in any test yet
+const MEMBERSHIP_FILE_METADATA: {
+  [artifactId: string]: {[path: string]: MetadataNode};
+} = {};
+
 function resolveRootProject(field: Vega3.QueryField) {
   const entityNameArg = field.args?.find(a => a.name === 'entityName')?.value;
   const projectNameArg = field.args?.find(a => a.name === 'name')?.value;
@@ -1496,6 +1506,34 @@ export class Client implements ServerAPI {
         if (metadata == null) {
           throw new Error(
             `serverApiTest missing metadata for artifact path ${artifactId} "${assetPath}"`
+          );
+        }
+        resolve(metadata);
+        // const contents = FILES?.[artifactId]?.[assetPath] ?? null;
+        // resolve({refFileId: null, contents});
+      }, 1);
+    });
+  }
+
+  getArtifactMembershipFileMetadata(
+    artifactCollectionMembershipId: string,
+    entityName: string,
+    projectName: string,
+    collectionName: string,
+    artifactCommitHash: string,
+    assetPath: string
+  ): Promise<DirMetadata | FileMetadata | null> {
+    return new Promise(resolve => {
+      // Delay for testing
+      // TODO: Unnecessary
+      setTimeout(() => {
+        const metadata =
+          MEMBERSHIP_FILE_METADATA?.[artifactCollectionMembershipId]?.[
+            assetPath
+          ];
+        if (metadata == null) {
+          throw new Error(
+            `serverApiTest missing metadata for artifact membership's artifact path ${artifactCollectionMembershipId} "${assetPath}"`
           );
         }
         resolve(metadata);

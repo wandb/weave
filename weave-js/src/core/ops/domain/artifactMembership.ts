@@ -114,10 +114,10 @@ export const opArtifactMembershipFile = makeStandardOp({
     }
     const artifactCollection = artifactMembership.artifactCollection;
     if (artifactCollection == null) {
-      throw new Error('opArtifactMembershipFile missing artifactCollection')
+      throw new Error('opArtifactMembershipFile missing artifactCollection');
     }
     if (artifactMembership.artifact == null) {
-      throw new Error('opArtifactMembershipFile missing artifact')
+      throw new Error('opArtifactMembershipFile missing artifact');
     }
 
     try {

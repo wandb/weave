@@ -28,12 +28,12 @@ export interface ServerAPI {
   ): Promise<DirMetadata | FileMetadata | null>;
 
   getArtifactMembershipFileMetadata(
-      artifactCollectionMembershipId: string,
-      entityName: string,
-      projectName: string,
-      collectionName: string,
-      artifactCommitHash: string,
-      assetPath: string
+    artifactCollectionMembershipId: string,
+    entityName: string,
+    projectName: string,
+    collectionName: string,
+    artifactCommitHash: string,
+    assetPath: string
   ): Promise<DirMetadata | FileMetadata | null>;
 
   getRunFileContents(

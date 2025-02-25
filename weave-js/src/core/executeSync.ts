@@ -118,12 +118,12 @@ class ThrowingPlaceholderServer implements ServerAPI {
   }
 
   getArtifactMembershipFileMetadata(
-      artifactCollectionMembershipId: string,
-      entityName: string,
-      projectName: string,
-      collectionName: string,
-      artifactCommitHash: string,
-      assetPath: string
+    artifactCollectionMembershipId: string,
+    entityName: string,
+    projectName: string,
+    collectionName: string,
+    artifactCommitHash: string,
+    assetPath: string
   ): Promise<DirMetadata | FileMetadata | null> {
     throw new Error(`Cannot getArtifactMembershipFileMetadata`);
   }

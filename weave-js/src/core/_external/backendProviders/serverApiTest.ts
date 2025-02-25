@@ -1,6 +1,7 @@
 import * as _ from 'lodash';
 
 import {hash} from '../../model/graph/editing/hash';
+import type {DirMetadata, FileMetadata} from '../../model/types';
 // CG imports
 import * as Types from '../../model/types';
 import * as ServerApi from '../../serverApi';
@@ -1072,6 +1073,11 @@ const FILE_METADATA: {
   },
 };
 
+// Todo: Not used in any test yet
+const MEMBERSHIP_FILE_METADATA: {
+  [artifactId: string]: {[path: string]: Types.MetadataNode};
+} = {};
+
 type ArgsType = {[key: string]: any};
 
 const toMany = (
@@ -1425,6 +1431,35 @@ export class Client implements ServerApi.ServerAPI {
         if (metadata == null) {
           throw new Error(
             `serverApiTest missing metadata for artifact path ${artifactId} "${assetPath}"`
+          );
+        }
+        resolve(metadata);
+        // const contents = FILES?.[artifactId]?.[assetPath] ?? null;
+        // resolve({refFileId: null, contents});
+      }, 1);
+    });
+  }
+
+  // TODO: NOT DONE
+  getArtifactMembershipFileMetadata(
+    artifactCollectionMembershipId: string,
+    entityName: string,
+    projectName: string,
+    collectionName: string,
+    artifactCommitHash: string,
+    assetPath: string
+  ): Promise<DirMetadata | FileMetadata | null> {
+    return new Promise(resolve => {
+      // Delay for testing
+      // TODO: Unnecessary
+      setTimeout(() => {
+        const metadata =
+          MEMBERSHIP_FILE_METADATA?.[artifactCollectionMembershipId]?.[
+            assetPath
+          ];
+        if (metadata == null) {
+          throw new Error(
+            `serverApiTest missing metadata for artifact membership's artifact path ${artifactCollectionMembershipId} "${assetPath}"`
           );
         }
         resolve(metadata);

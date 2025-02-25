@@ -1450,7 +1450,7 @@ export const toGqlField = (
             args: gqlArgs({}),
             fields: [],
           },
-        ])
+        ]),
       },
       {
         name: 'artifactCollection',
@@ -1466,7 +1466,7 @@ export const toGqlField = (
               {name: 'name', fields: []},
               {
                 name: 'entityName',
-                fields: []
+                fields: [],
               },
             ]),
           },
