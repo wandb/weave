@@ -398,18 +398,24 @@ class WeaveTable(Traceable):
                 )
             )
 
-            # Check if we need to handle prefetched rows mismatch
+            # When paginating through large datasets, we need special handling for prefetched rows
+            # on the first page. This is because prefetched_rows contains ALL rows, while each
+            # response page contains at most page_size rows.
             if page_index == 0 and self._prefetched_rows is not None:
                 response_rows_len = len(response.rows)
                 prefetched_rows_len = len(self._prefetched_rows)
 
-                # Only log an error if this isn't a normal pagination scenario
+                # There are two valid scenarios:
+                # 1. The response rows exactly match prefetched rows (small dataset, no pagination needed)
+                # 2. We're paginating a large dataset (response has page_size rows, prefetched has more)
+                #
+                # Any other mismatch indicates an inconsistency that should be handled by
+                # discarding the prefetched rows and relying solely on server responses.
                 if response_rows_len != prefetched_rows_len and not (
                     response_rows_len == page_size and prefetched_rows_len > page_size
                 ):
                     if get_raise_on_captured_errors():
                         raise
-                    # Use internal_logger with DEBUG level instead of ERROR
                     logger.debug(
                         f"Pagination handling: Response rows ({response_rows_len}) don't match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
                     )
