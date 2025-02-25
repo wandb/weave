@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from weave.trace.context.tests_context import raise_on_captured_errors
 
 
 def test_basic_dataset_lifecycle(client):
@@ -56,14 +57,11 @@ def test_dataset_from_calls(client):
     assert rows[1]["output"] == "Hello Bob, you are 25!"
 
 
-def test_dataset_caching(client, capsys):
+def test_dataset_caching(client):
     ds = weave.Dataset(rows=[{"a": i} for i in range(200)])
     ref = weave.publish(ds)
 
     ds2 = ref.get()
 
-    assert len(ds2) == 200
-
-    captured = capsys.readouterr()
-    assert "Expected length of response rows" not in captured.out
-    assert "Expected length of response rows" not in captured.err
+    with raise_on_captured_errors():
+        assert len(ds2) == 200
