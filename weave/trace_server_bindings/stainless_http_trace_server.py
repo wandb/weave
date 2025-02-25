@@ -9,7 +9,7 @@ from typing import Any, Optional, Union, cast
 
 import tenacity
 from pydantic import BaseModel, ValidationError
-from weave_trace import DefaultHttpxClient, WeaveTrace
+from weave_server_sdk import DefaultHttpxClient, WeaveTrace
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests

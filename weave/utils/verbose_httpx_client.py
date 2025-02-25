@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
-from weave_trace import DefaultHttpxClient
+from weave_server_sdk import DefaultHttpxClient
 
 logger = logging.getLogger(__name__)
 
