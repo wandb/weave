@@ -3300,3 +3300,46 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
             select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
             == 1
         )
+
+
+def test_filter_call_parts_by_int(client):
+    call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        op_name="test_name",
+        trace_id=trace_id,
+        parent_id=parent_id,
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"b": 5},
+    )
+    client.server.call_start(tsi.CallStartReq(start=start))
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        output={"a": 1},
+        summary={"a": 1},
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+    client.server.call_end(tsi.CallEndReq(end=end))
+
+    # filter query by input int
+    query = {
+        "$eq": [
+            {"$literal": 5},
+            {"$getField": "inputs.b"},
+        ]
+    }
+    res = client.server.calls_query(
+        tsi.CallsQueryReq.model_validate(
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
+        )
+    )
