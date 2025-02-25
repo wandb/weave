@@ -75,14 +75,14 @@ def get_gcp_credentials() -> GCPCredentials:
 
     from google.oauth2 import service_account
 
-    creds_json = environment.wf_storage_bucket_gcp_credentials_json()
-    if not creds_json:
+    creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()
+    if not creds_json_b64:
         raise ValueError(
-            "No GCP credentials found. Set WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON environment variable."
+            "No GCP credentials found. Set WF_FILE_STORAGE_BUCKET_GCP_CREDENTIALS_JSON_B64 environment variable."
         )
 
     try:
-        creds_dict = json.loads(creds_json)
+        creds_dict = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
         return service_account.Credentials.from_service_account_info(creds_dict)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid GCP credentials JSON: {e}")
