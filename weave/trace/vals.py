@@ -417,7 +417,7 @@ class WeaveTable(Traceable):
                     if get_raise_on_captured_errors():
                         raise
                     logger.debug(
-                        f"Response rows ({response_rows_len}) don't match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
+                        f"Expected length of response rows ({response_rows_len}) to match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
                     )
                     self._prefetched_rows = None
 
