@@ -102,7 +102,7 @@ def test_concurrent_mixed_operations():
         t.join()
 
     # Verify all threads got the same results
-    expected = [10, list(range(20, 25)), 50, list(range(90, 100))]
+    expected = [10, list(range(20, 25)), 50] + list(range(90, 100))
     assert all(r == expected for r in results)
 
 
