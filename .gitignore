@@ -18,4 +18,3 @@ gha-creds-*.json
 .nox
 *.log
 */file::memory:?cache=shared
-tests/weave_models/

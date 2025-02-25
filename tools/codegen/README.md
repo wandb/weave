@@ -11,8 +11,20 @@ This tool generates code from the OpenAPI specification for Python, Node.js, and
    ```
 
 2. Set the required environment variables:
+
    - `STAINLESS_API_KEY`
    - `GITHUB_TOKEN`
+
+3. Configure your local paths:
+
+   ```bash
+   # Copy the template configuration file
+   cp tools/codegen/generate_config.yaml.template tools/codegen/generate_config.yaml
+
+   # Edit generate_config.yaml with your local repository paths
+   ```
+
+   Note: Your local `generate_config.yaml` will be ignored by git to prevent checking in personal paths.
 
 ## Commands
 

@@ -1,16 +1,27 @@
+# =============================================
+# GENERATE_CONFIG.YAML TEMPLATE
+# =============================================
+# To use this template:
+# 1. Copy this file to generate_config.yaml
+# 2. Update the paths below with your local settings
+# 3. The generate_config.yaml file will be ignored by git
+# =============================================
+
 # ==============
 # CONFIGURE ONCE
 # ==============
 # Path to the Python package repository (required)
 # This is used both as the output directory for generated Python code
 # and as the repository path for updating pyproject.toml
-repo_path: absolute/path/to/your/local/stainless/python/repo
+repo_path: /path/to/your/local/python/repo
 
 # Path to the Node package repository (optional)
-node_output: absolute/path/to/your/local/stainless/node/repo
+# Comment out or remove if not needed
+node_output: /path/to/your/local/node/repo
 
 # Path to the TypeScript package repository (optional)
-typescript_output: absolute/path/to/your/local/stainless/typescript/repo
+# Comment out or remove if not needed
+typescript_output: /path/to/your/local/typescript/repo
 
 # ==========================
 # PROBABLY SHOULD NOT CHANGE
