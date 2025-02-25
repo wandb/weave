@@ -11,14 +11,14 @@ organization:
 # whether to emit the Node SDK and what it's package name should be.
 targets:
   node:
-    package_name: weave-trace2
+    package_name: weave-server-sdk-old
     production_repo: null
     publish:
       npm: false
     skip: false
   python:
-    package_name: weave_trace
-    project_name: weave-trace
+    package_name: weave_server_sdk
+    project_name: weave_server_sdk
     production_repo: null
     publish:
       pypi: false
@@ -27,7 +27,7 @@ targets:
       use_uv: true
       use_new_recursive_imports: true
   typescript:
-    package_name: weave-trace
+    package_name: weave-server-sdk
     publish:
       npm: false
 

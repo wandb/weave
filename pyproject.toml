@@ -51,7 +51,7 @@ dependencies = [
   # Basically:
   # 1. For normal dev, pin to a SHA and allow direct references
   # 2. For deploys, pin to a specific version and remove allow-direct-references.
-  "weave_trace @ git+https://github.com/wandb/weave-stainless@1f48a742fd1b8aaaac89c5bfebf8bbeb785a409f",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25",
 ]
 
 [project.optional-dependencies]

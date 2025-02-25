@@ -5,7 +5,9 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
 import httpx
@@ -13,12 +15,19 @@ import tomlkit
 import yaml
 from rich import print
 
+# Server configuration
 WEAVE_PORT = 6345
+SERVER_TIMEOUT = 30  # seconds
+SERVER_CHECK_INTERVAL = 1  # seconds
+SUBPROCESS_TIMEOUT = 30  # seconds
+
+# Stainless configuration
 STAINLESS_ORG_NAME = "weights-biases"
 STAINLESS_PROJECT_NAME = "weave"
 
-CODEGEN_BUNDLE_PATH = "tools/codegen/stainless.js"
+# Path configuration
 CODEGEN_ROOT_RELPATH = "tools/codegen"
+CODEGEN_BUNDLE_PATH = f"{CODEGEN_ROOT_RELPATH}/stainless.js"
 STAINLESS_CONFIG_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.stainless.yml"
 STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
@@ -99,12 +108,24 @@ def generate_code(
         )
         sys.exit(1)
 
-    if not os.getenv("STAINLESS_API_KEY"):
-        error("STAINLESS_API_KEY is not set")
-        sys.exit(1)
+    required_env_vars = {
+        "STAINLESS_API_KEY": "Stainless API key",
+        "GITHUB_TOKEN": "GitHub token",
+    }
 
-    if not os.getenv("GITHUB_TOKEN"):
-        error("GITHUB_TOKEN is not set")
+    missing_vars = [
+        var_name for var_name in required_env_vars if not os.getenv(var_name)
+    ]
+
+    if missing_vars:
+        error(
+            "Missing required environment variables: "
+            + ", ".join(
+                f"{var} ({desc})"
+                for var, desc in required_env_vars.items()
+                if var in missing_vars
+            )
+        )
         sys.exit(1)
 
     cmd = [
@@ -122,7 +143,16 @@ def generate_code(
     if typescript_path:
         cmd.append(f"--output-typescript={typescript_path}")
 
-    subprocess.run(cmd, check=True)
+    try:
+        subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
+    except subprocess.CalledProcessError as e:
+        error(f"Code generation failed with exit code {e.returncode}")
+        if e.output:
+            error(f"Output: {e.output.decode()}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
+        sys.exit(1)
 
 
 @cli.command()  # type: ignore
@@ -138,7 +168,9 @@ def update_pyproject(repo_path: str, package_name: str, release: bool = False) -
         _update_pyproject_toml(package_name, version, True)
         info(f"Updated {package_name} dependency to version: {version}")
     else:
-        sha, remote_url = _get_repo_info(path)
+        repo_info = _get_repo_info(path)
+        remote_url = repo_info.remote_url
+        sha = repo_info.sha
         if not sha:
             error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
@@ -171,22 +203,12 @@ def all(
     header("Running weave codegen")
 
     # Initialize config dict
-    cfg: dict = {}
-
-    # Read config from file if it exists
     config_path = _ensure_absolute_path(config)
     if config_path is None:
         error("Config path cannot be None")
         sys.exit(1)
 
-    try:
-        if Path(config_path).exists():
-            with open(config_path) as f:
-                cfg = yaml.safe_load(f) or {}
-            info(f"Loaded config from {config_path}")
-    except yaml.YAMLError as e:
-        error(f"Failed to parse config file: {e}")
-        sys.exit(1)
+    cfg = _load_config(config_path)
 
     # Override config with direct arguments if provided
     if repo_path is not None:
@@ -209,7 +231,6 @@ def all(
         )
         sys.exit(1)
 
-    # Convert repo_path to absolute path if relative
     str_path = _ensure_absolute_path(cfg["repo_path"])
     if str_path is None:
         error("repo_path cannot be None")
@@ -271,25 +292,36 @@ def info(text: str):
     print(f"INFO:    {text}")
 
 
-def _kill_port(port) -> bool:
+def _kill_port(port: int) -> bool:
     cmd = f"lsof -i :{port} | grep LISTEN | awk '{{print $2}}' | xargs kill -9"
     try:
-        subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+        subprocess.run(
+            cmd, shell=True, stderr=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        )
     except subprocess.CalledProcessError as e:
         info(f"No process found on port {port}")
+        warning(f"Command failed with error: {e}")
+        return False
+    except subprocess.TimeoutExpired:
+        error(f"Timeout while trying to kill process on port {port}")
         return False
     else:
         info(f"Successfully killed process on port {port}")
         return True
 
 
-def _wait_for_server(url: str, timeout: int = 30, interval: int = 1) -> bool:
+def _wait_for_server(
+    url: str, timeout: int = SERVER_TIMEOUT, interval: int = SERVER_CHECK_INTERVAL
+) -> bool:
     end_time = time.time() + timeout
     while time.time() < end_time:
         try:
-            httpx.get(url)
+            httpx.get(url, timeout=interval)
         except httpx.ConnectError:
             warning("Failed to connect to server, retrying...")
+            time.sleep(interval)
+        except httpx.TimeoutException:
+            warning("Server request timed out, retrying...")
             time.sleep(interval)
         else:
             info("Server is healthy!")
@@ -297,24 +329,35 @@ def _wait_for_server(url: str, timeout: int = 30, interval: int = 1) -> bool:
     return False
 
 
-def _get_repo_info(repo_path: Path) -> tuple[str, str]:
+@dataclass
+class RepoInfo:
+    sha: str
+    remote_url: str
+
+
+def _get_repo_info(repo_path: Path) -> RepoInfo:
     info(f"Getting SHA for {repo_path}")
-    sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+        ).stdout.strip()
 
-    # Get remote URL from the current directory
-    remote_url = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-    return sha, remote_url
+        remote_url = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+        ).stdout.strip()
+    except subprocess.TimeoutExpired:
+        error("Timeout while getting git repository information")
+        sys.exit(1)
+    else:
+        return RepoInfo(sha=sha, remote_url=remote_url)
 
 
 def _get_package_version(repo_path: Path) -> str:
@@ -373,7 +416,6 @@ def _update_pyproject_toml(
 
 
 def _format_command(command_name: str, **kwargs) -> str:
-    """Format a command and its arguments for display"""
     parts = [command_name]
     for k, v in kwargs.items():
         if v is not None:
@@ -387,12 +429,10 @@ def _format_command(command_name: str, **kwargs) -> str:
 
 
 def _announce_command(cmd: str) -> None:
-    """Announce a command with a simple line format"""
     print(f"\nINFO:    Running command: {cmd}")
 
 
 def _ensure_absolute_path(path: str | None) -> str | None:
-    """Convert a path to absolute if it's relative, return None if input is None"""
     if path is None:
         return None
     p = Path(path)
@@ -412,6 +452,25 @@ def _format_announce_invoke(
     cmd = _format_command(command.name, **kwargs)
     _announce_command(cmd)
     ctx.invoke(command, **kwargs)
+
+
+def _load_config(config_path: str | Path) -> dict[str, Any]:
+    config_path = Path(config_path)
+    if not config_path.exists():
+        return {}
+
+    try:
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        info(f"Loaded config from {config_path}")
+    except yaml.YAMLError as e:
+        error(f"Failed to parse config file: {e}")
+        sys.exit(1)
+    except OSError as e:
+        error(f"Failed to read config file: {e}")
+        sys.exit(1)
+    else:
+        return cfg
 
 
 if __name__ == "__main__":
