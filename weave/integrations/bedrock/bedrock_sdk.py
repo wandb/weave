@@ -1,3 +1,4 @@
+import json
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
@@ -48,15 +49,20 @@ def bedrock_on_finish_invoke(
         call.summary.update(summary_update)
 
 
-def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs.get("kwargs", {})
 
+def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
+    exploded_kwargs = inputs.get("kwargs", {})
+    if "body" in exploded_kwargs:
+        exploded_kwargs["body"] = json.loads(exploded_kwargs["body"])
+    return exploded_kwargs
 
 def _patch_converse(bedrock_client: "BaseClient") -> None:
     op = weave.op(
         bedrock_client.converse,
         name="BedrockRuntime.converse",
-        postprocess_inputs=postprocess_inputs,
+        postprocess_inputs=postprocess_inputs_converse,
     )
     op._set_on_finish_handler(bedrock_on_finish_converse)
     bedrock_client.converse = op
@@ -66,7 +72,7 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
     op = weave.op(
         bedrock_client.invoke_model,
         name="BedrockRuntime.invoke",
-        postprocess_inputs=postprocess_inputs,
+        postprocess_inputs=postprocess_inputs_invoke,
     )
     op._set_on_finish_handler(bedrock_on_finish_invoke)
     bedrock_client.invoke_model = op
@@ -119,7 +125,7 @@ def create_stream_wrapper(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=postprocess_inputs)(fn)
+        op = weave.op(postprocess_inputs=postprocess_inputs_converse)(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(bedrock_on_finish_converse)
 
