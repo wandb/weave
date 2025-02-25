@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Callable
+from typing import Any, Callable, Literal, TypedDict, Union
 
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.context.weave_client_context import require_weave_client
@@ -25,7 +25,45 @@ KNOWN_TYPES = {
 }
 
 
-def encode_custom_obj(obj: Any) -> dict | None:
+class WeaveTypeInfo(TypedDict):
+    """Information about the Weave type being serialized."""
+
+    type: str
+
+
+class ArtifactBasedCustomObject(TypedDict):
+    """A custom object serialized using artifact-based serialization."""
+
+    _type: Literal["CustomWeaveType"]
+    weave_type: WeaveTypeInfo
+    files: dict[str, str | bytes]
+    load_op: str | None
+
+
+class InlineCustomObject(TypedDict):
+    """A custom object serialized using inline serialization."""
+
+    _type: Literal["CustomWeaveType"]
+    weave_type: WeaveTypeInfo
+    inline_data: Any
+
+
+# Union type representing either serialization approach
+SerializedCustomObject = Union[ArtifactBasedCustomObject, InlineCustomObject]
+
+
+def encode_custom_obj(obj: Any) -> SerializedCustomObject | None:
+    """Encode a custom object into a serialized representation.
+
+    This function attempts to serialize an object using either inline serialization
+    or artifact-based serialization, depending on the capabilities of the serializer.
+
+    Args:
+        obj: The object to serialize
+
+    Returns:
+        A serialized representation of the object, or None if no serializer is found
+    """
     serializer = get_serializer_for_obj(obj)
     if serializer is None:
         # We silently return None right now. We could warn here. This object
@@ -35,11 +73,11 @@ def encode_custom_obj(obj: Any) -> dict | None:
     # Use inline serialization if available
     if serializer.inline_serialize is not None:
         inline_data = serializer.inline_serialize(obj)
-        return {
-            "_type": "CustomWeaveType",
-            "weave_type": {"type": serializer.id()},
-            "inline_data": inline_data,
-        }
+        return InlineCustomObject(
+            _type="CustomWeaveType",
+            weave_type=WeaveTypeInfo(type=serializer.id()),
+            inline_data=inline_data,
+        )
 
     # Fall back to artifact-based serialization
     art = MemTraceFilesArtifact()
@@ -66,12 +104,12 @@ def encode_custom_obj(obj: Any) -> dict | None:
         k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
         for k, v in art.path_contents.items()
     }
-    return {
-        "_type": "CustomWeaveType",
-        "weave_type": {"type": serializer.id()},
-        "files": encoded_path_contents,
-        "load_op": load_op_uri,
-    }
+    return ArtifactBasedCustomObject(
+        _type="CustomWeaveType",
+        weave_type=WeaveTypeInfo(type=serializer.id()),
+        files=encoded_path_contents,
+        load_op=load_op_uri,
+    )
 
 
 def _decode_custom_obj(
@@ -88,34 +126,65 @@ def _decode_custom_obj(
     return res
 
 
-def decode_custom_obj(
-    weave_type: dict,
+def _decode_custom_obj_inline(
+    weave_type: WeaveTypeInfo,
+    inline_data: Any,
+) -> Any:
+    """Decode a custom object using inline serialization.
+
+    Args:
+        weave_type: Information about the Weave type being deserialized
+        inline_data: The inline data to deserialize
+
+    Returns:
+        The deserialized object
+
+    Raises:
+        ValueError: If no inline deserializer is found for the type
+    """
+    _type = weave_type["type"]
+
+    if _type not in KNOWN_TYPES:
+        raise ValueError(f"No known serializer for type `{_type}`")
+
+    serializer = get_serializer_by_id(_type)
+    if serializer is None or serializer.inline_deserialize is None:
+        raise ValueError(f"No inline deserializer found for `{_type}`")
+
+    return serializer.inline_deserialize(inline_data)
+
+
+def _decode_custom_obj_artifact(
+    weave_type: WeaveTypeInfo,
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
-    inline_data: Any = None,
 ) -> Any:
-    _type = weave_type["type"]
-    found_serializer = False
+    """Decode a custom object using artifact-based serialization.
 
-    # First, try to load the object using a known serializer
+    Args:
+        weave_type: Information about the Weave type being deserialized
+        encoded_path_contents: The encoded file contents
+        load_instance_op_uri: The URI of the load operation, if needed
+
+    Returns:
+        The deserialized object
+
+    Raises:
+        ValueError: If no serializer is found for the type
+        TypeError: If load_instance_op_uri is not an ObjectRef
+        DecodeCustomObjectError: If decoding fails
+    """
+    _type = weave_type["type"]
+    load_instance_op = None
+
+    # First, try to use a known serializer
     if _type in KNOWN_TYPES:
         serializer = get_serializer_by_id(_type)
         if serializer is not None:
-            found_serializer = True
-
-            # If we have inline data and an inline deserializer, use it
-            if inline_data is not None and serializer.inline_deserialize is not None:
-                return serializer.inline_deserialize(inline_data)
-
-            # Otherwise use the standard artifact-based deserialization
             load_instance_op = serializer.load
-            try:
-                return _decode_custom_obj(encoded_path_contents, load_instance_op)
-            except Exception as e:
-                pass
 
-    # Otherwise, fall back to load_instance_op
-    if not found_serializer:
+    # If no known serializer, try to load from the provided URI
+    if load_instance_op is None:
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{_type}`")
 
@@ -136,3 +205,43 @@ def decode_custom_obj(
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{_type}`. See logs above for more information."
         ) from e
+
+
+def decode_custom_obj(
+    weave_type: WeaveTypeInfo,
+    encoded_path_contents: Mapping[str, str | bytes],
+    load_instance_op_uri: str | None = None,
+    inline_data: Any = None,
+) -> Any:
+    """Decode a custom object from its serialized representation.
+
+    This function handles both artifact-based and inline serialization approaches.
+    If inline_data is provided and a suitable inline deserializer exists, inline
+    deserialization is used. Otherwise, artifact-based deserialization is used.
+
+    Args:
+        weave_type: Information about the Weave type being deserialized
+        encoded_path_contents: The encoded file contents (required even for inline serialization)
+        load_instance_op_uri: For artifact-based serialization, the URI of the load operation
+        inline_data: For inline serialization, the inline data
+
+    Returns:
+        The deserialized object
+
+    Raises:
+        ValueError: If no serializer is found for the type
+        TypeError: If load_instance_op_uri is not an ObjectRef
+        DecodeCustomObjectError: If decoding fails
+    """
+    # Try inline deserialization first if inline_data is provided
+    if inline_data is not None:
+        try:
+            return _decode_custom_obj_inline(weave_type, inline_data)
+        except ValueError:
+            # Fall back to artifact-based deserialization if inline fails
+            pass
+
+    # Use artifact-based deserialization
+    return _decode_custom_obj_artifact(
+        weave_type, encoded_path_contents, load_instance_op_uri
+    )
