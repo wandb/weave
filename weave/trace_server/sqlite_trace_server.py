@@ -944,6 +944,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     )
                 )
                 parameters.extend(req.filter.row_digests)
+            else:
+                conds.append("1 = 1")
         else:
             conds.append("1 = 1")
 
