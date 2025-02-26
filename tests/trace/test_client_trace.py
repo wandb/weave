@@ -3353,26 +3353,6 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     res = _make_query("inputs.param.value1", "hello")
     assert len(res) == 1
     assert res[0].inputs["param"]["value1"] == "hello"
-
-    if client_is_sqlite(client):
-        # Does the query return the output?
-        with pytest.raises(TypeError):
-            # There will be no output because clickhouse hasn't merged the inputs and
-            # output yet
-            assert res[0].output["d"] == 5
-
-    # insert some more calls to encourage clickhouse to merge
-
-    @weave.op
-    def test():
-        return 1
-
-    test()
-    test()
-    test()
-
-    res = _make_query("inputs.param.value1", "hello")
-    assert len(res) == 1
     assert res[0].output["d"] == 5
 
 
@@ -3427,22 +3407,9 @@ def test_call_stream_query_heavy_query_batch(client):
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq.model_validate(output_query)
     )
-    if not client_is_sqlite(client):
-        # in clickhouse we don't know how many calls are merged,
-        # and the query filters out started_at is NULL, so this will
-        # likely fail to return all 10 calls.
-        try:
-            assert len(list(res)) == 10
-            for call in res:
-                assert call.attributes["a"] == 5
-        except AssertionError:
-            # This can happen if the call_parts are not merged in the query,
-            # which is likely when we are inserting so few rows
-            pass
-    else:
-        assert len(list(res)) == 10
-        for call in res:
-            assert call.attributes["a"] == 5
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["a"] == 5
 
     # now query for inputs by string. This should be okay,
     # because we don't filter out started_at is NULL
@@ -3473,16 +3440,5 @@ def test_call_stream_query_heavy_query_batch(client):
     )
     assert len(list(res)) == 10
     for call in res:
-        assert call.inputs["param"]["value1"] == "hello"
-        assert call.output["d"] == 5
-
-    # By making these queries, clickhouse normally merges the call_parts
-    # into calls_merged, and we should be able to query the outputs
-    # and get the correct results.
-    res1 = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(output_query)
-    )
-    assert len(list(res1)) == 10
-    for call in res1:
         assert call.inputs["param"]["value1"] == "hello"
         assert call.output["d"] == 5
