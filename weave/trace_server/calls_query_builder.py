@@ -924,7 +924,9 @@ def make_call_parts_predicate_filters_sql(
     """Makes the SQL for the predicate filters for the call parts.
 
     This function creates SQL conditions that can be applied before the GROUP BY
-    to filter out rows that definitely won't match the heavy conditions.
+    to filter out rows that definitely won't match the heavy conditions. These
+    conditions MUST be identical or less restrictive than the conditions in the
+    `conditions` list which will appear in HAVING after group by.
 
     For fields that may only exist in start or end parts, we add special handling
     to avoid filtering out rows where the field is NULL (as they might be part of
@@ -932,12 +934,11 @@ def make_call_parts_predicate_filters_sql(
 
     Returns an empty string if:
     1. There are no heavy conditions
-    2. There are OR operations between start-only and end-only fields, which would
-       make predicate pushdown unsafe
+    2. There are OR operations between start-only and end-only fields
+        TODO: support OR conditions between start and end fields
 
     Performance note: This optimization is critical for queries with heavy fields,
-    as it can significantly reduce the amount of data loaded into memory by
-    filtering at the storage level before aggregation.
+    as it can significantly reduce peak memory by filtering before aggregation.
     """
     heavy_conditions = [
         cond for cond in conditions if cond.is_heavy() and not cond.is_feedback()
@@ -965,12 +966,12 @@ def make_call_parts_predicate_filters_sql(
             # TODO: support OR conditions between start and end fields
             return ""
 
-        # Process the condition to create a predicate filter
+        # Process the condition to create a predicate filter, using non-aggregate fields
         condition_sql = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
             pb,
             table_alias,
-            use_agg_fn=False,  # Important: don't use aggregation functions
+            use_agg_fn=False,
         ).conditions[0]
 
         # Build NULL allowances for start-only fields
