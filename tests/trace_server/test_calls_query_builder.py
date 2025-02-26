@@ -919,3 +919,103 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
             "pb_3": "success",
         },
     )
+
+
+def test_calls_query_with_complex_heavy_filters() -> None:
+    """Test complex combinations of heavy filter conditions on inputs and outputs."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("output")
+
+    # Create a complex query with multiple conditions on inputs and outputs
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    # Multiple conditions on inputs
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.val"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$getField": "inputs.param.count"},
+                            {"$literal": 5},
+                        ]
+                    },
+                    # Multiple conditions on outputs
+                    {
+                        "$eq": [
+                            {"$getField": "output.result.status"},
+                            {"$literal": "success"},
+                        ]
+                    },
+                    {
+                        "$contains": {
+                            "input": {"$getField": "output.result.message"},
+                            "substr": {"$literal": "completed"},
+                            "case_insensitive": True,
+                        }
+                    },
+                    # Light condition
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.wb_user_id) = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls)
+        AND ((((JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
+        AND (((JSON_VALUE(calls_merged.inputs_dump, {pb_4:String}) > {pb_5:UInt64}) OR calls_merged.inputs_dump IS NULL))
+        AND (((JSON_VALUE(calls_merged.output_dump, {pb_6:String}) = {pb_7:String}) OR calls_merged.output_dump IS NULL))
+        AND ((positionCaseInsensitive(JSON_VALUE(calls_merged.output_dump, {pb_8:String}), {pb_9:String}) > 0 OR calls_merged.output_dump IS NULL)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
+            AND
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) > {pb_5:UInt64}))
+            AND
+            ((JSON_VALUE(any(calls_merged.output_dump), {pb_6:String}) = {pb_7:String}))
+            AND
+            (positionCaseInsensitive(JSON_VALUE(any(calls_merged.output_dump), {pb_8:String}), {pb_9:String}) > 0)
+        )
+        """,
+        {
+            "pb_0": "my_user_id",
+            "pb_1": "project",
+            "pb_2": '$."param"."val"',
+            "pb_3": "hello",
+            "pb_4": '$."param"."count"',
+            "pb_5": 5,
+            "pb_6": '$."result"."status"',
+            "pb_7": "success",
+            "pb_8": '$."result"."message"',
+            "pb_9": "completed",
+        },
+    )
