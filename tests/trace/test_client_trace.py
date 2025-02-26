@@ -3388,7 +3388,7 @@ def test_call_stream_query_heavy_query_batch(client):
             id=call_ids[i],
             ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
             summary={"c": 5},
-            output={"d": 5, "e": "f"},
+            output={"d": 5, "e": "f", "result": {"message": "completed"}},
         )
         client.server.call_end(tsi.CallEndReq(end=end))
 
@@ -3417,9 +3417,20 @@ def test_call_stream_query_heavy_query_batch(client):
         "project_id": project_id,
         "query": {
             "$expr": {
-                "$eq": [
-                    {"$getField": "inputs.param.value1"},
-                    {"$literal": "hello"},
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.value1"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                    {
+                        "$contains": {
+                            "input": {"$getField": "output.result.message"},
+                            "substr": {"$literal": "COMPleted"},
+                            "case_insensitive": True,
+                        }
+                    },
                 ]
             }
         },
@@ -3431,8 +3442,9 @@ def test_call_stream_query_heavy_query_batch(client):
     for call in res:
         assert call.inputs["param"]["value1"] == "hello"
         assert call.output["d"] == 5
+        assert call.output["result"]["message"] == "COMPLETED"
 
-    # Now lets query with a light filter + heavy filter, which
+    # Now lets add a light filter, which
     # changes how we filter out calls. Make sure that still works
     input_string_query["filter"] = {"op_names": ["test_name"]}
     res = client.server.calls_query_stream(
@@ -3440,5 +3452,5 @@ def test_call_stream_query_heavy_query_batch(client):
     )
     assert len(list(res)) == 10
     for call in res:
-        assert call.inputs["param"]["value1"] == "hello"
+        assert call.inputs["param"]["value1"] == "helslo"
         assert call.output["d"] == 5

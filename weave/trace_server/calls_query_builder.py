@@ -65,6 +65,9 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+    def is_heavy(self) -> bool:
+        return False
+
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
@@ -567,7 +570,8 @@ class CallsQuery(BaseModel):
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
-                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                    field=sort_by.field.field,
+                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
                 )
                 for sort_by in self.order_fields
             ]
