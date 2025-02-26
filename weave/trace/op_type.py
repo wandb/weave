@@ -426,7 +426,7 @@ def _get_code_deps(
                     if (client := get_weave_client()) is None:
                         raise ValueError("Weave client not found")
 
-                    from weave.trace.serialize import to_json
+                    from weave.trace.serialization.serialize import to_json
 
                     # Redact sensitive values
                     if should_redact(var_name):

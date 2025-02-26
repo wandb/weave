@@ -58,8 +58,12 @@ from weave.trace.refs import (
     parse_uri,
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization.serialize import (
+    from_json,
+    isinstance_namedtuple,
+    to_json,
+)
 from weave.trace.serialization.serializer import get_serializer_for_obj
-from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,

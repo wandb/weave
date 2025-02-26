@@ -26,7 +26,7 @@ from weave.trace.refs import (
     RefWithExtra,
     TableRef,
 )
-from weave.trace.serialize import from_json
+from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
