@@ -7,7 +7,6 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic  # type: ignore
 
-from weave.trace.errors import Error
 from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
 from weave.wandb_interface.wandb_api import WandbApiAsync
@@ -67,7 +66,7 @@ def api_key(
         return None
 
 
-class WeaveDefinitionError(Error): ...
+class WeaveDefinitionError(Exception): ...
 
 
 def object_method_app(
