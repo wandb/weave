@@ -13,9 +13,12 @@ _dspy_patcher: MultiPatcher | None = None
 class DSPyPatcher(MultiPatcher):
     def __init__(self, patchers: Sequence[Patcher]) -> None:
         super().__init__(patchers)
-        import dspy
+        try:
+            import dspy
 
-        dspy.configure(callbacks=[WeaveCallback()])
+            dspy.configure(callbacks=[WeaveCallback()])
+        except ImportError:
+            pass
 
 
 def get_dspy_patcher(
