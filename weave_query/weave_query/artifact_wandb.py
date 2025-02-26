@@ -994,7 +994,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and likely_commit_hash(self.version):
+        if self.version and (likely_commit_hash(self.version) or is_valid_version_index(self.version)):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
