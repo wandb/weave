@@ -97,11 +97,12 @@ def test_error_handling_continues_processing():
     processor.wait_until_all_processed()
 
     # Verify batches were processed
+    # Note: Order IS important in this test because we're explicitly controlling which
+    # batch fails (the 2nd one) based on batch_count, and verifying error handling works
+    # correctly with sequential processing
     assert batch_count == 3
     assert successful_items == all_items[:5] + all_items[10:]  # Batches 1, 3
     assert failed_items == all_items[5:10]  # Batch 2
-
-    # NOTE: In this current implementation, the processor does not retry failures!
 
 
 def test_processor_blocking_affects_queue():
@@ -159,6 +160,8 @@ def test_processor_blocking_affects_queue():
     processor.wait_until_all_processed()  # Wait for all items to be processed
 
     # Verify all batches were processed in the correct order
+    # Note: Unlike thread death tests, order IS guaranteed here because we're explicitly
+    # testing FIFO queue behavior with a single thread that gets blocked/unblocked
     expected_items = first_batch + second_batch + third_batch
     assert processed_items == expected_items
 
@@ -175,6 +178,10 @@ def test_thread_death_recovery():
     1. When the processing thread dies due to an unhandled exception, new items can still be processed
     2. The processor automatically creates a new processing thread when needed
     3. Items enqueued after thread death are still processed correctly
+
+    Note: Unlike the processor_blocking_affects_queue test, we cannot make assumptions about
+    processing order here because thread death and recreation can affect the timing and order
+    of batch processing.
     """
     processed_batches = []
     thread_death_event = threading.Event()
@@ -218,8 +225,10 @@ def test_thread_death_recovery():
     processor.wait_until_all_processed()
 
     # Verify the second batch was processed, indicating recovery
+    # With max_retries=0, the first batch should be lost
     assert len(processed_batches) == 1
-    assert processed_batches[0] == second_batch
+    assert second_batch in processed_batches
+    assert first_batch not in processed_batches
 
 
 @pytest.mark.disable_logging_error_check
@@ -231,6 +240,10 @@ def test_thread_death_recovery_with_retries():
     1. When the processing thread dies due to an unhandled exception, new items can still be processed
     2. The processor automatically creates a new processing thread when needed
     3. Items enqueued after thread death are still processed correctly
+
+    Note: Unlike the processor_blocking_affects_queue test, we cannot make assumptions about
+    processing order here because thread death and recreation can affect the timing and order
+    of batch processing.
     """
     processed_batches = []
     thread_death_event = threading.Event()
@@ -273,7 +286,8 @@ def test_thread_death_recovery_with_retries():
     # This should trigger the creation of a new processing thread
     processor.wait_until_all_processed()
 
-    # Verify the second batch was processed, indicating recovery
+    # Verify both batches were processed, indicating recovery
+    # Note: We don't assert the exact order as it cannot be guaranteed due to threading
     assert len(processed_batches) == 2
-    assert processed_batches[0] == first_batch
-    assert processed_batches[1] == second_batch
+    assert first_batch in processed_batches
+    assert second_batch in processed_batches
