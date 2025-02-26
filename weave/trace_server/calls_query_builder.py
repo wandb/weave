@@ -945,9 +945,8 @@ def should_add_predicate_filters(conditions: list[Condition]) -> bool:
     - output_dump
     - attributes_dump
     """
-    # If there are no conditions, we can safely add predicate filters
     if not conditions:
-        return True
+        return False
 
     # Check if we have any OR operations between start and end fields
     for condition in conditions:
