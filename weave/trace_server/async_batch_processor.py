@@ -34,10 +34,26 @@ class AsyncBatchProcessor(Generic[T]):
         self.queue: Queue[T] = Queue()
         self.lock = Lock()
         self.stop_event = Event()  # Use an event to signal stopping
-        self.processing_thread = Thread(target=self._process_batches)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
+        self.processing_thread = self._create_processing_thread()
         atexit.register(self.wait_until_all_processed)  # Register cleanup function
+
+    def _create_processing_thread(self) -> Thread:
+        """Creates and starts a new processing thread.
+
+        Returns:
+            Thread: The newly created and started processing thread.
+        """
+        thread = Thread(target=self._process_batches)
+        thread.daemon = True
+        thread.start()
+        return thread
+
+    def _ensure_processing_thread_alive(self) -> None:
+        """Ensures that the processing thread is alive, restarting it if necessary."""
+        with self.lock:
+            if not self.processing_thread.is_alive() and not self.stop_event.is_set():
+                logger.warning("Processing thread died, restarting...")
+                self.processing_thread = self._create_processing_thread()
 
     def enqueue(self, items: list[T]) -> None:
         """
@@ -46,6 +62,12 @@ class AsyncBatchProcessor(Generic[T]):
         Args:
             items (list[T]): The items to be processed.
         """
+        if not items:
+            return
+
+        # Ensure the processing thread is alive before enqueueing items
+        self._ensure_processing_thread_alive()
+
         with self.lock:
             for item in items:
                 self.queue.put(item)
@@ -54,25 +76,38 @@ class AsyncBatchProcessor(Generic[T]):
         """Internal method that continuously processes batches of items from the queue."""
         while True:
             current_batch: list[T] = []
-            while not self.queue.empty() and len(current_batch) < self.max_batch_size:
-                current_batch.append(self.queue.get())
+            try:
+                while (
+                    not self.queue.empty() and len(current_batch) < self.max_batch_size
+                ):
+                    current_batch.append(self.queue.get())
 
-            if current_batch:
-                try:
-                    self.processor_fn(current_batch)
-                except Exception as e:
-                    if get_raise_on_captured_errors():
-                        raise
-                    logger.exception(f"Error processing batch: {e}")
+                if current_batch:
+                    try:
+                        self.processor_fn(current_batch)
+                    except Exception as e:
+                        if get_raise_on_captured_errors():
+                            raise
+                        logger.exception(f"Error processing batch: {e}")
 
-            if self.stop_event.is_set() and self.queue.empty():
+                if self.stop_event.is_set() and self.queue.empty():
+                    break
+
+                # Unless we are stopping, sleep for a the min_batch_interval
+                if not self.stop_event.is_set():
+                    time.sleep(self.min_batch_interval)
+            except Exception as e:
+                # Log any unexpected exceptions in the thread loop itself
+                # This won't catch SystemExit, KeyboardInterrupt, etc. which will kill the thread
+                logger.exception(f"Unexpected error in processing thread: {e}")
+                # Exit the thread loop on unexpected errors
                 break
-
-            # Unless we are stopping, sleep for a the min_batch_interval
-            if not self.stop_event.is_set():
-                time.sleep(self.min_batch_interval)
 
     def wait_until_all_processed(self) -> None:
         """Waits until all enqueued items have been processed."""
         self.stop_event.set()
+
+        # Ensure the processing thread is alive before trying to join it
+        self._ensure_processing_thread_alive()
+
         self.processing_thread.join()
