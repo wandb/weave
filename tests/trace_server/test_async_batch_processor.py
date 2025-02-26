@@ -49,6 +49,10 @@ def test_multiple_enqueues():
     processor.enqueue([1, 2])
     processor.enqueue([3, 4])
     processor.enqueue([5])
+
+    # Sleep briefly to ensure items are all enqueued before processing
+    time.sleep(0.1)
+
     processor.wait_until_all_processed()
 
     processor_fn.assert_called_once()
