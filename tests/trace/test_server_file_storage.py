@@ -125,15 +125,22 @@ class TestGCSStorage:
         # Setup mock chain
         mock_storage_client.bucket.return_value = mock_bucket
         mock_bucket.blob.return_value = mock_blob
-        mock_blob.download_as_bytes.return_value = TEST_CONTENT
 
-        # Store uploaded data for verification
-        uploaded_data = {}
+        # In-memory storage for all blobs
+        blob_data = {}
 
-        def mock_upload(data, timeout=None):
-            uploaded_data["content"] = data
+        def mock_upload_from_string(data, timeout=None):
+            # Get the blob name from the mock's name attribute
+            blob_name = mock_blob.name
+            blob_data[blob_name] = data
 
-        mock_blob.upload_from_string.side_effect = mock_upload
+        def mock_download_as_bytes():
+            # Get the blob name from the mock's name attribute
+            blob_name = mock_blob.name
+            return blob_data.get(blob_name, b"")
+
+        mock_blob.upload_from_string.side_effect = mock_upload_from_string
+        mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
 
         with mock.patch(
             "google.cloud.storage.Client", return_value=mock_storage_client
