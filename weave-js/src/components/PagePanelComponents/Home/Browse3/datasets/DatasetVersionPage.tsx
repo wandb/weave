@@ -1,9 +1,8 @@
 import {Box, Tooltip} from '@mui/material';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {useCallback, useMemo, useState} from 'react';
-import {Link, useHistory} from 'react-router-dom';
-import {toast} from 'react-toastify';
+import React, {useCallback, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
@@ -25,14 +24,8 @@ import {objectVersionKeyToRefUri} from '../pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {useDatasetEditContext} from './DatasetEditorContext';
+import {updateExistingDataset} from './datasetOperations';
 import {EditableDatasetView} from './EditableDatasetView';
-
-const PUBLISHED_LINK_STYLES = {
-  color: 'rgb(94, 234, 212)',
-  textDecoration: 'none',
-  fontFamily: 'Inconsolata',
-  fontWeight: 600,
-} as const;
 
 const TOOLTIP_PROPS = {
   slotProps: {
@@ -80,22 +73,6 @@ export const DatasetVersionPage: React.FC<{
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
   const data = useRefsData([refUri]);
-  const viewerData = useMemo(() => {
-    if (data.loading) {
-      return {};
-    }
-    return data.result?.[0] ?? {};
-  }, [data.loading, data.result]);
-
-  const viewerDataAsObject = useMemo(() => {
-    const dataIsPrimitive =
-      typeof viewerData !== 'object' ||
-      viewerData === null ||
-      Array.isArray(viewerData);
-    return dataIsPrimitive ? {_result: viewerData} : viewerData;
-  }, [viewerData]);
-
-  const originalTableDigest = viewerDataAsObject?.rows?.split('/').pop() ?? '';
 
   const handleEditClick = useCallback(() => setIsEditing(true), []);
   const handleCancelClick = useCallback(() => {
@@ -111,51 +88,29 @@ export const DatasetVersionPage: React.FC<{
   const handlePublish = useCallback(async () => {
     setIsEditing(false);
 
-    const tableUpdateSpecs = convertEditsToTableUpdateSpec();
-    const tableUpdateResp = await tableUpdate(
+    const {url} = await updateExistingDataset({
       projectId,
-      originalTableDigest,
-      tableUpdateSpecs
-    );
-    const tableRef = `weave:///${projectId}/table/${tableUpdateResp.digest}`;
-
-    const newObjVersion = await objCreate(projectId, objectName, {
-      ...objectVersion.val,
-      rows: tableRef,
+      entity: entityName,
+      project: projectName,
+      selectedDataset: objectVersion,
+      datasetObject: objectVersion.val,
+      updateSpecs: convertEditsToTableUpdateSpec(),
+      tableUpdate,
+      objCreate,
+      router,
     });
 
-    const url = router.objectVersionUIUrl(
-      entityName,
-      projectName,
-      objectName,
-      newObjVersion,
-      undefined,
-      undefined
-    );
-
-    toast(
-      <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-        <Icon name="checkmark" width={20} height={20} />
-        Published{' '}
-        <Link to={url} style={PUBLISHED_LINK_STYLES}>
-          {objectName}:v{objectVersionCount}
-        </Link>
-      </div>
-    );
     history.push(url);
     resetEditState();
   }, [
+    objectVersion,
     resetEditState,
-    objectVersionCount,
     history,
     router,
-    objectName,
-    objectVersion.val,
     convertEditsToTableUpdateSpec,
     projectId,
     objCreate,
     tableUpdate,
-    originalTableDigest,
     entityName,
     projectName,
   ]);
