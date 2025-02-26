@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from weave.trace import serializer
-from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
 
 try:
