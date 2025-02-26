@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from weave.integrations.dspy.dspy_callback import WeaveCallback
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 
 _dspy_patcher: MultiPatcher | None = None
+
+
+class DSPyPatcher(MultiPatcher):
+    def __init__(self, patchers: Sequence[Patcher]) -> None:
+        super().__init__(patchers)
+        import dspy
+
+        dspy.configure(callbacks=[WeaveCallback()])
 
 
 def get_dspy_patcher(
@@ -22,7 +33,7 @@ def get_dspy_patcher(
 
     base = settings.op_settings
 
-    _dspy_patcher = MultiPatcher(
+    _dspy_patcher = DSPyPatcher(
         [
             get_symbol_patcher("dspy", "Embedder.__call__", base),
             get_symbol_patcher("dspy", "ColBERTv2.__call__", base),
