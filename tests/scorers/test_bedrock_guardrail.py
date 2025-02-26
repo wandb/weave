@@ -1,11 +1,8 @@
-import json
 from unittest.mock import patch, MagicMock
 
-import boto3
 import pytest
 from moto import mock_aws
 
-import weave
 from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
 
 
