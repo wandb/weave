@@ -6,7 +6,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 
 
 def test_enqueue_and_process():
