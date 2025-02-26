@@ -739,6 +739,10 @@ Calculated Fields:
     * Duration
     * Status
 
+## Save a trace table configuration as a View 
+
+You can save your custom column configurations, filters, and sorts as Views for quick access to your preferred data setup
+
 ## FAQs
 
 ### How do I disable tracing?
