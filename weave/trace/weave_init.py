@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
+from weave.trace import autopatch, init_message, trace_sentry, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.errors import Error
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server import sqlite_trace_server
 from weave.trace_server.trace_server_interface import TraceServerInterface
@@ -33,6 +34,9 @@ def get_username() -> str | None:
         return None
 
 
+class WeaveWandbAuthenticationException(Error): ...
+
+
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     from weave.wandb_interface import wandb_api
 
@@ -41,7 +45,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         api = wandb_api.get_wandb_api_sync()
         entity_name = api.default_entity_name()
         if entity_name is None:
-            raise errors.WeaveWandbAuthenticationException(
+            raise WeaveWandbAuthenticationException(
                 'weave init requires wandb. Run "wandb login"'
             )
         project_name = fields[0]
