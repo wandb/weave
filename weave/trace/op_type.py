@@ -13,7 +13,7 @@ import types as py_types
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, TypedDict, get_args, get_origin
 
-from weave.trace import serializer, settings
+from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ipython import (
     ClassNotFoundError,
@@ -24,6 +24,7 @@ from weave.trace.mem_artifact import MemTraceFilesArtifact
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization import serializer
 from weave.trace_server.trace_server_interface_util import str_digest
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")

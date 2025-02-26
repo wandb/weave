@@ -1,6 +1,6 @@
 import wave
 
-from weave.trace import serializer
+from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 AUDIO_FILE_NAME = "audio.wav"
