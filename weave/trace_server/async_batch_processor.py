@@ -142,19 +142,17 @@ class AsyncBatchProcessor(Generic[T]):
                 if self.process_timeout > 0:
                     # Use a separate thread with timeout for processing to avoid blocking
                     processing_completed = Event()
-                    processing_error = [
-                        None
-                    ]  # Use a list to store exception by reference
+                    processing_error = [None]
 
                     def process_with_timeout():
                         try:
                             self.processor_fn(current_batch)
-                            processing_completed.set()
                         except (SystemExit, KeyboardInterrupt) as e:
-                            # Don't catch fatal exceptions that should kill the thread
                             raise
                         except Exception as e:
                             processing_error[0] = e
+                            processing_completed.set()
+                        else:
                             processing_completed.set()
 
                     processing_thread = Thread(target=process_with_timeout)
