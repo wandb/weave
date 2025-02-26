@@ -709,7 +709,7 @@ ALLOWED_CALL_FIELDS = {
 }
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
-END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "attributes_dump"}
+END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
@@ -994,7 +994,7 @@ def make_call_parts_predicate_filters_sql(
         # Build NULL allowances for start-only fields
         if start_only_fields:
             null_conditions = [
-                f"{table_alias}.{field} IS NULL" for field in start_only_fields
+                f"{table_alias}.{field} IS NULL" for field in set(start_only_fields)
             ]
             if null_conditions:
                 condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
@@ -1002,7 +1002,7 @@ def make_call_parts_predicate_filters_sql(
         # Build NULL allowances for end-only fields
         if end_only_fields:
             null_conditions = [
-                f"{table_alias}.{field} IS NULL" for field in end_only_fields
+                f"{table_alias}.{field} IS NULL" for field in set(end_only_fields)
             ]
             if null_conditions:
                 condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
@@ -1145,7 +1145,7 @@ def _create_like_optimized_in_condition(
         field_name = f"{table_alias}.{field}"
         like_conditions.append(f"{field_name} LIKE {_param_slot(param_name, 'String')}")
 
-    return " OR ".join(like_conditions)
+    return "(" + " OR ".join(like_conditions) + ")"
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
