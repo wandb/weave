@@ -1,5 +1,6 @@
 from typing import Any, Optional
 
+import weave
 from weave.integrations.dspy.dspy_utils import (
     dspy_postprocess_inputs,
     get_op_name_for_callback,
@@ -15,7 +16,6 @@ try:
     from dspy.utils.callback import BaseCallback
 except Exception:
     import_failed = True
-
 
 if not import_failed:
 
@@ -84,8 +84,13 @@ if not import_failed:
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
             gc = weave_client_context.require_weave_client()
+
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
+
+            # TODO: Should we do this? Have to ask Ayush tomorrow.
+            if hasattr(instance, "func"):
+                instance.func = weave.op(instance.func)
 
             op_name = get_op_name_for_callback(instance, inputs)
             self._call_map[call_id] = gc.create_call(
