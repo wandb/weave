@@ -70,7 +70,14 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
 
         if isinstance(inputs["self"], Evaluate):
-            dictified_inputs_self["devset"] = inputs["self"].devset
+            if hasattr(inputs["self"], "devset"):
+                dictified_inputs_self["devset"] = [
+                    serialize_dspy_objects(example) for example in inputs["self"].devset
+                ]
+
+            # TODO: This is a hack to make the metric a weave op. Should we do this? Need to ask Ayush tomorrow.
+            if hasattr(inputs["self"], "metric"):
+                inputs["self"].metric = weave.op(inputs["self"].metric)
 
         inputs["self"] = dictified_inputs_self
 
