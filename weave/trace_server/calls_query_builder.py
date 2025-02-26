@@ -76,16 +76,16 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
-    use_agg_fn: bool = True
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
-        if not self.use_agg_fn:
+        if not use_agg_fn:
             return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
@@ -98,8 +98,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
-        res = super().as_sql(pb, table_alias)
+        res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
@@ -620,15 +621,9 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        if should_add_predicate_filters(self.query_conditions):
-            heavy_conditions = [
-                cond
-                for cond in self.query_conditions
-                if cond.is_heavy() and not cond.is_feedback()
-            ]
-            call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
-                pb, table_alias, heavy_conditions
-            )
+        call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
+            pb, table_alias, self.query_conditions
+        )
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -813,10 +808,10 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            if not use_agg_fn and isinstance(structured_field, CallsMergedAggField):
-                structured_field.use_agg_fn = False
-                field = structured_field.as_sql(param_builder, table_alias)
-                structured_field.use_agg_fn = True  # reset to default
+            if isinstance(structured_field, CallsMergedDynamicField):
+                field = structured_field.as_sql(
+                    param_builder, table_alias, use_agg_fn=use_agg_fn
+                )
             else:
                 field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
@@ -930,121 +925,90 @@ def process_calls_filter_to_conditions(
     return conditions
 
 
-def should_add_predicate_filters(conditions: list[Condition]) -> bool:
-    """Determines if predicate filters should be added to the query.
-
-    We want to return false if we operate on a start call part and an end
-    call part AND there is an OR operand.
-
-    Most calls in the table are merged, we don't care about them. Some
-    calls are still in parts: start, end. Specific fields:
-
-    Start:
-    - started_at
-    - inputs_dump
-    - attributes_dump
-
-    End:
-    - ended_at
-    - output_dump
-    - attributes_dump
-    """
-    # If there are no conditions, we can safely add predicate filters
-    if not conditions:
-        return True
-
-    # Check if we have any OR operations between start and end fields
-    for condition in conditions:
-        if not hasattr(condition, "operand"):
-            continue
-        if not isinstance(condition.operand, tsi_query.OrOperation):
-            continue
-
-        # Get all fields used in this OR operation
-        fields_used: set[str] = set()
-        for op in condition.operand.or_:
-            # Create a temporary condition to extract fields
-            temp_condition = Condition(operand=op)
-            fields_used.update(
-                field.field for field in temp_condition._get_consumed_fields()
-            )
-
-        # Check if we have both start and end fields in this OR operation
-        has_start_field = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
-        has_end_field = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
-
-        # If we have both start and end fields in an OR operation,
-        # then we can't add predicate filters
-        if has_start_field and has_end_field:
-            return False
-
-    return True
-
-
 def make_call_parts_predicate_filters_sql(
-    pb: ParamBuilder, table_alias: str, heavy_conditions: list[Condition]
+    pb: ParamBuilder, table_alias: str, conditions: list[Condition]
 ) -> str:
     """Makes the SQL for the predicate filters for the call parts.
 
     This function creates SQL conditions that can be applied before the GROUP BY
-    to filter out rows that definitely won't match the heavy conditions.
+    to filter out rows that definitely won't match the heavy conditions. These
+    conditions MUST be identical or less restrictive than the conditions in the
+    `conditions` list which will appear in HAVING after group by.
 
     For fields that may only exist in start or end parts, we add special handling
     to avoid filtering out rows where the field is NULL (as they might be part of
     a valid call when combined with other parts).
+
+    Returns an empty string if:
+    1. There are no heavy conditions
+    2. There are OR operations between start-only and end-only fields
+        TODO: support OR conditions between start and end fields
+
+    Performance note: This optimization is critical for queries with heavy fields,
+    as it can significantly reduce peak memory by filtering before aggregation.
     """
+    heavy_conditions = [
+        cond for cond in conditions if cond.is_heavy() and not cond.is_feedback()
+    ]
     if not heavy_conditions:
         return ""
 
-    # Process each heavy condition to create predicate filters
     predicate_conditions = []
     for condition in heavy_conditions:
-        # Check if this condition can use the LIKE optimization
+        # Get the fields used in this condition once
+        consumed_fields = condition._get_consumed_fields()
+        field_names = [field.field for field in consumed_fields]
+
+        # Categorize fields by type
+        start_only_fields = [f for f in field_names if f in START_ONLY_CALL_FIELDS]
+        end_only_fields = [f for f in field_names if f in END_ONLY_CALL_FIELDS]
+
+        # Early return for OR operations that mix start and end fields
+        if (
+            start_only_fields
+            and end_only_fields
+            and hasattr(condition, "operand")
+            and isinstance(condition.operand, tsi_query.OrOperation)
+        ):
+            # TODO: support OR conditions between start and end fields
+            return ""
+
+        # Check if this condition can use the LIKE optimization, only applies to string fields
+        # on dynamic json columns
         like_optimized_condition = try_create_like_optimized_condition(
             condition, pb, table_alias
         )
         if like_optimized_condition:
-            predicate_conditions.append(like_optimized_condition)
-            continue
+            condition_sql = like_optimized_condition
+        else:
+            # Process the condition to create a predicate filter, using non-aggregate fields
+            condition_sql = process_query_to_conditions(
+                tsi_query.Query.model_validate(
+                    {"$expr": {"$and": [condition.operand]}}
+                ),
+                pb,
+                table_alias,
+                use_agg_fn=False,
+            ).conditions[0]
 
-        # Create a new condition string using non-aggregated fields
-        condition_sql = process_query_to_conditions(
-            tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
-            pb,
-            table_alias,
-            use_agg_fn=False,  # Important: don't use aggregation functions
-        ).conditions[0]
+        # Build NULL allowances for start-only fields
+        if start_only_fields:
+            null_conditions = [
+                f"{table_alias}.{field} IS NULL" for field in start_only_fields
+            ]
+            if null_conditions:
+                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
 
-        # Get the fields used in this condition
-        fields_used = [field.field for field in condition._get_consumed_fields()]
-
-        # Check if any of the fields are start-only or end-only
-        has_start_only = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
-        has_end_only = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
-
-        # If the condition uses start-only fields, we need to allow NULL for those fields
-        if has_start_only:
-            start_nulls = []
-            for field in fields_used:
-                if field in START_ONLY_CALL_FIELDS:
-                    start_nulls.append(f"{table_alias}.{field} IS NULL")
-
-            if start_nulls:
-                condition_sql = f"({condition_sql} OR {' OR '.join(start_nulls)})"
-
-        # If the condition uses end-only fields, we need to allow NULL for those fields
-        if has_end_only:
-            end_nulls = []
-            for field in fields_used:
-                if field in END_ONLY_CALL_FIELDS:
-                    end_nulls.append(f"{table_alias}.{field} IS NULL")
-
-            if end_nulls:
-                condition_sql = f"({condition_sql} OR {' OR '.join(end_nulls)})"
+        # Build NULL allowances for end-only fields
+        if end_only_fields:
+            null_conditions = [
+                f"{table_alias}.{field} IS NULL" for field in end_only_fields
+            ]
+            if null_conditions:
+                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
 
         predicate_conditions.append(condition_sql)
 
-    # Combine all predicate conditions with AND
     if predicate_conditions:
         return "AND " + combine_conditions(predicate_conditions, "AND")
 
@@ -1086,19 +1050,12 @@ def _create_like_condition(
     """Creates a LIKE condition for a JSON field with NULL handling for start/end-only fields."""
     field_name = f"{table_alias}.{field}"
 
-    # Handle case sensitivity
     if case_insensitive:
-        # Lower the pattern in memory before adding it as a parameter
         param_name = pb.add_param(like_pattern.lower())
-        # Only apply lower() to the field in the SQL query
         like_condition = f"lower({field_name}) LIKE {_param_slot(param_name, 'String')}"
     else:
         param_name = pb.add_param(like_pattern)
         like_condition = f"{field_name} LIKE {_param_slot(param_name, 'String')}"
-
-    # Add NULL handling for start/end-only fields
-    if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
-        return f"({like_condition} OR {field_name} IS NULL)"
 
     return like_condition
 
@@ -1168,6 +1125,8 @@ def _create_like_optimized_in_condition(
     # Check if the right side is a list of values
     if len(operation.in_) != 2 or not isinstance(operation.in_[1], list):
         return None
+    if len(operation.in_[1]) == 0:
+        return None
 
     field = get_field_by_name(operation.in_[0].get_field_).field
 
@@ -1186,15 +1145,7 @@ def _create_like_optimized_in_condition(
         field_name = f"{table_alias}.{field}"
         like_conditions.append(f"{field_name} LIKE {_param_slot(param_name, 'String')}")
 
-    # Combine all LIKE conditions with OR
-    combined_condition = " OR ".join(like_conditions)
-
-    # Add NULL handling for start/end-only fields
-    if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
-        field_name = f"{table_alias}.{field}"
-        return f"(({combined_condition}) OR {field_name} IS NULL)"
-
-    return f"({combined_condition})"
+    return " OR ".join(like_conditions)
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
