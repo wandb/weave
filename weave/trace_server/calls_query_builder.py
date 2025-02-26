@@ -1067,8 +1067,7 @@ def _create_like_optimized_eq_condition(
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
         return None
-
-    # Check if the right side is a literal string
+    # Return if right-side isn't a string literal
     if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
         operation.eq_[1].literal_, str
     ):
@@ -1091,8 +1090,7 @@ def _create_like_optimized_contains_condition(
     # Check if the input is a GetField operation on a JSON field
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
         return None
-
-    # Check if the substring is a literal string
+    # Return if substr isn't a string literal
     if not isinstance(
         operation.contains_.substr, tsi_query.LiteralOperation
     ) or not isinstance(operation.contains_.substr.literal_, str):
@@ -1118,11 +1116,12 @@ def _create_like_optimized_in_condition(
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
         return None
-
-    # Check if the right side is a list of values
-    if len(operation.in_) != 2 or not isinstance(operation.in_[1], list):
-        return None
-    if len(operation.in_[1]) == 0:
+    # Return if right-side isn't non-empty list
+    if (
+        len(operation.in_) != 2
+        or not isinstance(operation.in_[1], list)
+        or len(operation.in_[1]) == 0
+    ):
         return None
 
     field = get_field_by_name(operation.in_[0].get_field_).field
@@ -1136,11 +1135,9 @@ def _create_like_optimized_in_condition(
         ):
             return None
 
-        value = value_operand.literal_
-        like_pattern = f'%"{value}"%'
-        param_name = pb.add_param(like_pattern)
-        field_name = f"{table_alias}.{field}"
-        like_conditions.append(f"{field_name} LIKE {_param_slot(param_name, 'String')}")
+        like_pattern = f'%"{value_operand.literal_}"%'
+        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+        like_conditions.append(like_condition)
 
     return "(" + " OR ".join(like_conditions) + ")"
 
