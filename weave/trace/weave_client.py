@@ -2199,9 +2199,19 @@ def elide_display_name(name: str) -> str:
 class ObjectVersionCollection:
     """A collection of object versions for a single object.
 
-    This class provides access to all versions of a specific object.
+    This class provides lazy access to all versions of a specific object.  You can index
+    into the collection to get the object at a specific version index, and the result
+    will be cached.
+
     By default, versions are sorted by version_index in ascending order
     (oldest to newest), unless explicitly sorted differently when created.
+
+    Example:
+        ```python
+        versions = client.get_versions("my_object")
+        version_1 = versions[0]
+        version_25 = versions[24]
+        ```
     """
 
     def __init__(self, object_id: str, versions: list[ObjSchema], client: WeaveClient):
