@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Iterable, Iterator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from threading import Lock
 from typing import Any, TypeVar, overload
 
 T = TypeVar("T")
 
 
-class ThreadSafeInMemoryIteratorAsSequence(Sequence[T], Iterable[T]):
+class ThreadSafeInMemorySequence(Sequence[T]):
     """
-    Provides a thread-safe, sequence-like interface to an iterator by caching results in memory.
+    Provides a thread-safe, iterable sequence by caching results in memory.
 
     This class is thread-safe and supports multiple iterations over the same data and
     concurrent access.

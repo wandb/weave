@@ -15,13 +15,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-def short_str(obj: Any, limit: int = 25) -> str:
-    str_val = str(obj)
-    if len(str_val) > limit:
-        return str_val[:limit] + "..."
-    return str_val
-
-
 @register_object
 class Dataset(Object):
     """
@@ -94,7 +87,7 @@ class Dataset(Object):
                     "Attempted to construct a Dataset with a non-dict object. Found type: "
                     + str(type(row))
                     + " of row: "
-                    + short_str(row)
+                    + _short_str(row)
                 )
             if len(row) == 0:
                 raise ValueError(
@@ -112,3 +105,10 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
+
+
+def _short_str(obj: Any, limit: int = 25) -> str:
+    str_val = str(obj)
+    if len(str_val) > limit:
+        return str_val[:limit] + "..."
+    return str_val

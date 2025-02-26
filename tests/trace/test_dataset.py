@@ -36,6 +36,11 @@ def test_pythonic_access(client):
         ds[-1]
 
 
+def _top_level_logs(log):
+    """Strip out internal logs from the log list"""
+    return [l for l in log if not l.startswith("_")]
+
+
 def test_dataset_laziness(client):
     """
     The intention of this test is to show that local construction of
@@ -43,24 +48,22 @@ def test_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
+    assert _top_level_logs(log) == ["ensure_project_exists"]
     client.server.attribute_access_log = []
 
     length = len(dataset)
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == []
+    assert _top_level_logs(log) == []
 
     length2 = len(dataset)
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == []
+    assert _top_level_logs(log) == []
 
     assert length == length2
 
-    i = 0
     for row in dataset:
         log = client.server.attribute_access_log
-        assert [l for l in log if not l.startswith("_")] == []
-        i += 1
+        assert _top_level_logs(log) == []
 
 
 def test_published_dataset_laziness(client):
@@ -72,32 +75,31 @@ def test_published_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == ["ensure_project_exists"]
+    assert _top_level_logs(log) == ["ensure_project_exists"]
     client.server.attribute_access_log = []
 
     ref = weave.publish(dataset)
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == ["table_create", "obj_create"]
+    assert _top_level_logs(log) == ["table_create", "obj_create"]
     client.server.attribute_access_log = []
 
     dataset = ref.get()
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == ["obj_read"]
+    assert _top_level_logs(log) == ["obj_read"]
     client.server.attribute_access_log = []
 
     length = len(dataset)
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == ["table_query_stats"]
+    assert _top_level_logs(log) == ["table_query_stats"]
     client.server.attribute_access_log = []
 
     length2 = len(dataset)
     log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == []
+    assert _top_level_logs(log) == []
 
     assert length == length2
 
-    i = 0
-    for row in dataset:
+    for i, row in enumerate(dataset):
         log = client.server.attribute_access_log
         # This is the critical part of the test - ensuring that
         # the rows are only fetched when they are actually needed.
@@ -106,10 +108,7 @@ def test_published_dataset_laziness(client):
         # page of results, which would result in this assertion changing
         # in that there would always be one more "table_query" than
         # the number of pages.
-        assert [l for l in log if not l.startswith("_")] == ["table_query"] * (
-            (i // 100) + 1
-        )
-        i += 1
+        assert _top_level_logs(log) == ["table_query"] * ((i // 100) + 1)
 
 
 def test_dataset_from_calls(client):

@@ -36,7 +36,7 @@ from weave.trace_server.trace_server_interface import (
     TableRowFilter,
     TraceServerInterface,
 )
-from weave.utils.iterators import ThreadSafeInMemoryIteratorAsSequence
+from weave.utils.iterators import ThreadSafeInMemorySequence
 
 logger = logging.getLogger(__name__)
 
@@ -297,11 +297,11 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = ThreadSafeInMemoryIteratorAsSequence(
+                self._rows = ThreadSafeInMemorySequence(
                     self._local_iter_with_remote_fallback()
                 )
             else:
-                self._rows = ThreadSafeInMemoryIteratorAsSequence(self._remote_iter())
+                self._rows = ThreadSafeInMemorySequence(self._remote_iter())
         return self._rows
 
     @rows.setter
@@ -322,6 +322,7 @@ class WeaveTable(Traceable):
         # a local list.
         if not isinstance(self.rows, list):
             self._rows = list(iter(self.rows))
+            self._known_length = len(self._rows)
         return typing.cast(list[dict], self.rows)
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
@@ -339,7 +340,7 @@ class WeaveTable(Traceable):
         self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
-        # This should e a single query
+        # This should be a single query
         if self._known_length is not None:
             return self._known_length
 
@@ -357,7 +358,7 @@ class WeaveTable(Traceable):
             self._known_length = len(self.table_ref._row_digests)
             return self._known_length
 
-        # Condition 2: We don't know the length, in which case we can get it from the server
+        # Condition 3: We don't know the length, in which case we can get it from the server
         if self.table_ref is not None:
             self._known_length = self._fetch_remote_length()
             return self._known_length
