@@ -120,9 +120,6 @@ test = [
   "httpx",
 ]
 
-[project.scripts]
-weave = "weave.trace.cli:cli"
-
 [project.urls]
 Company = "https://wandb.com"
 Documentation = "https://docs.wandb.com/"
