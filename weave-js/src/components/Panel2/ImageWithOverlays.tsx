@@ -45,6 +45,7 @@ interface CardImageProps {
     path: string;
     width: number;
     height: number;
+    caption?: string;
   };
   imageFileNode: Node;
   masks?: Array<{loadedFrom: Node; path: string}>;
@@ -84,19 +85,33 @@ export const CardImage: FC<CardImageProps> = ({
       data-test="card-image"
       style={{
         height: '100%',
-        width: '100%',
-        position: 'relative',
+        overflow: 'scroll',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
       }}>
       {signedUrl == null ? (
         <div />
       ) : (
         <>
           {!hideImage && (
-            <img
-              style={{...imageStyle, objectFit: 'contain'}}
-              alt={image.path}
-              src={signedUrl}
-            />
+            <>
+              <img
+                style={{height: '100%', objectFit: 'contain'}}
+                alt={image.path}
+                src={signedUrl}
+              />
+              {image.caption && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: 'gray',
+                  }}>
+                  {image.caption}
+                </div>
+              )}
+            </>
           )}
           {masks != null &&
             maskControls?.map((maskControl, i) => {
