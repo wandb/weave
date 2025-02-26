@@ -65,6 +65,7 @@ def fake_api_key() -> Generator[None, None, None]:
         "localhost",
         "trace.wandb.ai",
         "raw.githubusercontent.com",
+        "openaipublic.blob.core.windows.net",
     ],
     before_record_request=filter_body,
 )
@@ -95,6 +96,7 @@ def test_llamaindex_quickstart(
         "localhost",
         "trace.wandb.ai",
         "raw.githubusercontent.com",
+        "openaipublic.blob.core.windows.net",
     ],
     before_record_request=filter_body,
 )
