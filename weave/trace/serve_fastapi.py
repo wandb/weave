@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from weave_query import cache, op_args, pyfunc_type_util, weave_pydantic  # type: ignore
 
-from weave.trace import errors
+from weave.trace.errors import Error
 from weave.trace.op import Op, is_op
 from weave.trace.refs import ObjectRef
 from weave.wandb_interface.wandb_api import WandbApiAsync
@@ -67,6 +67,9 @@ def api_key(
         return None
 
 
+class WeaveDefinitionError(Error): ...
+
+
 def object_method_app(
     obj_ref: ObjectRef,
     method_name: typing.Optional[str] = None,
@@ -97,7 +100,7 @@ def object_method_app(
 
     try:
         args = pyfunc_type_util.determine_input_type(unbound_method)
-    except errors.WeaveDefinitionError as e:
+    except WeaveDefinitionError as e:
         raise ValueError(
             f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
         )
