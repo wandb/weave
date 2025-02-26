@@ -1723,7 +1723,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
         if batch:
             settings = {}
