@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from weave.integrations.dspy.dspy_callback import WeaveCallback
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
@@ -15,6 +14,8 @@ class DSPyPatcher(MultiPatcher):
         super().__init__(patchers)
         try:
             import dspy
+
+            from weave.integrations.dspy.dspy_callback import WeaveCallback
 
             dspy.configure(callbacks=[WeaveCallback()])
         except ImportError:
