@@ -3,8 +3,7 @@ import logging
 import traceback
 from collections.abc import Iterable
 from datetime import datetime
-from itertools import repeat
-from itertools.chain import from_iterable
+from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, TypeVar, Union
 
 from pydantic import PrivateAttr
@@ -216,7 +215,7 @@ class Evaluation(Object):
         _rows = dataset.rows
         num_rows = len(_rows) * self.trials
 
-        trial_rows = from_iterable(repeat(_rows, self.trials))
+        trial_rows = chain.from_iterable(repeat(_rows, self.trials))
         async for example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
