@@ -60,6 +60,8 @@ def get_dspy_patcher(
             get_symbol_patcher("dspy.retrievers", "Embeddings.forward", base),
             get_symbol_patcher("dspy", "PythonInterpreter.__call__", base),
             get_symbol_patcher("dspy", "PythonInterpreter.execute", base),
+            get_symbol_patcher("dspy", "ChatAdapter.__call__", base),
+            get_symbol_patcher("dspy", "JSONAdapter.__call__", base),
         ]
     )
 
