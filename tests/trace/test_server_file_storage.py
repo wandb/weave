@@ -134,7 +134,7 @@ class TestGCSStorage:
             blob_name = mock_blob.name
             blob_data[blob_name] = data
 
-        def mock_download_as_bytes():
+        def mock_download_as_bytes(timeout=None):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             return blob_data.get(blob_name, b"")
