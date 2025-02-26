@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import importlib
-
-from weave.integrations.dspy.dspy_utils import dspy_wrapper
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.integrations.dspy.dspy_utils import get_symbol_patcher
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher
 from weave.trace.autopatch import IntegrationSettings
 
 _dspy_patcher: MultiPatcher | None = None
@@ -26,213 +24,31 @@ def get_dspy_patcher(
 
     _dspy_patcher = MultiPatcher(
         [
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "Embedder.__call__",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.Embedder"})
-                ),
+            get_symbol_patcher("dspy", "Embedder.__call__", base),
+            get_symbol_patcher("dspy", "ColBERTv2.__call__", base),
+            get_symbol_patcher("dspy", "BootstrapFinetune.compile", base),
+            get_symbol_patcher("dspy", "MIPROv2.compile", base),
+            get_symbol_patcher("dspy", "LabeledFewShot.compile", base),
+            get_symbol_patcher("dspy", "KNNFewShot.compile", base),
+            get_symbol_patcher("dspy", "KNN.__call__", base),
+            get_symbol_patcher("dspy", "Ensemble.compile", base),
+            get_symbol_patcher("dspy", "COPRO.compile", base),
+            get_symbol_patcher(
+                "dspy", "BootstrapFewShotWithRandomSearch.compile", base
             ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "ColBERTv2.__call__",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.ColBERTv2"})
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "BootstrapFinetune.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.BootstrapFinetune.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "MIPROv2.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.MIPROv2.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "LabeledFewShot.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.LabeledFewShot.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "KNNFewShot.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.KNNFewShot.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "KNN.__call__",
-                dspy_wrapper(base.model_copy(update={"name": base.name or "dspy.KNN"})),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "Ensemble.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.Ensemble.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "COPRO.compile",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.COPRO.compile"})
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "BootstrapFewShotWithRandomSearch.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={
-                            "name": base.name
-                            or "dspy.BootstrapFewShotWithRandomSearch.compile"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "BootstrapFewShot.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.BootstrapFewShot.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "BetterTogether.compile",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.BetterTogether.compile"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "answer_passage_match",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={
-                            "name": base.name or "dspy.evaluate.answer_passage_match"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "answer_exact_match",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.evaluate.answer_exact_match"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "SemanticF1.__call__",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.evaluate.SemanticF1"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "SemanticF1.forward",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.evaluate.SemanticF1.forward"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "CompleteAndGrounded.__call__",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={
-                            "name": base.name or "dspy.evaluate.CompleteAndGrounded"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.evaluate"),
-                "CompleteAndGrounded.forward",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={
-                            "name": base.name
-                            or "dspy.evaluate.CompleteAndGrounded.forward"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "Evaluate.__call__",
-                dspy_wrapper(
-                    base.model_copy(update={"name": base.name or "dspy.Evaluate"})
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.retrievers"),
-                "Embeddings.__call__",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.retrievers.Embeddings"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy.retrievers"),
-                "Embeddings.forward",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={
-                            "name": base.name or "dspy.retrievers.Embeddings.forward"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "PythonInterpreter.__call__",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.PythonInterpreter"}
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("dspy"),
-                "PythonInterpreter.execute",
-                dspy_wrapper(
-                    base.model_copy(
-                        update={"name": base.name or "dspy.PythonInterpreter.execute"}
-                    )
-                ),
-            ),
+            get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),
+            get_symbol_patcher("dspy", "BetterTogether.compile", base),
+            get_symbol_patcher("dspy.evaluate", "answer_passage_match", base),
+            get_symbol_patcher("dspy.evaluate", "answer_exact_match", base),
+            get_symbol_patcher("dspy.evaluate", "SemanticF1.__call__", base),
+            get_symbol_patcher("dspy.evaluate", "SemanticF1.forward", base),
+            get_symbol_patcher("dspy.evaluate", "CompleteAndGrounded.__call__", base),
+            get_symbol_patcher("dspy.evaluate", "CompleteAndGrounded.forward", base),
+            get_symbol_patcher("dspy", "Evaluate.__call__", base),
+            get_symbol_patcher("dspy.retrievers", "Embeddings.__call__", base),
+            get_symbol_patcher("dspy.retrievers", "Embeddings.forward", base),
+            get_symbol_patcher("dspy", "PythonInterpreter.__call__", base),
+            get_symbol_patcher("dspy", "PythonInterpreter.execute", base),
         ]
     )
 

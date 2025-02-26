@@ -1,11 +1,31 @@
+import importlib
 from typing import TYPE_CHECKING, Any, Callable, Union
 
 import weave
+from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.serialize import dictify
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
+
+
+def get_symbol_patcher(
+    base_symbol: str, attribute_name: str, settings: OpSettings
+) -> SymbolPatcher:
+    display_name = base_symbol + "." + attribute_name
+    display_name = (
+        display_name.replace(".__call__", "")
+        if attribute_name.endswith(".__call__")
+        else display_name
+    )
+    return SymbolPatcher(
+        lambda: importlib.import_module(base_symbol),
+        attribute_name,
+        dspy_wrapper(
+            settings.model_copy(update={"name": settings.name or display_name})
+        ),
+    )
 
 
 def serialize_dspy_objects(data: Any) -> Any:
