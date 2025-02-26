@@ -65,9 +65,6 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
-    def is_heavy(self) -> bool:
-        return False
-
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
@@ -76,16 +73,16 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
-    use_agg_fn: bool = True
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
-        if not self.use_agg_fn:
+        if not use_agg_fn:
             return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
@@ -98,8 +95,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
-        res = super().as_sql(pb, table_alias)
+        res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
@@ -809,10 +807,10 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            if not use_agg_fn and isinstance(structured_field, CallsMergedAggField):
-                structured_field.use_agg_fn = False
-                field = structured_field.as_sql(param_builder, table_alias)
-                structured_field.use_agg_fn = True  # reset to default
+            if isinstance(structured_field, CallsMergedDynamicField):
+                field = structured_field.as_sql(
+                    param_builder, table_alias, use_agg_fn=use_agg_fn
+                )
             else:
                 field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
@@ -949,6 +947,8 @@ def should_add_predicate_filters(conditions: list[Condition]) -> bool:
         return False
 
     # Check if we have any OR operations between start and end fields
+    # For now, only support AND between start and end fields
+    # TODO: Support OR between start and end fields
     for condition in conditions:
         if not hasattr(condition, "operand"):
             continue
