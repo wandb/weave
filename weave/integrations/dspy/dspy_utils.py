@@ -51,7 +51,7 @@ def serialize_dspy_objects(data: Any) -> Any:
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    from dspy import Adapter, Predict
+    from dspy import Adapter, Evaluate, Predict
 
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
@@ -68,7 +68,12 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                     dictified_inputs_self["signature"] = inputs["self"].signature
 
         dictified_inputs_self = serialize_dspy_objects(dictified_inputs_self)
+
+        if isinstance(inputs["self"], Evaluate):
+            dictified_inputs_self["devset"] = inputs["self"].devset
+
         inputs["self"] = dictified_inputs_self
+
     return serialize_dspy_objects(inputs)
 
 
