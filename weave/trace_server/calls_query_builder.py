@@ -73,6 +73,7 @@ class CallsMergedField(QueryBuilderField):
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
+    use_agg_fn: bool = True
 
     def as_sql(
         self,
@@ -81,6 +82,8 @@ class CallsMergedAggField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if not self.use_agg_fn:
+            return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
@@ -280,6 +283,12 @@ class Condition(BaseModel):
     def is_heavy(self) -> bool:
         for field in self._get_consumed_fields():
             if field.is_heavy():
+                return True
+        return False
+
+    def is_feedback(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
 
@@ -592,15 +601,25 @@ class CallsQuery(BaseModel):
                 c.as_sql(pb, table_alias) for c in self.query_conditions
             )
             for query_condition in self.query_conditions:
-                for field in query_condition._get_consumed_fields():
-                    if isinstance(field, CallsMergedFeedbackPayloadField):
-                        needs_feedback = True
+                if query_condition.is_feedback():
+                    needs_feedback = True
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
+        call_parts_predicate_filters_sql = ""
         if len(having_conditions_sql) > 0:
             having_filter_sql = "HAVING " + combine_conditions(
                 having_conditions_sql, "AND"
+            )
+
+        if should_add_predicate_filters(self.query_conditions):
+            heavy_conditions = [
+                cond
+                for cond in self.query_conditions
+                if cond.is_heavy() and not cond.is_feedback()
+            ]
+            call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
+                pb, table_alias, heavy_conditions
             )
 
         order_by_sql = ""
@@ -654,6 +673,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {call_parts_predicate_filters_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -685,6 +705,9 @@ ALLOWED_CALL_FIELDS = {
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
 }
 
+START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
+END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "attributes_dump"}
+
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
@@ -713,6 +736,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    use_agg_fn: bool = True,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -781,7 +805,12 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            if not use_agg_fn and isinstance(structured_field, CallsMergedAggField):
+                structured_field.use_agg_fn = False
+                field = structured_field.as_sql(param_builder, table_alias)
+                structured_field.use_agg_fn = True  # reset to default
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
@@ -891,6 +920,119 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def should_add_predicate_filters(conditions: list[Condition]) -> bool:
+    """Determines if predicate filters should be added to the query.
+
+    We want to return false if we operate on a start call part and an end
+    call part AND there is an OR operand.
+
+    Most calls in the table are merged, we don't care about them. Some
+    calls are still in parts: start, end. Specific fields:
+
+    Start:
+    - started_at
+    - inputs_dump
+    - attributes_dump
+
+    End:
+    - ended_at
+    - output_dump
+    - attributes_dump
+    """
+    # If there are no conditions, we can safely add predicate filters
+    if not conditions:
+        return True
+
+    # Check if we have any OR operations between start and end fields
+    for condition in conditions:
+        if not hasattr(condition, "operand"):
+            continue
+        if not isinstance(condition.operand, tsi_query.OrOperation):
+            continue
+
+        # Get all fields used in this OR operation
+        fields_used: set[str] = set()
+        for op in condition.operand.or_:
+            # Create a temporary condition to extract fields
+            temp_condition = Condition(operand=op)
+            fields_used.update(
+                field.field for field in temp_condition._get_consumed_fields()
+            )
+
+        # Check if we have both start and end fields in this OR operation
+        has_start_field = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
+        has_end_field = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
+
+        # If we have both start and end fields in an OR operation,
+        # then we can't add predicate filters
+        if has_start_field and has_end_field:
+            return False
+
+    return True
+
+
+def make_call_parts_predicate_filters_sql(
+    pb: ParamBuilder, table_alias: str, heavy_conditions: list[Condition]
+) -> str:
+    """Makes the SQL for the predicate filters for the call parts.
+
+    This function creates SQL conditions that can be applied before the GROUP BY
+    to filter out rows that definitely won't match the heavy conditions.
+
+    For fields that may only exist in start or end parts, we add special handling
+    to avoid filtering out rows where the field is NULL (as they might be part of
+    a valid call when combined with other parts).
+    """
+    if not heavy_conditions:
+        return ""
+
+    # Process each heavy condition to create predicate filters
+    predicate_conditions = []
+    for condition in heavy_conditions:
+        # Create a new condition string using non-aggregated fields
+        condition_sql = process_query_to_conditions(
+            tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
+            pb,
+            table_alias,
+            use_agg_fn=False,  # Important: don't use aggregation functions
+        ).conditions[0]
+
+        # Get the fields used in this condition
+        fields_used = [field.field for field in condition._get_consumed_fields()]
+
+        # Check if any of the fields are start-only or end-only
+        has_start_only = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
+        has_end_only = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
+
+        # If the condition uses start-only fields, we need to allow NULL for those fields
+        if has_start_only:
+            start_nulls = []
+            for field in fields_used:
+                if field in START_ONLY_CALL_FIELDS:
+                    start_nulls.append(f"{table_alias}.{field} IS NULL")
+
+            if start_nulls:
+                condition_sql = f"({condition_sql} OR {' OR '.join(start_nulls)})"
+
+        # If the condition uses end-only fields, we need to allow NULL for those fields
+        if has_end_only:
+            end_nulls = []
+            for field in fields_used:
+                if field in END_ONLY_CALL_FIELDS:
+                    end_nulls.append(f"{table_alias}.{field} IS NULL")
+
+            if end_nulls:
+                condition_sql = f"({condition_sql} OR {' OR '.join(end_nulls)})"
+
+        predicate_conditions.append(condition_sql)
+
+    # Combine all predicate conditions with AND
+    if predicate_conditions:
+        return "AND " + combine_conditions(predicate_conditions, "AND")
+
+    return ""
 
 
 def _param_slot(param_name: str, param_type: str) -> str:

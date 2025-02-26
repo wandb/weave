@@ -278,6 +278,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             calls_merged.project_id = {pb_2:String}
         AND
             (calls_merged.id IN filtered_calls)
+        AND
+            ((JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}) = {pb_4:String})
+            OR calls_merged.inputs_dump IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) = {pb_4:String}
@@ -728,4 +731,191 @@ def test_calls_query_multiple_select_columns() -> None:
         )
         """,
         {"pb_0": "project"},
+    )
+
+
+def test_calls_query_with_predicate_filters() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.val"},
+                            {"$literal": "hello"},
+                        ]
+                    },  # <-- heavy condition
+                    {
+                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
+                    },  # <-- light condition
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.wb_user_id) = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls)
+        AND
+            ((JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = {pb_3:String})
+            OR calls_merged.inputs_dump IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}
+        )
+        """,
+        {
+            "pb_0": "my_user_id",
+            "pb_1": "project",
+            "pb_2": '$."param"."val"',
+            "pb_3": "hello",
+        },
+    )
+
+
+def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("output")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.val"},
+                            {"$literal": "hello"},
+                        ]
+                    },  # <-- heavy condition on start-only field
+                    {
+                        "$eq": [
+                            {"$getField": "output.result"},
+                            {"$literal": "success"},
+                        ]
+                    },  # <-- heavy condition on end-only field
+                    {
+                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
+                    },  # <-- light condition
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.wb_user_id) = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_1:String}
+        AND
+            (calls_merged.id IN filtered_calls)
+        AND ((((JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = {pb_3:String}) OR calls_merged.inputs_dump IS NULL))
+        AND (((JSON_VALUE(calls_merged.output_dump, {pb_4:String}) = {pb_5:String}) OR calls_merged.output_dump IS NULL)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
+            AND
+            ((JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}) = {pb_5:String}))
+        )
+        """,
+        {
+            "pb_0": "my_user_id",
+            "pb_1": "project",
+            "pb_2": '$."param"."val"',
+            "pb_3": "hello",
+            "pb_4": '$."result"',
+            "pb_5": "success",
+        },
+    )
+
+
+def test_calls_query_with_or_between_start_and_end_fields() -> None:
+    """Test that we don't create predicate filters when there's an OR between start and end fields."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("output")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.val"},
+                            {"$literal": "hello"},
+                        ]
+                    },  # <-- heavy condition on start-only field
+                    {
+                        "$eq": [
+                            {"$getField": "output.result"},
+                            {"$literal": "success"},
+                        ]
+                    },  # <-- heavy condition on end-only field
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_4:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
+            OR
+            (JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}) = {pb_3:String})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_4": "project",
+            "pb_0": '$."param"."val"',
+            "pb_1": "hello",
+            "pb_2": '$."result"',
+            "pb_3": "success",
+        },
     )
