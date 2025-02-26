@@ -190,7 +190,10 @@ def test_thread_death_recovery():
         processed_batches.append(items)
 
     processor = AsyncBatchProcessor(
-        thread_killing_processor, max_batch_size=3, min_batch_interval=0.1
+        thread_killing_processor,
+        max_batch_size=3,
+        min_batch_interval=0.1,
+        max_retries=0,  # With 0 retries, if a batch fails it is lost forever
     )
 
     # Phase 1: Enqueue items that will cause the thread to die
@@ -217,3 +220,60 @@ def test_thread_death_recovery():
     # Verify the second batch was processed, indicating recovery
     assert len(processed_batches) == 1
     assert processed_batches[0] == second_batch
+
+
+@pytest.mark.disable_logging_error_check
+def test_thread_death_recovery_with_retries():
+    """
+    Tests that the AsyncBatchProcessor can recover from a situation where the processing thread dies.
+
+    This test verifies that:
+    1. When the processing thread dies due to an unhandled exception, new items can still be processed
+    2. The processor automatically creates a new processing thread when needed
+    3. Items enqueued after thread death are still processed correctly
+    """
+    processed_batches = []
+    thread_death_event = threading.Event()
+
+    def thread_killing_processor(items):
+        # If the event is not set, this is the first batch - kill the thread
+        if not thread_death_event.is_set():
+            thread_death_event.set()
+            # This will kill the processing thread with an unhandled exception
+            raise SystemExit("Deliberately killing processing thread")
+
+        # Subsequent batches should still be processed if recovery works
+        processed_batches.append(items)
+
+    processor = AsyncBatchProcessor(
+        thread_killing_processor,
+        max_batch_size=3,
+        min_batch_interval=0.1,
+        max_retries=3,  # We expect failed event to be retried and succeed
+    )
+
+    # Phase 1: Enqueue items that will cause the thread to die
+    # -------------------------------------------------------
+    first_batch = [1, 2, 3]
+    processor.enqueue(first_batch)
+
+    # Wait for the thread to die
+    thread_death_event.wait(timeout=1.0)
+    assert thread_death_event.is_set(), "Thread death was not triggered"
+
+    # Give some time for the thread to actually die
+    time.sleep(0.2)
+
+    # Phase 2: Enqueue more items after thread death
+    # ---------------------------------------------
+    second_batch = [4, 5, 6]
+    processor.enqueue(second_batch)
+
+    # Wait for processing to complete
+    # This should trigger the creation of a new processing thread
+    processor.wait_until_all_processed()
+
+    # Verify the second batch was processed, indicating recovery
+    assert len(processed_batches) == 2
+    assert processed_batches[0] == first_batch
+    assert processed_batches[1] == second_batch
