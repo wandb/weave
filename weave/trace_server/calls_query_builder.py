@@ -211,8 +211,12 @@ def json_dump_field_as_sql(
     root_field_sanitized: str,
     extra_path: Optional[list[str]] = None,
     cast: Optional[tsi_query.CastTo] = None,
+    use_agg_fn: bool = True,
 ) -> str:
     if cast != "exists":
+        if not use_agg_fn:
+            return f"{root_field_sanitized}"
+
         path_str = "'$'"
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
@@ -995,6 +999,14 @@ def make_call_parts_predicate_filters_sql(
     # Process each heavy condition to create predicate filters
     predicate_conditions = []
     for condition in heavy_conditions:
+        # Check if this condition can use the LIKE optimization
+        like_optimized_condition = try_create_like_optimized_condition(
+            condition, pb, table_alias
+        )
+        if like_optimized_condition:
+            predicate_conditions.append(like_optimized_condition)
+            continue
+
         # Create a new condition string using non-aggregated fields
         condition_sql = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
@@ -1037,6 +1049,149 @@ def make_call_parts_predicate_filters_sql(
         return "AND " + combine_conditions(predicate_conditions, "AND")
 
     return ""
+
+
+def try_create_like_optimized_condition(
+    condition: Condition, pb: ParamBuilder, table_alias: str
+) -> Optional[str]:
+    """
+    Attempts to create a LIKE-optimized condition for simple string operations on JSON fields.
+    Supports equality checks, contains operations, and in operations.
+    Returns None if the optimization cannot be applied.
+    """
+    # Handle different operation types
+    if isinstance(condition.operand, tsi_query.EqOperation):
+        return _create_like_optimized_eq_condition(
+            condition.operand, condition, pb, table_alias
+        )
+    elif isinstance(condition.operand, tsi_query.ContainsOperation):
+        return _create_like_optimized_contains_condition(
+            condition.operand, condition, pb, table_alias
+        )
+    elif isinstance(condition.operand, tsi_query.InOperation):
+        return _create_like_optimized_in_condition(
+            condition.operand, condition, pb, table_alias
+        )
+
+    return None
+
+
+def _create_like_condition(
+    field: str,
+    like_pattern: str,
+    pb: ParamBuilder,
+    table_alias: str,
+    case_insensitive: bool = False,
+) -> str:
+    """Creates a LIKE condition for a JSON field with NULL handling for start/end-only fields."""
+    param_name = pb.add_param(like_pattern)
+    field_name = f"{table_alias}.{field}"
+
+    # Handle case sensitivity
+    if case_insensitive:
+        like_condition = f"ILIKE({field_name}, {_param_slot(param_name, 'String')})"
+    else:
+        like_condition = f"{field_name} LIKE {_param_slot(param_name, 'String')}"
+
+    # Add NULL handling for start/end-only fields
+    if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
+        return f"({like_condition} OR {field_name} IS NULL)"
+
+    return like_condition
+
+
+def _create_like_optimized_eq_condition(
+    operation: tsi_query.EqOperation,
+    condition: Condition,
+    pb: ParamBuilder,
+    table_alias: str,
+) -> Optional[str]:
+    """Creates a LIKE-optimized condition for equality operations."""
+    # Check if the left side is a GetField operation on a JSON field
+    if not isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
+        return None
+
+    # Check if the right side is a literal string
+    if not isinstance(operation.eq_[1], tsi_query.LiteralOperation) or not isinstance(
+        operation.eq_[1].literal_, str
+    ):
+        return None
+
+    field = get_field_by_name(operation.eq_[0].get_field_).field
+    literal_value = operation.eq_[1].literal_
+    like_pattern = f'%"{literal_value}"%'
+
+    return _create_like_condition(field, like_pattern, pb, table_alias)
+
+
+def _create_like_optimized_contains_condition(
+    operation: tsi_query.ContainsOperation,
+    condition: Condition,
+    pb: ParamBuilder,
+    table_alias: str,
+) -> Optional[str]:
+    """Creates a LIKE-optimized condition for contains operations."""
+    # Check if the input is a GetField operation on a JSON field
+    if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
+        return None
+
+    # Check if the substring is a literal string
+    if not isinstance(
+        operation.contains_.substr, tsi_query.LiteralOperation
+    ) or not isinstance(operation.contains_.substr.literal_, str):
+        return None
+
+    field = get_field_by_name(operation.contains_.input.get_field_).field
+    substr_value = operation.contains_.substr.literal_
+    case_insensitive = operation.contains_.case_insensitive or False
+    like_pattern = f'%"%{substr_value}%"%'
+
+    return _create_like_condition(
+        field, like_pattern, pb, table_alias, case_insensitive
+    )
+
+
+def _create_like_optimized_in_condition(
+    operation: tsi_query.InOperation,
+    condition: Condition,
+    pb: ParamBuilder,
+    table_alias: str,
+) -> Optional[str]:
+    """Creates a LIKE-optimized condition for in operations."""
+    # Check if the left side is a GetField operation on a JSON field
+    if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
+        return None
+
+    # Check if the right side is a list of values
+    if len(operation.in_) != 2 or not isinstance(operation.in_[1], list):
+        return None
+
+    field = get_field_by_name(operation.in_[0].get_field_).field
+
+    # Create OR conditions for each value
+    like_conditions: list[str] = []
+
+    for value_operand in operation.in_[1]:
+        if not isinstance(value_operand, tsi_query.LiteralOperation) or not isinstance(
+            value_operand.literal_, str
+        ):
+            return None
+
+        value = value_operand.literal_
+        like_pattern = f'%"{value}"%'
+        param_name = pb.add_param(like_pattern)
+        field_name = f"{table_alias}.{field}"
+        like_conditions.append(f"{field_name} LIKE {_param_slot(param_name, 'String')}")
+
+    # Combine all LIKE conditions with OR
+    combined_condition = " OR ".join(like_conditions)
+
+    # Add NULL handling for start/end-only fields
+    if field in START_ONLY_CALL_FIELDS or field in END_ONLY_CALL_FIELDS:
+        field_name = f"{table_alias}.{field}"
+        return f"(({combined_condition}) OR {field_name} IS NULL)"
+
+    return f"({combined_condition})"
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
