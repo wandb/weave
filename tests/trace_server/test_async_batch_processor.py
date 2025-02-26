@@ -205,6 +205,7 @@ def test_thread_death_recovery():
         max_batch_size=3,
         min_batch_interval=0.1,
         max_retries=0,  # With 0 retries, if a batch fails it is lost forever
+        process_timeout=0,  # Disable timeout mechanism to allow thread death
     )
 
     # Phase 1: Enqueue items that will cause the thread to die
@@ -267,6 +268,7 @@ def test_thread_death_recovery_with_retries():
         max_batch_size=3,
         min_batch_interval=0.1,
         max_retries=3,  # We expect failed event to be retried and succeed
+        process_timeout=0,  # Disable timeout mechanism to allow thread death
     )
 
     # Phase 1: Enqueue items that will cause the thread to die
@@ -295,3 +297,128 @@ def test_thread_death_recovery_with_retries():
     assert len(processed_batches) == 2
     assert first_batch in processed_batches
     assert second_batch in processed_batches
+
+
+@pytest.mark.disable_logging_error_check
+def test_processor_timeout_prevents_blocking():
+    """
+    Tests that the process_timeout feature prevents a blocking processor function from stalling the queue.
+
+    This test verifies that:
+    1. When processing takes longer than the timeout, the processor moves on to the next batch
+    2. Timed-out batches are actually requeued and retried multiple times
+    3. Processing continues for other batches even when one batch is problematic
+    4. Batches that time out on first attempt but succeed on retry are properly handled
+    """
+    process_attempts = []
+    process_completions = []
+    tracking_lock = threading.Lock()
+
+    # Track which items have been attempted before to implement different behaviors on retry
+    previously_attempted = set()
+
+    # Event that is never set - for items that should always hang
+    hang_forever_event = threading.Event()
+
+    def processing_function(items):
+        with tracking_lock:
+            process_attempts.extend(items)
+
+        # Group items into three categories:
+        # 1-3: Always hang (never complete)
+        # 4-6: Hang on first attempt only, complete on retry
+        # 7-12: Complete immediately (never hang)
+        always_hang_items = [item for item in items if 1 <= item <= 3]
+        hang_once_items = [item for item in items if 4 <= item <= 6]
+        fast_items = [item for item in items if item >= 7]
+
+        # Case 1: Fast items complete immediately
+        if fast_items:
+            with tracking_lock:
+                process_completions.extend(fast_items)
+
+        # Case 2: Hang-once items fail the first time, but complete on retry
+        if hang_once_items:
+            with tracking_lock:
+                new_items = [
+                    item for item in hang_once_items if item not in previously_attempted
+                ]
+                retry_items = [
+                    item for item in hang_once_items if item in previously_attempted
+                ]
+
+                # Update tracking for future attempts
+                previously_attempted.update(new_items)
+
+                # Complete the items that are being retried
+                if retry_items:
+                    process_completions.extend(retry_items)
+
+            # For first-time items, wait indefinitely (which will trigger timeout)
+            if new_items:
+                hang_forever_event.wait()
+                # This line is never reached due to timeout
+                with tracking_lock:
+                    process_completions.extend(new_items)
+
+        # Case 3: Always-hang items always hang; eventually they will be dropped
+        if always_hang_items:
+            hang_forever_event.wait()
+            # This line is never reached due to timeout
+            with tracking_lock:
+                process_completions.extend(always_hang_items)
+
+    processor = AsyncBatchProcessor(
+        processing_function,
+        max_batch_size=3,
+        min_batch_interval=0.01,
+        process_timeout=0.1,
+        max_retries=2,
+    )
+
+    # Enqueue 12 items which will be split into 4 batches of 3
+    # Items 1-3: Always hang
+    # Items 4-6: Hang on first attempt, complete on retry
+    # Items 7-12: Always complete immediately
+    all_items = list(range(1, 13))
+    processor.enqueue(all_items)
+    processor.wait_until_all_processed()
+
+    # Items that should have completed successfully:
+    # - Fast items (7-12)
+    # - Hang-once items on retry (4-6)
+    expected_completions = set(range(4, 13))
+    assert set(process_completions) == expected_completions, (
+        f"Expected items {expected_completions} to complete, but got {set(process_completions)}"
+    )
+
+    attempt_counts = {}
+    for item in process_attempts:
+        attempt_counts[item] = attempt_counts.get(item, 0) + 1
+
+    # Always-hang items (1-3) should be retried multiple times due to timeouts
+    for item in range(1, 4):
+        assert item in attempt_counts, f"Item {item} was never attempted"
+        assert attempt_counts[item] > 2, (
+            f"Item {item} was only attempted {attempt_counts[item]} time(s)"
+        )
+
+    # Hang-once items (4-6) should be attempted at least twice (first attempt times out, retry succeeds)
+    for item in range(4, 7):
+        assert item in attempt_counts, f"Item {item} was never attempted"
+        assert attempt_counts[item] == 2, (
+            f"Item {item} was only attempted {attempt_counts[item]} time(s), expected 2"
+        )
+
+    # Fast items (7-12) should be processed exactly once
+    for item in range(7, 13):
+        assert item in attempt_counts, f"Item {item} was never attempted"
+        assert attempt_counts[item] == 1, (
+            f"Item {item} was attempted {attempt_counts[item]} times, expected 1"
+        )
+
+    # Confirm that always-hang items never completed (they are dropped entirely)
+    for item in range(1, 4):
+        assert item not in process_completions, (
+            f"Always-hang item {item} was unexpectedly completed"
+        )
