@@ -275,6 +275,10 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-start-period=10s
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - "10000:10000"
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         env:
