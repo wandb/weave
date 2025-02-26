@@ -65,6 +65,9 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+    def is_heavy(self) -> bool:
+        return False
+
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
@@ -614,15 +617,14 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        if should_add_predicate_filters(self.query_conditions):
-            heavy_conditions = [
-                cond
-                for cond in self.query_conditions
-                if cond.is_heavy() and not cond.is_feedback()
-            ]
-            call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
-                pb, table_alias, heavy_conditions
-            )
+        heavy_non_feedback_conditions = [
+            cond
+            for cond in self.query_conditions
+            if cond.is_heavy() and not cond.is_feedback()
+        ]
+        call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
+            pb, table_alias, heavy_non_feedback_conditions
+        )
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -924,58 +926,6 @@ def process_calls_filter_to_conditions(
     return conditions
 
 
-def should_add_predicate_filters(conditions: list[Condition]) -> bool:
-    """Determines if predicate filters should be added to the query.
-
-    We want to return false if we operate on a start call part and an end
-    call part AND there is an OR operand.
-
-    Most calls in the table are merged, we don't care about them. Some
-    calls are still in parts: start, end. Specific fields:
-
-    Start:
-    - started_at
-    - inputs_dump
-    - attributes_dump
-
-    End:
-    - ended_at
-    - output_dump
-    - attributes_dump
-    """
-    if not conditions:
-        return False
-
-    # Check if we have any OR operations between start and end fields
-    # For now, only support AND between start and end fields
-    # TODO: Support OR between start and end fields
-    for condition in conditions:
-        if not hasattr(condition, "operand"):
-            continue
-        if not isinstance(condition.operand, tsi_query.OrOperation):
-            continue
-
-        # Get all fields used in this OR operation
-        fields_used: set[str] = set()
-        for op in condition.operand.or_:
-            # Create a temporary condition to extract fields
-            temp_condition = Condition(operand=op)
-            fields_used.update(
-                field.field for field in temp_condition._get_consumed_fields()
-            )
-
-        # Check if we have both start and end fields in this OR operation
-        has_start_field = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
-        has_end_field = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
-
-        # If we have both start and end fields in an OR operation,
-        # then we can't add predicate filters
-        if has_start_field and has_end_field:
-            return False
-
-    return True
-
-
 def make_call_parts_predicate_filters_sql(
     pb: ParamBuilder, table_alias: str, heavy_conditions: list[Condition]
 ) -> str:
@@ -987,14 +937,18 @@ def make_call_parts_predicate_filters_sql(
     For fields that may only exist in start or end parts, we add special handling
     to avoid filtering out rows where the field is NULL (as they might be part of
     a valid call when combined with other parts).
+
+    Returns an empty string if:
+    1. There are no heavy conditions
+    2. There are OR operations between start-only and end-only fields, which would
+       make predicate pushdown unsafe
     """
     if not heavy_conditions:
         return ""
 
-    # Process each heavy condition to create predicate filters
     predicate_conditions = []
     for condition in heavy_conditions:
-        # Create a new condition string using non-aggregated fields
+        # Now process the condition to create a predicate filter
         condition_sql = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
             pb,
@@ -1008,6 +962,14 @@ def make_call_parts_predicate_filters_sql(
         # Check if any of the fields are start-only or end-only
         has_start_only = any(field in START_ONLY_CALL_FIELDS for field in fields_used)
         has_end_only = any(field in END_ONLY_CALL_FIELDS for field in fields_used)
+
+        # Check if this is an OR operation that mixes start and end fields
+        if hasattr(condition, "operand") and isinstance(
+            condition.operand, tsi_query.OrOperation
+        ):
+            if has_start_only and has_end_only:
+                # TODO: support OR conditions between start and end fields
+                return ""
 
         # If the condition uses start-only fields, we need to allow NULL for those fields
         if has_start_only:
