@@ -248,7 +248,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        print(f"obj_read: {req.digest}")
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.obj_read(req)
         return self._with_cache_pydantic(
@@ -269,7 +268,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._next_trace_server.obj_delete(req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        print(f"table_query: {req.digest}")
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query(req)
         return self._with_cache_pydantic(
@@ -283,7 +281,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._next_trace_server.table_query_stream(req)
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        print(f"table_query_stats: {req.digest}")
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
@@ -305,7 +302,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         Returns:
             Response containing values for all requested refs
         """
-        print(f"refs_read_batch: {req.refs}")
         final_results = [None] * len(req.refs)
         needed_refs: list[str] = []
         needed_indices: list[int] = []
@@ -339,7 +335,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return tsi.RefsReadBatchRes(vals=final_results)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        print(f"file_content_read: {req.digest}")
         return self._with_cache(
             self._next_trace_server.file_content_read,
             req,
