@@ -17,7 +17,14 @@ class DSPyPatcher(MultiPatcher):
 
             from weave.integrations.dspy.dspy_callback import WeaveCallback
 
-            dspy.configure(callbacks=[WeaveCallback()])
+            is_callback_present = False
+            for callback in dspy.settings.callbacks:
+                if isinstance(callback, WeaveCallback):
+                    is_callback_present = True
+                    break
+
+            if not is_callback_present:
+                dspy.settings.callbacks.append(WeaveCallback())
         except ImportError:
             pass
 
