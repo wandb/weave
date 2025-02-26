@@ -153,7 +153,20 @@ export const PanelTable: React.FC<
   if (typedInputNodeUse.loading) {
     return <Panel2Loader />;
   } else if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
-    return <div>-</div>;
+    return (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '14px',
+        }}>
+        No items to display
+      </div>
+    );
   } else if (!nodeIsValidList(typedInputNode)) {
     console.warn(
       'PanelTable returning empty state because of Invalid input type: ',

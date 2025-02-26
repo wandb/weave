@@ -3305,3 +3305,157 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
             select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
             == 1
         )
+
+
+def test_calls_stream_heavy_condition_aggregation_parts(client):
+    def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
+        query = {
+            "$in": [
+                {"$getField": field},
+                [{"$literal": value}],
+            ]
+        }
+        res = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
+            )
+        )
+        return list(res)
+
+    call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        op_name="test_name",
+        trace_id=trace_id,
+        parent_id=parent_id,
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"param": {"value1": "hello"}},
+    )
+    client.server.call_start(tsi.CallStartReq(start=start))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert not res[0].output
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"c": 5},
+        output={"d": 5},
+    )
+    client.server.call_end(tsi.CallEndReq(end=end))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert res[0].output["d"] == 5
+
+
+def test_call_stream_query_heavy_query_batch(client):
+    # start 10 calls
+    call_ids = []
+    project_id = get_client_project_id(client)
+    for i in range(10):
+        call_id = generate_id()
+        call_ids.append(call_id)
+        trace_id = generate_id()
+        parent_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name="test_name",
+            trace_id=trace_id,
+            parent_id=parent_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            - datetime.timedelta(seconds=1),
+            attributes={"a": 5},
+            inputs={"param": {"value1": "hello"}},
+        )
+        client.server.call_start(tsi.CallStartReq(start=start))
+
+    # end 10 calls
+    for i in range(10):
+        call_id = generate_id()
+        trace_id = generate_id()
+        parent_id = generate_id()
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_ids[i],
+            ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            summary={"c": 5},
+            output={"d": 5, "e": "f", "result": {"message": "completed"}},
+        )
+        client.server.call_end(tsi.CallEndReq(end=end))
+
+    # filter by output
+    output_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "output.e"},
+                    {"$literal": "f"},
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(output_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["a"] == 5
+
+    # now query for inputs by string. This should be okay,
+    # because we don't filter out started_at is NULL
+    input_string_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.value1"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                    {
+                        "$contains": {
+                            "input": {"$getField": "output.result.message"},
+                            "substr": {"$literal": "COMPleted"},
+                            "case_insensitive": True,
+                        }
+                    },
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
+        assert call.output["result"]["message"] == "COMPLETED"
+
+    # Now lets add a light filter, which
+    # changes how we filter out calls. Make sure that still works
+    input_string_query["filter"] = {"op_names": ["test_name"]}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "helslo"
+        assert call.output["d"] == 5
