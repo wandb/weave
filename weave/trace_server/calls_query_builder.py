@@ -79,8 +79,11 @@ class CallsMergedAggField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
+        if not use_agg_fn:
+            return clickhouse_cast(inner)
         return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
@@ -92,8 +95,9 @@ class CallsMergedDynamicField(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: Optional[tsi_query.CastTo] = None,
+        use_agg_fn: bool = True,
     ) -> str:
-        res = super().as_sql(pb, table_alias)
+        res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
@@ -280,6 +284,12 @@ class Condition(BaseModel):
     def is_heavy(self) -> bool:
         for field in self._get_consumed_fields():
             if field.is_heavy():
+                return True
+        return False
+
+    def is_feedback(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
 
@@ -558,7 +568,8 @@ class CallsQuery(BaseModel):
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
-                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                    field=sort_by.field.field,
+                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
                 )
                 for sort_by in self.order_fields
             ]
@@ -592,16 +603,20 @@ class CallsQuery(BaseModel):
                 c.as_sql(pb, table_alias) for c in self.query_conditions
             )
             for query_condition in self.query_conditions:
-                for field in query_condition._get_consumed_fields():
-                    if isinstance(field, CallsMergedFeedbackPayloadField):
-                        needs_feedback = True
+                if query_condition.is_feedback():
+                    needs_feedback = True
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
+        call_parts_predicate_filters_sql = ""
         if len(having_conditions_sql) > 0:
             having_filter_sql = "HAVING " + combine_conditions(
                 having_conditions_sql, "AND"
             )
+
+        call_parts_predicate_filters_sql = make_call_parts_predicate_filters_sql(
+            pb, table_alias, self.query_conditions
+        )
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -654,6 +669,7 @@ class CallsQuery(BaseModel):
         {feedback_where_sql}
         {id_mask_sql}
         {id_subquery_sql}
+        {call_parts_predicate_filters_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -685,6 +701,9 @@ ALLOWED_CALL_FIELDS = {
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
 }
 
+START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
+END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "attributes_dump"}
+
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
@@ -713,6 +732,7 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
+    use_agg_fn: bool = True,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -781,7 +801,12 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             structured_field = get_field_by_name(operand.get_field_)
-            field = structured_field.as_sql(param_builder, table_alias)
+            if isinstance(structured_field, CallsMergedDynamicField):
+                field = structured_field.as_sql(
+                    param_builder, table_alias, use_agg_fn=use_agg_fn
+                )
+            else:
+                field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
@@ -891,6 +916,86 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def make_call_parts_predicate_filters_sql(
+    pb: ParamBuilder, table_alias: str, conditions: list[Condition]
+) -> str:
+    """Makes the SQL for the predicate filters for the call parts.
+
+    This function creates SQL conditions that can be applied before the GROUP BY
+    to filter out rows that definitely won't match the heavy conditions. These
+    conditions MUST be identical or less restrictive than the conditions in the
+    `conditions` list which will appear in HAVING after group by.
+
+    For fields that may only exist in start or end parts, we add special handling
+    to avoid filtering out rows where the field is NULL (as they might be part of
+    a valid call when combined with other parts).
+
+    Returns an empty string if:
+    1. There are no heavy conditions
+    2. There are OR operations between start-only and end-only fields
+        TODO: support OR conditions between start and end fields
+
+    Performance note: This optimization is critical for queries with heavy fields,
+    as it can significantly reduce peak memory by filtering before aggregation.
+    """
+    heavy_conditions = [
+        cond for cond in conditions if cond.is_heavy() and not cond.is_feedback()
+    ]
+    if not heavy_conditions:
+        return ""
+
+    predicate_conditions = []
+    for condition in heavy_conditions:
+        # Get the fields used in this condition once
+        consumed_fields = condition._get_consumed_fields()
+        field_names = [field.field for field in consumed_fields]
+
+        # Categorize fields by type
+        start_only_fields = [f for f in field_names if f in START_ONLY_CALL_FIELDS]
+        end_only_fields = [f for f in field_names if f in END_ONLY_CALL_FIELDS]
+
+        # Early return for OR operations that mix start and end fields
+        if (
+            start_only_fields
+            and end_only_fields
+            and hasattr(condition, "operand")
+            and isinstance(condition.operand, tsi_query.OrOperation)
+        ):
+            # TODO: support OR conditions between start and end fields
+            return ""
+
+        # Process the condition to create a predicate filter, using non-aggregate fields
+        condition_sql = process_query_to_conditions(
+            tsi_query.Query.model_validate({"$expr": {"$and": [condition.operand]}}),
+            pb,
+            table_alias,
+            use_agg_fn=False,
+        ).conditions[0]
+
+        # Build NULL allowances for start-only fields
+        if start_only_fields:
+            null_conditions = [
+                f"{table_alias}.{field} IS NULL" for field in start_only_fields
+            ]
+            if null_conditions:
+                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
+
+        # Build NULL allowances for end-only fields
+        if end_only_fields:
+            null_conditions = [
+                f"{table_alias}.{field} IS NULL" for field in end_only_fields
+            ]
+            if null_conditions:
+                condition_sql = f"({condition_sql} OR {' OR '.join(null_conditions)})"
+
+        predicate_conditions.append(condition_sql)
+
+    if predicate_conditions:
+        return "AND " + combine_conditions(predicate_conditions, "AND")
+
+    return ""
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
