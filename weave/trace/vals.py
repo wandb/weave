@@ -394,7 +394,7 @@ class WeaveTable(Traceable):
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
-                    # filter=self.filter,
+                    filter=self.filter,
                 )
             )
 
@@ -644,7 +644,7 @@ def make_trace_obj(
         # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
-    # Derefence val and create the appropriate wrapper object
+    # Dereference val and create the appropriate wrapper object
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
@@ -715,11 +715,20 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
+                table_row_filter = TableRowFilter()
+                if (
+                    len(extra) == 4
+                    and extra[0] == OBJECT_ATTR_EDGE_NAME
+                    and extra[1] == "rows"
+                    and extra[2] == TABLE_ROW_ID_EDGE_NAME
+                ):
+                    table_row_filter.row_digests = [extra[3]]
+
                 val = WeaveTable(
                     table_ref=val,
                     ref=new_ref,
                     server=server,
-                    filter=TableRowFilter(),
+                    filter=table_row_filter,
                     root=root,
                     parent=parent,
                 )
