@@ -1084,13 +1084,16 @@ def _create_like_condition(
     case_insensitive: bool = False,
 ) -> str:
     """Creates a LIKE condition for a JSON field with NULL handling for start/end-only fields."""
-    param_name = pb.add_param(like_pattern)
     field_name = f"{table_alias}.{field}"
 
     # Handle case sensitivity
     if case_insensitive:
-        like_condition = f"ILIKE({field_name}, {_param_slot(param_name, 'String')})"
+        # Lower the pattern in memory before adding it as a parameter
+        param_name = pb.add_param(like_pattern.lower())
+        # Only apply lower() to the field in the SQL query
+        like_condition = f"lower({field_name}) LIKE {_param_slot(param_name, 'String')}"
     else:
+        param_name = pb.add_param(like_pattern)
         like_condition = f"{field_name} LIKE {_param_slot(param_name, 'String')}"
 
     # Add NULL handling for start/end-only fields

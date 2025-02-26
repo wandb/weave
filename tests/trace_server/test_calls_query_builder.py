@@ -997,7 +997,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
         AND (((calls_merged.inputs_dump LIKE {pb_10:String} OR calls_merged.inputs_dump IS NULL))
         AND (((JSON_VALUE(calls_merged.inputs_dump, {pb_4:String}) > {pb_5:UInt64}) OR calls_merged.inputs_dump IS NULL))
         AND ((calls_merged.output_dump LIKE {pb_11:String} OR calls_merged.output_dump IS NULL))
-        AND ((ILIKE(calls_merged.output_dump, {pb_12:String}) OR calls_merged.output_dump IS NULL)))
+        AND ((lower(calls_merged.output_dump) LIKE {pb_12:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
@@ -1093,7 +1093,7 @@ def test_calls_query_with_like_optimization_contains() -> None:
         WHERE
             calls_merged.project_id = {pb_3:String}
         AND
-            (ILIKE(calls_merged.inputs_dump, {pb_2:String}) OR calls_merged.inputs_dump IS NULL)
+            (lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             (positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), {pb_1:String}) > 0)
@@ -1229,7 +1229,7 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             (calls_merged.id IN filtered_calls)
         AND (((calls_merged.attributes_dump LIKE {pb_9:String}
                OR calls_merged.attributes_dump IS NULL))
-             AND ((ILIKE(calls_merged.inputs_dump, {pb_10:String})
+             AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
                    OR calls_merged.inputs_dump IS NULL))
              AND (((calls_merged.attributes_dump LIKE {pb_11:String}
                     OR calls_merged.attributes_dump LIKE {pb_12:String})
