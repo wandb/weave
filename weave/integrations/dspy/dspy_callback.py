@@ -79,3 +79,29 @@ if not import_failed:
                 gc.finish_call(
                     self._call_map[call_id], serialize_dspy_objects(outputs), exception
                 )
+
+        def on_tool_start(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
+            gc = weave_client_context.require_weave_client()
+            if instance is not None:
+                inputs = {"self": dictify(instance), **inputs}
+
+            op_name = get_op_name_for_callback(instance, inputs)
+            self._call_map[call_id] = gc.create_call(
+                op_name,
+                inputs=dspy_postprocess_inputs(inputs),
+                display_name=op_name,
+            )
+
+        def on_tool_end(
+            self,
+            call_id: str,
+            outputs: Optional[dict[str, Any]],
+            exception: Optional[Exception] = None,
+        ) -> None:
+            gc = weave_client_context.require_weave_client()
+            if call_id in self._call_map:
+                gc.finish_call(
+                    self._call_map[call_id], serialize_dspy_objects(outputs), exception
+                )
