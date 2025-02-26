@@ -65,9 +65,6 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
-    def is_heavy(self) -> bool:
-        return False
-
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
