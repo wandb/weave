@@ -1442,30 +1442,9 @@ export const toGqlField = (
     ];
   } else if (forwardOp.op.name === 'artifactMembership-file') {
     return [
-      {name: 'versionIndex', fields: []},
       {
         name: 'artifact',
         fields: gqlBasicField('id'),
-      },
-      {
-        name: 'artifactCollection',
-        fields: gqlBasicField('id').concat([
-          {
-            name: 'defaultArtifactType',
-            fields: gqlBasicField('id').concat([{name: 'name', fields: []}]),
-          },
-          {name: 'name', fields: []},
-          {
-            name: 'project',
-            fields: gqlBasicField('id').concat([
-              {name: 'name', fields: []},
-              {
-                name: 'entityName',
-                fields: [],
-              },
-            ]),
-          },
-        ]),
       },
     ];
   } else if (forwardOp.op.name === 'artifact-memberships') {
