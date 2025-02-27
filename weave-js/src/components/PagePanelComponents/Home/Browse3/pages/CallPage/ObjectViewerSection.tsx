@@ -1,13 +1,7 @@
 import Box from '@mui/material/Box';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
@@ -20,7 +14,7 @@ import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatch
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
-import {getValueType, traverse} from './traverse';
+import {getValueType} from './traverse';
 import {ValueView} from './ValueView';
 
 const EXPANDED_IDS_LENGTH = 200;
@@ -51,35 +45,6 @@ const Title = styled.div`
   text-align: left;
 `;
 Title.displayName = 'S.Title';
-
-// We'll automatically expand objects if they are "simple" enough.
-// This is a heuristic for what that means.
-const isSimpleData = (data: Data): boolean => {
-  let isSimple = true;
-  traverse(data, context => {
-    if (context.depth > 3) {
-      isSimple = false;
-      return false;
-    }
-    if (isWeaveRef(context.value)) {
-      isSimple = false;
-      return false;
-    }
-    if (context.valueType === 'array' && context.value.length > 10) {
-      isSimple = false;
-      return false;
-    }
-    if (
-      context.valueType === 'object' &&
-      Object.keys(context.value).length > 10
-    ) {
-      isSimple = false;
-      return false;
-    }
-    return undefined;
-  });
-  return isSimple;
-};
 
 // Use a deep comparison to avoid re-rendering when the data object hasn't really changed.
 const ObjectViewerSectionNonEmptyMemoed = React.memo(
