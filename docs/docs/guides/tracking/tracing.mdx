@@ -592,7 +592,7 @@ The easiest way to get started is to construct a view in the UI, then learn more
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To fetch calls using the Python API, you can use the [`client.calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-calls) method:
+    To fetch calls using the Python API, you can use the [`client.get_calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-get_calls) method:
 
     ```python
     import weave
@@ -604,24 +604,6 @@ The easiest way to get started is to construct a view in the UI, then learn more
     calls = client.get_calls(filter=...)
     ```
 
-    :::info[Notice: Evolving APIs]
-    Currently, it is easier to use the lower-level [`calls_query_stream`](../../reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server#method-calls_query_stream) API as it is more flexible and powerful.
-    In the near future, we will move all functionality to the above client API.
-
-    ```python
-    import weave
-
-    # Initialize the client
-    client = weave.init("your-project-name")
-
-    calls = client.server.calls_query_stream({
-        "project_id": "",
-        "filter": {},
-        "query": {},
-        "sort_by": [],
-    })
-    ```
-    :::
     </TabItem>
     <TabItem value="typescript" label="TypeScript">
     To fetch calls using the TypeScript API, you can use the [`client.getCalls`](../../reference/typescript-sdk/weave/classes/WeaveClient#getcalls) method.
