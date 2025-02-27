@@ -146,19 +146,22 @@ const ObjectViewerSectionNonEmpty = ({
   }, [apiRef]);
 
   // Re-clicking the button will reapply collapse/expand
-  const onClickCollapsed = () => {
+  const onClickCollapsed = useCallback(() => {
     if (mode === 'collapsed') {
       setTreeExpanded(false);
     }
     setMode('collapsed');
     setExpandedIds([]);
-  };
+  }, [mode, setTreeExpanded]);
 
-  const isExpandAllSmall =
-    !!apiRef?.current?.getAllRowIds &&
-    getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH;
+  const isExpandAllSmall = useMemo(() => {
+    return (
+      !!apiRef?.current?.getAllRowIds &&
+      getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH
+    );
+  }, [apiRef, expandedIds.length, getGroupIds]);
 
-  const onClickExpanded = () => {
+  const onClickExpanded = useCallback(() => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
@@ -170,22 +173,13 @@ const ObjectViewerSectionNonEmpty = ({
         getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
       );
     }
-  };
-
-  // On first render and when data changes, recompute expansion state
-  useEffect(() => {
-    if (mode === 'hidden' || mode === 'json') {
-      return;
-    }
-    const isSimple = isSimpleData(data);
-    const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
-    if (newMode === 'expanded') {
-      onClickExpanded();
-    } else {
-      onClickCollapsed();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, isExpanded]);
+  }, [
+    expandedIds.length,
+    getGroupIds,
+    isExpandAllSmall,
+    mode,
+    setTreeExpanded,
+  ]);
 
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
