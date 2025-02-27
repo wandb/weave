@@ -290,11 +290,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
-        return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
-        )
+        # This previously called the deprecated /calls/query endpoint.
+        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(
+        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
+    ) -> Iterator[tsi.CallSchema]:
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
