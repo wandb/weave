@@ -6,10 +6,24 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
 
+from rich.progress import ProgressColumn, Task, Text
+
 T = TypeVar("T")
 U = TypeVar("U")
 
 _shown_warnings = set()
+
+
+class IterationSpeedColumn(ProgressColumn):
+    """Renders human readable iteration speed."""
+
+    def render(self, task: "Task") -> Text:
+        """Show iteration speed."""
+        speed = task.finished_speed or task.speed
+        if speed is None:
+            return Text("?", style="progress.data.speed")
+        it_speed = int(speed)
+        return Text(f"{it_speed}/s", style="progress.data.speed")
 
 
 def transpose(rows: list[dict]) -> dict[str, list]:

@@ -9,7 +9,15 @@ from rich import print
 from rich.console import Console
 from rich.panel import Panel
 from rich.pretty import Pretty
-from rich.progress import Progress
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from typing_extensions import Self
 
 import weave
@@ -219,15 +227,26 @@ class Evaluation(Object):
 
         n_complete = 0  # counter to track number of evaluated examples
 
-        with Progress() as progress:
-            task = progress.add_task("Evaluating examples", total=len(trial_rows))
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            BarColumn(),
+            util.IterationSpeedColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Evaluating samples...", total=len(trial_rows))
             async for _, eval_row in util.async_foreach(
                 trial_rows, eval_example, get_weave_parallelism()
             ):
                 progress.update(task, advance=1)
                 n_complete += 1
                 if verbose:
-                    print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
+                    console.print(
+                        f"Evaluated {n_complete} of {len(trial_rows)} samples"
+                    )
                 if eval_row is None:
                     eval_row = {self._output_key: None, "scores": {}}
                 else:
@@ -253,7 +272,7 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model, verbose)
         summary = await self.summarize(eval_results)
 
-        console.print(Panel(Pretty(summary), title="Evaluation Summary", expand=True))
+        console.print(Panel(Pretty(summary), title="Evaluation Results", expand=True))
 
         return summary
 
