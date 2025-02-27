@@ -63,8 +63,7 @@ def small_limit_trace_server(trace_server):
     return trace_server
 
 
-def test_batch_splitting(small_limit_trace_server):
-    """Test that large batches are properly split into smaller batches."""
+def test_large_batch_is_split_into_multiple_smaller_batches(small_limit_trace_server):
     # Create a large batch with many items to exceed the size limit
     batch = []
     for _ in range(20):
@@ -92,7 +91,29 @@ def test_batch_splitting(small_limit_trace_server):
     assert total_items_sent == len(batch)
 
 
-def test_single_large_item_error(small_limit_trace_server):
+def test_small_batch_is_sent_in_one_request(trace_server):
+    """Test that a small batch is sent without splitting."""
+    # Create and process a single item
+    start, _ = generate_call_start_end_pair()
+    batch = [StartBatchItem(req=start)]
+    trace_server._flush_calls(batch)
+
+    # Verify _send_batch_to_server was called once with the entire batch
+    assert trace_server._send_batch_to_server.call_count == 1
+    called_data = trace_server._send_batch_to_server.call_args[0][0]
+    decoded_batch = json.loads(called_data.decode("utf-8"))
+    assert len(decoded_batch["batch"]) == 1
+
+
+def test_empty_batch_is_noop(trace_server):
+    batch = []
+    trace_server._flush_calls(batch)
+
+    # Verify _send_batch_to_server was not called
+    assert trace_server._send_batch_to_server.call_count == 0
+
+
+def test_oversized_item_will_error_without_sending(small_limit_trace_server):
     """Test that a single item that's too large raises an error."""
     # Create a single item with a very large payload
     start = generate_start()
@@ -114,25 +135,5 @@ def test_single_large_item_error(small_limit_trace_server):
     assert "Single call size" in str(excinfo.value)
     assert "is too large to send" in str(excinfo.value)
 
-
-def test_empty_batch(trace_server):
-    """Test that an empty batch doesn't call _send_batch_to_server."""
-    batch = []
-    trace_server._flush_calls(batch)
-
     # Verify _send_batch_to_server was not called
     assert trace_server._send_batch_to_server.call_count == 0
-
-
-def test_small_batch_no_splitting(trace_server):
-    """Test that a small batch is sent without splitting."""
-    # Create and process a single item
-    start, _ = generate_call_start_end_pair()
-    batch = [StartBatchItem(req=start)]
-    trace_server._flush_calls(batch)
-
-    # Verify _send_batch_to_server was called once with the entire batch
-    assert trace_server._send_batch_to_server.call_count == 1
-    called_data = trace_server._send_batch_to_server.call_args[0][0]
-    decoded_batch = json.loads(called_data.decode("utf-8"))
-    assert len(decoded_batch["batch"]) == 1
