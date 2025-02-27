@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import atexit
 import logging
 import time
+from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
@@ -9,6 +12,12 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RetryTracker(Generic[T]):
+    item: T
+    retry_count: int = 0
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -38,13 +47,12 @@ class AsyncBatchProcessor(Generic[T]):
         self.min_batch_interval = min_batch_interval
         self.max_retries = max_retries
         self.process_timeout = process_timeout
-        self.queue: Queue[T] = Queue()
+        self.queue: Queue[RetryTracker[T]] = Queue()
         self.lock = Lock()
         self.stop_event = Event()
 
         # Tracks in-progress batch for recovery after thread death
-        self.current_batch: list[T] = []
-        self.current_batch_retries = 0  # Tracks retry attempts for the current batch
+        self.current_batch: list[RetryTracker[T]] = []
         self.processing_thread = self._create_processing_thread()
         atexit.register(self.wait_until_all_processed)  # Ensures clean shutdown
 
@@ -75,26 +83,23 @@ class AsyncBatchProcessor(Generic[T]):
 
             # Case 1: Nothing to retry, just reset retry counter
             if not self.current_batch:
-                self.current_batch_retries = 0
+                pass  # No need to reset anything as retry counts are per item
 
             # Case 2: Retry the batch by putting items into the back of the queue
-            elif self.current_batch_retries < self.max_retries:
-                logger.info(
-                    f"Retrying batch of {len(self.current_batch)} items "
-                    f"(attempt {self.current_batch_retries + 1}/{self.max_retries})"
-                )
-                for item in self.current_batch:
-                    self.queue.put(item)
-                self.current_batch_retries += 1
-
-            # Case 3: Max retries exceeded, drop the batch
             else:
-                logger.warning(
-                    f"Batch of {len(self.current_batch)} items exceeded max retries "
-                    f"({self.max_retries}), dropping batch"
-                )
+                for tracker in self.current_batch:
+                    if tracker.retry_count < self.max_retries:
+                        logger.info(
+                            f"Retrying item (attempt {tracker.retry_count + 1}/{self.max_retries})"
+                        )
+                        # Increment retry count before re-enqueueing
+                        tracker.retry_count += 1
+                        self.queue.put(tracker)
+                    else:
+                        logger.warning(
+                            f"Item exceeded max retries ({self.max_retries}), dropping item"
+                        )
                 self.current_batch = []
-                self.current_batch_retries = 0
 
         # Create thread outside lock to prevent deadlocks
         self.processing_thread = self._create_processing_thread()
@@ -104,12 +109,11 @@ class AsyncBatchProcessor(Generic[T]):
         if not items:
             return
 
-        # Ensure the thread is alive before queuing to ensure items will actually be processed
         self._ensure_processing_thread_alive()
-
         with self.lock:
             for item in items:
-                self.queue.put(item)
+                tracker = RetryTracker(item=item)
+                self.queue.put(tracker)
 
     def _process_batches(self) -> None:
         """Main thread loop that processes batches from the queue.
@@ -124,14 +128,9 @@ class AsyncBatchProcessor(Generic[T]):
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
                 # Safely collect a batch of items from the queue
-                current_batch: list[T] = []
-                for _ in range(self.max_batch_size):
-                    try:
-                        item = self.queue.get(block=False)
-                        current_batch.append(item)
-                    except Empty:
-                        break
-
+                current_batch: list[RetryTracker[T]] = _safely_get_batch(
+                    self.queue, self.max_batch_size
+                )
                 if not current_batch:
                     continue
 
@@ -139,16 +138,19 @@ class AsyncBatchProcessor(Generic[T]):
                 with self.lock:
                     self.current_batch = current_batch
 
+                # Extract the actual items from the trackers for processing
+                items_to_process = [tracker.item for tracker in current_batch]
+
+                processed = False  # Flag to track if batch was processed
+
                 if self.process_timeout > 0:
                     # Use a separate thread with timeout for processing to avoid blocking
                     processing_completed = Event()
-                    processing_error = [None]
+                    processing_error: list[Exception | None] = [None]
 
-                    def process_with_timeout():
+                    def process_with_timeout() -> None:
                         try:
-                            self.processor_fn(current_batch)
-                        except (SystemExit, KeyboardInterrupt) as e:
-                            raise
+                            self.processor_fn(items_to_process)
                         except Exception as e:
                             processing_error[0] = e
                             processing_completed.set()
@@ -168,23 +170,19 @@ class AsyncBatchProcessor(Generic[T]):
                         # Processing timed out
                         logger.warning(
                             f"Processing batch of {len(current_batch)} items timed out after {self.process_timeout}s. "
-                            f"Moving to next batch. This batch will be retried if retry attempts remain."
+                            f"Moving to next batch. Items will be retried if retry attempts remain."
                         )
-                        # Re-enqueue the batch for retry if attempts remain
+                        # Re-enqueue items for retry if attempts remain
                         with self.lock:
-                            if self.current_batch_retries < self.max_retries:
-                                logger.info(
-                                    f"Re-enqueueing timed out batch (attempt {self.current_batch_retries + 1}/{self.max_retries})"
-                                )
-                                for item in current_batch:
-                                    self.queue.put(item)
-                                self.current_batch_retries += 1
-                            else:
-                                logger.error(
-                                    f"Batch processing timed out and exceeded max retries ({self.max_retries}). "
-                                    f"Dropping {len(current_batch)} items."
-                                )
-                                self.current_batch_retries = 0
+                            for tracker in current_batch:
+                                if tracker.retry_count < self.max_retries:
+                                    tracker.retry_count += 1
+                                    self.queue.put(tracker)
+                                else:
+                                    logger.error(
+                                        f"Item processing timed out and exceeded max retries ({self.max_retries}). "
+                                        f"Dropping item."
+                                    )
                             self.current_batch = []
                     elif processing_error[0] is not None:
                         # Processing completed with an error
@@ -195,25 +193,29 @@ class AsyncBatchProcessor(Generic[T]):
                         )
                         with self.lock:
                             self.current_batch = []
-                            self.current_batch_retries = 0
                     else:
                         # Processing completed successfully
                         with self.lock:
                             self.current_batch = []
-                            self.current_batch_retries = 0
-                else:
+
+                    processed = True  # Mark as processed regardless of outcome
+
+                # Only process if not already processed with timeout mechanism
+                if not processed:
                     # Process without timeout (original behavior)
                     try:
-                        self.processor_fn(current_batch)
+                        self.processor_fn(items_to_process)
                     except Exception as e:
                         if get_raise_on_captured_errors():
                             raise
                         logger.exception(f"Error processing batch: {e}")
+                        # Clear the current batch even on error to avoid retrying indefinitely
+                        with self.lock:
+                            self.current_batch = []
                     else:
                         # If we succeed, then clear it out ahead of the next one
                         with self.lock:
                             self.current_batch = []
-                            self.current_batch_retries = 0
 
                 # Rate limiting to prevent CPU overuse on empty/small queues
                 if not self.stop_event.is_set():
@@ -257,3 +259,14 @@ class AsyncBatchProcessor(Generic[T]):
 
         if self.processing_thread.is_alive():
             self.processing_thread.join(timeout=1.0)
+
+
+def _safely_get_batch(queue: Queue[T], max_batch_size: int) -> list[T]:
+    batch: list[T] = []
+    for _ in range(max_batch_size):
+        try:
+            item = queue.get(block=False)
+            batch.append(item)
+        except Empty:
+            break
+    return batch
