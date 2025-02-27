@@ -130,7 +130,6 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
         uri=uri,
     )
 
-
 # Same as the artifactVersion-_file_refine_output_type op
 @op(
     name="artifactMembership-_file_refine_output_type",
