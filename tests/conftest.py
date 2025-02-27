@@ -32,6 +32,36 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
+@pytest.fixture(autouse=True)
+def disable_datadog():
+    """
+    Disables Datadog logging and tracing for tests.
+
+    This prevents Datadog from polluting test logs with messages like
+    'failed to send, dropping 1 traces to intake at...'
+    """
+    # Save original values to restore later
+    original_dd_env = os.environ.get("DD_ENV")
+    original_dd_trace = os.environ.get("DD_TRACE_ENABLED")
+
+    # Disable Datadog
+    os.environ["DD_ENV"] = "none"
+    os.environ["DD_TRACE_ENABLED"] = "false"
+
+    yield
+
+    # Restore original values
+    if original_dd_env is not None:
+        os.environ["DD_ENV"] = original_dd_env
+    elif "DD_ENV" in os.environ:
+        del os.environ["DD_ENV"]
+
+    if original_dd_trace is not None:
+        os.environ["DD_TRACE_ENABLED"] = original_dd_trace
+    elif "DD_TRACE_ENABLED" in os.environ:
+        del os.environ["DD_TRACE_ENABLED"]
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--weave-server",
