@@ -49,6 +49,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# `trace_server` is the dependency list of the trace server itself. We eventually will extract
+# this to a separate package. Note, when that happens, we will need to pull along some of the
+#default dependencies as well.
+trace_server = [
+  # BYOB - S3
+  "boto3>=1.34.0",
+  # BYOB - Azure
+  "azure-storage-blob>=12.24.0",
+  # BYOB - GCP
+  "google-cloud-storage>=2.7.0",
+]
+trace_server_tests = [
+  # BYOB - S3
+  "moto[s3]>=5.0.0",
+]
 docs = ["playwright", "lazydocs", "nbformat", "nbconvert"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
@@ -74,7 +89,7 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
-llamaindex = ["llama-index>=0.10.35"]
+llamaindex = ["llama-index>=0.10.35,<0.12.0"] # temporary max pin b/c 0.12.0 changes call structure and therefor tests
 mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
@@ -118,10 +133,10 @@ test = [
   "pillow",
   "filelock",
   "httpx",
+  
+  "weave[trace_server]",
+  "weave[trace_server_tests]",
 ]
-
-[project.scripts]
-weave = "weave.trace.cli:cli"
 
 [project.urls]
 Company = "https://wandb.com"
@@ -237,7 +252,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.35-dev0"
+current_version = "0.51.36-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
