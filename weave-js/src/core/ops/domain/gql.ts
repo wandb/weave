@@ -1442,15 +1442,10 @@ export const toGqlField = (
     ];
   } else if (forwardOp.op.name === 'artifactMembership-file') {
     return [
+      {name: 'versionIndex', fields: []},
       {
         name: 'artifact',
-        fields: gqlBasicField('id').concat([
-          {
-            name: 'commitHash',
-            args: gqlArgs({}),
-            fields: [],
-          },
-        ]),
+        fields: gqlBasicField('id'),
       },
       {
         name: 'artifactCollection',

@@ -126,7 +126,7 @@ export const opArtifactMembershipFile = makeStandardOp({
         artifactCollection.project.entityName,
         artifactCollection.project.name,
         artifactCollection.name,
-        artifactMembership.artifact.commitHash,
+        `v${artifactMembership.versionIndex}`,
         path
       );
       if (result == null) {
