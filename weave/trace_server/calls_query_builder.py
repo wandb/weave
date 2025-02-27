@@ -1075,6 +1075,9 @@ def _create_like_optimized_eq_condition(
 
     field = get_field_by_name(operation.eq_[0].get_field_).field
     literal_value = operation.eq_[1].literal_
+    if not literal_value:
+        # Empty string is not a valid value for LIKE optimization
+        return None
     like_pattern = f'%"{literal_value}"%'
 
     return _create_like_condition(field, like_pattern, pb, table_alias)
@@ -1098,6 +1101,9 @@ def _create_like_optimized_contains_condition(
 
     field = get_field_by_name(operation.contains_.input.get_field_).field
     substr_value = operation.contains_.substr.literal_
+    if not substr_value:
+        # Empty string is not a valid value for LIKE optimization
+        return None
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
@@ -1130,8 +1136,10 @@ def _create_like_optimized_in_condition(
     like_conditions: list[str] = []
 
     for value_operand in operation.in_[1]:
-        if not isinstance(value_operand, tsi_query.LiteralOperation) or not isinstance(
-            value_operand.literal_, str
+        if (
+            not isinstance(value_operand, tsi_query.LiteralOperation)
+            or not isinstance(value_operand.literal_, str)
+            or not value_operand.literal_
         ):
             return None
 

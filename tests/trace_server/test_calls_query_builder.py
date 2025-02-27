@@ -1259,3 +1259,41 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             "pb_12": '%"0.8"%',
         },
     )
+
+
+def test_calls_query_filter_by_empty_str() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
+        )
+    )
+    # Empty string is not a valid value for LIKE optimization, this test is to ensure that
+    # the query builder uses the JSON_VALUE function in the WHERE.
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE
+            calls_merged.project_id = {pb_2:String}
+        AND
+            ((JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}) = {pb_1:String})
+             OR calls_merged.inputs_dump IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"."val"',
+            "pb_1": "",
+            "pb_2": "project",
+        },
+    )
