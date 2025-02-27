@@ -66,6 +66,7 @@ from weave.trace_server.clickhouse_schema import (
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
+    ClickhouseQueryError,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -766,7 +767,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ORDER BY project_id, digest
         """
 
-        row_digest_result_query = self.ch_client.query(
+        row_digest_result_query = self._query(
             query,
             parameters={
                 "project_id": req.project_id,
@@ -947,7 +948,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         WHERE project_id = {project_id:String} AND digest = {digest:String}
         """
 
-        query_result = self.ch_client.query(query, parameters=parameters)
+        query_result = self._query(query, parameters=parameters)
         count = query_result.result_rows[0][0] if query_result.result_rows else 0
 
         return tsi.TableQueryStatsRes(count=count)
@@ -1339,7 +1340,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
-        query_result = self.ch_client.query(
+        query_result = self._query(
             """
             SELECT n_chunks, val_bytes, file_storage_uri
             FROM (
@@ -1445,7 +1446,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -1476,7 +1477,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
         prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        self._query(prepared.sql, prepared.parameters)
         return tsi.CostPurgeRes()
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
@@ -1535,7 +1536,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -1551,7 +1552,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.project_id(req.project_id)
         query = query.where(req.query)
         prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        self._query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
@@ -1792,24 +1793,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         summary = None
         parameters = _process_parameters(parameters)
-        with self.ch_client.query_rows_stream(
-            query,
-            parameters=parameters,
-            column_formats=column_formats,
-            use_none=True,
-            settings=settings,
-        ) as stream:
-            if isinstance(stream.source, QueryResult):
-                summary = stream.source.summary
-            logger.info(
-                "clickhouse_stream_query",
-                extra={
-                    "query": query,
-                    "parameters": parameters,
-                    "summary": summary,
-                },
+        try:
+            with self.ch_client.query_rows_stream(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+                settings=settings,
+            ) as stream:
+                if isinstance(stream.source, QueryResult):
+                    summary = stream.source.summary
+                logger.info(
+                    "clickhouse_stream_query",
+                    extra={
+                        "query": query,
+                        "parameters": parameters,
+                        "summary": summary,
+                    },
+                )
+                yield from stream
+        except Exception as e:
+            raise ClickhouseQueryError(
+                message=f"_query_stream exception: {e}",
+                query=query,
+                parameters=parameters,
+                summary=summary,
             )
-            yield from stream
 
     def _query(
         self,
@@ -1819,9 +1828,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
-            query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
+        try:
+            res = self.ch_client.query(
+                query,
+                parameters=parameters,
+                column_formats=column_formats,
+                use_none=True,
+            )
+        except Exception as e:
+            raise ClickhouseQueryError(
+                message=f"_query exception: {e}",
+                query=query,
+                parameters=parameters,
+            )
         logger.info(
             "clickhouse_query",
             extra={
