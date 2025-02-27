@@ -3,6 +3,7 @@ import {Box, Drawer} from '@mui/material';
 import {
   GridColumnVisibilityModel,
   GridFilterModel,
+  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridSortModel,
@@ -46,7 +47,10 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
-import {getValidFilterModel} from './Browse3/grid/filters';
+import {
+  defaultDateRangeFilter,
+  getValidFilterModel,
+} from './Browse3/grid/filters';
 import {
   DEFAULT_PAGE_SIZE,
   getValidPaginationModel,
@@ -741,6 +745,12 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const [filterDateRangeModel, setFilterDateRangeModel] =
+    useState<GridFilterModel>({
+      logicOperator: GridLogicOperator.And,
+      items: [defaultDateRangeFilter()],
+    });
+
   return (
     <CallsPage
       entity={entity}
@@ -757,6 +767,8 @@ const CallsPageBinding = () => {
       setSortModel={setSortModel}
       paginationModel={paginationModel}
       setPaginationModel={setPaginationModel}
+      filterDateRangeModel={filterDateRangeModel}
+      setFilterDateRangeModel={setFilterDateRangeModel}
     />
   );
 };

@@ -46,6 +46,9 @@ export const CallsPage: FC<{
 
   paginationModel: GridPaginationModel;
   setPaginationModel: (newModel: GridPaginationModel) => void;
+
+  filterDateRangeModel: GridFilterModel;
+  setFilterDateRangeModel: (newModel: GridFilterModel) => void;
 }> = props => {
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -103,6 +106,8 @@ export const CallsPage: FC<{
                 setSortModel={props.setSortModel}
                 paginationModel={props.paginationModel}
                 setPaginationModel={props.setPaginationModel}
+                filterDateRangeModel={props.filterDateRangeModel}
+                setFilterDateRangeModel={props.setFilterDateRangeModel}
               />
             ),
           },

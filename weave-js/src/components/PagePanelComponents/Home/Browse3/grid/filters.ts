@@ -41,3 +41,20 @@ export const getValidFilterModel = <T extends GridFilterModel | null>(
   }
   return def;
 };
+
+export const defaultDateRangeFilter = (): GridFilterItem => {
+  const now = new Date();
+  const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const startOfDayOneMonthAgo = new Date(
+    oneMonthAgo.getFullYear(),
+    oneMonthAgo.getMonth(),
+    oneMonthAgo.getDate()
+  ).toISOString();
+  const defaultFilterWithDaterange: GridFilterItem = {
+    id: 'default-date-range-filter',
+    field: 'started_at',
+    operator: '(date): after',
+    value: startOfDayOneMonthAgo,
+  };
+  return defaultFilterWithDaterange;
+};
