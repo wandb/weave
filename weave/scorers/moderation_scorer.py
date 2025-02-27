@@ -5,14 +5,14 @@ from pydantic import Field, PrivateAttr, validate_call
 import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-from weave.scorers.scorer_types import LiteLLMScorer, RollingWindowScorer
+from weave.scorers.scorer_types import LLMScorer, RollingWindowScorer
 from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights
 
 if TYPE_CHECKING:
     from torch import Tensor
 
 
-class OpenAIModerationScorer(LiteLLMScorer):
+class OpenAIModerationScorer(LLMScorer):
     """
     Uses the OpenAI moderation API to check if the model output is safe.
 

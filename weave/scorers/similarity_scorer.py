@@ -6,10 +6,10 @@ from pydantic import Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
-from weave.scorers.scorer_types import LiteLLMScorer
+from weave.scorers.scorer_types import LLMScorer
 
 
-class EmbeddingSimilarityScorer(LiteLLMScorer):
+class EmbeddingSimilarityScorer(LLMScorer):
     """
     Computes the cosine similarity between the embeddings of a model output and a target text.
 

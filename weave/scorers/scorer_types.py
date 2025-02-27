@@ -14,29 +14,7 @@ if TYPE_CHECKING:
     from transformers.tokenization_utils import PreTrainedTokenizer
 
 
-class LiteLLMScorer(weave.Scorer):
-    """Wrapper around litellm's functions."""
-
-    model_id: str = Field(
-        description="The model to use, check https://docs.litellm.ai/docs/providers for supported models"
-    )
-    _acompletion: "acompletion" = PrivateAttr()
-    _aembedding: "aembedding" = PrivateAttr()
-    _amoderation: "amoderation" = PrivateAttr()
-
-    def model_post_init(self, __context: Any) -> None:
-        try:
-            from litellm import acompletion, aembedding, amoderation  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
-            )
-        self._acompletion = acompletion
-        self._aembedding = aembedding
-        self._amoderation = amoderation
-
-
-class LLMScorer(LiteLLMScorer):
+class LLMScorer:
     """Score model outputs using a Large Language Model (LLM).
 
     This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
@@ -60,8 +38,23 @@ class LLMScorer(LiteLLMScorer):
         ..., description="The maximum number of tokens in the response"
     )
 
+    _acompletion: "acompletion" = PrivateAttr()
+    _aembedding: "aembedding" = PrivateAttr()
+    _amoderation: "amoderation" = PrivateAttr()
 
-class InstructorLLMScorer(LLMScorer):
+    def model_post_init(self, __context: Any) -> None:
+        try:
+            from litellm import acompletion, aembedding, amoderation  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
+            )
+        self._acompletion = acompletion
+        self._aembedding = aembedding
+        self._amoderation = amoderation
+
+
+class InstructorLLMScorer:
     def __new__(cls, *args, **kwargs):  # type: ignore
         raise DeprecationWarning(
             "InstructorLLMScorer is deprecated and will be removed in a future version. "
