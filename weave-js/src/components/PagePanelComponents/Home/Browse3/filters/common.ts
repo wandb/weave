@@ -33,10 +33,10 @@ export type FilterId = number | string | undefined;
 export const UNFILTERABLE_FIELDS = [
   'op_name',
   'feedback',
-  'status',
+  'summary.weave.status',
+  'summary.weave.latency_ms',
   'tokens',
   'cost',
-  'latency',
   'wb_user_id', // Option+Click works
 ];
 
