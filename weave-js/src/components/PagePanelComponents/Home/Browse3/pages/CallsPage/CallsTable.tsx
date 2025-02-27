@@ -61,7 +61,10 @@ import {
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnAddFilter} from '../../filters/CellFilterWrapper';
-import {getDefaultOperatorForValue} from '../../filters/common';
+import {
+  getDefaultOperatorForValue,
+  makeDefaultDateFilter,
+} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -132,6 +135,10 @@ export const DEFAULT_SORT_CALLS: GridSortModel = [
 ];
 export const DEFAULT_FILTER_CALLS: GridFilterModel = {
   items: [],
+  logicOperator: GridLogicOperator.And,
+};
+export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
+  items: [makeDefaultDateFilter()],
   logicOperator: GridLogicOperator.And,
 };
 
@@ -221,6 +228,13 @@ export const CallsTable: FC<{
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
+
+  const clearFilters = useCallback(() => {
+    setFilter({});
+    if (setFilterModel) {
+      setFilterModel({items: []});
+    }
+  }, [setFilter, setFilterModel]);
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -514,14 +528,6 @@ export const CallsTable: FC<{
       setRowIds(rowIds);
     }
   }, [rowIds, isPeeking, setRowIds]);
-
-  // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
-  const clearFilters = useCallback(() => {
-    setFilter({});
-    if (setFilterModel) {
-      setFilterModel({items: []});
-    }
-  }, [setFilter, setFilterModel]);
 
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -898,8 +904,8 @@ export const CallsTable: FC<{
                 entity,
                 project,
                 filter: effectiveFilter,
-                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-                gridSort: sortModel,
+                gridFilter: filterModelResolved,
+                gridSort: sortModelResolved,
               }}
             />
           </div>
@@ -1020,7 +1026,7 @@ export const CallsTable: FC<{
                   alignItems: 'center',
                 }}>
                 <Typography color="textSecondary">
-                  No calls found.{' '}
+                  No calls found for the specified date range.{' '}
                   {clearFilters != null ? (
                     <>
                       Try{' '}

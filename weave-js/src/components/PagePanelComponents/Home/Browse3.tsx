@@ -58,6 +58,7 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_FILTER_CALLS,
+  DEFAULT_FILTER_CALLS_WITH_DATE,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
 } from './Browse3/pages/CallsPage/CallsTable';
@@ -632,8 +633,9 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
+  const isEvaluationsTab = tab === 'evaluations';
   const initialFilter = useMemo(() => {
-    if (tab === 'evaluations') {
+    if (isEvaluationsTab) {
       return {
         frozen: true,
         opVersionRefs: [
@@ -692,14 +694,17 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const defaultDateFilter = isEvaluationsTab
+    ? DEFAULT_FILTER_CALLS // No date filter for evaluations
+    : DEFAULT_FILTER_CALLS_WITH_DATE;
   const filterModel = useMemo(
-    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
-    [query.filters]
+    () => getValidFilterModel(query.filters, defaultDateFilter),
+    [query.filters, defaultDateFilter]
   );
   const setFilterModel = (newModel: GridFilterModel) => {
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
-      newQuery.delete('filters');
+      newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));
     }
