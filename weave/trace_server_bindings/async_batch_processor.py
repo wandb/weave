@@ -88,6 +88,9 @@ class AsyncBatchProcessor(Generic[T]):
                     if get_raise_on_captured_errors():
                         raise
                     logger.exception(f"Error processing batch: {e}")
+                else:
+                    for _ in current_batch:
+                        self.queue.task_done()
 
             if self.stop_accepting_work_event.is_set() and self.queue.empty():
                 break
