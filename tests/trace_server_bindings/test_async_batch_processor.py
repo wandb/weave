@@ -39,3 +39,24 @@ def test_min_batch_interval():
 
     # Processor should batch them all together
     processor_fn.assert_called_once_with([1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+
+def test_wait_until_all_processed():
+    processor_fn = MagicMock()
+    processor = AsyncBatchProcessor(
+        processor_fn, max_batch_size=100, min_batch_interval=0.01
+    )
+
+    processor.enqueue([1, 2, 3])
+    processor.wait_until_all_processed()
+
+    # Despite queueing extra items, they will never get flushed because the processor is
+    # already stopped.
+    processor.enqueue([4, 5, 6])
+    processor.wait_until_all_processed()
+    processor.enqueue([7, 8, 9])
+    processor.wait_until_all_processed()
+
+    # We should only see the first batch.  Everything else is stuck in the queue.
+    processor_fn.assert_has_calls([call([1, 2, 3])])
+    assert processor.queue.qsize() == 6
