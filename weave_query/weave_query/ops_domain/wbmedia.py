@@ -211,6 +211,7 @@ class ImageArtifactFileRef:
     height: int
     width: int
     sha256: str
+    caption: typing.Optional[str] = ""
     boxes: typing.Optional[dict[str, list[dict]]] = dataclasses.field(
         default_factory=dict
     )  # type: ignore
@@ -218,7 +219,6 @@ class ImageArtifactFileRef:
         default_factory=dict
     )  # type: ignore
     classes: typing.Optional[typing.Optional[dict]] = None
-    caption: str = ""
 
 
 ImageArtifactFileRef.WeaveType = ImageArtifactFileRefType  # type: ignore
