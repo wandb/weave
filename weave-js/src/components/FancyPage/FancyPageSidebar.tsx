@@ -30,6 +30,9 @@ const SidebarSections = styled.div`
   gap: 20px;
   position: sticky;
   top: 0;
+  height: calc(
+    100vh - 60px - 12px
+  ); // Full page, minus header, minus top margin
   @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
     gap: 14px;
     height: 100%;
@@ -53,6 +56,7 @@ export type FancyPageSidebarItemButton = {
   name: string;
   nameTooltip?: string;
   slug: string;
+  className?: string;
 
   // Some buttons should get active highlighting for multiple different slugs.
   additionalSlugs?: string[];

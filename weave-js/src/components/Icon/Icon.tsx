@@ -101,6 +101,7 @@ import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ig
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
+import {ReactComponent as ImportIntercomLogo} from '../../assets/icons/icon-intercom-logo.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
 import {ReactComponent as ImportJobCalculator} from '../../assets/icons/icon-job-calculator.svg';
 import {ReactComponent as ImportJobProgramCode} from '../../assets/icons/icon-job-program-code.svg';
@@ -1090,6 +1091,9 @@ export const IconYoutubeSocial = (props: SVGIconProps) => (
 export const IconZoomInTool = (props: SVGIconProps) => (
   <ImportZoomInTool {...updateIconProps(props)} />
 );
+export const IconIntercomLogo = (props: SVGIconProps) => (
+  <ImportIntercomLogo {...updateIconProps(props)} />
+);
 
 const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
@@ -1361,6 +1365,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,
   'zoom-in-tool': IconZoomInTool,
+  'intercom-logo': IconIntercomLogo,
 };
 
 export interface IconProps {
