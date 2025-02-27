@@ -578,7 +578,7 @@ function makeCodeText(
   includeFeedback: boolean,
   includeCosts: boolean
 ) {
-  let codeStr = `import weave\nassert weave.__version__ >= "0.51.29", "Please upgrade weave!"\n\nclient = weave.init("${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {

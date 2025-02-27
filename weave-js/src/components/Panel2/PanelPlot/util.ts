@@ -9,6 +9,7 @@ import {
   Node,
   numberBin,
   oneOrMany,
+  opIsNone,
   opPick,
   opRunId,
   opRunName,
@@ -16,6 +17,7 @@ import {
   timestampBin,
   union,
   varNode,
+  weaveIf,
 } from '@wandb/weave/core';
 import {useMemo} from 'react';
 
@@ -118,42 +120,72 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
       if (labelSelectFn.nodeType !== 'void') {
         const labelType = TableState.getTableColType(table, dims.label);
         if (frame.runColors != null) {
+          let runNode: Node | undefined;
           if (isAssignableTo(labelType, maybe('run'))) {
-            let retTable = TableState.updateColumnSelect(
-              table,
-              dims.color,
-              opPick({
-                obj: varNode(frame.runColors.type, 'runColors'),
-                key: opRunId({
-                  run: labelSelectFn,
-                }),
-              })
-            );
-
-            retTable = TableState.updateColumnSelect(
-              retTable,
-              dims.label,
-              opRunName({
-                run: labelSelectFn,
-              })
-            );
-
-            return retTable;
+            runNode = labelSelectFn;
           } else if (
             labelSelectFn.nodeType === 'output' &&
             labelSelectFn.fromOp.name === 'run-name'
           ) {
-            return TableState.updateColumnSelect(
-              table,
-              dims.color,
-              opPick({
-                obj: varNode(frame.runColors.type, 'runColors'),
-                key: opRunId({
-                  run: labelSelectFn.fromOp.inputs.run,
+            runNode = labelSelectFn.fromOp.inputs.run;
+          } else {
+            return table;
+          }
+
+          let retTable = table;
+          retTable = TableState.updateColumnSelect(
+            table,
+            dims.color,
+            opPick({
+              obj: varNode(frame.runColors.type, 'runColors'),
+              key: opRunId({
+                run: runNode,
+              }),
+            })
+          );
+          retTable = TableState.updateColumnName(
+            retTable,
+            dims.color,
+            'runColor'
+          );
+
+          if (frame.customRunNames != null) {
+            const customRunNamePickNode = opPick({
+              obj: varNode(frame.customRunNames.type, 'customRunNames'),
+              key: opRunId({
+                run: runNode,
+              }),
+            });
+
+            retTable = TableState.updateColumnSelect(
+              retTable,
+              dims.label,
+              weaveIf(
+                opIsNone({
+                  val: customRunNamePickNode,
                 }),
+                opRunName({
+                  run: runNode,
+                }),
+                customRunNamePickNode
+              )
+            );
+          } else {
+            retTable = TableState.updateColumnSelect(
+              retTable,
+              dims.label,
+              opRunName({
+                run: runNode,
               })
             );
           }
+          retTable = TableState.updateColumnName(
+            retTable,
+            dims.label,
+            'runName'
+          );
+
+          return retTable;
         }
 
         if (
@@ -172,7 +204,7 @@ export const useVegaReadyTables = (series: SeriesConfig[], frame: Frame) => {
       }
       return table;
     });
-  }, [series, frame.runColors]);
+  }, [series, frame.runColors, frame.customRunNames]);
 };
 
 export function defaultPlot(

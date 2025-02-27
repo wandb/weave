@@ -1,3 +1,4 @@
+import logging
 import urllib
 import typing
 
@@ -13,10 +14,6 @@ from weave_query.ops_domain.wandb_domain_gql import (
 
 static_art_membership_file_gql = """
             versionIndex
-            artifact {
-                id
-                commitHash
-            }
             artifactCollection {
                 id 
                 name 
@@ -121,11 +118,11 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     # This is valid because the commitHash for portfolios is always null. So we will leverage
     # the artifact's membership in its source collection to fetch it via the commitHash in
     # downstream paths
-    commit_hash = artifactMembership["artifact"]["commitHash"]
+    version = f"v{artifactMembership['versionIndex']}"
     entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
     project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
     uri = artifact_wandb.WeaveWBArtifactURI(
-        collection_name, commit_hash, entity_name, project_name
+        collection_name, version, entity_name, project_name
     )
     return artifact_wandb.WandbArtifact(
         name=collection_name,
@@ -134,6 +131,7 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     )
 
 
+# Same as the artifactVersion-_file_refine_output_type op
 @op(
     name="artifactMembership-_file_refine_output_type",
     hidden=True,
@@ -145,11 +143,7 @@ def _file_refine_output_type(artifactMembership: wdt.ArtifactCollectionMembershi
     return types.TypeRegistry.type_of(art_local.path_info(path))
 
 
-# Warning: the return type of this is incorrect! Weave0 treats
-# type 'file' (FilesystemArtifactFile) as both dir and file.
-# We have a refiner to do the correct thing, but the return
-# type is set to `File` so that the first non-refine compile
-# path will still work.
+# Same as the artifactVersion-file op
 @op(
     name="artifactMembership-file",
     refine_output_type=_file_refine_output_type,

@@ -87,6 +87,7 @@ export const opArtifactMembershipLink = makeStandardOp({
   }),
 });
 
+// Same as opArtifactVersionFile
 export const opArtifactMembershipFile = makeStandardOp({
   name: 'artifactMembership-file',
   argTypes: {...artifactArgTypes, path: 'string'},
@@ -127,14 +128,13 @@ export const opArtifactMembershipFile = makeStandardOp({
         artifactCollection.project.name,
         artifactCollection.name,
         `v${artifactMembership.versionIndex}`,
-        path
-      );
+         path)
       if (result == null) {
         return null;
       }
       return {artifact: artifactMembership.artifact, path};
     } catch (e) {
-      console.warn('Error loading artifact file from membership', {
+      console.warn('Error loading artifact from membership', {
         err: e,
         artifact: artifactMembership.artifact,
         path,
