@@ -43,6 +43,7 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {CallTimelineView} from './CallTimelineView';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
@@ -314,6 +315,8 @@ const CallPageInnerVertical: FC<{
 
   const callTabs = useCallTabs(currentCall);
 
+  const [viewType, setViewType] = useState<'tree' | 'timeline'>('tree');
+
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
   }
@@ -333,11 +336,24 @@ const CallPageInnerVertical: FC<{
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
+              icon="layout-vertical"
+              tooltip={`Switch to ${
+                viewType === 'tree' ? 'timeline' : 'tree'
+              } view`}
+              variant="ghost"
+              active={viewType === 'timeline'}
+              onClick={() =>
+                setViewType(viewType === 'tree' ? 'timeline' : 'tree')
+              }
+              className="mr-4"
+            />
+            <Button
               icon="layout-tabs"
               tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
               active={showTraceTree ?? false}
               onClick={onToggleTraceTree}
+              className="mr-4"
             />
             <Button
               icon="marker"
@@ -371,13 +387,20 @@ const CallPageInnerVertical: FC<{
           <div className="h-full bg-moon-50">
             {loading ? (
               <Loading centered />
-            ) : (
+            ) : viewType === 'tree' ? (
               <CallTraceView
                 call={call}
                 selectedCall={currentCall}
                 rows={rows}
                 forcedExpandKeys={expandKeys}
                 path={path}
+                costLoading={costLoading}
+              />
+            ) : (
+              <CallTimelineView
+                call={call}
+                selectedCall={currentCall}
+                rows={rows}
                 costLoading={costLoading}
               />
             )}
