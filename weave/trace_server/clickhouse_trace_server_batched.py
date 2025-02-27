@@ -21,7 +21,6 @@
 # subqueries, and put the project_id predicate in the innermost subquery, which fixes
 # the problem.
 
-
 import dataclasses
 import datetime
 import hashlib
@@ -35,7 +34,9 @@ from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
+import ddtrace
 import emoji
+from clickhouse_connect.driver import httputil
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -1678,12 +1679,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return self._thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
+        pool_mgr = httputil.get_pool_manager(maxsize=1, num_pools=1)
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            pool_mgr=pool_mgr,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -1719,6 +1722,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if self._use_async_insert:
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
+            self._insert(
+                "call_parts",
+                data=batch,
+                column_names=all_call_insert_columns,
+                settings=settings,
+            )
+
+    def _insert_call_batch_2(self, batch: list) -> None:
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 1
             self._insert(
                 "call_parts",
                 data=batch,
@@ -1832,6 +1848,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return res
 
+    @ddtrace.tracer.wrap(name="clickhouse-insert")
     def _insert(
         self,
         table: str,
@@ -1840,6 +1857,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         settings: Optional[dict[str, Any]] = None,
     ) -> QuerySummary:
         try:
+            logger.info(
+                f"Inserting {len(data)} rows into '{table}' with settings {settings}"
+            )
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
             )
@@ -1869,7 +1889,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _flush_calls(self) -> None:
         try:
-            self._insert_call_batch(self._call_batch)
+            import random
+
+            if random.random() < 0.5:
+                self._insert_call_batch_2(self._call_batch)
+            else:
+                self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
