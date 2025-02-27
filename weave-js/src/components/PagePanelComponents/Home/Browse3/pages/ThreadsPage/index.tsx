@@ -13,7 +13,7 @@ import {
   useThreadList,
   useTraceRootsForThread,
 } from './hooks';
-import {ThreadsPageProps} from './types';
+import {ThreadsPageProps, TraceTreeFlat} from './types';
 import {buildTraceTreeFlat} from './utils';
 import {
   callViews,
@@ -76,7 +76,6 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
   // View state
   const [threadViewId, setThreadViewId] = useState(threadViews[0].id);
-  const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
   const [callViewId, setCallViewId] = useState(callViews[0].id);
 
@@ -210,103 +209,6 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     );
   };
 
-  const renderTraceView = () => {
-    if (!selectedThreadId) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="info" className="mb-2" />
-          <p>Select a thread to view traces</p>
-        </div>
-      );
-    }
-
-    if (tracesLoading) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="loading" className="mb-2 animate-spin" />
-          <p>Loading traces...</p>
-        </div>
-      );
-    }
-
-    if (tracesError) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-red-500">
-          <Icon name="warning" className="mb-2" />
-          <p>Error loading traces: {tracesError.message}</p>
-        </div>
-      );
-    }
-
-    if (!traces || traces.length === 0) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="info" className="mb-2" />
-          <p>No traces found for this thread</p>
-        </div>
-      );
-    }
-
-    if (!selectedTraceId) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="loading" className="mb-2 animate-spin" />
-          <p>Selecting trace...</p>
-        </div>
-      );
-    }
-
-    if (callsLoading) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="loading" className="mb-2 animate-spin" />
-          <p>Loading trace details...</p>
-        </div>
-      );
-    }
-
-    if (callsError) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-red-500">
-          <Icon name="warning" className="mb-2" />
-          <p>Error loading trace details: {callsError.message}</p>
-        </div>
-      );
-    }
-
-    const TraceViewComponent = getTraceView(traceViewId).component;
-    return (
-      <div className="flex h-full flex-col">
-        {Object.keys(traceTreeFlat).length > 0 && (
-          <StackContextProvider
-            traceTreeFlat={traceTreeFlat}
-            selectedCallId={selectedCallId}>
-            <StackBreadcrumb
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}
-              onCallSelect={setSelectedCallId}
-            />
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <div className="flex-1 overflow-auto">
-                <TraceViewComponent
-                  traceTreeFlat={traceTreeFlat}
-                  selectedCallId={selectedCallId}
-                  onCallSelect={setSelectedCallId}
-                />
-              </div>
-              {getTraceView(traceViewId).showScrubber && (
-                <TraceScrubber
-                  traceTreeFlat={traceTreeFlat}
-                  selectedCallId={selectedCallId}
-                  onCallSelect={setSelectedCallId}
-                />
-              )}
-            </div>
-          </StackContextProvider>
-        )}
-      </div>
-    );
-  };
 
   const renderCallDetails = () => {
     if (callsLoading) {
@@ -438,26 +340,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
           {/* Trace Panel - 40% */}
           <div className="flex w-[40%] flex-col overflow-hidden">
-            <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
-              <h2 className="truncate text-sm font-semibold">Trace View</h2>
-              <div className="flex items-center gap-3">
-                {traceViews.map(view => (
-                  <Button
-                    key={view.id}
-                    variant={traceViewId === view.id ? 'primary' : 'ghost'}
-                    onClick={() => setTraceViewId(view.id)}
-                    icon={view.icon}
-                    size="small"
-                    className="!p-3"
-                    title={view.label}>
-                    <span className="sr-only">{view.label}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {renderTraceView()}
-            </div>
+          <TraceNavigator traceViewId={traceViewId} setTraceViewId={setTraceViewId} traceTreeFlat={traceTreeFlat} selectedCallId={selectedCallId} setSelectedCallId={setSelectedCallId} />
           </div>
 
           {/* Call Detail Panel - 30% */}
@@ -513,3 +396,66 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     </Tailwind>
   );
 };
+const TraceNavigator = ({
+  traceTreeFlat,
+  selectedCallId,
+  setSelectedCallId,
+}: {
+  traceTreeFlat: TraceTreeFlat;
+  selectedCallId: string | undefined;
+  setSelectedCallId: React.Dispatch<React.SetStateAction<string | undefined>>;
+}) => {
+  const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
+  const TraceViewComponent = getTraceView(traceViewId).component;
+  return <div className="h-full flex flex-col overflow-hidden">
+    <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
+      <h2 className="truncate text-sm font-semibold">Trace View</h2>
+      <div className="flex items-center gap-3">
+        {traceViews.map(view => (
+          <Button
+            key={view.id}
+            variant={traceViewId === view.id ? 'primary' : 'ghost'}
+            onClick={() => setTraceViewId(view.id)}
+            icon={view.icon}
+            size="small"
+            className="!p-3"
+            title={view.label}>
+            <span className="sr-only">{view.label}</span>
+          </Button>
+        ))}
+      </div>
+    </div>
+    <div className="min-h-0 flex-1 overflow-hidden">
+    <div className="flex h-full flex-col">
+    {Object.keys(traceTreeFlat).length > 0 && (
+      <StackContextProvider
+        traceTreeFlat={traceTreeFlat}
+        selectedCallId={selectedCallId}>
+        <StackBreadcrumb
+          traceTreeFlat={traceTreeFlat}
+          selectedCallId={selectedCallId}
+          onCallSelect={setSelectedCallId}
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            <TraceViewComponent
+              traceTreeFlat={traceTreeFlat}
+              selectedCallId={selectedCallId}
+              onCallSelect={setSelectedCallId}
+            />
+          </div>
+          {getTraceView(traceViewId).showScrubber && (
+            <TraceScrubber
+              traceTreeFlat={traceTreeFlat}
+              selectedCallId={selectedCallId}
+              onCallSelect={setSelectedCallId}
+            />
+          )}
+        </div>
+      </StackContextProvider>
+    )}
+  </div>
+    </div>
+  </div>;
+}
+
