@@ -53,7 +53,7 @@ dependencies = [
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 #default dependencies as well.
 trace_server = [
-  "ddtrace>=2.7.0",
+  "ddtrace==2.7.0",
   # BYOB - S3
   "boto3>=1.34.0",
   # BYOB - Azure
