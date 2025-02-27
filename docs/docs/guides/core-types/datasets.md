@@ -152,7 +152,9 @@ You can create, edit, and delete `Dataset`s in the UI.
     - You can customize the column names for each selected field.
     - You can select a subset of fields to include in the new `Dataset`, or deselect all fields.
 
-8. Once you've configured the dataset fields, click **Next**. A preview of your new `Dataset` appears.
+8. Once you've configured the dataset fields, click **Next**. A preview of your new `Dataset` appears. 
+
+9. (Optional) Click any of the editable fields in your **Dataset** to edit the entry.
 
 10. Click **Create dataset**. Your new dataset is created.
 
@@ -230,6 +232,8 @@ You can create, edit, and delete `Dataset`s in the UI.
 6. (Optional) In **Configure field mapping**, you can adjust the mapping of fields from your calls to the corresponding dataset columns.
 
 7. Once you've configured field mappings, click **Next**. A preview of your new `Dataset` appears.
+
+8. In the empty row (green), add your new example value(s). Note that the **id** field is not editable and is created automatically by Weave.
 
 9. Click **Add to dataset**. Alternatively, to return to the **Configure field mapping** screen, click **Back**.
 
