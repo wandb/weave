@@ -254,3 +254,43 @@ We are continuously improving our integrations with third-party services and lib
 While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations. 
 
 See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+### Create an Evals View in the UI 
+
+You can save your Evals table configurations, filters, and sorts as _Views_ for quick access to your preferred setup. Once you create a View, you can load, edit and rename the View.  
+
+#### Create a View
+
+1. Navigate to your **Evals** tab.
+2. Adjust any of the following variables in your table configuration:
+   - Filters
+   - Sort order
+   - Page size
+   - Column visibility
+   - Column pinning
+3. In the upper right hand corner, click **Save view**. Weave automatically saves your View.
+
+#### Load a saved View
+
+1. Navigate to your **Evals** tab.
+2. Click the hamburger menu to the right of the **Evals** tab. A dropdown menu showing all saved Views displays. 
+3. Click the View that you want to access. The saved View displays in the **Evals** tab. 
+
+#### Rename a saved View
+
+1. Follow the steps described in [Access a saved View](#access-a-saved-view).
+2. In the upper lefthand corner of the **Evals** tab, click the View name.
+3. Enter a new name for the View.
+4. To save the new View name, press **Enter**. The View name is updated and saved.
+
+#### Edit a saved view
+
+1. Follow the steps described in [Access a saved View](#access-a-saved-view).
+2. Adjust your table configuration.
+3. In the upper right hand corner, click **Save view**. Weave automatically saves your updated View.
+
+#### Return to the default Evals View
+
+1. Navigate to your **Evals** tab.
+2. Click the hamburger menu to the right of the **Evals** tab. A dropdown menu showing all saved Views displays. 
+3. At the bottom on the menu, click **Evals**. The default View displays.

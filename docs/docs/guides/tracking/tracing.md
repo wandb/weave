@@ -739,9 +739,45 @@ Calculated Fields:
     * Duration
     * Status
 
-## Save a trace table configuration as a View 
+## Create a Trace View in the UI 
 
-You can save your custom column configurations, filters, and sorts as Views for quick access to your preferred data setup
+You can save your Trace table configurations, filters, and sorts as _Views_ for quick access to your preferred setup. Once you create a View, you can load, edit and rename the View.  
+
+### Create a View
+
+1. Navigate to your **Traces** tab.
+2. Adjust any of the following variables in your table configuration:
+   - Filters
+   - Sort order
+   - Page size
+   - Column visibility
+   - Column pinning
+3. In the upper right hand corner, click **Save view**. Weave automatically saves your View.
+
+### Access a saved View
+
+1. Navigate to your **Traces** tab.
+2. Click the hamburger menu to the right of the **Trace** tab. A dropdown menu showing all saved Views displays. 
+3. Click the View that you want to access. The saved View displays in the **Traces** tab. 
+
+### Rename a saved View
+
+1. Follow the steps described in [Access a saved View](#access-a-saved-view).
+2. In the upper lefthand corner of the **Traces** tab, click the View name.
+3. Enter a new name for the View.
+4. To save the new View name, press **Enter**. The View name is updated and saved.
+
+### Edit a saved view
+
+1. Follow the steps described in [Access a saved View](#access-a-saved-view).
+2. Adjust your table configuration.
+3. In the upper right hand corner, click **Save view**. Weave automatically saves your updated View.
+
+### Return to the default Traces View
+
+1. Navigate to your **Traces** tab.
+2. Click the hamburger menu to the right of the **Trace** tab. A dropdown menu showing all saved Views displays. 
+3. At the bottom on the menu, click **Traces**. The default View displays.
 
 ## FAQs
 
