@@ -1,7 +1,7 @@
 import atexit
 import logging
 import time
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
 
@@ -39,6 +39,15 @@ class AsyncBatchProcessor(Generic[T]):
         self.processing_thread = Thread(target=self._process_batches)
         self.processing_thread.daemon = True
         self.processing_thread.start()
+
+        # TODO: Probably should include a health check thread here.  It will revive the
+        # processing thread if that thread dies.
+
+        # TODO: Probably should include some sort of local write buffer.  It might not need
+        # to be here, but it should exist.  That handles 2 cases:
+        # 1. The queue is full, so users can sync up data later.
+        # 2. The system crashes for some reason, so users can resume from the local buffer.
+
         atexit.register(self.stop_accepting_new_work_and_safely_shutdown)
 
     def enqueue(self, items: list[T]) -> None:
@@ -50,8 +59,13 @@ class AsyncBatchProcessor(Generic[T]):
         """
         with self.lock:
             for item in items:
-                # TODO: If the queue is full, this will block.
-                self.queue.put(item)
+                try:
+                    self.queue.put_nowait(item)
+                except Full:
+                    # TODO: This is probably not what you want, but it will prevent OOM for now.
+                    logger.warning(
+                        f"Queue is full.  Dropping item.  Max queue size: {self.queue.maxsize}"
+                    )
 
     def _get_next_batch(self) -> list[T]:
         batch: list[T] = []
