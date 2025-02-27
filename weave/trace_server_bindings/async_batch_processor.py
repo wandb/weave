@@ -144,35 +144,35 @@ class AsyncBatchProcessor(Generic[T]):
                 processed = False  # Flag to track if batch was processed
 
                 if self.process_timeout > 0:
-                    # Use a separate thread with timeout for processing to avoid blocking
+                    # If a timeout is set, use a separate thread to enforce the timeout.
+                    # This is necessary because the processing function may block indefinitely.
                     processing_completed = Event()
-                    processing_error: list[Exception | None] = [None]
+                    processing_error = None
 
                     def process_with_timeout() -> None:
+                        nonlocal processing_error
+
                         try:
                             self.processor_fn(items_to_process)
                         except Exception as e:
-                            processing_error[0] = e
+                            processing_error = e
                             processing_completed.set()
                         else:
                             processing_completed.set()
 
+                    # Start and wait for processing to complete or timeout
                     processing_thread = Thread(target=process_with_timeout)
                     processing_thread.daemon = True
                     processing_thread.start()
+                    processing_success = processing_completed.wait(self.process_timeout)
 
-                    # Wait for processing to complete or timeout
-                    processing_success = processing_completed.wait(
-                        timeout=self.process_timeout
-                    )
-
+                    # Case 1: Processing timed out
                     if not processing_success:
-                        # Processing timed out
-                        logger.warning(
+                        logger.info(
                             f"Processing batch of {len(current_batch)} items timed out after {self.process_timeout}s. "
                             f"Moving to next batch. Items will be retried if retry attempts remain."
                         )
-                        # Re-enqueue items for retry if attempts remain
+                        # Queue items back up for retry if they haven't exceeded max retries
                         with self.lock:
                             for tracker in current_batch:
                                 if tracker.retry_count < self.max_retries:
@@ -184,34 +184,33 @@ class AsyncBatchProcessor(Generic[T]):
                                         f"Dropping item."
                                     )
                             self.current_batch = []
-                    elif processing_error[0] is not None:
-                        # Processing completed with an error
-                        if get_raise_on_captured_errors():
-                            raise processing_error[0]
-                        logger.exception(
-                            f"Error processing batch: {processing_error[0]}"
-                        )
+
+                    # Case 2: Processing completed with an error
+                    elif processing_error is not None:
                         with self.lock:
                             self.current_batch = []
+                        if get_raise_on_captured_errors():
+                            raise processing_error
+                        logger.exception(f"Error processing batch: {processing_error}")
+
+                    # Case 3: Processing completed successfully
                     else:
-                        # Processing completed successfully
                         with self.lock:
                             self.current_batch = []
 
                     processed = True  # Mark as processed regardless of outcome
 
-                # Only process if not already processed with timeout mechanism
+                # Only process if not already processed with timeout mechanism.
                 if not processed:
-                    # Process without timeout (original behavior)
                     try:
                         self.processor_fn(items_to_process)
                     except Exception as e:
-                        if get_raise_on_captured_errors():
-                            raise
-                        logger.exception(f"Error processing batch: {e}")
                         # Clear the current batch even on error to avoid retrying indefinitely
                         with self.lock:
                             self.current_batch = []
+                        if get_raise_on_captured_errors():
+                            raise
+                        logger.exception(f"Error processing batch: {e}")
                     else:
                         # If we succeed, then clear it out ahead of the next one
                         with self.lock:

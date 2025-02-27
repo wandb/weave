@@ -388,9 +388,9 @@ def test_processor_timeout_prevents_blocking():
     # - Fast items (7-12)
     # - Hang-once items on retry (4-6)
     expected_completions = set(range(4, 13))
-    assert set(process_completions) == expected_completions, (
-        f"Expected items {expected_completions} to complete, but got {set(process_completions)}"
-    )
+    assert (
+        set(process_completions) == expected_completions
+    ), f"Expected items {expected_completions} to complete, but got {set(process_completions)}"
 
     attempt_counts = {}
     for item in process_attempts:
@@ -399,26 +399,26 @@ def test_processor_timeout_prevents_blocking():
     # Always-hang items (1-3) should be retried multiple times due to timeouts
     for item in range(1, 4):
         assert item in attempt_counts, f"Item {item} was never attempted"
-        assert attempt_counts[item] > 2, (
-            f"Item {item} was only attempted {attempt_counts[item]} time(s)"
-        )
+        assert (
+            attempt_counts[item] > 2
+        ), f"Item {item} was only attempted {attempt_counts[item]} time(s)"
 
     # Hang-once items (4-6) should be attempted at least twice (first attempt times out, retry succeeds)
     for item in range(4, 7):
         assert item in attempt_counts, f"Item {item} was never attempted"
-        assert attempt_counts[item] == 2, (
-            f"Item {item} was only attempted {attempt_counts[item]} time(s), expected 2"
-        )
+        assert (
+            attempt_counts[item] == 2
+        ), f"Item {item} was only attempted {attempt_counts[item]} time(s), expected 2"
 
     # Fast items (7-12) should be processed exactly once
     for item in range(7, 13):
         assert item in attempt_counts, f"Item {item} was never attempted"
-        assert attempt_counts[item] == 1, (
-            f"Item {item} was attempted {attempt_counts[item]} times, expected 1"
-        )
+        assert (
+            attempt_counts[item] == 1
+        ), f"Item {item} was attempted {attempt_counts[item]} times, expected 1"
 
     # Confirm that always-hang items never completed (they are dropped entirely)
     for item in range(1, 4):
-        assert item not in process_completions, (
-            f"Always-hang item {item} was unexpectedly completed"
-        )
+        assert (
+            item not in process_completions
+        ), f"Always-hang item {item} was unexpectedly completed"
