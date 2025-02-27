@@ -120,6 +120,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
         }}>
         {!onlyOneChat && <Tag label={`${idx + 1}`} />}
         <LLMDropdown
+          entity={entity}
+          project={project}
           value={playgroundStates[idx].model}
           onChange={(model, maxTokens) =>
             handleModelChange(idx, model, maxTokens)

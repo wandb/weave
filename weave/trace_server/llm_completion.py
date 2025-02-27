@@ -9,6 +9,8 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
+CUSTOM_PROVIDER_PREFIX = "__weave_custom_provider__/"
+
 
 def lite_llm_completion(
     api_key: str,
@@ -32,9 +34,85 @@ def lite_llm_completion(
         azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
     import litellm
+    from litellm import LiteLLM
 
+    litellm.set_verbose = True
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
+
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+    import os
+
+    os.environ["LITELLM_LOG"] = "DEBUG"
+    if CUSTOM_PROVIDER_PREFIX in inputs.model:
+
+        print(inputs, flush=True)
+        print(
+            """
+
+
+
+
+================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+        )
+        inputs.model = "custom/claude-3-5-sonnet-202410222"
+
+        # llm = LiteLLM(
+        #     base_url="https://api.anthropic.com/v1/messages",
+        #     api_key=api_key,
+        # )
+
+        # llm.default_headers = {"Auth" "x-api-key": api_key, "Content-Type": "application/json"}
+
+        # print(llm.default_headers)
+        # res = llm.chat.completions.create(
+        #     **inputs.model_dump(exclude_none=True),
+        #     headers={"x-api-key": api_key, "Content-Type": "application/json"},
+        # )
+        res = litellm.completion(
+            **inputs.model_dump(exclude_none=True),
+            # api_key=api_key,
+            api_base="https://api.anthropic.com/v1/messages",
+            # headers={
+            #     "Authorization": f"Bearer {api_key}",
+            #     "x-api-key": api_key,
+            #     "api-key": api_key,
+            #     "Content-Type": "application/json",
+            # },
+            # default_headers={
+            #     "Authorization": f"Bearer {api_key}",
+            #     "x-api-key": api_key,
+            #     "api-key": api_key,
+            #     "Content-Type": "application/json",
+            # },
+            extra_headers={
+                # "Authorization": f"Bearer {api_key}",
+                "x-api-key": api_key,
+                # "api-key": api_key,
+                # "Content-Type": "application/json",
+            },
+        )
+        return tsi.CompletionsCreateRes(response=res.model_dump())
 
     try:
         res = litellm.completion(
@@ -45,6 +123,11 @@ def lite_llm_completion(
             aws_region_name=aws_region_name,
             api_base=azure_api_base,
             api_version=azure_api_version,
+            # api_base=(
+            #     "https://api.anthropic.com/v1/messages"
+            #     if "custom" in inputs.model
+            #     else None
+            # ),
         )
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
