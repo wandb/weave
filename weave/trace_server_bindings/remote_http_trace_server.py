@@ -184,7 +184,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # If the batch is too big, split it in half and process each half
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
             split_idx = int(len(batch) // 2)
-            # Process each half separately, without recursion
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
