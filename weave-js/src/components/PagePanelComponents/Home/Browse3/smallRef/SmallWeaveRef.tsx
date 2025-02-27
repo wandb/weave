@@ -16,7 +16,6 @@ import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {SmallRefLoaded} from './SmallRefLoaded';
-import {WFDBTableType} from './types';
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
@@ -87,14 +86,14 @@ const getObjectVersionLabel = (
 
 type SmallWeaveRefProps = {
   objRef: WeaveObjectRef;
-  wfTable?: WFDBTableType;
   iconOnly?: boolean;
+  noLink?: boolean;
 };
 
 export const SmallWeaveRef = ({
   objRef,
-  wfTable,
   iconOnly = false,
+  noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjectVersion} = useWFHooks();
@@ -128,13 +127,24 @@ export const SmallWeaveRef = ({
     objRef.weaveKind === 'op' ? 'Op' : baseObjectClass ?? 'Object';
 
   const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
-  const url = peekingRouter.refUIUrl(rootTypeName, objRef, wfTable);
+
+  const url = peekingRouter.refUIUrl(
+    rootTypeName,
+    objRef,
+    objRef.weaveKind === 'op' ? 'OpVersion' : undefined
+  );
   const label = iconOnly
     ? undefined
     : getObjectVersionLabel(objRef, versionIndex);
   return (
     <TailwindContents>
-      <SmallRefLoaded icon={icon} label={label} url={url} error={error} />
+      <SmallRefLoaded
+        icon={icon}
+        label={label}
+        url={url}
+        error={error}
+        noLink={noLink}
+      />
     </TailwindContents>
   );
 };

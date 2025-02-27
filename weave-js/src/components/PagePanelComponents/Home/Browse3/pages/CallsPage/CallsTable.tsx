@@ -55,6 +55,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
@@ -93,6 +94,7 @@ import {
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
+  BulkAddToDatasetButton,
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   CompareTracesTableButton,
@@ -112,7 +114,7 @@ import {
 import {useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
-const MAX_EVAL_COMPARISONS = 5;
+
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
@@ -591,17 +593,14 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                const maxForTable = isEvaluateTable
-                  ? MAX_EVAL_COMPARISONS
-                  : MAX_SELECT;
                 if (
                   selectedCalls.length ===
-                  Math.min(tableData.length, maxForTable)
+                  Math.min(tableData.length, MAX_SELECT)
                 ) {
                   setSelectedCalls([]);
                 } else {
                   setSelectedCalls(
-                    tableData.map(row => row.id).slice(0, maxForTable)
+                    tableData.map(row => row.id).slice(0, MAX_SELECT)
                   );
                 }
               }}
@@ -611,19 +610,11 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabled =
-            !isSelected &&
-            (isEvaluateTable
-              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
-              : selectedCalls.length >= MAX_SELECT);
-          let tooltipText = '';
-          if (isEvaluateTable) {
-            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
-              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
-            }
-          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
-            tooltipText = `Selection limited to ${MAX_SELECT} items`;
-          }
+          const disabled = !isSelected && selectedCalls.length >= MAX_SELECT;
+          const tooltipText =
+            selectedCalls.length >= MAX_SELECT && !isSelected
+              ? `Selection limited to ${MAX_SELECT} items`
+              : '';
 
           return (
             <Tooltip title={tooltipText} placement="right" arrow>
@@ -653,7 +644,7 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
+  }, [columns.cols, selectedCalls, tableData]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -677,6 +668,24 @@ export const CallsTable: FC<{
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
+
+  // Replace the state and effect with a single memo
+  const selectedCallObjects = useMemo(() => {
+    if (!callsResult) {
+      return [];
+    }
+    return callsResult
+      .filter(
+        call =>
+          call?.traceCall?.id != null &&
+          selectedCalls.includes(call.traceCall.id)
+      )
+      .map(call => ({
+        digest: call.traceCall!.id,
+        val: call.traceCall!,
+      }));
+  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -856,6 +865,20 @@ export const CallsTable: FC<{
                   onDeleteCallback={() => {
                     setSelectedCalls([]);
                   }}
+                />
+              </div>
+              <ButtonDivider />
+              <div className="flex-none">
+                <BulkAddToDatasetButton
+                  onClick={() => setAddToDatasetModalOpen(true)}
+                  disabled={selectedCalls.length === 0}
+                />
+                <AddToDatasetDrawer
+                  entity={entity}
+                  project={project}
+                  open={addToDatasetModalOpen}
+                  onClose={() => setAddToDatasetModalOpen(false)}
+                  selectedCalls={selectedCallObjects}
                 />
               </div>
               <ButtonDivider />

@@ -14,7 +14,6 @@ from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.errors import InternalError
-from weave.trace.object_preparers import prepare_obj
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -395,7 +394,7 @@ class WeaveTable(Traceable):
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
-                    # filter=self.filter,
+                    filter=self.filter,
                 )
             )
 
@@ -633,7 +632,7 @@ def make_trace_obj(
         # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
-    # Derefence val and create the appropriate wrapper object
+    # Dereference val and create the appropriate wrapper object
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
@@ -648,7 +647,6 @@ def make_trace_obj(
                 )
             )
             val = from_json(read_res.obj.val, project_id, server)
-            prepare_obj(val)
         except ObjectDeletedError as e:
             # encountered a deleted object, return DeletedRef, warn and continue
             val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
@@ -705,11 +703,20 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
+                table_row_filter = TableRowFilter()
+                if (
+                    len(extra) == 4
+                    and extra[0] == OBJECT_ATTR_EDGE_NAME
+                    and extra[1] == "rows"
+                    and extra[2] == TABLE_ROW_ID_EDGE_NAME
+                ):
+                    table_row_filter.row_digests = [extra[3]]
+
                 val = WeaveTable(
                     table_ref=val,
                     ref=new_ref,
                     server=server,
-                    filter=TableRowFilter(),
+                    filter=table_row_filter,
                     root=root,
                     parent=parent,
                 )

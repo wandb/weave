@@ -9,6 +9,7 @@ import set from 'lodash/set';
 import React, {useCallback, useState} from 'react';
 
 import {CellValue} from '../../Browse2/CellValue';
+import {isRefPrefixedString} from '../filters/common';
 import {DatasetRow, useDatasetEditContext} from './DatasetEditorContext';
 import {CodeEditor} from './editors/CodeEditor';
 import {DiffEditor} from './editors/DiffEditor';
@@ -16,9 +17,9 @@ import {TextEditor} from './editors/TextEditor';
 import {EditorMode, EditPopover} from './EditPopover';
 
 export const CELL_COLORS = {
-  DELETED: 'rgba(255, 0, 0, 0.1)',
-  EDITED: 'rgba(0, 128, 128, 0.1)',
-  NEW: 'rgba(0, 255, 0, 0.1)',
+  DELETED: '#FFE6E6', // Red 200
+  EDITED: '#E0EDFE', // Blue 200
+  NEW: '#E4F7EE', // Green 200
   TRANSPARENT: 'transparent',
 } as const;
 
@@ -30,12 +31,10 @@ export const DELETED_CELL_STYLES = {
 const cellViewingStyles = {
   height: '100%',
   width: '100%',
-  fontFamily: '"Source Sans Pro", sans-serif',
-  fontSize: '14px',
-  lineHeight: '1.5',
-  padding: '8px 12px',
   display: 'flex',
+  padding: '8px 12px',
   alignItems: 'center',
+  justifyContent: 'center',
   transition: 'background-color 0.2s ease',
 };
 
@@ -46,38 +45,6 @@ interface CellViewingRendererProps {
   isEditing?: boolean;
   serverValue?: any;
 }
-
-const ShimmerOverlay: React.FC = () => (
-  <Box
-    sx={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background:
-        'linear-gradient(90deg, transparent 0%, rgba(128, 128, 128, 0) 20%, rgba(128, 128, 128, 0.2) 50%, rgba(128, 128, 128, 0) 80%, transparent 100%)',
-      animation: 'shimmer-wobble 2s infinite ease-in-out',
-      '@keyframes shimmer-wobble': {
-        '0%': {
-          transform: 'translateX(-100%) skewX(-15deg)',
-          opacity: 0,
-        },
-        '20%': {
-          opacity: 1,
-        },
-        '80%': {
-          opacity: 1,
-        },
-        '100%': {
-          transform: 'translateX(100%) skewX(-15deg)',
-          opacity: 0,
-        },
-      },
-      pointerEvents: 'none',
-    }}
-  />
-);
 
 export const CellViewingRenderer: React.FC<
   GridRenderCellParams & CellViewingRendererProps
@@ -93,9 +60,11 @@ export const CellViewingRenderer: React.FC<
   serverValue,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const {setEditedRows} = useDatasetEditContext();
+  const {setEditedRows, setAddedRows} = useDatasetEditContext();
 
-  const isEditable = typeof value !== 'object' && typeof value !== 'boolean';
+  const isWeaveUrl = isRefPrefixedString(value);
+  const isEditable =
+    !isWeaveUrl && typeof value !== 'object' && typeof value !== 'boolean';
 
   const handleEditClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -138,11 +107,19 @@ export const CellViewingRenderer: React.FC<
       const existingRow = api.getRow(id);
       const updatedRow = {...existingRow, [field]: !value};
       api.updateRows([{id, ...updatedRow}]);
-      setEditedRows(prev => {
-        const newMap = new Map(prev);
-        newMap.set(existingRow.___weave?.index, updatedRow);
-        return newMap;
-      });
+      if (existingRow.___weave?.isNew) {
+        setAddedRows(prev => {
+          const newMap = new Map(prev);
+          newMap.set(existingRow.___weave?.id, updatedRow);
+          return newMap;
+        });
+      } else {
+        setEditedRows(prev => {
+          const newMap = new Map(prev);
+          newMap.set(existingRow.___weave?.index, updatedRow);
+          return newMap;
+        });
+      }
     };
 
     return (
@@ -176,8 +153,11 @@ export const CellViewingRenderer: React.FC<
               : 'none',
             cursor: 'pointer',
             transition: 'background-color 0.2s ease',
+            borderLeft: '1px solid transparent',
+            borderRight: '1px solid transparent',
             '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.08)',
+              borderLeft: '1px solid #DFE0E2',
+              borderRight: '1px solid #DFE0E2',
             },
           }}>
           <Icon
@@ -185,7 +165,7 @@ export const CellViewingRenderer: React.FC<
             height={20}
             width={20}
             style={{
-              color: value ? '#22c55e' : '#ef4444',
+              color: value ? '#00875A' : '#CC2944',
             }}
           />
         </Box>
@@ -209,18 +189,21 @@ export const CellViewingRenderer: React.FC<
             },
           },
         }}>
-        <Box
+        <div
           onClick={e => e.stopPropagation()}
           onDoubleClick={e => e.stopPropagation()}
-          sx={{
+          style={{
+            height: '100%',
             backgroundColor: getBackgroundColor(),
             opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,
             textDecoration: isDeleted
               ? DELETED_CELL_STYLES.textDecoration
               : 'none',
+            alignContent: 'center',
+            paddingLeft: '8px',
           }}>
-          <CellValue value={value} />
-        </Box>
+          <CellValue value={value} noLink={true} />
+        </div>
       </Tooltip>
     );
   }
@@ -253,24 +236,20 @@ export const CellViewingRenderer: React.FC<
           textDecoration: isDeleted
             ? DELETED_CELL_STYLES.textDecoration
             : 'none',
-          '@keyframes shimmer': {
-            '0%': {
-              transform: 'translateX(-100%)',
-            },
-            '100%': {
-              transform: 'translateX(100%)',
-            },
-          },
+          borderLeft: '1px solid transparent',
+          borderRight: '1px solid transparent',
           '&:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            borderLeft: '1px solid #DFE0E2',
+            borderRight: '1px solid #DFE0E2',
           },
           ...(isEditing && {
-            outline: '2px solid rgb(77, 208, 225)',
+            border: '2px solid rgb(77, 208, 225)',
+            backgroundColor: 'rgba(77, 208, 225, 0.2)',
           }),
         }}>
         <span style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
           {value}
-          {isEditing && <ShimmerOverlay />}
+          {isEditing}
         </span>
         {isHovered && (
           <Box
@@ -364,6 +343,8 @@ const NumberEditor: React.FC<{
         alignItems: 'center',
         height: '100%',
         width: '100%',
+        border: '2px solid rgb(77, 208, 225)',
+        backgroundColor: 'rgba(77, 208, 225, 0.2)',
       }}>
       <input
         type="number"
@@ -596,23 +577,44 @@ export const CellEditingRenderer: React.FC<
   );
 };
 
-interface ControlCellProps {
+export interface ControlCellProps {
   params: GridRenderCellParams;
-  deleteRow: (absoluteIndex: number) => void;
-  restoreRow: (absoluteIndex: number) => void;
-  deleteAddedRow: (rowId: string) => void;
+  deleteRow: (index: number) => void;
+  deleteAddedRow: (id: string) => void;
+  restoreRow: (index: number) => void;
   isDeleted: boolean;
   isNew: boolean;
+  hideRemoveForAddedRows?: boolean;
 }
 
 export const ControlCell: React.FC<ControlCellProps> = ({
   params,
   deleteRow,
-  restoreRow,
   deleteAddedRow,
+  restoreRow,
   isDeleted,
   isNew,
+  hideRemoveForAddedRows,
 }) => {
+  const rowId = params.id as string;
+  const rowIndex = params.row.___weave?.index;
+
+  // Hide remove button for added rows if requested
+  if (isNew && hideRemoveForAddedRows) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          width: '100%',
+          backgroundColor: CELL_COLORS.NEW,
+        }}
+      />
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -640,28 +642,21 @@ export const ControlCell: React.FC<ControlCellProps> = ({
             opacity: 0,
           },
           zIndex: 1000,
+          backgroundColor: 'transparent',
         }}>
-        {isNew && (
+        {isDeleted ? (
           <Button
-            onClick={() => deleteAddedRow(params.row.___weave?.id)}
-            tooltip="Remove"
-            icon="close"
-            size="small"
-            variant="secondary"
-          />
-        )}
-        {isDeleted && (
-          <Button
-            onClick={() => restoreRow(params.row.___weave?.index)}
+            onClick={() => restoreRow(rowIndex)}
             tooltip="Restore"
             icon="undo"
             size="small"
             variant="secondary"
           />
-        )}
-        {!isNew && !isDeleted && (
+        ) : (
           <Button
-            onClick={() => deleteRow(params.row.___weave?.index)}
+            onClick={() =>
+              isNew ? deleteAddedRow(rowId) : deleteRow(rowIndex)
+            }
             tooltip="Delete"
             icon="delete"
             size="small"

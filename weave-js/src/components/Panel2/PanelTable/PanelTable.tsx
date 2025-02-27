@@ -83,6 +83,7 @@ import * as TableType from './tableType';
 import {
   BaseTableDataType,
   getColumnCellFormats,
+  getColumnVariables,
   getTableMeasurements,
   nodeIsValidList,
   tableIsPanelVariable,
@@ -152,7 +153,20 @@ export const PanelTable: React.FC<
   if (typedInputNodeUse.loading) {
     return <Panel2Loader />;
   } else if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
-    return <div>-</div>;
+    return (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '14px',
+        }}>
+        No items to display
+      </div>
+    );
   } else if (!nodeIsValidList(typedInputNode)) {
     console.warn(
       'PanelTable returning empty state because of Invalid input type: ',
@@ -228,19 +242,7 @@ const PanelTableInnerConfigSetter: React.FC<
   }, [config, tableState, autoTable]);
 
   const columnVariables: {[key: string]: NodeOrVoidNode} = useMemo(() => {
-    const defineColumnVariables = (currentTableState: Table.TableState) => {
-      return Object.keys(currentTableState.columns).reduce(
-        (acc: {[key: string]: NodeOrVoidNode}, colId) => {
-          const columnName =
-            currentTableState.columnNames[colId] || colId.replace(/-/g, '');
-          acc[columnName] = currentTableState.columnSelectFunctions[colId];
-          return acc;
-        },
-        {}
-      );
-    };
-
-    return defineColumnVariables(config.tableState ?? tableState ?? autoTable);
+    return getColumnVariables(config.tableState ?? tableState ?? autoTable);
   }, [config.tableState, tableState, autoTable]);
 
   const [showColumnSelect, setShowColumnSelect] = React.useState(false);
@@ -882,6 +884,7 @@ const PanelTableInner: React.FC<
                 <Tooltip
                   key={rowSize}
                   content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  noTriggerWrap
                   trigger={
                     <Button
                       startIcon={rowSizeIconName[RowSize[rowSize]]}

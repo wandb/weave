@@ -78,6 +78,12 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.file_storage import (
+    key_for_project_digest,
+    read_from_bucket,
+    store_in_bucket,
+)
+from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import lite_llm_completion
 from weave.trace_server.model_providers.model_providers import (
@@ -127,7 +133,7 @@ MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
-MAX_DELETE_CALLS_COUNT = 100
+MAX_DELETE_CALLS_COUNT = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 
@@ -186,6 +192,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        file_storage_uri_str: Optional[str] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -198,6 +205,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._file_storage_uri_str = file_storage_uri_str
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -210,6 +218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
+            file_storage_uri_str=wf_env.wf_file_storage_uri(),
         )
 
     @contextmanager
@@ -305,13 +314,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         columns = all_call_select_columns
         if req.columns:
+            # TODO: add support for json extract fields
+            # Split out any nested column requests
+            columns = [col.split(".")[0] for col in req.columns]
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
-            columns = list(set(required_call_columns + req.columns))
-            # TODO: add support for json extract fields
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in columns]
+            columns = list(set(required_call_columns + columns))
 
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
@@ -922,7 +931,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = self._query_stream(query, parameters=pb.get_params())
 
         for row in res:
-            yield tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
+            yield tsi.TableRowSchema(
+                digest=row[0], val=json.loads(row[1]), original_index=row[2]
+            )
 
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         parameters: dict[str, Any] = {
@@ -1231,6 +1242,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
+        base_file_storage_uri = self._get_base_file_storage_uri()
+
+        if base_file_storage_uri is not None:
+            self._file_create_bucket(req, digest, base_file_storage_uri)
+        else:
+            self._file_create_clickhouse(req, digest)
+        return tsi.FileCreateRes(digest=digest)
+
+    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
@@ -1245,6 +1265,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     len(chunks),
                     req.name,
                     chunk,
+                    len(chunk),
+                    None,
                 )
                 for i, chunk in enumerate(chunks)
             ],
@@ -1255,15 +1277,71 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "n_chunks",
                 "name",
                 "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
             ],
         )
-        return tsi.FileCreateRes(digest=digest)
+
+    def _file_create_bucket(
+        self, req: tsi.FileCreateReq, digest: str, base_file_storage_uri: FileStorageURI
+    ) -> None:
+        target_file_storage_uri = base_file_storage_uri.with_path(
+            # It is entirely compatible with the design to support chunking on the
+            # bucket side. Just need to add a `/CHUNK` suffix to the key.
+            key_for_project_digest(req.project_id, digest)
+        )
+        store_in_bucket(target_file_storage_uri, req.content)
+        self._insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    0,
+                    1,
+                    req.name,
+                    b"",
+                    len(req.content),
+                    target_file_storage_uri.to_uri_str(),
+                )
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val_bytes",
+                "bytes_stored",
+                "file_storage_uri",
+            ],
+        )
+
+    def _get_base_file_storage_uri(self) -> Optional[FileStorageURI]:
+        """
+        Get the base storage URI for a project.
+
+        Currently this is quite simple as it uses the default storage bucket
+        for the entire client (most typically configured via environment variable).
+
+        However, in the near future, this might be something that is driven by
+        the project or a context variable. Leaving this method here for clarity
+        and future extensibility.
+        """
+        if not self._file_storage_uri_str:
+            return None
+        res = FileStorageURI.parse_uri_str(self._file_storage_uri_str)
+        if res.has_path():
+            raise ValueError(
+                f"Supplied file storage uri contains path components: {self._file_storage_uri_str}"
+            )
+        return res
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
-            SELECT n_chunks, val_bytes
+            SELECT n_chunks, val_bytes, file_storage_uri
             FROM (
                 SELECT *
                 FROM (
@@ -1280,10 +1358,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             column_formats={"val_bytes": "bytes"},
         )
         n_chunks = query_result.result_rows[0][0]
-        chunks = [r[1] for r in query_result.result_rows]
-        if len(chunks) != n_chunks:
+        result_rows = list(query_result.result_rows)
+
+        if len(result_rows) != n_chunks:
             raise ValueError("Missing chunks")
-        return tsi.FileContentReadRes(content=b"".join(chunks))
+
+        # There are 2 cases:
+        # 1: file_storage_uri_str is not none (storing in file store)
+        # 2: file_storage_uri_str is None (storing directly in clickhouse)
+        bytes = b""
+
+        for result_row in result_rows:
+            chunk_file_storage_uri_str = result_row[2]
+            if chunk_file_storage_uri_str:
+                file_storage_uri = FileStorageURI.parse_uri_str(
+                    chunk_file_storage_uri_str
+                )
+                bytes += read_from_bucket(file_storage_uri)
+            else:
+                chunk_bytes = result_row[1]
+                bytes += chunk_bytes
+
+        return tsi.FileContentReadRes(content=bytes)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         assert_non_null_wb_user_id(req)

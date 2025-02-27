@@ -14,8 +14,9 @@ LLM providers are the vendors that offer access to large language models for gen
 - **[Anthropic](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
 - **[Cohere](/guides/integrations/cohere)**
-- **[Google Gemini](/guides/integrations/google-gemini)**
+- **[Google](/guides/integrations/google)**
 - **[Groq](/guides/integrations/groq)**
+- **[Hugging Face Hub](/guides/integrations/huggingface)**
 - **[LiteLLM](/guides/integrations/litellm)**
 - **[Microsoft Azure](/guides/integrations/azure)**
 - **[MistralAI](/guides/integrations/mistral)**

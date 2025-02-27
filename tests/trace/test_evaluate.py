@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import pytest
 
@@ -286,3 +287,75 @@ def test_scorer_name_sanitization(scorer_name):
 
     result = asyncio.run(evaluation.evaluate(model))
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
+
+
+def test_sync_eval_parallelism(client):
+    @weave.op()
+    def sync_op(a):
+        time.sleep(1)
+        return a
+
+    @weave.op()
+    def score(output):
+        return 1
+
+    dataset = [
+        {"a": 1},
+        {"a": 2},
+        {"a": 3},
+        {"a": 4},
+        {"a": 5},
+        {"a": 6},
+        {"a": 7},
+        {"a": 8},
+        {"a": 9},
+        {"a": 10},
+    ]
+
+    # 10 rows, should complete in <5 seconds. if sync, 10+
+
+    now = time.time()
+
+    evaluation = Evaluation(dataset=dataset, scorers=[score])
+    result = asyncio.run(evaluation.evaluate(sync_op))
+    assert result == {
+        "output": {"mean": 5.5},
+        "score": {"mean": 1.0},
+        "model_latency": {"mean": pytest.approx(1, abs=1)},
+    }
+    assert time.time() - now < 5
+
+
+def test_evaluation_from_weaveobject_missing_evaluation_name(client):
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+    dataset = Dataset(rows=dataset_rows)
+
+    class EvalModel(Model):
+        @weave.op()
+        async def predict(self, input) -> str:
+            return eval(input)
+
+    @weave.op()
+    def score(target, output):
+        return target == output
+
+    # Create and save an Evaluation object
+    evaluation = Evaluation(
+        dataset=dataset,
+        scorers=[score],
+        name="test-eval",
+    )
+    ref = weave.publish(evaluation)
+
+    # To simulate it being an older object, we delete the evaluation_name attribute from
+    # the gotten weave object.
+    eval_obj = ref.get(objectify=False)
+    delattr(eval_obj._val, "evaluation_name")
+
+    # We should still be able to load the Evaluation object even if this attr doesn't exist
+    # and it should continue to work and produce expected results
+    evaluation = Evaluation.from_obj(eval_obj)
+    model = EvalModel()
+
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result == expected_eval_result

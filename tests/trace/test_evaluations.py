@@ -9,7 +9,6 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
-from weave.scorers import Scorer
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
@@ -769,8 +768,8 @@ async def test_eval_with_complex_types(client):
     # the correct behavior of the dataset (the should be the
     # MyDataclass, MyModel, and MyObj)
     assert isinstance(row["dc"], str)  #  MyDataclass
-    assert isinstance(row["model"], str)  #  MyModel
-    assert isinstance(row["obj"], str)  #  MyObj
+    assert isinstance(row["model"], str)  # MyModel
+    assert isinstance(row["obj"], str)  # MyObj
     assert isinstance(row["text"], str)
 
     access_log = client.server.attribute_access_log
@@ -782,7 +781,7 @@ async def test_eval_with_complex_types(client):
 @pytest.mark.asyncio
 async def test_evaluation_with_column_map():
     # Define a dummy scorer that uses column_map
-    class DummyScorer(Scorer):
+    class DummyScorer(weave.Scorer):
         @weave.op()
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
@@ -821,7 +820,7 @@ async def test_evaluation_with_column_map():
 @pytest.mark.asyncio
 async def test_evaluation_with_wrong_column_map():
     # Define a dummy scorer that uses column_map
-    class DummyScorer(Scorer):
+    class DummyScorer(weave.Scorer):
         @weave.op()
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
@@ -874,13 +873,13 @@ async def test_evaluation_with_wrong_column_map():
 # Define another dummy scorer
 @pytest.mark.asyncio
 async def test_evaluation_with_multiple_column_maps():
-    class DummyScorer(Scorer):
+    class DummyScorer(weave.Scorer):
         @weave.op()
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
 
-    class AnotherDummyScorer(Scorer):
+    class AnotherDummyScorer(weave.Scorer):
         @weave.op()
         def score(self, input1: str, input2: str, output: str) -> dict:
             # Return whether input1 == output reversed
@@ -981,7 +980,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     def predict(text: str) -> str:
         return text
 
-    class MyScorer(Scorer):
+    class MyScorer(weave.Scorer):
         @weave.op
         def score(self, text, output) -> bool:
             return text == output
@@ -1010,7 +1009,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
 
 
 def test_scorers_with_output_and_model_output_raise_error():
-    class MyScorer(Scorer):
+    class MyScorer(weave.Scorer):
         @weave.op
         def score(self, text, output, model_output):
             return text == output == model_output

@@ -12,6 +12,7 @@ import React, {
   useState,
 } from 'react';
 
+import {isFirefox} from '../../../components/WeavePanelBank/panelbankUtil';
 import {DragData, DragRef} from './types';
 
 export interface DragDropState {
@@ -201,32 +202,20 @@ const DragDropProviderComp: FC<DragDropProviderProps> = ({
   }, [clearDragRef]);
 
   useEffect(() => {
-    // Firefox doesn't give you clientX and clientY on drag events (wtf)
-    // So we add an event handler to document.dragover and store the result in the context
-    function mousemoveHandler(e: MouseEvent) {
-      setClientXYFromEvent(e);
-    }
-
-    function dragstartHandler() {
-      document.addEventListener('mousemove', mousemoveHandler);
-    }
-
-    function dragendHandler() {
-      document.removeEventListener('mousemove', mousemoveHandler);
-    }
-
-    function dragoverHandler(e: DragEvent) {
+    // Firefox sets clientX and clientY on drag events to 0
+    // This is a 16 year old bug that they still haven't addressed https://bugzilla.mozilla.org/show_bug.cgi?id=505521
+    function handler(e: DragEvent) {
+      // This is a workaround to get clientXY for Firefox that users have proposed in the bug thread.
+      // There's no need to do this for Chrome.
+      if (isFirefox) {
+        setClientXYFromEvent(e);
+      }
       onDocumentDragOver?.(contextValRef.current, e);
     }
 
-    document.addEventListener('dragstart', dragstartHandler);
-    document.addEventListener('dragend', dragendHandler);
-    document.addEventListener('dragover', dragoverHandler);
+    document.addEventListener('dragover', handler);
     return () => {
-      document.removeEventListener('mousemove', mousemoveHandler);
-      document.removeEventListener('dragover', dragoverHandler);
-      document.removeEventListener('dragstart', dragstartHandler);
-      document.removeEventListener('dragend', dragstartHandler);
+      document.removeEventListener('dragover', handler);
     };
   }, [setClientXYFromEvent, onDocumentDragOver]);
 
