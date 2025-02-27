@@ -657,7 +657,7 @@ const CallsPageBinding = () => {
       console.log(e);
       return {};
     }
-  }, [query.filter, entity, project, tab]);
+  }, [query.filter, entity, project, isEvaluationsTab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
