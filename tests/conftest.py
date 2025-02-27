@@ -48,6 +48,23 @@ def disable_datadog():
     os.environ["DD_ENV"] = "none"
     os.environ["DD_TRACE_ENABLED"] = "false"
 
+    # Silence Datadog loggers
+    dd_loggers = [
+        "ddtrace",
+        "ddtrace.writer",
+        "ddtrace.api",
+        "ddtrace.internal",
+        "datadog",
+        "datadog.dogstatsd",
+        "datadog.api",
+    ]
+
+    original_levels = {}
+    for logger_name in dd_loggers:
+        logger = logging.getLogger(logger_name)
+        original_levels[logger_name] = logger.level
+        logger.setLevel(logging.CRITICAL)  # Only show critical errors
+
     yield
 
     # Restore original values
