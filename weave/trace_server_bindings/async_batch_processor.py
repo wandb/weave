@@ -19,6 +19,7 @@ class AsyncBatchProcessor(Generic[T]):
         processor_fn: Callable[[list[T]], None],
         max_batch_size: int = 100,
         min_batch_interval: float = 1.0,
+        max_queue_size: int = 10_000,
     ) -> None:
         """
         Initializes an instance of AsyncBatchProcessor.
@@ -27,11 +28,12 @@ class AsyncBatchProcessor(Generic[T]):
             processor_fn (Callable[[list[T]], None]): The function to process the batches of items.
             max_batch_size (int, optional): The maximum size of each batch. Defaults to 100.
             min_batch_interval (float, optional): The minimum interval between processing batches. Defaults to 1.0.
+            max_queue_size (int, optional): The maximum number of items to hold in the queue. Defaults to 10_000.  0 means no limit.
         """
         self.processor_fn = processor_fn
         self.max_batch_size = max_batch_size
         self.min_batch_interval = min_batch_interval
-        self.queue: Queue[T] = Queue()
+        self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
         self.processing_thread = Thread(target=self._process_batches)
@@ -48,6 +50,7 @@ class AsyncBatchProcessor(Generic[T]):
         """
         with self.lock:
             for item in items:
+                # TODO: If the queue is full, this will block.
                 self.queue.put(item)
 
     def _get_next_batch(self) -> list[T]:
