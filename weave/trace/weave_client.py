@@ -733,6 +733,7 @@ def make_client_call(
         id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
