@@ -61,6 +61,7 @@ import {
   DEFAULT_FILTER_CALLS_WITH_DATE,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
+  filterHasDefaultDateFilter,
 } from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
@@ -660,8 +661,20 @@ const CallsPageBinding = () => {
   }, [query.filter, entity, project, isEvaluationsTab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
+
+  // Track if we've ever had a filter applied
+  const hasHadFilter = useRef(false);
+
+  // Track if the user has explicitly removed the date filter
+  const hasRemovedDateFilter = useRef(false);
+
+  // Update the onFilterUpdate callback to track filter state
   const onFilterUpdate = useCallback(
     filter => {
+      // Mark that we've had a filter applied
+      hasHadFilter.current = true;
+
+      // Push the new URL with the updated filter
       history.push(routerContext.callsUIUrl(entity, project, filter));
     },
     [history, entity, project, routerContext]
@@ -694,16 +707,28 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
-  const defaultDateFilter = isEvaluationsTab
-    ? DEFAULT_FILTER_CALLS // No date filter for evaluations
-    : DEFAULT_FILTER_CALLS_WITH_DATE;
+  // Only show the date filter if not evals and we haven't explicitly removed it
+  const defaultDateFilter =
+    isEvaluationsTab || hasRemovedDateFilter.current
+      ? DEFAULT_FILTER_CALLS // No date filter for evaluations or if user removed it
+      : DEFAULT_FILTER_CALLS_WITH_DATE;
+
   const filterModel = useMemo(
     () => getValidFilterModel(query.filters, defaultDateFilter),
     [query.filters, defaultDateFilter]
   );
+
   const setFilterModel = (newModel: GridFilterModel) => {
+    // If there was a date filter and now there isn't, mark it as explicitly removed
+    const hadDateFilter = filterHasDefaultDateFilter(filterModel);
+    if (hadDateFilter && !filterHasDefaultDateFilter(newModel)) {
+      hasRemovedDateFilter.current = true;
+    }
+
     const newQuery = new URLSearchParams(location.search);
     if (newModel.items.length === 0) {
+      // If clearing all filters, mark date filter as explicitly removed
+      hasRemovedDateFilter.current = true;
       newQuery.set('filters', JSON.stringify(DEFAULT_FILTER_CALLS));
     } else {
       newQuery.set('filters', JSON.stringify(newModel));

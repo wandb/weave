@@ -141,6 +141,11 @@ export const DEFAULT_FILTER_CALLS_WITH_DATE: GridFilterModel = {
   items: [makeDefaultDateFilter()],
   logicOperator: GridLogicOperator.And,
 };
+export const filterHasDefaultDateFilter = (filter: GridFilterModel) => {
+  return filter.items.some(
+    item => item.field === 'started_at' && item.operator === '(date): after'
+  );
+};
 
 const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
