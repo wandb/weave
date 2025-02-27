@@ -1,20 +1,22 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Track data flows and app metadata
+# Track nested functions and metadata
 
-In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
+In the [Log a trace](/quickstart) tutorial, you learned how to create a Weave project and log your first trace.
 
-In this tutorial you will learn how to:
+In this guide, you will learn how to:
 
-- **Track data** as it flows through your application
-- **Track metadata** at call time
+- Track nested function calls
+- Track metadata at call time
 
-## Tracking nested function calls
+## Track nested function calls
 
-LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track.
+Creating LLM-powered applications often requires the use of multiple functions, nested functions for LLMs calls, additional data processing, and validation logic. It is important for LLM application developers to be able to monitor and analyze these nested functions.
 
-Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
+With Weave, you can automatically track the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track.
+
+Building on the [basic tracing example](/quickstart), the following example adds additional functions (`extract_dinos` and `count_dinos`) to extract and count the items returned by `gpt-4o`. The `weave.op()` decorator is added to every function for tracing. Now, Weave keeps track of every function in the application, including parent-child relationships.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -74,9 +76,8 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     result = dino_tracker(sentence)
     print(result)
     ```
-    **Nested functions**
 
-    When you run the above code you will see the the inputs and outputs from the two nested functions (`extract_dinos` and `count_dinos`), as well as the automatically-logged OpenAI trace.
+    To view the trace data for the inputs and outputs from the nested functions, as well as the automatically-logged OpenAI trace, run the code sample, and navigate to your Weave **Traces** tab.
 
     ![Nested Weave Trace](../static/img/tutorial_tracing_2_nested_dinos.png)
 
@@ -141,11 +142,17 @@ Building on our [basic tracing example](/quickstart), we will now add additional
   </TabItem>
 </Tabs>
 
-## Tracking metadata
+## Track metadata
 
-Tracking metadata can be done easily by using the `weave.attributes` context manager and passing it a dictionary of the metadata to track at call time.
+You can track metadata using the `weave.attributes` context manager. To track metadata using `weave.attributes`, pass it a dictionary of metadata to track at call time.
 
-Continuing our example from above:
+:::tip
+Using `weave.attributes` is only recommended for tracking run time metadata such as user ids and environment information (production, development, etc.).
+
+To track system attributes, such as a System Prompt, use [Weave `Model`s](guides/core-types/models)
+:::
+
+The following example builds on [Track nested function calls](#track-nested-function-calls). A dictionary containing `user_id` and `env` metadata is passed to `weave.attributes`. Now, when `dino_tracker` is called on `sentence`, Weave automatically logs the metadata.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -171,12 +178,6 @@ Continuing our example from above:
     ```
   </TabItem>
 </Tabs>
-
-:::note
-It's recommended to use metadata tracking to track metadata at run time, e.g. user ids or whether or not the call is part of the development process or is in production etc.
-
-To track system attributes, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
-:::
 
 ## What's next?
 

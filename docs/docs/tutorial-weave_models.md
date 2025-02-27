@@ -1,34 +1,30 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# App versioning
+# Track app versions
 
-Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or app attributes change your outputs. Weave's `Model` class is how these changes can be tracked in Weave.
-
-In this tutorial you'll learn:
-
-- How to use Weave `Model` to track and version your app and its attributes.
-- How to export, modify and re-use a Weave `Model` already logged.
-
-## Using `weave.Model`
+In [Log a trace](/quickstart) and [Track nested functions and metadata](/tutorial-tracing_2), you learned important Weave fundamentals: logging a call to Weave, tracking nested functions, and logging metadata. Building on this, it's critical to understand how modifications to your application code and/or attributes change application outputs. With Weave's `Model` class, you can track application versions, understand how changes between versions affect application behavior, and store and version changing application attribute like model vendor IDs, systme prompts, temperature, and more.
 
 :::important
-
-The `weave.Model` class is currently only supported in Python.
-
+The `Model` class is currently only available in Python.
 :::
 
-Using Weave `Model`s means that attributes such as model vendor ids, prompts, temperature, and more are stored and versioned when they change.
+In this guide, you'll learn:
 
-To create a `Model` in Weave, you need the following:
+- How to use `Model` to track and version your app and its attributes.
+- How to export, modify and reuse a `Model` that you've already logged.
 
-- a class that inherits from `weave.Model`
-- type definitions on all class attributes
-- a typed `invoke` function with the `@weave.op()` decorator
+## Use `Model` to version an app
 
-When you change the class attributes or the code that defines your model, **these changes will be logged and the version will be updated**. This ensures that you can compare the generations across different versions of your app.
+To create a `Model`, do the following:
 
-In the example below, the **model name, temperature and system prompt will be tracked and versioned**:
+1. Define a class that inherits from `weave.Model`
+2. Add type definitions to all class attributes
+3. Add a typed `invoke` function with the `@weave.op()` decorator to your class.
+
+When you change the class attributes or the code that defines your model, Weave automatically logs changes and updates the application version. Now, you can easily compare output across different versions of your app.
+
+In the example below, the model name, temperature and system prompt are tracked and versioned using `Model`.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -82,7 +78,7 @@ In the example below, the **model name, temperature and system prompt will be tr
   </TabItem>
 </Tabs>
 
-Now you can instantiate and call the model with `invoke`:
+Now, you can instantiate and call the model with `.invoke`:
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -118,25 +114,22 @@ Now you can instantiate and call the model with `invoke`:
   </TabItem>
 </Tabs>
 
-Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
+After calling `.invoke`, you can view the trace in Weave. Now, model attributes are tracked along with model functions that have been decorated with `weave.op()`. You can see the model is also versioned (in the example, `v21`). Click on the model to see all of calls that have used that version of the model.
 
 ![Re-using a weave model](../static/img/tutorial-model_invoke3.png)
 
-**A note on using `weave.Model`:**
+## Export and reuse a `Model`
 
-- You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
-- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
-- Attributes starting with an underscore are ignored by weave and won't be logged
+Because Weave stores and versions `Model`s that have been invoked, you can export and reuse these models. To do so, complete the following steps:
 
-## Exporting and re-using a logged `weave.Model`
+1. In the Weave UI, navigate to the **Models** tab.
+2. In the row for the `Model` with versions that you want to export or reuse, click the contents of the **Versions** column. The available versions display.
+3. In the **Object** column, click the name of the `Model` version that you want to reuse or export. A pop-up modal displays.
+4. Select the **Use** tab.
+5. Under `The ref for this model version is:`, copy the `Model` URI (e.g. `weave:///wandb/weave-intro-notebook/object/OpenAIGrammarCorrector:a21QVEgoDsNJKFHo7FkLd6S2gsf4frMXYMpwX2Qg7sw`).
+6. To retrieve the `Model` version for export or resuse, call `weave.ref(<URI>).get()`, replacing `<URI>` with your URI.
 
-Because Weave stores and versions Models that have been invoked, it is possible to export and re-use these models.
-
-**Get the Model ref**
-In the Weave UI you can get the Model ref for a particular version
-
-**Using the Model**
-Once you have the URI of the Model object, you can export and re-use it. Note that the exported model is already initialised and ready to use:
+The following code examples builds on the example in [ Use `Model` to version an app](#use-model-to-version-an-app), and shows reuse of a  `Model` version specified by `weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4`.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -161,7 +154,7 @@ Once you have the URI of the Model object, you can export and re-use it. Note th
   </TabItem>
 </Tabs>
 
-Here you can now see the name Model version (v21) was used with the new input:
+In the Weave UI, you can now see that the new `Model` version (`v21`) was used with the new input:
 
 ![Re-using a weave model](../static/img/tutorial-model_re-use.png)
 

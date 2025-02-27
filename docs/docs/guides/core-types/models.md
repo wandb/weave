@@ -169,3 +169,9 @@ A `Model` is a combination of data (which can include configuration, trained mod
     ```
   </TabItem>
 </Tabs>
+
+
+## Usage notes
+- You can use `predict` instead of `invoke` for the name of the function in your Weave `Model`.
+- If you want other class methods to be tracked by Weave, use `weave.op()`.
+- Attributes with names that start with an underscore are ignored by Weave and won't be logged.

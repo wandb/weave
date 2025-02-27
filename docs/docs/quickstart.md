@@ -1,17 +1,22 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Track LLM inputs & outputs
+# Log a trace
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
-Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Follow these steps to track your first call
 
-## 1. Install Weave and create an API Key
+:::tip
+You can try the Quickstart as a Jupyter Notebook.
+<a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+:::
 
-**Install weave**
+## 1. Prerequisites
 
-First install the weave library:
+### Install weave
+
+First, install the `weave` library:
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -26,22 +31,37 @@ First install the weave library:
   </TabItem>
 </Tabs>
 
-**Get your API key**
+### Create a W&B account 
 
-Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your API key from https://wandb.ai/authorize
+Next, create a Weights & Biases (W&B).
+1. Navigate to [https://wandb.ai](https://wandb.ai).
+2. Click **Sign Up**.
+3. In the sign-up modal, enter an email and password, or use one of the available authentication providers.
+
+### Get your API key
+
+Once you've created your account, copy and set you W&B API key:
+
+1. Navigate to [https://wandb.ai/authorize](https://wandb.ai/authorize).
+2. Copy your API key.
+3. Set the API key as to the `WANDB_API_KEY` environment variable.
 
 ## 2. Log a trace to a new project
 
-To get started with tracking your first project with Weave:
+To track LLM calls
 
-- Import the `weave` library
-- Call `weave.init('project-name')` to start tracking
-  - You will be prompted to log in with your API key if you are not yet logged in on your machine.
-  - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
-  - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
-- Add the `@weave.op()` decorator to the python functions you want to track
+1. Import the `weave` library
+2. Call `weave.init('project-name')`. You will be prompted to log in with your API key if you are not yet logged in on your machine.
 
-_In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
+    :::tip
+    To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
+    :::
+
+3. Add the `@weave.op()` decorator to the python functions you want to track
+
+:::important
+In the following example, you will need an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+:::
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -129,13 +149,9 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
   </TabItem>
 </Tabs>
 
-## 3. Automated LLM library logging
+## 4. View traces in the UI
 
-Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrations/index.md) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`.
-
-## 4. See traces of your application in your project
-
-🎉 Congrats! Now, every time you call this function, weave will automatically capture the input & output data and log any changes made to the code.
+🎉 Congrats! Now, every time you call this function, `weave` automatically captures the input and output data, and logs any changes made to the code.
 
 ![Weave Trace Outputs 1](../static/img/tutorial_trace_1.png)
 

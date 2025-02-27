@@ -11,30 +11,30 @@ const CATEGORY_SECTION_HEADER_MIXIN: SidebarItemCategoryBase = {
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
     {
-      label: "👋 Getting Started",
+      label: "👋 Get Started",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
-        "introduction",
         {
           type: "doc",
-          label: "Trace LLMs",
-          id: "quickstart",
+          id: "introduction",  
+          label: "Overview",
         },
         {
-          type: "doc",
-          label: "Trace Applications",
-          id: "tutorial-tracing_2",
-        },
-        "tutorial-weave_models",
-        {
-          type: "doc",
-          label: "Build an Evaluation",
-          id: "tutorial-eval",
-        },
-        {
-          type: "doc",
-          label: "Evaluate a RAG App",
-          id: "tutorial-rag",
+          type: "category",
+          collapsible: true,
+          collapsed: true,
+          label: "Quickstart",
+          link: { 
+            type: "doc", 
+            id: "get-started",
+          },
+          items: [
+            "quickstart",
+            "tutorial-tracing_2",
+            "tutorial-weave_models",
+            "tutorial-eval",
+            "tutorial-rag"
+          ],
         },
       ],
     },
