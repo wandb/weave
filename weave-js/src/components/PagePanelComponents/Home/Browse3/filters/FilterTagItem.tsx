@@ -7,7 +7,7 @@ import {RemoveAction} from '@wandb/weave/components/Tag';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Timestamp} from '../../../../Timestamp';
+import {TimestampMicro} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -37,8 +37,10 @@ const quoteValue = (valueType: string, value: string): string => {
 
 export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
   const field = getFieldLabel(item.field);
-
   const operator = getOperatorLabel(item.operator);
+  let label: any = `${field} ${operator}`;
+  let disableRemove = false;
+
   let value: React.ReactNode = '';
   const fieldType = getFieldType(item.field);
   if (fieldType === 'id') {
@@ -50,12 +52,13 @@ export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
   } else if (!isValuelessOperator(item.operator)) {
     const valueType = getOperatorValueType(item.operator);
     if (valueType === 'date') {
-      value = <Timestamp value={item.value} />;
+      label = <TimestampMicro value={item.value} />;
+      disableRemove = true;
     } else {
       value = ' ' + quoteValue(valueType, item.value);
     }
   }
-  const label = `${field} ${operator}`;
+
   return (
     <FilterTag
       label={
@@ -65,12 +68,16 @@ export const FilterTagItem = ({item, onRemoveFilter}: FilterTagItemProps) => {
         </>
       }
       removeAction={
-        <RemoveAction
-          onClick={(e: any) => {
-            e.stopPropagation();
-            onRemoveFilter(item.id);
-          }}
-        />
+        disableRemove ? (
+          <></>
+        ) : (
+          <RemoveAction
+            onClick={(e: any) => {
+              e.stopPropagation();
+              onRemoveFilter(item.id);
+            }}
+          />
+        )
       }
     />
   );
