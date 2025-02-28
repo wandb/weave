@@ -36,6 +36,7 @@ export const DatasetPreview: React.FC<DatasetPreviewProps> = ({
       datasetObject={datasetObject}
       isEditing={true}
       hideRemoveForAddedRows={true}
+      showAddRowButton={false}
     />
   );
 };

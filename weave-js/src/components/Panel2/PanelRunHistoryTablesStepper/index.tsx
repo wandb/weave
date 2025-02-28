@@ -218,14 +218,15 @@ const PanelRunHistoryTablesStepper: React.FC<
           {steps.length > 0 && (
             <div
               style={{
-                padding: '2px',
-                height: '1.7em',
+                padding: '8px',
                 borderTop: '1px solid #ddd',
                 backgroundColor: '#f8f8f8',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
+                marginTop: '8px',
               }}>
+              Step:{' '}
               <SliderInput
                 min={steps[0]}
                 max={steps[steps.length - 1]}

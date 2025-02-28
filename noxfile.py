@@ -72,6 +72,7 @@ def tests(session, shard):
             "WB_SERVER_HOST",
             "WF_CLICKHOUSE_HOST",
             "WEAVE_SERVER_DISABLE_ECOSYSTEM",
+            "DD_TRACE_ENABLED",
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard

@@ -59,6 +59,7 @@ export interface EditableDatasetViewProps {
   datasetObject: DatasetObjectVal;
   isEditing?: boolean;
   hideRemoveForAddedRows?: boolean;
+  showAddRowButton?: boolean;
 }
 
 interface OrderedRow {
@@ -70,6 +71,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   datasetObject,
   isEditing = false,
   hideRemoveForAddedRows = false,
+  showAddRowButton = true,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -473,7 +475,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const CustomFooter = useCallback(() => {
     return (
       <GridFooterContainer>
-        {isEditing && (
+        {isEditing && showAddRowButton && (
           <Box
             sx={{
               padding: '8px 16px',
@@ -499,7 +501,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         </Box>
       </GridFooterContainer>
     );
-  }, [isEditing, handleAddRowsClick]);
+  }, [isEditing, handleAddRowsClick, showAddRowButton]);
 
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>

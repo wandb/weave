@@ -33,7 +33,6 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
@@ -214,6 +213,9 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
+
+
+class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
