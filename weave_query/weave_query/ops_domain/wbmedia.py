@@ -53,6 +53,7 @@ class ImageArtifactFileRefType(types.ObjectType):
     boxScoreKeys: typing.Union[types.Type, list] = types.List(types.UnknownType())
     maskLayers: typing.Union[types.Type, dict] = types.TypedDict({})
     classMap: typing.Union[types.Type, dict] = types.TypedDict({})
+    caption: typing.Union[types.Type, str] = types.Const(types.String(), "")
 
     # TODO: This should probably be standard for Type!
     def __post_init__(self):
@@ -69,6 +70,7 @@ class ImageArtifactFileRefType(types.ObjectType):
         d["boxScoreKeys"] = types.constliteral_type_to_json(self.boxScoreKeys)  # type: ignore
         d["maskLayers"] = types.constliteral_type_to_json(self.maskLayers)  # type: ignore
         d["classMap"] = types.constliteral_type_to_json(self.classMap)  # type: ignore
+        d["caption"] = types.constliteral_type_to_json(self.caption)  # type: ignore
         return d
 
     # TODO: This should probably be standard for Type!
@@ -79,6 +81,7 @@ class ImageArtifactFileRefType(types.ObjectType):
             d.get("boxScoreKeys", []),
             d.get("maskLayers", {}),
             d.get("classMap", {}),
+            d.get("caption", ""),
         )
 
     def property_types(self) -> dict[str, types.Type]:
@@ -155,6 +158,7 @@ class ImageArtifactFileRefType(types.ObjectType):
                     }
                 )
             ),
+            "caption": types.optional(types.String()),
         }
         return res
 
@@ -194,6 +198,7 @@ class ImageArtifactFileRefType(types.ObjectType):
             boxScoreKeys=boxScoreKeys,
             maskLayers=maskLayers,
             classMap={},
+            caption=obj.caption,
         )
 
 
@@ -206,6 +211,7 @@ class ImageArtifactFileRef:
     height: int
     width: int
     sha256: str
+    caption: typing.Optional[str] = ""
     boxes: typing.Optional[dict[str, list[dict]]] = dataclasses.field(
         default_factory=dict
     )  # type: ignore
