@@ -120,7 +120,6 @@ export const opArtifactMembershipFile = makeStandardOp({
     if (artifactCollection == null) {
       throw new Error('opArtifactMembershipFile missing artifactCollection');
     }
-    
     try {
       const result = await context.backend.getArtifactMembershipFileMetadata(
         artifactMembership.id,

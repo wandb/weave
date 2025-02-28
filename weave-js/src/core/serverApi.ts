@@ -27,7 +27,7 @@ export interface ServerAPI {
     assetPath: string
   ): Promise<DirMetadata | FileMetadata | null>;
 
-  getArtifactMembershipFileMetadata?(
+  getArtifactMembershipFileMetadata(
     artifactCollectionMembershipId: string,
     entityName: string,
     projectName: string,
