@@ -25,6 +25,7 @@ export interface WBImage {
     [maskName: string]: MaskFile;
   };
   classes?: ClassesFile;
+  caption?: string;
 }
 
 export interface ClassSet {
