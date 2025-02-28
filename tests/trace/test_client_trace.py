@@ -3378,7 +3378,7 @@ def test_call_stream_query_heavy_query_batch(client):
             parent_id=parent_id,
             started_at=datetime.datetime.now(tz=datetime.timezone.utc)
             - datetime.timedelta(seconds=1),
-            attributes={"a": 5},
+            attributes={"a": 5, "empty": "", "null": None},
             inputs={"param": {"value1": "hello"}},
         )
         client.server.call_start(tsi.CallStartReq(start=start))
@@ -3459,3 +3459,15 @@ def test_call_stream_query_heavy_query_batch(client):
     for call in res:
         assert call.inputs["param"]["value1"] == "helslo"
         assert call.output["d"] == 5
+
+    # now try to filter by the empty attribute string
+    query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}
+        },
+    }
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(query))
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["empty"] == ""
