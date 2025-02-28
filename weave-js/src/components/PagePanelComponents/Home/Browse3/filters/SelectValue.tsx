@@ -50,6 +50,21 @@ export const SelectValue = ({
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
+  if (fieldType === 'datetime' && operator.startsWith('(date): between')) {
+    // TODO: Make this a real component, either StyledDateTimeRangePicker (update?)
+    // or a custom input.
+    return (
+      <input
+        type="text"
+        name="daterange"
+        value={`${value.start} - ${value.end}`}
+        onChange={e => {
+          const [start, end] = e.target.value.split(' - ');
+          onSetValue(`${start} - ${end}`);
+        }}
+      />
+    );
+  }
   if (fieldType === 'datetime') {
     const dateTimeValue = value ? moment(value) : null;
     return (

@@ -22,6 +22,7 @@ type FilterRowProps = {
   onAddFilter: (field: string) => void;
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
+  isDefaultFilter?: boolean;
 };
 
 export const FilterRow = ({
@@ -30,6 +31,7 @@ export const FilterRow = ({
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
+  isDefaultFilter = false,
 }: FilterRowProps) => {
   const onSelectField = (field: string) => {
     if (item.id == null) {
@@ -66,6 +68,7 @@ export const FilterRow = ({
           options={options}
           value={item.field}
           onSelectField={onSelectField}
+          isDisabled={isDefaultFilter}
         />
       </div>
       <div className="w-[140px]">
@@ -74,7 +77,7 @@ export const FilterRow = ({
             options={operatorOptions}
             value={item.operator}
             onSelectOperator={onSelectOperator}
-            isDisabled={isOperatorDisabled}
+            isDisabled={isOperatorDisabled || isDefaultFilter}
           />
         )}
       </div>
@@ -89,7 +92,7 @@ export const FilterRow = ({
         )}
       </div>
       <div className="flex items-center justify-center">
-        {item.id != null && (
+        {item.id != null && !isDefaultFilter && (
           <Button
             size="small"
             variant="ghost"

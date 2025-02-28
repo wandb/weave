@@ -251,6 +251,12 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
         label: 'before',
         group: 'date',
       },
+      // TODO: actually support this
+      {
+        value: '(date): between',
+        label: 'between',
+        group: 'date',
+      },
     ];
   }
   if ('status' === fieldType) {

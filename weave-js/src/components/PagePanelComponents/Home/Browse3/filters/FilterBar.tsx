@@ -49,6 +49,10 @@ const isFilterIncomplete = (filter: GridFilterItem): boolean => {
   );
 };
 
+const isDefaultFilter = (filter: GridFilterItem): boolean => {
+  return typeof filter.id === 'string' && filter.id.startsWith('default');
+};
+
 export const FilterBar = ({
   filterModel,
   setFilterModel,
@@ -146,6 +150,7 @@ export const FilterBar = ({
   });
 
   const onRemoveAll = () => {
+    // TODO: do we want to remove default filters?
     setFilterModel({items: []});
     setAnchorEl(null);
   };
@@ -249,9 +254,19 @@ export const FilterBar = ({
   const labelW = refLabel.current?.offsetWidth ?? 0;
   const availableWidth = width - outlineW - paddingW - iconW - labelW - gapW;
 
+  const defaultFilters = localFilterModel.items.filter(f => isDefaultFilter(f));
+  const dynamicFilters = localFilterModel.items.filter(
+    f => !isDefaultFilter(f)
+  );
   const completeItems = localFilterModel.items.filter(
     f => !isFilterIncomplete(f)
   );
+  completeItems.sort((a, b) => {
+    if (isDefaultFilter(a) && !isDefaultFilter(b)) {
+      return -1;
+    }
+    return 0;
+  });
 
   return (
     <>
@@ -309,8 +324,28 @@ export const FilterBar = ({
                 )}
               </div>
             </DraggableHandle>
+
+            {/* Default filters section */}
+            <div className="mb-8 grid grid-cols-[auto_auto_auto_30px] gap-4">
+              {defaultFilters.map(defaultFilter => (
+                <FilterRow
+                  key={defaultFilter.id}
+                  item={defaultFilter}
+                  options={options}
+                  onAddFilter={onAddFilter}
+                  onUpdateFilter={onUpdateFilter}
+                  onRemoveFilter={() => {}} // Default filters can't be removed
+                  isDefaultFilter={true}
+                />
+              ))}
+            </div>
+
+            {/* Separator */}
+            <div className="my-8 border-t border-moon-200"></div>
+
+            {/* Dynamic filters section */}
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {localFilterModel.items.map(item => (
+              {dynamicFilters.map(item => (
                 <FilterRow
                   key={item.id}
                   item={item}
@@ -321,7 +356,7 @@ export const FilterBar = ({
                 />
               ))}
             </div>
-            {localFilterModel.items.length === 0 && (
+            {dynamicFilters.length === 0 && (
               <FilterRow
                 item={{
                   id: undefined,
@@ -340,7 +375,7 @@ export const FilterBar = ({
                 size="small"
                 variant="ghost"
                 icon="add-new"
-                disabled={localFilterModel.items.length === 0}
+                disabled={dynamicFilters.length === 0}
                 onClick={() => onAddFilter('')}>
                 Add filter
               </Button>
@@ -349,7 +384,7 @@ export const FilterBar = ({
                 size="small"
                 variant="ghost"
                 icon="delete"
-                disabled={localFilterModel.items.length === 0}
+                disabled={dynamicFilters.length === 0}
                 onClick={onRemoveAll}>
                 Remove all
               </Button>
