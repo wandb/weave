@@ -176,8 +176,8 @@ const useCall = (
   const deepKey = useDeepMemo(key);
   const doFetch = useCallback(() => {
     if (deepKey) {
-      setCallRes(null);
       loadingRef.current = true;
+      setCallRes(null);
       getTsClient()
         .callRead({
           project_id: projectIdFromParts(deepKey),
@@ -232,7 +232,7 @@ const useCall = (
     } else {
       // Stale call result
       return {
-        loading: false,
+        loading: true,
         result: null,
       };
     }

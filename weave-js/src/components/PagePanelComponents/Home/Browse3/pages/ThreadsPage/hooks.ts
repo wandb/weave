@@ -114,12 +114,12 @@ export const useBareTraceCalls = (
   entity: string,
   project: string,
   traceId?: string,
-  pollIntervalMs: number = 1000
+  pollIntervalMs: number = 0
 ): LoadableWithError<TraceCallSchema[]> => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [traceCalls, setTraceCalls] = useState<TraceCallSchema[]>([]);
-  const [shouldPoll, setShouldPoll] = useState(true);
+  // const [shouldPoll, setShouldPoll] = useState(true);
   const getClient = useGetTraceServerClientContext();
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export const useBareTraceCalls = (
 
           // Check if any call in the trace is still running
           const hasRunningCalls = res.some(call => !call.ended_at);
-          setShouldPoll(hasRunningCalls);
+          // setShouldPoll(hasRunningCalls);
 
           // Schedule next poll if we should continue polling
           if (hasRunningCalls && pollIntervalMs > 0) {
@@ -156,7 +156,7 @@ export const useBareTraceCalls = (
           setError(err as Error);
           setLoading(false);
           // Continue polling on error
-          setShouldPoll(true);
+          // setShouldPoll(true);
           if (pollIntervalMs > 0) {
             pollTimeout = setTimeout(fetchCalls, pollIntervalMs);
           }
@@ -173,7 +173,7 @@ export const useBareTraceCalls = (
         clearTimeout(pollTimeout);
       }
     };
-  }, [entity, getClient, project, traceId, pollIntervalMs, shouldPoll]);
+  }, [entity, getClient, project, traceId, pollIntervalMs]);
 
   return {
     loading,
