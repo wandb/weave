@@ -141,7 +141,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         """
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=encoded_data,
+            data=encoded_data,  # type: ignore
             auth=self._auth,
             timeout=DEFAULT_TIMEOUT,
         )
