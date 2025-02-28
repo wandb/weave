@@ -48,7 +48,7 @@ class AsyncBatchProcessor(Generic[T]):
         # 1. The queue is full, so users can sync up data later.
         # 2. The system crashes for some reason, so users can resume from the local buffer.
 
-        atexit.register(self.stop_accepting_new_work_and_safely_shutdown)
+        atexit.register(self.stop_accepting_new_work_and_flush_queue)
 
     def enqueue(self, items: list[T]) -> None:
         """
@@ -99,9 +99,13 @@ class AsyncBatchProcessor(Generic[T]):
             if not self.stop_accepting_work_event.is_set():
                 time.sleep(self.min_batch_interval)
 
-    def stop_accepting_new_work_and_safely_shutdown(self) -> None:
+    def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stops accepting new work and begins gracefully shutting down.
 
         Any new items enqueued after this call will not be processed!"""
         self.stop_accepting_work_event.set()
         self.processing_thread.join()
+
+    def accept_new_work(self) -> None:
+        """Resumes accepting new work."""
+        self.stop_accepting_work_event.clear()

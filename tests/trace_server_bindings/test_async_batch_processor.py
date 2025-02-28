@@ -12,7 +12,7 @@ def test_max_batch_size():
 
     # Queue up 2 batches of 3 items
     processor.enqueue([1, 2, 3])
-    processor.stop_accepting_new_work_and_safely_shutdown()
+    processor.stop_accepting_new_work_and_flush_queue()
 
     # But the max batch size is 2, so the batch is split apart
     processor_fn.assert_has_calls(
@@ -35,7 +35,7 @@ def test_min_batch_interval():
     processor.enqueue([4, 5, 6])
     time.sleep(0.1)
     processor.enqueue([7, 8, 9])
-    processor.stop_accepting_new_work_and_safely_shutdown()
+    processor.stop_accepting_new_work_and_flush_queue()
 
     # Processor should batch them all together
     processor_fn.assert_called_once_with([1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -48,14 +48,14 @@ def test_wait_until_all_processed():
     )
 
     processor.enqueue([1, 2, 3])
-    processor.stop_accepting_new_work_and_safely_shutdown()
+    processor.stop_accepting_new_work_and_flush_queue()
 
     # Despite queueing extra items, they will never get flushed because the processor is
     # already shut down.
     processor.enqueue([4, 5, 6])
-    processor.stop_accepting_new_work_and_safely_shutdown()
+    processor.stop_accepting_new_work_and_flush_queue()
     processor.enqueue([7, 8, 9])
-    processor.stop_accepting_new_work_and_safely_shutdown()
+    processor.stop_accepting_new_work_and_flush_queue()
 
     # We should only see the first batch.  Everything else is stuck in the queue.
     processor_fn.assert_has_calls([call([1, 2, 3])])
