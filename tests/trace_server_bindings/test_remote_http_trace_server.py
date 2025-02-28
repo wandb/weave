@@ -55,7 +55,11 @@ def trace_server():
     """Mocks sending batches to a remote server."""
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     server._send_batch_to_server = MagicMock()
-    return server
+    yield server
+
+    # Clean up the background thread to prevent test from hanging
+    if hasattr(server, "call_processor"):
+        server.call_processor.stop_accepting_new_work_and_safely_shutdown()
 
 
 @pytest.fixture
