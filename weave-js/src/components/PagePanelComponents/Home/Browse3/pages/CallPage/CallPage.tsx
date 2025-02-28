@@ -61,6 +61,7 @@ export const CallPage: FC<{
     project: props.project,
     callId: props.callId,
   });
+  console.log('call', call);
 
   const lastResult = useRef(call.result);
   useEffect(() => {
@@ -233,9 +234,10 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
+  callId: string;
   setCallById: (callId: string) => void;
   path?: string;
-}> = ({call, setCallById: setCallId, path}) => {
+}> = ({call, callId, setCallById: setCallId, path}) => {
   useViewTraceEvent(call);
 
   const {useCall} = useWFHooks();
@@ -258,14 +260,14 @@ const CallPageInnerVertical: FC<{
         call.entity,
         call.project,
         call.traceId,
-        call.callId,
+        callId,
         path,
         !showTraceTree,
         showFeedbackExpand ? true : undefined
       )
     );
   }, [
-    call.callId,
+    callId,
     call.entity,
     call.project,
     call.traceId,
@@ -281,13 +283,13 @@ const CallPageInnerVertical: FC<{
         call.entity,
         call.project,
         call.traceId,
-        call.callId,
+        callId,
         path,
         showTraceTree,
         !showFeedbackExpand ? true : undefined
       )
     );
-  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  }, [history, currentRouter, call.entity, call.project, call.traceId, callId, path, showTraceTree, showFeedbackExpand]);
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
@@ -296,31 +298,33 @@ const CallPageInnerVertical: FC<{
   // const tree = useCallFlattenedTraceTree(call, path ?? null);
   // const {loading, selectedCall} = tree;
   const selectedCall = call;
-  const callComplete = useCall({
-    entity: selectedCall.entity,
-    project: selectedCall.project,
-    callId: selectedCall.callId,
-  });
-  const callCompleteWithCosts = useMemo(() => {
-    if (callComplete.result?.traceCall == null) {
-      return callComplete.result;
-    }
-    return {
-      ...callComplete.result,
-      traceCall: {
-        ...callComplete.result?.traceCall,
-        summary: {
-          ...callComplete.result?.traceCall?.summary,
-          weave: {
-            ...callComplete.result?.traceCall?.summary?.weave,
-            // Only selectedCall has costs, injected when creating
-            // the trace tree
-            costs: selectedCall.traceCall?.summary?.weave?.costs,
-          },
-        },
-      },
-    };
-  }, [callComplete.result, selectedCall]);
+  const callComplete = selectedCall
+  // useCall({
+  //   entity: selectedCall.entity,
+  //   project: selectedCall.project,
+  //   callId: selectedCall.callId,
+  // });
+  const callCompleteWithCosts = callComplete
+  // useMemo(() => {
+  //   if (callComplete.result?.traceCall == null) {
+  //     return callComplete.result;
+  //   }
+  //   return {
+  //     ...callComplete.result,
+  //     traceCall: {
+  //       ...callComplete.result?.traceCall,
+  //       summary: {
+  //         ...callComplete.result?.traceCall?.summary,
+  //         weave: {
+  //           ...callComplete.result?.traceCall?.summary?.weave,
+  //           // Only selectedCall has costs, injected when creating
+  //           // the trace tree
+  //           costs: selectedCall.traceCall?.summary?.weave?.costs,
+  //         },
+  //       },
+  //     },
+  //   };
+  // }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -382,7 +386,7 @@ const CallPageInnerVertical: FC<{
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
               specsLoading={specsLoading}
-              callID={currentCall.callId}
+              callID={callId}
               entity={currentCall.entity}
               project={currentCall.project}
             />
@@ -398,7 +402,7 @@ const CallPageInnerVertical: FC<{
               entity={currentCall.entity}
               project={currentCall.project}
               selectedTraceId={currentCall.traceId}
-              selectedCallId={currentCall.callId}
+              selectedCallId={callId}
               setSelectedCallId={setCallId}
             />
           </div>
