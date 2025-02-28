@@ -46,14 +46,35 @@ const sidebars: SidebarsConfig = {
           type: "category",
           collapsible: true,
           collapsed: false,
-          label: "LLM Application Tracing",
+          label: "Trace & Debug AI Applications",
           link: { type: "doc", id: "guides/tracking/index" },
           items: [
-            "guides/tracking/tracing",
-            "guides/tracking/ops",
-            "guides/tracking/objects",
-            "guides/tracking/redact-pii",
-            "guides/tracking/faqs"
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: false,
+              label: "Understanding App Behavior",
+              items: [
+                "guides/tracking/tracing",
+                "guides/tracking/costs",
+                "guides/core-types/media",
+                "guides/tools/comparison",
+                "guides/tracking/redact-pii",
+                "guides/core-types/env-vars",
+              ]
+            },
+            {
+              type: "category",
+              collapsible: true,
+              collapsed: true,
+              label: "Version Control for Prompts & Models",
+              items: [
+                "guides/core-types/prompts", 
+                "guides/core-types/models",
+                "guides/tracking/objects",
+                "guides/tracking/ops",
+              ]
+            }
           ],
         },
         {
@@ -63,10 +84,12 @@ const sidebars: SidebarsConfig = {
           label: "Evaluation",
           items: [
             "guides/core-types/evaluations",
+            "guides/tracking/feedback",
+            "guides/core-types/datasets",
             {
               type: "category",
               collapsible: true,
-              collapsed: false,
+              collapsed: true,
               label: "Online Evaluation",
               link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
               items: [
@@ -87,7 +110,7 @@ const sidebars: SidebarsConfig = {
             {
               type: "category",
               collapsible: true,
-              collapsed: false,
+              collapsed: true,
               label: "Scoring",
               items: [
                 "guides/evaluation/scorers", 
@@ -97,18 +120,12 @@ const sidebars: SidebarsConfig = {
             }
           ],
         },
-        "guides/core-types/prompts",
-        "guides/core-types/models",
-        "guides/core-types/datasets",
-        "guides/tracking/feedback",
-        "guides/tracking/costs",
-        "guides/tools/comparison",
         "guides/tools/playground",
-        "guides/core-types/media",
-        "guides/core-types/env-vars",
         "guides/troubleshooting",
+        "guides/tracking/faqs",
         {
           type: "category",
+
           collapsible: true,
           collapsed: true,
           label: "Tools & Utilities",
