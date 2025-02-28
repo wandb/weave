@@ -1,21 +1,61 @@
 import {Button} from '@wandb/weave/components/Button';
-import React, {useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {TraceScrubber} from './components/TraceScrubber';
 import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './components/TraceScrubber/context';
-import {TraceTreeFlat} from './types';
+import {useBareTraceCalls} from './hooks';
+import {buildTraceTreeFlat} from './utils';
 import {getTraceView, traceViews} from './viewRegistry';
 
 export const TraceNavigator = ({
-  traceTreeFlat,
+  entity,
+  project,
+  selectedTraceId,
   selectedCallId,
   setSelectedCallId,
 }: {
-  traceTreeFlat: TraceTreeFlat;
+  entity: string;
+  project: string;
+  selectedTraceId: string;
   selectedCallId: string | undefined;
   setSelectedCallId: React.Dispatch<React.SetStateAction<string | undefined>>;
 }) => {
+  const {
+    loading: traceCallsLoading,
+    error: traceCallsError,
+    result: traceCalls,
+  } = useBareTraceCalls(entity, project, selectedTraceId);
+
+  // Derived data
+  const traceTreeFlat = useMemo(
+    () => buildTraceTreeFlat(traceCalls ?? []),
+    [traceCalls]
+  );
+
+  // Auto-select first call when trace tree is built and no call is selected
+  useEffect(() => {
+    const treeEntries = Object.entries(traceTreeFlat);
+    if (
+      !selectedCallId &&
+      treeEntries.length > 0 &&
+      !traceCallsLoading &&
+      !traceCallsError
+    ) {
+      // Find the call with the lowest dfsOrder (root of the trace)
+      const [firstCallId] = treeEntries.reduce((acc, [id, node]) =>
+        node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
+      );
+      setSelectedCallId(firstCallId);
+    }
+  }, [
+    selectedCallId,
+    setSelectedCallId,
+    traceCallsError,
+    traceCallsLoading,
+    traceTreeFlat,
+  ]);
+
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
   return (

@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
@@ -12,7 +12,6 @@ import {
 } from './hooks';
 import {TraceNavigator} from './TraceNavigator';
 import {ThreadsPageProps} from './types';
-import {buildTraceTreeFlat} from './utils';
 import {
   callViews,
   getCallView,
@@ -93,11 +92,11 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     threadViewId === 'connected' ? 2000 : 0 // Poll every 2 seconds for connected view
   );
 
-  const {
-    loading: callsLoading,
-    error: callsError,
-    result: traceCalls,
-  } = useBareTraceCalls(entity, project, selectedTraceId);
+  // const {
+  //   loading: callsLoading,
+  //   error: callsError,
+  //   result: traceCalls,
+  // } = useBareTraceCalls(entity, project, selectedTraceId);
 
   // Clear downstream selections when thread changes or starts loading
   useEffect(() => {
@@ -108,7 +107,8 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   // Clear call selection when trace changes or starts loading
   useEffect(() => {
     setSelectedCallId(undefined);
-  }, [selectedTraceId, callsLoading]);
+  }, [selectedTraceId]);
+  // }, [selectedTraceId, callsLoading]);
 
   // Auto-select first thread when threads load and none is selected
   useEffect(() => {
@@ -143,43 +143,43 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   }, [traces, tracesLoading, tracesError, selectedTraceId, setSelectedTraceId]);
 
   // Derived data
-  const traceTreeFlat = useMemo(
-    () => buildTraceTreeFlat(traceCalls ?? []),
-    [traceCalls]
-  );
+  // const traceTreeFlat = useMemo(
+  //   () => buildTraceTreeFlat(traceCalls ?? []),
+  //   [traceCalls]
+  // );
 
-  // Auto-select first call when trace tree is built and no call is selected
-  useEffect(() => {
-    const treeEntries = Object.entries(traceTreeFlat);
-    if (
-      !selectedCallId &&
-      treeEntries.length > 0 &&
-      !callsLoading &&
-      !callsError
-    ) {
-      // Find the call with the lowest dfsOrder (root of the trace)
-      const [firstCallId] = treeEntries.reduce((acc, [id, node]) =>
-        node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
-      );
-      setSelectedCallId(firstCallId);
-    }
-  }, [
-    traceTreeFlat,
-    callsLoading,
-    callsError,
-    selectedCallId,
-    setSelectedCallId,
-  ]);
+  // // Auto-select first call when trace tree is built and no call is selected
+  // useEffect(() => {
+  //   const treeEntries = Object.entries(traceTreeFlat);
+  //   if (
+  //     !selectedCallId &&
+  //     treeEntries.length > 0 &&
+  //     !callsLoading &&
+  //     !callsError
+  //   ) {
+  //     // Find the call with the lowest dfsOrder (root of the trace)
+  //     const [firstCallId] = treeEntries.reduce((acc, [id, node]) =>
+  //       node.dfsOrder < acc[1].dfsOrder ? [id, node] : acc
+  //     );
+  //     setSelectedCallId(firstCallId);
+  //   }
+  // }, [
+  //   traceTreeFlat,
+  //   callsLoading,
+  //   callsError,
+  //   selectedCallId,
+  //   setSelectedCallId,
+  // ]);
 
   // Only show call details if we have valid data and aren't loading
-  const showCallDetails =
-    !callsLoading &&
-    !callsError &&
-    selectedCallId &&
-    traceTreeFlat[selectedCallId];
-  const selectedCall = showCallDetails
-    ? traceTreeFlat[selectedCallId]?.call
-    : undefined;
+  // const showCallDetails =
+  //   !callsLoading &&
+  //   !callsError &&
+  //   selectedCallId &&
+  //   traceTreeFlat[selectedCallId];
+  // const selectedCall = showCallDetails
+  //   ? traceTreeFlat[selectedCallId]?.call
+  //   : undefined;
 
   // Render helpers
   const renderThreadView = () => {
@@ -206,25 +206,25 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
   };
 
   const renderCallDetails = () => {
-    if (callsLoading) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-moon-500">
-          <Icon name="loading" className="mb-2 animate-spin" />
-          <p>Loading call details...</p>
-        </div>
-      );
-    }
+    // if (callsLoading) {
+    //   return (
+    //     <div className="flex h-full flex-col items-center justify-center text-moon-500">
+    //       <Icon name="loading" className="mb-2 animate-spin" />
+    //       <p>Loading call details...</p>
+    //     </div>
+    //   );
+    // }
 
-    if (callsError) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-red-500">
-          <Icon name="warning" className="mb-2" />
-          <p>Error loading call details: {callsError.message}</p>
-        </div>
-      );
-    }
+    // if (callsError) {
+    //   return (
+    //     <div className="flex h-full flex-col items-center justify-center text-red-500">
+    //       <Icon name="warning" className="mb-2" />
+    //       <p>Error loading call details: {callsError.message}</p>
+    //     </div>
+    //   );
+    // }
 
-    if (!selectedCall) {
+    if (!selectedCallId) {
       return (
         <div className="flex h-full flex-col items-center justify-center text-moon-500">
           <Icon name="info" className="mb-2" />
@@ -237,7 +237,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       <CallViewWrapper
         entity={entity}
         project={project}
-        callId={selectedCall.id}
+        callId={selectedCallId}
         viewId={callViewId}
       />
     );
@@ -335,11 +335,15 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
           {/* Trace Panel - 40% */}
           <div className="flex w-[40%] flex-col overflow-hidden">
-            <TraceNavigator
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}
-              setSelectedCallId={setSelectedCallId}
-            />
+            {selectedTraceId ? (
+              <TraceNavigator
+                entity={entity}
+                project={project}
+                selectedTraceId={selectedTraceId}
+                selectedCallId={selectedCallId}
+                setSelectedCallId={setSelectedCallId}
+              />
+            ) : null}
           </div>
 
           {/* Call Detail Panel - 30% */}
@@ -378,14 +382,8 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
               ? `Thread: ${selectedThreadId} (${traces?.length ?? 0} traces)`
               : 'No thread selected'}{' '}
             {' | '}
-            {callsLoading
-              ? 'Loading calls...'
-              : callsError
-              ? `Error: ${callsError.message}`
-              : selectedTraceId
-              ? `Trace: ${selectedTraceId} (${
-                  Object.keys(traceTreeFlat).length
-                } calls)`
+            {selectedTraceId
+              ? `Trace: ${selectedTraceId}`
               : 'No trace selected'}{' '}
             {' | '}
             {selectedCallId ? `Call: ${selectedCallId}` : 'No call selected'}
