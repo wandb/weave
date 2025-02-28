@@ -16,7 +16,6 @@ import {RowId} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pa
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import get from 'lodash/get';
 import React, {
-  FC,
   useCallback,
   useContext,
   useEffect,
@@ -56,9 +55,11 @@ interface DatasetObjectVal {
   _bases: ['Object', 'BaseModel'];
 }
 
-interface EditableDataTableViewProps {
+export interface EditableDatasetViewProps {
   datasetObject: DatasetObjectVal;
-  isEditing: boolean;
+  isEditing?: boolean;
+  hideRemoveForAddedRows?: boolean;
+  showAddRowButton?: boolean;
 }
 
 interface OrderedRow {
@@ -66,9 +67,11 @@ interface OrderedRow {
   [key: string]: any;
 }
 
-export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
+export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   datasetObject,
-  isEditing,
+  isEditing = false,
+  hideRemoveForAddedRows = false,
+  showAddRowButton = true,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -99,15 +102,6 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     page: 0,
     pageSize: 50,
   });
-
-  // Reset sort model and pagination if we enter edit mode with sorting applied.
-  useEffect(() => {
-    if (isEditing && sortModel.length > 0) {
-      setPaginationModel({page: 0, pageSize: 50});
-      setSortModel([]);
-      setSortBy([]);
-    }
-  }, [isEditing, sortModel]);
 
   const sharedRef = useContext(WeaveCHTableSourceRefContext);
 
@@ -269,16 +263,14 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
 
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
-      return loadedRows.map((row, i) => {
+      return loadedRows.map(row => {
         const digest = row.digest;
-        const absoluteIndex =
-          i + paginationModel.pageSize * paginationModel.page;
         const value = flattenObjectPreservingWeaveTypes(row.val);
-        const editedRow = editedRows.get(absoluteIndex);
+        const editedRow = editedRows.get(row.original_index);
         return {
           ___weave: {
-            id: `${digest}_${absoluteIndex}`,
-            index: absoluteIndex,
+            id: `${digest}_${row.original_index}`,
+            index: row.original_index,
             isNew: false,
             serverValue: value,
           },
@@ -287,7 +279,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       });
     }
     return [];
-  }, [loadedRows, fetchQueryLoaded, editedRows, paginationModel]);
+  }, [loadedRows, fetchQueryLoaded, editedRows]);
 
   const combinedRows = useMemo(() => {
     if (
@@ -305,15 +297,29 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     return [...displayedAddedRows, ...rows];
   }, [rows, addedRows, numAddedRows, paginationModel, isEditing]);
 
+  const initialFieldsSet = useMemo(
+    () => new Set(initialFields),
+    [initialFields]
+  );
+
   const preserveFieldOrder = useCallback(
     (row: OrderedRow): OrderedRow => {
       const orderedRow: OrderedRow = {___weave: row.___weave};
+      // First add all fields that are in initialFields in the correct order
       initialFields.forEach(field => {
         orderedRow[field] = row[field] !== undefined ? row[field] : '';
       });
+
+      // Then add any additional fields that weren't in initialFields
+      Object.keys(row).forEach(field => {
+        if (field !== '___weave' && !initialFieldsSet.has(field)) {
+          orderedRow[field] = row[field];
+        }
+      });
+
       return orderedRow;
     },
-    [initialFields]
+    [initialFields, initialFieldsSet]
   );
 
   const columns = useMemo(() => {
@@ -390,6 +396,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
                   restoreRow={restoreRow}
                   isDeleted={deletedRows.includes(params.row.___weave?.index)}
                   isNew={params.row.___weave?.isNew}
+                  hideRemoveForAddedRows={hideRemoveForAddedRows}
                 />
               ),
             },
@@ -404,14 +411,19 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
       flex: columnWidths[field as string] ? undefined : 1,
       minWidth: 100,
       editable: isEditing,
-      sortable: !isEditing,
+      sortable: true,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
-            <Box sx={{marginLeft: '8px', height: '100%'}}>
+            <div
+              style={{
+                marginLeft: '8px',
+                height: '100%',
+                alignContent: 'center',
+              }}>
               <CellValue value={params.value} />
-            </Box>
+            </div>
           );
         }
         const rowIndex = params.row.___weave?.index;
@@ -464,6 +476,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
     loadedRows,
     columnWidths,
     preserveFieldOrder,
+    hideRemoveForAddedRows,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {
@@ -476,7 +489,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
   const CustomFooter = useCallback(() => {
     return (
       <GridFooterContainer>
-        {isEditing && (
+        {isEditing && showAddRowButton && (
           <Box
             sx={{
               padding: '8px 16px',
@@ -502,7 +515,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
         </Box>
       </GridFooterContainer>
     );
-  }, [isEditing, handleAddRowsClick]);
+  }, [isEditing, handleAddRowsClick, showAddRowButton]);
 
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
@@ -550,7 +563,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
           '& .MuiDataGrid-cell': {
             padding: '0',
             // This vertical / horizontal center aligns <span>'s inside of the columns
-            // Fixes an issure where boolean checkboxes are top-aligned pre-edit
+            // Fixes an issue where boolean checkboxes are top-aligned pre-edit
             '& .MuiBox-root': {
               '& span.cursor-inherit': {
                 display: 'flex',
@@ -559,6 +572,7 @@ export const EditableDatasetView: FC<EditableDataTableViewProps> = ({
                 height: '34px',
               },
             },
+            lineHeight: '20px',
           },
           // Removed default MUI blue from editing cell
           '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {

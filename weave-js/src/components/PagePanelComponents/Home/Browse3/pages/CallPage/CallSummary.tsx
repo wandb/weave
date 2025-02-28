@@ -69,10 +69,7 @@ export const CallSummary: React.FC<{
           data={{
             Operation:
               parseRefMaybe(span.name) != null ? (
-                <SmallRef
-                  objRef={parseRefMaybe(span.name)!}
-                  wfTable="OpVersion"
-                />
+                <SmallRef objRef={parseRefMaybe(span.name)!} />
               ) : (
                 span.name
               ),

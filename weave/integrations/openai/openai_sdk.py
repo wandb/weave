@@ -6,10 +6,10 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import Op, ProcessedInputs
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -245,7 +245,10 @@ def openai_accumulator(
                 choices=output_choices,
                 created=value.created,  # Each chunk has the same timestamp
                 model=value.model,
-                object=value.object,
+                # The AzureOpenAI service will return an initial chunk with object=''
+                # which causes a pydantic_core._pydantic_core.ValidationError as
+                # the OpenAI SDK requires this literal value.
+                object=value.object or "chat.completion.chunk",
                 system_fingerprint=value.system_fingerprint,
             )
             return acc

@@ -1440,6 +1440,13 @@ export const toGqlField = (
         ]),
       },
     ];
+  } else if (forwardOp.op.name === 'artifactMembership-file') {
+    return [
+      {
+        name: 'artifact',
+        fields: gqlBasicField('id'),
+      },
+    ];
   } else if (forwardOp.op.name === 'artifact-memberships') {
     return [
       {

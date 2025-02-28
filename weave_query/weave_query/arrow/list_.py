@@ -32,6 +32,7 @@ from weave_query.arrow.arrow import (
     offsets_starting_at_zero,
     pretty_print_arrow_type,
     safe_is_null,
+    safe_list_array_from_arrays
 )
 from weave_query.language_features.tagging import (
     tag_store,
@@ -800,14 +801,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             items: ArrowWeaveList = ArrowWeaveList(
                 arr.flatten(), self.object_type.object_type, self._artifact
             )._map_column(fn, pre_fn, path + (PathItemList(),))
-            # print("SELF OBJECT TYPE", self.object_type)
-            # print("SELF ARROW DATA TYPE", self._arrow_data.type)
+
+            new_offsets = offsets_starting_at_zero(self._arrow_data)
+            result_array = safe_list_array_from_arrays(
+                new_offsets,
+                items._arrow_data,
+                pa.compute.is_null(arr)
+            )
+
             with_mapped_children = ArrowWeaveList(
-                pa.ListArray.from_arrays(
-                    offsets_starting_at_zero(self._arrow_data),
-                    items._arrow_data,
-                    mask=pa.compute.is_null(arr),
-                ),
+                result_array,
                 self.object_type.__class__(items.object_type),
                 self._artifact,
                 invalid_reason=items._invalid_reason,
@@ -1308,16 +1311,21 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
     ):
         if index == None:
             return None
+
         indexes: pa.Array
+        
+        arr = self._arrow_data
+        length = len(arr)
+
         if isinstance(index, int):
+            if index >= length or index < -length:
+                return None
             indexes = [index]
         elif isinstance(index, ArrowWeaveList):
             indexes = index._arrow_data
         else:
             indexes = index
 
-        arr = self._arrow_data
-        length = len(arr)
         neg_cond = pc.less(indexes, 0)
         indexes_neg = pc.add(indexes, length)
         indexes = pc.choose(neg_cond, indexes, indexes_neg)

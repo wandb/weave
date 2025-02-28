@@ -1843,3 +1843,43 @@ def test_delete_op_version(client):
     # but the ref is still deleted
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         op_ref.get()
+
+
+def test_global_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(global_attributes={"env": "test", "version": "1.0"}) as client:
+        my_op(1)
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Check global attributes are present
+        assert call.attributes["env"] == "test"
+        assert call.attributes["version"] == "1.0"
+
+
+def test_global_attributes_with_call_attributes(client_creator):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a
+
+    with client_creator(
+        global_attributes={"global_attr": "global", "env": "test"}
+    ) as client:
+        with weave.attributes({"local_attr": "local", "env": "override"}):
+            my_op(1)
+
+        calls = list(client.get_calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Both global and local attributes are present
+        assert call.attributes["global_attr"] == "global"
+        assert call.attributes["local_attr"] == "local"
+
+        # Local attributes override global ones
+        assert call.attributes["env"] == "override"

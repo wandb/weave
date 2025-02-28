@@ -1,10 +1,17 @@
+import {opFileType} from '@wandb/weave/core';
+import * as TypeHelpers from '@wandb/weave/core/model/helpers';
+import {docType} from '@wandb/weave/core/util/docs';
+import * as _ from 'lodash';
+
 import {artifact} from '../../_external/util/urls';
-import {list} from '../../model';
+import {list, maybe, union} from '../../model';
 import {makeStandardOp} from '../opKinds';
 
 const artifactArgTypes = {
   artifactMembership: 'artifactMembership' as const,
 };
+
+const artifactMembershipArgDescription = `A ${docType('artifactMembership')}`;
 
 export const opArtifactMembershipId = makeStandardOp({
   hidden: true,
@@ -78,4 +85,83 @@ export const opArtifactMembershipLink = makeStandardOp({
       artifactCommitHash: `v${artifactMembership.versionIndex}`,
     }),
   }),
+});
+
+// Same as opArtifactVersionFile
+export const opArtifactMembershipFile = makeStandardOp({
+  name: 'artifactMembership-file',
+  argTypes: {...artifactArgTypes, path: 'string'},
+  description: `Returns the ${docType('file')} of the ${docType(
+    'artifactMembership'
+  )} for the given path`,
+  argDescriptions: {
+    artifactMembership: artifactMembershipArgDescription,
+    path: `The path of the ${docType('file')}`,
+  },
+  returnValueDescription: `The ${docType('file')} of the ${docType(
+    'artifactMembership'
+  )} for the given path`,
+  returnType: inputTypes => maybe({type: 'file'}),
+  resolver: async (
+    {artifactMembership, path},
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context
+  ) => {
+    if (artifactMembership == null) {
+      throw new Error('opArtifactMembershipFile missing artifactMembership');
+    }
+    if (artifactMembership.artifact == null) {
+      throw new Error('opArtifactMembershipFile missing artifact');
+    }
+    try {
+      const result = await context.backend.getArtifactFileMetadata(
+        artifactMembership.artifact.id,
+        path
+      );
+      if (result == null) {
+        return null;
+      }
+      return {artifact: artifactMembership.artifact, path};
+    } catch (e) {
+      console.warn('Error loading artifact from membership', {
+        err: e,
+        artifact: artifactMembership.artifact,
+        path,
+      });
+      return null;
+    }
+  },
+  resolveOutputType: async (inputTypes, node, executableNode, client) => {
+    const fileTypeNode = opFileType({
+      file: executableNode as any,
+    });
+    let fileType = await client.query(fileTypeNode);
+
+    if (fileType == null) {
+      return 'none';
+    }
+
+    // The standard op pattern does not handle returning types as arrays. This
+    // should be merged into standard op, but since opFileType is the only "type"
+    // op, and only used here, just keeping it simple.
+    // This is for Weave0
+    if (_.isArray(fileType)) {
+      fileType = union(fileType.map(t => (t == null ? 'none' : t)));
+    }
+
+    // This is a Weave1 hack. Weave1's type refinement ops (like file-type) return
+    // tagged/mapped results. But the Weave0 opKinds framework is going to do
+    // the same wrapping to the result we return here. So we unwrap the Weave1
+    // result and let it be rewrapped.
+    if (TypeHelpers.isTaggedValue(fileType)) {
+      fileType = TypeHelpers.taggedValueValueType(fileType);
+    }
+    if (TypeHelpers.isList(fileType)) {
+      fileType = fileType.objectType;
+    }
+    return fileType ?? 'none';
+  },
 });

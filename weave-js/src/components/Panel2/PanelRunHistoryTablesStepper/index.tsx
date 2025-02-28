@@ -1,24 +1,32 @@
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {TABLE_FILE_TYPE} from '@wandb/weave/common/types/file';
+import {getTableKeysFromNodeType} from '@wandb/weave/common/util/table';
 import {
   constFunction,
-  constNodeUnsafe,
   constNumber,
   constString,
-  file,
+  isAssignableTo,
+  isUnion,
+  listObjectType,
+  maybe,
   NodeOrVoidNode,
-  opDict,
+  nullableTaggableValue,
+  opConcat,
   opFileTable,
+  opFilter,
   opIndex,
-  opMap,
+  opNumberEqual,
   opPick,
   opRunHistory,
   opTableRows,
+  Type,
+  typedDictPropertyTypes,
+  Union,
   voidNode,
 } from '@wandb/weave/core';
 import React, {useEffect, useState} from 'react';
 
 import {LIST_RUNS_TYPE} from '../../../common/types/run';
-import {getTableKeysFromNodeType} from '../../../common/util/table';
 import {useNodeValue, useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
@@ -34,19 +42,71 @@ type PanelRunHistoryTablesStepperProps = Panel2.PanelProps<
   PanelRunsHistoryTablesConfigType
 >;
 
+const getTableKeysFromRunsHistoryPropertyType = (
+  runsHistoryPropertyType: Type | undefined
+) => {
+  // Case where keys across runs vary (hence the union)
+  if (
+    runsHistoryPropertyType &&
+    isUnion(nullableTaggableValue(listObjectType(runsHistoryPropertyType)))
+  ) {
+    const runsPropertyType: Union = nullableTaggableValue(
+      listObjectType(runsHistoryPropertyType)
+    ) as Union;
+    const tableKeys = runsPropertyType.members.reduce(
+      (acc: string[], member: Type) => {
+        const typeMap = typedDictPropertyTypes(member);
+        const runTableKeys = Object.keys(typeMap).filter(key => {
+          return isAssignableTo(typeMap[key], maybe(TABLE_FILE_TYPE));
+        });
+
+        return [...acc, ...runTableKeys];
+      },
+      []
+    );
+
+    return [...new Set(tableKeys)].sort();
+  }
+
+  // Case where keys across runs are the same
+  if (runsHistoryPropertyType) {
+    const {tableKeys} = getTableKeysFromNodeType(runsHistoryPropertyType);
+    return tableKeys.sort();
+  }
+
+  return [];
+};
+
+const getCurrentTableHistoryKey = (
+  tableKeys: string[],
+  configKey: string | undefined
+) => {
+  if (configKey && tableKeys.indexOf(configKey) !== -1) {
+    return configKey;
+  } else if (tableKeys.length > 0) {
+    return tableKeys[0];
+  }
+  return '';
+};
+
 const PanelRunHistoryTablesStepperConfig: React.FC<
   PanelRunHistoryTablesStepperProps
 > = props => {
-  const firstRun = opIndex({arr: props.input, index: constNumber(0)});
-  const runHistoryNode = opRunHistory({run: firstRun as any});
-  const runHistoryRefined = useNodeWithServerType(runHistoryNode);
-  const {tableKeys, value} = getTableKeysFromNodeType(
-    runHistoryRefined.result?.type,
+  const runsHistoryNode = opConcat({
+    arr: opRunHistory({run: props.input as any}),
+  });
+  const runsHistoryRefined = useNodeWithServerType(runsHistoryNode);
+  const tableKeys = getTableKeysFromRunsHistoryPropertyType(
+    runsHistoryRefined.result?.type
+  );
+  const tableHistoryKey = getCurrentTableHistoryKey(
+    tableKeys,
     props.config?.tableHistoryKey
   );
+
   const options = tableKeys.map(key => ({text: key, value: key}));
   const updateConfig = props.updateConfig;
-  const setSummaryKey = React.useCallback(
+  const setTableHistoryKey = React.useCallback(
     val => {
       updateConfig({tableHistoryKey: val});
     },
@@ -61,9 +121,9 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
         scrolling
         multiple={false}
         options={options}
-        value={value}
+        value={tableHistoryKey}
         onChange={(e, data) => {
-          setSummaryKey(data.value as any);
+          setTableHistoryKey(data.value as any);
         }}
       />
     </ConfigPanel.ConfigOption>
@@ -73,64 +133,70 @@ const PanelRunHistoryTablesStepperConfig: React.FC<
 const PanelRunHistoryTablesStepper: React.FC<
   PanelRunHistoryTablesStepperProps
 > = props => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [currentTableHistoryKey, setCurrentTableHistoryKey] =
-    useState<any>(null);
+  const [currentStep, setCurrentStep] = useState<number>(-1);
   const [steps, setSteps] = useState<number[]>([]);
-  const [tables, setTables] = useState<any[]>([]);
+  const {input} = props;
 
-  const {input, config} = props;
-  const firstRun = opIndex({arr: input, index: constNumber(0)});
-  const runHistoryNode = opRunHistory({run: firstRun as any});
-  const runHistoryRefined = useNodeWithServerType(runHistoryNode);
-  const {value} = getTableKeysFromNodeType(
-    runHistoryRefined.result?.type,
-    config?.tableHistoryKey
+  const runsHistoryNode = opConcat({
+    arr: opRunHistory({run: input as any}),
+  });
+  const runsHistoryRefined = useNodeWithServerType(runsHistoryNode);
+  const tableKeys = getTableKeysFromRunsHistoryPropertyType(
+    runsHistoryRefined.result?.type
   );
-  const tableWithStepsNode = opMap({
-    arr: runHistoryRefined.result as any,
-    mapFn: constFunction({row: runHistoryRefined.result.type}, ({row}) =>
-      opDict({
-        _step: opPick({obj: row, key: constString('_step')}),
-        table: opPick({obj: row, key: constString(value ?? '')}),
-      } as any)
-    ) as any,
-  });
+  const tableHistoryKey = getCurrentTableHistoryKey(
+    tableKeys,
+    props.config?.tableHistoryKey
+  );
 
-  const {
-    result: tablesWithStepsNodeResult,
-    loading: tablesWithStepsNodeLoading,
-  } = useNodeValue(tableWithStepsNode, {
-    skip: !value || currentTableHistoryKey === value,
+  const stepsNode = opPick({
+    obj: runsHistoryNode,
+    key: constString('_step'),
   });
+  const {result: stepsNodeResult, loading: stepsNodeLoading} =
+    useNodeValue(stepsNode);
 
   useEffect(() => {
-    if (tablesWithStepsNodeLoading) {
+    if (stepsNodeLoading) {
       return;
     }
 
-    if (tablesWithStepsNodeResult != null) {
-      const nonNullTables = tablesWithStepsNodeResult.filter(
-        (row: any) => row.table != null
+    if (stepsNodeResult != null) {
+      const newSteps: number[] = [...new Set<number>(stepsNodeResult)].sort(
+        (a, b) => a - b
       );
-      const newSteps = nonNullTables.map((row: any) => row._step);
-      const newTables = nonNullTables.map((row: any) => row.table);
       setSteps(newSteps);
       setCurrentStep(newSteps[0]);
-      setCurrentTableHistoryKey(value);
-      setTables(newTables);
     }
-  }, [tablesWithStepsNodeResult, tablesWithStepsNodeLoading, value]);
+  }, [stepsNodeResult, stepsNodeLoading]);
 
-  const tableIndex = steps.indexOf(currentStep);
+  const exampleRow = opIndex({
+    arr: runsHistoryNode,
+    index: constNumber(0),
+  });
+  const exampleRowRefined = useNodeWithServerType(exampleRow);
   let defaultNode: NodeOrVoidNode = voidNode();
-  if (tableIndex !== -1 && tables[tableIndex] != null) {
-    defaultNode = opTableRows({
-      table: opFileTable({
-        file: constNodeUnsafe(
-          file('json', {type: 'table', columnTypes: {}}),
-          tables[tableIndex]
-        ),
+  if (currentStep != null && currentStep >= 0 && tableHistoryKey) {
+    // This performs the following weave expression:
+    // runs.history.concat.filter((row) => row._step == <current-step>)[<table-history-key>].concat
+    defaultNode = opConcat({
+      arr: opTableRows({
+        table: opFileTable({
+          file: opPick({
+            obj: opFilter({
+              arr: runsHistoryNode,
+              filterFn: constFunction(
+                {row: exampleRowRefined.result.type},
+                ({row}) =>
+                  opNumberEqual({
+                    lhs: opPick({obj: row, key: constString('_step')}),
+                    rhs: constNumber(currentStep),
+                  })
+              ),
+            }),
+            key: constString(tableHistoryKey),
+          }),
+        }),
       }),
     });
   }
@@ -153,7 +219,7 @@ const PanelRunHistoryTablesStepper: React.FC<
             loading={props.loading}
             panelSpec={TableSpec}
             configMode={false}
-            config={config}
+            config={props.config}
             context={props.context}
             updateConfig={props.updateConfig}
             updateContext={props.updateContext}
@@ -162,14 +228,15 @@ const PanelRunHistoryTablesStepper: React.FC<
           {steps.length > 0 && (
             <div
               style={{
-                padding: '2px',
-                height: '1.7em',
+                padding: '8px',
                 borderTop: '1px solid #ddd',
                 backgroundColor: '#f8f8f8',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
+                marginTop: '8px',
               }}>
+              Step:{' '}
               <SliderInput
                 min={steps[0]}
                 max={steps[steps.length - 1]}
