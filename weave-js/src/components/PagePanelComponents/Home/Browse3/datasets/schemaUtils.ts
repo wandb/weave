@@ -26,13 +26,13 @@ export const inferType = (value: any): string => {
 export const flattenObject = (obj: any, prefix = ''): SchemaField[] => {
   let fields: SchemaField[] = [];
 
+  // Return empty array for null or undefined inputs
+  if (obj == null) {
+    return fields;
+  }
+
   // Special handling for __ref__ and __val__ pattern
-  if (
-    obj != null &&
-    typeof obj === 'object' &&
-    '__ref__' in obj &&
-    '__val__' in obj
-  ) {
+  if (typeof obj === 'object' && '__ref__' in obj && '__val__' in obj) {
     return flattenObject(obj.__val__, prefix);
   }
 
@@ -95,7 +95,16 @@ export interface FieldMapping {
 export const extractSourceSchema = (calls: CallData[]): SchemaField[] => {
   const allFields: SchemaField[] = [];
 
+  if (!calls || !Array.isArray(calls)) {
+    return allFields;
+  }
+
   calls.forEach(call => {
+    // Skip if call or call.val is undefined
+    if (!call || !call.val) {
+      return;
+    }
+
     if (call.val.inputs) {
       allFields.push(...flattenObject(call.val.inputs, 'inputs'));
     }
