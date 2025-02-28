@@ -2,19 +2,25 @@
  * This bar above a grid displays currently set filters for quick editing.
  */
 
-import {Popover} from '@mui/material';
+import {Autocomplete, FormControl, Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
+import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
-import {IconFilterAlt} from '../../../../Icon';
+import {Icon, IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
 import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from '../pages/CallsPage/callsTableFilter';
+import {WFHighLevelCallFilter} from '../pages/CallsPage/callsTableFilter';
+import {OpVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {StyledPaper} from '../StyledAutocomplete';
+import {StyledTextField} from '../StyledTextField';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -26,7 +32,7 @@ import {
 } from './common';
 import {FilterRow} from './FilterRow';
 import {FilterTagItem} from './FilterTagItem';
-import {GroupedOption, SelectFieldOption} from './SelectField';
+import {GroupedOption, SelectField, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 const DEBOUNCE_MS = 700;
@@ -38,6 +44,20 @@ type FilterBarProps = {
   selectedCalls: string[];
   clearSelectedCalls: () => void;
 
+  // op stuff
+  frozenFilter: WFHighLevelCallFilter | undefined;
+  filter: WFHighLevelCallFilter;
+  setFilter: (state: WFHighLevelCallFilter) => void;
+  selectedOpVersionOption: string;
+  opVersionOptions: Record<
+    string,
+    {
+      title: string;
+      ref: string;
+      group: string;
+      objectVersion?: OpVersionSchema;
+    }
+  >;
   width: number;
   height: number;
 };
@@ -56,6 +76,11 @@ export const FilterBar = ({
   selectedCalls,
   clearSelectedCalls,
   width,
+  frozenFilter,
+  filter,
+  setFilter,
+  selectedOpVersionOption,
+  opVersionOptions,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
@@ -64,6 +89,7 @@ export const FilterBar = ({
   // local filter model is used to avoid triggering a re-render of the trace
   // table on every keystroke. debounced DEBOUNCE_MS ms
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
+
   useEffect(() => {
     setLocalFilterModel(filterModel);
   }, [filterModel]);
@@ -209,12 +235,20 @@ export const FilterBar = ({
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
+      if (filterId === 'default-operation') {
+        // set the op to None
+        setFilter({
+          ...filter,
+          opVersionRefs: [],
+        });
+        return;
+      }
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
       setFilterModel(newModel);
     },
-    [localFilterModel, setFilterModel]
+    [localFilterModel, setFilterModel, setFilter, filter]
   );
 
   const onSetSelected = useCallback(() => {
@@ -242,6 +276,29 @@ export const FilterBar = ({
     setAnchorEl(null);
   }, [localFilterModel, setFilterModel, selectedCalls, clearSelectedCalls]);
 
+  // Handle operation change
+  const handleOperationChange = useCallback(
+    (event: any, newValue: string | null) => {
+      if (!newValue) {
+        return;
+      }
+
+      // Update the high-level filter directly
+      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+        setFilter({
+          ...filter,
+          opVersionRefs: [],
+        });
+      } else {
+        setFilter({
+          ...filter,
+          opVersionRefs: [newValue],
+        });
+      }
+    },
+    [setFilter, filter]
+  );
+
   const outlineW = 2 * 2;
   const paddingW = 8 * 2;
   const iconW = 20;
@@ -252,6 +309,106 @@ export const FilterBar = ({
   const completeItems = localFilterModel.items.filter(
     f => !isFilterIncomplete(f)
   );
+
+  // Custom renderer for operation filter
+  const renderOperationFilter = () => {
+    const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes(
+      'opVersions'
+    );
+
+    return (
+      <>
+        {/* First column - Field */}
+        <div className="min-w-[190px]">
+          <SelectField
+            options={[
+              {
+                label: 'operation',
+                options: [{value: 'operation', label: 'operation'}],
+              },
+            ]}
+            value="operation"
+            onSelectField={() => {}}
+            isDisabled={true}
+          />
+        </div>
+
+        {/* Second column - Operator */}
+        <div className="w-[140px]">
+          <SelectField
+            options={[
+              {
+                label: 'equals',
+                options: [{value: 'equals', label: 'equals'}],
+              },
+            ]}
+            value="equals"
+            onSelectField={() => {}}
+            isDisabled={true}
+          />
+        </div>
+
+        {/* Third column - Value */}
+        <div className="w-full flex-grow">
+          <FormControl
+            fullWidth
+            sx={{borderColor: MOON_200, width: '100%', minWidth: 220}}>
+            <Autocomplete
+              PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+              sx={{
+                width: '100%',
+                '& .MuiOutlinedInput-root': {
+                  height: '32px',
+                  width: '100%',
+                  '& fieldset': {
+                    borderColor: MOON_200,
+                  },
+                  '&:hover fieldset': {
+                    borderColor: `rgba(${TEAL_300}, 0.48)`,
+                  },
+                },
+                '& .MuiOutlinedInput-input': {
+                  height: '32px',
+                  padding: '0 14px',
+                  boxSizing: 'border-box',
+                },
+              }}
+              size="small"
+              limitTags={1}
+              disabled={frozenOpFilter}
+              value={selectedOpVersionOption}
+              onChange={handleOperationChange}
+              renderInput={renderParams => (
+                <StyledTextField {...renderParams} fullWidth />
+              )}
+              getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
+              disableClearable={
+                selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+              }
+              groupBy={option => opVersionOptions[option]?.group}
+              options={Object.keys(opVersionOptions)}
+              popupIcon={<Icon name="chevron-down" />}
+              clearIcon={<Icon name="close" />}
+            />
+          </FormControl>
+        </div>
+      </>
+    );
+  };
+
+  const operationItem = filter.opVersionRefs?.map(ref => ({
+    id: 'default-operation',
+    field: 'op',
+    operator: 'operation',
+    value: ref,
+  })) ?? [
+    {
+      id: 'default-operation',
+      field: 'op',
+      operator: 'operation',
+      value: ALL_TRACES_OR_CALLS_REF_KEY,
+    },
+  ];
 
   return (
     <>
@@ -266,7 +423,7 @@ export const FilterBar = ({
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>
-          {completeItems.map(f => (
+          {[...operationItem, ...completeItems].map(f => (
             <FilterTagItem
               key={f.id}
               item={f}
@@ -309,6 +466,22 @@ export const FilterBar = ({
                 )}
               </div>
             </DraggableHandle>
+
+            {/* Default filters section */}
+            <div className="mb-8">
+              <div className="mb-2 text-sm text-moon-500">Default filters</div>
+              <div className="grid grid-cols-[190px_140px_1fr_30px] gap-4">
+                {renderOperationFilter()}
+              </div>
+            </div>
+
+            {/* Divider between default and custom filters */}
+            <div className="my-6 border-t border-moon-200"></div>
+
+            {/* AND text for custom filters */}
+            <div className="mb-2 text-sm text-moon-500">AND</div>
+
+            {/* Custom filters section */}
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
               {localFilterModel.items.map(item => (
                 <FilterRow
@@ -320,27 +493,26 @@ export const FilterBar = ({
                   onRemoveFilter={onRemoveFilter}
                 />
               ))}
+              {localFilterModel.items.length === 0 && (
+                <FilterRow
+                  item={{
+                    id: undefined,
+                    field: '',
+                    operator: '',
+                    value: undefined,
+                  }}
+                  options={options}
+                  onAddFilter={onAddFilter}
+                  onUpdateFilter={onUpdateFilter}
+                  onRemoveFilter={onRemoveFilter}
+                />
+              )}
             </div>
-            {localFilterModel.items.length === 0 && (
-              <FilterRow
-                item={{
-                  id: undefined,
-                  field: '',
-                  operator: '',
-                  value: undefined,
-                }}
-                options={options}
-                onAddFilter={onAddFilter}
-                onUpdateFilter={onUpdateFilter}
-                onRemoveFilter={onRemoveFilter}
-              />
-            )}
             <div className="mt-8 flex items-center">
               <Button
                 size="small"
                 variant="ghost"
                 icon="add-new"
-                disabled={localFilterModel.items.length === 0}
                 onClick={() => onAddFilter('')}>
                 Add filter
               </Button>
