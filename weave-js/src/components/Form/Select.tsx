@@ -23,6 +23,7 @@ import {
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 import ReactSelect, {
+  ClearIndicatorProps,
   components,
   DropdownIndicatorProps,
   GroupBase,
@@ -54,7 +55,7 @@ const MIN_HEIGHTS: Record<SelectSize, number | undefined> = {
   small: undefined,
   medium: undefined,
   large: undefined,
-  variable: 40,
+  variable: 34,
 } as const;
 
 const LINE_HEIGHTS: Record<SelectSize, string | undefined> = {
@@ -75,7 +76,7 @@ const PADDING: Record<SelectSize, string> = {
   small: '2px 8px',
   medium: '4px 12px',
   large: '8px 12px',
-  variable: '2px 8px',
+  variable: '4px 12px',
 } as const;
 
 const OUTWARD_MARGINS: Record<SelectSize, string> = {
@@ -99,6 +100,26 @@ export type AdditionalProps = {
   cursor?: string;
 };
 
+const ClearIndicator = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: ClearIndicatorProps<Option, IsMulti, Group>
+) => {
+  return (
+    <components.ClearIndicator {...props}>
+      <Icon
+        name="close"
+        height={16}
+        width={16}
+        role="button"
+        aria-label="Clear all"
+      />
+    </components.ClearIndicator>
+  );
+};
+
 // Toggle icon when open
 const DropdownIndicator = <
   Option,
@@ -107,6 +128,9 @@ const DropdownIndicator = <
 >(
   indicatorProps: DropdownIndicatorProps<Option, IsMulti, Group>
 ) => {
+  if (indicatorProps.isMulti) {
+    return null;
+  }
   const iconName = indicatorProps.selectProps.menuIsOpen
     ? 'chevron-up'
     : 'chevron-down';
@@ -182,7 +206,7 @@ const getStyles = <
     },
     valueContainer: baseStyles => {
       const padding = PADDING[size];
-      return {...baseStyles, padding};
+      return {...baseStyles, padding, gap: '2px'};
     },
     multiValueLabel: baseStyles => {
       const fontSize = FONT_SIZES[size];
@@ -219,6 +243,7 @@ const getStyles = <
         fontSize,
         cursor: props.cursor ?? 'default',
         border: 0,
+        borderRadius: '3px',
         boxShadow: state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
           : state.isFocused
@@ -285,6 +310,7 @@ const getStyles = <
         },
       };
     },
+    placeholder: baseStyles => ({...baseStyles, fontSize: '16px'}),
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -305,7 +331,7 @@ export const Select = <
     <ReactSelect
       {...props}
       components={Object.assign(
-        {DropdownIndicator, GroupHeading},
+        {ClearIndicator, DropdownIndicator, GroupHeading},
         props.components
       )}
       styles={styles}
