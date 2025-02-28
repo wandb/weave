@@ -2,69 +2,66 @@
 
 ## Overview
 
-This doc covers the serialization patterns in Weave, including how objects are serialized, stored, and retrieved.
+This doc covers the current serialization patterns in Weave. For the purposes of this doc, contents are grouped by the files they are implemented in. Some concepts are currently split across multiple files, which is a limitation that should be addressed in the future.
 
 ## Core Serialization Components
 
-### 1. Basic Serialization (`serialize.py`)
+### 1. Serialization Entrypoint (`serialize.py`)
 
-The core serialization functionality is implemented in `weave/trace/serialize.py`, which provides:
+The entrypoint for serialization is `weave/trace/serialization/serialize.py`. This file principly contains:
 
-- **to_json()**: Converts Python objects to JSON-serializable formats
-- **from_json()**: Converts JSON data back to Python objects
-- **dictify()**: Creates dictionary representations of objects
-- **stringify()**: Provides string representations for objects that can't be serialized
+1. `to_json()`, which converts Python objects to JSON-serializable formats
+2. `from_json()`, which converts JSON data back to Python objects
 
-The serialization process handles:
+Today, serialization handles a variety of types, including:
+| Type | Reversibility |
+|------|---------------|
+| Python primitives (int, float, str, bool, None) | Reversible |
+| Collections (list, tuple, dict) | Reversible |
+| Registered custom objects (via the `custom_objs` module) | Reversible |
+| Arbitrary python objects | Not reversible |
+| "Dictifiable" objects | Partially reversible (back into a dict) |
 
-- Primitive types (int, float, str, bool, None)
-- Collections (list, tuple, dict)
-- Namedtuples
-- ObjectRecords and References (ObjectRef, TableRef)
-- Custom objects via the custom_objs module
+NOTE: Not all serialization is reversible, which can be surprising and frustrating. We also handle weave-specific concepts like `ObjectRecord` and refs (`ObjectRef`, `TableRef`, etc.)
 
-### 2. Custom Object Serialization (`custom_objs.py`)
+### 2. Custom Object Serialization (`custom_objs.py` and `serializer.py`)
 
-For objects that can't be directly serialized to JSON, Weave provides a custom object serialization system:
+The entrypoint for custom object serialization is `weave/trace/serialization/custom_objs.py`. This file primarily contains:
 
-- **encode_custom_obj()**: Encodes custom objects using registered serializers
-- **decode_custom_obj()**: Decodes custom objects using the appropriate serializer
-- Uses a file-based approach to store serialized data
+1. `encode_custom_obj()`, which encodes custom objects using registered serializers
+2. `decode_custom_obj()`, which decodes custom objects using the appropriate serializer
 
-The system maintains a list of `KNOWN_TYPES` that are recognized and can be deserialized without requiring the original serializer to be registered in the current runtime.
+Custom serializers can be registered with `register_serializer`. This allows users to specify custom `save` and `load` methods for custom types. For portability, weave also packages the `load` function as an op in the saved object so it can try to be loaded even if the serializer is not registered in the target runtime (this is done on a best-effort basis). See more in the `Adding Custom Types` section.
 
-### 3. Pluggable Serializers (`serializer.py`)
+Weave also ships with a set of first-class serializers for common types, defined in `weave/type_handlers/`, including:
 
-Weave allows registering custom serializers for specific types:
+- Images (`PIL.Image.Image`)
+- Audio (`wave.Wave_read`)
+- Op (`weave.Op`)
 
-- **register_serializer()**: Registers save/load functions for a specific type
-- **get_serializer_by_id()**: Retrieves a serializer by its ID
-- **get_serializer_for_obj()**: Finds the appropriate serializer for an object
+These `KNOWN_TYPES` are implemented using `register_serializer`. Unlike other types, these will always be loaded using the SDK's current `load` function (instead of the one packaged with the object).
 
-Example serializers include:
+#### File-based serialization
 
-- Image serializer (for PIL.Image.Image)
-- Audio serializer (for wave.Wave_read)
-- Op serializer (for weave.Op)
+Today, all custom object serialization is file-based via `MemTraceFilesArtifact`. Technicaly this supports many files per artifact, but in practice today we use just a single file (obj.py) for each artifact. Elements of this are hardcoded in both the SDK and App layers.
 
-### 4. Dictifiable Protocol (`serialization/dictifiable.py`)
+#### Inline serialization
 
-A protocol for objects that can be converted to dictionaries:
+Notably, this system is missing the ability to register inline serializers for custom objects. For example, the user may have a simple type like a custom datetime. This is a known limitation and will be addressed in the future.
 
-- **Dictifiable**: Protocol defining the to_dict() method
-- **try_to_dict()**: Attempts to convert an object to a dictionary using the protocol
+#### Other limitations
 
-### 5. Serialization Reversibility
+1. File I/O can block the main thread for particularly large files.
+2. There's not an easy way to know what types are registered, or their relative order. This may become more relevant as users begin to bring their own types, and especially if there is a conflicting type hierarchy (e.g. a registered `torch.Tensor` serializer + a subclass of `torch.Tensor` serializer.)
+3. The current file-based approach also requires a network request for each file. This can be a problematic, especially in the dataset case, where a row may contain many custom objects that each have to reach out to the server to load.
+4. There is no file-deduplication for custom objects. If a custom object is saved multiple times, it will use multiple files. This might be surprising, e.g. in the dataset case where a single image may be present in multiple rows.
 
-An important consideration in the serialization system is whether the serialization process is reversible (i.e., whether the original object can be reconstructed from its serialized form). The reversibility of different serialization methods varies:
+### Fallback serialization
 
-- **Custom Serializers**: Fully reversible. Objects serialized using registered custom serializers can be fully reconstructed with their original type and data.
-- **to_json/from_json**: Partially reversible. Basic types, collections, and objects with registered serializers can be reconstructed. Complex objects without serializers may lose type information.
-- **dictify**: Partially reversible. While dictify preserves more structure than stringify, it loses method information and may not capture all the necessary state to reconstruct the original object. The resulting dictionary contains class information but not the logic to reconstruct instances.
-- **stringify**: Not reversible. The stringify method produces a string representation that is meant for display purposes only. It cannot be used to reconstruct the original object as it discards all type information and internal structure.
-- **Dictifiable Protocol**: Potentially reversible, but depends on the implementation. If the to_dict method is designed to capture all necessary state and there's a corresponding from_dict method, objects can be reconstructed.
+For objects that are not explicitly registered, there are a few (lossy) fallback mechanisms, including:
 
-When designing systems that need to store and retrieve objects, it's crucial to use the appropriate serialization method based on whether the objects need to be reconstructed later.
+1. `Dictifiable` -- objects that can represented as a dict will attempt to be serialized as a dict.
+2. `stringify` -- in the worst case, python objects will be serialized as the object's repr string.
 
 ## Adding Custom Types
 
@@ -80,8 +77,8 @@ To add support for a custom type, you need to define two functions:
 Example:
 
 ```python
-from weave.trace import serializer
-from weave.trace.custom_objs import MemTraceFilesArtifact
+from weave.trace.serialization import serializer
+from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 class MyCustomType:
     def __init__(self, value):
@@ -104,7 +101,7 @@ def load_my_type(artifact: MemTraceFilesArtifact, name: str) -> MyCustomType:
 Once you have defined the save and load functions, you need to register them with Weave:
 
 ```python
-from weave.trace import serializer
+from weave.trace.serialization import serializer
 
 # Register the serializer for your custom type
 serializer.register_serializer(MyCustomType, save_my_type, load_my_type)
@@ -126,103 +123,14 @@ ref = client.save(my_obj, "my-custom-object")
 
 # Retrieve the object from Weave
 retrieved_obj = client.get(ref)
-print(retrieved_obj.value)  # Output: Hello, Weave!
 ```
 
-### 4. Handling Large Data
+### 4. Cross-Runtime Compatibility
 
-For custom types that contain large data, you should be careful about how you serialize them. Weave provides mechanisms to handle large files efficiently:
+When a custom object is saved, Weave also saves the load function as an op. This allows the object to be deserialized in a Python runtime that does not have the serializer registered, as long as the necessary dependencies are available. This is done on a best-effort basis, and the object will not be loadable if any of the dependencies are not available.
 
-```python
-def save_large_data(obj, artifact, name):
-    with artifact.new_file(name) as f:
-        # Write data in chunks to avoid memory issues
-        for chunk in obj.get_data_chunks():
-            f.write(chunk)
+We don't currently save a lock file of the dependencies, but we might want to if we want to provide better portability in future.
 
-def load_large_data(artifact, name):
-    # Load data efficiently
-    return LargeDataType(artifact.path(name))
-```
+## Server-Side Object Registration (WIP)
 
-### 5. Cross-Runtime Compatibility
-
-When a custom object is saved, Weave also saves the load function as an operation. This allows the object to be deserialized in a Python runtime that does not have the serializer registered, as long as the necessary dependencies are available.
-
-## Gaps and Limitations
-
-Based on the analysis, the following gaps in the current serialization and object management system have been identified:
-
-1. **Collection Support**: There's no explicit support for organizing objects into collections or groups. Objects are currently identified by their IDs and can be filtered by base classes, but there's no way to group related objects together.
-
-2. **Pagination**: While the ObjQueryReq supports limit and offset parameters, there's no high-level pagination API in the client for efficiently browsing large sets of objects.
-
-3. **List Objects API**: There's no dedicated API for listing objects with collection support and pagination. The current `_objects()` method is internal and doesn't provide a user-friendly interface for browsing objects.
-
-4. **Metadata Querying**: While objects can be filtered by their base classes and IDs, there's limited support for querying objects based on their metadata or attributes.
-
-5. **Collection Management**: There's no API for creating, updating, or deleting collections of objects.
-
-6. **Serialization Error Handling**: The current system silently returns None when no serializer is found for an object, which can lead to data loss without clear error messages.
-
-7. **Type Registration Discovery**: There's no easy way for users to discover what types are already registered or to list available serializers.
-
-8. **Serialization Reversibility**: Not all serialization methods are reversible. The system lacks clear documentation about which methods preserve enough information to reconstruct objects and which are for display purposes only.
-
-## Recommendations
-
-To address these gaps, the following implementations are recommended:
-
-1. **Collection Support**:
-
-   - Add a collection field to objects or create a separate collection mapping system
-   - Implement APIs for creating and managing collections
-
-2. **Enhanced Pagination**:
-
-   - Create a PaginatedObjectIterator similar to the existing PaginatedIterator for calls
-   - Support both offset-based and cursor-based pagination
-
-3. **List Objects API**:
-
-   - Implement a public `list_objects()` method in WeaveClient
-   - Support filtering by collections, object types, and metadata
-   - Include pagination support
-
-4. **Collection Management API**:
-
-   - Add methods for creating, updating, and deleting collections
-   - Support moving objects between collections
-
-5. **Metadata Querying**:
-
-   - Enhance the ObjectVersionFilter to support querying by object metadata
-   - Add support for complex queries using the existing Query system
-
-6. **Improved Serialization Error Handling**:
-
-   - Provide clear warnings or errors when objects cannot be serialized
-   - Add logging for serialization failures
-
-7. **Serializer Registry API**:
-
-   - Add methods to list registered serializers
-   - Provide documentation on available serializers
-
-8. **Serialization Reversibility Documentation**:
-   - Clearly document which serialization methods are reversible and which are not
-   - Provide guidelines for choosing the appropriate serialization method based on use case
-
-## Implementation Approach
-
-The implementation should follow these steps:
-
-1. Extend the server interface to support collections and enhanced object querying
-2. Update the database schema to store collection information
-3. Implement the client-side APIs for collection management and object listing
-4. Add pagination support to the object listing API
-5. Create comprehensive tests for the new functionality
-6. Improve error handling and documentation for serialization
-7. Add clear documentation about serialization reversibility
-
-This approach will provide a more user-friendly and powerful way to manage and browse objects in the Weave system.
+Weave is also in the process of adding support for server-side object registration. Currently, we have limited support for server-side object registration through the `BUILTIN_OBJECT_REGISTRY`
