@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from transformers.tokenization_utils import PreTrainedTokenizer
 
 
-class LLMScorer:
+class LLMScorer(weave.Scorer):
     """Score model outputs using a Large Language Model (LLM).
 
     This scorer leverages LLMs to evaluate and score model outputs. It provides a flexible
