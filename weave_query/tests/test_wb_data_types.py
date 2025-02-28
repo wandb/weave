@@ -323,6 +323,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": "",
             },
         },
         {
@@ -377,6 +378,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": "",
             },
         },
         {
@@ -431,6 +433,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": "",
             },
         },
         {
@@ -485,6 +488,7 @@ def exp_raw_data(commit_hash: str):
                         "sha256": "00c619b2faa45fdc9ce6de014e7aef7839c9de725bf78b528ef47d279039aacf",
                     }
                 },
+                "caption": "",
             },
         },
     ]
