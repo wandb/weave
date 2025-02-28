@@ -9,7 +9,7 @@ import React from 'react';
 
 import {Link} from '../common/Links';
 import {useConfiguredProviders} from '../PlaygroundPage/useConfiguredProviders';
-import {useWFHooks, WFDataModelAutoProvider} from '../wfReactInterface/context';
+import {WFDataModelAutoProvider} from '../wfReactInterface/context';
 import {ProviderTable} from './ProviderTable';
 
 const ProviderStatus = ({isActive}: {isActive: boolean}) => {
