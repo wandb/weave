@@ -10,20 +10,24 @@ STATE_TYPE = list[dict]
 
 thread_state: dict[str, STATE_TYPE] = {}
 
+
 @weave.op
 async def search_weather(location: str) -> str:
     await asyncio.sleep(1)
     return f"The weather in {location} is sunny and 72°F"
+
 
 @weave.op
 async def search_restaurants(cuisine: str, location: str) -> str:
     await asyncio.sleep(1)
     return f"Found 3 {cuisine} restaurants in {location}: Restaurant A, Restaurant B, Restaurant C"
 
+
 @weave.op
 async def get_directions(start: str, end: str) -> str:
     await asyncio.sleep(1)
     return f"Directions from {start} to {end}: Head north for 2 blocks, turn right..."
+
 
 @weave.op
 async def execute_function_call(function_name: str, function_args: dict) -> str:
@@ -34,6 +38,7 @@ async def execute_function_call(function_name: str, function_args: dict) -> str:
     elif function_name == "get_directions":
         return await get_directions(**function_args)
     return None
+
 
 @weave.op()
 async def predict(input: str, thread_id: str) -> str:
@@ -50,8 +55,8 @@ async def predict(input: str, thread_id: str) -> str:
                 "properties": {
                     "location": {"type": "string", "description": "City name"}
                 },
-                "required": ["location"]
-            }
+                "required": ["location"],
+            },
         },
         {
             "name": "search_restaurants",
@@ -60,10 +65,10 @@ async def predict(input: str, thread_id: str) -> str:
                 "type": "object",
                 "properties": {
                     "cuisine": {"type": "string", "description": "Type of cuisine"},
-                    "location": {"type": "string", "description": "City name"}
+                    "location": {"type": "string", "description": "City name"},
                 },
-                "required": ["cuisine", "location"]
-            }
+                "required": ["cuisine", "location"],
+            },
         },
         {
             "name": "get_directions",
@@ -72,11 +77,11 @@ async def predict(input: str, thread_id: str) -> str:
                 "type": "object",
                 "properties": {
                     "start": {"type": "string", "description": "Starting location"},
-                    "end": {"type": "string", "description": "Destination location"}
+                    "end": {"type": "string", "description": "Destination location"},
                 },
-                "required": ["start", "end"]
-            }
-        }
+                "required": ["start", "end"],
+            },
+        },
     ]
 
     client = openai.OpenAI()
@@ -86,10 +91,7 @@ async def predict(input: str, thread_id: str) -> str:
 
     while current_step < max_steps:
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=new_state,
-            functions=functions,
-            function_call="auto"
+            model="gpt-4", messages=new_state, functions=functions, function_call="auto"
         )
 
         response_message = response.choices[0].message
@@ -103,26 +105,23 @@ async def predict(input: str, thread_id: str) -> str:
 
         function_response = await execute_function_call(function_name, function_args)
 
-        new_state.append({
-            "role": "assistant",
-            "content": None,
-            "function_call": {
-                "name": function_name,
-                "arguments": response_message.function_call.arguments
+        new_state.append(
+            {
+                "role": "assistant",
+                "content": None,
+                "function_call": {
+                    "name": function_name,
+                    "arguments": response_message.function_call.arguments,
+                },
             }
-        })
-        new_state.append({
-            "role": "function",
-            "name": function_name,
-            "content": function_response
-        })
+        )
+        new_state.append(
+            {"role": "function", "name": function_name, "content": function_response}
+        )
 
         # Check if the assistant wants to take another action
         followup = client.chat.completions.create(
-            model="gpt-4",
-            messages=new_state,
-            functions=functions,
-            function_call="auto"
+            model="gpt-4", messages=new_state, functions=functions, function_call="auto"
         )
 
         if not followup.choices[0].message.function_call:
@@ -141,6 +140,7 @@ async def predict(input: str, thread_id: str) -> str:
 
 class PredictRequest(ThreadPredictRequest):
     input: str
+
 
 weave.init("threading-demo")
 host_op(PredictRequest, predict)

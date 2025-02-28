@@ -7,6 +7,7 @@ STATE_TYPE = list[dict]
 
 thread_state: dict[str, STATE_TYPE] = {}
 
+
 @weave.op()
 async def predict(input: str, thread_id: str) -> str:
     curr_state = thread_state.get(thread_id, [])
@@ -25,6 +26,7 @@ async def predict(input: str, thread_id: str) -> str:
 
 class PredictRequest(ThreadPredictRequest):
     input: str
+
 
 weave.init("threading-demo")
 host_op(PredictRequest, predict)

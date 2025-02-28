@@ -5,23 +5,19 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {useWFHooks} from '../wfReactInterface/context';
-import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
-import {StackContextProvider} from './components/TraceScrubber/context';
-import {TraceScrubber} from './components/TraceScrubber/index';
 import {
   useBareTraceCalls,
   useThreadList,
   useTraceRootsForThread,
 } from './hooks';
-import {ThreadsPageProps, TraceTreeFlat} from './types';
+import {TraceNavigator} from './TraceNavigator';
+import {ThreadsPageProps} from './types';
 import {buildTraceTreeFlat} from './utils';
 import {
   callViews,
   getCallView,
   getThreadView,
-  getTraceView,
   threadViews,
-  traceViews,
 } from './viewRegistry';
 
 interface CallViewWrapperProps {
@@ -94,7 +90,7 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     entity,
     project,
     selectedThreadId,
-    threadViewId === 'connected' ? 2000 : 0  // Poll every 2 seconds for connected view
+    threadViewId === 'connected' ? 2000 : 0 // Poll every 2 seconds for connected view
   );
 
   const {
@@ -208,7 +204,6 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
       />
     );
   };
-
 
   const renderCallDetails = () => {
     if (callsLoading) {
@@ -340,7 +335,11 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
 
           {/* Trace Panel - 40% */}
           <div className="flex w-[40%] flex-col overflow-hidden">
-          <TraceNavigator traceViewId={traceViewId} setTraceViewId={setTraceViewId} traceTreeFlat={traceTreeFlat} selectedCallId={selectedCallId} setSelectedCallId={setSelectedCallId} />
+            <TraceNavigator
+              traceTreeFlat={traceTreeFlat}
+              selectedCallId={selectedCallId}
+              setSelectedCallId={setSelectedCallId}
+            />
           </div>
 
           {/* Call Detail Panel - 30% */}
@@ -396,66 +395,3 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
     </Tailwind>
   );
 };
-const TraceNavigator = ({
-  traceTreeFlat,
-  selectedCallId,
-  setSelectedCallId,
-}: {
-  traceTreeFlat: TraceTreeFlat;
-  selectedCallId: string | undefined;
-  setSelectedCallId: React.Dispatch<React.SetStateAction<string | undefined>>;
-}) => {
-  const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
-  const TraceViewComponent = getTraceView(traceViewId).component;
-  return <div className="h-full flex flex-col overflow-hidden">
-    <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
-      <h2 className="truncate text-sm font-semibold">Trace View</h2>
-      <div className="flex items-center gap-3">
-        {traceViews.map(view => (
-          <Button
-            key={view.id}
-            variant={traceViewId === view.id ? 'primary' : 'ghost'}
-            onClick={() => setTraceViewId(view.id)}
-            icon={view.icon}
-            size="small"
-            className="!p-3"
-            title={view.label}>
-            <span className="sr-only">{view.label}</span>
-          </Button>
-        ))}
-      </div>
-    </div>
-    <div className="min-h-0 flex-1 overflow-hidden">
-    <div className="flex h-full flex-col">
-    {Object.keys(traceTreeFlat).length > 0 && (
-      <StackContextProvider
-        traceTreeFlat={traceTreeFlat}
-        selectedCallId={selectedCallId}>
-        <StackBreadcrumb
-          traceTreeFlat={traceTreeFlat}
-          selectedCallId={selectedCallId}
-          onCallSelect={setSelectedCallId}
-        />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto">
-            <TraceViewComponent
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}
-              onCallSelect={setSelectedCallId}
-            />
-          </div>
-          {getTraceView(traceViewId).showScrubber && (
-            <TraceScrubber
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}
-              onCallSelect={setSelectedCallId}
-            />
-          )}
-        </div>
-      </StackContextProvider>
-    )}
-  </div>
-    </div>
-  </div>;
-}
-

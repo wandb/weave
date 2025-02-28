@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import React from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
@@ -20,7 +20,7 @@ export const useThreadList = (
   project: string
 ): LoadableWithError<string[]> => {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error] = useState<Error | null>(null);
   const [threads, setThreads] = useState<string[]>([]);
 
   useEffect(() => {
@@ -63,7 +63,12 @@ export const useTraceRootsForThread = (
     const fetchTraces = async () => {
       try {
         const client = getClient();
-        const res = await fetchBareThreadTraces(client, entity, project, threadId);
+        const res = await fetchBareThreadTraces(
+          client,
+          entity,
+          project,
+          threadId
+        );
         if (mounted) {
           setTraces(res);
           setLoading(false);
@@ -131,7 +136,7 @@ export const useBareTraceCalls = (
       try {
         const client = getClient();
         const res = await fetchBareTraceCalls(client, entity, project, traceId);
-        
+
         if (mounted) {
           setTraceCalls(res);
           setLoading(false);
@@ -183,16 +188,18 @@ const fetchBareThreadTraces = (
   project: string,
   threadId: string
 ): Promise<TraceCallSchema[]> => {
-  let query: any = {"$expr":{"$eq":[{"$getField":"attributes.thread_id"},{"$literal":threadId}]}}
+  let query: any = {
+    $expr: {$eq: [{$getField: 'attributes.thread_id'}, {$literal: threadId}]},
+  };
   if (threadId === '_roots_') {
-    query = undefined
+    query = undefined;
   }
   const traceCallsProm = client.callsQuery({
     project_id: `${entity}/${project}`,
     filter: {
       trace_roots_only: true,
     },
-    query: query,
+    query,
     limit: 10,
     sort_by: [{field: 'started_at', direction: 'desc'}],
     columns: [
@@ -310,7 +317,7 @@ export const usePollingCall = (
   });
 
   // Function to fetch call data directly
-  const fetchCall = async () => {
+  const fetchCall = useCallback(async () => {
     try {
       const client = getClient();
       const res = await client.callsQuery({
@@ -338,7 +345,7 @@ export const usePollingCall = (
         include_costs: false,
         include_feedback: false,
       });
-      
+
       if (res.calls.length > 0) {
         const call = res.calls[0];
         setPolledCall({
@@ -355,7 +362,7 @@ export const usePollingCall = (
     } finally {
       setLoading(false);
     }
-  };
+  }, [entity, project, callId, getClient]);
 
   // Set up polling when the call is running
   useEffect(() => {
@@ -363,9 +370,11 @@ export const usePollingCall = (
     let pollTimeout: NodeJS.Timeout | undefined;
 
     const poll = async () => {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       await fetchCall();
-      
+
       // Schedule next poll if we should continue polling
       if (mounted && shouldPoll) {
         pollTimeout = setTimeout(poll, pollIntervalMs);
@@ -381,12 +390,20 @@ export const usePollingCall = (
         clearTimeout(pollTimeout);
       }
     };
-  }, [entity, project, callId, pollIntervalMs, getClient, shouldPoll]);
+  }, [
+    entity,
+    project,
+    callId,
+    pollIntervalMs,
+    getClient,
+    shouldPoll,
+    fetchCall,
+  ]);
 
   // Use polled data once available, fall back to initial call data
   return {
     loading: loading && initialCallResult.loading,
-    error: error,
+    error,
     result: polledCall || initialCallResult.result,
   };
 };

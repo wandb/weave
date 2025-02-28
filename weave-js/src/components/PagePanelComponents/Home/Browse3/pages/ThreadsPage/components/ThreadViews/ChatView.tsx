@@ -1,15 +1,13 @@
 import Input from '@wandb/weave/common/components/Input';
 import {IconNames} from '@wandb/weave/components/Icon';
-import backendHost from '@wandb/weave/config';
 import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
-import {useWFHooks} from '../../../wfReactInterface/context';
 import {TraceCallSchema} from '../../../wfReactInterface/traceServerClientTypes';
-import {ThreadViewProps} from '../../types';
 import {usePollingCall} from '../../hooks';
+import {ThreadViewProps} from '../../types';
 
 const Container = styled.div`
   height: 100%;
@@ -90,7 +88,7 @@ const RunningIndicator = styled.div`
   gap: 4px;
   font-size: 11px;
   font-weight: 500;
-  color: #3B82F6;
+  color: #3b82f6;
   padding: 8px;
   text-align: center;
 `;
@@ -189,13 +187,6 @@ interface ConnectionStatus {
   schema: any;
   error: string | null;
   threadId: string | null;
-}
-
-interface FormField {
-  name: string;
-  type: string;
-  description?: string;
-  required?: boolean;
 }
 
 // Shared components for both views
@@ -306,10 +297,7 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
 
   // Check if we have a single string input field
   const isSingleStringInput = useMemo(() => {
-    return (
-      formFields.length === 1 &&
-      formFields[0].type === 'string'
-    );
+    return formFields.length === 1 && formFields[0].type === 'string';
   }, [formFields]);
 
   // Connect to the local runtime
@@ -317,8 +305,11 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
     try {
       // Validate URL protocol
       const url = new URL(connection.url);
-      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '0.0.0.0';
-      
+      const isLocalhost =
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.hostname === '0.0.0.0';
+
       if (!isLocalhost && url.protocol !== 'https:') {
         throw new Error('HTTPS is required for non-localhost connections');
       }
@@ -334,9 +325,9 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
       const threadId = crypto.randomUUID();
 
       // Set the thread ID as the selected thread
-      onTraceSelect('');  // Clear any existing trace selection first
-      setFormValues({thread_id: threadId});  // Set form values before connection state
-      
+      onTraceSelect(''); // Clear any existing trace selection first
+      setFormValues({thread_id: threadId}); // Set form values before connection state
+
       setConnection(prev => ({
         ...prev,
         isConnected: true,
@@ -383,19 +374,21 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
 
   // Run the thread with current form values
   const handleRun = async () => {
-    if (!connection.threadId) return;
-    
+    if (!connection.threadId) {
+      return;
+    }
+
     // Store the current values
     const currentValues = {...formValues};
     const fieldName = isSingleStringInput ? formFields[0].name : null;
-    
+
     // Clear the form immediately
     if (fieldName) {
       setFormValues({thread_id: connection.threadId, [fieldName]: ''});
     } else {
       setFormValues({thread_id: connection.threadId});
     }
-    
+
     setIsRunning(true);
     setRunError(null);
     try {
@@ -474,9 +467,12 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
                 Connect
               </Button>
             </ConnectionForm>
-            {connection.error && <ErrorMessage>{connection.error}</ErrorMessage>}
+            {connection.error && (
+              <ErrorMessage>{connection.error}</ErrorMessage>
+            )}
             <div style={{marginTop: '8px', fontSize: '12px', color: '#64748B'}}>
-              Note: Use HTTP for localhost connections (e.g., http://localhost:2323). HTTPS is required for all other hosts.
+              Note: Use HTTP for localhost connections (e.g.,
+              http://localhost:2323). HTTPS is required for all other hosts.
             </div>
           </>
         ) : (
@@ -485,7 +481,9 @@ export const ConnectedThreadView: React.FC<ThreadViewProps> = ({
               <ChatInput>
                 <Input
                   type="text"
-                  placeholder={formFields[0].description || 'Type your message...'}
+                  placeholder={
+                    formFields[0].description || 'Type your message...'
+                  }
                   value={formValues[formFields[0].name] ?? ''}
                   onChange={e =>
                     setFormValues(prev => ({

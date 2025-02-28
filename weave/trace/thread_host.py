@@ -28,20 +28,22 @@ from weave.trace.op import Op
 #     def predict(self, input: int, thread_id: str) -> int:
 #         return input + 1
 
+
 class ThreadPredictRequest(BaseModel):
     thread_id: str
 
+
 def host_op(
-        req_type: type[ThreadPredictRequest],
-        op: Op,
-        port: int = 2323,
-        allowed_origins: list[str] = [
-            "https://app.wandb.test",
-            "https://wandb.ai",
-            "https://localhost:3000",
-            "http://localhost:3000",  # Allow HTTP for local development
-            "http://app.wandb.test",  # Allow HTTP for local development
-        ],
+    req_type: type[ThreadPredictRequest],
+    op: Op,
+    port: int = 2323,
+    allowed_origins: list[str] = [
+        "https://app.wandb.test",
+        "https://wandb.ai",
+        "https://localhost:3000",
+        "http://localhost:3000",  # Allow HTTP for local development
+        "http://app.wandb.test",  # Allow HTTP for local development
+    ],
 ):
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
