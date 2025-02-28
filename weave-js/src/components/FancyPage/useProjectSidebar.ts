@@ -55,7 +55,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Overview',
             slug: 'overview',
-            isShown: isModelsOnly,
+            isShown: true,
             iconName: IconNames.Info,
           },
           {
