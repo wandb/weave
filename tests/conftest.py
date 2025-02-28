@@ -398,7 +398,7 @@ def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
     logger.addHandler(handler)
-    if request.param == "warning":
+    if hasattr(request, "param") and request.param == "warning":
         logger.setLevel(logging.WARNING)
     else:
         logger.setLevel(logging.ERROR)
