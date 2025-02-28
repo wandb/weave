@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {
@@ -343,10 +342,6 @@ const CallPageInnerVertical: FC<{
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
-
-  // if (loading && !assumeCallIsSelectedCall) {
-  //   return <Loading centered />;
-  // }
 
   return (
     <SimplePageLayoutWithHeader
