@@ -31,9 +31,11 @@ class LLMScorer(weave.Scorer):
     model_id: str = Field(
         description="The model to use, check https://docs.litellm.ai/docs/providers for supported models"
     )
-    temperature: float = Field(default=0.0, description="The temperature to use for the response"
+    temperature: float = Field(
+        default=0.0, description="The temperature to use for the response"
     )
-    max_tokens: int = Field(default=4096, description="The maximum number of tokens in the response"
+    max_tokens: int = Field(
+        default=4096, description="The maximum number of tokens in the response"
     )
 
     _acompletion: "acompletion" = PrivateAttr()
