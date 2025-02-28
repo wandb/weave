@@ -66,6 +66,17 @@ def _local_path_and_download_url(
     else:
         # TODO: storage_region
         storage_region = "default"
+        if isinstance(art_uri, artifact_wandb.WeaveWBArtifactURI):
+            return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}/{}/{}".format(
+                base_url,
+                storage_region,
+                entity_name or "_",
+                art_uri.project_name,
+                art_uri.name,
+                urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
+                md5_hex,
+                urllib.parse.quote(file_name),
+                )
         # For artifactsV2 (which is all artifacts now), the file download handler ignores the entity
         # parameter while parsing the url, and fetches the files directly via the artifact id
         # Refer to: https://github.com/wandb/core/blob/7cfee1cd07ddc49fe7ba70ce3d213d2a11bd4456/services/gorilla/api/handler/artifacts.go#L179
