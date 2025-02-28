@@ -140,6 +140,127 @@ def test_oversized_item_will_error_without_sending(small_limit_trace_server):
     assert small_limit_trace_server._send_batch_to_server.call_count == 0
 
 
+def test_multi_level_recursive_splitting(small_limit_trace_server):
+    """Test that a very large batch is recursively split multiple times."""
+    # Create a very large batch with many items to force multiple levels of splitting.
+    # Some items are larger than others to test non-uniform sizes.
+    batch = []
+    for i in range(50):
+        start = generate_start()
+        end = generate_end()
+        if i % 5 == 0:
+            start.attributes = {"data": "x" * 500}
+        batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+        batch.append(EndBatchItem(req=tsi.CallEndReq(end=end)))
+
+    # Process the batch
+    small_limit_trace_server._flush_calls(batch)
+
+    # Verify _send_batch_to_server was called multiple times
+    # The exact number depends on the batch sizes, but it should be more than just 1 split
+    assert small_limit_trace_server._send_batch_to_server.call_count > 2
+
+    # Verify all items were sent
+    total_items_sent = 0
+    for call in small_limit_trace_server._send_batch_to_server.call_args_list:
+        called_data = call[0][0]
+        decoded_batch = json.loads(called_data.decode("utf-8"))
+        total_items_sent += len(decoded_batch["batch"])
+
+    assert total_items_sent == len(batch)
+
+
+def test_dynamic_batch_size_adjustment(trace_server):
+    """Test that max_batch_size is dynamically adjusted based on item sizes."""
+    # Create a batch with consistent item sizes
+    batch = []
+    for _ in range(10):
+        start, end = generate_call_start_end_pair()
+        batch.append(StartBatchItem(req=start))
+
+    # Initial max_batch_size should be the default
+    original_max_batch_size = trace_server.call_processor.max_batch_size
+
+    # Process the batch
+    trace_server._flush_calls(batch)
+
+    # Verify max_batch_size was updated
+    new_max_batch_size = trace_server.call_processor.max_batch_size
+    assert new_max_batch_size != original_max_batch_size
+
+    # The new max_batch_size should be based on the average item size
+    data = Batch(batch=batch).model_dump_json()
+    encoded_bytes = len(data.encode("utf-8"))
+    estimated_bytes_per_item = encoded_bytes / len(batch)
+    expected_max_batch_size = max(
+        1, int(trace_server.remote_request_bytes_limit // estimated_bytes_per_item)
+    )
+
+    assert new_max_batch_size == expected_max_batch_size
+
+
+def test_non_uniform_batch_items(small_limit_trace_server):
+    """Test batch with extremely non-uniform item sizes."""
+    # Create a batch with vastly different sized items
+    batch = []
+
+    # Add several small items
+    for _ in range(5):
+        start, _ = generate_call_start_end_pair()
+        batch.append(StartBatchItem(req=start))
+
+    # Add one medium item
+    start = generate_start()
+    start.attributes = {"medium_data": "y" * 300}
+    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+
+    # Add one large item (but still under the limit)
+    start = generate_start()
+    start.attributes = {
+        "large_data": "z" * (small_limit_trace_server.remote_request_bytes_limit // 2)
+    }
+    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+
+    # Process the batch
+    small_limit_trace_server._flush_calls(batch)
+
+    # The batch should have been split to accommodate the different sized items
+    assert small_limit_trace_server._send_batch_to_server.call_count >= 2
+
+    # Verify all items were sent
+    total_items_sent = 0
+    for call in small_limit_trace_server._send_batch_to_server.call_args_list:
+        called_data = call[0][0]
+        decoded_batch = json.loads(called_data.decode("utf-8"))
+        total_items_sent += len(decoded_batch["batch"])
+
+    assert total_items_sent == len(batch)
+
+
+@patch("weave.trace_server.requests.post")
+def test_http_413_error_handling(mock_post, trace_server):
+    """Test handling of HTTP 413 (Entity Too Large) errors."""
+    # Create a response that simulates a 413 error
+    error_response = MagicMock()
+    error_response.status_code = 413
+    error_response.text = json.dumps({"reason": "Request entity too large"})
+
+    # Mock the request to return a 413 error
+    mock_post.return_value = error_response
+
+    # Create a batch
+    start, _ = generate_call_start_end_pair()
+    batch = [StartBatchItem(req=start)]
+
+    # Process the batch and expect an HTTPError due to 413
+    with pytest.raises(requests.HTTPError) as excinfo:
+        trace_server._flush_calls(batch)
+
+    # Verify the error message contains the reason
+    assert "413 Client Error" in str(excinfo.value)
+    assert "Request entity too large" in str(excinfo.value)
+
+
 @pytest.fixture
 def success_response():
     response = MagicMock()
@@ -160,7 +281,7 @@ def test_timeout_retry_mechanism(mock_post, success_response):
         success_response,
     ]
 
-    # Trying to send a batch with 1 item should fail 2 times, then succeed
+    # Trying to send a batch should fail 2 times, then succeed
     start, _ = generate_call_start_end_pair()
     batch = [StartBatchItem(req=start)]
     server._flush_calls(batch)
