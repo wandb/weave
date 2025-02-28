@@ -238,8 +238,11 @@ def test_non_uniform_batch_items(small_limit_trace_server):
 
 
 @patch("weave.trace_server.requests.post")
-def test_http_413_error_handling(mock_post, trace_server):
+def test_http_413_error_handling(mock_post):
     """Test handling of HTTP 413 (Entity Too Large) errors."""
+    # Create a server without mocking _send_batch_to_server
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+
     # Create a response that simulates a 413 error
     error_response = MagicMock()
     error_response.status_code = 413
@@ -254,7 +257,7 @@ def test_http_413_error_handling(mock_post, trace_server):
 
     # Process the batch and expect an HTTPError due to 413
     with pytest.raises(requests.HTTPError) as excinfo:
-        trace_server._flush_calls(batch)
+        server._flush_calls(batch)
 
     # Verify the error message contains the reason
     assert "413 Client Error" in str(excinfo.value)
