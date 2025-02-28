@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import datetime
 import json
+from types import MethodType
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+import tenacity
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
@@ -295,3 +297,49 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 
     # Verify that requests.post was called 3 times
     assert mock_post.call_count == 3
+
+
+@patch("weave.trace_server.requests.post")
+def test_post_timeout(mock_post, caplog):
+    """Test that we can still send new batches even if one batch times out.
+
+    This test modifies the retry mechanism to use a short wait time and limited retries
+    to verify behavior when retries are exhausted.
+    """
+    # Create server with fast retry mechanism for testing
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    fast_retry = tenacity.retry(
+        wait=tenacity.wait_fixed(0.1),
+        stop=tenacity.stop_after_attempt(2),
+        reraise=True,
+    )
+    server._send_batch_to_server = fast_retry(
+        MethodType(server._send_batch_to_server.__wrapped__, server)
+    )
+
+    success_response = MagicMock()
+    success_response.status_code = 200
+    success_response.json.return_value = {"id": "test_id", "trace_id": "test_trace_id"}
+
+    # Configure mock to timeout twice to exhaust retries
+    mock_post.side_effect = [
+        # First batch times out
+        requests.exceptions.Timeout("Connection timed out"),
+        requests.exceptions.Timeout("Connection timed out"),
+        # Second batch times out once, but then succeeds
+        requests.exceptions.Timeout("Connection timed out"),
+        success_response,
+    ]
+
+    # Phase 1: Try but fail to process the first batch
+    start, _ = generate_call_start_end_pair()
+    batch = [StartBatchItem(req=start)]
+    with pytest.raises(requests.exceptions.Timeout):
+        server._flush_calls(batch)
+
+    # Phase 2: Try and succeed with the second batch
+    start2, _ = generate_call_start_end_pair()
+    batch2 = [StartBatchItem(req=start2)]
+    server._flush_calls(batch2)
+
+    assert mock_post.call_count == 4
