@@ -64,6 +64,16 @@ describe('flattenObject', () => {
     const obj = {created: date};
     expect(flattenObject(obj)).toEqual([{name: 'created', type: 'date'}]);
   });
+
+  test('handles null values', () => {
+    const obj = {value: null};
+    expect(flattenObject(obj)).toEqual([{name: 'value', type: 'null'}]);
+  });
+
+  test('handles undefined values', () => {
+    const obj = {value: undefined};
+    expect(flattenObject(obj)).toEqual([{name: 'value', type: 'undefined'}]);
+  });
 });
 
 describe('inferSchema', () => {
