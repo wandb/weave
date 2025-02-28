@@ -1,9 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Evaluation Metrics
-
-## Evaluations in Weave
+# Scoring Overview
 
 In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
@@ -25,11 +23,12 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 ## Create your own Scorers
 
 :::tip[Ready-to-Use Scorers]
-While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) that you can use right away, including:
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) and [local SLM scorers](./weave_local_scorers.md) that you can use right away, including:
 - [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
 - [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
 - [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
-- [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
+- [Toxicity detection (local)](./weave_local_scorers.md#weavetoxicityscorerv1)
+- [Context Relevance scoring (local)](./weave_local_scorers.md#weavecontextrelevancescorerv1)
 - And more!
 :::
 

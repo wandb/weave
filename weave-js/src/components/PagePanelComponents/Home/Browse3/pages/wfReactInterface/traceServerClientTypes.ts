@@ -314,7 +314,6 @@ export type CompletionsCreateInputs = {
   model: string;
   messages: any[];
   temperature: number;
-  max_tokens: number;
 
   // These are optional, depending on the LLM provider some accept these some dont
   stop?: string[];
@@ -326,6 +325,9 @@ export type CompletionsCreateInputs = {
     type: string;
   };
   tools?: any[];
+  // These are optional, o3 accepts max_completion_tokens, others accept max_tokens
+  max_tokens?: number;
+  max_completion_tokens?: number;
 };
 
 export type CompletionsCreateReq = {
@@ -393,4 +395,18 @@ export type TableUpdateReq = {
 export type TableUpdateRes = {
   digest: string;
   updated_row_digests: string[];
+};
+
+export type TableCreateReq = {
+  table: TableSchemaForInsert;
+};
+
+export type TableSchemaForInsert = {
+  project_id: string;
+  rows: Array<Record<string, any>>;
+};
+
+export type TableCreateRes = {
+  digest: string;
+  row_digests: string[];
 };

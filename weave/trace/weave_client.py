@@ -45,7 +45,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import Op, as_op, is_op, maybe_unbind_method
+from weave.trace.op import Op, as_op, is_op, maybe_unbind_method, print_call_link
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -64,6 +64,8 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_print_call_link,
+    should_redact_pii,
 )
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
@@ -114,6 +116,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
+    import pandas as pd
+
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -251,9 +255,43 @@ class PaginatedIterator(Generic[T, R]):
             raise TypeError("This iterator does not support len()")
         return self.size_func()
 
+    def to_pandas(self) -> pd.DataFrame:
+        """Convert the iterator's contents to a pandas DataFrame.
+
+        Returns:
+            A pandas DataFrame containing all the data from the iterator.
+
+        Example:
+            ```python
+            calls = client.get_calls()
+            df = calls.to_pandas()
+            ```
+
+        Note:
+            This method will fetch all data from the iterator, which may involve
+            multiple network calls. For large datasets, consider using limits
+            or filters to reduce the amount of data fetched.
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is required to use this method")
+
+        records = []
+        for item in self:
+            if isinstance(item, dict):
+                records.append(item)
+            elif hasattr(item, "to_dict"):
+                records.append(item.to_dict())
+            else:
+                raise ValueError(f"Unable to convert item to dict: {item}")
+
+        return pd.DataFrame(records)
+
 
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 def _make_calls_iterator(
@@ -267,24 +305,24 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
-        response = server.calls_query(
-            CallsQueryReq(
-                project_id=project_id,
-                filter=filter,
-                offset=offset,
-                limit=limit,
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                query=query,
-                sort_by=sort_by,
-                columns=columns,
-                expand_columns=expand_columns,
+        return list(
+            server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=project_id,
+                    filter=filter,
+                    offset=offset,
+                    limit=limit,
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    query=query,
+                    sort_by=sort_by,
+                    columns=columns,
+                )
             )
         )
-        return response.calls
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
@@ -308,6 +346,7 @@ def _make_calls_iterator(
         size_func=size_func,
         limit=limit_override,
         offset=offset_override,
+        page_size=page_size,
     )
 
 
@@ -547,7 +586,16 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(self) -> CallsIter:
+    def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
+        """
+        Get the children of the call.
+
+        Args:
+            page_size: Tune performance by changing the number of calls fetched at a time.
+
+        Returns:
+            An iterator of calls.
+        """
         client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
@@ -559,6 +607,7 @@ class Call:
             client.server,
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
+            page_size=page_size,
         )
 
     def delete(self) -> bool:
@@ -685,6 +734,7 @@ def make_client_call(
         id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -905,6 +955,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
         scored_by: str | list[str] | None = None,
+        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """
         Get a list of calls.
@@ -924,6 +975,7 @@ class WeaveClient:
                 to filter by. Multiple scorers are ANDed together. If passing in just the name,
                 then scores for all versions of the scorer are returned. If passing in the full ref
                 URI, then scores for a specific version of the scorer are returned.
+            page_size: Tune performance by changing the number of calls fetched at a time.
 
         Returns:
             An iterator of calls.
@@ -944,6 +996,7 @@ class WeaveClient:
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
+            page_size=page_size,
         )
 
     @deprecated(new_name="get_calls")
@@ -976,18 +1029,20 @@ class WeaveClient:
         Returns:
             A call object.
         """
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self._project_id(),
-                filter=CallsFilter(call_ids=[call_id]),
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                columns=columns,
+        calls = list(
+            self.server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self._project_id(),
+                    filter=CallsFilter(call_ids=[call_id]),
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    columns=columns,
+                )
             )
         )
-        if not response.calls:
+        if not calls:
             raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
+        response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
@@ -1032,11 +1087,12 @@ class WeaveClient:
         unbound_op = maybe_unbind_method(op)
         op_def_ref = self._save_op(unbound_op)
 
-        inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
+
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
         else:
-            inputs_postprocessed = inputs_redacted
+            inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
             inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
@@ -1100,8 +1156,19 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        def send_start_call() -> None:
-            inputs_json = to_json(inputs_with_refs, project_id, self, use_dictify=False)
+        _should_print_call_link = should_print_call_link()
+        _current_call = call_context.get_current_call()
+
+        def send_start_call() -> bool:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
             self.server.call_start(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
@@ -1118,8 +1185,18 @@ class WeaveClient:
                     )
                 )
             )
+            return True
 
-        self.future_executor.defer(send_start_call)
+        def on_complete(f: Future) -> None:
+            try:
+                root_call_did_not_error = f.result() and not _current_call
+                if root_call_did_not_error and _should_print_call_link:
+                    print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_start_call)
+        fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -1206,7 +1283,15 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            output_json = to_json(output_as_refs, project_id, self, use_dictify=False)
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.trace.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
             self.server.call_end(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(

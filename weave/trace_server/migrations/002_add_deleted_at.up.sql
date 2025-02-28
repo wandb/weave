@@ -8,7 +8,8 @@ This migration adds:
 ALTER TABLE object_versions
     ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
 
-CREATE OR REPLACE VIEW object_versions_deduped as
+DROP VIEW object_versions_deduped;
+CREATE VIEW object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,

@@ -1,6 +1,7 @@
 import 'react-base-table/lib/TableRow';
 
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {useRunName} from '@wandb/weave/common/hooks/useRunName';
 import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
   callOpVeryUnsafe,
@@ -27,7 +28,6 @@ import {
   opMap,
   opPick,
   opRunId,
-  opRunName,
   Stack,
   taggedValue,
   Type,
@@ -153,7 +153,20 @@ export const PanelTable: React.FC<
   if (typedInputNodeUse.loading) {
     return <Panel2Loader />;
   } else if (typedInputNode && isAssignableTo(typedInputNode.type, 'none')) {
-    return <div>-</div>;
+    return (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '14px',
+        }}>
+        No items to display
+      </div>
+    );
   } else if (!nodeIsValidList(typedInputNode)) {
     console.warn(
       'PanelTable returning empty state because of Invalid input type: ',
@@ -1214,17 +1227,18 @@ const IndexCell: React.FC<{
           }),
         })
       : constString('inherit');
-  const runNameNode =
-    props.runNode != null
-      ? opRunName({
-          run: weave.callFunction(props.runNode, {
-            row: props.rowNode as any,
-          }),
-        })
-      : constString('');
 
   const colorNodeValue = LLReact.useNodeValue(colorNode);
-  const runNameNodeValue = LLReact.useNodeValue(runNameNode);
+
+  const runNode =
+    props.runNode !== null
+      ? weave.callFunction(props.runNode, {
+          row: props.rowNode as any,
+        })
+      : null;
+
+  const runName = useRunName(runNode);
+
   const index = LLReact.useNodeValue(
     opGetIndexCheckpointTag({obj: props.rowNode})
   );
@@ -1233,7 +1247,6 @@ const IndexCell: React.FC<{
   } else {
     const isSelected =
       index.result != null && index.result === props.activeRowIndex;
-    const runName = runNameNodeValue.result ?? '';
     const basicIndexContent = (
       <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
     );

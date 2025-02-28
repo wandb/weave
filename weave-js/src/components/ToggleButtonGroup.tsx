@@ -70,6 +70,7 @@ export const ToggleButtonGroup = React.forwardRef<
             }) => {
               const button = (
                 <Button
+                  data-test={`toggle-button-${optionValue}`}
                   icon={icon}
                   size={size}
                   onClick={() => handleValueChange(optionValue)}

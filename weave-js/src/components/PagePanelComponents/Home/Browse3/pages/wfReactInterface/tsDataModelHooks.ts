@@ -578,7 +578,8 @@ const useCallsExport = () => {
       query?: Query,
       columns?: string[],
       expandedRefCols?: string[],
-      includeFeedback?: boolean
+      includeFeedback?: boolean,
+      includeCosts?: boolean
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
         project_id: projectIdFromParts({entity, project}),
@@ -600,6 +601,7 @@ const useCallsExport = () => {
         columns: columns ?? undefined,
         expand_columns: expandedRefCols ?? undefined,
         include_feedback: includeFeedback ?? false,
+        include_costs: includeCosts ?? false,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
@@ -2004,6 +2006,19 @@ export const useTableUpdate = (): ((
   );
 };
 
+export const useTableCreate = (): ((
+  table: traceServerTypes.TableCreateReq
+) => Promise<traceServerTypes.TableCreateRes>) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useCallback(
+    (table: traceServerTypes.TableCreateReq) => {
+      return getTsClient().tableCreate(table);
+    },
+    [getTsClient]
+  );
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
@@ -2030,6 +2045,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useTableRowsQuery,
   useTableQueryStats,
   useTableUpdate,
+  useTableCreate,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

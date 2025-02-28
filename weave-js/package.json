@@ -14,7 +14,7 @@
     "eslint-fix": "eslint --fix --ext .js,.jsx,.ts,.tsx src",
     "tslint": "tslint --project .",
     "tslint-fix": "tslint --fix --project .",
-    "generate": "graphql-codegen",
+    "generate": "graphql-codegen --silent",
     "generate:watch": "graphql-codegen -w",
     "prettier": "prettier --config .prettierrc --check \"src/**/*.ts\" \"src/**/*.tsx\"",
     "prettier-fix": "prettier --loglevel warn --config .prettierrc --write \"src/**/*.ts\" \"src/**/*.tsx\"",
