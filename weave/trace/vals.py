@@ -13,7 +13,6 @@ from pydantic import v1 as pydantic_v1
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -611,6 +610,9 @@ class WeaveDict(Traceable, dict):
             if other[k] != v:
                 return False
         return True
+
+
+class InternalError(Exception): ...
 
 
 def make_trace_obj(
