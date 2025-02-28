@@ -5,11 +5,7 @@ import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
 import {useWFHooks} from '../wfReactInterface/context';
-import {
-  useBareTraceCalls,
-  useThreadList,
-  useTraceRootsForThread,
-} from './hooks';
+import {useThreadList, useTraceRootsForThread} from './hooks';
 import {TraceNavigator} from './TraceNavigator';
 import {ThreadsPageProps} from './types';
 import {
@@ -343,7 +339,12 @@ export const ThreadsPage = ({entity, project, threadId}: ThreadsPageProps) => {
                 selectedCallId={selectedCallId}
                 setSelectedCallId={setSelectedCallId}
               />
-            ) : null}
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center text-moon-500">
+                <Icon name="info" className="mb-2" />
+                <p>Select a trace to view details</p>
+              </div>
+            )}
           </div>
 
           {/* Call Detail Panel - 30% */}

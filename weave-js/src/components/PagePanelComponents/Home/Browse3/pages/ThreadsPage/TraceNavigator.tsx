@@ -19,7 +19,7 @@ export const TraceNavigator = ({
   project: string;
   selectedTraceId: string;
   selectedCallId: string | undefined;
-  setSelectedCallId: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setSelectedCallId: (callId: string) => void;
 }) => {
   const {
     loading: traceCallsLoading,
