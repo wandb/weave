@@ -362,14 +362,14 @@ class InMemoryWeaveLogCollector(logging.Handler):
             self.log_records[curr_test] = []
         self.log_records[curr_test].append(record)
 
-    def get_error_logs(self):
+    def _get_logs(self, levelname: str):
         curr_test = get_test_name()
         logs = self.log_records.get(curr_test, [])
 
         return [
             record
             for record in logs
-            if record.levelname == "ERROR"
+            if record.levelname == levelname
             and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
@@ -386,13 +386,22 @@ class InMemoryWeaveLogCollector(logging.Handler):
             and not "legacy" in record.name
         ]
 
+    def get_error_logs(self):
+        return self._get_logs("ERROR")
+
+    def get_warning_logs(self):
+        return self._get_logs("WARNING")
+
 
 @pytest.fixture
-def log_collector():
+def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
     logger.addHandler(handler)
-    logger.setLevel(logging.ERROR)  # Set the level to capture all logs
+    if request.param == "warning":
+        logger.setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.ERROR)
     yield handler
     logger.removeHandler(handler)  # Clean up after the test
 

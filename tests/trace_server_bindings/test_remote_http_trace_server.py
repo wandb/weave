@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import json
+from queue import Full
 from types import MethodType
 from unittest.mock import MagicMock, patch
 
@@ -318,3 +319,25 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
     assert len(logs) == 1  # No new errors
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize("server", ["normal"], indirect=True)
+@pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
+def test_drop_data_when_queue_is_full(server, log_collector):
+    """Test that items are dropped when the queue is full."""
+    # Replace the real queue with a mock that raises Full when put_nowait is called
+    mock_queue = MagicMock()
+    mock_queue.put_nowait.side_effect = Full
+    server.call_processor.queue = mock_queue
+
+    server.call_start(tsi.CallStartReq(start=generate_start()))
+
+    # Verify that the put_nowait method was called (meaning we tried to enqueue the item)
+    mock_queue.put_nowait.assert_called_once()
+
+    # We can still check logs as a secondary verification
+    logs = log_collector.get_warning_logs()
+    assert len(logs) == 1
+    assert "Queue is full" in logs[0].msg
+    assert "Dropping item" in logs[0].msg
