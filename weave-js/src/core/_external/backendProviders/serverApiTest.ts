@@ -1446,7 +1446,7 @@ export class Client implements ServerApi.ServerAPI {
     entityName: string,
     projectName: string,
     collectionName: string,
-    artifactCommitHash: string,
+    artifactVersionIndex: string,
     assetPath: string
   ): Promise<DirMetadata | FileMetadata | null> {
     return new Promise(resolve => {
