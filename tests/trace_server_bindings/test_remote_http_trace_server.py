@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
@@ -136,4 +137,33 @@ def test_oversized_item_will_error_without_sending(small_limit_trace_server):
     assert "is too large to send" in str(excinfo.value)
 
     # Verify _send_batch_to_server was not called
-    assert trace_server._send_batch_to_server.call_count == 0
+    assert small_limit_trace_server._send_batch_to_server.call_count == 0
+
+
+@pytest.fixture
+def success_response():
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"id": "test_id", "trace_id": "test_trace_id"}
+    return response
+
+
+@patch("weave.trace_server.requests.post")
+def test_timeout_retry_mechanism(mock_post, success_response):
+    """Test that timeouts trigger the retry mechanism."""
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    # Mock server to raise errors twice, then succeed
+    mock_post.side_effect = [
+        requests.exceptions.Timeout("Connection timed out"),
+        requests.exceptions.HTTPError("500 Server Error"),
+        success_response,
+    ]
+
+    # Trying to send a batch with 1 item should fail 2 times, then succeed
+    start, _ = generate_call_start_end_pair()
+    batch = [StartBatchItem(req=start)]
+    server._flush_calls(batch)
+
+    # Verify that requests.post was called 3 times
+    assert mock_post.call_count == 3
