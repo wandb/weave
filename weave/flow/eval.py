@@ -1,10 +1,9 @@
 import asyncio
 import logging
 import traceback
-from collections.abc import Iterable
 from datetime import datetime
 from itertools import chain, repeat
-from typing import Any, Callable, Literal, Optional, TypeVar, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
 from rich import print
@@ -269,12 +268,3 @@ def is_valid_model(model: Any) -> bool:
             and is_op(model.predict)
         )
     )
-
-
-T = TypeVar("T")
-
-
-def repeated_iterable(iterable: Iterable[T], n: int) -> Iterable[T]:
-    for val in iterable:
-        for _ in range(n):
-            yield val

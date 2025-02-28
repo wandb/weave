@@ -35,7 +35,7 @@ from weave.trace_server.trace_server_interface import (
     TableRowFilter,
     TraceServerInterface,
 )
-from weave.utils.iterators import ThreadSafeInMemorySequence
+from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
 
@@ -296,11 +296,9 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = ThreadSafeInMemorySequence(
-                    self._local_iter_with_remote_fallback()
-                )
+                self._rows = ThreadSafeLazyList(self._local_iter_with_remote_fallback())
             else:
-                self._rows = ThreadSafeInMemorySequence(self._remote_iter())
+                self._rows = ThreadSafeLazyList(self._remote_iter())
         return self._rows
 
     @rows.setter

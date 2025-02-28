@@ -6,6 +6,7 @@ from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
+from weave.flow.util import short_str
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
@@ -87,7 +88,7 @@ class Dataset(Object):
                     "Attempted to construct a Dataset with a non-dict object. Found type: "
                     + str(type(row))
                     + " of row: "
-                    + _short_str(row)
+                    + short_str(row)
                 )
             if len(row) == 0:
                 raise ValueError(
@@ -105,10 +106,3 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
-
-
-def _short_str(obj: Any, limit: int = 25) -> str:
-    str_val = str(obj)
-    if len(str_val) > limit:
-        return str_val[:limit] + "..."
-    return str_val

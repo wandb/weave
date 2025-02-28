@@ -7,7 +7,7 @@ from typing import Any, TypeVar, overload
 T = TypeVar("T")
 
 
-class ThreadSafeInMemorySequence(Sequence[T]):
+class ThreadSafeLazyList(Sequence[T]):
     """
     Provides a thread-safe, iterable sequence by caching results in memory.
 
