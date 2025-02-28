@@ -70,7 +70,7 @@ def _local_path_and_download_url(
             return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}/{}/{}".format(
                 base_url,
                 storage_region,
-                entity_name or "_",
+                art_uri.entity_name,
                 art_uri.project_name,
                 art_uri.name,
                 urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
