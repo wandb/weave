@@ -8,6 +8,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
@@ -36,6 +37,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import {TraceNavigator} from '../ThreadsPage/TraceNavigator';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -43,7 +45,6 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
-import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
@@ -51,6 +52,7 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
+  setCallId: (callId: string) => void;
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
@@ -61,12 +63,38 @@ export const CallPage: FC<{
     callId: props.callId,
   });
 
-  if (call.loading) {
-    return <CenteredAnimatedLoader />;
-  } else if (call.result === null) {
-    return <NotFoundPanel title="Call not found" />;
+  const lastResult = useRef(call.result);
+  useEffect(() => {
+    if (call.result) {
+      lastResult.current = call.result;
+    }
+  }, [call.result]);
+
+  if (!call.loading) {
+    if (call.result === null) {
+      return <NotFoundPanel title="Call not found" />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          call={call.result}
+          setCallById={props.setCallId}
+        />
+      );
+    }
+  } else {
+    if (lastResult.current === null) {
+      return <CenteredAnimatedLoader />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          call={lastResult.current}
+          setCallById={props.setCallId}
+        />
+      );
+    }
   }
-  return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
 export const useShowRunnableUI = () => {
@@ -206,8 +234,9 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
+  setCallById: (callId: string) => void;
   path?: string;
-}> = ({call, path}) => {
+}> = ({call, setCallById: setCallId, path}) => {
   useViewTraceEvent(call);
 
   const {useCall} = useWFHooks();
@@ -265,8 +294,9 @@ const CallPageInnerVertical: FC<{
     call.project
   );
 
-  const tree = useCallFlattenedTraceTree(call, path ?? null);
-  const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
+  // const tree = useCallFlattenedTraceTree(call, path ?? null);
+  // const {loading, selectedCall} = tree;
+  const selectedCall = call;
   const callComplete = useCall({
     entity: selectedCall.entity,
     project: selectedCall.project,
@@ -314,9 +344,9 @@ const CallPageInnerVertical: FC<{
 
   const callTabs = useCallTabs(currentCall);
 
-  if (loading && !assumeCallIsSelectedCall) {
-    return <Loading centered />;
-  }
+  // if (loading && !assumeCallIsSelectedCall) {
+  //   return <Loading centered />;
+  // }
 
   return (
     <SimplePageLayoutWithHeader
@@ -369,18 +399,13 @@ const CallPageInnerVertical: FC<{
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
-            {loading ? (
-              <Loading centered />
-            ) : (
-              <CallTraceView
-                call={call}
-                selectedCall={currentCall}
-                rows={rows}
-                forcedExpandKeys={expandKeys}
-                path={path}
-                costLoading={costLoading}
-              />
-            )}
+            <TraceNavigator
+              entity={currentCall.entity}
+              project={currentCall.project}
+              selectedTraceId={currentCall.traceId}
+              selectedCallId={currentCall.callId}
+              setSelectedCallId={setCallId}
+            />
           </div>
         </Tailwind>
       }
