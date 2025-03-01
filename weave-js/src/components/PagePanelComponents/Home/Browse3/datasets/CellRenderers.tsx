@@ -189,10 +189,22 @@ export const CellViewingRenderer: React.FC<
             },
           },
         }}>
-        <div
-          onClick={e => e.stopPropagation()}
-          onDoubleClick={e => e.stopPropagation()}
-          style={{
+        <Box
+          onClick={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onDoubleClick={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onKeyDown={e => e.preventDefault()}
+          onFocus={e => e.target.blur()}
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          sx={{
             height: '100%',
             backgroundColor: getBackgroundColor(),
             opacity: isDeleted ? DELETED_CELL_STYLES.opacity : 1,
@@ -203,7 +215,7 @@ export const CellViewingRenderer: React.FC<
             paddingLeft: '8px',
           }}>
           <CellValue value={value} noLink={true} />
-        </div>
+        </Box>
       </Tooltip>
     );
   }
