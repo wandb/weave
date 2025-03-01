@@ -85,11 +85,9 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   const objCreate = useObjCreate();
   const tableCreate = useTableCreate();
 
-  // Access edit context methods through the drawer context's editorContext property
   const {getRowsNoMeta, convertEditsToTableUpdateSpec, resetEditState} =
     editorContext;
 
-  // Fetch datasets on component mount
   const objectVersions = useRootObjectVersions(
     entity,
     project,
@@ -100,7 +98,6 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     true
   );
 
-  // Update datasets when data is loaded
   useEffect(() => {
     if (objectVersions.result) {
       dispatch({
@@ -110,7 +107,6 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     }
   }, [objectVersions.result, dispatch]);
 
-  // Extract source schema from selected calls
   useEffect(() => {
     if (selectedCalls.length > 0) {
       const extractedSchema = extractSourceSchema(selectedCalls);

@@ -21,11 +21,25 @@ export const DatasetPublishToast: React.FC<DatasetPublishToastProps> = ({
   url,
   message,
 }) => (
-  <Box sx={{display: 'flex', flexDirection: 'column', gap: 1}}>
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 1,
+      width: '100%',
+      minWidth: '280px',
+    }}>
     <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
       <Icon name="checkmark-circle" width={24} height={24} color={TEAL_500} />
       <Typography
-        sx={{color: 'white', fontSize: '16px', fontFamily: 'Source Sans Pro'}}>
+        sx={{
+          color: 'white',
+          fontSize: '16px',
+          fontFamily: 'Source Sans Pro',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
         {message}
       </Typography>
     </Box>

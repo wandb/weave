@@ -12,6 +12,7 @@ import {SmallRef} from '../smallRef/SmallRef';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {useDatasetEditContext} from './DatasetEditorContext';
+import {validateDatasetName} from './datasetNameValidation';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -199,41 +200,9 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
 
   const handleNameChange = (value: string) => {
     setNewDatasetName(value);
-    if (!value.trim()) {
-      setError(null);
-      onValidationChange(false);
-      return;
-    }
-
-    try {
-      // First check if it starts with a letter or number
-      if (!/^[a-zA-Z0-9]/.test(value)) {
-        setError('Dataset name must start with a letter or number');
-        onValidationChange(false);
-        return;
-      }
-
-      // Then check if it only contains allowed characters
-      if (!/^[a-zA-Z0-9\-_]+$/.test(value)) {
-        const invalidChars = [
-          ...new Set(
-            value
-              .split('')
-              .filter(c => !/[a-zA-Z0-9\-_]/.test(c))
-              .map(c => (c === ' ' ? '<space>' : c))
-          ),
-        ].join(', ');
-        setError(`Invalid characters found: ${invalidChars}`);
-        onValidationChange(false);
-        return;
-      }
-
-      setError(null);
-      onValidationChange(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid dataset name');
-      onValidationChange(false);
-    }
+    const validationResult = validateDatasetName(value);
+    setError(validationResult.error);
+    onValidationChange(validationResult.isValid);
   };
 
   const filteredDatasets = useMemo(() => {
