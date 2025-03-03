@@ -340,7 +340,7 @@ def _execute_op(
     try:
         res = func(*args, **kwargs)
     except Exception as e:
-        handle_exception(e)
+        return handle_exception(e)
     else:
         return process(res)
 
