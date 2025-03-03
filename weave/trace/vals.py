@@ -3,7 +3,7 @@ import inspect
 import logging
 import operator
 import typing
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, Union
 
@@ -31,9 +31,11 @@ from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableQueryStatsReq,
     TableRowFilter,
     TraceServerInterface,
 )
+from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +264,11 @@ class WeaveObject(Traceable):
 
 class WeaveTable(Traceable):
     filter: TableRowFilter
+    _known_length: Optional[int] = None
+    _rows: Optional[Sequence[dict]] = None
+    # _prefetched_rows is a local cache of rows that can be used to
+    # avoid a remote call. Should only be used by internal code.
+    _prefetched_rows: Optional[list[dict]] = None
 
     def __init__(
         self,
@@ -278,14 +285,9 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: Optional[list[dict]] = None
-
-        # _prefetched_rows is a local cache of rows that can be used to
-        # avoid a remote call. Should only be used by internal code.
-        self._prefetched_rows: Optional[list[dict]] = None
 
     @property
-    def rows(self) -> list[dict]:
+    def rows(self) -> Sequence[dict]:
         if self._rows is None:
             should_local_iter = (
                 self.ref is not None
@@ -294,18 +296,31 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = list(self._local_iter_with_remote_fallback())
+                self._rows = ThreadSafeLazyList(self._local_iter_with_remote_fallback())
             else:
-                self._rows = list(self._remote_iter())
+                self._rows = ThreadSafeLazyList(self._remote_iter())
         return self._rows
 
     @rows.setter
-    def rows(self, value: list[dict]) -> None:
+    def rows(self, value: Sequence[dict]) -> None:
         if not all(isinstance(row, dict) for row in value):
             raise ValueError("All table rows must be dicts")
 
         self._rows = value
         self._mark_dirty()
+
+    def _inefficiently_materialize_rows_as_list(self) -> list[dict]:
+        # This method is named `inefficiently` to warn callers that
+        # it should be avoided. We have this nasty paradigm where sometimes
+        # a WeaveTable needs to act like a list, but it is actually a remote
+        # table. This method will force iteration through the remote data
+        # and materialize it into a list. Any uses of this are signs of a design
+        # problem arising from a remote table clashing with the need to feel like
+        # a local list.
+        if not isinstance(self.rows, list):
+            self._rows = list(iter(self.rows))
+            self._known_length = len(self._rows)
+        return typing.cast(list[dict], self.rows)
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
         """Sets the rows to a local cache of rows that can be used to
@@ -322,14 +337,54 @@ class WeaveTable(Traceable):
         self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
-        return len(self.rows)
+        # This should be a single query
+        if self._known_length is not None:
+            return self._known_length
+
+        # Condition 1: we already have all the rows in memory
+        if self._prefetched_rows is not None:
+            self._known_length = len(self._prefetched_rows)
+            return self._known_length
+
+        # Condition 2: we have the row digests and they are a list
+        if (
+            self.table_ref is not None
+            and self.table_ref._row_digests is not None
+            and isinstance(self.table_ref._row_digests, list)
+        ):
+            self._known_length = len(self.table_ref._row_digests)
+            return self._known_length
+
+        # Condition 3: We don't know the length, in which case we can get it from the server
+        if self.table_ref is not None:
+            self._known_length = self._fetch_remote_length()
+            return self._known_length
+
+        # Finally, if we have no table ref, we can still get the length
+        # by materializing the rows as a list. I actually think this
+        # can never happen, but it is here for completeness.
+        rows_as_list = self._inefficiently_materialize_rows_as_list()
+        return len(rows_as_list)
+
+    def _fetch_remote_length(self) -> int:
+        if self.table_ref is None:
+            raise ValueError("Cannot fetch remote length of table without table ref")
+
+        response = self.server.table_query_stats(
+            TableQueryStatsReq(
+                project_id=self.table_ref.project_id, digest=self.table_ref.digest
+            )
+        )
+        return response.count
 
     def __eq__(self, other: Any) -> bool:
-        return self.rows == other
+        rows = self._inefficiently_materialize_rows_as_list()
+        return rows == other
 
     def _mark_dirty(self) -> None:
         self.table_ref = None
         self._prefetched_rows = None
+        self._known_length = None
         super()._mark_dirty()
 
     def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
@@ -442,7 +497,11 @@ class WeaveTable(Traceable):
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        rows = self.rows
+        # TODO: ideally we would have some sort of intelligent
+        # LRU style caching that allows us to minimize materialization
+        # of the rows as a list.
+        rows = self._inefficiently_materialize_rows_as_list()
+
         if isinstance(key, (int, slice)):
             return rows[key]
 
@@ -456,14 +515,16 @@ class WeaveTable(Traceable):
         return iter(self.rows)
 
     def append(self, val: dict) -> None:
+        rows = self._inefficiently_materialize_rows_as_list()
         if not isinstance(val, dict):
             raise TypeError("Can only append dicts to tables")
         self._mark_dirty()
-        self.rows.append(val)
+        rows.append(val)
 
     def pop(self, index: int) -> None:
+        rows = self._inefficiently_materialize_rows_as_list()
         self._mark_dirty()
-        self.rows.pop(index)
+        rows.pop(index)
 
 
 class WeaveList(Traceable, list):

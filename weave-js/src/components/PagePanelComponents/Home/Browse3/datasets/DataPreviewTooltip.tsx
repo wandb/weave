@@ -1,6 +1,7 @@
-import {Box, Paper, Tooltip, TooltipProps} from '@mui/material';
+import {Box, Paper, Tooltip, TooltipProps, Typography} from '@mui/material';
 import React from 'react';
 
+import {TEAL_600} from '../../../../../common/css/globals.styles';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
 import {CellValue} from '../../Browse2/CellValue';
 
@@ -61,6 +62,36 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
   const hasMoreColumns = allColumns.length > maxColumns;
   const hasMoreRows = rows.length > maxRows;
 
+  // Helper to render cell content with special handling for missing values
+  const renderCellContent = (row: Record<string, any>, column: string) => {
+    const value = row[column];
+    if (value === undefined || value === null) {
+      return (
+        <Typography
+          component="code"
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            padding: '2px 4px',
+            borderRadius: '2px',
+            color: TEAL_600,
+            fontWeight: 'bold',
+          }}>
+          undefined
+        </Typography>
+      );
+    }
+    return (
+      <Box
+        onClick={e => e.stopPropagation()}
+        onMouseEnter={e => e.stopPropagation()}
+        onMouseLeave={e => e.stopPropagation()}>
+        <CellValue value={value} noLink />
+      </Box>
+    );
+  };
+
   const tooltipContent = (
     <Paper
       elevation={0}
@@ -71,6 +102,7 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
         fontSize: '14px',
         borderRadius: 1,
         overflow: 'hidden',
+        border: '1px solid rgba(224, 224, 224, 1)',
       }}>
       <Box
         sx={{
@@ -78,6 +110,7 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
           overflowY: 'auto',
           maxHeight: '400px',
         }}>
+        {/* Table Structure */}
         <Box
           sx={{
             display: 'grid',
@@ -85,9 +118,6 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
               previewColumns.length + (hasMoreColumns ? 1 : 0)
             }, minmax(120px, 1fr))`,
             minWidth: 'fit-content',
-            gap: 0,
-            border: '1px solid rgba(224, 224, 224, 1)',
-            borderRadius: 1,
           }}>
           {/* Header row */}
           {previewColumns.map((column, colIndex) => (
@@ -147,14 +177,12 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
                       colIndex < previewColumns.length - 1 || hasMoreColumns
                         ? '1px solid rgba(224, 224, 224, 1)'
                         : 'none',
-                    maxWidth: '300px',
+                    minHeight: '32px', // Ensure all cells have at least a minimum height
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: 'transparent',
                   }}>
-                  <Box
-                    onClick={e => e.stopPropagation()}
-                    onMouseEnter={e => e.stopPropagation()}
-                    onMouseLeave={e => e.stopPropagation()}>
-                    <CellValue value={row[column]} noLink />
-                  </Box>
+                  {renderCellContent(row, column)}
                 </Box>
               ))}
               {hasMoreColumns && (
@@ -174,19 +202,22 @@ export const DataPreviewTooltip: React.FC<DataPreviewTooltipProps> = ({
             </React.Fragment>
           ))}
         </Box>
-      </Box>
 
-      {hasMoreRows && (
-        <Box
-          sx={{
-            mt: 1,
-            color: 'text.secondary',
-            fontStyle: 'italic',
-            textAlign: 'center',
-          }}>
-          {rows.length - maxRows} more rows...
-        </Box>
-      )}
+        {/* More rows indicator */}
+        {hasMoreRows && (
+          <Box
+            sx={{
+              p: 1,
+              color: 'text.secondary',
+              fontStyle: 'italic',
+              textAlign: 'center',
+              borderTop: '1px solid rgba(224, 224, 224, 1)',
+              backgroundColor: '#fafafa',
+            }}>
+            {rows.length - maxRows} more rows...
+          </Box>
+        )}
+      </Box>
     </Paper>
   );
 

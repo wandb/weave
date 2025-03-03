@@ -140,6 +140,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               variant="secondary"
               size="medium"
               startIcon="add-new"
+              disabled={isLoading || chatText.trim() === ''}
               onClick={() => handleAdd(addMessageRole, chatText)}>
               Add
             </Button>
