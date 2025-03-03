@@ -278,69 +278,146 @@ def _execute_op(
     __should_raise: bool = True,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
+    """Execute an operation and handle its result.
+
+    This function supports both synchronous and asynchronous operations,
+    manages call context, finishes calls, and processes outputs.
+
+    Args:
+        __op: The operation to execute
+        __call: The call object representing this execution
+        __should_raise: Whether to raise exceptions or return None
+        *args, **kwargs: Arguments to pass to the operation
+
+    Returns:
+        A tuple of (result, call) or a coroutine that resolves to that tuple
+    """
     func = __op.resolve_fn
     client = weave_client_context.require_weave_client()
-    has_finished = False
 
-    def finish(output: Any = None, exception: BaseException | None = None) -> None:
-        nonlocal has_finished
-        if has_finished:
-            raise ValueError("Should not call finish more than once")
+    # Determine if we're executing an async function
+    is_async = inspect.iscoroutinefunction(func)
 
-        client.finish_call(
-            __call,
-            output,
-            exception,
-            op=__op,
+    # Define shared helper functions outside the execution paths
+    # to make the code more linear and easier to follow
+    if is_async:
+        return _execute_op_async(
+            __op, __call, func, client, __should_raise, *args, **kwargs
+        )
+    else:
+        return _execute_op_sync(
+            __op, __call, func, client, __should_raise, *args, **kwargs
         )
 
-    def on_output(output: Any) -> Any:
-        if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, __call.inputs)
-        finish(output)
-        return output
 
-    def process(res: Any) -> tuple[Any, Call]:
-        res = box.box(res)
-        try:
-            # Here we do a try/catch because we don't want to
-            # break the user process if we trip up on processing
-            # the output
-            res = on_output(res)
-        except Exception as e:
-            if get_raise_on_captured_errors():
-                raise
-            log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
-        finally:
-            # Is there a better place for this? We want to ensure that even
-            # if the final output fails to be captured, we still pop the call
-            # so we don't put future calls under the old call.
-            call_context.pop_call(__call.id)
+def _finish_call(
+    __op: Op,
+    __call: Call,
+    client: Any,
+    output: Any = None,
+    exception: BaseException | None = None,
+) -> None:
+    """Mark a call as finished and record its output/exception."""
+    client.finish_call(
+        __call,
+        output,
+        exception,
+        op=__op,
+    )
 
-        return res, __call
 
-    def handle_exception(e: Exception) -> tuple[Any, Call]:
-        finish(exception=e)
+def _process_output(__op: Op, __call: Call, client: Any, result: Any) -> Any:
+    """Process the output of an operation, applying any handlers."""
+    result = box.box(result)
+
+    # Apply output handler if one exists
+    if handler := getattr(__op, "_on_output_handler", None):
+        # Create a finish callback for the handler
+        has_finished = False
+
+        def finish_callback(
+            output: Any = None, exception: BaseException | None = None
+        ) -> None:
+            nonlocal has_finished
+            if has_finished:
+                raise ValueError("Should not call finish more than once")
+            has_finished = True
+            _finish_call(__op, __call, client, output, exception)
+
+        return handler(result, finish_callback, __call.inputs)
+
+    # No handler, just finish the call with the result
+    _finish_call(__op, __call, client, result)
+    return result
+
+
+def _cleanup_call_context(__call: Call, result: Any) -> tuple[Any, Call]:
+    """Clean up the call context and return the result."""
+    # Is there a better place for this? We want to ensure that even
+    # if the final output fails to be captured, we still pop the call
+    # so we don't put future calls under the old call.
+    call_context.pop_call(__call.id)
+    return result, __call
+
+
+def _execute_op_sync(
+    __op: Op,
+    __call: Call,
+    func: Callable,
+    client: Any,
+    __should_raise: bool,
+    *args: Any,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    """Execute a synchronous operation."""
+    try:
+        result = func(*args, **kwargs)
+    except Exception as e:
+        # Handle exceptions in the operation
+        _finish_call(__op, __call, client, exception=e)
         if __should_raise:
             raise
         return None, __call
 
-    if inspect.iscoroutinefunction(func):
+    try:
+        # Process the result
+        result = _process_output(__op, __call, client, result)
+    except Exception as e:
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
 
-        async def _call_async() -> tuple[Any, Call]:
-            try:
-                res = await func(*args, **kwargs)
-            except Exception as e:
-                return handle_exception(e)
-            return process(res)
+    return _cleanup_call_context(__call, result)
 
-        return _call_async()
+
+async def _execute_op_async(
+    __op: Op,
+    __call: Call,
+    func: Callable,
+    client: Any,
+    __should_raise: bool,
+    *args: Any,
+    **kwargs: Any,
+) -> tuple[Any, Call]:
+    """Execute an asynchronous operation."""
+    try:
+        result = await func(*args, **kwargs)
+    except Exception as e:
+        # Handle exceptions in the operation
+        _finish_call(__op, __call, client, exception=e)
+        if __should_raise:
+            raise
+        return None, __call
 
     try:
-        res = func(*args, **kwargs)
+        # Process the result
+        result = _process_output(__op, __call, client, result)
     except Exception as e:
-        return handle_exception(e)
-    return process(res)
+        if get_raise_on_captured_errors():
+            raise
+        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
+
+    return _cleanup_call_context(__call, result)
 
 
 def call(
@@ -397,6 +474,34 @@ def _placeholder_call() -> Call:
     )
 
 
+def _should_skip_tracing(op: Op) -> bool:
+    """Check whether tracing should be skipped for various reasons.
+
+    This is a common check used by both sync and async call paths.
+    """
+    if settings.should_disable_weave():
+        return True
+    if weave_client_context.get_weave_client() is None:
+        return True
+    if not op._tracing_enabled:
+        return True
+    if not get_tracing_enabled():
+        return True
+    return False
+
+
+def _should_skip_for_sampling(op: Op) -> bool:
+    """Check if the call should be skipped due to sampling.
+
+    Only applies to root calls, and uses the op's tracing_sample_rate.
+    """
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        # Root call: decide whether to trace based on sample rate
+        return random.random() > op.tracing_sample_rate
+    return False
+
+
 def _do_call(
     op: Op,
     *args: Any,
@@ -404,46 +509,32 @@ def _do_call(
     __should_raise: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
+    """Execute a synchronous op call with tracing."""
     func = op.resolve_fn
     call = _placeholder_call()
 
+    # Process arguments through input handler
     pargs = None
     if op._on_input_handler is not None:
         pargs = op._on_input_handler(op, args, kwargs)
     if not pargs:
         pargs = _default_on_input_handler(op, args, kwargs)
 
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = func(*pargs.args, **pargs.kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
+    # Skip tracing if needed
+    if _should_skip_tracing(op):
         res = func(*pargs.args, **pargs.kwargs)
         call.output = res
         return res, call
 
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = func(*pargs.args, **pargs.kwargs)
-                call.output = res
-                return res, call
+    # Check sampling for root calls
+    if _should_skip_for_sampling(op):
+        # Disable tracing for this call and all descendants
+        with tracing_disabled():
+            res = func(*pargs.args, **pargs.kwargs)
+            call.output = res
+            return res, call
 
-    # Proceed with tracing. Note that we don't check the sample rate here.
-    # Only root calls get sampling applied.
-    # If the parent was traced (sampled in), the child will be too.
+    # Proceed with tracing
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
@@ -476,36 +567,23 @@ async def _do_call_async(
     __should_raise: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
+    """Execute an asynchronous op call with tracing."""
     func = op.resolve_fn
     call = _placeholder_call()
 
-    # Handle all of the possible cases where we would skip tracing.
-    if settings.should_disable_weave():
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if weave_client_context.get_weave_client() is None:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not op._tracing_enabled:
-        res = await func(*args, **kwargs)
-        call.output = res
-        return res, call
-    if not get_tracing_enabled():
+    # Skip tracing if needed
+    if _should_skip_tracing(op):
         res = await func(*args, **kwargs)
         call.output = res
         return res, call
 
-    current_call = call_context.get_current_call()
-    if current_call is None:
-        # Root call: decide whether to trace based on sample rate
-        if random.random() > op.tracing_sample_rate:
-            # Disable tracing for this call and all descendants
-            with tracing_disabled():
-                res = await func(*args, **kwargs)
-                call.output = res
-                return res, call
+    # Check sampling for root calls
+    if _should_skip_for_sampling(op):
+        # Disable tracing for this call and all descendants
+        with tracing_disabled():
+            res = await func(*args, **kwargs)
+            call.output = res
+            return res, call
 
     # Proceed with tracing
     try:
