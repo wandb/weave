@@ -124,6 +124,8 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           onChange={(model, maxTokens) =>
             handleModelChange(idx, model, maxTokens)
           }
+          entity={entity}
+          project={project}
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
