@@ -4,8 +4,7 @@ This module provides functionality for displaying progress bars when flushing
 tasks in the WeaveClient.
 """
 
-import time
-from typing import Optional
+from typing import Callable, TypedDict
 
 from rich.console import Console
 from rich.progress import (
@@ -17,188 +16,107 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from weave.trace.concurrent.futures import FutureExecutor
+
+class WeaveFlushStatus(TypedDict):
+    """Status information about the current flush operation."""
+
+    # Current job counts
+    main_jobs: int
+    fastlane_jobs: int
+    call_processor_jobs: int
+    total_jobs: int
+
+    # Tracking of completed jobs
+    completed_since_last_update: int
+    total_completed: int
+
+    # Maximum number of jobs seen during this flush operation
+    max_total_jobs: int
+
+    # Whether there are any pending jobs
+    has_pending_jobs: bool
 
 
-class TaskProgressBar:
-    """A class to manage and display progress for task execution.
+def create_progress_bar_callback() -> Callable[[WeaveFlushStatus], None]:
+    """Create a callback function that displays a progress bar for flush status.
 
-    This class provides a rich progress bar interface for tracking the execution
-    of tasks in the WeaveClient.
+    Returns:
+        A callback function that can be passed to WeaveClient._flush.
     """
+    console = Console()
 
-    def __init__(
-        self,
-        main_executor: FutureExecutor,
-        fastlane_executor: Optional[FutureExecutor] = None,
-    ):
-        """Initialize the TaskProgressBar.
+    # Create a progress bar instance
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(bar_width=None, complete_style="magenta"),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        refresh_per_second=10,
+        expand=True,
+        transient=False,
+    )
 
-        Args:
-            main_executor: The main executor for regular tasks.
-            fastlane_executor: The fastlane executor for file upload tasks, if any.
-        """
-        self.main_executor = main_executor
-        self.fastlane_executor = fastlane_executor
-        self.console = Console()
+    # Start the progress display
+    progress.start()
 
-        # Initialize tracking variables
-        self.initial_main_jobs = main_executor.num_outstanding_futures
-        self.initial_fastlane_jobs = 0
-        if fastlane_executor:
-            self.initial_fastlane_jobs = fastlane_executor.num_outstanding_futures
+    # Create a task for tracking progress
+    task_id = None
 
-        self.total_initial_jobs = self.initial_main_jobs + self.initial_fastlane_jobs
-
-        # Progress tracking state
-        self.prev_main_jobs = self.initial_main_jobs
-        self.prev_fastlane_jobs = self.initial_fastlane_jobs
-        self.max_total_jobs = self.total_initial_jobs
-        self.total_completed = 0
-
-    def _create_progress_instance(self) -> Progress:
-        """Create and configure a Rich Progress instance.
-
-        Returns:
-            A configured Rich Progress instance.
-        """
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=None, complete_style="magenta"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            console=self.console,
-            refresh_per_second=10,
-            expand=True,
-            transient=False,
-        )
-
-    def _get_current_job_counts(self) -> tuple[int, int, int]:
-        """Get the current counts of outstanding jobs.
-
-        Returns:
-            A tuple containing (current_main_jobs, current_fastlane_jobs, current_total_jobs)
-        """
-        current_main_jobs = self.main_executor.num_outstanding_futures
-        current_fastlane_jobs = 0
-        if self.fastlane_executor:
-            current_fastlane_jobs = self.fastlane_executor.num_outstanding_futures
-
-        current_total_jobs = current_main_jobs + current_fastlane_jobs
-        return current_main_jobs, current_fastlane_jobs, current_total_jobs
-
-    def _calculate_completed_jobs(
-        self, current_main_jobs: int, current_fastlane_jobs: int
-    ) -> int:
-        """Calculate the number of jobs completed since the last update.
+    def progress_callback(status: WeaveFlushStatus) -> None:
+        """Update the progress bar based on the flush status.
 
         Args:
-            current_main_jobs: Current count of main jobs.
-            current_fastlane_jobs: Current count of fastlane jobs.
-
-        Returns:
-            Number of jobs completed in this iteration.
+            status: The current flush status.
         """
-        main_completed = max(0, self.prev_main_jobs - current_main_jobs)
-        fastlane_completed = max(0, self.prev_fastlane_jobs - current_fastlane_jobs)
-        return main_completed + fastlane_completed
+        nonlocal task_id
 
-    def _format_job_details(
-        self, current_main_jobs: int, current_fastlane_jobs: int
-    ) -> str:
-        """Format job details for the progress bar description.
+        # If this is the first update, create the task
+        if task_id is None:
+            if status["max_total_jobs"] == 0:
+                # No jobs to track, just return
+                progress.stop()
+                return
 
-        Args:
-            current_main_jobs: Current count of main jobs.
-            current_fastlane_jobs: Current count of fastlane jobs.
+            # Print initial message
+            if not progress.live.is_started:
+                print(f"Flushing {status['max_total_jobs']} pending tasks...")
 
-        Returns:
-            Formatted string describing job details.
-        """
-        job_details = []
-        if current_main_jobs > 0:
-            job_details.append(f"{current_main_jobs} main")
-        if current_fastlane_jobs > 0:
-            job_details.append(f"{current_fastlane_jobs} file-upload")
+            # Create the task
+            task_id = progress.add_task(
+                "Flushing tasks", total=status["max_total_jobs"]
+            )
 
-        return ", ".join(job_details) if job_details else "none"
-
-    def _has_pending_jobs(self) -> bool:
-        """Check if there are any pending jobs.
-
-        Returns:
-            True if there are pending jobs, False otherwise.
-        """
-        if self.main_executor.num_outstanding_futures > 0:
-            return True
-        if (
-            self.fastlane_executor
-            and self.fastlane_executor.num_outstanding_futures > 0
-        ):
-            return True
-        return False
-
-    def run(self) -> None:
-        """Run the progress bar to track task execution until completion."""
-        if self.total_initial_jobs == 0:
+        # If there are no more pending jobs, complete the progress bar
+        if not status["has_pending_jobs"]:
+            progress.update(task_id, completed=status["max_total_jobs"])
+            progress.stop()
             return
 
-        print(f"Flushing {self.total_initial_jobs} pending tasks...")
+        # If new jobs were added, update the total
+        if status["max_total_jobs"] > progress.tasks[task_id].total:
+            progress.update(task_id, total=status["max_total_jobs"])
 
-        with self._create_progress_instance() as progress:
-            # Create a task for tracking progress
-            task_id = progress.add_task("Flushing tasks", total=self.total_initial_jobs)
+        # Update progress bar with completed jobs
+        if status["completed_since_last_update"] > 0:
+            progress.update(task_id, advance=status["completed_since_last_update"])
 
-            while self._has_pending_jobs():
-                current_main_jobs, current_fastlane_jobs, current_total_jobs = (
-                    self._get_current_job_counts()
-                )
+        # Format job details for description
+        job_details = []
+        if status["main_jobs"] > 0:
+            job_details.append(f"{status['main_jobs']} main")
+        if status["fastlane_jobs"] > 0:
+            job_details.append(f"{status['fastlane_jobs']} file-upload")
+        if status["call_processor_jobs"] > 0:
+            job_details.append(f"{status['call_processor_jobs']} call-batch")
 
-                # If new jobs were added, update the total
-                if current_total_jobs > self.max_total_jobs - self.total_completed:
-                    new_jobs = current_total_jobs - (
-                        self.max_total_jobs - self.total_completed
-                    )
-                    self.max_total_jobs += new_jobs
-                    progress.update(task_id, total=self.max_total_jobs)
+        job_details_str = ", ".join(job_details) if job_details else "none"
 
-                # Calculate completed jobs since last update
-                completed_this_iteration = self._calculate_completed_jobs(
-                    current_main_jobs, current_fastlane_jobs
-                )
+        # Update progress bar description
+        progress.update(
+            task_id,
+            description=f"Flushing tasks ({status['total_jobs']} remaining: {job_details_str})",
+        )
 
-                # Update progress bar
-                if completed_this_iteration > 0:
-                    progress.update(task_id, advance=completed_this_iteration)
-                    self.total_completed += completed_this_iteration
-
-                # Update progress bar description
-                job_details_str = self._format_job_details(
-                    current_main_jobs, current_fastlane_jobs
-                )
-                progress.update(
-                    task_id,
-                    description=f"Flushing tasks ({current_total_jobs} remaining: {job_details_str})",
-                )
-
-                # Store current counts for next iteration
-                self.prev_main_jobs = current_main_jobs
-                self.prev_fastlane_jobs = current_fastlane_jobs
-
-                # Sleep briefly to allow background threads to make progress
-                time.sleep(0.1)
-
-
-def flush_with_progress_bar(
-    main_executor: FutureExecutor,
-    fastlane_executor: Optional[FutureExecutor] = None,
-) -> None:
-    """Flush tasks with a progress bar.
-
-    Args:
-        main_executor: The main executor.
-        fastlane_executor: The fastlane executor, if any.
-    """
-    progress_bar = TaskProgressBar(main_executor, fastlane_executor)
-    progress_bar.run()
+    return progress_callback

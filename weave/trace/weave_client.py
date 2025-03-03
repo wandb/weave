@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -28,7 +29,10 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
-from weave.trace.client_progress_bar import flush_with_progress_bar
+from weave.trace.client_progress_bar import (
+    WeaveFlushStatus,
+    create_progress_bar_callback,
+)
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -1971,47 +1975,6 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
-    def flush(self) -> None:
-        """
-        Flushes all background tasks to ensure they are processed.
-
-        This method blocks until all currently enqueued jobs are processed,
-        displaying a progress bar to show the status of the pending tasks.
-        It ensures parallel processing during main thread execution and can
-        improve performance when user code completes before data has been
-        uploaded to the server.
-        """
-        # Use the progress bar utility
-        flush_with_progress_bar(
-            main_executor=self.future_executor,
-            fastlane_executor=self.future_executor_fastlane,
-        )
-
-        # Make sure all jobs are processed, including `call_processor` jobs which
-        # are not handled by the progress bar utility
-        self._flush()
-
-    def _flush(self) -> None:
-        # Used to wait until all currently enqueued jobs are processed
-        # This is basic flush implementation without progress bar
-        if not self.future_executor._in_thread_context.get():
-            self.future_executor.flush()
-        if self.future_executor_fastlane:
-            self.future_executor_fastlane.flush()
-        if self._server_is_flushable:
-            # We don't want to do an instance check here because it could
-            # be susceptible to shutdown race conditions. So we save a boolean
-            # _server_is_flushable and only call this if we know the server is
-            # flushable. The # type: ignore is safe because we check the type
-            # first.
-            self.server.call_processor.wait_until_all_processed()  # type: ignore
-
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
-
     @property
     def num_outstanding_jobs(self) -> int:
         """
@@ -2031,6 +1994,164 @@ class WeaveClient:
         if self._server_is_flushable:
             total += self.server.call_processor.num_outstanding_jobs  # type: ignore
         return total
+
+    def flush(self, use_progress_bar: bool = True) -> None:
+        """
+        Flushes all background tasks to ensure they are processed.
+
+        This method blocks until all currently enqueued jobs are processed,
+        displaying a progress bar to show the status of the pending tasks.
+        It ensures parallel processing during main thread execution and can
+        improve performance when user code completes before data has been
+        uploaded to the server.
+
+        Args:
+            use_progress_bar: Whether to display a progress bar during flush.
+                              Set to False for environments where a progress bar
+                              would not render well (e.g., CI environments).
+        """
+        if use_progress_bar:
+            callback = create_progress_bar_callback()
+            self._flush_with_tracking(callback=callback)
+        else:
+            self._flush_with_tracking()
+
+    def _flush_with_tracking(
+        self,
+        callback: Callable[[WeaveFlushStatus], None] | None = None,
+        refresh_interval: float = 0.1,
+    ) -> None:
+        """Used to wait until all currently enqueued jobs are processed.
+
+        Args:
+            callback: Optional callback function that receives status updates.
+            refresh_interval: Time in seconds between status updates.
+        """
+        # Initialize tracking variables
+        (
+            prev_main_jobs,
+            prev_fastlane_jobs,
+            prev_call_processor_jobs,
+            max_total_jobs,
+        ) = self._get_pending_jobs()
+
+        # If no jobs and no callback, just do a basic flush
+        if max_total_jobs == 0 and callback is None:
+            self._flush()
+            return
+
+        total_completed = 0
+
+        # If we have a callback, provide status updates
+        if callback is not None:
+            while self._has_pending_jobs():
+                (
+                    current_main_jobs,
+                    current_fastlane_jobs,
+                    current_call_processor_jobs,
+                    current_total_jobs,
+                ) = self._get_pending_jobs()
+
+                # If new jobs were added, update the total
+                if current_total_jobs > max_total_jobs - total_completed:
+                    new_jobs = current_total_jobs - (max_total_jobs - total_completed)
+                    max_total_jobs += new_jobs
+
+                # Calculate completed jobs since last update
+                main_completed = max(0, prev_main_jobs - current_main_jobs)
+                fastlane_completed = max(0, prev_fastlane_jobs - current_fastlane_jobs)
+                call_processor_completed = max(
+                    0, prev_call_processor_jobs - current_call_processor_jobs
+                )
+                completed_this_iteration = (
+                    main_completed + fastlane_completed + call_processor_completed
+                )
+
+                if completed_this_iteration > 0:
+                    total_completed += completed_this_iteration
+
+                status = WeaveFlushStatus(
+                    main_jobs=current_main_jobs,
+                    fastlane_jobs=current_fastlane_jobs,
+                    call_processor_jobs=current_call_processor_jobs,
+                    total_jobs=current_total_jobs,
+                    completed_since_last_update=completed_this_iteration,
+                    total_completed=total_completed,
+                    max_total_jobs=max_total_jobs,
+                    has_pending_jobs=True,
+                )
+
+                callback(status)
+
+                # Store current counts for next iteration
+                prev_main_jobs = current_main_jobs
+                prev_fastlane_jobs = current_fastlane_jobs
+                prev_call_processor_jobs = current_call_processor_jobs
+
+                # Sleep briefly to allow background threads to make progress
+                time.sleep(refresh_interval)
+
+        # Do the actual flush
+        self._flush()
+
+        # Final callback with no pending jobs
+        if callback is not None:
+            final_status = WeaveFlushStatus(
+                main_jobs=0,
+                fastlane_jobs=0,
+                call_processor_jobs=0,
+                total_jobs=0,
+                completed_since_last_update=0,
+                total_completed=total_completed,
+                max_total_jobs=max_total_jobs,
+                has_pending_jobs=False,
+            )
+            callback(final_status)
+
+    def _flush(self) -> None:
+        """Used to wait until all currently enqueued jobs are processed."""
+        if not self.future_executor._in_thread_context.get():
+            self.future_executor.flush()
+        if self.future_executor_fastlane:
+            self.future_executor_fastlane.flush()
+        if self._server_is_flushable:
+            self.server.call_processor.stop_accepting_new_work_and_flush_queue()  # type: ignore
+
+    def _get_pending_jobs(self) -> tuple[int, int, int, int]:
+        """Get the current number of pending jobs for each type.
+
+        Returns:
+            tuple[int, int, int, int]: A tuple containing:
+                - main_jobs: Number of pending jobs in the main executor
+                - fastlane_jobs: Number of pending jobs in the fastlane executor
+                - call_processor_jobs: Number of pending jobs in the call processor
+                - total_jobs: Total number of pending jobs
+        """
+        main_jobs = self.future_executor.num_outstanding_futures
+        fastlane_jobs = 0
+        if self.future_executor_fastlane:
+            fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
+        call_processor_jobs = 0
+        if self._server_is_flushable:
+            call_processor_jobs = self.server.call_processor.num_outstanding_jobs  # type: ignore
+
+        total_jobs = main_jobs + fastlane_jobs + call_processor_jobs
+        return main_jobs, fastlane_jobs, call_processor_jobs, total_jobs
+
+    def _has_pending_jobs(self) -> bool:
+        """Check if there are any pending jobs.
+
+        Returns:
+            True if there are pending jobs, False otherwise.
+        """
+        total_jobs = self._get_pending_jobs()[3]
+        return total_jobs > 0
+
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            return self.future_executor_fastlane.defer(self.server.file_create, req)
+        return self.future_executor.defer(self.server.file_create, req)
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
