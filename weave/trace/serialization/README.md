@@ -1,4 +1,4 @@
-# Serialization Patterns Audit in Weave
+# Serialization Patterns Audit in Weave (for Weave devs)
 
 ## Overview
 
@@ -8,7 +8,7 @@ This doc covers the current serialization patterns in Weave. For the purposes of
 
 ### 1. Serialization Entrypoint (`serialize.py`)
 
-The entrypoint for serialization is `weave/trace/serialization/serialize.py`. This file principly contains:
+The entrypoint for serialization is `weave/trace/serialization/serialize.py`. This file principally contains:
 
 1. `to_json()`, which converts Python objects to JSON-serializable formats
 2. `from_json()`, which converts JSON data back to Python objects
@@ -25,6 +25,8 @@ Today, serialization handles a variety of types, including:
 NOTE: Not all serialization is reversible, which can be surprising and frustrating. We also handle weave-specific concepts like `ObjectRecord` and refs (`ObjectRef`, `TableRef`, etc.)
 
 ### 2. Custom Object Serialization (`custom_objs.py` and `serializer.py`)
+
+NOTE: Custom object serialization is WIP and subject to change!
 
 The entrypoint for custom object serialization is `weave/trace/serialization/custom_objs.py`. This file primarily contains:
 
@@ -60,7 +62,7 @@ Notably, this system is missing the ability to register inline serializers for c
 
 For objects that are not explicitly registered, there are a few (lossy) fallback mechanisms, including:
 
-1. `Dictifiable` -- objects that can represented as a dict will attempt to be serialized as a dict.
+1. `Dictifiable` -- objects that can implement `to_dict() -> dict[str, Any]` will attempt to be serialized as a dict. The actual mechanics are up to the object's implementation, but usually this involves dumping the object's public attributes to a dict.
 2. `stringify` -- in the worst case, python objects will be serialized as the object's repr string.
 
 ## Adding Custom Types
