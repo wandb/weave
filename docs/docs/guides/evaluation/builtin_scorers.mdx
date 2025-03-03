@@ -318,6 +318,42 @@ import TabItem from '@theme/TabItem';
 
     ---
 
+    ## `VerdictScorer`
+
+    [Verdict](https://github.com/haizelabs/verdict) is a library for creating arbitrary execution graphs of chained LLM judge calls.
+
+    ```python
+    from weave.scorers import VerdictScorer
+
+    from verdict import Pipeline, Layer
+    from verdict.common.judge import JudgeUnit
+    from verdict.scale import BooleanScale
+    from verdict.transform import MaxPoolUnit
+
+    pipeline = Pipeline() \
+        >> Layer(
+            JudgeUnit(BooleanScale(), explanation=True).prompt("""
+                Is the <output> to the <query> consistent with the <context>?
+                <query>{source.query}</query>
+                <context>{source.context}</context>
+                <output>{source.output}</output>
+            """)
+        , repeat=3) \
+        >> MaxPoolUnit()
+
+    verdict_scorer = VerdictScorer(pipeline)
+    result = verdict_scorer.score(
+        query="What is the capital of France?",
+        context="Paris is the capital of France.",
+        output="Paris."
+    )
+    print(result)
+    ```
+
+    This will execute a Verdict pipeline that makes 3 LLM calls in parallel and then takes the majority vote of the results.
+
+    ---
+
     ## `PydanticScorer`
 
     The `PydanticScorer` validates the AI system's output against a Pydantic model to ensure it adheres to a specified schema or data structure.
