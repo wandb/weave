@@ -16,9 +16,9 @@ from weave.wandb_interface import project_creator
 logger = logging.getLogger(__name__)
 
 # Default timeout values (in seconds)
-DEFAULT_CONNECT_TIMEOUT = 10
-DEFAULT_READ_TIMEOUT = 30
-DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
+# DEFAULT_CONNECT_TIMEOUT = 10
+# DEFAULT_READ_TIMEOUT = 30
+# DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
 class StartBatchItem(BaseModel):
@@ -143,7 +143,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,  # type: ignore
             auth=self._auth,
-            timeout=DEFAULT_TIMEOUT,
+            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 413:
             # handle 413 explicitly to provide actionable error message
@@ -212,7 +212,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
             stream=stream,
-            timeout=DEFAULT_TIMEOUT,
+            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 500:
             reason_val = r.text
@@ -267,7 +267,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def server_info(self) -> ServerInfoRes:
         r = requests.get(
             self.trace_server_url + "/server_info",
-            timeout=DEFAULT_TIMEOUT,
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
@@ -500,7 +500,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
-            timeout=DEFAULT_TIMEOUT,
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
@@ -520,7 +520,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
             auth=self._auth,
-            timeout=DEFAULT_TIMEOUT,
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         # TODO: Should stream to disk rather than to memory
