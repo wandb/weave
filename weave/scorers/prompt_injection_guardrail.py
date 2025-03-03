@@ -1,7 +1,6 @@
 import warnings
 from typing import Any, Optional
 
-from litellm import acompletion
 from pydantic import BaseModel
 
 import weave
@@ -12,6 +11,7 @@ from weave.scorers.prompts import (
     PROMPT_INJECTION_GUARDRAIL_USER_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
+from weave.scorers.scorer_types import LLMScorer
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -24,7 +24,7 @@ class LLMGuardrailReasoning(BaseModel):
 SUPPORTED_MODELS = ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini", "o1", "o3-mini"]
 
 
-class PromptInjectionLLMGuardrail(weave.Scorer):
+class PromptInjectionLLMGuardrail(LLMScorer):
     """
     The `PromptInjectionLLMGuardrail` uses an LLM to assess whether a prompt
     is a prompt injection attack or not. It uses a prompting strategy that is based on
@@ -57,7 +57,7 @@ class PromptInjectionLLMGuardrail(weave.Scorer):
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
             prompt=output,
         )
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},

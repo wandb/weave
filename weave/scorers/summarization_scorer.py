@@ -1,7 +1,6 @@
 import asyncio
 from typing import Literal
 
-from litellm import acompletion
 from pydantic import BaseModel, Field
 
 import weave
@@ -117,7 +116,7 @@ class SummarizationScorer(LLMScorer):
     @weave.op
     async def _extract_entities(self, text: str) -> list[str]:
         """Use an LLM to extract unique entities from the provided text."""
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.extraction_system_prompt},
                 {"role": "user", "content": self.extraction_prompt.format(text=text)},
@@ -138,7 +137,7 @@ class SummarizationScorer(LLMScorer):
         self, input: str, summary: str
     ) -> SummarizationEvaluationResponse:
         """Evaluate the quality of a summary using an LLM."""
-        response = await acompletion(
+        response = await self._acompletion(
             messages=[
                 {
                     "role": "system",
