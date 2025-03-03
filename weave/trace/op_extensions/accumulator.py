@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import atexit
+import inspect
 import logging
 import sys
 import traceback
+import typing
 import weakref
-from collections.abc import AsyncIterator, Generator, Iterator
+from collections.abc import AsyncIterator, Coroutine, Generator, Iterator
 from typing import Any, Callable, Generic, Optional, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -69,7 +71,7 @@ class _IteratorWrapper(Generic[V]):
         if not self._on_finished_called:
             try:
                 self._on_close()  # type: ignore
-            except Exception as e:
+            except Exception:
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_CLOSE_MSG.format(traceback.format_exc()))
@@ -115,7 +117,7 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_YIELD_MSG.format(traceback.format_exc()))
-        except (StopIteration, StopAsyncIteration) as e:
+        except (StopIteration, StopAsyncIteration):
             self._call_on_close_once()
             raise
         except Exception as e:
@@ -154,7 +156,7 @@ class _IteratorWrapper(Generic[V]):
                 if get_raise_on_captured_errors():
                     raise
                 log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
-        except (StopAsyncIteration, StopIteration) as e:
+        except (StopAsyncIteration, StopIteration):
             self._call_on_close_once()
             raise StopAsyncIteration
         except Exception as e:
@@ -257,16 +259,44 @@ def add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
-    ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
+        value: Iterator[V] | Coroutine[Any, Any, Iterator[V]],
+        on_finish: FinishCallbackType,
+        inputs: dict,
+    ) -> (
+        # Iterator[V] returned when value is Iterator[V] and not `should_accumulate`
+        Iterator[V]
+        # Coroutine[Any, Any, Iterator[V]] returned when value is Coroutine[Any, Any, Iterator[V]] and not `should_accumulate`
+        | Coroutine[Any, Any, Iterator[V]]
+        # _IteratorWrapper[V] returned when value is Iterator[V] and `should_accumulate`
+        | _IteratorWrapper[V]
+        # Coroutine[Any, Any, _IteratorWrapper[V]] returned when value is Coroutine[Any, Any, Iterator[V]] and `should_accumulate`
+        | Coroutine[Any, Any, _IteratorWrapper[V]]
+    ):
+        def wrapped_on_finish(final_value: Any, e: BaseException | None = None) -> None:
             if on_finish_post_processor is not None:
-                value = on_finish_post_processor(value)
-            on_finish(value, e)
+                final_value = on_finish_post_processor(final_value)
+            on_finish(final_value, e)
 
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
+            if inspect.iscoroutine(value):
+
+                async def _build_iterator_from_accumulator_for_op_coro() -> (
+                    _IteratorWrapper[V]
+                ):
+                    nonlocal value
+                    value = typing.cast(Coroutine[Any, Any, Iterator[V]], value)
+                    awaited_value = await value
+                    return _build_iterator_from_accumulator_for_op(
+                        awaited_value,
+                        accumulator,
+                        wrapped_on_finish,
+                        iterator_wrapper,
+                    )
+
+                return _build_iterator_from_accumulator_for_op_coro()
+            value = typing.cast(Iterator[V], value)
             return _build_iterator_from_accumulator_for_op(
                 value,
                 accumulator,
@@ -274,7 +304,18 @@ def add_accumulator(
                 iterator_wrapper,
             )
         else:
-            wrapped_on_finish(value)
+            if inspect.iscoroutine(value):
+
+                async def wrapped_on_finish_coro() -> Iterator[V]:
+                    nonlocal value
+                    value = typing.cast(Coroutine[Any, Any, Iterator[V]], value)
+                    awaited_value = await value
+                    wrapped_on_finish(awaited_value)
+                    return awaited_value
+
+                return wrapped_on_finish_coro()
+            else:
+                wrapped_on_finish(value)
             return value
 
     op._set_on_output_handler(on_output)

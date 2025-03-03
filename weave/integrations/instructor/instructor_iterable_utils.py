@@ -1,5 +1,4 @@
-from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -43,15 +42,8 @@ def instructor_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callab
 
 def instructor_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        def _fn_wrapper(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
-
-            return _async_wrapper
-
         op_kwargs = settings.model_dump()
-        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op = weave.op(fn, **op_kwargs)
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: instructor_iterable_accumulator,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
@@ -107,18 +106,11 @@ def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable
 
 def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        def _fn_wrapper(fn: Callable) -> Callable:
-            @wraps(fn)
-            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
-
-            return _async_wrapper
-
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
 
-        op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op = weave.op(fn, **op_kwargs)
         op._set_on_finish_handler(vertexai_on_finish)
         return add_accumulator(
             op,  # type: ignore
