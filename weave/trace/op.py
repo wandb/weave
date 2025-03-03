@@ -332,8 +332,7 @@ def _execute_op(
                 res = await func(*args, **kwargs)
             except Exception as e:
                 return handle_exception(e)
-            else:
-                return process(res)
+            return process(res)
 
         return _call_async()
 
@@ -341,8 +340,7 @@ def _execute_op(
         res = func(*args, **kwargs)
     except Exception as e:
         return handle_exception(e)
-    else:
-        return process(res)
+    return process(res)
 
 
 def call(
