@@ -2027,7 +2027,7 @@ class WeaveClient:
         if self.future_executor_fastlane:
             total += self.future_executor_fastlane.num_outstanding_futures
 
-        # Add server jobs if available
+        # Add call batch uploads if available
         if self._server_is_flushable:
             total += self.server.call_processor.num_outstanding_jobs  # type: ignore
         return total
