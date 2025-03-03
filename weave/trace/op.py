@@ -344,8 +344,6 @@ def _execute_op(
     else:
         return process(res)
 
-    return None, __call
-
 
 def call(
     op: Op,
