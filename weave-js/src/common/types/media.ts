@@ -226,6 +226,10 @@ export const isMediaCardType = (type: string): type is MediaCardType => {
   return _.includes(mediaCardStrings, type);
 };
 
+export const isMediaString = (type: string): type is MediaString => {
+  return _.includes(mediaStrings, type);
+};
+
 export const mediaCardTypeToKeys = (mediaType: MediaCardType) => {
   const mapping: {[k in MediaCardType]: MediaCardString[]} = {
     image: ['images', 'image-file', 'images/separated'],
