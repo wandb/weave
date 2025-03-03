@@ -40,7 +40,7 @@ class AsyncBatchProcessor(Generic[T]):
         atexit.register(self.wait_until_all_processed)  # Register cleanup function
 
     @property
-    def num_outstanding_items(self) -> int:
+    def num_outstanding_jobs(self) -> int:
         """Returns the number of items currently in the queue."""
         with self.lock:
             return self.queue.qsize()

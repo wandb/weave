@@ -8,6 +8,7 @@ import time
 from typing import Optional
 
 import tqdm
+
 from weave.trace.concurrent.futures import FutureExecutor
 
 
@@ -47,7 +48,6 @@ def flush_with_progress_bar(
             while main_executor.num_outstanding_futures > 0 or (
                 fastlane_executor and fastlane_executor.num_outstanding_futures > 0
             ):
-
                 # Update progress bar based on completed jobs
                 current_main_jobs = main_executor.num_outstanding_futures
                 current_fastlane_jobs = 0

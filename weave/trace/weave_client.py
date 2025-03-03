@@ -2013,7 +2013,7 @@ class WeaveClient:
         return self.future_executor.defer(self.server.file_create, req)
 
     @property
-    def total_work_left(self) -> int:
+    def num_outstanding_jobs(self) -> int:
         """
         Returns the total number of pending jobs across all executors and the server.
 
@@ -2029,7 +2029,7 @@ class WeaveClient:
 
         # Add server jobs if available
         if self._server_is_flushable:
-            total += self.server.call_processor.num_outstanding_items  # type: ignore
+            total += self.server.call_processor.num_outstanding_jobs  # type: ignore
         return total
 
 
