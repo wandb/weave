@@ -28,6 +28,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.client_progress_bar import flush_with_progress_bar
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -1972,15 +1973,27 @@ class WeaveClient:
 
     def flush(self) -> None:
         """
-        An optional flushing method for the client.
-        Forces all background tasks to be processed, which ensures parallel processing
-        during main thread execution. Can improve performance when user code completes
-        before data has been uploaded to the server.
+        Flushes all background tasks to ensure they are processed.
+
+        This method blocks until all currently enqueued jobs are processed,
+        displaying a progress bar to show the status of the pending tasks.
+        It ensures parallel processing during main thread execution and can
+        improve performance when user code completes before data has been
+        uploaded to the server.
         """
+        # Use the progress bar utility
+        flush_with_progress_bar(
+            main_executor=self.future_executor,
+            fastlane_executor=self.future_executor_fastlane,
+        )
+
+        # Make sure all jobs are processed, including `call_processor` jobs which
+        # are not handled by the progress bar utility
         self._flush()
 
     def _flush(self) -> None:
         # Used to wait until all currently enqueued jobs are processed
+        # This is basic flush implementation without progress bar
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
         if self.future_executor_fastlane:
@@ -1998,6 +2011,26 @@ class WeaveClient:
             # If we have a separate upload worker pool, use it
             return self.future_executor_fastlane.defer(self.server.file_create, req)
         return self.future_executor.defer(self.server.file_create, req)
+
+    @property
+    def total_work_left(self) -> int:
+        """
+        Returns the total number of pending jobs across all executors and the server.
+
+        This property can be used to check the progress of background tasks
+        without blocking the main thread.
+
+        Returns:
+            int: The total number of pending jobs
+        """
+        total = self.future_executor.num_outstanding_futures
+        if self.future_executor_fastlane:
+            total += self.future_executor_fastlane.num_outstanding_futures
+
+        # Add server jobs if available
+        if self._server_is_flushable:
+            total += self.server.call_processor.num_outstanding_items  # type: ignore
+        return total
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
