@@ -271,45 +271,6 @@ def _create_call(
     )
 
 
-def _execute_op(
-    __op: Op,
-    __call: Call,
-    *args: Any,
-    __should_raise: bool = True,
-    **kwargs: Any,
-) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    """Execute an operation and handle its result.
-
-    This function supports both synchronous and asynchronous operations,
-    manages call context, finishes calls, and processes outputs.
-
-    Args:
-        __op: The operation to execute
-        __call: The call object representing this execution
-        __should_raise: Whether to raise exceptions or return None
-        *args, **kwargs: Arguments to pass to the operation
-
-    Returns:
-        A tuple of (result, call) or a coroutine that resolves to that tuple
-    """
-    func = __op.resolve_fn
-    client = weave_client_context.require_weave_client()
-
-    # Determine if we're executing an async function
-    is_async = inspect.iscoroutinefunction(func)
-
-    # Define shared helper functions outside the execution paths
-    # to make the code more linear and easier to follow
-    if is_async:
-        return _execute_op_async(
-            __op, __call, func, client, __should_raise, *args, **kwargs
-        )
-    else:
-        return _execute_op_sync(
-            __op, __call, func, client, __should_raise, *args, **kwargs
-        )
-
-
 def _finish_call(
     __op: Op,
     __call: Call,
@@ -548,14 +509,10 @@ def _do_call(
         )
         res = func(*pargs.args, **pargs.kwargs)
     else:
-        execute_result = _execute_op(
-            op, call, *pargs.args, __should_raise=__should_raise, **pargs.kwargs
+        client = weave_client_context.require_weave_client()
+        execute_result = _execute_op_sync(
+            op, call, func, client, __should_raise, *pargs.args, **pargs.kwargs
         )
-        if inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a sync result"
-            )
-        execute_result = cast(tuple[Any, "Call"], execute_result)
         res, call = execute_result
     return res, call
 
@@ -599,14 +556,10 @@ async def _do_call_async(
         )
         res = await func(*args, **kwargs)
     else:
-        execute_result = _execute_op(
-            op, call, *args, __should_raise=__should_raise, **kwargs
+        client = weave_client_context.require_weave_client()
+        res, call = await _execute_op_async(
+            op, call, func, client, __should_raise, *args, **kwargs
         )
-        if not inspect.iscoroutine(execute_result):
-            raise TypeError(
-                "Internal error: Expected `_execute_call` to return a coroutine"
-            )
-        res, call = await execute_result
     return res, call
 
 
