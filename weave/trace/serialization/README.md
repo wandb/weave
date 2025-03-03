@@ -13,6 +13,22 @@ The entrypoint for serialization is `weave/trace/serialization/serialize.py`. Th
 1. `to_json()`, which converts Python objects to JSON-serializable formats
 2. `from_json()`, which converts JSON data back to Python objects
 
+#### Serialization Flow Diagram
+
+```mermaid
+flowchart LR
+    UserCode1["User Code"] -->|Python Objects| WeaveClient
+
+    subgraph WeaveClient["Weave Client"]
+        ClientSave["client.save()"] --> ToJson["to_json()"]
+        ToJson -->|JSON Data| ServerStorage["Server Storage"]
+        ServerStorage -->|JSON Data| FromJson["from_json()"]
+        FromJson --> ClientGet["client.get()"]
+    end
+
+    WeaveClient -->|Python Objects| UserCode2["User Code"]
+```
+
 Today, serialization handles a variety of types, including:
 | Type | Reversibility |
 |------|---------------|
@@ -32,6 +48,28 @@ The entrypoint for custom object serialization is `weave/trace/serialization/cus
 
 1. `encode_custom_obj()`, which encodes custom objects using registered serializers
 2. `decode_custom_obj()`, which decodes custom objects using the appropriate serializer
+
+#### Custom Object Serialization Flow
+
+```mermaid
+flowchart TD
+    CustomObj["Custom Object (PIL.Image.Image, wave.Wave_read, etc.)"] --> ToJson["to_json()"]
+    ToJson --> EncodeCustomObj["encode_custom_obj()"]
+
+    subgraph CustomSerialization["Custom Object Serialization Process"]
+        EncodeCustomObj --> Serializer["Registered Serializer (save method)"]
+        Serializer -->|Write to files| MemArtifact["MemTraceFilesArtifact"]
+
+        MemArtifact -->|Read from files| Deserializer["Registered Serializer (load method)"]
+        Deserializer --> DecodeCustomObj["decode_custom_obj()"]
+    end
+
+    DecodeCustomObj --> FromJson["from_json()"]
+    FromJson --> ReconstructedObj["Reconstructed Custom Object"]
+
+    RegisterSerializer["register_serializer()"] -.->|Registers| Serializer
+    RegisterSerializer -.->|Registers| Deserializer
+```
 
 Custom serializers can be registered with `register_serializer`. This allows users to specify custom `save` and `load` methods for custom types. For portability, weave also packages the `load` function as an op in the saved object so it can try to be loaded even if the serializer is not registered in the target runtime (this is done on a best-effort basis). See more in the `Adding Custom Types` section.
 
