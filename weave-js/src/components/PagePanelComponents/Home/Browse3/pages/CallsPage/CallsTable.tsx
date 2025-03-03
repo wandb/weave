@@ -6,15 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {
-  Autocomplete,
-  Box,
-  Chip,
-  FormControl,
-  ListItem,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import {Box, Chip, Tooltip, Typography} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -26,11 +18,9 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Switch} from '@wandb/weave/components';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
-  Icon,
   IconNotVisible,
   IconPinToRight,
   IconSortAscending,
@@ -65,9 +55,7 @@ import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
-import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
@@ -86,10 +74,7 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
@@ -757,15 +742,6 @@ export const CallsTable: FC<{
             onClick={() => calls.refetch()}
             disabled={callsLoading}
           />
-          {!hideOpSelector && (
-            <OpSelector
-              frozenFilter={frozenFilter}
-              filter={filter}
-              setFilter={setFilter}
-              selectedOpVersionOption={selectedOpVersionOption}
-              opVersionOptions={opVersionOptions}
-            />
-          )}
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
@@ -773,6 +749,12 @@ export const CallsTable: FC<{
               setFilterModel={setFilterModel}
               selectedCalls={selectedCalls}
               clearSelectedCalls={clearSelectedCalls}
+              // op stuff
+              frozenFilter={frozenFilter}
+              filter={filter}
+              setFilter={setFilter}
+              selectedOpVersionOption={selectedOpVersionOption}
+              opVersionOptions={opVersionOptions}
             />
           )}
           <div className="flex items-center gap-6">
@@ -1056,90 +1038,6 @@ export const CallsTable: FC<{
         }}
       />
     </FilterLayoutTemplate>
-  );
-};
-
-const OpSelector = ({
-  frozenFilter,
-  filter,
-  setFilter,
-  selectedOpVersionOption,
-  opVersionOptions,
-}: {
-  frozenFilter: WFHighLevelCallFilter | undefined;
-  filter: WFHighLevelCallFilter;
-  setFilter: (state: WFHighLevelCallFilter) => void;
-  selectedOpVersionOption: string;
-  opVersionOptions: Record<
-    string,
-    {
-      title: string;
-      ref: string;
-      group: string;
-      objectVersion?: OpVersionSchema;
-    }
-  >;
-}) => {
-  const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
-  const handleChange = useCallback(
-    (event: any, newValue: string | null) => {
-      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-        setFilter({
-          ...filter,
-          opVersionRefs: [],
-        });
-      } else {
-        setFilter({
-          ...filter,
-          opVersionRefs: newValue ? [newValue] : [],
-        });
-      }
-    },
-    [filter, setFilter]
-  );
-
-  return (
-    <div className="flex-none">
-      <ListItem sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
-        <FormControl fullWidth sx={{borderColor: MOON_200}}>
-          <Autocomplete
-            PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                height: '32px',
-                '& fieldset': {
-                  borderColor: MOON_200,
-                },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
-              },
-              '& .MuiOutlinedInput-input': {
-                height: '32px',
-                padding: '0 14px',
-                boxSizing: 'border-box',
-              },
-            }}
-            size="small"
-            limitTags={1}
-            disabled={frozenOpFilter}
-            value={selectedOpVersionOption}
-            onChange={handleChange}
-            renderInput={renderParams => (
-              <StyledTextField {...renderParams} sx={{maxWidth: '350px'}} />
-            )}
-            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
-            disableClearable={
-              selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-            }
-            groupBy={option => opVersionOptions[option]?.group}
-            options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" />}
-            clearIcon={<Icon name="close" />}
-          />
-        </FormControl>
-      </ListItem>
-    </div>
   );
 };
 
