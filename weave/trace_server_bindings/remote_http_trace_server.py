@@ -145,10 +145,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
             timeout=DEFAULT_TIMEOUT,
         )
-        # TODO: I think this handles the case where len(batch) == 1 and
-        # encoded_bytes > self.remote_request_bytes_limit case, but it feels weird to
-        # have to send it to the server to find out.  We should just save the network
-        # cost if we know we can't send it...
         if r.status_code == 413:
             # handle 413 explicitly to provide actionable error message
             reason = json.loads(r.text)["reason"]
@@ -172,12 +168,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         data = Batch(batch=batch).model_dump_json()
         encoded_data = data.encode("utf-8")
         encoded_bytes = len(encoded_data)
-
-        if len(batch) == 1 and encoded_bytes > self.remote_request_bytes_limit:
-            raise ValueError(
-                f"Single call size ({encoded_bytes}) is too large to send.  Max size: "
-                f"{self.remote_request_bytes_limit} bytes.  Unable to send."
-            )
 
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
         estimated_bytes_per_item = encoded_bytes / len(batch)
