@@ -767,6 +767,10 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "claude-3-7-sonnet-20250219": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-3-5-sonnet-20241022": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -1004,6 +1008,10 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "anthropic.claude-3-5-sonnet-20240620-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "anthropic.claude-3-7-sonnet-20250219-v1:0": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },

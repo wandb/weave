@@ -285,65 +285,63 @@ export const SelectDatasetStep: React.FC<SelectDatasetStepProps> = ({
   };
 
   return (
-    <Stack spacing={1} sx={{mt: 2}}>
-      <Typography sx={{...typographyStyle, fontWeight: 600, mb: 2}}>
-        Choose a dataset
-      </Typography>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 3,
-        }}>
-        <Box sx={{flex: '0 1 400px', minWidth: 0}}>
-          <Select
-            placeholder="Select Dataset"
-            value={
-              selectedDataset
-                ? dropdownOptions.find(opt => opt.value === selectedDataset)
-                : isCreatingNew
-                ? dropdownOptions.find(
-                    opt => opt.value === CREATE_NEW_OPTION_VALUE
-                  )
-                : null
-            }
-            options={dropdownOptions}
-            onChange={handleDatasetChange}
-            isSearchable={true}
-            isClearable={false}
-            filterOption={filterOption}
-            components={{MenuList: DatasetSelectMenu}}
-            maxMenuHeight={300}
-          />
-        </Box>
+    <Stack spacing={'24px'} sx={{mt: '24px'}}>
+      <Box>
+        <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
+          Choose a dataset
+        </Typography>
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: 1,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            mt: 1,
+            gap: 3,
           }}>
-          <Typography
-            onClick={() => setShowLatestOnly(!showLatestOnly)}
-            sx={{...typographyStyle, userSelect: 'none', cursor: 'pointer'}}>
-            Show latest versions only
-          </Typography>
-          <Checkbox
-            style={{
-              marginRight: 4,
-            }}
-            checked={showLatestOnly}
-            onCheckedChange={checked => setShowLatestOnly(checked === true)}
-            size="small"
-          />
+          <Box sx={{flex: '0 1 400px', minWidth: 0}}>
+            <Select
+              placeholder="Select Dataset"
+              value={
+                selectedDataset
+                  ? dropdownOptions.find(opt => opt.value === selectedDataset)
+                  : isCreatingNew
+                  ? dropdownOptions.find(
+                      opt => opt.value === CREATE_NEW_OPTION_VALUE
+                    )
+                  : null
+              }
+              options={dropdownOptions}
+              onChange={handleDatasetChange}
+              isSearchable={true}
+              isClearable={false}
+              filterOption={filterOption}
+              components={{MenuList: DatasetSelectMenu}}
+              maxMenuHeight={300}
+            />
+          </Box>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}>
+            <Checkbox
+              checked={showLatestOnly}
+              onCheckedChange={checked => setShowLatestOnly(checked === true)}
+              size="small"
+            />
+            <Typography
+              onClick={() => setShowLatestOnly(!showLatestOnly)}
+              sx={{...typographyStyle, userSelect: 'none', cursor: 'pointer'}}>
+              Show latest versions only
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
       {isCreatingNew && (
-        <Box sx={{mt: 4}}>
-          <Typography sx={{...typographyStyle, fontWeight: 600, mb: 2}}>
+        <Box>
+          <Typography sx={{...typographyStyle, fontWeight: 600, mb: '8px'}}>
             Dataset name
           </Typography>
           <TextField

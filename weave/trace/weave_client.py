@@ -308,20 +308,21 @@ def _make_calls_iterator(
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
-        response = server.calls_query(
-            CallsQueryReq(
-                project_id=project_id,
-                filter=filter,
-                offset=offset,
-                limit=limit,
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                query=query,
-                sort_by=sort_by,
-                columns=columns,
+        return list(
+            server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=project_id,
+                    filter=filter,
+                    offset=offset,
+                    limit=limit,
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    query=query,
+                    sort_by=sort_by,
+                    columns=columns,
+                )
             )
         )
-        return response.calls
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
@@ -733,6 +734,7 @@ def make_client_call(
         id=call_id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -1027,18 +1029,20 @@ class WeaveClient:
         Returns:
             A call object.
         """
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self._project_id(),
-                filter=CallsFilter(call_ids=[call_id]),
-                include_costs=include_costs,
-                include_feedback=include_feedback,
-                columns=columns,
+        calls = list(
+            self.server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self._project_id(),
+                    filter=CallsFilter(call_ids=[call_id]),
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    columns=columns,
+                )
             )
         )
-        if not response.calls:
+        if not calls:
             raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
+        response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
