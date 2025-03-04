@@ -2,18 +2,17 @@ import {ApolloProvider} from '@apollo/client';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
+import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useMemo} from 'react';
+import {Timestamp} from '@wandb/weave/components/Timestamp';
+import React, {useCallback, useMemo} from 'react';
 
+import {DeleteModal} from '../common/DeleteModal';
 import {Link} from '../common/Links';
 import {useConfiguredProviders} from '../PlaygroundPage/useConfiguredProviders';
 import {useWFHooks, WFDataModelAutoProvider} from '../wfReactInterface/context';
-import {Button} from '@wandb/weave/components/Button';
-import {Timestamp} from '@wandb/weave/components/Timestamp';
-
-import {DeleteModal} from '../common/DeleteModal';
 import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
 import {AddProviderDrawer} from './AddProviderDrawer';
 import {ProviderTable} from './ProviderTable';
@@ -194,6 +193,16 @@ export const ProvidersTabInner: React.FC<{
     };
   };
 
+  const refetch = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+    refetchCustomModels();
+  }, [
+    refetchCustomModels,
+    refetchCustomProviderModels,
+    refetchCustomProviders,
+  ]);
+
   const customProviders: any[] = useMemo(
     () =>
       customProvidersResult?.map(provider => {
@@ -285,14 +294,9 @@ export const ProvidersTabInner: React.FC<{
       entityName,
       projectName,
       objectDeleteAllVersions,
+      refetch,
     ]
   );
-
-  const refetch = () => {
-    refetchCustomProviders();
-    refetchCustomProviderModels();
-    refetchCustomModels();
-  };
 
   return (
     <Tailwind>

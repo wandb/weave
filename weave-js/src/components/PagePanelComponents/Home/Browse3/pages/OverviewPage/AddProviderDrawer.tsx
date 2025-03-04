@@ -1,11 +1,12 @@
-import React, {useEffect, useState} from 'react';
-import {Drawer, TextField, Typography, Box, Divider} from '@mui/material';
-import {Button} from '@wandb/weave/components/Button';
-import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
-import {Icon} from '@wandb/weave/components/Icon';
-import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
+import {Box, Divider, Drawer, TextField, Typography} from '@mui/material';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Button} from '@wandb/weave/components/Button';
+import {Icon} from '@wandb/weave/components/Icon';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import React, {useEffect, useState} from 'react';
+
+import {findMaxTokensByModelName} from '../PlaygroundPage/llmMaxTokens';
+import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
 
 interface AddProviderDrawerProps {
   isOpen: boolean;
@@ -95,6 +96,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
     try {
       let modelDigests: string[] = [];
       if (result?.digest) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         modelDigests = await Promise.all(
           modelName.map(async model => {
             const modelResult = await createProviderModel({

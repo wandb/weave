@@ -2,6 +2,7 @@ import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
+import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 import {useWFHooks} from '../../wfReactInterface/context';
 import {
   LLM_MAX_TOKENS,
@@ -15,7 +16,6 @@ import {
   dividerOption,
   ProviderOption,
 } from './LLMDropdownOptions';
-import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
 
 interface LLMDropdownProps {
   value: LLMMaxTokensKey;
