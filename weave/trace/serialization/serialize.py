@@ -5,10 +5,12 @@ from collections.abc import Sequence
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any
 
-from weave.trace import custom_objs
+from pydantic import BaseModel
+
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
@@ -22,6 +24,19 @@ from weave.trace_server.trace_server_interface_util import bytes_digest
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
+
+
+def is_pydantic_model_class(obj: Any) -> bool:
+    """Determine if obj is a subclass of pydantic.BaseModel."""
+    try:
+        return (
+            isinstance(obj, type)
+            and issubclass(obj, BaseModel)
+            and obj is not BaseModel
+        )
+    except TypeError:
+        # Might be something like Iterable[CalendarEvent]
+        return False
 
 
 def to_json(
@@ -45,6 +60,8 @@ def to_json(
         return [to_json(v, project_id, client, use_dictify) for v in obj]
     elif isinstance(obj, dict):
         return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+    elif is_pydantic_model_class(obj):
+        return obj.model_json_schema()
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj

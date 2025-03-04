@@ -32,6 +32,53 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
+@pytest.fixture(autouse=True)
+def disable_datadog():
+    """
+    Disables Datadog logging and tracing for tests.
+
+    This prevents Datadog from polluting test logs with messages like
+    'failed to send, dropping 1 traces to intake at...'
+    """
+    # Save original values to restore later
+    original_dd_env = os.environ.get("DD_ENV")
+    original_dd_trace = os.environ.get("DD_TRACE_ENABLED")
+
+    # Disable Datadog
+    os.environ["DD_ENV"] = "none"
+    os.environ["DD_TRACE_ENABLED"] = "false"
+
+    # Silence Datadog loggers
+    dd_loggers = [
+        "ddtrace",
+        "ddtrace.writer",
+        "ddtrace.api",
+        "ddtrace.internal",
+        "datadog",
+        "datadog.dogstatsd",
+        "datadog.api",
+    ]
+
+    original_levels = {}
+    for logger_name in dd_loggers:
+        logger = logging.getLogger(logger_name)
+        original_levels[logger_name] = logger.level
+        logger.setLevel(logging.CRITICAL)  # Only show critical errors
+
+    yield
+
+    # Restore original values
+    if original_dd_env is not None:
+        os.environ["DD_ENV"] = original_dd_env
+    elif "DD_ENV" in os.environ:
+        del os.environ["DD_ENV"]
+
+    if original_dd_trace is not None:
+        os.environ["DD_TRACE_ENABLED"] = original_dd_trace
+    elif "DD_TRACE_ENABLED" in os.environ:
+        del os.environ["DD_TRACE_ENABLED"]
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--weave-server",
@@ -362,14 +409,14 @@ class InMemoryWeaveLogCollector(logging.Handler):
             self.log_records[curr_test] = []
         self.log_records[curr_test].append(record)
 
-    def get_error_logs(self):
+    def _get_logs(self, levelname: str):
         curr_test = get_test_name()
         logs = self.log_records.get(curr_test, [])
 
         return [
             record
             for record in logs
-            if record.levelname == "ERROR"
+            if record.levelname == levelname
             and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
@@ -386,13 +433,22 @@ class InMemoryWeaveLogCollector(logging.Handler):
             and not "legacy" in record.name
         ]
 
+    def get_error_logs(self):
+        return self._get_logs("ERROR")
+
+    def get_warning_logs(self):
+        return self._get_logs("WARNING")
+
 
 @pytest.fixture
-def log_collector():
+def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
     logger.addHandler(handler)
-    logger.setLevel(logging.ERROR)  # Set the level to capture all logs
+    if hasattr(request, "param") and request.param == "warning":
+        logger.setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.ERROR)
     yield handler
     logger.removeHandler(handler)  # Clean up after the test
 
