@@ -32,6 +32,19 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   margin-left: 8px;
 `;
 
+const RecursiveIcon = styled.span`
+  display: inline-flex;
+  align-items: center;
+  color: #6366f1;
+  font-size: 14px;
+  margin-left: 4px;
+  
+  &::after {
+    content: '↺';
+    font-weight: bold;
+  }
+`;
+
 const NodeHeader = styled.button`
   width: 100%;
   padding: 8px 12px;
@@ -64,7 +77,7 @@ const CallPanel = styled.div`
 
 const CallPanelHeader = styled.div`
   padding: 6px 12px;
-  background: #f1f5f9;
+  background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
   font-size: 11px;
   font-weight: 500;
@@ -74,44 +87,26 @@ const CallPanelHeader = styled.div`
   align-items: center;
 `;
 
-const CallList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 8px;
-  background: #f8fafc;
-`;
 
-const CallItem = styled.div<{$isSelected?: boolean}>`
+const RecursionBlock = styled.div`
+  margin: 2px 0;
+  margin-left: 8px;
   padding: 8px 12px;
-  cursor: pointer;
-  background: ${props => (props.$isSelected ? '#EFF6FF' : 'white')};
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid ${props => (props.$isSelected ? '#93C5FD' : '#E2e8f0')};
+  border: 1px dashed #6366f1;
   border-radius: 4px;
-
-  &:hover {
-    background: ${props => (props.$isSelected ? '#DBEAFE' : '#F8FAFC')};
-  }
-`;
-
-const CallInfo = styled.div`
+  background: #f8fafc;
+  color: #6366f1;
+  font-size: 11px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 0;
-  flex: 1;
-`;
+  gap: 4px;
+  cursor: default;
 
-const CallName = styled.div`
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  &::before {
+    content: '↺';
+    font-weight: bold;
+    font-size: 14px;
+  }
 `;
 
 interface CodeMapNodeProps extends TraceViewProps {
@@ -134,6 +129,7 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
 }) => {
   const hasChildren = node.children.length > 0;
   const isSelected = node.opName === selectedOpName;
+  const recursiveAncestors = Array.from(node.recursiveAncestors);
 
   // Get duration range and stats for this operation
   const stats = useMemo(() => {
@@ -179,42 +175,51 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   };
 
   return (
-    <NodeContainer $level={level} $isSelected={isSelected}>
-      <NodeHeader onClick={handleClick}>
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <div className="flex min-w-0 flex-col">
-            <div className="truncate text-xs font-medium">{node.opName}</div>
-            <div className="truncate text-[11px] text-moon-500">
-              {node.callIds.length} calls
-              {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
-              {` • ${formatDuration(avgDuration)} avg`}
+  
+      <NodeContainer $level={level} $isSelected={isSelected}>
+        <NodeHeader onClick={handleClick}>
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <div className="flex min-w-0 flex-col">
+              <div className="truncate text-xs font-medium flex items-center">
+                {node.opName}
+              </div>
+              <div className="truncate text-[11px] text-moon-500">
+                {node.callIds.length} calls
+                {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
+                {` • ${formatDuration(avgDuration)} avg`}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="whitespace-nowrap text-[11px] text-moon-500">
-          {formatDuration(stats.minDuration)} -{' '}
-          {formatDuration(stats.maxDuration)}
-        </div>
-      </NodeHeader>
+          <div className="whitespace-nowrap text-[11px] text-moon-500">
+            {formatDuration(stats.minDuration)} -{' '}
+            {formatDuration(stats.maxDuration)}
+          </div>
+        </NodeHeader>
 
-      {hasChildren && (
-        <NodeContent $isExpanded={true}>
-          {node.children.map(child => (
-            <CodeMapNodeComponent
-              key={child.opName}
-              node={child}
-              selectedCallId={selectedCallId}
-              selectedOpName={selectedOpName}
-              onCallSelect={onCallSelect}
-              onOpSelect={onOpSelect}
-              traceTreeFlat={traceTreeFlat}
-              stack={stack}
-              level={level + 1}
-            />
-          ))}
-        </NodeContent>
-      )}
-    </NodeContainer>
+        {hasChildren && (
+          <NodeContent $isExpanded={true}>
+            {node.children.map(child => (
+              <CodeMapNodeComponent
+                key={child.opName}
+                node={child}
+                selectedCallId={selectedCallId}
+                selectedOpName={selectedOpName}
+                onCallSelect={onCallSelect}
+                onOpSelect={onOpSelect}
+                traceTreeFlat={traceTreeFlat}
+                stack={stack}
+                level={level + 1}
+              />
+            ))}
+          </NodeContent>
+        )}
+      {recursiveAncestors.map(ancestor => (
+        <RecursionBlock key={ancestor}>
+          {ancestor}
+        </RecursionBlock>
+      ))}
+      </NodeContainer>
+
   );
 };
 

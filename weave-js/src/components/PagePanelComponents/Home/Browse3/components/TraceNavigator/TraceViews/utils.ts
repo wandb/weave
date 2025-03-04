@@ -118,6 +118,8 @@ export interface CodeMapNode {
   children: CodeMapNode[];
   /** All trace call IDs that map to this operation */
   callIds: string[];
+  /** Set of ancestor operation names that this node recursively calls */
+  recursiveAncestors: Set<string>;
 }
 
 /**
@@ -129,7 +131,7 @@ export interface CodeMapNode {
  * - Collapses multiple calls to the same operation into a single node
  * - Maintains the logical structure of the code
  * - Preserves references to all calls for each operation
- * - Handles recursive calls by reusing existing nodes
+ * - Handles recursive calls by marking nodes that call their ancestors
  *
  * @param traceTreeFlat The flattened trace tree to transform
  * @returns An array of root CodeMapNodes representing the code structure
@@ -183,13 +185,15 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
       const childOpName = parseSpanName(childNode.call.op_name);
 
       // Find if this operation exists in ancestors or peers
-      const existingOp = findExistingOp(childOpName, target, [
-        ...ancestors,
-        target,
-      ]);
+      const existingOp = findExistingOp(childOpName, target, [...ancestors, target]);
 
       if (existingOp) {
-        // Operation exists, process child at that location
+        // Check for recursion
+        if (ancestors.includes(existingOp) || existingOp === target) {
+          // Add recursive ancestor to the target node
+          target.recursiveAncestors.add(existingOp.opName);
+        }
+        // Process child at that location
         processNode(
           childId,
           existingOp,
@@ -205,6 +209,7 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
           opName: childOpName,
           children: [],
           callIds: [],
+          recursiveAncestors: new Set(),
         };
         target.children.push(newOp);
         processNode(childId, newOp, [...ancestors, target]);
@@ -227,6 +232,7 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
           opName,
           children: [],
           callIds: [],
+          recursiveAncestors: new Set(),
         };
         rootMap.set(opName, rootOp);
       }
