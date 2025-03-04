@@ -1,7 +1,7 @@
 import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
-import React, {useEffect,useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
@@ -18,7 +18,6 @@ interface TreeNodeProps {
   level?: number;
   filterCallIds?: Set<string>;
 }
-
 
 // Status type for the node
 type NodeStatus = 'success' | 'running' | 'error' | 'unknown';
@@ -37,7 +36,7 @@ const getStatusColor = (status: NodeStatus) => {
   }
 };
 
-type NodeType = 'agent' | 'tool' | 'llm' | 'model' | 'evaluation' | 'none'; 
+type NodeType = 'agent' | 'tool' | 'llm' | 'model' | 'evaluation' | 'none';
 
 // Helper function to get call type icon
 const getCallTypeIcon = (type: NodeType): IconName => {
@@ -67,10 +66,19 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   if (spanName.includes('tool')) {
     return 'tool';
   }
-  if (spanName.includes('completion') || spanName.includes('generation') || spanName.includes('chat') || spanName.includes('llm')) {
+  if (
+    spanName.includes('completion') ||
+    spanName.includes('generation') ||
+    spanName.includes('chat') ||
+    spanName.includes('llm')
+  ) {
     return 'llm';
   }
-  if (spanName.includes('model') || spanName.includes('predict') || spanName.includes('generate')) {
+  if (
+    spanName.includes('model') ||
+    spanName.includes('predict') ||
+    spanName.includes('generate')
+  ) {
     return 'model';
   }
   if (spanName.includes('evaluation')) {
@@ -112,9 +120,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   // Derive type from the op_name as a fallback
   const spanName = parseSpanName(call.op_name);
   const typeName = spanNameToTypeHeuristic(spanName);
-  const cost =  0.0348;
+  const cost = 0.0348;
   const tokens = 12377;
-               
+
   const opColor = getColorForOpName(spanName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
 
@@ -133,12 +141,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   }
 
   // Filter child IDs to only those in the filter (if filtering is active)
-  const filteredChildrenIds = filterCallIds 
+  const filteredChildrenIds = filterCallIds
     ? childrenIds.filter(childId => filterCallIds.has(childId))
     : childrenIds;
-    
-  const hasChildren = filteredChildrenIds.length > 0;
 
+  const hasChildren = filteredChildrenIds.length > 0;
   return (
     <div className="flex flex-col">
       <span ref={nodeRef} className="w-full px-4">
@@ -146,13 +153,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           variant={id === selectedCallId ? 'secondary' : 'ghost'}
           active={id === selectedCallId}
           onClick={() => onCallSelect(id)}
-          className="w-full justify-start text-left px-8"
+          className="w-full justify-start px-8 text-left"
           style={{
             borderLeft: `4px solid ${opColor}`,
           }}>
           <div className="flex w-full items-center justify-between">
             {/* Left section with indentation, chevron, status, type icon, and name */}
-            <div className="flex items-center min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 items-center">
               <div style={{width: level * 24}} />
               {hasChildren ? (
                 <Icon
@@ -162,7 +169,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                     e.stopPropagation();
                     setIsExpanded(!isExpanded);
                   }}
-                  className="shrink-0 cursor-pointer hover:bg-moon-200 rounded p-0.5"
+                  className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-200"
                 />
               ) : (
                 <div className="w-4" />
@@ -170,23 +177,23 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               <Icon
                 name={getCallTypeIcon(typeName)}
                 size="small"
-                className="shrink-0 text-moon-500 mx-1"
+                className="mx-1 shrink-0 text-moon-500"
               />
-              <div className="truncate font-medium ml-2">{getCallDisplayName(call)}</div>
+              <div className="ml-2 truncate font-medium">
+                {getCallDisplayName(call)}
+              </div>
             </div>
 
             {/* Right section with metrics */}
-            <div className="flex items-center gap-8 text-sm text-moon-500 shrink-0 ml-8">
-              <div className={`w-8 h-8 rounded-full ${getStatusColor(status)}`} />
+            <div className="ml-8 flex shrink-0 items-center gap-8 text-sm text-moon-500">
+              <div
+                className={`h-8 w-8 rounded-full ${getStatusColor(status)}`}
+              />
               <div className="w-48 text-right">
                 {duration !== null ? formatDuration(duration) : ''}
               </div>
-              <div className="w-48 text-right">
-                ${cost.toFixed(4)}
-              </div>
-              <div className="w-48 text-right">
-                {tokens.toLocaleString()}
-              </div>
+              <div className="w-48 text-right">${cost.toFixed(4)}</div>
+              <div className="w-48 text-right">{tokens.toLocaleString()}</div>
             </div>
           </div>
         </Button>
@@ -215,14 +222,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   );
 };
 
-export const TreeView: React.FC<TraceViewProps & { filterCallIds?: string[]}> = ({
-  traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
-  filterCallIds,
-}) => {
-  const filterSet = useMemo(() => 
-    filterCallIds ? new Set(filterCallIds) : undefined, 
+export const TreeView: React.FC<
+  TraceViewProps & {filterCallIds?: string[]}
+> = ({traceTreeFlat, selectedCallId, onCallSelect, filterCallIds}) => {
+  const filterSet = useMemo(
+    () => (filterCallIds ? new Set(filterCallIds) : undefined),
     [filterCallIds]
   );
 
@@ -232,31 +236,32 @@ export const TreeView: React.FC<TraceViewProps & { filterCallIds?: string[]}> = 
       return Object.values(traceTreeFlat).filter(
         node => !node.parentId || !traceTreeFlat[node.parentId]
       );
-    } 
-    
+    }
+
     // When filtering, we only want to show nodes that are in the filter
     const filterIdSet = new Set(filterCallIds);
-    
+
     // Create a special set of "root" nodes for the filtered view
     // These are nodes that are in the filter but don't have parents in the filter
-    const filteredRootNodes = Object.values(traceTreeFlat)
-      .filter(node => {
-        if (!filterIdSet.has(node.id)) {
-          return false; // Node not in filter
-        }
-        
-        // Check if this node has a parent that's also in the filter
-        return !node.parentId || 
-               !traceTreeFlat[node.parentId] || 
-               !filterIdSet.has(node.parentId);
-      });
-    
+    const filteredRootNodes = Object.values(traceTreeFlat).filter(node => {
+      if (!filterIdSet.has(node.id)) {
+        return false; // Node not in filter
+      }
+
+      // Check if this node has a parent that's also in the filter
+      return (
+        !node.parentId ||
+        !traceTreeFlat[node.parentId] ||
+        !filterIdSet.has(node.parentId)
+      );
+    });
+
     return filteredRootNodes;
   }, [traceTreeFlat, filterCallIds]);
 
   return (
     <div className="h-full overflow-hidden">
-      <div className="h-[calc(100%)] overflow-y-auto pt-4 pb-4">
+      <div className="h-[calc(100%)] overflow-y-auto pb-4 pt-4">
         <div className="flex flex-col">
           {rootNodes.map(node => (
             <TreeNode

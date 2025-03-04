@@ -29,20 +29,7 @@ const NodeContainer = styled.div<{$level: number; $isSelected?: boolean}>`
   border-radius: 4px;
   background: ${props => (props.$isSelected ? '#EFF6FF' : 'white')};
   transition: all 0.1s ease-in-out;
-  margin-left: 8px;
-`;
-
-const RecursiveIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  color: #6366f1;
-  font-size: 14px;
-  margin-left: 4px;
-  
-  &::after {
-    content: '↺';
-    font-weight: bold;
-  }
+  flex: 1 1 100px;
 `;
 
 const NodeHeader = styled.button`
@@ -87,25 +74,23 @@ const CallPanelHeader = styled.div`
   align-items: center;
 `;
 
-
 const RecursionBlock = styled.div`
   margin: 2px 0;
-  margin-left: 8px;
   padding: 8px 12px;
   border: 1px dashed #6366f1;
   border-radius: 4px;
   background: #f8fafc;
   color: #6366f1;
-  font-size: 11px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   gap: 4px;
   cursor: default;
+  flex: 1 1 100px;
 
   &::before {
     content: '↺';
     font-weight: bold;
-    font-size: 14px;
   }
 `;
 
@@ -128,34 +113,49 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   level = 0,
 }) => {
   const hasChildren = node.children.length > 0;
-  const isSelected = node.opName === selectedOpName;
+  const isSelected = node.callIds.includes(selectedCallId ?? '');
   const recursiveAncestors = Array.from(node.recursiveAncestors);
 
   // Get duration range and stats for this operation
   const stats = useMemo(() => {
-    return node.callIds.reduce(
-      (acc, callId) => {
-        const call = traceTreeFlat[callId].call;
-        const duration = call.ended_at
-          ? Date.parse(call.ended_at) - Date.parse(call.started_at)
-          : Date.now() - Date.parse(call.started_at);
-        return {
-          minDuration: Math.min(acc.minDuration, duration),
-          maxDuration: Math.max(acc.maxDuration, duration),
-          totalDuration: acc.totalDuration + duration,
-          errorCount: acc.errorCount + (call.exception ? 1 : 0),
-        };
-      },
-      {
-        minDuration: Infinity,
-        maxDuration: -Infinity,
-        totalDuration: 0,
-        errorCount: 0,
+    const initialStats = {
+      minDuration: Infinity,
+      maxDuration: -Infinity,
+      totalDuration: 0,
+      errorCount: 0,
+      finishedCallCount: 0,
+      unfinishedCallCount: 0,
+    };
+
+    return node.callIds.reduce((acc, callId) => {
+      const call = traceTreeFlat[callId].call;
+
+      // Track errors regardless of completion status
+      if (call.exception) {
+        acc.errorCount++;
       }
-    );
+
+      // Only include finished calls in timing calculations
+      if (call.ended_at) {
+        const duration =
+          Date.parse(call.ended_at) - Date.parse(call.started_at);
+        acc.minDuration = Math.min(acc.minDuration, duration);
+        acc.maxDuration = Math.max(acc.maxDuration, duration);
+        acc.totalDuration += duration;
+        acc.finishedCallCount++;
+      } else {
+        acc.unfinishedCallCount++;
+      }
+
+      return acc;
+    }, initialStats);
   }, [node.callIds, traceTreeFlat]);
 
-  const avgDuration = stats.totalDuration / node.callIds.length;
+  // Only calculate average if we have finished calls
+  const avgDuration =
+    stats.finishedCallCount > 0
+      ? stats.totalDuration / stats.finishedCallCount
+      : 0;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -175,51 +175,53 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   };
 
   return (
-  
-      <NodeContainer $level={level} $isSelected={isSelected}>
-        <NodeHeader onClick={handleClick}>
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            <div className="flex min-w-0 flex-col">
-              <div className="truncate text-xs font-medium flex items-center">
-                {node.opName}
-              </div>
-              <div className="truncate text-[11px] text-moon-500">
-                {node.callIds.length} calls
-                {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
-                {` • ${formatDuration(avgDuration)} avg`}
-              </div>
+    <NodeContainer $level={level} $isSelected={isSelected}>
+      <NodeHeader onClick={handleClick}>
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex min-w-0 flex-col">
+            <div className="flex items-center truncate text-sm font-medium">
+              {node.opName}
+            </div>
+            <div className="truncate text-[11px] text-moon-500">
+              {stats.finishedCallCount} finished
+              {stats.unfinishedCallCount > 0 &&
+                ` • ${stats.unfinishedCallCount} running`}
+              {stats.errorCount > 0 && ` • ${stats.errorCount} errors`}
+              {stats.finishedCallCount > 0 &&
+                ` • ${formatDuration(avgDuration)} avg`}
             </div>
           </div>
-          <div className="whitespace-nowrap text-[11px] text-moon-500">
-            {formatDuration(stats.minDuration)} -{' '}
-            {formatDuration(stats.maxDuration)}
-          </div>
-        </NodeHeader>
+        </div>
+        <div className="whitespace-nowrap text-[11px] text-moon-500">
+          {stats.finishedCallCount > 0
+            ? `${formatDuration(stats.minDuration)} - ${formatDuration(
+                stats.maxDuration
+              )}`
+            : 'Running...'}
+        </div>
+      </NodeHeader>
 
-        {hasChildren && (
-          <NodeContent $isExpanded={true}>
-            {node.children.map(child => (
-              <CodeMapNodeComponent
-                key={child.opName}
-                node={child}
-                selectedCallId={selectedCallId}
-                selectedOpName={selectedOpName}
-                onCallSelect={onCallSelect}
-                onOpSelect={onOpSelect}
-                traceTreeFlat={traceTreeFlat}
-                stack={stack}
-                level={level + 1}
-              />
-            ))}
-          </NodeContent>
-        )}
+      {hasChildren && (
+        <NodeContent $isExpanded={true}>
+          {node.children.map(child => (
+            <CodeMapNodeComponent
+              key={child.opName}
+              node={child}
+              selectedCallId={selectedCallId}
+              selectedOpName={selectedOpName}
+              onCallSelect={onCallSelect}
+              onOpSelect={onOpSelect}
+              traceTreeFlat={traceTreeFlat}
+              stack={stack}
+              level={level + 1}
+            />
+          ))}
+        </NodeContent>
+      )}
       {recursiveAncestors.map(ancestor => (
-        <RecursionBlock key={ancestor}>
-          {ancestor}
-        </RecursionBlock>
+        <RecursionBlock key={ancestor}>{ancestor}</RecursionBlock>
       ))}
-      </NodeContainer>
-
+    </NodeContainer>
   );
 };
 

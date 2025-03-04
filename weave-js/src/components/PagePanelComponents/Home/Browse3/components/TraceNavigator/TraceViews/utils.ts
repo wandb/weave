@@ -185,7 +185,10 @@ export const buildCodeMap = (traceTreeFlat: TraceTreeFlat): CodeMapNode[] => {
       const childOpName = parseSpanName(childNode.call.op_name);
 
       // Find if this operation exists in ancestors or peers
-      const existingOp = findExistingOp(childOpName, target, [...ancestors, target]);
+      const existingOp = findExistingOp(childOpName, target, [
+        ...ancestors,
+        target,
+      ]);
 
       if (existingOp) {
         // Check for recursion

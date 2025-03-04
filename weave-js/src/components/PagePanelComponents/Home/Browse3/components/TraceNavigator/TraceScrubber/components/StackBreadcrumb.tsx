@@ -11,7 +11,7 @@ import {BaseScrubberProps} from './BaseScrubber';
 
 export const StackBreadcrumb: React.FC<BaseScrubberProps> = props => {
   const selectedItemRef = React.useRef<HTMLButtonElement>(null);
-  
+
   useScrollIntoView(selectedItemRef, Boolean(props.selectedCallId));
 
   if (!props.selectedCallId) {
