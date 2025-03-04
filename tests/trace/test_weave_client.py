@@ -28,7 +28,10 @@ from weave.trace.refs import (
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
 )
-from weave.trace.serializer import get_serializer_for_obj, register_serializer
+from weave.trace.serialization.serializer import (
+    get_serializer_for_obj,
+    register_serializer,
+)
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.sqlite_trace_server import (

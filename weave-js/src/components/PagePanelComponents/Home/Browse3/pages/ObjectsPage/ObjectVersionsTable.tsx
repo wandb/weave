@@ -162,6 +162,9 @@ export const ObjectVersionsTable: React.FC<{
       // with the dynamic fields added below.
       basicField('weave__object_version_link', props.objectTitle ?? 'Object', {
         hideable: false,
+        valueGetter: (unused: any, row: any) => {
+          return row.obj.objectId;
+        },
         renderCell: cellParams => {
           // Icon to indicate navigation to the object version
           const obj: ObjectVersionSchema = cellParams.row.obj;
@@ -244,7 +247,7 @@ export const ObjectVersionsTable: React.FC<{
     if (!props.hideCategoryColumn) {
       cols.push(
         basicField('baseObjectClass', 'Category', {
-          width: 120,
+          width: 132,
           display: 'flex',
           valueGetter: (unused: any, row: any) => {
             return row.obj.baseObjectClass;
