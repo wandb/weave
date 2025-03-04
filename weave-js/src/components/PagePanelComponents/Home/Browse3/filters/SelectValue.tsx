@@ -2,13 +2,11 @@
  * Select the value for a filter. Depends on the operator.
  */
 
-import moment from 'moment';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
-import {StyledDateTimePicker} from '../StyledDateTimePicker';
 import {
   getFieldType,
   getStringList,
@@ -17,6 +15,7 @@ import {
   isWeaveRef,
 } from './common';
 import {IdList} from './IdList';
+import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
 
@@ -51,15 +50,7 @@ export const SelectValue = ({
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
   }
   if (fieldType === 'datetime') {
-    const dateTimeValue = value ? moment(value) : null;
-    return (
-      <StyledDateTimePicker
-        value={dateTimeValue}
-        onChange={(newValue: moment.Moment | null) =>
-          onSetValue(newValue ? newValue.toISOString() : '')
-        }
-      />
-    );
+    return <SelectDatetimeDropdown value={value} onChange={onSetValue} />;
   }
 
   if (operator.startsWith('(bool): ')) {
