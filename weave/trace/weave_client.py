@@ -125,6 +125,14 @@ if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
+def _is_pandas_df(obj: Any) -> bool:
+    try:
+        import pandas as pd
+    except ImportError:
+        return False
+    return isinstance(obj, pd.DataFrame)
+
+
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
@@ -1796,6 +1804,10 @@ class WeaveClient:
         elif isinstance(obj, dict):
             for v in obj.values():
                 self._save_nested_objects(v)
+        elif _is_pandas_df(obj):
+            table = Table(rows=obj)
+            table_ref = self._save_table(table)
+            set_ref(obj, table_ref)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
