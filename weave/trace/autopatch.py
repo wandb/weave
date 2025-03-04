@@ -38,6 +38,7 @@ class AutopatchSettings(BaseModel):
     anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
     cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    crewai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
     google_ai_studio: IntegrationSettings = Field(default_factory=IntegrationSettings)
     groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -61,6 +62,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
+    from weave.integrations.crewai.crewai_sdk import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
@@ -90,6 +92,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_dspy_patcher(settings.dspy).attempt_patch()
     get_cerebras_patcher(settings.cerebras).attempt_patch()
     get_cohere_patcher(settings.cohere).attempt_patch()
+    get_crewai_patcher(settings.crewai).attempt_patch()
     get_google_genai_patcher(settings.google_ai_studio).attempt_patch()
     get_notdiamond_patcher(settings.notdiamond).attempt_patch()
     get_vertexai_patcher(settings.vertexai).attempt_patch()
@@ -104,6 +107,7 @@ def reset_autopatch() -> None:
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
+    from weave.integrations.crewai.crewai_sdk import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_genai_patcher,
@@ -133,6 +137,7 @@ def reset_autopatch() -> None:
     get_dspy_patcher().undo_patch()
     get_cerebras_patcher().undo_patch()
     get_cohere_patcher().undo_patch()
+    get_crewai_patcher().undo_patch()
     get_google_genai_patcher().undo_patch()
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
