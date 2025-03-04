@@ -1,3 +1,5 @@
+import {vi} from 'vitest';
+
 import {
   dateToISOString,
   formatDate,
@@ -31,14 +33,14 @@ describe('Date Utility Functions', () => {
   beforeAll(() => {
     // Mock current date to 2023-06-15
     const mockDate = new Date(2023, 5, 15);
-    jest.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
-    jest.useFakeTimers().setSystemTime(mockDate);
+    vi.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
+    vi.setSystemTime(mockDate);
   });
 
   afterAll(() => {
     // Restore original Date.now
-    jest.spyOn(Date, 'now').mockRestore();
-    jest.useRealTimers();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('parseDate', () => {
