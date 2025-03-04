@@ -670,7 +670,7 @@ const useURLBackedCallPageState = () => {
 
   const debouncedHistoryPush = useMemo(() => {
     return debounce((path: string) => {
-      if (history.location.pathname !== path) {
+      if (history.location.pathname + history.location.search !== path) {
         history.push(path);
       }
     }, 500);

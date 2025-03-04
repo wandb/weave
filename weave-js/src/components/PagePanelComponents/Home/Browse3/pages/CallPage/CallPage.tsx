@@ -70,6 +70,7 @@ export const CallPage: FC<CallPageProps> = props => {
     }
     // , {includeCosts: true}
   );
+  // console.log(call)
   // TODO: CLean this up!
   const lastResult = useRef(call.result);
   useEffect(() => {
@@ -251,16 +252,29 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
 }) => {
   useViewTraceEvent(call);
 
-  const showTraceTree =
-    hideTracetree != null ? !hideTracetree : !isEvaluateOp(call.spanName);
-  const showFeedbackExpand = showFeedback != null ? showFeedback : false;
+  const hideTraceTreeDefault = isEvaluateOp(call.spanName);
+  const showFeedbackDefault = false;
+  const hideTraceTree =
+    hideTracetree != null ? hideTracetree : hideTraceTreeDefault;
+  const showFeedbackExpand =
+    showFeedback != null ? showFeedback : showFeedbackDefault;
 
   const onToggleTraceTree = useCallback(() => {
-    setHideTracetree(showTraceTree);
-  }, [setHideTracetree, showTraceTree]);
+    const targetValue = !hideTraceTree;
+    if (targetValue === hideTraceTreeDefault) {
+      setHideTracetree(undefined);
+    } else {
+      setHideTracetree(targetValue);
+    }
+  }, [hideTraceTree, hideTraceTreeDefault, setHideTracetree]);
   const onToggleFeedbackExpand = useCallback(() => {
-    setShowFeedback(!showFeedbackExpand);
-  }, [setShowFeedback, showFeedbackExpand]);
+    const targetValue = !showFeedbackExpand;
+    if (targetValue === showFeedbackDefault) {
+      setShowFeedback(undefined);
+    } else {
+      setShowFeedback(targetValue);
+    }
+  }, [setShowFeedback, showFeedbackDefault, showFeedbackExpand]);
 
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
@@ -338,9 +352,9 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
-              tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+              tooltip={`${!hideTraceTree ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
-              active={showTraceTree ?? false}
+              active={!hideTraceTree}
               onClick={onToggleTraceTree}
             />
             <Button
@@ -369,7 +383,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         </Tailwind>
       }
       headerContent={<CallOverview call={currentCall} />}
-      isLeftSidebarOpen={showTraceTree}
+      isLeftSidebarOpen={!hideTraceTree}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
