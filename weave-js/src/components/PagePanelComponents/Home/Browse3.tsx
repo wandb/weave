@@ -661,11 +661,11 @@ const useURLBackedCallPageState = () => {
     setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
   }, [query]);
 
-  const [hideTracetree, setHideTracetree] = useState<boolean | undefined>(
+  const [hideTraceTree, setHideTraceTree] = useState<boolean | undefined>(
     getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
   );
   useEffect(() => {
-    setHideTracetree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
+    setHideTraceTree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
   }, [query]);
 
   const debouncedHistoryPush = useMemo(() => {
@@ -684,7 +684,7 @@ const useURLBackedCallPageState = () => {
         '',
         rootCallId,
         descendentCallId,
-        hideTracetree,
+        hideTraceTree,
         showFeedback
       )
     );
@@ -699,7 +699,7 @@ const useURLBackedCallPageState = () => {
     rootCallId,
     descendentCallId,
     showFeedback,
-    hideTracetree,
+    hideTraceTree,
   ]);
 
   return {
@@ -708,11 +708,11 @@ const useURLBackedCallPageState = () => {
     rootCallId,
     descendentCallId,
     showFeedback,
-    hideTracetree,
+    hideTraceTree,
     setRootCallId,
     setDescendentCallId,
     setShowFeedback,
-    setHideTracetree,
+    setHideTraceTree,
   };
 };
 
@@ -725,11 +725,11 @@ const CallPageBinding = () => {
     rootCallId,
     descendentCallId,
     showFeedback,
-    hideTracetree,
+    hideTraceTree,
     setRootCallId,
     setDescendentCallId,
     setShowFeedback,
-    setHideTracetree,
+    setHideTraceTree,
   } = useURLBackedCallPageState();
 
   return (
@@ -740,8 +740,8 @@ const CallPageBinding = () => {
       setRootCallId={setRootCallId}
       descendentCallId={descendentCallId}
       setDescendentCallId={setDescendentCallId}
-      hideTracetree={hideTracetree}
-      setHideTracetree={setHideTracetree}
+      hideTraceTree={hideTraceTree}
+      setHideTraceTree={setHideTraceTree}
       showFeedback={showFeedback}
       setShowFeedback={setShowFeedback}
     />

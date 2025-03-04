@@ -39,8 +39,8 @@ type CallPageProps = {
   setRootCallId: (callId: string) => void;
   descendentCallId?: string;
   setDescendentCallId: (descendentCallId: string | undefined) => void;
-  hideTracetree?: boolean;
-  setHideTracetree: (hideTracetree: boolean | undefined) => void;
+  hideTraceTree?: boolean;
+  setHideTraceTree: (hideTraceTree: boolean | undefined) => void;
   showFeedback?: boolean;
   setShowFeedback: (showFeedback: boolean | undefined) => void;
 };
@@ -232,37 +232,37 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   descendentCall: call,
   descendentCallId: callId,
   setRootCallId: setCallId,
-  setHideTracetree,
+  setHideTraceTree,
   setShowFeedback,
   showFeedback,
-  hideTracetree,
+  hideTraceTree,
 }) => {
   useViewTraceEvent(call);
   const callIsCached = call.callId !== callId;
 
   const hideTraceTreeDefault = isEvaluateOp(call.spanName);
   const showFeedbackDefault = false;
-  const hideTraceTree =
-    hideTracetree != null ? hideTracetree : hideTraceTreeDefault;
-  const showFeedbackExpand =
+  const hideTraceTreeActual =
+    hideTraceTree != null ? hideTraceTree : hideTraceTreeDefault;
+  const showFeedbackActual =
     showFeedback != null ? showFeedback : showFeedbackDefault;
 
   const onToggleTraceTree = useCallback(() => {
-    const targetValue = !hideTraceTree;
+    const targetValue = !hideTraceTreeActual;
     if (targetValue === hideTraceTreeDefault) {
-      setHideTracetree(undefined);
+      setHideTraceTree(undefined);
     } else {
-      setHideTracetree(targetValue);
+      setHideTraceTree(targetValue);
     }
-  }, [hideTraceTree, hideTraceTreeDefault, setHideTracetree]);
+  }, [hideTraceTreeActual, hideTraceTreeDefault, setHideTraceTree]);
   const onToggleFeedbackExpand = useCallback(() => {
-    const targetValue = !showFeedbackExpand;
+    const targetValue = !showFeedbackActual;
     if (targetValue === showFeedbackDefault) {
       setShowFeedback(undefined);
     } else {
       setShowFeedback(targetValue);
     }
-  }, [setShowFeedback, showFeedbackDefault, showFeedbackExpand]);
+  }, [setShowFeedback, showFeedbackDefault, showFeedbackActual]);
 
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
@@ -291,23 +291,23 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"
-              tooltip={`${!hideTraceTree ? 'Hide' : 'Show'} trace tree`}
+              tooltip={`${!hideTraceTreeActual ? 'Hide' : 'Show'} trace tree`}
               variant="ghost"
-              active={!hideTraceTree}
+              active={!hideTraceTreeActual}
               onClick={onToggleTraceTree}
             />
             <Button
               icon="marker"
-              tooltip={`${showFeedbackExpand ? 'Hide' : 'Show'} feedback`}
+              tooltip={`${showFeedbackActual ? 'Hide' : 'Show'} feedback`}
               variant="ghost"
-              active={showFeedbackExpand ?? false}
+              active={showFeedbackActual ?? false}
               onClick={onToggleFeedbackExpand}
               className="ml-4"
             />
           </Box>
         </Box>
       }
-      isRightSidebarOpen={showFeedbackExpand}
+      isRightSidebarOpen={showFeedbackActual}
       rightSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="flex h-full flex-col">
@@ -322,7 +322,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         </Tailwind>
       }
       headerContent={<CallOverview call={call} />}
-      isLeftSidebarOpen={!hideTraceTree}
+      isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">

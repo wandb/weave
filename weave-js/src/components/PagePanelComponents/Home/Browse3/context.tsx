@@ -101,7 +101,7 @@ export const browse2Context = {
     traceId: string,
     callId: string,
     descendentCallId?: string,
-    hideTracetree?: boolean,
+    hideTraceTree?: boolean,
     showFeedback?: boolean
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
@@ -352,7 +352,7 @@ export const browse3ContextGen = (
       traceId: string,
       callId: string,
       descendentCallId?: string,
-      hideTracetree?: boolean,
+      hideTraceTree?: boolean,
       showFeedback?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
@@ -360,8 +360,8 @@ export const browse3ContextGen = (
       if (descendentCallId) {
         params.set(DESCENDENT_CALL_ID_PARAM, descendentCallId);
       }
-      if (hideTracetree !== undefined) {
-        params.set(HIDE_TRACETREE_PARAM, hideTracetree ? '1' : '0');
+      if (hideTraceTree !== undefined) {
+        params.set(HIDE_TRACETREE_PARAM, hideTraceTree ? '1' : '0');
       }
       if (showFeedback !== undefined) {
         params.set(SHOW_FEEDBACK_PARAM, showFeedback ? '1' : '0');
@@ -542,7 +542,7 @@ type RouteType = {
     traceId: string,
     callId: string,
     descendentCallId?: string,
-    hideTracetree?: boolean,
+    hideTraceTree?: boolean,
     showFeedback?: boolean
   ) => string;
   tracesUIUrl: (entityName: string, projectName: string) => string;
@@ -624,7 +624,7 @@ const useSetSearchParam = () => {
 };
 
 export const PEEK_PARAM = 'peekPath';
-export const HIDE_TRACETREE_PARAM = 'hideTracetree';
+export const HIDE_TRACETREE_PARAM = 'hideTraceTree';
 export const SHOW_FEEDBACK_PARAM = 'showFeedback';
 export const DESCENDENT_CALL_ID_PARAM = 'descendentCallId';
 

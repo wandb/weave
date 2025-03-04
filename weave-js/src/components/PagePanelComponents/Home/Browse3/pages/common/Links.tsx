@@ -320,7 +320,7 @@ export const CallLink: React.FC<{
     : undefined;
   // default to true if not specified and not an eval
   const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
-  const hideTracetree =
+  const hideTraceTree =
     traceTreeParam === '1'
       ? true
       : traceTreeParam === '0'
@@ -342,7 +342,7 @@ export const CallLink: React.FC<{
     '',
     props.callId,
     descendentCallId,
-    hideTracetree,
+    hideTraceTree,
     showFeedbackExpand
   );
 
