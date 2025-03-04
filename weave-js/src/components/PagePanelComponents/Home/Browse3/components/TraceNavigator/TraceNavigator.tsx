@@ -1,5 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {FC, useEffect, useMemo, useState} from 'react';
 
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
@@ -76,23 +77,44 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
   const loading = props.traceTreeFlat[props.selectedCallId ?? ''] == null;
+
+  // Count total traces
+  const traceCount = Object.keys(props.traceTreeFlat).length;
+
+  // If current view becomes disabled, switch to tree view
+  useEffect(() => {
+    const currentView = getTraceView(traceViewId);
+    if (currentView.maxTraces && traceCount > currentView.maxTraces) {
+      setTraceViewId(traceViews[0].id);
+    }
+  }, [traceCount, traceViewId]);
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
         <h2 className="truncate text-sm font-semibold">Trace View</h2>
         <div className="flex items-center gap-3">
-          {traceViews.map(view => (
-            <Button
-              key={view.id}
-              variant={traceViewId === view.id ? 'primary' : 'ghost'}
-              onClick={() => setTraceViewId(view.id)}
-              icon={view.icon}
-              size="small"
-              className="!p-3"
-              title={view.label}>
-              <span className="sr-only">{view.label}</span>
-            </Button>
-          ))}
+          {traceViews.map(view => {
+            const isDisabled = !!(view.maxTraces && traceCount > view.maxTraces);
+            const tooltipContent = isDisabled 
+              ? `${view.label} view is disabled (maximum ${view.maxTraces} traces)`
+              : view.label;
+            
+            return (
+              <Tooltip key={view.id} content= {tooltipContent} trigger={<Button
+                variant={traceViewId === view.id ? 'primary' : 'ghost'}
+                onClick={() => setTraceViewId(view.id)}
+                icon={view.icon}
+                size="small"
+                className="!p-3"
+                disabled={isDisabled}>
+                <span className="sr-only">{view.label}</span>
+              </Button>}>
+                
+                
+              </Tooltip>
+            );
+          })}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">

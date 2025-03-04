@@ -19,6 +19,8 @@ export interface ViewDefinition<T> {
   component: FC<T>;
   /** Whether to show the scrubber for this view */
   allowedScrubbers?: ScrubberOption[];
+  /** Maximum number of traces this view can handle before being disabled */
+  maxTraces?: number;
 }
 
 /**
@@ -46,14 +48,16 @@ export const traceViews: TraceViewRegistry = [
   },
   {
     id: 'flamegraph',
-    label: 'Flame Graph',
+    label: 'Flame',
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
+    maxTraces: 500,
   },
   {
     id: 'graph',
     label: 'Graph',
     icon: 'chart-scatterplot',
     component: GraphView,
+    maxTraces: 50,
   },
 ];
