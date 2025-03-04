@@ -49,12 +49,16 @@ type CallPageInnerProps = CallPageProps & {
   descendentCallId: string;
   setDescendentCallId: (descendentCallId: string) => void;
   descendentCall: CallSchema;
+  callIsStale: boolean;
 };
 
 export const CallPage: FC<CallPageProps> = props => {
   const {useCall} = useWFHooks();
 
   const descendentCallId = props.descendentCallId ?? props.rootCallId;
+
+  // Note to future devs: We could delay the cost (and i/o) fetching. This is
+  // just needed to validate that the call truly exists.
   const call = useCall(
     {
       entity: props.entity,
@@ -82,6 +86,7 @@ export const CallPage: FC<CallPageProps> = props => {
           {...props}
           descendentCallId={descendentCallId}
           descendentCall={call.result}
+          callIsStale={call.result.callId !== descendentCallId}
         />
       );
     }
@@ -94,6 +99,7 @@ export const CallPage: FC<CallPageProps> = props => {
           {...props}
           descendentCallId={descendentCallId}
           descendentCall={lastResult.current}
+          callIsStale={lastResult.current.callId !== descendentCallId}
         />
       );
     }
@@ -236,9 +242,9 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   setShowFeedback,
   showFeedback,
   hideTraceTree,
+  callIsStale,
 }) => {
   useViewTraceEvent(call);
-  const callIsCached = call.callId !== callId;
 
   const hideTraceTreeDefault = isEvaluateOp(call.spanName);
   const showFeedbackDefault = false;
@@ -337,7 +343,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         </Tailwind>
       }
       tabs={callTabs}
-      dimMainContent={callIsCached}
+      dimMainContent={callIsStale}
     />
   );
 };
