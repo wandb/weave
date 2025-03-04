@@ -3,6 +3,7 @@ import dataclasses
 import json
 import platform
 import sys
+import time
 
 import pydantic
 import pytest
@@ -1886,3 +1887,45 @@ def test_global_attributes_with_call_attributes(client_creator):
 
         # Local attributes override global ones
         assert call.attributes["env"] == "override"
+
+
+def test_flush_progress_bar(client):
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+
+    # flush with progress bar
+    client.flush(use_progress_bar=True)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
+
+
+def test_flush_callback(client):
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+
+    def fake_logger(status):
+        assert "job_counts" in status
+
+    # flush with callback
+    client.flush(callback=fake_logger)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
+
+    op_1()
+
+    # this should also work, the callback will override the progress bar
+    client.flush(callback=fake_logger, use_progress_bar=True)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
