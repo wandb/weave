@@ -65,8 +65,8 @@ def tests(session, shard):
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
-    # if session.python.startswith("3.9") and shard in PY309_INCOMPATIBLE_SHARDS:
-    #     session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
+    if session.python.startswith("3.9") and shard in PY309_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
