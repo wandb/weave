@@ -1,6 +1,6 @@
+import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 
-import {Icon} from '../../../../../../../../../Icon';
 import {useStackContext} from '../context';
 import {
   ArrowButton,

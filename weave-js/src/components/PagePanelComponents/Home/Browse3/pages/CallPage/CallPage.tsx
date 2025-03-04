@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -17,6 +16,7 @@ import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -36,7 +36,6 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {TraceNavigator} from '../ThreadsPage/TraceNavigator';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -240,7 +239,6 @@ const CallPageInnerVertical: FC<{
 }> = ({call, callId, setCallById: setCallId, path}) => {
   useViewTraceEvent(call);
 
-  const {useCall} = useWFHooks();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 

@@ -1,10 +1,10 @@
+import {Icon} from '@wandb/weave/components/Icon';
 import React, {useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
-import {Icon} from '../../../../../../../Icon';
-import {TraceViewProps} from '../../types';
-import {buildCodeMap, CodeMapNode} from '../../utils';
-import {useStackContext} from './TraceScrubber/context';
+import {useStackContext} from '../TraceScrubber/context';
+import {TraceViewProps} from './types';
+import {buildCodeMap, CodeMapNode} from './utils';
 import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
 
 const Container = styled.div`

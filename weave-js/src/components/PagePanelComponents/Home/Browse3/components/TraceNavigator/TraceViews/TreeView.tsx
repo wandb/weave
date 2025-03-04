@@ -1,9 +1,9 @@
+import {Button} from '@wandb/weave/components/Button';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
 import React, {useMemo} from 'react';
 
-import {Button} from '../../../../../../../Button';
-import {Icon, IconName} from '../../../../../../../Icon';
-import {useScrollIntoView} from '../../hooks';
-import {TraceViewProps} from '../../types';
+import {TraceViewProps} from './types';
 import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
 
 interface TreeNodeProps {

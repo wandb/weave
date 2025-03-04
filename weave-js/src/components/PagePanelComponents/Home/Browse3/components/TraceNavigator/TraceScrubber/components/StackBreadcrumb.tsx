@@ -1,7 +1,7 @@
+import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
 import React from 'react';
 
-import {useScrollIntoView} from '../../../../hooks';
-import {getCallDisplayName} from '../../utils';
+import {getCallDisplayName} from '../../TraceViews/utils';
 import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,

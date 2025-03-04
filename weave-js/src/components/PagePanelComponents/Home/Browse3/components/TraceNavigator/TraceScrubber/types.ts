@@ -1,4 +1,4 @@
-import {TraceTreeFlat} from '../../../types';
+import {TraceTreeFlat} from '../TraceViews/types';
 
 export interface BaseScrubberProps {
   traceTreeFlat: TraceTreeFlat;

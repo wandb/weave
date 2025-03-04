@@ -14,8 +14,8 @@ import {
 import dagre from 'dagre';
 import React, {useMemo} from 'react';
 
-import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
-import {TraceViewProps} from '../../types';
+import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
 
 const NODE_WIDTH = 180;

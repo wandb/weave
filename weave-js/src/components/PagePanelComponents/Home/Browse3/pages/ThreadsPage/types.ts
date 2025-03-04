@@ -14,24 +14,6 @@ export interface ThreadsPageProps {
 }
 
 /**
- * Flattened representation of a trace call tree
- */
-export interface TraceTreeFlat {
-  [callId: string]: {
-    /** The unique identifier for this call */
-    id: string;
-    /** The parent call ID, if any */
-    parentId?: string;
-    /** IDs of child calls */
-    childrenIds: string[];
-    /** Order in depth-first traversal */
-    dfsOrder: number;
-    /** The actual call data */
-    call: TraceCallSchema;
-  };
-}
-
-/**
  * Props shared by all thread view components
  */
 export interface ThreadViewProps {
@@ -49,18 +31,6 @@ export interface ThreadViewProps {
   onThreadSelect?: (threadId: string) => void;
   /** Polling interval in milliseconds (0 for no polling) */
   pollIntervalMs?: number;
-}
-
-/**
- * Props shared by all trace view components
- */
-export interface TraceViewProps {
-  /** The flattened trace call tree */
-  traceTreeFlat: TraceTreeFlat;
-  /** Currently selected call ID */
-  selectedCallId?: string;
-  /** Callback when a call is selected */
-  onCallSelect: (callId: string) => void;
 }
 
 /**

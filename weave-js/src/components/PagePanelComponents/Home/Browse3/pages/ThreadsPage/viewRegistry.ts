@@ -1,11 +1,15 @@
+import {
+  CodeView,
+  FlameGraphView,
+  GraphView,
+  TreeView,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/components/TraceNavigator/TraceViews';
 import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
 import {DetailsView} from './components/CallViews/DetailsView';
 import {CallJsonView} from './components/CallViews/JsonView';
 import {ConnectedThreadView, StaticThreadView} from './components/ThreadViews';
-import {FlameGraphView, GraphView, TreeView} from './components/TraceViews';
-import {CodeView} from './components/TraceViews/CodeView';
 import {CallViewProps, ThreadViewProps, TraceViewProps} from './types';
 
 /**

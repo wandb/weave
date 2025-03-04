@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {TraceTreeFlat} from '../../../types';
+import {TraceTreeFlat} from '../TraceViews/types';
 import {
   PeerScrubber,
   SiblingScrubber,

@@ -4,8 +4,8 @@ import {
   FlameGraphNode as FlameGraphNodeType,
 } from 'react-flame-graph';
 
-import {parseSpanName} from '../../../wfReactInterface/tsDataModelHooks';
-import {TraceViewProps} from '../../types';
+import {parseSpanName} from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {TraceViewProps} from './types';
 import {getCallDisplayName, getColorForOpName} from './utils';
 
 // Use the imported type directly

@@ -4,9 +4,9 @@ import {Button} from '../../../../../Button';
 import * as DropdownMenu from '../../../../../DropdownMenu';
 import {Icon} from '../../../../../Icon';
 import {Tailwind} from '../../../../../Tailwind';
+import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
 import {useWFHooks} from '../wfReactInterface/context';
 import {useThreadList, useTraceRootsForThread} from './hooks';
-import {TraceNavigator} from './TraceNavigator';
 import {ThreadsPageProps} from './types';
 import {
   callViews,

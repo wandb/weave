@@ -1,12 +1,12 @@
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {TraceScrubber} from './components/TraceViews/TraceScrubber';
-import {StackBreadcrumb} from './components/TraceViews/TraceScrubber/components/StackBreadcrumb';
-import {StackContextProvider} from './components/TraceViews/TraceScrubber/context';
-import {useBareTraceCalls} from './hooks';
-import {buildTraceTreeFlat} from './utils';
-import {getTraceView, traceViews} from './viewRegistry';
+import {useBareTraceCalls} from '../../pages/ThreadsPage/hooks';
+import {getTraceView, traceViews} from '../../pages/ThreadsPage/viewRegistry';
+import {TraceScrubber} from './TraceScrubber';
+import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
+import {StackContextProvider} from './TraceScrubber/context';
+import {buildTraceTreeFlat} from './TraceViews/utils';
 
 export const TraceNavigator = ({
   entity,
