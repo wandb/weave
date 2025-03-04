@@ -383,3 +383,17 @@ export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
 };
+
+export const makeDefaultDateFilter = (): GridFilterItem => {
+  /*
+    Default date filter is 30 days agoqq
+    TODO: should this be configurable?
+  */
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  return {
+    id: 0,
+    field: 'started_at',
+    operator: '(date): after',
+    value: thirtyDaysAgo.toISOString(),
+  };
+};
