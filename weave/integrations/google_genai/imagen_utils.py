@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional
 
 import weave
 from weave.integrations.google_genai.gemini_utils import (
@@ -36,7 +36,7 @@ def google_genai_gemini_postprocess_outputs(
 
 
 def google_genai_imagen_on_finish(
-    call: Call, output: Any, exception: Union[Exception, None]
+    call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
     model_name = None
     if "model" in call.inputs:

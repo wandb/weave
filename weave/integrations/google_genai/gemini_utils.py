@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
@@ -24,7 +24,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
 
 
 def google_genai_gemini_on_finish(
-    call: Call, output: Any, exception: Union[Exception, None]
+    call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
     """
     On finish handler for the Google GenAI Gemini API integration that ensures the usage
@@ -52,7 +52,7 @@ def google_genai_gemini_on_finish(
 
 
 def google_genai_gemini_accumulator(
-    acc: Union["GenerateContentResponse", None], value: "GenerateContentResponse"
+    acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
 ) -> "GenerateContentResponse":
     if acc is None:
         return value
