@@ -10,6 +10,18 @@ from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 
+SERVICE_TAG_NAME = "Service"
+CALLS_TAG_NAME = "Calls"
+OPS_TAG_NAME = "Ops"
+OBJECTS_TAG_NAME = "Objects"
+TABLES_TAG_NAME = "Tables"
+REFS_TAG_NAME = "Refs"
+FILES_TAG_NAME = "Files"
+FEEDBACK_TAG_NAME = "Feedback"
+COST_TAG_NAME = "Costs"
+COMPLETIONS_TAG_NAME = "Completions"
+ACTIONS_TAG_NAME = "Actions"
+
 
 class AuthParams(NamedTuple):
     headers: dict[str, str] | None = None
@@ -53,7 +65,9 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
-def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
+def generate_routes(
+    router: APIRouter, server_impl: tsi.TraceServerInterface
+) -> FastAPI:
     """Generate a FastAPI app from a TraceServerInterface implementation.
 
     Args:
@@ -62,22 +76,16 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
     Returns:
         A FastAPI application with all routes implemented
     """
-    app = FastAPI(
-        servers=[
-            {"url": "https://trace.wandb.ai", "description": "Prod"},
-        ]
-    )
-    router = APIRouter()
 
-    @router.post("/call/start")
+    @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(req: tsi.CallStartReq, auth_params: Auth) -> tsi.CallStartRes:
         return server_impl.call_start(req)
 
-    @router.post("/call/end")
+    @router.post("/call/end", tags=[CALLS_TAG_NAME])
     def call_end(req: tsi.CallEndReq, auth_params: Auth) -> tsi.CallEndRes:
         return server_impl.call_end(req)
 
-    @router.post("/call/upsert_batch")
+    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
     def call_start_batch(
         req: CallCreateBatchReq, auth_params: Auth
     ) -> CallCreateBatchRes:
@@ -89,16 +97,17 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
                 results.append(server_impl.call_end(item.req))
         return CallCreateBatchRes(res=results)
 
-    @router.post("/call/read")
+    @router.post("/call/read", tags=[CALLS_TAG_NAME])
     def call_read(req: tsi.CallReadReq, auth_params: Auth) -> tsi.CallReadRes:
         return server_impl.call_read(req)
 
-    @router.post("/calls/query")
+    @router.post("/calls/query", tags=[CALLS_TAG_NAME])
     def calls_query(req: tsi.CallsQueryReq, auth_params: Auth) -> tsi.CallsQueryRes:
         return server_impl.calls_query(req)
 
     @router.post(
         "/calls/query_stream",
+        tags=[CALLS_TAG_NAME],
         response_class=StreamingResponse,
         responses={
             200: {
@@ -121,69 +130,69 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
     ) -> StreamingResponse:
         return StreamingResponse(server_impl.calls_query_stream(req))
 
-    @router.post("/calls/delete")
+    @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
     def calls_delete(req: tsi.CallsDeleteReq, auth_params: Auth) -> tsi.CallsDeleteRes:
         return server_impl.calls_delete(req)
 
-    @router.post("/calls/query_stats")
+    @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
     def calls_query_stats(
         req: tsi.CallsQueryStatsReq, auth_params: Auth
     ) -> tsi.CallsQueryStatsRes:
         return server_impl.calls_query_stats(req)
 
-    @router.post("/call/update")
+    @router.post("/call/update", tags=[CALLS_TAG_NAME])
     def call_update(req: tsi.CallUpdateReq, auth_params: Auth) -> tsi.CallUpdateRes:
         return server_impl.call_update(req)
 
-    @router.post("/op/create")
+    @router.post("/op/create", tags=[OPS_TAG_NAME])
     def op_create(req: tsi.OpCreateReq, auth_params: Auth) -> tsi.OpCreateRes:
         return server_impl.op_create(req)
 
-    @router.post("/op/read")
+    @router.post("/op/read", tags=[OPS_TAG_NAME])
     def op_read(req: tsi.OpReadReq, auth_params: Auth) -> tsi.OpReadRes:
         return server_impl.op_read(req)
 
-    @router.post("/ops/query")
+    @router.post("/ops/query", tags=[OPS_TAG_NAME])
     def ops_query(req: tsi.OpQueryReq, auth_params: Auth) -> tsi.OpQueryRes:
         return server_impl.ops_query(req)
 
-    @router.post("/cost/create")
+    @router.post("/cost/create", tags=[COST_TAG_NAME])
     def cost_create(req: tsi.CostCreateReq, auth_params: Auth) -> tsi.CostCreateRes:
         return server_impl.cost_create(req)
 
-    @router.post("/cost/query")
+    @router.post("/cost/query", tags=[COST_TAG_NAME])
     def cost_query(req: tsi.CostQueryReq, auth_params: Auth) -> tsi.CostQueryRes:
         return server_impl.cost_query(req)
 
-    @router.post("/cost/purge")
+    @router.post("/cost/purge", tags=[COST_TAG_NAME])
     def cost_purge(req: tsi.CostPurgeReq, auth_params: Auth) -> tsi.CostPurgeRes:
         return server_impl.cost_purge(req)
 
-    @router.post("/obj/create")
+    @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
     def obj_create(req: tsi.ObjCreateReq, auth_params: Auth) -> tsi.ObjCreateRes:
         return server_impl.obj_create(req)
 
-    @router.post("/obj/read")
+    @router.post("/obj/read", tags=[OBJECTS_TAG_NAME])
     def obj_read(req: tsi.ObjReadReq, auth_params: Auth) -> tsi.ObjReadRes:
         return server_impl.obj_read(req)
 
-    @router.post("/objs/query")
+    @router.post("/objs/query", tags=[OBJECTS_TAG_NAME])
     def objs_query(req: tsi.ObjQueryReq, auth_params: Auth) -> tsi.ObjQueryRes:
         return server_impl.objs_query(req)
 
-    @router.post("/obj/delete")
+    @router.post("/obj/delete", tags=[OBJECTS_TAG_NAME])
     def obj_delete(req: tsi.ObjDeleteReq, auth_params: Auth) -> tsi.ObjDeleteRes:
         return server_impl.obj_delete(req)
 
-    @router.post("/table/create")
+    @router.post("/table/create", tags=[TABLES_TAG_NAME])
     def table_create(req: tsi.TableCreateReq, auth_params: Auth) -> tsi.TableCreateRes:
         return server_impl.table_create(req)
 
-    @router.post("/table/update")
+    @router.post("/table/update", tags=[TABLES_TAG_NAME])
     def table_update(req: tsi.TableUpdateReq, auth_params: Auth) -> tsi.TableUpdateRes:
         return server_impl.table_update(req)
 
-    @router.post("/table/query")
+    @router.post("/table/query", tags=[TABLES_TAG_NAME])
     def table_query(req: tsi.TableQueryReq, auth_params: Auth) -> tsi.TableQueryRes:
         return server_impl.table_query(req)
 
@@ -211,19 +220,19 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
     ) -> StreamingResponse:
         return StreamingResponse(server_impl.table_query_stream(req))
 
-    @router.post("/table/query_stats")
+    @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
         req: tsi.TableQueryStatsReq, auth_params: Auth
     ) -> tsi.TableQueryStatsRes:
         return server_impl.table_query_stats(req)
 
-    @router.post("/refs/read_batch")
+    @router.post("/refs/read_batch", tags=[REFS_TAG_NAME])
     def refs_read_batch(
         req: tsi.RefsReadBatchReq, auth_params: Auth
     ) -> tsi.RefsReadBatchRes:
         return server_impl.refs_read_batch(req)
 
-    @router.post("/file/create")
+    @router.post("/file/create", tags=[FILES_TAG_NAME])
     async def file_create(
         project_id: Annotated[str, Form()], file: UploadFile, auth_params: Auth
     ) -> tsi.FileCreateRes:
@@ -234,48 +243,47 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
             )
         )
 
-    @router.post("/file/content")
+    @router.post("/file/content", tags=[FILES_TAG_NAME])
     def file_content(
         req: tsi.FileContentReadReq, auth_params: Auth
     ) -> StreamingResponse:
         res = server_impl.file_content_read(req)
         return StreamingResponse(iter([res.content]))
 
-    @router.post("/feedback/create")
+    @router.post("/feedback/create", tags=[FEEDBACK_TAG_NAME])
     def feedback_create(
         req: tsi.FeedbackCreateReq, auth_params: Auth
     ) -> tsi.FeedbackCreateRes:
         return server_impl.feedback_create(req)
 
-    @router.post("/feedback/query")
+    @router.post("/feedback/query", tags=[FEEDBACK_TAG_NAME])
     def feedback_query(
         req: tsi.FeedbackQueryReq, auth_params: Auth
     ) -> tsi.FeedbackQueryRes:
         return server_impl.feedback_query(req)
 
-    @router.post("/feedback/purge")
+    @router.post("/feedback/purge", tags=[FEEDBACK_TAG_NAME])
     def feedback_purge(
         req: tsi.FeedbackPurgeReq, auth_params: Auth
     ) -> tsi.FeedbackPurgeRes:
         return server_impl.feedback_purge(req)
 
-    @router.post("/feedback/replace")
+    @router.post("/feedback/replace", tags=[FEEDBACK_TAG_NAME])
     def feedback_replace(
         req: tsi.FeedbackReplaceReq, auth_params: Auth
     ) -> tsi.FeedbackReplaceRes:
         return server_impl.feedback_replace(req)
 
-    @router.post("/actions/execute_batch")
+    @router.post("/actions/execute_batch", tags=[ACTIONS_TAG_NAME])
     def actions_execute_batch(
         req: tsi.ActionsExecuteBatchReq, auth_params: Auth
     ) -> tsi.ActionsExecuteBatchRes:
         return server_impl.actions_execute_batch(req)
 
-    @router.post("/completions/create")
+    @router.post("/completions/create", tags=[COMPLETIONS_TAG_NAME])
     def completions_create(
         req: tsi.CompletionsCreateReq, auth_params: Auth
     ) -> tsi.CompletionsCreateRes:
         return server_impl.completions_create(req)
 
-    app.include_router(router)
-    return app
+    return router

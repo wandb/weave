@@ -1,5 +1,7 @@
+from fastapi import APIRouter, FastAPI
+
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.reference.generate import generate_server
+from weave.trace_server.reference.generate import generate_routes
 
 
 class StubTraceServer(tsi.TraceServerInterface): ...
@@ -10,4 +12,7 @@ class StubTraceServer(tsi.TraceServerInterface): ...
 stub_server = StubTraceServer()  # type: ignore
 
 
-app = generate_server(stub_server)
+app = FastAPI()
+router = APIRouter()
+router = generate_routes(router, stub_server)
+app.include_router(router)
