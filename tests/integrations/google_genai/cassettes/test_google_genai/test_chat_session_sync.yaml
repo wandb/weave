@@ -37,7 +37,7 @@ interactions:
         \"STOP\",\n      \"citationMetadata\": {\n        \"citationSources\": [\n
         \         {\n            \"startIndex\": 300,\n            \"endIndex\": 495,\n
         \           \"uri\": \"https://github.com/Multifaceted/Prog_Class\"\n          }\n
-        \       ]\n      },\n      \"avgLogprobs\": -0.021018162081318518\n    }\n
+        \       ]\n      },\n      \"avgLogprobs\": -0.019617208357780209\n    }\n
         \ ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 51,\n    \"candidatesTokenCount\":
         155,\n    \"totalTokenCount\": 206,\n    \"promptTokensDetails\": [\n      {\n
         \       \"modality\": \"TEXT\",\n        \"tokenCount\": 51\n      }\n    ],\n
@@ -51,11 +51,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Tue, 04 Mar 2025 19:35:38 GMT
+      - Tue, 04 Mar 2025 19:43:47 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=2602
+      - gfet4t7; dur=2471
       Transfer-Encoding:
       - chunked
       Vary:
