@@ -1,8 +1,8 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
 import {TreeView} from './TreeView';
-import {TraceViewProps} from './types';
+import {TraceTreeFlat, TraceViewProps} from './types';
 import {buildCodeMap, CodeMapNode} from './utils';
 import {formatDuration} from './utils';
 
@@ -96,18 +96,13 @@ const RecursionBlock = styled.div`
 
 interface CodeMapNodeProps extends TraceViewProps {
   node: CodeMapNode;
-  selectedOpName?: string;
-  onCallSelect: (callId: string) => void;
-  onOpSelect: (opName: string) => void;
   level?: number;
 }
 
 const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   node,
   selectedCallId,
-  selectedOpName,
   onCallSelect,
-  onOpSelect,
   traceTreeFlat,
   stack,
   level = 0,
@@ -159,7 +154,6 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    onOpSelect(node.opName);
 
     // Select the first call in this operation if we have any calls
     if (node.callIds.length > 0) {
@@ -208,9 +202,7 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
               key={child.opName}
               node={child}
               selectedCallId={selectedCallId}
-              selectedOpName={selectedOpName}
               onCallSelect={onCallSelect}
-              onOpSelect={onOpSelect}
               traceTreeFlat={traceTreeFlat}
               stack={stack}
               level={level + 1}
@@ -225,6 +217,36 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   );
 };
 
+export const locateNodeForCallId = (
+  codeMap: CodeMapNode[],
+  selectedCallId: string
+) => {
+  const findOpByCallId = (nodes: CodeMapNode[]): CodeMapNode | null => {
+    for (const node of nodes) {
+      if (node.callIds.includes(selectedCallId)) {
+        return node;
+      }
+      const found = findOpByCallId(node.children);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  };
+  return findOpByCallId(codeMap);
+};
+
+export const getSortedPeerPathCallIds = (
+  selectedCodeNode: CodeMapNode | null,
+  traceTreeFlat: TraceTreeFlat
+) => {
+  return (selectedCodeNode?.callIds ?? []).sort(
+    (a, b) =>
+      Date.parse(traceTreeFlat[a].call.started_at) -
+      Date.parse(traceTreeFlat[b].call.started_at)
+  );
+};
+
 export const CodeView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
   selectedCallId,
@@ -232,55 +254,19 @@ export const CodeView: React.FC<TraceViewProps> = ({
   stack,
 }) => {
   const codeMap = useMemo(() => buildCodeMap(traceTreeFlat), [traceTreeFlat]);
-  const [selectedOpName, setSelectedOpName] = useState<string>();
 
   // Find the selected operation's calls and update when selectedCallId changes
-  const selectedOp = useMemo(() => {
+  const selectedCodeNode = useMemo(() => {
     // First try to find the op containing the selected call
-    if (selectedCallId) {
-      const findOpByCallId = (nodes: CodeMapNode[]): CodeMapNode | null => {
-        for (const node of nodes) {
-          if (node.callIds.includes(selectedCallId)) {
-            return node;
-          }
-          const found = findOpByCallId(node.children);
-          if (found) {
-            return found;
-          }
-        }
-        return null;
-      };
-      const opWithCall = findOpByCallId(codeMap);
-      if (opWithCall) {
-        return opWithCall;
-      }
-    }
-
-    // Fall back to currently selected op
-    if (!selectedOpName) {
+    if (!selectedCallId) {
       return null;
     }
-    const findOp = (nodes: CodeMapNode[]): CodeMapNode | null => {
-      for (const node of nodes) {
-        if (node.opName === selectedOpName) {
-          return node;
-        }
-        const found = findOp(node.children);
-        if (found) {
-          return found;
-        }
-      }
-      return null;
-    };
-    return findOp(codeMap);
-  }, [codeMap, selectedCallId, selectedOpName]);
+    return locateNodeForCallId(codeMap, selectedCallId);
+  }, [codeMap, selectedCallId]);
 
-  // Update selectedOpName when we find the operation containing selectedCallId
-  useEffect(() => {
-    if (selectedOp && selectedOp.opName !== selectedOpName) {
-      setSelectedOpName(selectedOp.opName);
-    }
-  }, [selectedOp, selectedOpName]);
+  const selectedPeerPathCallIds = useMemo(() => {
+    return getSortedPeerPathCallIds(selectedCodeNode, traceTreeFlat);
+  }, [selectedCodeNode, traceTreeFlat]);
 
   return (
     <Container>
@@ -290,9 +276,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
             key={node.opName}
             node={node}
             selectedCallId={selectedCallId}
-            selectedOpName={selectedOpName}
             onCallSelect={onCallSelect}
-            onOpSelect={setSelectedOpName}
             traceTreeFlat={traceTreeFlat}
             stack={stack}
           />
@@ -300,11 +284,11 @@ export const CodeView: React.FC<TraceViewProps> = ({
       </TreePanel>
 
       <CallPanel>
-        {selectedOp ? (
+        {selectedCodeNode ? (
           <>
             <CallPanelHeader>
-              <span>Calls for {selectedOp.opName}</span>
-              <span>{selectedOp.callIds.length} calls</span>
+              <span>Calls for {selectedCodeNode.opName}</span>
+              <span>{selectedPeerPathCallIds.length} calls</span>
             </CallPanelHeader>
 
             <div className="flex-1 overflow-hidden">
@@ -312,7 +296,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
                 traceTreeFlat={traceTreeFlat}
                 selectedCallId={selectedCallId}
                 onCallSelect={onCallSelect}
-                filterCallIds={selectedOp.callIds}
+                filterCallIds={selectedPeerPathCallIds}
                 stack={stack}
               />
             </div>

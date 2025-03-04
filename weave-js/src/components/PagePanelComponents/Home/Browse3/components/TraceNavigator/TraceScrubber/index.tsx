@@ -2,6 +2,7 @@ import React from 'react';
 
 import {BaseScrubberProps} from './components/BaseScrubber';
 import {
+  CodePathScrubber,
   PeerScrubber,
   SiblingScrubber,
   StackScrubber,
@@ -9,7 +10,12 @@ import {
 } from './components/scrubbers';
 import {Container} from './styles';
 
-export type ScrubberOption = 'timeline' | 'peer' | 'sibling' | 'stack';
+export type ScrubberOption =
+  | 'timeline'
+  | 'peer'
+  | 'sibling'
+  | 'stack'
+  | 'codePath';
 
 const TraceScrubber: React.FC<
   BaseScrubberProps & {
@@ -26,6 +32,7 @@ const TraceScrubber: React.FC<
     <Container>
       {showScrubber('timeline') && <TimelineScrubber {...props} />}
       {showScrubber('peer') && <PeerScrubber {...props} />}
+      {showScrubber('codePath') && <CodePathScrubber {...props} />}
       {showScrubber('sibling') && <SiblingScrubber {...props} />}
       {showScrubber('stack') && <StackScrubber {...props} />}
     </Container>

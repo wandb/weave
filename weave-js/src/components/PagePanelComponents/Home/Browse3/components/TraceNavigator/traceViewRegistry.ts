@@ -38,13 +38,14 @@ export const traceViews: TraceViewRegistry = [
     label: 'Tree',
     icon: 'layout-tabs',
     component: TreeView,
+    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
   {
     id: 'code',
     label: 'Code',
     icon: 'code-alt',
     component: CodeView,
-    allowedScrubbers: ['peer'],
+    allowedScrubbers: ['codePath'],
   },
   {
     id: 'flamegraph',
@@ -52,6 +53,7 @@ export const traceViews: TraceViewRegistry = [
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
     maxTraces: 500,
+    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
   {
     id: 'graph',
@@ -59,5 +61,6 @@ export const traceViews: TraceViewRegistry = [
     icon: 'chart-scatterplot',
     component: GraphView,
     maxTraces: 50,
+    allowedScrubbers: ['timeline', 'peer', 'sibling', 'stack'],
   },
 ];

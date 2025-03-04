@@ -95,24 +95,28 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
         <h2 className="truncate text-sm font-semibold">Trace View</h2>
         <div className="flex items-center gap-3">
           {traceViews.map(view => {
-            const isDisabled = !!(view.maxTraces && traceCount > view.maxTraces);
-            const tooltipContent = isDisabled 
+            const isDisabled = !!(
+              view.maxTraces && traceCount > view.maxTraces
+            );
+            const tooltipContent = isDisabled
               ? `${view.label} view is disabled (maximum ${view.maxTraces} traces)`
               : view.label;
-            
+
             return (
-              <Tooltip key={view.id} content= {tooltipContent} trigger={<Button
-                variant={traceViewId === view.id ? 'primary' : 'ghost'}
-                onClick={() => setTraceViewId(view.id)}
-                icon={view.icon}
-                size="small"
-                className="!p-3"
-                disabled={isDisabled}>
-                <span className="sr-only">{view.label}</span>
-              </Button>}>
-                
-                
-              </Tooltip>
+              <Tooltip
+                key={view.id}
+                content={tooltipContent}
+                trigger={
+                  <Button
+                    variant={traceViewId === view.id ? 'primary' : 'ghost'}
+                    onClick={() => setTraceViewId(view.id)}
+                    icon={view.icon}
+                    size="small"
+                    className="!p-3"
+                    disabled={isDisabled}>
+                    <span className="sr-only">{view.label}</span>
+                  </Button>
+                }></Tooltip>
             );
           })}
         </div>

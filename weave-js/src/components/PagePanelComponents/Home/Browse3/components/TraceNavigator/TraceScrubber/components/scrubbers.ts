@@ -1,3 +1,8 @@
+import {
+  getSortedPeerPathCallIds,
+  locateNodeForCallId,
+} from '../../TraceViews/CodeView';
+import {buildCodeMap} from '../../TraceViews/utils';
 import {createScrubber} from './BaseScrubber';
 
 export const TimelineScrubber = createScrubber({
@@ -31,6 +36,25 @@ export const PeerScrubber = createScrubber({
         (a, b) => Date.parse(a.call.started_at) - Date.parse(b.call.started_at)
       )
       .map(node => node.id);
+  },
+});
+
+export const CodePathScrubber = createScrubber({
+  label: 'Code Path',
+  description:
+    'Navigate through all calls with the same code path as the selected call',
+  getNodes: ({traceTreeFlat, selectedCallId}) => {
+    if (!selectedCallId) {
+      return [];
+    }
+    const currentNode = traceTreeFlat[selectedCallId];
+    if (!currentNode) {
+      return [];
+    }
+
+    const codeMap = buildCodeMap(traceTreeFlat);
+    const codeNode = locateNodeForCallId(codeMap, selectedCallId);
+    return getSortedPeerPathCallIds(codeNode, traceTreeFlat);
   },
 });
 
