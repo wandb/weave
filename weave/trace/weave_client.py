@@ -1994,10 +1994,11 @@ class WeaveClient:
 
         # Add call batch uploads if available
         if self._server_is_flushable:
-            total += self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            total += server.call_processor.num_outstanding_jobs
         return total
 
-    def flush(
+    def finish(
         self,
         use_progress_bar: bool = True,
         callback: Callable[[FlushStatus], None] | None = None,
@@ -2027,6 +2028,11 @@ class WeaveClient:
             self._flush_with_callback(callback=callback)
         else:
             self._flush()
+
+    @deprecated(new_name="finish")
+    def flush(self) -> None:
+        """Renamed 'finish' for clarity."""
+        self.finish()
 
     def _flush_with_callback(
         self,
@@ -2111,13 +2117,19 @@ class WeaveClient:
         callback(final_status)
 
     def _flush(self) -> None:
-        """Used to wait until all currently enqueued jobs are processed."""
+        # Used to wait until all currently enqueued jobs are processed
         if not self.future_executor._in_thread_context.get():
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
         if self._server_is_flushable:
-            self.server.call_processor.stop_accepting_new_work_and_flush_queue()  # type: ignore
+            # We don't want to do an instance check here because it could
+            # be susceptible to shutdown race conditions. So we save a boolean
+            # _server_is_flushable and only call this if we know the server is
+            # flushable. The # type: ignore is safe because we check the type
+            # first.
+            server = cast(RemoteHTTPTraceServer, self.server)
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2135,7 +2147,8 @@ class WeaveClient:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
         if self._server_is_flushable:
-            call_processor_jobs = self.server.call_processor.num_outstanding_jobs  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            call_processor_jobs = server.call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,
