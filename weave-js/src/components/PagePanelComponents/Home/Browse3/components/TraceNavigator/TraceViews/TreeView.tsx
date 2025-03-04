@@ -77,7 +77,8 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   if (
     spanName.includes('model') ||
     spanName.includes('predict') ||
-    spanName.includes('generate')
+    spanName.includes('generate') ||
+    spanName.includes('invoke')
   ) {
     return 'model';
   }
