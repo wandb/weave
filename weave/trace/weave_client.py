@@ -2019,6 +2019,14 @@ class WeaveClient:
             callback: Optional callback function that receives status updates.
                       Overrides use_progress_bar.
         """
+        if self._server_is_flushable:
+            server = cast(RemoteHTTPTraceServer, self.server)
+            if not server.call_processor.is_accepting_new_work():
+                raise ValueError(
+                    "client.finish() called while async processor already stopping. client.finish() "
+                    "may only be called once, at the end of program execution."
+                )
+
         if use_progress_bar and callback is None:
             from weave.trace.client_progress_bar import create_progress_bar_callback
 
