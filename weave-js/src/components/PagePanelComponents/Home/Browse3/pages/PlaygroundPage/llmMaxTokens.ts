@@ -107,6 +107,15 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 100000,
     supports_function_calling: true,
   },
+  'gpt-4.5-preview': {
+    litellm_provider: 'openai',
+    api_key_name: 'OPENAI_API_KEY',
+  },
+  'gpt-4.5-preview-2025-02-27': {
+    provider: 'openai',
+    max_tokens: 16384,
+    supports_function_calling: true,
+  },
 
   // Anthropic models
   'claude-3-7-sonnet-20250219': {
