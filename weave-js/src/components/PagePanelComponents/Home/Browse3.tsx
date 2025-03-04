@@ -617,13 +617,42 @@ const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+
+  const [callId, setCallIdDirect] = useState(params.itemName);
+  useEffect(() => {
+    setCallIdDirect(params.itemName);
+  }, [params.itemName]);
+
+  const setCallId = useCallback(
+    (newCallId: string) => {
+      setCallIdDirect(newCallId);
+
+      // TODO: Handle this navigation more gracefully - ideally
+      // we implement a generalized state management system for
+      // navigating between different views
+      history.push(
+        currentRouter.callUIUrl(
+          params.entity,
+          params.project,
+          '',
+          newCallId,
+          '',
+          true
+        )
+      );
+    },
+    [currentRouter, history, params.entity, params.project]
+  );
 
   return (
     <CallPage
       entity={params.entity}
       project={params.project}
-      callId={params.itemName}
+      callId={callId}
       path={query[PATH_PARAM]}
+      setCallId={setCallId}
     />
   );
 };

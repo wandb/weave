@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import {Loading} from '@wandb/weave/components/Loading';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {
@@ -7,7 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
+  useRef,
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
@@ -17,6 +16,7 @@ import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
 import {
   FEEDBACK_EXPAND_PARAM,
   TRACETREE_PARAM,
@@ -43,7 +43,6 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
-import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
@@ -51,6 +50,7 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
+  setCallId: (callId: string) => void;
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
@@ -60,13 +60,39 @@ export const CallPage: FC<{
     project: props.project,
     callId: props.callId,
   });
+  // TODO: CLean this up!
+  const lastResult = useRef(call.result);
+  useEffect(() => {
+    if (call.result) {
+      lastResult.current = call.result;
+    }
+  }, [call.result]);
 
-  if (call.loading) {
-    return <CenteredAnimatedLoader />;
-  } else if (call.result === null) {
-    return <NotFoundPanel title="Call not found" />;
+  if (!call.loading) {
+    if (call.result === null) {
+      return <NotFoundPanel title="Call not found" />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          call={call.result}
+          setCallById={props.setCallId}
+        />
+      );
+    }
+  } else {
+    if (lastResult.current === null) {
+      return <CenteredAnimatedLoader />;
+    } else {
+      return (
+        <CallPageInnerVertical
+          {...props}
+          call={lastResult.current}
+          setCallById={props.setCallId}
+        />
+      );
+    }
   }
-  return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
 export const useShowRunnableUI = () => {
@@ -206,11 +232,12 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
+  callId: string;
+  setCallById: (callId: string) => void;
   path?: string;
-}> = ({call, path}) => {
+}> = ({call, callId, setCallById: setCallId, path}) => {
   useViewTraceEvent(call);
 
-  const {useCall} = useWFHooks();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
@@ -230,14 +257,14 @@ const CallPageInnerVertical: FC<{
         call.entity,
         call.project,
         call.traceId,
-        call.callId,
+        callId,
         path,
         !showTraceTree,
         showFeedbackExpand ? true : undefined
       )
     );
   }, [
-    call.callId,
+    callId,
     call.entity,
     call.project,
     call.traceId,
@@ -253,45 +280,59 @@ const CallPageInnerVertical: FC<{
         call.entity,
         call.project,
         call.traceId,
-        call.callId,
+        callId,
         path,
         showTraceTree,
         !showFeedbackExpand ? true : undefined
       )
     );
-  }, [currentRouter, history, path, showTraceTree, call, showFeedbackExpand]);
+  }, [
+    history,
+    currentRouter,
+    call.entity,
+    call.project,
+    call.traceId,
+    callId,
+    path,
+    showTraceTree,
+    showFeedbackExpand,
+  ]);
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
   );
 
-  const tree = useCallFlattenedTraceTree(call, path ?? null);
-  const {rows, expandKeys, loading, costLoading, selectedCall} = tree;
-  const callComplete = useCall({
-    entity: selectedCall.entity,
-    project: selectedCall.project,
-    callId: selectedCall.callId,
-  });
-  const callCompleteWithCosts = useMemo(() => {
-    if (callComplete.result?.traceCall == null) {
-      return callComplete.result;
-    }
-    return {
-      ...callComplete.result,
-      traceCall: {
-        ...callComplete.result?.traceCall,
-        summary: {
-          ...callComplete.result?.traceCall?.summary,
-          weave: {
-            ...callComplete.result?.traceCall?.summary?.weave,
-            // Only selectedCall has costs, injected when creating
-            // the trace tree
-            costs: selectedCall.traceCall?.summary?.weave?.costs,
-          },
-        },
-      },
-    };
-  }, [callComplete.result, selectedCall]);
+  // TODO: remove this or understand it
+  // const tree = useCallFlattenedTraceTree(call, path ?? null);
+  // const {loading, selectedCall} = tree;
+  const selectedCall = call;
+  const callComplete = selectedCall;
+  // useCall({
+  //   entity: selectedCall.entity,
+  //   project: selectedCall.project,
+  //   callId: selectedCall.callId,
+  // });
+  const callCompleteWithCosts = callComplete;
+  // useMemo(() => {
+  //   if (callComplete.result?.traceCall == null) {
+  //     return callComplete.result;
+  //   }
+  //   return {
+  //     ...callComplete.result,
+  //     traceCall: {
+  //       ...callComplete.result?.traceCall,
+  //       summary: {
+  //         ...callComplete.result?.traceCall?.summary,
+  //         weave: {
+  //           ...callComplete.result?.traceCall?.summary?.weave,
+  //           // Only selectedCall has costs, injected when creating
+  //           // the trace tree
+  //           costs: selectedCall.traceCall?.summary?.weave?.costs,
+  //         },
+  //       },
+  //     },
+  //   };
+  // }, [callComplete.result, selectedCall]);
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
@@ -313,10 +354,6 @@ const CallPageInnerVertical: FC<{
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(currentCall);
-
-  if (loading && !assumeCallIsSelectedCall) {
-    return <Loading centered />;
-  }
 
   return (
     <SimplePageLayoutWithHeader
@@ -357,7 +394,7 @@ const CallPageInnerVertical: FC<{
             <FeedbackSidebar
               humanAnnotationSpecs={humanAnnotationSpecs}
               specsLoading={specsLoading}
-              callID={currentCall.callId}
+              callID={callId}
               entity={currentCall.entity}
               project={currentCall.project}
             />
@@ -369,18 +406,13 @@ const CallPageInnerVertical: FC<{
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
-            {loading ? (
-              <Loading centered />
-            ) : (
-              <CallTraceView
-                call={call}
-                selectedCall={currentCall}
-                rows={rows}
-                forcedExpandKeys={expandKeys}
-                path={path}
-                costLoading={costLoading}
-              />
-            )}
+            <TraceNavigator
+              entity={currentCall.entity}
+              project={currentCall.project}
+              selectedTraceId={currentCall.traceId}
+              selectedCallId={callId}
+              setSelectedCallId={setCallId}
+            />
           </div>
         </Tailwind>
       }
