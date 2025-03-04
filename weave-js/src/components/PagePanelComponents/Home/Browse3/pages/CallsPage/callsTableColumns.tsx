@@ -245,7 +245,7 @@ function buildCallsTableColumns(
             opName={opName}
             callId={rowParams.row.id}
             fullWidth={true}
-            preservePath={preservePath}
+            preserveDescendentCallId={preservePath}
             color={TEAL_600}
             isEval={isEval}
           />

@@ -1,83 +1,31 @@
 import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import React, {FC, useCallback, useContext, useEffect} from 'react';
-import {useHistory} from 'react-router-dom';
 
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
-import {
-  FEEDBACK_EXPAND_PARAM,
-  TRACETREE_PARAM,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
-import {useURLSearchParamsDict} from '../util';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const PaginationControls: FC<{
   call: CallSchema;
-  path?: string;
-}> = ({call, path}) => {
+  setRootCallId: (callId: string) => void;
+}> = ({call, setRootCallId}) => {
   // Call navigation by arrow keys and buttons
   const {getNextRowId, getPreviousRowId, rowIdInTable} = useContext(
     TableRowSelectionContext
   );
-  const history = useHistory();
-  const currentRouter = useWeaveflowCurrentRouteContext();
-  const query = useURLSearchParamsDict();
-  const showTraceTree =
-    TRACETREE_PARAM in query ? query[TRACETREE_PARAM] === '1' : false;
-  const showFeedbackExpand =
-    FEEDBACK_EXPAND_PARAM in query
-      ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : undefined;
 
   const onNextCall = useCallback(() => {
     const nextCallId = getNextRowId?.(call.callId);
     if (nextCallId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          call.entity,
-          call.project,
-          call.traceId,
-          nextCallId,
-          path,
-          showTraceTree,
-          showFeedbackExpand
-        )
-      );
+      setRootCallId(nextCallId);
     }
-  }, [
-    call,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getNextRowId,
-    showFeedbackExpand,
-  ]);
+  }, [getNextRowId, call.callId, setRootCallId]);
   const onPreviousCall = useCallback(() => {
     const previousRowId = getPreviousRowId?.(call.callId);
     if (previousRowId) {
-      history.replace(
-        currentRouter.callUIUrl(
-          call.entity,
-          call.project,
-          call.traceId,
-          previousRowId,
-          path,
-          showTraceTree,
-          showFeedbackExpand
-        )
-      );
+      setRootCallId(previousRowId);
     }
-  }, [
-    call,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    getPreviousRowId,
-    showFeedbackExpand,
-  ]);
+  }, [getPreviousRowId, call.callId, setRootCallId]);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown' && event.shiftKey) {

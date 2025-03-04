@@ -9,7 +9,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
@@ -17,12 +16,7 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
-import {
-  FEEDBACK_EXPAND_PARAM,
-  TRACETREE_PARAM,
-  useWeaveflowCurrentRouteContext,
-  WeaveflowPeekContext,
-} from '../../context';
+import {WeaveflowPeekContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
@@ -36,7 +30,6 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
@@ -46,20 +39,37 @@ import {CallSummary} from './CallSummary';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
-export const CallPage: FC<{
+type CallPageProps = {
   entity: string;
   project: string;
-  callId: string;
-  setCallId: (callId: string) => void;
-  path?: string;
-}> = props => {
+  rootCallId: string;
+  setRootCallId: (callId: string) => void;
+  descendentCallId?: string;
+  setDescendentCallId: (descendentCallId: string | undefined) => void;
+  hideTracetree?: boolean;
+  setHideTracetree: (hideTracetree: boolean | undefined) => void;
+  showFeedback?: boolean;
+  setShowFeedback: (showFeedback: boolean | undefined) => void;
+};
+
+type CallPageInnerProps = CallPageProps & {
+  descendentCallId: string;
+  setDescendentCallId: (descendentCallId: string) => void;
+  descendentCall: CallSchema;
+};
+
+export const CallPage: FC<CallPageProps> = props => {
   const {useCall} = useWFHooks();
 
-  const call = useCall({
-    entity: props.entity,
-    project: props.project,
-    callId: props.callId,
-  });
+  const descendentCallId = props.descendentCallId ?? props.rootCallId;
+  const call = useCall(
+    {
+      entity: props.entity,
+      project: props.project,
+      callId: descendentCallId,
+    }
+    // , {includeCosts: true}
+  );
   // TODO: CLean this up!
   const lastResult = useRef(call.result);
   useEffect(() => {
@@ -75,8 +85,8 @@ export const CallPage: FC<{
       return (
         <CallPageInnerVertical
           {...props}
-          call={call.result}
-          setCallById={props.setCallId}
+          descendentCallId={descendentCallId}
+          descendentCall={call.result}
         />
       );
     }
@@ -87,8 +97,8 @@ export const CallPage: FC<{
       return (
         <CallPageInnerVertical
           {...props}
-          call={lastResult.current}
-          setCallById={props.setCallId}
+          descendentCallId={descendentCallId}
+          descendentCall={lastResult.current}
         />
       );
     }
@@ -230,73 +240,28 @@ const useCallTabs = (call: CallSchema) => {
   ];
 };
 
-const CallPageInnerVertical: FC<{
-  call: CallSchema;
-  callId: string;
-  setCallById: (callId: string) => void;
-  path?: string;
-}> = ({call, callId, setCallById: setCallId, path}) => {
+const CallPageInnerVertical: FC<CallPageInnerProps> = ({
+  descendentCall: call,
+  descendentCallId: callId,
+  setRootCallId: setCallId,
+  setHideTracetree,
+  setShowFeedback,
+  showFeedback,
+  hideTracetree,
+}) => {
   useViewTraceEvent(call);
 
-  const history = useHistory();
-  const currentRouter = useWeaveflowCurrentRouteContext();
-
-  const query = useURLSearchParamsDict();
   const showTraceTree =
-    TRACETREE_PARAM in query
-      ? query[TRACETREE_PARAM] === '1'
-      : !isEvaluateOp(call.spanName);
-  const showFeedbackExpand =
-    FEEDBACK_EXPAND_PARAM in query
-      ? query[FEEDBACK_EXPAND_PARAM] === '1'
-      : false;
+    hideTracetree != null ? !hideTracetree : !isEvaluateOp(call.spanName);
+  const showFeedbackExpand = showFeedback != null ? showFeedback : false;
 
   const onToggleTraceTree = useCallback(() => {
-    history.replace(
-      currentRouter.callUIUrl(
-        call.entity,
-        call.project,
-        call.traceId,
-        callId,
-        path,
-        !showTraceTree,
-        showFeedbackExpand ? true : undefined
-      )
-    );
-  }, [
-    callId,
-    call.entity,
-    call.project,
-    call.traceId,
-    currentRouter,
-    history,
-    path,
-    showTraceTree,
-    showFeedbackExpand,
-  ]);
+    setHideTracetree(showTraceTree);
+  }, [setHideTracetree, showTraceTree]);
   const onToggleFeedbackExpand = useCallback(() => {
-    history.replace(
-      currentRouter.callUIUrl(
-        call.entity,
-        call.project,
-        call.traceId,
-        callId,
-        path,
-        showTraceTree,
-        !showFeedbackExpand ? true : undefined
-      )
-    );
-  }, [
-    history,
-    currentRouter,
-    call.entity,
-    call.project,
-    call.traceId,
-    callId,
-    path,
-    showTraceTree,
-    showFeedbackExpand,
-  ]);
+    setShowFeedback(!showFeedbackExpand);
+  }, [setShowFeedback, showFeedbackExpand]);
+
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
@@ -313,6 +278,7 @@ const CallPageInnerVertical: FC<{
   //   callId: selectedCall.callId,
   // });
   const callCompleteWithCosts = callComplete;
+  // console.log(callCompleteWithCosts)
   // useMemo(() => {
   //   if (callComplete.result?.traceCall == null) {
   //     return callComplete.result;
@@ -334,15 +300,15 @@ const CallPageInnerVertical: FC<{
   //   };
   // }, [callComplete.result, selectedCall]);
 
-  const assumeCallIsSelectedCall = path == null || path === '';
+  // const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
   const callLoading = call.callId !== callId;
 
-  useEffect(() => {
-    if (assumeCallIsSelectedCall) {
-      setCurrentCall(selectedCall);
-    }
-  }, [assumeCallIsSelectedCall, selectedCall]);
+  // useEffect(() => {
+  //   if (assumeCallIsSelectedCall) {
+  //     setCurrentCall(selectedCall);
+  //   }
+  // }, [assumeCallIsSelectedCall, selectedCall]);
 
   useEffect(() => {
     if (callCompleteWithCosts != null) {
@@ -367,7 +333,7 @@ const CallPageInnerVertical: FC<{
             alignItems: 'center',
           }}>
           {showPaginationControls && (
-            <PaginationControls call={call} path={path} />
+            <PaginationControls call={call} setRootCallId={setCallId} />
           )}
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button

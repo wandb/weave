@@ -38,8 +38,10 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  PATH_PARAM,
+  DESCENDENT_CALL_ID_PARAM,
+  HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
+  SHOW_FEEDBACK_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -613,53 +615,135 @@ const useParamsDecoded = <T extends object>() => {
   }, [params]);
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const CallPageBinding = () => {
-  useCallPeekRedirect();
+const getOptionalBoolean = (
+  dict: Record<string, string>,
+  key: string
+): boolean | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value === '1';
+};
+
+const getOptionalString = (
+  dict: Record<string, string>,
+  key: string
+): string | undefined => {
+  const value = dict[key];
+  if (value == null) {
+    return undefined;
+  }
+  return value;
+};
+
+const useURLBackedCallPageState = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
-
-  const [callId, setCallIdDirect] = useState(params.itemName);
+  const [rootCallId, setRootCallId] = useState(params.itemName);
   useEffect(() => {
-    setCallIdDirect(params.itemName);
+    setRootCallId(params.itemName);
   }, [params.itemName]);
+
+  const [descendentCallId, setDescendentCallId] = useState<string | undefined>(
+    getOptionalString(query, DESCENDENT_CALL_ID_PARAM)
+  );
+  useEffect(() => {
+    setDescendentCallId(getOptionalString(query, DESCENDENT_CALL_ID_PARAM));
+  }, [query]);
+
+  const [showFeedback, setShowFeedback] = useState<boolean | undefined>(
+    getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
+  );
+  useEffect(() => {
+    setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
+  }, [query]);
+
+  const [hideTracetree, setHideTracetree] = useState<boolean | undefined>(
+    getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
+  );
+  useEffect(() => {
+    setHideTracetree(getOptionalBoolean(query, HIDE_TRACETREE_PARAM));
+  }, [query]);
 
   const debouncedHistoryPush = useMemo(() => {
     return debounce((path: string) => {
-      history.push(path);
-    }, 1000);
+      if (history.location.pathname !== path) {
+        history.push(path);
+      }
+    }, 500);
   }, [history]);
 
-  const setCallId = useCallback(
-    (newCallId: string) => {
-      setCallIdDirect(newCallId);
+  useEffect(() => {
+    debouncedHistoryPush(
+      currentRouter.callUIUrl(
+        params.entity,
+        params.project,
+        '',
+        rootCallId,
+        descendentCallId,
+        hideTracetree,
+        showFeedback
+      )
+    );
+    return () => {
+      debouncedHistoryPush.cancel();
+    };
+  }, [
+    currentRouter,
+    debouncedHistoryPush,
+    params.entity,
+    params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTracetree,
+  ]);
 
-      // TODO: Handle this navigation more gracefully - ideally
-      // we implement a generalized state management system for
-      // navigating between different views
-      debouncedHistoryPush(
-        currentRouter.callUIUrl(
-          params.entity,
-          params.project,
-          '',
-          newCallId,
-          '',
-          true
-        )
-      );
-    },
-    [currentRouter, debouncedHistoryPush, params.entity, params.project]
-  );
+  return {
+    entity: params.entity,
+    project: params.project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTracetree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTracetree,
+  };
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
+const CallPageBinding = () => {
+  useCallPeekRedirect();
+  const {
+    entity,
+    project,
+    rootCallId,
+    descendentCallId,
+    showFeedback,
+    hideTracetree,
+    setRootCallId,
+    setDescendentCallId,
+    setShowFeedback,
+    setHideTracetree,
+  } = useURLBackedCallPageState();
 
   return (
     <CallPage
-      entity={params.entity}
-      project={params.project}
-      callId={callId}
-      path={query[PATH_PARAM]}
-      setCallId={setCallId}
+      entity={entity}
+      project={project}
+      rootCallId={rootCallId}
+      setRootCallId={setRootCallId}
+      descendentCallId={descendentCallId}
+      setDescendentCallId={setDescendentCallId}
+      hideTracetree={hideTracetree}
+      setHideTracetree={setHideTracetree}
+      showFeedback={showFeedback}
+      setShowFeedback={setShowFeedback}
     />
   );
 };
