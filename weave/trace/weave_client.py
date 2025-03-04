@@ -2024,7 +2024,8 @@ class WeaveClient:
             if not server.call_processor.is_accepting_new_work():
                 raise ValueError(
                     "client.finish() called while async processor already stopping. client.finish() "
-                    "may only be called once, at the end of program execution."
+                    "may only be called once, at the end of program execution. For repeated flushing, "
+                    "use client.flush() instead."
                 )
 
         if use_progress_bar and callback is None:
@@ -2037,10 +2038,9 @@ class WeaveClient:
         else:
             self._flush()
 
-    @deprecated(new_name="finish")
     def flush(self) -> None:
-        """Renamed 'finish' for clarity."""
-        self.finish()
+        """Flushes background asynchronous tasks, safe to call multiple times."""
+        self._flush()
 
     def _flush_with_callback(
         self,
@@ -2134,10 +2134,12 @@ class WeaveClient:
             # We don't want to do an instance check here because it could
             # be susceptible to shutdown race conditions. So we save a boolean
             # _server_is_flushable and only call this if we know the server is
-            # flushable. The # type: ignore is safe because we check the type
-            # first.
+            # flushable.
             server = cast(RemoteHTTPTraceServer, self.server)
             server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+            # Restart call processor processing thread after flushing
+            server.call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

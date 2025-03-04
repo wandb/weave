@@ -115,6 +115,10 @@ class AsyncBatchProcessor(Generic[T]):
     def accept_new_work(self) -> None:
         """Resumes accepting new work."""
         self.stop_accepting_work_event.clear()
+        # Start a new processing thread
+        self.processing_thread = Thread(target=self._process_batches)
+        self.processing_thread.daemon = True
+        self.processing_thread.start()
 
     def is_accepting_new_work(self) -> bool:
         """Returns True if the processor is accepting new work."""

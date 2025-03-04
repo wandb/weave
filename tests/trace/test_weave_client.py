@@ -1924,3 +1924,28 @@ def test_flush_callback(client):
     # make sure there are no pending jobs
     assert client._get_pending_jobs()["total_jobs"] == 0
     assert client._has_pending_jobs() == False
+
+
+def test_repeated_flushing(client):
+    client.set_autoflush(False)
+
+    @weave.op
+    def op_1():
+        time.sleep(1)
+
+    op_1()
+    client.flush()
+    op_1()
+    op_1()
+    client.flush()
+
+    calls = list(op_1.calls())
+    assert len(calls) == 3
+
+    op_1()
+    client.flush()
+    client.flush()
+    client.flush()
+
+    calls = list(op_1.calls())
+    assert len(calls) == 4
