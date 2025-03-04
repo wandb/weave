@@ -1,6 +1,7 @@
 import {IconName} from '@wandb/weave/components/Icon';
 import {FC} from 'react';
 
+import {ScrubberOption} from './TraceScrubber';
 import {CodeView, FlameGraphView, GraphView, TreeView} from './TraceViews';
 import {TraceViewProps} from './TraceViews/types';
 
@@ -17,7 +18,7 @@ export interface ViewDefinition<T> {
   /** The React component that implements the view */
   component: FC<T>;
   /** Whether to show the scrubber for this view */
-  showScrubber?: boolean;
+  allowedScrubbers?: ScrubberOption[];
 }
 
 /**
@@ -35,27 +36,24 @@ export const traceViews: TraceViewRegistry = [
     label: 'Tree',
     icon: 'layout-tabs',
     component: TreeView,
-    showScrubber: true,
   },
   {
     id: 'code',
     label: 'Code',
     icon: 'code-alt',
     component: CodeView,
-    showScrubber: false,
+    allowedScrubbers: ['peer'],
   },
   {
     id: 'flamegraph',
     label: 'Flame Graph',
     icon: 'chart-horizontal-bars',
     component: FlameGraphView,
-    showScrubber: true,
   },
   {
     id: 'graph',
     label: 'Graph',
     icon: 'chart-scatterplot',
     component: GraphView,
-    showScrubber: true,
   },
 ];

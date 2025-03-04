@@ -9,13 +9,25 @@ import {
 } from './components/scrubbers';
 import {Container} from './styles';
 
-const TraceScrubber: React.FC<BaseScrubberProps> = props => {
+export type ScrubberOption = 'timeline' | 'peer' | 'sibling' | 'stack';
+
+const TraceScrubber: React.FC<
+  BaseScrubberProps & {
+    allowedScrubbers?: ScrubberOption[];
+  }
+> = props => {
+  const showScrubber = (scrubber: ScrubberOption) => {
+    if (!props.allowedScrubbers) {
+      return true;
+    }
+    return props.allowedScrubbers.includes(scrubber);
+  };
   return (
     <Container>
-      <TimelineScrubber {...props} />
-      <PeerScrubber {...props} />
-      <SiblingScrubber {...props} />
-      <StackScrubber {...props} />
+      {showScrubber('timeline') && <TimelineScrubber {...props} />}
+      {showScrubber('peer') && <PeerScrubber {...props} />}
+      {showScrubber('sibling') && <SiblingScrubber {...props} />}
+      {showScrubber('stack') && <StackScrubber {...props} />}
     </Container>
   );
 };

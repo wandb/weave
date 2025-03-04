@@ -108,9 +108,11 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
                 <div className="flex-1 overflow-auto">
                   <TraceViewComponent {...props} />
                 </div>
-                {getTraceView(traceViewId).showScrubber && (
-                  <TraceScrubber {...props} />
-                )}
+
+                <TraceScrubber
+                  {...props}
+                  allowedScrubbers={getTraceView(traceViewId).allowedScrubbers}
+                />
               </div>
             </>
           )}

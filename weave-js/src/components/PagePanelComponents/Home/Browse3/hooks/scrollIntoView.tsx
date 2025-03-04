@@ -16,7 +16,9 @@ export const useScrollIntoView = (
     const doScroll = () => {
       if (mounted && shouldScroll && elementRef.current) {
         elementRef.current.scrollIntoView({
-          behavior: instant ? ('instant' as const) : ('smooth' as const),
+          // not sure why lint is complaining
+          // as behavior is defined as type ScrollBehavior = "auto" | "instant" | "smooth";
+          behavior: instant ? 'instant' : ('smooth' as any),
           block: 'nearest',
         });
       }
