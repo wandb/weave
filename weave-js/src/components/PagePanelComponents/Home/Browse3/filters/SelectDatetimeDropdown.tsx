@@ -6,7 +6,13 @@ import {
 import {Icon} from '@wandb/weave/components/Icon';
 import React, {useEffect, useRef, useState} from 'react';
 
-import {parseDate} from '../../../../../util/date'; // Assuming there's a date parser utility
+import {
+  dateToISOString,
+  formatDate,
+  formatDateOnly,
+  isRelativeDate,
+  parseDate,
+} from '../../../../../util/date';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -47,7 +53,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   // Initialize the parsed date from the initial value
   useEffect(() => {
     if (value) {
-      parseInput(value);
+      const date = parseDate(value);
+      setParsedDate(date);
     }
   }, [value]);
 
@@ -71,7 +78,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setInputValue(newInputValue);
 
     // Parse the input to get a date
-    const date = parseInput(newInputValue);
+    const date = parseDate(newInputValue);
     setParsedDate(date);
 
     // Call the parent onChange handler with the timestamp
@@ -111,7 +118,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     setInputValue(suggestionValue);
 
     // Parse the suggestion to get a date
-    const date = parseInput(suggestionValue);
+    const date = parseDate(suggestionValue);
     setParsedDate(date);
 
     // Call the parent onChange handler with the timestamp
@@ -148,7 +155,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   // Compute a label for the input based on the input text and parse result
   const dateLabel = inputValue.trim()
     ? parsedDate
-      ? isRelativeInput(inputValue)
+      ? isRelativeDate(inputValue)
         ? 'Relative'
         : 'Absolute'
       : 'Unparsable'
@@ -158,7 +165,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const labelColor = !inputValue.trim()
     ? '#000'
     : parsedDate
-    ? isRelativeInput(inputValue)
+    ? isRelativeDate(inputValue)
       ? '#4CAF50' // green for relative
       : '#2196F3' // blue for absolute
     : '#F44336'; // red for unparsable
@@ -258,7 +265,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               }}>
               {/* Dynamic label for relative or absolute */}
               <strong>
-                {isRelativeInput(inputValue) ? 'Relative:' : 'Absolute:'}
+                {isRelativeDate(inputValue) ? 'Relative:' : 'Absolute:'}
               </strong>{' '}
               {formatDate(parsedDate)}
             </li>
@@ -297,101 +304,4 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       )}
     </div>
   );
-};
-
-const isRelativeInput = (value: string) => {
-  // If the input matches a shorthand pattern, treat it as relative
-  if (/^\d+[dwmy]$/i.test(value)) {
-    return true;
-  }
-  const relativeKeywords = [
-    'ago',
-    'last',
-    'yesterday',
-    'today',
-    'tomorrow',
-    'next',
-    'this',
-    'previous',
-    'past',
-    'coming',
-  ];
-  return relativeKeywords.some(keyword =>
-    value.toLowerCase().includes(keyword)
-  );
-};
-
-const parseInput = (value: string): Date | null => {
-  // Updated shorthand regex to support "y" for years
-  const shorthandPattern = /^(\d+)([dwmy])$/i;
-  const match = value.match(shorthandPattern);
-
-  if (match) {
-    const amount = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    const now = new Date();
-    let targetDate: Date | null;
-
-    switch (unit) {
-      case 'd':
-        targetDate = new Date(now.setDate(now.getDate() - amount));
-        break;
-      case 'w':
-        targetDate = new Date(now.setDate(now.getDate() - amount * 7));
-        break;
-      case 'm':
-        targetDate = new Date(now.setMonth(now.getMonth() - amount));
-        break;
-      case 'y':
-        targetDate = new Date(now.setFullYear(now.getFullYear() - amount));
-        break;
-      default:
-        targetDate = null;
-    }
-    return targetDate;
-  } else {
-    try {
-      // Assuming parseDate is a utility function that parses date strings
-      // If it doesn't exist, you might need to implement it or use a library
-      const date = parseDate ? parseDate(value) : new Date(value);
-      const validDate = date && !isNaN(date.getTime()) ? date : null;
-      return validDate;
-    } catch (e) {
-      return null;
-    }
-  }
-};
-
-// Helper to format a date as a localized string (date and time)
-const formatDate = (date: Date | null) => {
-  if (!date) {
-    return '';
-  }
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  };
-  return date.toLocaleString('en-US', options);
-};
-
-// Helper to format a date as just the date (without time)
-const formatDateOnly = (date: Date | null) => {
-  if (!date) {
-    return '';
-  }
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  };
-  return date.toLocaleDateString('en-US', options);
-};
-
-// Convert a date to ISO string or return empty string if null
-const dateToISOString = (date: Date | null): string => {
-  return date ? date.toISOString() : '';
 };
