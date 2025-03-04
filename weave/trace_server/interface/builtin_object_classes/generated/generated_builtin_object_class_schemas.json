@@ -146,9 +146,6 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
-          "enum": [
-            "contains_words"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -164,6 +161,52 @@
         "target_words"
       ],
       "title": "ContainsWordsActionConfig",
+      "type": "object"
+    },
+    "ExampleForTesting": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "primitive": {
+          "title": "Primitive",
+          "type": "integer"
+        },
+        "nested_base_model": {
+          "$ref": "#/$defs/NestedBaseModelForTesting"
+        },
+        "nested_base_object": {
+          "title": "Nested Base Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "primitive",
+        "nested_base_model",
+        "nested_base_object"
+      ],
+      "title": "ExampleForTesting",
       "type": "object"
     },
     "Leaderboard": {
@@ -246,9 +289,6 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
-          "enum": [
-            "llm_judge"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -277,53 +317,7 @@
       "title": "LlmJudgeActionConfig",
       "type": "object"
     },
-    "TestOnlyExample": {
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "primitive": {
-          "title": "Primitive",
-          "type": "integer"
-        },
-        "nested_base_model": {
-          "$ref": "#/$defs/TestOnlyNestedBaseModel"
-        },
-        "nested_base_object": {
-          "title": "Nested Base Object",
-          "type": "string"
-        }
-      },
-      "required": [
-        "primitive",
-        "nested_base_model",
-        "nested_base_object"
-      ],
-      "title": "TestOnlyExample",
-      "type": "object"
-    },
-    "TestOnlyNestedBaseModel": {
+    "NestedBaseModelForTesting": {
       "properties": {
         "a": {
           "title": "A",
@@ -333,10 +327,10 @@
       "required": [
         "a"
       ],
-      "title": "TestOnlyNestedBaseModel",
+      "title": "NestedBaseModelForTesting",
       "type": "object"
     },
-    "TestOnlyNestedBaseObject": {
+    "NestedBaseObjectForTesting": {
       "properties": {
         "name": {
           "anyOf": [
@@ -370,16 +364,16 @@
       "required": [
         "b"
       ],
-      "title": "TestOnlyNestedBaseObject",
+      "title": "NestedBaseObjectForTesting",
       "type": "object"
     }
   },
   "properties": {
-    "TestOnlyExample": {
-      "$ref": "#/$defs/TestOnlyExample"
+    "ExampleForTesting": {
+      "$ref": "#/$defs/ExampleForTesting"
     },
-    "TestOnlyNestedBaseObject": {
-      "$ref": "#/$defs/TestOnlyNestedBaseObject"
+    "NestedBaseObjectForTesting": {
+      "$ref": "#/$defs/NestedBaseObjectForTesting"
     },
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
@@ -392,8 +386,8 @@
     }
   },
   "required": [
-    "TestOnlyExample",
-    "TestOnlyNestedBaseObject",
+    "ExampleForTesting",
+    "NestedBaseObjectForTesting",
     "Leaderboard",
     "ActionSpec",
     "AnnotationSpec"

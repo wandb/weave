@@ -24,6 +24,13 @@ export const AnnotationSpecSchema = z.object({
 });
 export type AnnotationSpec = z.infer<typeof AnnotationSpecSchema>;
 
+export const NestedBaseModelForTestingSchema = z.object({
+  a: z.number(),
+});
+export type NestedBaseModelForTesting = z.infer<
+  typeof NestedBaseModelForTestingSchema
+>;
+
 export const LeaderboardColumnSchema = z.object({
   evaluation_object_ref: z.string(),
   scorer_name: z.string(),
@@ -32,20 +39,13 @@ export const LeaderboardColumnSchema = z.object({
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
 
-export const TestOnlyNestedBaseModelSchema = z.object({
-  a: z.number(),
-});
-export type TestOnlyNestedBaseModel = z.infer<
-  typeof TestOnlyNestedBaseModelSchema
->;
-
-export const TestOnlyNestedBaseObjectSchema = z.object({
+export const NestedBaseObjectForTestingSchema = z.object({
   b: z.number(),
   description: z.union([z.null(), z.string()]).optional(),
   name: z.union([z.null(), z.string()]).optional(),
 });
-export type TestOnlyNestedBaseObject = z.infer<
-  typeof TestOnlyNestedBaseObjectSchema
+export type NestedBaseObjectForTesting = z.infer<
+  typeof NestedBaseObjectForTestingSchema
 >;
 
 export const ActionSpecSchema = z.object({
@@ -55,6 +55,15 @@ export const ActionSpecSchema = z.object({
 });
 export type ActionSpec = z.infer<typeof ActionSpecSchema>;
 
+export const ExampleForTestingSchema = z.object({
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+  nested_base_model: NestedBaseModelForTestingSchema,
+  nested_base_object: z.string(),
+  primitive: z.number(),
+});
+export type ExampleForTesting = z.infer<typeof ExampleForTestingSchema>;
+
 export const LeaderboardSchema = z.object({
   columns: z.array(LeaderboardColumnSchema),
   description: z.union([z.null(), z.string()]).optional(),
@@ -62,21 +71,12 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
-export const TestOnlyExampleSchema = z.object({
-  description: z.union([z.null(), z.string()]).optional(),
-  name: z.union([z.null(), z.string()]).optional(),
-  nested_base_model: TestOnlyNestedBaseModelSchema,
-  nested_base_object: z.string(),
-  primitive: z.number(),
-});
-export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
-
 export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
+  ExampleForTesting: ExampleForTestingSchema,
   Leaderboard: LeaderboardSchema,
-  TestOnlyExample: TestOnlyExampleSchema,
-  TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
+  NestedBaseObjectForTesting: NestedBaseObjectForTestingSchema,
 };
 
 export const GeneratedBuiltinObjectClassesZodSchema = z.object(
