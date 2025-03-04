@@ -101,7 +101,7 @@ def generate_routes(
     def call_read(req: tsi.CallReadReq, auth_params: Auth) -> tsi.CallReadRes:
         return server_impl.call_read(req)
 
-    @router.post("/calls/query", tags=[CALLS_TAG_NAME])
+    @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
     def calls_query(req: tsi.CallsQueryReq, auth_params: Auth) -> tsi.CallsQueryRes:
         return server_impl.calls_query(req)
 
@@ -233,6 +233,7 @@ def generate_routes(
         return server_impl.refs_read_batch(req)
 
     @router.post("/file/create", tags=[FILES_TAG_NAME])
+    @router.post("/files/create", tags=[FILES_TAG_NAME], include_in_schema=False)
     async def file_create(
         project_id: Annotated[str, Form()], file: UploadFile, auth_params: Auth
     ) -> tsi.FileCreateRes:
@@ -244,6 +245,7 @@ def generate_routes(
         )
 
     @router.post("/file/content", tags=[FILES_TAG_NAME])
+    @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
     def file_content(
         req: tsi.FileContentReadReq, auth_params: Auth
     ) -> StreamingResponse:
@@ -274,13 +276,17 @@ def generate_routes(
     ) -> tsi.FeedbackReplaceRes:
         return server_impl.feedback_replace(req)
 
-    @router.post("/actions/execute_batch", tags=[ACTIONS_TAG_NAME])
+    @router.post(
+        "/actions/execute_batch", tags=[ACTIONS_TAG_NAME], include_in_schema=False
+    )
     def actions_execute_batch(
         req: tsi.ActionsExecuteBatchReq, auth_params: Auth
     ) -> tsi.ActionsExecuteBatchRes:
         return server_impl.actions_execute_batch(req)
 
-    @router.post("/completions/create", tags=[COMPLETIONS_TAG_NAME])
+    @router.post(
+        "/completions/create", tags=[COMPLETIONS_TAG_NAME], include_in_schema=False
+    )
     def completions_create(
         req: tsi.CompletionsCreateReq, auth_params: Auth
     ) -> tsi.CompletionsCreateRes:
