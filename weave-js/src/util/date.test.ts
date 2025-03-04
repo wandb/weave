@@ -289,109 +289,114 @@ describe('Date Utility Functions', () => {
       ).toBe(true);
     });
 
-    // X days/weeks/months before/after today
-    expect(
-      areDatesEqual(parseDate('3 days before today'), createDate(2023, 6, 12))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('3 days after today'), createDate(2023, 6, 18))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 week before today'), createDate(2023, 6, 8))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 week after today'), createDate(2023, 6, 22))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 month before today'), createDate(2023, 5, 15))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 month after today'), createDate(2023, 7, 15))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 year before today'), createDate(2022, 6, 15))
-    ).toBe(true);
-    expect(
-      areDatesEqual(parseDate('1 year after today'), createDate(2024, 6, 15))
-    ).toBe(true);
+    test('should handle before/after today and current time formats', () => {
+      // X days/weeks/months before/after today
+      expect(
+        areDatesEqual(parseDate('3 days before today'), createDate(2023, 6, 12))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('3 days after today'), createDate(2023, 6, 18))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('1 week before today'), createDate(2023, 6, 8))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('1 week after today'), createDate(2023, 6, 22))
+      ).toBe(true);
+      expect(
+        areDatesEqual(
+          parseDate('1 month before today'),
+          createDate(2023, 5, 15)
+        )
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('1 month after today'), createDate(2023, 7, 15))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('1 year before today'), createDate(2022, 6, 15))
+      ).toBe(true);
+      expect(
+        areDatesEqual(parseDate('1 year after today'), createDate(2024, 6, 15))
+      ).toBe(true);
 
-    // Current time
-    const now = new Date(2023, 5, 15); // Our mocked current date
-    expect(parseDate('now')?.getFullYear()).toBe(now.getFullYear());
-    expect(parseDate('now')?.getMonth()).toBe(now.getMonth());
-    expect(parseDate('now')?.getDate()).toBe(now.getDate());
-    expect(parseDate('right now')?.getFullYear()).toBe(now.getFullYear());
-    expect(parseDate('current time')?.getFullYear()).toBe(now.getFullYear());
-  });
-});
-
-describe('isRelativeDate', () => {
-  test('should identify relative date inputs', () => {
-    // Shorthand formats
-    expect(isRelativeDate('1d')).toBe(true);
-    expect(isRelativeDate('2w')).toBe(true);
-    expect(isRelativeDate('3m')).toBe(true);
-    expect(isRelativeDate('4y')).toBe(true);
-
-    // Natural language formats
-    expect(isRelativeDate('today')).toBe(true);
-    expect(isRelativeDate('yesterday')).toBe(true);
-    expect(isRelativeDate('tomorrow')).toBe(true);
-    expect(isRelativeDate('last week')).toBe(true);
-    expect(isRelativeDate('next month')).toBe(true);
-    expect(isRelativeDate('this year')).toBe(true);
-    expect(isRelativeDate('3 days ago')).toBe(true);
-    expect(isRelativeDate('in 2 weeks')).toBe(true);
+      // Current time
+      const now = new Date(2023, 5, 15); // Our mocked current date
+      expect(parseDate('now')?.getFullYear()).toBe(now.getFullYear());
+      expect(parseDate('now')?.getMonth()).toBe(now.getMonth());
+      expect(parseDate('now')?.getDate()).toBe(now.getDate());
+      expect(parseDate('right now')?.getFullYear()).toBe(now.getFullYear());
+      expect(parseDate('current time')?.getFullYear()).toBe(now.getFullYear());
+    });
   });
 
-  test('should identify absolute date inputs', () => {
-    expect(isRelativeDate('2023-06-15')).toBe(false);
-    expect(isRelativeDate('06/15/2023')).toBe(false);
-    expect(isRelativeDate('June 15, 2023')).toBe(false);
-    expect(isRelativeDate('Q2 2023')).toBe(false);
-    expect(isRelativeDate('2023 Q2')).toBe(false);
-    expect(isRelativeDate('June 2023')).toBe(false);
-    expect(isRelativeDate('2023 June')).toBe(false);
-  });
-});
+  describe('isRelativeDate', () => {
+    test('should identify relative date inputs', () => {
+      // Shorthand formats
+      expect(isRelativeDate('1d')).toBe(true);
+      expect(isRelativeDate('2w')).toBe(true);
+      expect(isRelativeDate('3m')).toBe(true);
+      expect(isRelativeDate('4y')).toBe(true);
 
-describe('formatDate', () => {
-  test('should format dates correctly', () => {
-    const date = new Date(2023, 5, 15, 12, 30, 45);
-    expect(formatDate(date)).toBe('2023-06-15 12:30:45');
-    expect(formatDate(date, 'YYYY-MM-DD')).toBe('2023-06-15');
-    expect(formatDate(date, 'MM/DD/YYYY')).toBe('06/15/2023');
-    expect(formatDate(date, 'MMMM D, YYYY')).toBe('June 15, 2023');
-  });
+      // Natural language formats
+      expect(isRelativeDate('today')).toBe(true);
+      expect(isRelativeDate('yesterday')).toBe(true);
+      expect(isRelativeDate('tomorrow')).toBe(true);
+      expect(isRelativeDate('last week')).toBe(true);
+      expect(isRelativeDate('next month')).toBe(true);
+      expect(isRelativeDate('this year')).toBe(true);
+      expect(isRelativeDate('3 days ago')).toBe(true);
+      expect(isRelativeDate('in 2 weeks')).toBe(true);
+    });
 
-  test('should handle null or undefined inputs', () => {
-    expect(formatDate(null)).toBe('');
-    expect(formatDate(undefined)).toBe('');
-  });
-});
-
-describe('formatDateOnly', () => {
-  test('should format dates without time', () => {
-    const date = new Date(2023, 5, 15, 12, 30, 45);
-    expect(formatDateOnly(date)).toBe('2023-06-15');
-    expect(formatDateOnly(date, 'MM/DD/YYYY')).toBe('06/15/2023');
-    expect(formatDateOnly(date, 'MMMM D, YYYY')).toBe('June 15, 2023');
+    test('should identify absolute date inputs', () => {
+      expect(isRelativeDate('2023-06-15')).toBe(false);
+      expect(isRelativeDate('06/15/2023')).toBe(false);
+      expect(isRelativeDate('June 15, 2023')).toBe(false);
+      expect(isRelativeDate('Q2 2023')).toBe(false);
+      expect(isRelativeDate('2023 Q2')).toBe(false);
+      expect(isRelativeDate('June 2023')).toBe(false);
+      expect(isRelativeDate('2023 June')).toBe(false);
+    });
   });
 
-  test('should handle null or undefined inputs', () => {
-    expect(formatDateOnly(null)).toBe('');
-    expect(formatDateOnly(undefined)).toBe('');
-  });
-});
+  describe('formatDate', () => {
+    test('should format dates correctly', () => {
+      const date = new Date(2023, 5, 15, 12, 30, 45);
+      expect(formatDate(date)).toBe('2023-06-15 12:30:45');
+      expect(formatDate(date, 'YYYY-MM-DD')).toBe('2023-06-15');
+      expect(formatDate(date, 'MM/DD/YYYY')).toBe('06/15/2023');
+      expect(formatDate(date, 'MMMM D, YYYY')).toBe('June 15, 2023');
+    });
 
-describe('dateToISOString', () => {
-  test('should convert dates to ISO strings', () => {
-    const date = new Date(2023, 5, 15, 12, 30, 45);
-    expect(dateToISOString(date)).toBe(date.toISOString());
+    test('should handle null or undefined inputs', () => {
+      expect(formatDate(null)).toBe('');
+      expect(formatDate(undefined)).toBe('');
+    });
   });
 
-  test('should handle null or undefined inputs', () => {
-    expect(dateToISOString(null)).toBe('');
-    expect(dateToISOString(undefined)).toBe('');
+  describe('formatDateOnly', () => {
+    test('should format dates without time', () => {
+      const date = new Date(2023, 5, 15, 12, 30, 45);
+      expect(formatDateOnly(date)).toBe('2023-06-15');
+      expect(formatDateOnly(date, 'MM/DD/YYYY')).toBe('06/15/2023');
+      expect(formatDateOnly(date, 'MMMM D, YYYY')).toBe('June 15, 2023');
+    });
+
+    test('should handle null or undefined inputs', () => {
+      expect(formatDateOnly(null)).toBe('');
+      expect(formatDateOnly(undefined)).toBe('');
+    });
+  });
+
+  describe('dateToISOString', () => {
+    test('should convert dates to ISO strings', () => {
+      const date = new Date(2023, 5, 15, 12, 30, 45);
+      expect(dateToISOString(date)).toBe(date.toISOString());
+    });
+
+    test('should handle null or undefined inputs', () => {
+      expect(dateToISOString(null)).toBe('');
+      expect(dateToISOString(undefined)).toBe('');
+    });
   });
 });
