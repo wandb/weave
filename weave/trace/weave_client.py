@@ -1970,13 +1970,19 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
-    def flush(self) -> None:
+    def finish(self) -> None:
         """
-        An optional flushing method for the client.
+        A flushing method for the client that can be run ONCE at the end of execution.
+
         Forces all background tasks to be processed, which ensures parallel processing
         during main thread execution. Can improve performance when user code completes
         before data has been uploaded to the server.
         """
+        self._flush()
+
+    @deprecated(new_name="finish")
+    def flush(self) -> None:
+        """Renamed 'finish' for clarity."""
         self._flush()
 
     def _flush(self) -> None:
@@ -1991,7 +1997,8 @@ class WeaveClient:
             # _server_is_flushable and only call this if we know the server is
             # flushable. The # type: ignore is safe because we check the type
             # first.
-            self.server.call_processor.stop_accepting_new_work_and_flush_queue()  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         if self.future_executor_fastlane:
