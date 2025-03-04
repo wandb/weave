@@ -336,6 +336,7 @@ const CallPageInnerVertical: FC<{
 
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
+  const callLoading = call.callId !== callId;
 
   useEffect(() => {
     if (assumeCallIsSelectedCall) {
@@ -417,6 +418,7 @@ const CallPageInnerVertical: FC<{
         </Tailwind>
       }
       tabs={callTabs}
+      dimMainContent={callLoading}
     />
   );
 };

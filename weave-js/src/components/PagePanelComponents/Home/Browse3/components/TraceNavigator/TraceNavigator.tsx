@@ -1,4 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {FC, useEffect, useMemo, useState} from 'react';
 
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
@@ -74,6 +75,7 @@ export const TraceNavigator = ({
 export const TraceNavigatorInner: FC<TraceViewProps> = props => {
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
+  const loading = props.traceTreeFlat[props.selectedCallId ?? ''] == null;
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-32 shrink-0 items-center justify-between border-b border-moon-250 px-8">
@@ -95,7 +97,11 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col">
-          {Object.keys(props.traceTreeFlat).length > 0 && (
+          {loading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <LoadingDots />
+            </div>
+          ) : (
             <>
               <StackBreadcrumb {...props} />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

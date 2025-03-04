@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {debounce} from 'lodash';
 import React, {
   FC,
   useCallback,
@@ -625,6 +626,12 @@ const CallPageBinding = () => {
     setCallIdDirect(params.itemName);
   }, [params.itemName]);
 
+  const debouncedHistoryPush = useMemo(() => {
+    return debounce((path: string) => {
+      history.push(path);
+    }, 1000);
+  }, [history]);
+
   const setCallId = useCallback(
     (newCallId: string) => {
       setCallIdDirect(newCallId);
@@ -632,7 +639,7 @@ const CallPageBinding = () => {
       // TODO: Handle this navigation more gracefully - ideally
       // we implement a generalized state management system for
       // navigating between different views
-      history.push(
+      debouncedHistoryPush(
         currentRouter.callUIUrl(
           params.entity,
           params.project,
@@ -643,7 +650,7 @@ const CallPageBinding = () => {
         )
       );
     },
-    [currentRouter, history, params.entity, params.project]
+    [currentRouter, debouncedHistoryPush, params.entity, params.project]
   );
 
   return (

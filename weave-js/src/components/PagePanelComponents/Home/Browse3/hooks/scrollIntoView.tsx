@@ -16,8 +16,8 @@ export const useScrollIntoView = (
     const doScroll = () => {
       if (mounted && shouldScroll && elementRef.current) {
         elementRef.current.scrollIntoView({
-          behavior: instant ? 'instant' : 'smooth',
-          block: 'center',
+          behavior: instant ? ('instant' as const) : ('smooth' as const),
+          block: 'nearest',
         });
       }
     };
