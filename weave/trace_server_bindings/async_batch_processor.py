@@ -50,6 +50,12 @@ class AsyncBatchProcessor(Generic[T]):
 
         atexit.register(self.stop_accepting_new_work_and_flush_queue)
 
+    @property
+    def num_outstanding_jobs(self) -> int:
+        """Returns the number of items currently in the queue."""
+        with self.lock:
+            return self.queue.qsize()
+
     def enqueue(self, items: list[T]) -> None:
         """
         Enqueues a list of items to be processed.
