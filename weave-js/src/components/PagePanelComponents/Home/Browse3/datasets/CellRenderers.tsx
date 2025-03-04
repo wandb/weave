@@ -60,7 +60,7 @@ export const CellViewingRenderer: React.FC<
   serverValue,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const {setEditedRows, setAddedRows} = useDatasetEditContext();
+  const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isEditable =
@@ -77,6 +77,7 @@ export const CellViewingRenderer: React.FC<
     event.stopPropagation();
     const existingRow = api.getRow(id);
     const updatedRow = {...existingRow};
+
     set(updatedRow, field, serverValue);
     api.updateRows([{id, ...updatedRow}]);
     api.setEditCellValue({id, field, value: serverValue});
@@ -85,6 +86,9 @@ export const CellViewingRenderer: React.FC<
       newMap.set(existingRow.___weave?.index, updatedRow);
       return newMap;
     });
+    if (existingRow.___weave?.index !== undefined) {
+      setFieldEdited(existingRow.___weave.index, field, false);
+    }
   };
 
   const getBackgroundColor = () => {
@@ -107,16 +111,22 @@ export const CellViewingRenderer: React.FC<
       const existingRow = api.getRow(id);
       const updatedRow = {...existingRow, [field]: !value};
       api.updateRows([{id, ...updatedRow}]);
+      const rowToUpdate = {...updatedRow};
+
       if (existingRow.___weave?.isNew) {
         setAddedRows(prev => {
           const newMap = new Map(prev);
-          newMap.set(existingRow.___weave?.id, updatedRow);
+          newMap.set(existingRow.___weave?.id, rowToUpdate);
           return newMap;
         });
       } else {
+        if (!rowToUpdate.___weave.editedFields) {
+          rowToUpdate.___weave.editedFields = new Set<string>();
+        }
+        rowToUpdate.___weave.editedFields.add(field);
         setEditedRows(prev => {
           const newMap = new Map(prev);
-          newMap.set(existingRow.___weave?.index, updatedRow);
+          newMap.set(existingRow.___weave?.index, rowToUpdate);
           return newMap;
         });
       }
@@ -311,9 +321,10 @@ const NumberEditor: React.FC<{
   api: any;
   id: string | number;
   field: string;
-}> = ({value, onClose, api, id, field}) => {
+  serverValue?: any;
+}> = ({value, onClose, api, id, field, serverValue}) => {
   const [inputValue, setInputValue] = useState(value.toString());
-  const {setEditedRows, setAddedRows} = useDatasetEditContext();
+  const {setEditedRows, setAddedRows, setFieldEdited} = useDatasetEditContext();
 
   const handleValueUpdate = (newValue: string) => {
     setInputValue(newValue);
@@ -327,6 +338,8 @@ const NumberEditor: React.FC<{
     if (inputValue !== '') {
       const numValue = Number(inputValue);
       const existingRow = api.getRow(id);
+      const isValueChanged = numValue !== serverValue;
+
       if (existingRow.___weave?.isNew) {
         setAddedRows((prev: Map<string, DatasetRow>) => {
           const newMap = new Map(prev);
@@ -343,6 +356,9 @@ const NumberEditor: React.FC<{
           newMap.set(existingRow.___weave?.index, updatedRow);
           return newMap;
         });
+        if (isValueChanged && existingRow.___weave?.index !== undefined) {
+          setFieldEdited(existingRow.___weave.index, field, isValueChanged);
+        }
       }
     }
     onClose();
@@ -524,13 +540,13 @@ const StringEditor: React.FC<{
 
 export const CellEditingRenderer: React.FC<
   CellEditingRendererProps
-> = params => {
+> = props => {
   const {setEditedRows, setAddedRows} = useDatasetEditContext();
-  const {id, value, field, api, serverValue, preserveFieldOrder} = params;
+  const {id, value, field, api, serverValue, preserveFieldOrder} = props;
 
   // Convert edit params to render params
   const renderParams: GridRenderCellParams = {
-    ...params,
+    ...props,
     value,
   };
 
@@ -557,6 +573,7 @@ export const CellEditingRenderer: React.FC<
         api={api}
         id={id}
         field={field}
+        serverValue={serverValue}
       />
     );
   }
@@ -569,16 +586,38 @@ export const CellEditingRenderer: React.FC<
       onClose={() => {
         const existingRow = api.getRow(id);
         const updatedRow = updateRow(existingRow, value);
+
+        const isValueChanged = value !== serverValue;
+        const rowToUpdate = {...updatedRow};
+
         if (existingRow.___weave?.isNew) {
           setAddedRows(prev => {
             const newMap = new Map(prev);
-            newMap.set(existingRow.___weave?.id, updatedRow);
+            newMap.set(existingRow.___weave?.id, rowToUpdate);
             return newMap;
           });
         } else {
+          if (!rowToUpdate.___weave.editedFields) {
+            rowToUpdate.___weave.editedFields = new Set<string>();
+          }
+
+          if (isValueChanged) {
+            rowToUpdate.___weave.editedFields.add(field);
+          } else {
+            rowToUpdate.___weave.editedFields.delete(field);
+          }
+
           setEditedRows(prev => {
             const newMap = new Map(prev);
-            newMap.set(existingRow.___weave?.index, updatedRow);
+
+            // If we don't have any edited fields and it's not a new row,
+            // don't add it to the editedRows map
+            if (rowToUpdate.___weave.editedFields.size === 0) {
+              newMap.delete(existingRow.___weave?.index);
+            } else {
+              newMap.set(existingRow.___weave?.index, rowToUpdate);
+            }
+
             return newMap;
           });
         }
