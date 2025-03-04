@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import sys
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -1927,9 +1928,13 @@ class WeaveClient:
         return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def _objects(
+        self, filter: ObjectVersionFilter | dict | None = None
+    ) -> list[ObjSchema]:
         if not filter:
             filter = ObjectVersionFilter()
+        elif isinstance(filter, dict):
+            filter = ObjectVersionFilter(**filter)
         else:
             filter = filter.model_copy()
         filter = cast(ObjectVersionFilter, filter)
@@ -1942,6 +1947,86 @@ class WeaveClient:
             )
         )
         return response.objs
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_objects(
+        self,
+        *,
+        filter: ObjectVersionFilter | dict | None = None,
+    ) -> list[ObjectVersionCollection]:
+        """
+        Get objects with versions grouped by object ID.
+
+        This method retrieves objects from the Weave server and groups them by object ID,
+        returning a list of ObjectVersionCollection instances. Each collection contains
+        all versions of a single object.
+
+        Args:
+            filter: Filter to apply to the objects query. Can be used to filter by object IDs,
+                   base object classes, or other criteria.
+
+        Returns:
+            A list of ObjectVersionCollection objects, each containing versions of a single object.
+
+        Examples:
+            ```python
+            # Get all objects
+            objects = client.get_objects()
+
+            # Get objects of a specific class
+            model_objects = client.get_objects(
+                filter=ObjectVersionFilter(base_object_classes=["Model"])
+            )
+
+            # You can also pass a dict for the filter
+            model_objects = client.get_objects(
+                filter={"base_object_classes": ["Model"]}
+            )
+
+            # Get specific objects by ID
+            specific_objects = client.get_objects(
+                filter=ObjectVersionFilter(object_ids=["my_model", "my_dataset"])
+            )
+            ```
+        """
+        all_objects = self._objects(filter)
+
+        grouped_objects = defaultdict(list)
+        for obj in all_objects:
+            grouped_objects[obj.object_id].append(obj)
+
+        return [
+            ObjectVersionCollection(object_id, versions, self)
+            for object_id, versions in grouped_objects.items()
+        ]
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_versions(
+        self,
+        object_id: str,
+    ) -> ObjectVersionCollection:
+        """
+        Get all versions of a specific object by its ID.
+
+        This method retrieves all versions of an object with the given object_id
+        and returns them as an ObjectVersionCollection.
+
+        Args:
+            object_id: The ID of the object to retrieve versions for.
+
+        Returns:
+            An ObjectVersionCollection containing all versions of the specified object.
+            If the object doesn't exist, an empty collection is returned.
+
+        Examples:
+            ```python
+            # Get all versions of a specific object
+            model_versions = client.get_versions("my_model")
+            ```
+
+        """
+        objects = self._objects(ObjectVersionFilter(object_ids=[object_id]))
+        return ObjectVersionCollection(object_id, objects, self)
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
@@ -2119,4 +2204,81 @@ def elide_display_name(name: str) -> str:
     return name
 
 
-__docspec__ = [WeaveClient, Call, CallsIter]
+class ObjectVersionCollection:
+    """A collection of object versions for a single object.
+
+    This class provides lazy access to all versions of a specific object.  You can index
+    into the collection to get the object at a specific version index, and the result
+    will be cached.
+
+    By default, versions are sorted by version_index in ascending order
+    (oldest to newest), unless explicitly sorted differently when created.
+
+    Example:
+        ```python
+        versions = client.get_versions("my_object")
+        version_1 = versions[0]
+        version_25 = versions[24]
+        ```
+    """
+
+    def __init__(self, object_id: str, versions: list[ObjSchema], client: WeaveClient):
+        """Initialize a collection of object versions.
+
+        Args:
+            object_id: The ID of the object
+            versions: List of object versions (obj schemas)
+            client: WeaveClient instance for loading objects
+        """
+        self.object_id = object_id
+        self._raw_versions = sorted(versions, key=lambda v: v.version_index)
+        self._client = client
+        self._weave_objects: dict[int, Any] = {}  # {version: object}
+
+    def __iter__(self) -> Iterator[Any]:
+        for i in range(len(self._raw_versions)):
+            yield self._get_object_at_index(i)
+
+    def __len__(self) -> int:
+        return len(self._raw_versions)
+
+    def __getitem__(self, index: int) -> Any:
+        if index < 0:
+            # Technically it can be, but it will be confusing for most users.
+            raise IndexError(
+                "Negative indexing is not supported for ObjectVersionCollection"
+            )
+        elif index >= len(self._raw_versions):
+            raise IndexError(
+                f"Index {index} out of range for collection with {len(self._raw_versions)} versions"
+            )
+        return self._get_object_at_index(index)
+
+    def __repr__(self) -> str:
+        base_class = self.base_object_class or "Unknown"
+        return f"ObjectVersionCollection(object_id='{self.object_id}', base_class='{base_class}', versions={len(self._raw_versions)})"
+
+    def _get_object_at_index(self, index: int) -> Any:
+        if index not in self._weave_objects:
+            version = self._raw_versions[index]
+            entity, project = version.project_id.split("/", 1)
+
+            ref = ObjectRef(
+                entity=entity,
+                project=project,
+                name=version.object_id,
+                _digest=version.digest,
+            )
+            self._weave_objects[index] = self._client.get(ref)
+
+        return self._weave_objects[index]
+
+    @property
+    def base_object_class(self) -> str | None:
+        """Get the base object class of this object."""
+        if self._raw_versions:
+            return self._raw_versions[0].base_object_class
+        return None
+
+
+__docspec__ = [WeaveClient, Call, CallsIter, ObjectVersionCollection]
