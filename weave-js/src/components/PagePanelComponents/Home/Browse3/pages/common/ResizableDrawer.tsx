@@ -118,7 +118,19 @@ export const ResizableDrawer: React.FC<ResizableDrawerProps> = ({
         }}
         onMouseDown={handleMouseDown}
       />
-      {children}
+      <Box sx={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+        {title && (
+          <Box sx={{borderBottom: '1px solid', borderColor: 'divider'}}>
+            {title}
+          </Box>
+        )}
+        {headerContent && (
+          <Box sx={{borderBottom: '1px solid', borderColor: 'divider'}}>
+            {headerContent}
+          </Box>
+        )}
+        <Box sx={{flex: 1, overflow: 'auto'}}>{children}</Box>
+      </Box>
     </Drawer>
   );
 };
