@@ -6,6 +6,11 @@ from weave.trace_server.interface.builtin_object_classes.base_object_def import 
     BaseObject,
 )
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
+from weave.trace_server.interface.builtin_object_classes.llm_model import (
+    LLMModel,
+    ProviderModel,
+)
+from weave.trace_server.interface.builtin_object_classes.provider import Provider
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyExample,
     TestOnlyNestedBaseObject,
@@ -29,3 +34,6 @@ register_base_object(TestOnlyNestedBaseObject)
 register_base_object(Leaderboard)
 register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)
+register_base_object(Provider)
+register_base_object(LLMModel)
+register_base_object(ProviderModel)
