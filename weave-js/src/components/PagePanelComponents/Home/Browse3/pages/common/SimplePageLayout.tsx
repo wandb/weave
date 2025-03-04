@@ -179,6 +179,7 @@ export const SimplePageLayoutWithHeader: FC<{
   // Right sidebar
   isRightSidebarOpen?: boolean;
   rightSidebarContent?: ReactNode;
+  dimMainContent?: boolean;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -273,6 +274,12 @@ export const SimplePageLayoutWithHeader: FC<{
               maxWidth="50%"
               drawer={props.rightSidebarContent}
               isDrawerOpen={props.isRightSidebarOpen ?? false}
+              style={{
+                opacity: props.dimMainContent ? 0.5 : 1,
+                transition: 'opacity 0.3s ease-in-out',
+                // Disable pointer events
+                pointerEvents: 'none',
+              }}
               main={
                 <SimpleTabView
                   headerContent={props.headerContent}

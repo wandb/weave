@@ -11,6 +11,7 @@ import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {debounce} from 'lodash';
 import React, {
   FC,
   useCallback,
@@ -617,13 +618,48 @@ const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+
+  const [callId, setCallIdDirect] = useState(params.itemName);
+  useEffect(() => {
+    setCallIdDirect(params.itemName);
+  }, [params.itemName]);
+
+  const debouncedHistoryPush = useMemo(() => {
+    return debounce((path: string) => {
+      history.push(path);
+    }, 1000);
+  }, [history]);
+
+  const setCallId = useCallback(
+    (newCallId: string) => {
+      setCallIdDirect(newCallId);
+
+      // TODO: Handle this navigation more gracefully - ideally
+      // we implement a generalized state management system for
+      // navigating between different views
+      debouncedHistoryPush(
+        currentRouter.callUIUrl(
+          params.entity,
+          params.project,
+          '',
+          newCallId,
+          '',
+          true
+        )
+      );
+    },
+    [currentRouter, debouncedHistoryPush, params.entity, params.project]
+  );
 
   return (
     <CallPage
       entity={params.entity}
       project={params.project}
-      callId={params.itemName}
+      callId={callId}
       path={query[PATH_PARAM]}
+      setCallId={setCallId}
     />
   );
 };
