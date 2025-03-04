@@ -22,7 +22,7 @@ type CallStatusInfo = {
   color: TagColorName;
   tooltip: string;
 };
-const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
+export const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
   SUCCESS: {
     icon: 'checkmark-circle',
     label: 'Finished',

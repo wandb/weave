@@ -108,13 +108,12 @@ export const TraceNavigatorInner: FC<TraceViewProps> = props => {
                 content={tooltipContent}
                 trigger={
                   <Button
-                    variant={traceViewId === view.id ? 'primary' : 'ghost'}
+                    variant={ 'ghost'}
+                    active={traceViewId === view.id}
                     onClick={() => setTraceViewId(view.id)}
                     icon={view.icon}
                     size="small"
-                    className="!p-3"
                     disabled={isDisabled}>
-                    <span className="sr-only">{view.label}</span>
                   </Button>
                 }></Tooltip>
             );
