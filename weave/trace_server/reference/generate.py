@@ -69,14 +69,6 @@ def generate_server(server_impl: tsi.TraceServerInterface) -> FastAPI:
     )
     router = APIRouter()
 
-    @router.get("/health")
-    def read_root():
-        return {"status": "ok"}
-
-    @router.get("/server_info")
-    def server_info() -> ServerInfoRes:
-        return ServerInfoRes(min_required_weave_python_version="0.0.1")
-
     @router.post("/call/start")
     def call_start(req: tsi.CallStartReq, auth_params: Auth) -> tsi.CallStartRes:
         return server_impl.call_start(req)
