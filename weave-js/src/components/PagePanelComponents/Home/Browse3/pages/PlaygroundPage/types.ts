@@ -24,6 +24,11 @@ export type PlaygroundState = {
   maxTokensLimit: number;
   model: LLMMaxTokensKey;
   selectedChoiceIndex: number;
+  customModelInfo: {
+    baseUrl: string;
+    model: string;
+    headers: Record<string, string>;
+  } | null;
 };
 
 export type PlaygroundStateKey = keyof PlaygroundState;

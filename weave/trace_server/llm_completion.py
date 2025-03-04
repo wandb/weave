@@ -9,11 +9,16 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
+CUSTOM_PROVIDER_PREFIX = "__weave_custom_provider__/"
+
 
 def lite_llm_completion(
     api_key: str,
     inputs: tsi.CompletionsCreateRequestInputs,
     provider: Optional[str] = None,
+    base_url: Optional[str] = None,
+    extra_headers: Optional[dict[str, str]] = None,
+    return_type: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
     azure_api_base, azure_api_version = None, None
@@ -32,9 +37,43 @@ def lite_llm_completion(
         azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
     import litellm
+    from litellm import LiteLLM
 
+    litellm.set_verbose = True
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
+
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+    import os
+
+    os.environ["LITELLM_LOG"] = "DEBUG"
+
+    # Handle custom provider
+    if provider == "custom" and base_url:
+        try:
+            # Prepare headers
+            headers = extra_headers or {}
+
+            # Make the API call using litellm
+            res = litellm.completion(
+                **inputs.model_dump(exclude_none=True),
+                api_key=api_key,
+                api_base=base_url,
+                extra_headers=headers,
+            )
+
+            # Convert the response based on return_type if needed
+            if return_type and return_type != "openai":
+                # Handle different return types if needed in the future
+                pass
+
+            return tsi.CompletionsCreateRes(response=res.model_dump())
+        except Exception as e:
+            error_message = str(e)
+            error_message = error_message.replace("litellm.", "")
+            return tsi.CompletionsCreateRes(response={"error": error_message})
 
     try:
         res = litellm.completion(
