@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 import weave
 from weave.trace.autopatch import OpSettings
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.serialize import dictify
+from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
