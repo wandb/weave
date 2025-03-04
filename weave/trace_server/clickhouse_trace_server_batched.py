@@ -87,7 +87,6 @@ from weave.trace_server.file_storage import (
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import (
-    CUSTOM_PROVIDER_PREFIX,
     get_custom_provider_info,
     lite_llm_completion,
 )
@@ -1627,25 +1626,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # For custom and standard models, we fetch the fields differently
         #  1. Standard models: All of the information comes from the model_to_provider_info_map
         #  2. Custom models: We fetch the provider object and provider model object
-        if CUSTOM_PROVIDER_PREFIX not in model_name:
+
+        # First we try to see if the model name is a custom model
+        model_info = self._model_to_provider_info_map.get(model_name)
+
+        if model_info:
             # Handle standard model case
             # 1. We get the model info from the map
             # 2. We fetch the API key, with the secret fetcher
             # 3. We set the provider, to the litellm provider
             # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
 
+            secret_name = model_info.get("api_key_name")
+            if not secret_name:
+                raise InvalidRequest(f"No secret name found for model {model_name}")
+
             secret_fetcher = _secret_fetcher_context.get()
             if not secret_fetcher:
                 raise InvalidRequest(
                     f"No secret fetcher found, cannot fetch API key for model {model_name}"
                 )
-            model_info = self._model_to_provider_info_map.get(model_name)
-            if not model_info:
-                raise InvalidRequest(f"No model info found for model {model_name}")
-
-            secret_name = model_info.get("api_key_name")
-            if not secret_name:
-                raise InvalidRequest(f"No secret name found for model {model_name}")
 
             api_key = (
                 secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
@@ -1660,19 +1660,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
 
         else:
+            # If we don't have model info, we assume it is a custom model
             # Handle custom provider case
             # We fetch the provider object and provider model object
-            (
-                base_url,
-                api_key,
-                extra_headers,
-                return_type,
-                actual_model_name,
-            ) = get_custom_provider_info(
-                project_id=req.project_id,
-                model_name=model_name,
-                obj_read_func=self.obj_read,
-            )
+            try:
+                (
+                    base_url,
+                    api_key,
+                    extra_headers,
+                    return_type,
+                    actual_model_name,
+                ) = get_custom_provider_info(
+                    project_id=req.project_id,
+                    model_name=model_name,
+                    obj_read_func=self.obj_read,
+                )
+            except Exception as e:
+                return tsi.CompletionsCreateRes(response={"error": str(e)})
 
             # Always use "custom" as the provider for litellm
             provider = "custom"

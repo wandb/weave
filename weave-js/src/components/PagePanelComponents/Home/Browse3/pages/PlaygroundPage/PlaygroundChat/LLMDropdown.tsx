@@ -24,8 +24,6 @@ interface LLMDropdownProps {
   project: string;
 }
 
-const CUSTOM_PROVIDER_PREFIX = '__weave_custom_provider__/';
-
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   value,
   onChange,
@@ -110,18 +108,12 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
       const customLLMs = [
         ...currentProviderModels.map(model => ({
           label: shortenedProviderLabel + '/' + model.val.name,
-          value: (CUSTOM_PROVIDER_PREFIX +
-            provider.val.name +
-            '/' +
-            model.val.name) as LLMMaxTokensKey,
+          value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
           max_tokens: model.val.max_tokens,
         })),
         ...currentLLMModels.map(model => ({
           label: shortenedProviderLabel + '/' + model.val.name,
-          value: (CUSTOM_PROVIDER_PREFIX +
-            provider.val.name +
-            '/' +
-            model.val.name) as LLMMaxTokensKey,
+          value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
           max_tokens: model.val.max_tokens,
         })),
       ];

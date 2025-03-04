@@ -53,7 +53,7 @@ export const ProviderSchema = z.object({
   base_url: z.string(),
   description: z.union([z.null(), z.string()]).optional(),
   extra_headers: z.record(z.string(), z.string()).optional(),
-  name: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
   return_type: ReturnTypeSchema.optional(),
 });
 export type Provider = z.infer<typeof ProviderSchema>;
@@ -62,7 +62,7 @@ export const ProviderModelSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
   max_tokens: z.number(),
   mode: ModelModeSchema.optional(),
-  name: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
   provider: z.string(),
 });
 export type ProviderModel = z.infer<typeof ProviderModelSchema>;
@@ -100,7 +100,7 @@ export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 export const LlmModelSchema = z.object({
   default_params: ModelParamsSchema.optional(),
   description: z.union([z.null(), z.string()]).optional(),
-  name: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
   prompt: z.union([z.null(), z.string()]).optional(),
   provider_model: z.string(),
 });

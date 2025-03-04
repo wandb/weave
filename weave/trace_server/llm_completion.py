@@ -11,8 +11,6 @@ from weave.trace_server.secret_fetcher_context import (
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
-CUSTOM_PROVIDER_PREFIX = "__weave_custom_provider__/"
-
 
 def lite_llm_completion(
     api_key: str,
@@ -168,7 +166,7 @@ def get_custom_provider_info(
 
     Args:
         project_id: The project ID
-        model_name: The model name (format: __weave_custom_provider__/<provider_id>/<provider_model_id>)
+        model_name: The model name (format: <provider_id>/<provider_model_id>)
         obj_read_func: Function to read objects from the database
         secret_fetcher: Secret fetcher to get API keys
 
@@ -187,13 +185,13 @@ def get_custom_provider_info(
         )
 
     # Parse the model name to extract provider_id and provider_model_id
-    # Format: __weave_custom_provider__/<provider_id>/<provider_model_id>
+    # Format: <provider_id>/<provider_model_id>
     parts = model_name.split("/")
-    if len(parts) < 3:
+    if len(parts) < 2:
         raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
 
-    provider_id = parts[1]
-    provider_model_id = parts[2]
+    provider_id = parts[0]
+    provider_model_id = parts[1]
 
     # Default values
     base_url = None
@@ -224,6 +222,10 @@ def get_custom_provider_info(
         extra_headers = provider_obj.val.get("extra_headers", {})
         return_type = provider_obj.val.get("return_type", "openai")
 
+    except Exception as e:
+        raise InvalidRequest(f"Failed to fetch provider information: {str(e)}")
+
+    try:
         # Fetch the provider model object
         # Provider models have the format: <provider_id>-<provider_model>
         provider_model_obj_req = tsi.ObjReadReq(
@@ -244,7 +246,7 @@ def get_custom_provider_info(
         actual_model_name = provider_model_obj.val.get("name")
 
     except Exception as e:
-        raise InvalidRequest(f"Failed to fetch provider or model information: {str(e)}")
+        raise InvalidRequest(f"Failed to fetch provider_model information: {str(e)}")
 
     # Get the API key
     if not secret_name:

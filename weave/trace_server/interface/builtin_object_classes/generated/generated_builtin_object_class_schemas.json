@@ -166,8 +166,16 @@
     "LLMModel": {
       "properties": {
         "name": {
-          "title": "Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         },
         "description": {
           "anyOf": [
@@ -210,7 +218,6 @@
         }
       },
       "required": [
-        "name",
         "provider_model"
       ],
       "title": "LLMModel",
@@ -419,8 +426,16 @@
     "Provider": {
       "properties": {
         "name": {
-          "title": "Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         },
         "description": {
           "anyOf": [
@@ -456,7 +471,6 @@
         }
       },
       "required": [
-        "name",
         "base_url",
         "api_key_name"
       ],
@@ -466,8 +480,16 @@
     "ProviderModel": {
       "properties": {
         "name": {
-          "title": "Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         },
         "description": {
           "anyOf": [
@@ -495,7 +517,6 @@
         }
       },
       "required": [
-        "name",
         "provider",
         "max_tokens"
       ],
