@@ -1,10 +1,10 @@
-import {Icon} from '@wandb/weave/components/Icon';
 import React, {useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
+import {TreeView} from './TreeView';
 import {TraceViewProps} from './types';
 import {buildCodeMap, CodeMapNode} from './utils';
-import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
+import {formatDuration} from './utils';
 
 const Container = styled.div`
   height: 100%;
@@ -299,40 +299,16 @@ export const CodeView: React.FC<TraceViewProps> = ({
               <span>Calls for {selectedOp.opName}</span>
               <span>{selectedOp.callIds.length} calls</span>
             </CallPanelHeader>
-            <CallList>
-              {selectedOp.callIds.map(callId => {
-                const call = traceTreeFlat[callId].call;
-                const duration = call.ended_at
-                  ? Date.parse(call.ended_at) - Date.parse(call.started_at)
-                  : Date.now() - Date.parse(call.started_at);
 
-                return (
-                  <CallItem
-                    key={callId}
-                    $isSelected={callId === selectedCallId}
-                    onClick={() => onCallSelect(callId)}>
-                    <CallInfo>
-                      <CallName>
-                        <div className="truncate text-xs font-medium">
-                          {getCallDisplayName(call)}
-                        </div>
-                        <div className="truncate text-[11px] text-moon-500">
-                          {formatTimestamp(call.started_at)}
-                        </div>
-                      </CallName>
-                      <div className="flex items-center gap-2 whitespace-nowrap text-xs">
-                        <span className="font-medium">
-                          {formatDuration(duration)}
-                        </span>
-                        {call.exception && (
-                          <Icon name="warning" className="text-red-500" />
-                        )}
-                      </div>
-                    </CallInfo>
-                  </CallItem>
-                );
-              })}
-            </CallList>
+            <div className="flex-1 overflow-hidden">
+              <TreeView
+                traceTreeFlat={traceTreeFlat}
+                selectedCallId={selectedCallId}
+                onCallSelect={onCallSelect}
+                filterCallIds={selectedOp.callIds}
+                stack={stack}
+              />
+            </div>
           </>
         ) : (
           <div className="flex h-full items-center justify-center text-moon-500">
