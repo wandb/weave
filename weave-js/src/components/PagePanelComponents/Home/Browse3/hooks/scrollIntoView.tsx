@@ -9,16 +9,16 @@ import React from 'react';
 export const useScrollIntoView = (
   elementRef: React.RefObject<HTMLElement>,
   shouldScroll: boolean,
-  options: ScrollIntoViewOptions = {
-    behavior: 'smooth',
-    block: 'center',
-  }
+  instant: boolean = false
 ) => {
   React.useEffect(() => {
     let mounted = true;
     const doScroll = () => {
       if (mounted && shouldScroll && elementRef.current) {
-        elementRef.current.scrollIntoView(options);
+        elementRef.current.scrollIntoView({
+          behavior: instant ? 'instant' : 'smooth',
+          block: 'center',
+        });
       }
     };
 
@@ -27,5 +27,5 @@ export const useScrollIntoView = (
       mounted = false;
       clearTimeout(timeout);
     };
-  }, [elementRef, shouldScroll, options]);
+  }, [elementRef, shouldScroll, instant]);
 };

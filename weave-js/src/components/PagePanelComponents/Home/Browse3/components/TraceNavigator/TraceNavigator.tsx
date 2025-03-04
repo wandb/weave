@@ -1,11 +1,11 @@
 import {Button} from '@wandb/weave/components/Button';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {FC, useEffect, useMemo, useState} from 'react';
 
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
 import TraceScrubber from './TraceScrubber';
 import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
 import {getTraceView, traceViews} from './traceViewRegistry';
-import {StackState, TraceTreeFlat} from './TraceViews/types';
+import {StackState, TraceTreeFlat, TraceViewProps} from './TraceViews/types';
 import {buildTraceTreeFlat} from './TraceViews/utils';
 
 export const TraceNavigator = ({
@@ -68,6 +68,10 @@ export const TraceNavigator = ({
     [traceTreeFlat, selectedCallId, setSelectedCallId, stack]
   );
 
+  return <TraceNavigatorInner {...childProps} />;
+};
+
+export const TraceNavigatorInner: FC<TraceViewProps> = props => {
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
   return (
@@ -91,15 +95,15 @@ export const TraceNavigator = ({
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col">
-          {Object.keys(traceTreeFlat).length > 0 && (
+          {Object.keys(props.traceTreeFlat).length > 0 && (
             <>
-              <StackBreadcrumb {...childProps} />
+              <StackBreadcrumb {...props} />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex-1 overflow-auto">
-                  <TraceViewComponent {...childProps} />
+                  <TraceViewComponent {...props} />
                 </div>
                 {getTraceView(traceViewId).showScrubber && (
-                  <TraceScrubber {...childProps} />
+                  <TraceScrubber {...props} />
                 )}
               </div>
             </>
@@ -118,7 +122,6 @@ const useStackForCallId = (
 
   const buildStackForCall = React.useCallback(
     (callId: string) => {
-      console.log('buildStackForCall', callId, traceTreeFlat);
       if (!callId || Object.keys(traceTreeFlat).length === 0) {
         return [];
       }
