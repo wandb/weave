@@ -1,7 +1,7 @@
 import React from 'react';
 
-import {useScrollIntoView} from '../../../hooks';
-import {getCallDisplayName} from '../../TraceViews/utils';
+import {useScrollIntoView} from '../../../../hooks';
+import {getCallDisplayName} from '../../utils';
 import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,

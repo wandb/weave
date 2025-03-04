@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import {Icon} from '../../../../../../../Icon';
 import {TraceViewProps} from '../../types';
 import {buildCodeMap, CodeMapNode} from '../../utils';
-import {useStackContext} from '../TraceScrubber/context';
+import {useStackContext} from './TraceScrubber/context';
 import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
 
 const Container = styled.div`

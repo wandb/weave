@@ -289,7 +289,17 @@ const CallPageInnerVertical: FC<{
         !showFeedbackExpand ? true : undefined
       )
     );
-  }, [history, currentRouter, call.entity, call.project, call.traceId, callId, path, showTraceTree, showFeedbackExpand]);
+  }, [
+    history,
+    currentRouter,
+    call.entity,
+    call.project,
+    call.traceId,
+    callId,
+    path,
+    showTraceTree,
+    showFeedbackExpand,
+  ]);
   const {humanAnnotationSpecs, specsLoading} = useHumanAnnotationSpecs(
     call.entity,
     call.project
@@ -298,13 +308,13 @@ const CallPageInnerVertical: FC<{
   // const tree = useCallFlattenedTraceTree(call, path ?? null);
   // const {loading, selectedCall} = tree;
   const selectedCall = call;
-  const callComplete = selectedCall
+  const callComplete = selectedCall;
   // useCall({
   //   entity: selectedCall.entity,
   //   project: selectedCall.project,
   //   callId: selectedCall.callId,
   // });
-  const callCompleteWithCosts = callComplete
+  const callCompleteWithCosts = callComplete;
   // useMemo(() => {
   //   if (callComplete.result?.traceCall == null) {
   //     return callComplete.result;

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {TraceTreeFlat} from '../../types';
+import {TraceTreeFlat} from '../../../types';
 import {StackContextType, StackState} from './types';
 
 export const StackContext = React.createContext<StackContextType | null>(null);

@@ -1,9 +1,9 @@
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {TraceScrubber} from './components/TraceScrubber';
-import {StackBreadcrumb} from './components/TraceScrubber/components/StackBreadcrumb';
-import {StackContextProvider} from './components/TraceScrubber/context';
+import {TraceScrubber} from './components/TraceViews/TraceScrubber';
+import {StackBreadcrumb} from './components/TraceViews/TraceScrubber/components/StackBreadcrumb';
+import {StackContextProvider} from './components/TraceViews/TraceScrubber/context';
 import {useBareTraceCalls} from './hooks';
 import {buildTraceTreeFlat} from './utils';
 import {getTraceView, traceViews} from './viewRegistry';
