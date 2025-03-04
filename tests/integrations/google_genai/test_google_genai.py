@@ -2,6 +2,8 @@ import asyncio
 import os
 
 import pytest
+from google import genai
+from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -19,8 +21,6 @@ class Recipe(BaseModel):
 )
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_sync(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content(
         model="gemini-2.0-flash",
@@ -50,8 +50,6 @@ def test_content_generation_sync(client):
 )
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = await google_client.aio.models.generate_content(
         model="gemini-2.0-flash",
@@ -78,8 +76,6 @@ async def test_content_generation_async(client):
 )
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_sync_stream(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_content_stream(
         model="gemini-2.0-flash",
@@ -116,8 +112,6 @@ def test_content_generation_sync_stream(client):
 )
 @pytest.mark.skip_clickhouse_client
 async def test_content_generation_async_stream(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response_text = ""
     try:
@@ -152,8 +146,6 @@ async def test_content_generation_async_stream(client):
 )
 @pytest.mark.skip_clickhouse_client
 def test_chat_session_sync(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     system_instruction = """
 You are an expert software developer and a helpful coding assistant.
@@ -192,8 +184,6 @@ You are able to generate high-quality code in the Python programming language.""
 )
 @pytest.mark.skip_clickhouse_client
 async def test_chat_session_async(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = await google_client.aio.chats.create(
         model="gemini-2.0-flash",
@@ -227,8 +217,6 @@ You are able to generate high-quality code in the Python programming language.""
 )
 @pytest.mark.skip_clickhouse_client
 def test_function_calling(client):
-    from google import genai
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     get_destination = genai.types.FunctionDeclaration(
         name="get_destination",
@@ -284,9 +272,6 @@ def test_function_calling(client):
 )
 @pytest.mark.skip_clickhouse_client
 def test_image_generation_sync(client):
-    from google import genai
-    from google.genai.types import GenerateImagesConfig
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
         model="imagen-3.0-generate-002",
@@ -309,9 +294,6 @@ def test_image_generation_sync(client):
 )
 @pytest.mark.skip_clickhouse_client
 def test_image_generation_async(client):
-    from google import genai
-    from google.genai.types import GenerateImagesConfig
-
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = asyncio.run(
         google_client.aio.models.generate_images(
