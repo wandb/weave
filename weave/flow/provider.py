@@ -1,8 +1,9 @@
 from enum import Enum
 from typing import Any, Optional, TypedDict, Union
-from typing_extensions import Self
+
 from pydantic import Field
 from rich.table import Table
+from typing_extensions import Self
 
 from weave.flow.obj import Object
 from weave.trace.api import publish as weave_publish

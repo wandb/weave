@@ -1,11 +1,13 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
 )
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.secret_fetcher_context import (
+    _secret_fetcher_context,
+)
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
@@ -37,18 +39,9 @@ def lite_llm_completion(
         azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
     import litellm
-    from litellm import LiteLLM
 
-    litellm.set_verbose = True
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
-
-    import logging
-
-    logging.basicConfig(level=logging.DEBUG)
-    import os
-
-    os.environ["LITELLM_LOG"] = "DEBUG"
 
     # Handle custom provider
     if provider == "custom" and base_url:
@@ -163,3 +156,106 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
         )
 
     return azure_api_base, azure_api_version
+
+
+def get_custom_provider_info(
+    project_id: str,
+    model_name: str,
+    obj_read_func: Callable,
+) -> tuple[str, str, dict[str, str], str, str]:
+    """
+    Extract provider information from a custom provider model.
+
+    Args:
+        project_id: The project ID
+        model_name: The model name (format: __weave_custom_provider__/<provider_id>/<provider_model_id>)
+        obj_read_func: Function to read objects from the database
+        secret_fetcher: Secret fetcher to get API keys
+
+    Returns:
+        Tuple containing:
+        - base_url: The base URL for the provider
+        - api_key: The API key for the provider
+        - extra_headers: Extra headers to send with the request
+        - return_type: The return type for the provider
+        - actual_model_name: The actual model name to use for the API call
+    """
+    secret_fetcher = _secret_fetcher_context.get()
+    if not secret_fetcher:
+        raise InvalidRequest(
+            f"No secret fetcher found, cannot fetch API key for model {model_name}"
+        )
+
+    # Parse the model name to extract provider_id and provider_model_id
+    # Format: __weave_custom_provider__/<provider_id>/<provider_model_id>
+    parts = model_name.split("/")
+    if len(parts) < 3:
+        raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
+
+    provider_id = parts[1]
+    provider_model_id = parts[2]
+
+    # Default values
+    base_url = None
+    secret_name = None
+    extra_headers = {}
+    return_type = "openai"
+    actual_model_name = model_name
+
+    try:
+        # Fetch the provider object
+        provider_obj_req = tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=provider_id,
+            digest="latest",
+            metadata_only=False,
+        )
+        provider_obj_res = obj_read_func(provider_obj_req)
+        provider_obj = provider_obj_res.obj
+
+        if provider_obj.base_object_class != "Provider":
+            raise InvalidRequest(
+                f"Object {provider_id} is not a Provider, it is a {provider_obj.base_object_class}"
+            )
+
+        # Extract provider information
+        base_url = provider_obj.val.get("base_url")
+        secret_name = provider_obj.val.get("api_key_name")
+        extra_headers = provider_obj.val.get("extra_headers", {})
+        return_type = provider_obj.val.get("return_type", "openai")
+
+        # Fetch the provider model object
+        # Provider models have the format: <provider_id>-<provider_model>
+        provider_model_obj_req = tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=f"{provider_id}-{provider_model_id}",
+            digest="latest",
+            metadata_only=False,
+        )
+        provider_model_obj_res = obj_read_func(provider_model_obj_req)
+        provider_model_obj = provider_model_obj_res.obj
+
+        if provider_model_obj.base_object_class != "ProviderModel":
+            raise InvalidRequest(
+                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj.base_object_class}"
+            )
+
+        # Use the provider model's name as the actual model name for the API call
+        actual_model_name = provider_model_obj.val.get("name")
+
+    except Exception as e:
+        raise InvalidRequest(f"Failed to fetch provider or model information: {str(e)}")
+
+    # Get the API key
+    if not secret_name:
+        raise InvalidRequest(f"No secret name found for provider {provider_id}")
+
+    api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+
+    if not api_key:
+        raise MissingLLMApiKeyError(
+            f"No API key {secret_name} found for provider {provider_id}",
+            api_key_name=secret_name,
+        )
+
+    return base_url, api_key, extra_headers, return_type, actual_model_name

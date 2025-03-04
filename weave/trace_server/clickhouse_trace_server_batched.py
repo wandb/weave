@@ -87,8 +87,9 @@ from weave.trace_server.file_storage import (
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import (
-    lite_llm_completion,
     CUSTOM_PROVIDER_PREFIX,
+    get_custom_provider_info,
+    lite_llm_completion,
 )
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
@@ -1613,105 +1614,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # Required fields
         model_name = req.inputs.model
         api_key = None
         provider = None
-        secret_name = None
-        base_url = None
-        extra_headers = {}
-        return_type = None
 
-        # Handle custom provider case
-        if CUSTOM_PROVIDER_PREFIX in model_name:
-            # Parse the model name to extract provider_id and provider_model_id
-            # Format: __weave_custom_provider__/<provider_id>/<provider_model_id>
-            parts = model_name.split("/")
-            if len(parts) < 3:
-                raise InvalidRequest(
-                    f"Invalid custom provider model format: {model_name}"
-                )
+        # Custom model fields
+        base_url: Optional[str] = None
+        extra_headers: dict[str, str] = {}
+        return_type: Optional[str] = None
 
-            provider_id = parts[1]
-            provider_model_id = parts[2]
+        # For custom and standard models, we fetch the fields differently
+        #  1. Standard models: All of the information comes from the model_to_provider_info_map
+        #  2. Custom models: We fetch the provider object and provider model object
+        if CUSTOM_PROVIDER_PREFIX not in model_name:
+            # Handle standard model case
+            # 1. We get the model info from the map
+            # 2. We fetch the API key, with the secret fetcher
+            # 3. We set the provider, to the litellm provider
+            # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
 
-            # Fetch the provider object
-            try:
-                provider_obj_req = tsi.ObjReadReq(
-                    project_id=req.project_id,
-                    object_id=provider_id,
-                    digest="latest",
-                    metadata_only=False,
-                )
-                provider_obj_res = self.obj_read(provider_obj_req)
-                provider_obj = provider_obj_res.obj
-
-                if provider_obj.base_object_class != "Provider":
-                    raise InvalidRequest(
-                        f"Object {provider_id} is not a Provider, it is a {provider_obj.base_object_class}"
-                    )
-
-                # Extract provider information
-                base_url = provider_obj.val.get("base_url")
-                secret_name = provider_obj.val.get("api_key_name")
-                extra_headers = provider_obj.val.get("extra_headers", {})
-                return_type = provider_obj.val.get("return_type", "openai")
-
-                # Fetch the provider model object
-                provider_model_obj_req = tsi.ObjReadReq(
-                    project_id=req.project_id,
-                    object_id=f"{provider_id}-{provider_model_id}",
-                    digest="latest",
-                    metadata_only=False,
-                )
-                provider_model_obj_res = self.obj_read(provider_model_obj_req)
-                provider_model_obj = provider_model_obj_res.obj
-
-                if provider_model_obj.base_object_class != "ProviderModel":
-                    raise InvalidRequest(
-                        f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj.base_object_class}"
-                    )
-
-                # Use the provider model's name as the actual model name for the API call
-                req.inputs.model = provider_model_obj.val.get("name")
-
-            except Exception as e:
-                raise InvalidRequest(
-                    f"Failed to fetch provider or model information: {str(e)}"
-                )
-
-            # Get the API key
             secret_fetcher = _secret_fetcher_context.get()
             if not secret_fetcher:
                 raise InvalidRequest(
                     f"No secret fetcher found, cannot fetch API key for model {model_name}"
                 )
-
-            if not secret_name:
-                raise InvalidRequest(f"No secret name found for provider {provider_id}")
-
-            api_key = (
-                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-            )
-
-            if not api_key:
-                raise MissingLLMApiKeyError(
-                    f"No API key {secret_name} found for provider {provider_id}",
-                    api_key_name=secret_name,
-                )
-
-            provider = "custom"  # Use "custom" as the provider for litellm
-
-        else:
-            # Handle standard model case
             model_info = self._model_to_provider_info_map.get(model_name)
             if not model_info:
                 raise InvalidRequest(f"No model info found for model {model_name}")
-
-            secret_fetcher = _secret_fetcher_context.get()
-            if not secret_fetcher:
-                raise InvalidRequest(
-                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
-                )
 
             secret_name = model_info.get("api_key_name")
             if not secret_name:
@@ -1722,12 +1652,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             provider = model_info.get("litellm_provider", "openai")
 
+            # We fetch bedrock credentials, in lite_llm_completion, later
             if not api_key and provider != "bedrock" and provider != "bedrock_converse":
                 raise MissingLLMApiKeyError(
                     f"No API key {secret_name} found for model {model_name}",
                     api_key_name=secret_name,
                 )
 
+        else:
+            # Handle custom provider case
+            # We fetch the provider object and provider model object
+            (
+                base_url,
+                api_key,
+                extra_headers,
+                return_type,
+                actual_model_name,
+            ) = get_custom_provider_info(
+                project_id=req.project_id,
+                model_name=model_name,
+                obj_read_func=self.obj_read,
+            )
+
+            # Always use "custom" as the provider for litellm
+            provider = "custom"
+            # Update the model name for the API call
+            req.inputs.model = actual_model_name
+
+        # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
         # Make the API call
