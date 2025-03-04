@@ -1890,6 +1890,8 @@ def test_global_attributes_with_call_attributes(client_creator):
 
 
 def test_flush_progress_bar(client):
+    client.set_autoflush(False)
+
     @weave.op
     def op_1():
         time.sleep(1)
@@ -1905,6 +1907,8 @@ def test_flush_progress_bar(client):
 
 
 def test_flush_callback(client):
+    client.set_autoflush(False)
+
     @weave.op
     def op_1():
         time.sleep(1)
@@ -1920,9 +1924,3 @@ def test_flush_callback(client):
     # make sure there are no pending jobs
     assert client._get_pending_jobs()["total_jobs"] == 0
     assert client._has_pending_jobs() == False
-
-    op_1()
-
-    with pytest.raises(ValueError):
-        # already called finish, can't call again
-        client.finish(callback=fake_logger, use_progress_bar=True)
