@@ -24,7 +24,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
 
 
 def google_genai_gemini_on_finish(
-    call: Call, output: Any, exception: Union[BaseException, None]
+    call: Call, output: Any, exception: Union[Exception, None]
 ) -> None:
     """
     On finish handler for the Google GenAI Gemini API integration that ensures the usage

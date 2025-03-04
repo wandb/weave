@@ -36,7 +36,7 @@ def google_genai_gemini_postprocess_outputs(
 
 
 def google_genai_imagen_on_finish(
-    call: Call, output: Any, exception: Union[BaseException, None]
+    call: Call, output: Any, exception: Union[Exception, None]
 ) -> None:
     model_name = None
     if "model" in call.inputs:
