@@ -331,7 +331,11 @@ export const CallLink: React.FC<{
   // default to false if not specified
   const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
   const showFeedbackExpand =
-    showFeedbackParam === '1' ? true : showFeedbackParam === '0' ? false : undefined;
+    showFeedbackParam === '1'
+      ? true
+      : showFeedbackParam === '0'
+      ? false
+      : undefined;
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
