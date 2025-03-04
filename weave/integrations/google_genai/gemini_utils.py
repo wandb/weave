@@ -18,8 +18,11 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     (i.e, if the function being traced is a stateful method), it is converted to a
     dictionary of attributes that can be displayed in the Weave UI.
     """
+    model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
+    if model_name is not None:
+        inputs["model"] = model_name
     return inputs
 
 
