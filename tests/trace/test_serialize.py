@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from weave.trace.serialize import (
+from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,
     is_pydantic_model_class,

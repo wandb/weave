@@ -10,10 +10,15 @@ from pydantic import BaseModel, ValidationError
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
+
+# Default timeout values (in seconds)
+# DEFAULT_CONNECT_TIMEOUT = 10
+# DEFAULT_READ_TIMEOUT = 30
+# DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
 class StartBatchItem(BaseModel):
@@ -129,12 +134,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         retry_error_callback=_log_failure,
         reraise=True,
     )
+    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of data to the server with retry logic.
+
+        This method is separated from _flush_calls to avoid recursive retries.
+        """
+        r = requests.post(
+            self.trace_server_url + "/call/upsert_batch",
+            data=encoded_data,  # type: ignore
+            auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
+        )
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
+        r.raise_for_status()
+
     def _flush_calls(
         self,
         batch: list,
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
+        """Process a batch of calls, splitting if necessary and sending to the server.
+
+        This method handles the logic of splitting batches that are too large,
+        but delegates the actual server communication (with retries) to _send_batch_to_server.
+        """
         if len(batch) == 0:
             return
 
@@ -150,23 +177,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
             self.call_processor.max_batch_size = max(1, target_batch_size)
 
-        # If the batch is too big, recursively split it in half
+        # If the batch is too big, split it in half and process each half
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
             split_idx = int(len(batch) // 2)
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        r = requests.post(
-            self.trace_server_url + "/call/upsert_batch",
-            data=encoded_data,
-            auth=self._auth,
-        )
-        if r.status_code == 413:
-            # handle 413 explicitly to provide actionable error message
-            reason = json.loads(r.text)["reason"]
-            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
-        r.raise_for_status()
+        # Send the batch to the server with retries
+        self._send_batch_to_server(encoded_data)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -193,6 +212,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
             stream=stream,
+            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 500:
             reason_val = r.text
@@ -245,7 +265,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         reraise=True,
     )
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(self.trace_server_url + "/server_info")
+        r = requests.get(
+            self.trace_server_url + "/server_info",
+            # timeout=DEFAULT_TIMEOUT,
+        )
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
 
@@ -290,11 +313,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def calls_query(
         self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
     ) -> tsi.CallsQueryRes:
-        return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
-        )
+        # This previously called the deprecated /calls/query endpoint.
+        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(
+        self, req: Union[tsi.CallsQueryReq, dict[str, Any]]
+    ) -> Iterator[tsi.CallSchema]:
         return self._generic_stream_request(
             "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
@@ -477,6 +501,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
@@ -496,6 +521,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
             auth=self._auth,
+            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         # TODO: Should stream to disk rather than to memory
