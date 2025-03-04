@@ -1,7 +1,7 @@
 import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {useBareTraceCalls} from '../../pages/ThreadsPage/hooks';
+import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
 import {TraceScrubber} from './TraceScrubber';
 import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
 import {StackContextProvider} from './TraceScrubber/context';
