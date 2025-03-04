@@ -1991,7 +1991,8 @@ class WeaveClient:
             # _server_is_flushable and only call this if we know the server is
             # flushable. The # type: ignore is safe because we check the type
             # first.
-            self.server.call_processor.wait_until_all_processed()  # type: ignore
+            server = cast(RemoteHTTPTraceServer, self.server)
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         if self.future_executor_fastlane:
