@@ -30,10 +30,6 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = props => {
     };
   });
 
-  if (stack.length <= 1) {
-    return null;
-  }
-
   return (
     <BreadcrumbContainer>
       {stack.map((node, index) => (

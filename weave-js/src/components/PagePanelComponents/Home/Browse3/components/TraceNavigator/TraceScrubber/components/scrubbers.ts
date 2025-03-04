@@ -61,3 +61,12 @@ export const SiblingScrubber = createScrubber({
     return traceTreeFlat[parentId].childrenIds;
   },
 });
+
+export const StackScrubber = createScrubber({
+  label: 'Stack',
+  description:
+    'Navigate up and down the call stack from root to the selected call',
+  getNodes: ({stack}) => {
+    return stack;
+  },
+});

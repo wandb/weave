@@ -4,9 +4,9 @@ import {BaseScrubberProps} from './components/BaseScrubber';
 import {
   PeerScrubber,
   SiblingScrubber,
+  StackScrubber,
   TimelineScrubber,
 } from './components/scrubbers';
-import {StackScrubber} from './components/StackScrubber';
 import {Container} from './styles';
 
 const TraceScrubber: React.FC<BaseScrubberProps> = props => {

@@ -118,7 +118,8 @@ const useStackForCallId = (
 
   const buildStackForCall = React.useCallback(
     (callId: string) => {
-      if (!callId) {
+      console.log('buildStackForCall', callId, traceTreeFlat);
+      if (!callId || Object.keys(traceTreeFlat).length === 0) {
         return [];
       }
       const stack: string[] = [];
