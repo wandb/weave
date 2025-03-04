@@ -12,19 +12,24 @@ if TYPE_CHECKING:
 
 
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    model_name = inputs["self"]._model if hasattr(inputs["self"], "_model") else None
+    """
+    Postprocess inputs of the trace for the Google GenAI Gemini API to be used in
+    the trace visualization in the Weave UI. If the parameter `self` is present
+    (i.e, if the function being traced is a stateful method), it is converted to a
+    dictionary of attributes that can be displayed in the Weave UI.
+    """
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
-        if inputs["self"]["__class__"]["module"] == "__main__":
-            inputs["self"]["__class__"]["module"] = ""
-    if model_name is not None:
-        inputs["model"] = model_name
     return inputs
 
 
 def google_genai_gemini_on_finish(
     call: Call, output: Any, exception: Union[BaseException, None]
 ) -> None:
+    """
+    On finish handler for the Google GenAI Gemini API integration that ensures the usage
+    metadata is added to the summary of the trace.
+    """
     model_name = None
     if "model" in call.inputs:
         model_name = call.inputs["model"]
@@ -37,10 +42,9 @@ def google_genai_gemini_on_finish(
         if hasattr(output, "usage_metadata"):
             usage[model_name].update(
                 {
-                    "cached_content_token_count": output.usage_metadata.cached_content_token_count,
-                    "prompt_token_count": output.usage_metadata.prompt_token_count,
-                    "candidates_token_count": output.usage_metadata.candidates_token_count,
-                    "total_token_count": output.usage_metadata.total_token_count,
+                    "prompt_tokens": output.usage_metadata.prompt_token_count,
+                    "completion_tokens": output.usage_metadata.candidates_token_count,
+                    "total_tokens": output.usage_metadata.total_token_count,
                 }
             )
     if call.summary is not None:
