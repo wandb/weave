@@ -80,6 +80,7 @@ import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
+import {ThreadsPage} from './Browse3/pages/ThreadsPage/index';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
@@ -471,6 +472,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/compare`}>
           <ComparePageBinding />
         </Route>
+        <Route path={`${projectRoot}/threads`}>
+          <ThreadsPageBinding />
+        </Route>
       </Switch>
     </Box>
   );
@@ -617,13 +621,40 @@ const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+
+  const [callId, setCallIdDirect] = useState(params.itemName);
+  useEffect(() => {
+    setCallIdDirect(params.itemName);
+  }, [params.itemName]);
+
+  const setCallId = useCallback(
+    (newCallId: string) => {
+      setCallIdDirect(newCallId);
+
+      // TODO: Handle this navigation more gracefully
+      history.push(
+        currentRouter.callUIUrl(
+          params.entity,
+          params.project,
+          '',
+          newCallId,
+          '',
+          true
+        )
+      );
+    },
+    [currentRouter, history, params.entity, params.project]
+  );
 
   return (
     <CallPage
       entity={params.entity}
       project={params.project}
-      callId={params.itemName}
+      callId={callId}
       path={query[PATH_PARAM]}
+      setCallId={setCallId}
     />
   );
 };
@@ -969,6 +1000,18 @@ const ComparePageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <ComparePage entity={params.entity} project={params.project} />;
+};
+
+const ThreadsPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+
+  return (
+    <ThreadsPage
+      entity={params.entity}
+      project={params.project}
+      threadId={params.itemName}
+    />
+  );
 };
 
 const PlaygroundPageBinding = () => {
