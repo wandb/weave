@@ -2,10 +2,10 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {useBareTraceCalls} from '../../pages/wfReactInterface/tsDataModelHooksTraces';
-import {TraceScrubber} from './TraceScrubber';
+import TraceScrubber from './TraceScrubber';
 import {StackBreadcrumb} from './TraceScrubber/components/StackBreadcrumb';
-import {StackContextProvider} from './TraceScrubber/context';
 import {getTraceView, traceViews} from './traceViewRegistry';
+import {StackState, TraceTreeFlat} from './TraceViews/types';
 import {buildTraceTreeFlat} from './TraceViews/utils';
 
 export const TraceNavigator = ({
@@ -56,6 +56,18 @@ export const TraceNavigator = ({
     traceTreeFlat,
   ]);
 
+  const stack = useStackForCallId(traceTreeFlat, selectedCallId);
+
+  const childProps = useMemo(
+    () => ({
+      traceTreeFlat,
+      selectedCallId,
+      onCallSelect: setSelectedCallId,
+      stack,
+    }),
+    [traceTreeFlat, selectedCallId, setSelectedCallId, stack]
+  );
+
   const [traceViewId, setTraceViewId] = useState(traceViews[0].id);
   const TraceViewComponent = getTraceView(traceViewId).component;
   return (
@@ -80,34 +92,83 @@ export const TraceNavigator = ({
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col">
           {Object.keys(traceTreeFlat).length > 0 && (
-            <StackContextProvider
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}>
-              <StackBreadcrumb
-                traceTreeFlat={traceTreeFlat}
-                selectedCallId={selectedCallId}
-                onCallSelect={setSelectedCallId}
-              />
+            <>
+              <StackBreadcrumb {...childProps} />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex-1 overflow-auto">
-                  <TraceViewComponent
-                    traceTreeFlat={traceTreeFlat}
-                    selectedCallId={selectedCallId}
-                    onCallSelect={setSelectedCallId}
-                  />
+                  <TraceViewComponent {...childProps} />
                 </div>
                 {getTraceView(traceViewId).showScrubber && (
-                  <TraceScrubber
-                    traceTreeFlat={traceTreeFlat}
-                    selectedCallId={selectedCallId}
-                    onCallSelect={setSelectedCallId}
-                  />
+                  <TraceScrubber {...childProps} />
                 )}
               </div>
-            </StackContextProvider>
+            </>
           )}
         </div>
       </div>
     </div>
   );
+};
+
+const useStackForCallId = (
+  traceTreeFlat: TraceTreeFlat,
+  selectedCallId: string | undefined
+) => {
+  const [stackState, setStackState] = React.useState<StackState>([]);
+
+  const buildStackForCall = React.useCallback(
+    (callId: string) => {
+      if (!callId) {
+        return [];
+      }
+      const stack: string[] = [];
+      let currentId = callId;
+
+      // Build stack up to root
+      while (currentId) {
+        stack.unshift(currentId);
+        const node = traceTreeFlat[currentId];
+        if (!node) {
+          break;
+        }
+        currentId = node.parentId || '';
+      }
+
+      // Build stack down to leaves
+      currentId = callId;
+      while (currentId) {
+        const node = traceTreeFlat[currentId];
+        if (!node || node.childrenIds.length === 0) {
+          break;
+        }
+        // Take the first child in chronological order
+        const nextId = [...node.childrenIds].sort(
+          (a, b) =>
+            Date.parse(traceTreeFlat[a].call.started_at) -
+            Date.parse(traceTreeFlat[b].call.started_at)
+        )[0];
+        stack.push(nextId);
+        currentId = nextId;
+      }
+
+      return stack;
+    },
+    [traceTreeFlat]
+  );
+
+  // Update stack state whenever selected call changes
+  React.useEffect(() => {
+    if (selectedCallId) {
+      setStackState(curr => {
+        if (!curr.includes(selectedCallId)) {
+          return buildStackForCall(selectedCallId);
+        }
+        return curr;
+      });
+    } else {
+      setStackState([]);
+    }
+  }, [selectedCallId, buildStackForCall]);
+
+  return stackState;
 };

@@ -2,7 +2,6 @@ import {Icon} from '@wandb/weave/components/Icon';
 import React, {useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
-import {useStackContext} from '../TraceScrubber/context';
 import {TraceViewProps} from './types';
 import {buildCodeMap, CodeMapNode} from './utils';
 import {formatDuration, formatTimestamp, getCallDisplayName} from './utils';
@@ -115,13 +114,11 @@ const CallName = styled.div`
   gap: 1px;
 `;
 
-interface CodeMapNodeProps {
+interface CodeMapNodeProps extends TraceViewProps {
   node: CodeMapNode;
-  selectedCallId?: string;
   selectedOpName?: string;
   onCallSelect: (callId: string) => void;
   onOpSelect: (opName: string) => void;
-  traceTreeFlat: TraceViewProps['traceTreeFlat'];
   level?: number;
 }
 
@@ -132,9 +129,9 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
   onCallSelect,
   onOpSelect,
   traceTreeFlat,
+  stack,
   level = 0,
 }) => {
-  const {setStackState, buildStackForCall} = useStackContext();
   const hasChildren = node.children.length > 0;
   const isSelected = node.opName === selectedOpName;
 
@@ -178,12 +175,6 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
       );
       const selectedCall = sortedCallIds[0];
       onCallSelect(selectedCall);
-
-      // Update the stack state for breadcrumbs
-      setStackState({
-        stack: buildStackForCall(selectedCall),
-        originalCallId: selectedCall,
-      });
     }
   };
 
@@ -217,6 +208,7 @@ const CodeMapNodeComponent: React.FC<CodeMapNodeProps> = ({
               onCallSelect={onCallSelect}
               onOpSelect={onOpSelect}
               traceTreeFlat={traceTreeFlat}
+              stack={stack}
               level={level + 1}
             />
           ))}
@@ -230,8 +222,8 @@ export const CodeView: React.FC<TraceViewProps> = ({
   traceTreeFlat,
   selectedCallId,
   onCallSelect,
+  stack,
 }) => {
-  const {setStackState, buildStackForCall} = useStackContext();
   const codeMap = useMemo(() => buildCodeMap(traceTreeFlat), [traceTreeFlat]);
   const [selectedOpName, setSelectedOpName] = useState<string>();
 
@@ -283,16 +275,6 @@ export const CodeView: React.FC<TraceViewProps> = ({
     }
   }, [selectedOp, selectedOpName]);
 
-  // Handle call selection from the call list
-  const handleCallSelect = (callId: string) => {
-    onCallSelect(callId);
-    // Update the stack state for breadcrumbs
-    setStackState({
-      stack: buildStackForCall(callId),
-      originalCallId: callId,
-    });
-  };
-
   return (
     <Container>
       <TreePanel>
@@ -305,6 +287,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
             onCallSelect={onCallSelect}
             onOpSelect={setSelectedOpName}
             traceTreeFlat={traceTreeFlat}
+            stack={stack}
           />
         ))}
       </TreePanel>
@@ -327,7 +310,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
                   <CallItem
                     key={callId}
                     $isSelected={callId === selectedCallId}
-                    onClick={() => handleCallSelect(callId)}>
+                    onClick={() => onCallSelect(callId)}>
                     <CallInfo>
                       <CallName>
                         <div className="truncate text-xs font-medium">

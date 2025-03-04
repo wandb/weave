@@ -2,34 +2,28 @@ import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Hom
 import React from 'react';
 
 import {getCallDisplayName} from '../../TraceViews/utils';
-import {useStackContext} from '../context';
 import {
   BreadcrumbContainer,
   BreadcrumbItem,
   BreadcrumbSeparator,
 } from '../styles';
-import {BaseScrubberProps} from '../types';
+import {BaseScrubberProps} from './BaseScrubber';
 
-export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
-  traceTreeFlat,
-  selectedCallId,
-  onCallSelect,
-}) => {
-  const {stackState} = useStackContext();
+export const StackBreadcrumb: React.FC<BaseScrubberProps> = props => {
   const selectedItemRef = React.useRef<HTMLButtonElement>(null);
 
-  useScrollIntoView(selectedItemRef, Boolean(selectedCallId), {
+  useScrollIntoView(selectedItemRef, Boolean(props.selectedCallId), {
     behavior: 'smooth',
     block: 'center',
     inline: 'nearest',
   });
 
-  if (!selectedCallId || !stackState) {
+  if (!props.selectedCallId) {
     return null;
   }
 
-  const stack = stackState.stack.map(id => {
-    const call = traceTreeFlat[id]?.call;
+  const stack = props.stack.map(id => {
+    const call = props.traceTreeFlat[id]?.call;
     return {
       id,
       name: call ? getCallDisplayName(call) : id,
@@ -46,9 +40,9 @@ export const StackBreadcrumb: React.FC<BaseScrubberProps> = ({
         <React.Fragment key={node.id}>
           {index > 0 && <BreadcrumbSeparator>{'/'}</BreadcrumbSeparator>}
           <BreadcrumbItem
-            ref={node.id === selectedCallId ? selectedItemRef : undefined}
-            $active={node.id === selectedCallId}
-            onClick={() => onCallSelect(node.id)}
+            ref={node.id === props.selectedCallId ? selectedItemRef : undefined}
+            $active={node.id === props.selectedCallId}
+            onClick={() => props.onCallSelect(node.id)}
             title={node.name}>
             {node.name}
           </BreadcrumbItem>

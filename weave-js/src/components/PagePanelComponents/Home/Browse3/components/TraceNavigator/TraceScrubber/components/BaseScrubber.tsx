@@ -1,6 +1,7 @@
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 
+import {TraceViewProps} from '../../TraceViews/types';
 import {
   ArrowButton,
   CountIndicator,
@@ -13,7 +14,15 @@ import {
   TooltipContainer,
   TooltipContent,
 } from '../styles';
-import {BaseScrubberProps, ScrubberConfig} from '../types';
+
+export type BaseScrubberProps = TraceViewProps;
+
+interface ScrubberConfig {
+  label: string;
+  description: string;
+  getNodes: (props: BaseScrubberProps) => string[];
+  alwaysEnabled?: boolean;
+}
 
 export const createScrubber = ({
   label,

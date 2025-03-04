@@ -18,6 +18,8 @@ export interface TraceTreeFlat {
   };
 }
 
+export type StackState = string[];
+
 /**
  * Props shared by all trace view components
  */
@@ -26,6 +28,8 @@ export interface TraceViewProps {
   traceTreeFlat: TraceTreeFlat;
   /** Currently selected call ID */
   selectedCallId?: string;
+  /** Current stack  */
+  stack: StackState;
   /** Callback when a call is selected */
   onCallSelect: (callId: string) => void;
 }

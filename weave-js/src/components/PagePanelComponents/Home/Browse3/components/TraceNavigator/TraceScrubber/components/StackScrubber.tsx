@@ -1,7 +1,6 @@
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 
-import {useStackContext} from '../context';
 import {
   ArrowButton,
   CountIndicator,
@@ -14,66 +13,47 @@ import {
   TooltipContainer,
   TooltipContent,
 } from '../styles';
-import {BaseScrubberProps} from '../types';
+import {BaseScrubberProps} from './BaseScrubber';
 
 export const StackScrubber: React.FC<BaseScrubberProps> = props => {
-  const {selectedCallId} = props;
-  const {stackState, setStackState, buildStackForCall} = useStackContext();
-
-  React.useEffect(() => {
-    if (!selectedCallId) {
-      setStackState(null);
-      return;
-    }
-
-    // Only update stack state if we don't have one or if the selected call
-    // isn't in our current stack
-    if (!stackState || !stackState.stack.includes(selectedCallId)) {
-      setStackState({
-        originalCallId: selectedCallId,
-        stack: buildStackForCall(selectedCallId),
-      });
-    }
-  }, [selectedCallId, stackState, setStackState, buildStackForCall]);
-
-  const currentIndex = stackState?.stack.indexOf(selectedCallId || '') || 0;
-  const stackLength = stackState?.stack.length || 0;
+  const currentIndex = props.stack.indexOf(props.selectedCallId || '') || 0;
+  const stackLength = props.stack.length || 0;
   const progress =
     stackLength > 1 ? (currentIndex / (stackLength - 1)) * 100 : 0;
 
   const moveStep = React.useCallback(
     (step: number) => {
-      if (!stackState?.stack) {
+      if (!props.stack) {
         return;
       }
       const newIndex = Math.min(
-        stackState.stack.length - 1,
+        props.stack.length - 1,
         Math.max(0, currentIndex + step)
       );
-      if (stackState.stack[newIndex]) {
-        props.onCallSelect(stackState.stack[newIndex]);
+      if (props.stack[newIndex]) {
+        props.onCallSelect(props.stack[newIndex]);
       }
     },
-    [currentIndex, props, stackState]
+    [currentIndex, props]
   );
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!stackState?.stack) {
+      if (!props.stack) {
         return;
       }
       const index = Math.min(
-        stackState.stack.length - 1,
+        props.stack.length - 1,
         Math.max(0, Math.floor(Number(e.target.value)))
       );
-      if (stackState.stack[index]) {
-        props.onCallSelect(stackState.stack[index]);
+      if (props.stack[index]) {
+        props.onCallSelect(props.stack[index]);
       }
     },
-    [props, stackState]
+    [props]
   );
 
-  const isDisabled = !stackState?.stack.length || stackState.stack.length <= 1;
+  const isDisabled = !props.stack.length || props.stack.length <= 1;
 
   return (
     <ScrubberRow>
@@ -95,7 +75,7 @@ export const StackScrubber: React.FC<BaseScrubberProps> = props => {
             <RangeInput
               type="range"
               min={0}
-              max={Math.max(0, (stackState?.stack.length || 1) - 1)}
+              max={Math.max(0, (props.stack.length || 1) - 1)}
               value={currentIndex}
               onChange={handleChange}
               $progress={progress}
@@ -109,8 +89,8 @@ export const StackScrubber: React.FC<BaseScrubberProps> = props => {
             </ArrowButton>
           </SliderContainer>
           <CountIndicator>
-            {stackState?.stack.length
-              ? `${currentIndex + 1}/${stackState.stack.length}`
+            {props.stack.length
+              ? `${currentIndex + 1}/${props.stack.length}`
               : '0/0'}
           </CountIndicator>
         </RangeContainer>
