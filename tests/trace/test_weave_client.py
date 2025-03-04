@@ -7,6 +7,7 @@ import sys
 import pydantic
 import pytest
 import requests
+from PIL import Image
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -1886,3 +1887,61 @@ def test_global_attributes_with_call_attributes(client_creator):
 
         # Local attributes override global ones
         assert call.attributes["env"] == "override"
+
+
+def test_flush_progress_bar(client):
+    # expensive op
+    @weave.op
+    def make_image():
+        img = Image.new("RGB", (300, 300))
+        pixels = img.load()
+        for x in range(300):
+            for y in range(300):
+                pixels[x, y] = (x, y, 0)
+        return img
+
+    ds2 = [make_image() for i in range(10)]
+
+    # really expensive op
+    @weave.op
+    def make_dataset(ds2):
+        new_ds = [make_image() for i in range(10)]
+        return ds2 + new_ds
+
+    make_dataset(ds2)
+
+    # flush with progress bar
+    client.flush(use_progress_bar=True)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs() == (0, 0, 0, 0)
+    assert client._has_pending_jobs() == False
+
+
+def test_flush_status_callback(client, capsys):
+    @weave.op
+    def make_image():
+        img = Image.new("RGB", (300, 300))
+        pixels = img.load()
+        for x in range(300):
+            for y in range(300):
+                pixels[x, y] = (x, y, 0)
+        return img
+
+    ds = [make_image() for i in range(10)]
+
+    @weave.op
+    def use_dataset(ds):
+        return ds
+
+    use_dataset(ds)
+
+    def logger(status):
+        assert status["main_jobs"] == 0
+
+    # use custom logger callback
+    client.flush(callback=logger)
+
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs() == (0, 0, 0, 0)
+    assert client._has_pending_jobs() == False

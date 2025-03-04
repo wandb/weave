@@ -1995,7 +1995,11 @@ class WeaveClient:
             total += self.server.call_processor.num_outstanding_jobs  # type: ignore
         return total
 
-    def flush(self, use_progress_bar: bool = True) -> None:
+    def flush(
+        self,
+        use_progress_bar: bool = True,
+        callback: Callable[[WeaveFlushStatus], None] | None = None,
+    ) -> None:
         """
         Flushes all background tasks to ensure they are processed.
 
@@ -2009,14 +2013,17 @@ class WeaveClient:
             use_progress_bar: Whether to display a progress bar during flush.
                               Set to False for environments where a progress bar
                               would not render well (e.g., CI environments).
+            callback: Optional callback function that receives status updates.
+                      Overrides use_progress_bar.
         """
-        if use_progress_bar:
+        if use_progress_bar and callback is None:
             callback = create_progress_bar_callback()
-            self._flush_with_tracking(callback=callback)
+        if callback is None:
+            self._flush()
         else:
-            self._flush_with_tracking()
+            self._flush_with_callback(callback=callback)
 
-    def _flush_with_tracking(
+    def _flush_with_callback(
         self,
         callback: Callable[[WeaveFlushStatus], None] | None = None,
         refresh_interval: float = 0.1,
