@@ -1,16 +1,10 @@
-import {
-  CodeView,
-  FlameGraphView,
-  GraphView,
-  TreeView,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/components/TraceNavigator/TraceViews';
 import {FC} from 'react';
 
 import {IconName} from '../../../../../Icon';
 import {DetailsView} from './components/CallViews/DetailsView';
 import {CallJsonView} from './components/CallViews/JsonView';
 import {ConnectedThreadView, StaticThreadView} from './components/ThreadViews';
-import {CallViewProps, ThreadViewProps, TraceViewProps} from './types';
+import {CallViewProps, ThreadViewProps} from './types';
 
 /**
  * Definition for a view component and its metadata
@@ -30,8 +24,7 @@ export interface ViewDefinition<T> {
 
 /** Registry of available thread views */
 export type ThreadViewRegistry = Array<ViewDefinition<ThreadViewProps>>;
-/** Registry of available trace views */
-export type TraceViewRegistry = Array<ViewDefinition<TraceViewProps>>;
+
 /** Registry of available call views */
 export type CallViewRegistry = Array<ViewDefinition<CallViewProps>>;
 
@@ -48,38 +41,6 @@ export const threadViews: ThreadViewRegistry = [
     label: 'Connected',
     icon: 'forum-chat-bubble',
     component: ConnectedThreadView,
-  },
-];
-
-/** Available trace visualization views */
-export const traceViews: TraceViewRegistry = [
-  {
-    id: 'tree',
-    label: 'Tree',
-    icon: 'layout-tabs',
-    component: TreeView,
-    showScrubber: true,
-  },
-  {
-    id: 'code',
-    label: 'Code',
-    icon: 'code-alt',
-    component: CodeView,
-    showScrubber: false,
-  },
-  {
-    id: 'flamegraph',
-    label: 'Flame Graph',
-    icon: 'chart-horizontal-bars',
-    component: FlameGraphView,
-    showScrubber: true,
-  },
-  {
-    id: 'graph',
-    label: 'Graph',
-    icon: 'chart-scatterplot',
-    component: GraphView,
-    showScrubber: true,
   },
 ];
 
@@ -104,12 +65,6 @@ export const callViews: CallViewRegistry = [
  */
 export const getThreadView = (viewId: string) =>
   threadViews.find(view => view.id === viewId) ?? threadViews[0];
-
-/**
- * Get a trace view by ID, falling back to the first view if not found
- */
-export const getTraceView = (viewId: string) =>
-  traceViews.find(view => view.id === viewId) ?? traceViews[0];
 
 /**
  * Get a call view by ID, falling back to the first view if not found
