@@ -91,11 +91,11 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
 
   const {
     editedRows,
-    getEditedFields,
     deletedRows,
     setDeletedRows,
     setAddedRows,
     addedRows,
+    isFieldEdited,
   } = useDatasetEditContext();
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
@@ -428,14 +428,14 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         }
         const rowIndex = params.row.___weave?.index;
 
-        const editedFields =
-          rowIndex != null && !params.row.___weave?.isNew
-            ? getEditedFields(rowIndex)
-            : {};
         return (
           <CellViewingRenderer
             {...params}
-            isEdited={editedFields[field as string] !== undefined}
+            isEdited={
+              rowIndex != null && !params.row.___weave?.isNew
+                ? isFieldEdited(rowIndex, field as string)
+                : false
+            }
             isDeleted={deletedRows.includes(params.row.___weave?.index)}
             isNew={params.row.___weave?.isNew}
             serverValue={get(
@@ -464,7 +464,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return [...baseColumns, ...fieldColumns];
   }, [
     combinedRows,
-    getEditedFields,
     deleteRow,
     restoreRow,
     deletedRows,
@@ -477,6 +476,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     columnWidths,
     preserveFieldOrder,
     hideRemoveForAddedRows,
+    isFieldEdited,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {
