@@ -1,14 +1,7 @@
 import Box from '@mui/material/Box';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
@@ -67,11 +60,12 @@ export const CallPage: FC<CallPageProps> = props => {
       entity: props.entity,
       project: props.project,
       callId: descendentCallId,
-    }
-    // , {includeCosts: true}
+    },
+    {includeCosts: true}
   );
-  // console.log(call)
-  // TODO: CLean this up!
+
+  // This is a little hack, but acceptable for now.
+  // We don't want the entire page to re-render when the call result is updated.
   const lastResult = useRef(call.result);
   useEffect(() => {
     if (call.result) {
@@ -104,13 +98,6 @@ export const CallPage: FC<CallPageProps> = props => {
       );
     }
   }
-};
-
-export const useShowRunnableUI = () => {
-  return false;
-  // Uncomment to re-enable
-  // const viewerInfo = useViewerInfo();
-  // return viewerInfo.loading ? false : viewerInfo.userInfo?.admin;
 };
 
 const useCallTabs = (call: CallSchema) => {
@@ -251,6 +238,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   hideTracetree,
 }) => {
   useViewTraceEvent(call);
+  const callIsCached = call.callId !== callId;
 
   const hideTraceTreeDefault = isEvaluateOp(call.spanName);
   const showFeedbackDefault = false;
@@ -281,60 +269,11 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
     call.project
   );
 
-  // TODO: remove this or understand it
-  // const tree = useCallFlattenedTraceTree(call, path ?? null);
-  // const {loading, selectedCall} = tree;
-  const selectedCall = call;
-  const callComplete = selectedCall;
-  // useCall({
-  //   entity: selectedCall.entity,
-  //   project: selectedCall.project,
-  //   callId: selectedCall.callId,
-  // });
-  const callCompleteWithCosts = callComplete;
-  // console.log(callCompleteWithCosts)
-  // useMemo(() => {
-  //   if (callComplete.result?.traceCall == null) {
-  //     return callComplete.result;
-  //   }
-  //   return {
-  //     ...callComplete.result,
-  //     traceCall: {
-  //       ...callComplete.result?.traceCall,
-  //       summary: {
-  //         ...callComplete.result?.traceCall?.summary,
-  //         weave: {
-  //           ...callComplete.result?.traceCall?.summary?.weave,
-  //           // Only selectedCall has costs, injected when creating
-  //           // the trace tree
-  //           costs: selectedCall.traceCall?.summary?.weave?.costs,
-  //         },
-  //       },
-  //     },
-  //   };
-  // }, [callComplete.result, selectedCall]);
-
-  // const assumeCallIsSelectedCall = path == null || path === '';
-  const [currentCall, setCurrentCall] = useState(call);
-  const callLoading = call.callId !== callId;
-
-  // useEffect(() => {
-  //   if (assumeCallIsSelectedCall) {
-  //     setCurrentCall(selectedCall);
-  //   }
-  // }, [assumeCallIsSelectedCall, selectedCall]);
-
-  useEffect(() => {
-    if (callCompleteWithCosts != null) {
-      setCurrentCall(callCompleteWithCosts);
-    }
-  }, [callCompleteWithCosts]);
-
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
-  const callTabs = useCallTabs(currentCall);
+  const callTabs = useCallTabs(call);
 
   return (
     <SimplePageLayoutWithHeader
@@ -376,21 +315,21 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
               humanAnnotationSpecs={humanAnnotationSpecs}
               specsLoading={specsLoading}
               callID={callId}
-              entity={currentCall.entity}
-              project={currentCall.project}
+              entity={call.entity}
+              project={call.project}
             />
           </div>
         </Tailwind>
       }
-      headerContent={<CallOverview call={currentCall} />}
+      headerContent={<CallOverview call={call} />}
       isLeftSidebarOpen={!hideTraceTree}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
           <div className="h-full bg-moon-50">
             <TraceNavigator
-              entity={currentCall.entity}
-              project={currentCall.project}
-              selectedTraceId={currentCall.traceId}
+              entity={call.entity}
+              project={call.project}
+              selectedTraceId={call.traceId}
               selectedCallId={callId}
               setSelectedCallId={setCallId}
             />
@@ -398,7 +337,7 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
         </Tailwind>
       }
       tabs={callTabs}
-      dimMainContent={callLoading}
+      dimMainContent={callIsCached}
     />
   );
 };
