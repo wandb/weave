@@ -1975,6 +1975,12 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+        if self.future_executor_fastlane:
+            # If we have a separate upload worker pool, use it
+            return self.future_executor_fastlane.defer(self.server.file_create, req)
+        return self.future_executor.defer(self.server.file_create, req)
+
     @property
     def num_outstanding_jobs(self) -> int:
         """
@@ -2153,12 +2159,6 @@ class WeaveClient:
         """
         total_jobs = self._get_pending_jobs()[3]
         return total_jobs > 0
-
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
-        if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            return self.future_executor_fastlane.defer(self.server.file_create, req)
-        return self.future_executor.defer(self.server.file_create, req)
 
 
 def get_parallelism_settings() -> tuple[int | None, int | None]:
