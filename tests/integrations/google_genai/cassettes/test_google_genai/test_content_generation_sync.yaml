@@ -330,13 +330,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 04 Mar 2025 19:34:01 GMT
+      - Tue, 04 Mar 2025 19:35:28 GMT
       ETag:
       - W/"32ad15256cf1ec07fe4b1ccce9d2141f6eae2ea4ef582dbf0e237c31d40a6d33"
       Expires:
-      - Tue, 04 Mar 2025 19:39:01 GMT
+      - Tue, 04 Mar 2025 19:40:28 GMT
       Source-Age:
-      - '293'
+      - '79'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -346,19 +346,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '12343'
+      - '5'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 078af51acc0a1eafc0fc9257873521f0a791e4fe
+      - 93fe87f3907827af5a0b8957b458b5475397d844
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - FA8F:2BA30C:562D0A:DB773F:67C62095
       X-Served-By:
-      - cache-hyd1100035-HYD
+      - cache-hyd1100021-HYD
       X-Timer:
-      - S1741116842.807050,VS0,VE0
+      - S1741116929.806267,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -387,13 +387,13 @@ interactions:
   response:
     body:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
-        [\n          {\n            \"text\": \"The capital of France is **Paris**.\\n\"\n
+        [\n          {\n            \"text\": \"The capital of France is Paris.\\n\"\n
         \         }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
-        \"STOP\",\n      \"avgLogprobs\": -0.025427078207333881\n    }\n  ],\n  \"usageMetadata\":
-        {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 9,\n    \"totalTokenCount\":
-        17,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
+        \"STOP\",\n      \"avgLogprobs\": -0.0286064725369215\n    }\n  ],\n  \"usageMetadata\":
+        {\n    \"promptTokenCount\": 8,\n    \"candidatesTokenCount\": 8,\n    \"totalTokenCount\":
+        16,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n
         \       \"tokenCount\": 8\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      }\n
+        [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 8\n      }\n
         \   ]\n  },\n  \"modelVersion\": \"gemini-2.0-flash\"\n}\n"
     headers:
       Alt-Svc:
@@ -403,11 +403,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Tue, 04 Mar 2025 19:34:04 GMT
+      - Tue, 04 Mar 2025 19:35:31 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=1747
+      - gfet4t7; dur=1751
       Transfer-Encoding:
       - chunked
       Vary:
