@@ -269,7 +269,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
   const selectedPeerPathCallIds = useMemo(() => {
     return getSortedPeerPathCallIds(selectedCodeNode, traceTreeFlat);
   }, [selectedCodeNode, traceTreeFlat]);
-  console.log(selectedPeerPathCallIds)
+  console.log(selectedPeerPathCallIds);
   return (
     <Container>
       <TreePanel>
@@ -284,7 +284,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
           />
         ))}
       </TreePanel>
-        
+
       <CallPanel>
         {selectedCodeNode ? (
           <>

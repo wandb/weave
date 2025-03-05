@@ -14,13 +14,17 @@ import {
   getTokensFromUsage,
   TraceStat,
 } from '../../../pages/CallPage/cost';
-import {STATUS_INFO, StatusChip} from '../../../pages/common/StatusChip';
+import {
+  CallStatusType,
+  STATUS_INFO,
+  StatusChip,
+} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {
   parseSpanName,
   traceCallStatusCode,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
-import {TraceViewProps} from './types';
+import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
 interface FlattenedNode {
@@ -30,16 +34,15 @@ interface FlattenedNode {
   isExpanded: boolean;
   isVisible: boolean;
   childrenIds: string[];
+  hasDescendantErrors: boolean;
 }
 
 interface TreeNodeProps {
   node: FlattenedNode;
   style: React.CSSProperties;
-  traceTreeFlat: TraceViewProps['traceTreeFlat'];
   selectedCallId?: string;
   onCallSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
-  filterCallIds?: Set<string>;
   deemphasizeCallIds?: string[];
 }
 
@@ -131,14 +134,12 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
   style,
-  traceTreeFlat,
   selectedCallId,
   onCallSelect,
   onToggleExpand,
-  filterCallIds,
   deemphasizeCallIds,
 }) => {
-  const {id, call, level, isExpanded, childrenIds} = node;
+  const {id, call, level, isExpanded, childrenIds, hasDescendantErrors} = node;
   const duration = call.ended_at
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
@@ -154,8 +155,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
   const isDeemphasized = deemphasizeCallIds?.includes(id);
   const hasChildren = childrenIds.length > 0;
-  const statusCode = traceCallStatusCode(call);
-
+  let statusCode: CallStatusType = traceCallStatusCode(call);
+  if (hasDescendantErrors && statusCode === 'SUCCESS') {
+    statusCode = 'DESCENDANT_ERROR';
+  }
   const showTypeIcon = true;
   const showDuration = true;
   const showStatusIcon = true;
@@ -418,7 +421,7 @@ export const TreeView: React.FC<
 
   const flattenedNodes = useMemo(() => {
     const result: FlattenedNode[] = [];
-    const processNode = (node: any, level: number) => {
+    const processNode = (node: TraceTreeFlat[string], level: number) => {
       const isExpanded = expandedNodes.has(node.id);
       const filteredChildren = node.childrenIds.filter(childId => {
         return !filterSet || filterSet.has(childId);
@@ -430,6 +433,7 @@ export const TreeView: React.FC<
         isExpanded,
         isVisible: true,
         childrenIds: filteredChildren,
+        hasDescendantErrors: node.descendantHasErrors,
       });
 
       if (isExpanded) {
@@ -463,11 +467,9 @@ export const TreeView: React.FC<
         key={node.id}
         node={node}
         style={style}
-        traceTreeFlat={traceTreeFlat}
         selectedCallId={selectedCallId}
         onCallSelect={onCallSelect}
         onToggleExpand={handleToggleExpand}
-        filterCallIds={filterSet}
         deemphasizeCallIds={deemphasizeCallIds}
       />
     );

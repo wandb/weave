@@ -28,6 +28,7 @@ export const buildTraceTreeFlat = (
       childrenIds: [],
       dfsOrder: 0,
       call,
+      descendantHasErrors: false,
     };
   });
 
@@ -82,6 +83,17 @@ export const buildTraceTreeFlat = (
     node.dfsOrder = dfsOrder++;
     stack = [...node.childrenIds, ...stack];
   }
+
+  // Third pass: Check for descendant errors (using reverse DFS order)
+  Object.values(traceTreeFlat)
+    .sort((a, b) => b.dfsOrder - a.dfsOrder)
+    .forEach(node => {
+      if (node.call.exception !== null || node.descendantHasErrors) {
+        if (node.call.parent_id) {
+          traceTreeFlat[node.call.parent_id].descendantHasErrors = true;
+        }
+      }
+    });
 
   return traceTreeFlat;
 };

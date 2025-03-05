@@ -15,6 +15,8 @@ export interface TraceTreeFlat {
     dfsOrder: number;
     /** The actual call data */
     call: TraceCallSchema;
+    /** Whether this call has a descendant that has errors */
+    descendantHasErrors: boolean;
   };
 }
 
