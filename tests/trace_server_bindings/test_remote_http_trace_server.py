@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from queue import Full
 from types import MethodType
 from unittest.mock import MagicMock, patch
@@ -364,35 +365,23 @@ def test_drop_data_when_queue_is_full(server, log_collector):
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 def test_requeue_after_max_retries(server, caplog):
     """Test that batches are requeued after max retries."""
-    import logging
-
     caplog.set_level(logging.WARNING)
+
+    # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
+    server.call_processor.enqueue = MagicMock()
+    server._send_batch_to_server = MagicMock(
+        side_effect=requests.ConnectionError("Connection error")
+    )
 
     # Create a batch
     start, end = generate_call_start_end_pair()
     batch = [StartBatchItem(req=start), EndBatchItem(req=end)]
 
-    # Mock the _send_batch_to_server method to throw an exception
-    server._send_batch_to_server = MagicMock(
-        side_effect=requests.ConnectionError("Connection error")
-    )
-
-    # Mock the enqueue method to verify it's called
-    original_enqueue = server.call_processor.enqueue
-    server.call_processor.enqueue = MagicMock()
-
-    # Process the batch, which should fail and requeue
+    # Process the batch, which should fail and requeue.
     server._flush_calls(batch)
-
-    # Verify enqueue was called with the original batch
     server.call_processor.enqueue.assert_called_once_with(batch)
 
-    # Restore the original enqueue method
-    server.call_processor.enqueue = original_enqueue
-
-    # Check that the enqueue method was called - this is sufficient to verify our requeue mechanism
-    # The logs test can be less strict, just check for the error message
-    assert any(
-        "Failed to send batch after max retries" in record.message
-        for record in caplog.records
-    )
+    # On enqueue, the user should expect this error message
+    assert len(caplog.records) == 1
+    msg = caplog.records[0].message
+    assert "requeueing for later processing" in msg
