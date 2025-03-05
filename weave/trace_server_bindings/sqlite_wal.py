@@ -25,7 +25,7 @@ class SQLiteWriteAheadLog:
         db_path: str | None = None,
         table_name: str = "batch_items",
         max_items: int = 10000,
-    ):
+    ) -> None:
         """Initialize the SQLite write-ahead log.
 
         Args:
@@ -50,7 +50,7 @@ class SQLiteWriteAheadLog:
         # Initialize the database
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         """Initialize the SQLite database with the required schema."""
         conn = sqlite3.connect(self.db_path)
         try:
@@ -71,7 +71,7 @@ class SQLiteWriteAheadLog:
 
             # Create an index on created_at for faster cleanup
             cursor.execute(f"""
-                CREATE INDEX IF NOT EXISTS idx_{self.table_name}_created_at 
+                CREATE INDEX IF NOT EXISTS idx_{self.table_name}_created_at
                 ON {self.table_name} (created_at)
             """)
 

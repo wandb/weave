@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import atexit
 import logging
 import time
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
-from typing import Callable, Generic, List, Optional, TypeVar, cast
+from typing import Callable, Generic, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -28,7 +30,7 @@ class AsyncBatchProcessor(Generic[T]):
         min_batch_interval: float = 1.0,
         max_queue_size: int = 10_000,
         use_wal: bool = False,
-        wal_path: Optional[str] = None,
+        wal_path: str | None = None,
     ) -> None:
         """
         Initializes an instance of AsyncBatchProcessor.
@@ -39,7 +41,7 @@ class AsyncBatchProcessor(Generic[T]):
             min_batch_interval (float, optional): The minimum interval between processing batches. Defaults to 1.0.
             max_queue_size (int, optional): The maximum number of items to hold in the queue. Defaults to 10_000. 0 means no limit.
             use_wal (bool, optional): Whether to use a SQLite write-ahead log for durability. Defaults to False.
-            wal_path (Optional[str], optional): Path to the SQLite WAL database. If None, a default path will be used.
+            wal_path (str, optional): Path to the SQLite WAL database. If None, a default path will be used.
         """
         self.processor_fn = processor_fn
         self.max_batch_size = max_batch_size
@@ -116,19 +118,19 @@ class AsyncBatchProcessor(Generic[T]):
                             from weave.trace_server import trace_server_interface as tsi
 
                             req = tsi.CallStartReq.model_validate(item["data"]["req"])
-                            recovered_items.append(cast(T, StartBatchItem(req=req)))
+                            recovered_items.append(StartBatchItem(req=req))
                         elif item_type == "EndBatchItem":
                             from weave.trace_server import trace_server_interface as tsi
 
                             req = tsi.CallEndReq.model_validate(item["data"]["req"])
-                            recovered_items.append(cast(T, EndBatchItem(req=req)))
+                            recovered_items.append(EndBatchItem(req=req))
                 except Exception as e:
                     logger.exception(f"Error recovering item from WAL: {e}")
 
             # Add recovered items to the queue
             for item in recovered_items:
                 try:
-                    self.queue.put_nowait(item)
+                    self.queue.put_nowait(cast(T, item))
                 except Full:
                     logger.warning(
                         f"Queue is full during recovery. Dropping item. Max queue size: {self.queue.maxsize}"
@@ -164,8 +166,8 @@ class AsyncBatchProcessor(Generic[T]):
             and all(isinstance(item, BaseModel) for item in items)
         ):
             try:
-                # Cast to List[BaseModel] since we've verified all items are BaseModel instances
-                self.wal.append(cast(List[BaseModel], items))
+                # Cast to list[BaseModel] since we've verified all items are BaseModel instances
+                self.wal.append(cast(list[BaseModel], items))
             except Exception as e:
                 logger.exception(f"Error writing to WAL: {e}")
                 # Continue anyway to try to process the items
