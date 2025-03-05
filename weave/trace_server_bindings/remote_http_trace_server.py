@@ -159,7 +159,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list[StartBatchItem | EndBatchItem],
+        batch: list[Union[StartBatchItem, EndBatchItem]],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -168,6 +168,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         This method handles the logic of splitting batches that are too large,
         but delegates the actual server communication (with retries) to _send_batch_to_server.
         """
+        # Call processor must be defined for this method
+        assert self.call_processor is not None
         if len(batch) == 0:
             return
 
@@ -306,6 +308,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
@@ -325,6 +329,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
         if self.should_batch:
+            assert self.call_processor is not None
+
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
