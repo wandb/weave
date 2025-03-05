@@ -1,0 +1,117 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"system","content":"Your input fields are:\n1. `sentence`
+      (str)\n\nYour output fields are:\n1. `sentiment` (Literal[''positive'', ''negative'',
+      ''neutral''])\n2. `confidence` (float)\n\nAll interactions will be structured
+      in the following way, with the appropriate values filled in.\n\n[[ ## sentence
+      ## ]]\n{sentence}\n\n[[ ## sentiment ## ]]\n{sentiment}        # note: the value
+      you produce must exactly match (no extra characters) one of: positive; negative;
+      neutral\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you
+      produce must be a single float value\n\n[[ ## completed ## ]]\n\nIn adhering
+      to this structure, your objective is: \n        Classify sentiment of a given
+      sentence."},{"role":"user","content":"[[ ## sentence ## ]]\nThis book was super
+      fun to read, though not the last chapter.\n\nRespond with the corresponding
+      output fields, starting with the field `[[ ## sentiment ## ]]` (must be formatted
+      as a valid Python Literal[''positive'', ''negative'', ''neutral'']), then `[[
+      ## confidence ## ]]` (must be formatted as a valid Python float), and then ending
+      with the marker for `[[ ## completed ## ]]`."}],"model":"gpt-4o-mini","max_tokens":1000,"temperature":0.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1208'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=GbK8JXZHsZVcoGYI_S8PkwFEmSU46Oo99u6EgkoA0fs-1741165712-1.0.1.1-wdM43K8m20zKTHb9VzxHV.d6TQi.P2UC_NGijmDyWqH2KSbJMFDUUks.K88r0qNyCUPmurr7_faEmUXRT9OrCIYn28XtDsanw7ECC5mZEaM;
+        _cfuvid=P7hvmMR1hwuZYk7CpAX0sHf7i2_w64BccBH7g8tL5TE-1741165712716-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.65.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.65.3
+      x-stainless-raw-response:
+      - 'true'
+      x-stainless-read-timeout:
+      - '600.0'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFLLTsMwELznKyxzbVDSV2hvcOAKZ9oqMvYm3eLYlr3hIdR/R07aJgiQ
+        uETKzs54Znc/E8Y4Kr5mXO4Fycbp9K6o8rdi9ej0rLUfL/r+dgGH9wdxuH3yd3wSGfb5AJLOrGtp
+        G6eB0Joelh4EQVTNi3meLxdFvuyAxirQkVY7Suc2bdBgOs2m8zQr0vzmxN5blBD4mm0Sxhj77L7R
+        p1Hwztcsm5wrDYQgauDrSxNj3FsdK1yEgIGEIT4ZQGkNgemsbzbs6ooFMIQNGIo/u93WOBuQ8BW2
+        Zmv6FmlNhQqMhHNPdn2zGONdfFA9PH7OQ9UGESObVutT/Xjxr23tvH0OJ/xSr9Bg2JceRLAmeg1k
+        He/QY8LYrptT+y06d942jkqyL2Ci4HS+6vX4sJ4ROj2BZEnoUb3IJ7/olQpIoA6jSXMp5B7UQB3W
+        IlqFdgQko9Q/3fym3SdHU/9HfgCkBEegSudBofyeeGjzEK/3r7bLlDvDPIB/RQklIfi4CQWVaHV/
+        Uzx8BIKmrNDU4J3H/rAqV2bLYlaI1Sxb8uSYfAEAAP//AwDhVxJNZgMAAA==
+    headers:
+      CF-RAY:
+      - 91b8783fde3e7f93-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 05 Mar 2025 09:08:37 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '482'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149998734'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_fe86a8d7e5c1adf21e9de47c26e0e72d
+    status:
+      code: 200
+      message: OK
+version: 1
