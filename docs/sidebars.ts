@@ -11,24 +11,79 @@ const CATEGORY_SECTION_HEADER_MIXIN: SidebarItemCategoryBase = {
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
     {
-      label: "👋 Getting Started",
+      label: "👋 Introduction",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         "introduction",
         {
           type: "doc",
-          label: "Trace LLMs",
+          label: "Quickstart: Track LLM Calls",
           id: "quickstart",
         },
+      ],
+    },
+    {
+      label: "🔄 Iteration",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      
+      items: [
         {
           type: "doc",
-          label: "Trace Applications",
+          label: "Track Application Logic",
           id: "tutorial-tracing_2",
         },
-        "tutorial-weave_models",
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Tracing & Debugging",
+          items: [
+            {
+              type: "doc",
+              label: "Tracing Overview",
+              id: "guides/tracking/tracing",
+            },
+            "guides/tracking/costs",
+            {
+              type: "doc",
+              label: "Logging Media",
+              id: "guides/core-types/media",
+            },
+            "guides/tools/playground",
+            "guides/integrations/index",
+            {
+              type: "doc",
+              label: "Compare Traces",
+              id: "guides/tools/comparison",
+            },
+          ]
+        },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: true,
+          label: "Version Control for Models & Prompts",
+          items: [
+            {
+              type: "doc",
+              label: "App Versioning",
+              id: "tutorial-weave_models",
+            },
+            "guides/core-types/models",
+            "guides/core-types/prompts",
+            "guides/tracking/objects",
+            "guides/tracking/ops",
+          ]
+        },
+      ],
+    },
+    {
+      label: "📊 Evaluation",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      items: [
         {
           type: "doc",
-          label: "Build an Evaluation",
+          label: "Build an Evaluation Pipeline",
           id: "tutorial-eval",
         },
         {
@@ -36,61 +91,39 @@ const sidebars: SidebarsConfig = {
           label: "Evaluate a RAG App",
           id: "tutorial-rag",
         },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Evaluations",
+          items: [
+            "guides/core-types/evaluations",
+            "guides/core-types/datasets",
+            "guides/evaluation/scorers",
+            "guides/evaluation/builtin_scorers",
+          ]
+        },
       ],
     },
     {
-      label: "🤖 Product Walkthrough",
+      label: "🚀 Productionization",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         {
           type: "category",
           collapsible: true,
           collapsed: false,
-          label: "Trace & Debug AI Applications",
-          link: { type: "doc", id: "guides/tracking/index" },
+          label: "Collect Feedback & Examples",
           items: [
-            {
-              type: "category",
-              collapsible: true,
-              collapsed: false,
-              label: "Understanding App Behavior",
-              items: [
-                "guides/tracking/tracing",
-                "guides/tracking/costs",
-                "guides/core-types/media",
-                "guides/tools/comparison",
-                "guides/tracking/redact-pii",
-                "guides/core-types/env-vars",
-              ]
-            },
-            {
-              type: "category",
-              collapsible: true,
-              collapsed: true,
-              label: "Version Control for Prompts & Models",
-              items: [
-                "guides/core-types/prompts", 
-                "guides/core-types/models",
-                "guides/tracking/objects",
-                "guides/tracking/ops",
-              ]
-            }
-          ],
+            "guides/tracking/feedback",
+            "guides/tracking/redact-pii",
+          ]
         },
         {
           type: "category",
           collapsible: true,
           collapsed: false,
-          label: "Evaluation",
-          items: [
-            "guides/core-types/evaluations",
-            "guides/tracking/feedback",
-            "guides/core-types/datasets",
-            {
-              type: "category",
-              collapsible: true,
-              collapsed: true,
-              label: "Online Evaluation",
+          label: "Online Evaluation",
               link: { type: "doc", id: "guides/evaluation/guardrails_and_monitors" },
               items: [
                 {
@@ -106,26 +139,9 @@ const sidebars: SidebarsConfig = {
                   autoAddBaseUrl: true,
                 }
               ],
-            },
-            {
-              type: "category",
-              collapsible: true,
-              collapsed: true,
-              label: "Scoring",
-              items: [
-                "guides/evaluation/scorers", 
-                "guides/evaluation/builtin_scorers",
-                "guides/evaluation/weave_local_scorers"
-              ],
-            }
-          ],
         },
-        "guides/tools/playground",
-        "guides/troubleshooting",
-        "guides/tracking/faqs",
         {
           type: "category",
-
           collapsible: true,
           collapsed: true,
           label: "Tools & Utilities",
@@ -168,7 +184,6 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Frameworks",
           items: [
-            ,
             "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
@@ -189,6 +204,15 @@ const sidebars: SidebarsConfig = {
           type: "doc",
           id: "guides/platform/weave-self-managed",
         }
+      ],
+    },
+    {
+      label: "🛠️ Tools & Resources",
+      ...CATEGORY_SECTION_HEADER_MIXIN,
+      items: [
+        "guides/core-types/env-vars",
+        "guides/troubleshooting",
+        "guides/tracking/faqs",
       ],
     },
   ],
