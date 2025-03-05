@@ -67,6 +67,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
     def test_500_502_503_504_429_retry(self, mock_post):
         # This test has multiple failures, so it needs extra retries!
         os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "6"
+        os.environ["WEAVE_RETRY_MAX_INTERVAL"] = "0.1"
         call_id = generate_id()
 
         resp0 = requests.Response()
@@ -99,6 +100,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
     def test_other_error_retry(self, mock_post):
         # This test has multiple failures, so it needs extra retries!
         os.environ["WEAVE_RETRY_MAX_ATTEMPTS"] = "6"
+        os.environ["WEAVE_RETRY_MAX_INTERVAL"] = "0.1"
         call_id = generate_id()
 
         resp2 = requests.Response()
