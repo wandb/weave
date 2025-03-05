@@ -97,12 +97,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
+        use_wal: bool = True,
+        wal_path: Optional[str] = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(self._flush_calls)
+            self.call_processor = AsyncBatchProcessor(
+                self._flush_calls, use_wal=use_wal, wal_path=wal_path
+            )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
@@ -116,10 +120,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
+    def from_env(
+        cls, should_batch: bool = False, use_wal: bool = True
+    ) -> "RemoteHTTPTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
-        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
+        return RemoteHTTPTraceServer(
+            weave_trace_server_url(), should_batch, use_wal=use_wal
+        )
 
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
