@@ -420,17 +420,20 @@ export const TreeView: React.FC<
     const result: FlattenedNode[] = [];
     const processNode = (node: any, level: number) => {
       const isExpanded = expandedNodes.has(node.id);
+      const filteredChildren = node.childrenIds.filter(childId => {
+        return !filterSet || filterSet.has(childId);
+      });
       result.push({
         id: node.id,
         call: node.call,
         level,
         isExpanded,
         isVisible: true,
-        childrenIds: node.childrenIds,
+        childrenIds: filteredChildren,
       });
 
       if (isExpanded) {
-        node.childrenIds.forEach((childId: string) => {
+        filteredChildren.forEach((childId: string) => {
           const child = traceTreeFlat[childId];
           if (child && (!filterSet || filterSet.has(childId))) {
             processNode(child, level + 1);

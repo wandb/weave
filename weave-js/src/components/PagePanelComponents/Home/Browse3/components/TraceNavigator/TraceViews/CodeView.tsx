@@ -60,6 +60,8 @@ const CallPanel = styled.div`
   height: 50%;
   overflow-y: auto;
   background: #f8fafc;
+  display: flex;
+  flex-direction: column;
 `;
 
 const CallPanelHeader = styled.div`
@@ -267,7 +269,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
   const selectedPeerPathCallIds = useMemo(() => {
     return getSortedPeerPathCallIds(selectedCodeNode, traceTreeFlat);
   }, [selectedCodeNode, traceTreeFlat]);
-
+  console.log(selectedPeerPathCallIds)
   return (
     <Container>
       <TreePanel>
@@ -282,7 +284,7 @@ export const CodeView: React.FC<TraceViewProps> = ({
           />
         ))}
       </TreePanel>
-
+        
       <CallPanel>
         {selectedCodeNode ? (
           <>

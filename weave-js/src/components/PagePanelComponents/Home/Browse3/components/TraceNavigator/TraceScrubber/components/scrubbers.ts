@@ -36,7 +36,7 @@ export const PeerScrubber = createScrubber({
 });
 
 export const CodePathScrubber = createScrubber({
-  label: 'Code Path',
+  label: 'Path',
   description:
     'Navigate through all calls with the same code path as the selected call',
   getNodes: ({traceTreeFlat, selectedCallId}) => {
