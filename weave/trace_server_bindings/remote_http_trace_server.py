@@ -44,10 +44,6 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 
-REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
-REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
-REMOTE_REQUEST_MAX_ATTEMPTS = 6  # Maximum immediate retry attempts
-
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
