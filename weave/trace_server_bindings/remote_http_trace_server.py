@@ -139,9 +139,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # If a single item is too large, we can't send it - raise an error
+        # If a single item is too large, we can't send it -- log an error and drop it
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            raise ValueError(
+            logger.error(
                 f"Single call size ({encoded_bytes} bytes) is too large to send. "
                 f"The maximum size is {self.remote_request_bytes_limit} bytes."
             )
