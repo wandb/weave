@@ -11,9 +11,7 @@ export const TimelineScrubber = createScrubber({
   alwaysEnabled: true,
   getNodes: ({traceTreeFlat}) =>
     Object.values(traceTreeFlat)
-      .sort(
-        (a, b) => Date.parse(a.call.started_at) - Date.parse(b.call.started_at)
-      )
+      .sort((a, b) => a.dfsOrder - b.dfsOrder)
       .map(node => node.id),
 });
 
@@ -32,9 +30,7 @@ export const PeerScrubber = createScrubber({
 
     return Object.values(traceTreeFlat)
       .filter(node => node.call.op_name === currentNode.call.op_name)
-      .sort(
-        (a, b) => Date.parse(a.call.started_at) - Date.parse(b.call.started_at)
-      )
+      .sort((a, b) => a.dfsOrder - b.dfsOrder)
       .map(node => node.id);
   },
 });
@@ -75,10 +71,7 @@ export const SiblingScrubber = createScrubber({
     if (!parentId) {
       return Object.values(traceTreeFlat)
         .filter(node => !node.parentId)
-        .sort(
-          (a, b) =>
-            Date.parse(a.call.started_at) - Date.parse(b.call.started_at)
-        )
+        .sort((a, b) => a.dfsOrder - b.dfsOrder)
         .map(node => node.id);
     }
 

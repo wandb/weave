@@ -1,14 +1,13 @@
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import {useScrollIntoView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/hooks/scrollIntoView';
-import * as Switch from '@wandb/weave/components/Switch';
 import {
   getTagColorClass,
   IconOnlyPill,
   TagColorName,
 } from '@wandb/weave/components/Tag';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {AutoSizer, List} from 'react-virtualized';
 
 import {
   getCostFromCostData,
@@ -24,52 +23,34 @@ import {
 import {TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
-// Width breakpoints
-const WIDTH_BREAKPOINTS = {
-  COMPACT: 250,
-  MEDIUM: 300,
-  LARGE: 350,
-  XLARGE: 500,
-};
-
-// Hook to track container width
-const useContainerWidth = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    if (!containerRef.current) {
-      return;
-    }
-
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setWidth(containerRef.current.offsetWidth);
-      }
-    };
-
-    const resizeObserver = new ResizeObserver(updateWidth);
-    resizeObserver.observe(containerRef.current);
-    updateWidth(); // Initial measurement
-
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  return {containerRef, width};
-};
-
-interface TreeNodeProps {
+interface FlattenedNode {
   id: string;
   call: TraceCallSchema;
+  level: number;
+  isExpanded: boolean;
+  isVisible: boolean;
   childrenIds: string[];
+}
+
+interface TreeNodeProps {
+  node: FlattenedNode;
+  style: React.CSSProperties;
   traceTreeFlat: TraceViewProps['traceTreeFlat'];
   selectedCallId?: string;
   onCallSelect: (id: string) => void;
-  level?: number;
+  onToggleExpand: (id: string) => void;
   filterCallIds?: Set<string>;
+  deemphasizeCallIds?: string[];
 }
 
-type NodeType = 'agent' | 'tool' | 'llm' | 'model' | 'evaluation' | 'none';
+type NodeType =
+  | 'agent'
+  | 'tool'
+  | 'llm'
+  | 'model'
+  | 'evaluation'
+  | 'scorer'
+  | 'none';
 
 // Helper function to get call type icon
 const getCallTypeIcon = (type: NodeType): IconName => {
@@ -86,6 +67,8 @@ const getCallTypeIcon = (type: NodeType): IconName => {
       return 'model';
     case 'evaluation':
       return 'number';
+    case 'scorer':
+      return 'checkmark-circle';
     default:
       return 'circle';
   }
@@ -103,6 +86,8 @@ const opTypeToColor = (typeName: NodeType): TagColorName => {
       return 'green';
     case 'evaluation':
       return 'cactus';
+    case 'scorer':
+      return 'magenta';
     default:
       return 'moon';
   }
@@ -117,6 +102,9 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   }
   if (spanName.includes('tool')) {
     return 'tool';
+  }
+  if (spanName.includes('score')) {
+    return 'scorer';
   }
   if (
     spanName.includes('completion') ||
@@ -140,22 +128,17 @@ const spanNameToTypeHeuristic = (spanName: string): NodeType => {
   return 'none';
 };
 
-const TreeNode: React.FC<
-  TreeNodeProps & {containerWidth: number; deemphasizeCallIds?: string[]}
-> = ({
-  id,
-  call,
-  childrenIds,
+const TreeNode: React.FC<TreeNodeProps> = ({
+  node,
+  style,
   traceTreeFlat,
   selectedCallId,
   onCallSelect,
-  level = 0,
+  onToggleExpand,
   filterCallIds,
   deemphasizeCallIds,
-  containerWidth,
 }) => {
-  const nodeRef = React.useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = React.useState(true);
+  const {id, call, level, isExpanded, childrenIds} = node;
   const duration = call.ended_at
     ? Date.parse(call.ended_at) - Date.parse(call.started_at)
     : null;
@@ -170,174 +153,126 @@ const TreeNode: React.FC<
   const opTypeColor = opTypeToColor(typeName);
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
   const isDeemphasized = deemphasizeCallIds?.includes(id);
-
-  // Auto-expand when filtering
-  useEffect(() => {
-    if (filterCallIds) {
-      setIsExpanded(true);
-    }
-  }, [filterCallIds]);
-
-  useScrollIntoView(nodeRef, id === selectedCallId);
-
-  // If filtering is active and this node is not in the filter, don't show it
-  if (filterCallIds && !filterCallIds.has(id)) {
-    return null;
-  }
-
-  // Filter child IDs to only those in the filter (if filtering is active)
-  const filteredChildrenIds = filterCallIds
-    ? childrenIds.filter(childId => filterCallIds.has(childId))
-    : childrenIds;
-
-  const hasChildren = filteredChildrenIds.length > 0;
+  const hasChildren = childrenIds.length > 0;
   const statusCode = traceCallStatusCode(call);
 
-  const showTypeIcon = containerWidth >= WIDTH_BREAKPOINTS.LARGE;
-  const showDuration = containerWidth >= WIDTH_BREAKPOINTS.MEDIUM;
-  const showStatusIcon = containerWidth >= WIDTH_BREAKPOINTS.COMPACT;
-  const usageIconsOnly = containerWidth < WIDTH_BREAKPOINTS.XLARGE;
-  const indentMultiplier = Math.max(4, Math.min(32, containerWidth / 50));
+  const showTypeIcon = true;
+  const showDuration = true;
+  const showStatusIcon = true;
+  const usageIconsOnly = false;
+  const indentMultiplier = 10;
 
   return (
-    <div className="flex flex-col">
-      <span ref={nodeRef} className="w-full px-4">
-        <Button
-          variant={id === selectedCallId ? 'secondary' : 'ghost'}
-          active={id === selectedCallId}
-          onClick={() => onCallSelect(id)}
-          className="h-[32px] w-full justify-start px-8 text-left text-sm "
-          style={{
-            opacity: isDeemphasized ? 0.6 : 1,
-            // borderLeft: `4px solid ${opColor}`,
-          }}>
-          <div className="flex w-full items-center justify-between gap-8">
-            <div className="flex-0 flex min-w-0 items-center">
-              {showTypeIcon ? (
-                <IconOnlyPill
-                  icon={getCallTypeIcon(typeName)}
-                  color={opTypeColor}
-                  isInteractive={false}
-                />
-              ) : (
-                <div
-                  className={`h-8 w-8 rounded-full ${getTagColorClass(
-                    opTypeColor
-                  )}`}
-                />
-              )}
-            </div>
-            {/* Left section with indentation, chevron, status, type icon, and name */}
-            <div className="flex min-w-0 flex-1 items-center">
-              <div style={{minWidth: level * indentMultiplier}} />
-              {hasChildren ? (
-                <Icon
-                  name={chevronIcon}
-                  size="small"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setIsExpanded(!isExpanded);
-                  }}
-                  className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-200"
-                />
-              ) : (
-                <div className="w-4" />
-              )}
-
-              {/* <Icon
-                name={getCallTypeIcon(typeName)}
+    <div style={style}>
+      <Button
+        variant={id === selectedCallId ? 'secondary' : 'ghost'}
+        active={id === selectedCallId}
+        onClick={() => onCallSelect(id)}
+        className="h-[32px] w-full justify-start px-8 text-left text-sm"
+        style={{
+          opacity: isDeemphasized ? 0.6 : 1,
+        }}>
+        <div className="flex w-full items-center justify-between gap-8">
+          <div className="flex-0 flex min-w-0 items-center">
+            {showTypeIcon ? (
+              <IconOnlyPill
+                icon={getCallTypeIcon(typeName)}
+                color={opTypeColor}
+                isInteractive={false}
+              />
+            ) : (
+              <div
+                className={`h-8 w-8 rounded-full ${getTagColorClass(
+                  opTypeColor
+                )}`}
+              />
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 items-center">
+            <div style={{minWidth: level * indentMultiplier}} />
+            {hasChildren ? (
+              <Icon
+                name={chevronIcon}
                 size="small"
-                className="mx-1 shrink-0 text-moon-500"
-                style={{backgroundColor: opColor, borderRadius: '50%'}}
-              /> */}
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onToggleExpand(id);
+                }}
+                className="p-0.5 shrink-0 cursor-pointer rounded hover:bg-moon-200"
+              />
+            ) : (
+              <div className="w-4" />
+            )}
 
-              <div className="ml-2 truncate font-medium">
-                {getCallDisplayName(call)}
-              </div>
-            </div>
-
-            {/* Right section with metrics */}
-            <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
-              {showDuration && (
-                <>
-                  {usageIconsOnly ? (
-                    <>
-                      <div className="w-20 text-right">
-                        {cost && (
-                          <TraceStat
-                            label={''}
-                            tooltip={<>{cost && costToolTipContent}<br />{tokens && tokenToolTipContent}</>}
-                            icon="credit-card-payment"
-                            className="text-xs text-moon-400"
-                          />
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {cost && (
-                        <div className="w-64 text-right">
-                          <TraceStat
-                            label={cost}
-                            tooltip={costToolTipContent}
-                            icon="credit-card-payment"
-                            className="text-xs text-moon-400"
-                          />
-                        </div>
-                      )}
-                      {tokens && (
-                        <div className="w-64 text-right">
-                          <TraceStat
-                            icon="database-artifacts"
-                            label={tokens.toString()}
-                            tooltip={tokenToolTipContent}
-                            className="text-xs text-moon-400"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div className="w-32 text-right">
-                    {duration !== null ? formatDuration(duration) : ''}
-                  </div>
-                </>
-              )}
-
-              {showStatusIcon ? (
-                <StatusChip value={statusCode} iconOnly />
-              ) : (
-                <div
-                  className={`h-8 w-8 rounded-full ${getTagColorClass(
-                    STATUS_INFO[statusCode].color
-                  )}`}
-                />
-              )}
+            <div className="ml-2 truncate font-medium">
+              {getCallDisplayName(call)}
             </div>
           </div>
-        </Button>
-      </span>
-      {isExpanded && hasChildren && (
-        <div className="flex flex-col">
-          {filteredChildrenIds.map(childId => {
-            const child = traceTreeFlat[childId];
-            return (
-              <TreeNode
-                key={childId}
-                id={childId}
-                call={child.call}
-                childrenIds={child.childrenIds}
-                traceTreeFlat={traceTreeFlat}
-                selectedCallId={selectedCallId}
-                onCallSelect={onCallSelect}
-                level={level + 1}
-                filterCallIds={filterCallIds}
-                containerWidth={containerWidth}
-                deemphasizeCallIds={deemphasizeCallIds}
+
+          <div className="ml-8 flex shrink-0 items-center gap-8 text-xs text-moon-400">
+            {showDuration && (
+              <>
+                {usageIconsOnly ? (
+                  <>
+                    <div className="w-20 text-right">
+                      {cost && (
+                        <TraceStat
+                          label={''}
+                          tooltip={
+                            <>
+                              {cost && costToolTipContent}
+                              <br />
+                              {tokens && tokenToolTipContent}
+                            </>
+                          }
+                          icon="credit-card-payment"
+                          className="text-xs text-moon-400"
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {cost && (
+                      <div className="w-64 text-right">
+                        <TraceStat
+                          label={cost}
+                          tooltip={costToolTipContent}
+                          icon="credit-card-payment"
+                          className="text-xs text-moon-400"
+                        />
+                      </div>
+                    )}
+                    {tokens && (
+                      <div className="w-64 text-right">
+                        <TraceStat
+                          icon="database-artifacts"
+                          label={tokens.toString()}
+                          tooltip={tokenToolTipContent}
+                          className="text-xs text-moon-400"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="w-32 text-right">
+                  {duration !== null ? formatDuration(duration) : ''}
+                </div>
+              </>
+            )}
+
+            {showStatusIcon ? (
+              <StatusChip value={statusCode} iconOnly />
+            ) : (
+              <div
+                className={`h-8 w-8 rounded-full ${getTagColorClass(
+                  STATUS_INFO[statusCode].color
+                )}`}
               />
-            );
-          })}
+            )}
+          </div>
         </div>
-      )}
+      </Button>
     </div>
   );
 };
@@ -354,36 +289,32 @@ interface TreeViewHeaderProps {
 const TreeViewHeader: React.FC<TreeViewHeaderProps> = ({
   searchQuery,
   onSearchChange,
-  selectedView,
-  onViewChange,
-  showDollars,
-  onShowDollarsChange,
 }) => {
   return (
-    <div className="flex items-center gap-2 p-2">
+    <div className="flex items-center px-8 py-4 text-sm">
       <TextField
         value={searchQuery}
         onChange={onSearchChange}
-        placeholder="Search"
-        icon="search"
+        placeholder="Filter by op name"
+        icon="filter-alt"
+        extraActions={
+          searchQuery !== '' && (
+            <div className="mr-6 cursor-pointer rounded-sm p-1 hover:bg-moon-200">
+              <Icon
+                name="close"
+                size="small"
+                onClick={() => onSearchChange('')}
+              />
+            </div>
+          )
+        }
       />
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-moon-500">Time</span>
-        <Switch.Root
-          size="small"
-          checked={showDollars}
-          onCheckedChange={onShowDollarsChange}>
-          <Switch.Thumb size="small" checked={showDollars} />
-        </Switch.Root>
-        <span className="text-sm text-moon-500">Cost</span>
-      </div>
     </div>
   );
 };
 
 export const FilterableTreeView: React.FC<TraceViewProps> = props => {
   const [searchQuery, setSearchQuery] = useState('');
-
   const [showDollars, setShowDollars] = useState(false);
 
   const [filteredCallIds, deemphasizeCallIds] = useMemo(() => {
@@ -397,8 +328,6 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
         );
       })
       .map(([id]) => id);
-
-    // Recursively include all ancestors of the filtered calls
 
     const foundCallIds = new Set<string>(filtered);
     const itemsToProcess = [...filtered];
@@ -444,7 +373,10 @@ export const FilterableTreeView: React.FC<TraceViewProps> = props => {
 };
 
 export const TreeView: React.FC<
-  TraceViewProps & {filterCallIds?: string[]; deemphasizeCallIds?: string[]}
+  TraceViewProps & {
+    filterCallIds?: string[];
+    deemphasizeCallIds?: string[];
+  }
 > = ({
   traceTreeFlat,
   selectedCallId,
@@ -452,61 +384,129 @@ export const TreeView: React.FC<
   filterCallIds,
   deemphasizeCallIds,
 }) => {
-  const {containerRef, width} = useContainerWidth();
+  // Initialize expandedNodes with all node IDs
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
+    () => new Set(Object.keys(traceTreeFlat))
+  );
+
   const filterSet = useMemo(
     () => (filterCallIds ? new Set(filterCallIds) : undefined),
     [filterCallIds]
   );
 
+  const listRef = useRef<List>(null);
+
   const rootNodes = useMemo(() => {
     if (!filterCallIds || filterCallIds.length === 0) {
-      // No filtering - show the normal tree with root nodes
       return Object.values(traceTreeFlat).filter(
         node => !node.parentId || !traceTreeFlat[node.parentId]
       );
     }
 
-    // When filtering, we only want to show nodes that are in the filter
     const filterIdSet = new Set(filterCallIds);
-
-    // Create a special set of "root" nodes for the filtered view
-    // These are nodes that are in the filter but don't have parents in the filter
-    const filteredRootNodes = Object.values(traceTreeFlat).filter(node => {
+    return Object.values(traceTreeFlat).filter(node => {
       if (!filterIdSet.has(node.id)) {
-        return false; // Node not in filter
+        return false;
       }
-
-      // Check if this node has a parent that's also in the filter
       return (
         !node.parentId ||
         !traceTreeFlat[node.parentId] ||
         !filterIdSet.has(node.parentId)
       );
     });
-
-    return filteredRootNodes;
   }, [traceTreeFlat, filterCallIds]);
 
+  const flattenedNodes = useMemo(() => {
+    const result: FlattenedNode[] = [];
+    const processNode = (node: any, level: number) => {
+      const isExpanded = expandedNodes.has(node.id);
+      result.push({
+        id: node.id,
+        call: node.call,
+        level,
+        isExpanded,
+        isVisible: true,
+        childrenIds: node.childrenIds,
+      });
+
+      if (isExpanded) {
+        node.childrenIds.forEach((childId: string) => {
+          const child = traceTreeFlat[childId];
+          if (child && (!filterSet || filterSet.has(childId))) {
+            processNode(child, level + 1);
+          }
+        });
+      }
+    };
+
+    rootNodes.forEach(node => processNode(node, 0));
+    return result;
+  }, [rootNodes, traceTreeFlat, expandedNodes, filterSet]);
+
+  const handleToggleExpand = (id: string) => {
+    const newExpandedNodes = new Set(expandedNodes);
+    if (newExpandedNodes.has(id)) {
+      newExpandedNodes.delete(id);
+    } else {
+      newExpandedNodes.add(id);
+    }
+    setExpandedNodes(newExpandedNodes);
+  };
+
+  const rowRenderer = ({index, style}: any) => {
+    const node = flattenedNodes[index];
+    return (
+      <TreeNode
+        key={node.id}
+        node={node}
+        style={style}
+        traceTreeFlat={traceTreeFlat}
+        selectedCallId={selectedCallId}
+        onCallSelect={onCallSelect}
+        onToggleExpand={handleToggleExpand}
+        filterCallIds={filterSet}
+        deemphasizeCallIds={deemphasizeCallIds}
+      />
+    );
+  };
+
+  // Scroll when selectedCallId changes
+  useEffect(() => {
+    const scrollToSelectedRow = () => {
+      if (!selectedCallId || !listRef.current) {
+        return;
+      }
+
+      const selectedIndex = flattenedNodes.findIndex(
+        (node: FlattenedNode) => node.id === selectedCallId
+      );
+      if (selectedIndex === -1) {
+        return;
+      }
+
+      listRef.current.scrollToRow(selectedIndex);
+    };
+
+    const timer = setTimeout(scrollToSelectedRow, 0);
+    return () => clearTimeout(timer);
+  }, [selectedCallId, flattenedNodes]);
+
   return (
-    <div className="h-full overflow-hidden" ref={containerRef}>
-      <div className="h-[calc(100%)] overflow-y-auto pb-4 pt-4">
-        <div className="flex flex-col">
-          {rootNodes.map(node => (
-            <TreeNode
-              key={node.id}
-              id={node.id}
-              call={node.call}
-              childrenIds={node.childrenIds}
-              traceTreeFlat={traceTreeFlat}
-              selectedCallId={selectedCallId}
-              onCallSelect={onCallSelect}
-              filterCallIds={filterSet}
-              deemphasizeCallIds={deemphasizeCallIds}
-              containerWidth={width}
-            />
-          ))}
-        </div>
-      </div>
+    <div className="h-full overflow-hidden">
+      <AutoSizer>
+        {({width, height}) => (
+          <List
+            ref={listRef}
+            width={width}
+            height={height}
+            rowCount={flattenedNodes.length}
+            rowHeight={32}
+            rowRenderer={rowRenderer}
+            overscanRowCount={10}
+            scrollToAlignment="auto"
+          />
+        )}
+      </AutoSizer>
     </div>
   );
 };
