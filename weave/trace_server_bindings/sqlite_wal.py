@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 class SQLiteWriteAheadLog(Generic[T]):
@@ -143,7 +145,13 @@ class SQLiteWriteAheadLog(Generic[T]):
             items = []
             for row in cursor.fetchall():
                 id, item_type, item_data = row
-                item = json.loads(item_data)
+                try:
+                    item = json.loads(item_data)
+                except json.JSONDecodeError:
+                    logger.warning(
+                        f"Skipping item because failed to parse item data from WAL: {item_data}"
+                    )
+                    continue
                 item["_wal_id"] = id  # Add the WAL ID for later deletion
                 items.append({"type": item_type, "data": item})
 
