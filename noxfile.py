@@ -95,7 +95,7 @@ def tests(session, shard):
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "trace": ["trace/"],
+        "trace": ["trace/", "trace_server_bindings/"],
         "trace_server": ["trace_server/"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
