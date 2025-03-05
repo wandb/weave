@@ -82,58 +82,19 @@ class AsyncBatchProcessor(Generic[T]):
                 return
 
             logger.info(f"Recovering {len(items)} items from WAL")
-
-            # Group items by type
-            recovered_items = []
-            wal_ids_to_delete = []
-
-            for item in items:
-                wal_id = item["data"].pop("_wal_id", None)
-                if wal_id is not None:
-                    wal_ids_to_delete.append(wal_id)
-
-                # This is a simplified recovery that assumes the items can be
-                # directly reconstructed from the WAL data.
-                # In a real implementation, you would need to handle the specific
-                # item types and their reconstruction.
-                try:
-                    # Try to import the class dynamically
-                    item_type = item["type"]
-                    module_parts = item_type.split(".")
-                    if len(module_parts) == 1:
-                        # If no module specified, assume it's from the current module
-                        # This is a simplification and might not work for all cases
-                        from weave.trace_server_bindings.remote_http_trace_server import (
-                            EndBatchItem,
-                            StartBatchItem,
-                        )
-
-                        if item_type == "StartBatchItem":
-                            from weave.trace_server import trace_server_interface as tsi
-
-                            req = tsi.CallStartReq.model_validate(item["data"]["req"])
-                            recovered_items.append(StartBatchItem(req=req))
-                        elif item_type == "EndBatchItem":
-                            from weave.trace_server import trace_server_interface as tsi
-
-                            req = tsi.CallEndReq.model_validate(item["data"]["req"])
-                            recovered_items.append(EndBatchItem(req=req))
-                except Exception as e:
-                    logger.exception(f"Error recovering item from WAL: {e}")
-
+            starting_wal_ids = {x["_wal_id"] for x in items if x["_wal_id"] is not None}
+            wal_ids_to_keep = set()
             # Add recovered items to the queue
-            for item in recovered_items:
+            for item in items:
                 try:
-                    self.queue.put_nowait(cast(T, item))
+                    self.queue.put_nowait(cast(T, item["data"]))
                 except Full:
-                    logger.warning(
-                        f"Queue is full during recovery. Dropping item. Max queue size: {self.queue.maxsize}"
-                    )
+                    wal_ids_to_keep.add(item["_wal_id"])
 
-            # Delete processed items from the WAL
-            self.wal.delete_items(wal_ids_to_delete)
-
-            logger.info(f"Recovered {len(recovered_items)} items from WAL")
+            # Delete successfully queued items from the WAL
+            wal_ids_to_delete = starting_wal_ids - wal_ids_to_keep
+            self.wal.delete_items(list(wal_ids_to_delete))
+            logger.info(f"Recovered {len(wal_ids_to_delete)} items from WAL")
         except Exception as e:
             logger.exception(f"Error recovering from WAL: {e}")
 

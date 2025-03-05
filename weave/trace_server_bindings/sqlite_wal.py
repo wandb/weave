@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, NotRequired, TypedDict, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 logger = logging.getLogger(__name__)
+
+
+class ItemDict(TypedDict):
+    type: str
+    data: BaseModel
+    _wal_id: NotRequired[int]
 
 
 class SQLiteWriteAheadLog(Generic[T]):
@@ -112,7 +117,7 @@ class SQLiteWriteAheadLog(Generic[T]):
                 )
             """)
 
-    def get_all_items(self, item_types: list[str] | None = None) -> list[dict]:
+    def get_all_items(self, item_types: list[str] | None = None) -> list[ItemDict]:
         """Get all items from the write-ahead log.
 
         Args:
@@ -144,16 +149,15 @@ class SQLiteWriteAheadLog(Generic[T]):
 
             items = []
             for row in cursor.fetchall():
-                id, item_type, item_data = row
+                id_, item_type, item_data = row
                 try:
-                    item = json.loads(item_data)
-                except json.JSONDecodeError:
+                    data = _load_pydantic(item_type, item_data)
+                except Exception:
                     logger.warning(
                         f"Skipping item because failed to parse item data from WAL: {item_data}"
                     )
                     continue
-                item["_wal_id"] = id  # Add the WAL ID for later deletion
-                items.append({"type": item_type, "data": item})
+                items.append(ItemDict(type=item_type, data=data, _wal_id=id_))
 
             return items
 
@@ -179,3 +183,17 @@ class SQLiteWriteAheadLog(Generic[T]):
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute(f"DELETE FROM {self.table_name}")
+
+
+def _load_pydantic(item_type: str, item_data: str) -> BaseModel:
+    """Loads a pydantic model from a string."""
+    if item_type == "StartBatchItem":
+        from weave.trace_server_bindings.remote_http_trace_server import StartBatchItem
+
+        return StartBatchItem.model_validate_json(item_data)
+    elif item_type == "EndBatchItem":
+        from weave.trace_server_bindings.remote_http_trace_server import EndBatchItem
+
+        return EndBatchItem.model_validate_json(item_data)
+
+    raise ValueError(f"Unknown item type: {item_type}")
